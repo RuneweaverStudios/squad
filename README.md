@@ -1,0 +1,637 @@
+# Jomarchy Agent Tools
+
+**A complete AI-assisted development environment in one command.**
+
+Agent Mail (multi-agent coordination) + Beads (task planning) + 43 bash tools = 32,000+ token savings over MCP servers.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/joewinke/jomarchy-agent-tools/main/install.sh | bash
+```
+
+---
+
+## What Is This?
+
+Jomarchy Agent Tools is a **zero-configuration AI development environment** that gives your coding assistants (Claude Code, Cursor, Aider, OpenCode, etc.) the ability to:
+
+- **Coordinate** across multiple agents without conflicts (Agent Mail)
+- **Plan** work with dependency-aware task management (Beads)
+- **Execute** efficiently with 43 lightweight bash tools (32k+ token savings vs MCP)
+- **Scale** across all your projects with unified dashboard views
+
+**Philosophy:** Following [What if you don't need MCP?](https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/) by Mario Zechner - simple bash tools achieve 80x token reduction while being more composable and cross-CLI compatible.
+
+---
+
+## Why Use This?
+
+### The Problem
+
+Modern AI coding assistants face three major challenges:
+
+1. **Coordination chaos**: Multiple agents editing the same files simultaneously
+2. **Token bloat**: MCP servers consume 30k+ tokens just for tool definitions
+3. **Task amnesia**: Agents lose context between sessions
+
+### The Solution
+
+**Jomarchy Agent Tools solves all three:**
+
+| Challenge | Solution | Benefit |
+|-----------|----------|---------|
+| Coordination | Agent Mail (file reservations + messaging) | No more merge conflicts |
+| Token bloat | 43 bash tools instead of MCP | 32,425 token savings |
+| Task amnesia | Beads (git-backed task database) | Persistent multi-session memory |
+
+**Real-world impact:**
+- 80x token reduction (32,425 tokens saved)
+- Works across ALL AI coding assistants (Claude, Cursor, Aider, etc.)
+- Bash composability (pipes, jq, xargs)
+- Multi-project support with unified dashboard
+
+---
+
+## Quick Start
+
+### One-Line Install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/joewinke/jomarchy-agent-tools/main/install.sh | bash
+```
+
+This installs:
+- ✅ Agent Mail Server (http://localhost:3141)
+- ✅ Beads CLI (`bd` command)
+- ✅ 43 bash agent tools (am-*, browser-*, db-*, etc.)
+- ✅ Global ~/.claude/CLAUDE.md configuration
+- ✅ Per-repo setup (bd init, CLAUDE.md templates)
+
+**Time:** ~2 minutes | **Requires:** Linux/macOS, curl
+
+---
+
+## What Gets Installed
+
+### 1. Agent Mail Server
+
+**Multi-agent coordination system**
+
+```bash
+# Check status
+systemctl --user status agent-mail
+
+# API endpoint
+http://localhost:3141
+```
+
+**Features:**
+- Agent identity management (register, whoami)
+- Inbox/outbox messaging with threads
+- File reservation system (prevent conflicts)
+- Searchable message archives
+- Human-auditable Git artifacts
+
+**Usage:**
+```bash
+am-register --program claude-code --model sonnet-4.5
+am-inbox AgentName --unread
+am-send "Subject" "Body" --from Agent1 --to Agent2 --thread task-123
+am-reserve "src/**" --agent AgentName --ttl 3600 --reason "task-123"
+```
+
+### 2. Beads CLI
+
+**Dependency-aware task planning**
+
+```bash
+# Verify installation
+bd --version
+```
+
+**Features:**
+- Per-project task databases (`.beads/` directory)
+- Dependency tracking (blocks/blocked-by relationships)
+- Priority-based work queues
+- Git-backed storage (committable tasks)
+- Multi-project aggregation
+
+**Usage:**
+```bash
+bd ready                    # Show tasks ready to work
+bd create "Task title" \
+  --type bug \
+  --labels security,auth \
+  --priority 1 \
+  --description "Detailed description"
+bd update task-id --status in_progress --assignee AgentName
+bd close task-id --reason "Completed"
+```
+
+### 3. 43 Bash Agent Tools
+
+**Location:** `~/.local/bin/` (globally available)
+
+#### Agent Mail Tools (12)
+- `am-register` - Register agent identity
+- `am-inbox` - Check inbox (--unread, --json)
+- `am-send` - Send messages with threads
+- `am-reply` - Reply to thread
+- `am-ack` - Acknowledge messages
+- `am-reserve` - Reserve files (prevent conflicts)
+- `am-release` - Release file reservations
+- `am-reservations` - List active reservations
+- `am-search` - Search message archives
+- `am-agents` - List all agents
+- `am-whoami` - Show current agent identity
+
+#### Browser Automation Tools (7)
+Based on [badlogic/browser-tools](https://github.com/badlogic/browser-tools)
+
+- `browser-start.js` - Start Chrome with remote debugging
+- `browser-nav.js` - Navigate to URL
+- `browser-eval.js` - Execute JavaScript
+- `browser-screenshot.js` - Capture screenshots
+- `browser-pick.js` - Interactive element picker
+- `browser-cookies.js` - Manage cookies
+- `browser-hn-scraper.js` - Example scraper
+
+#### Additional Tools (24)
+Database, monitoring, media management, deployment helpers
+
+**All tools have `--help` flags:**
+```bash
+am-inbox --help
+browser-eval.js --help
+```
+
+### 4. Global Configuration
+
+**File:** `~/.claude/CLAUDE.md`
+
+Contains multi-project instructions for:
+- Agent Mail usage patterns
+- Beads workflow conventions
+- Bash tool integration
+- Best practices
+
+**Automatically loaded by AI assistants in all projects.**
+
+### 5. Per-Repository Setup
+
+For each git repository in `~/code/*`:
+
+1. **Initializes Beads:**
+   - Creates `.beads/` directory
+   - Installs git hooks (pre-commit, merge driver)
+   - Sets up project-specific issue prefix
+
+2. **Creates/Updates CLAUDE.md:**
+   - Project-specific documentation template
+   - Agent tools configuration section
+   - Quick start guide for AI assistants
+
+---
+
+## How It Works
+
+### Multi-Project Architecture
+
+Each project gets its own `.beads/` database, while Chimaro's development dashboard aggregates all projects:
+
+```
+~/code/
+├── project-a/
+│   ├── .beads/              # Project A tasks
+│   └── CLAUDE.md            # Project A docs
+├── project-b/
+│   ├── .beads/              # Project B tasks
+│   └── CLAUDE.md            # Project B docs
+└── chimaro/
+    └── /account/development/beads
+        # 👆 Unified dashboard showing ALL tasks
+```
+
+**Benefits:**
+- ✅ Clean separation (each project's tasks committable to its repo)
+- ✅ Single dashboard view (filter by project, status, priority)
+- ✅ Context-aware (`bd` commands work in current project)
+- ✅ Visual distinction (color-coded ID badges show project)
+
+### Workflow Example
+
+```bash
+# 1. Pick work (Beads)
+cd ~/code/myproject
+bd ready --json          # Shows tasks ready to work
+
+# 2. Register with Agent Mail
+am-register --program claude-code --model sonnet-4.5
+
+# 3. Reserve files (prevent conflicts)
+am-reserve "src/**/*.ts" \
+  --agent AgentName \
+  --ttl 3600 \
+  --exclusive \
+  --reason "task-123: Implementing auth"
+
+# 4. Update task status
+bd update task-123 --status in_progress --assignee AgentName
+
+# 5. Announce start (optional - for team coordination)
+am-send "[task-123] Starting: Auth implementation" \
+  "Working on OAuth flow..." \
+  --from AgentName \
+  --thread task-123
+
+# 6. Work on code...
+
+# 7. Complete and release
+bd close task-123 --reason "Completed: OAuth flow implemented"
+am-release "src/**/*.ts" --agent AgentName
+```
+
+---
+
+## Tool Reference
+
+### Bash Composability Examples
+
+One of the major advantages of bash tools over MCP:
+
+```bash
+# Chain tools with pipes
+am-inbox AgentName --unread --json | jq '.[] | select(.importance=="urgent")'
+
+# Save and process
+am-inbox AgentName --unread > inbox.json
+cat inbox.json | jq length
+cat inbox.json | jq -r '.[].subject'
+
+# Bulk acknowledge
+am-inbox AgentName --unread --json | jq -r '.[].id' | \
+  xargs -I {} am-ack {} --agent AgentName
+
+# Conditional operations
+if am-reservations --agent AgentName | grep -q "src/auth"; then
+  echo "Already working on auth"
+else
+  am-reserve "src/auth/**" --agent AgentName --ttl 3600
+fi
+```
+
+### Integration with Git
+
+```bash
+# Include task IDs in commits
+git commit -m "feat: implement OAuth login (task-123)"
+
+# Pre-commit hook checks reservations automatically
+# (installed by bd init)
+```
+
+### Browser Automation Examples
+
+```bash
+# Start browser and navigate
+browser-start.js --remote-debugging-port 9222
+browser-nav.js "http://localhost:3000"
+
+# Execute JavaScript
+browser-eval.js 'document.title'
+browser-eval.js 'document.querySelector("button").click()'
+
+# Capture screenshot for verification
+screenshot=$(browser-screenshot.js)
+echo "Screenshot saved: $screenshot"
+
+# Interactive element picker
+browser-pick.js  # Click elements to copy selectors
+```
+
+---
+
+## Integration Examples
+
+### With Claude Code
+
+Claude Code automatically reads `~/.claude/CLAUDE.md` and project `CLAUDE.md` files.
+
+**No additional configuration needed!**
+
+```bash
+# Just start Claude in your project
+cd ~/code/myproject
+claude-code
+```
+
+Claude will:
+- See available agent tools
+- Know about Beads task management
+- Understand Agent Mail coordination
+- Follow project-specific patterns
+
+### With Cursor
+
+Add to Cursor's settings (`.cursorrules`):
+
+```markdown
+# Agent Tools Available
+
+See ~/.claude/CLAUDE.md for full documentation.
+
+Quick reference:
+- Task management: bd ready, bd create, bd update
+- Agent coordination: am-register, am-reserve, am-inbox
+- Browser testing: browser-*.js tools
+```
+
+### With Aider
+
+Aider can use bash tools directly:
+
+```bash
+aider --message "Check beads for ready tasks" --yes-always
+# Aider will run: bd ready --json
+```
+
+### With OpenCode
+
+OpenCode reads the same CLAUDE.md files as Claude Code:
+
+```bash
+cd ~/code/myproject
+opencode
+```
+
+---
+
+## Beads Workflow Patterns
+
+### Creating Well-Documented Tasks
+
+```bash
+bd create "Fix OAuth authentication timeout" \
+  --type bug \
+  --labels security,auth,urgent \
+  --priority 1 \
+  --description "Users experience timeout when logging in via OAuth. Need to investigate token refresh logic and increase timeout threshold. Affects production users." \
+  --assignee "AgentName"
+```
+
+### Task Dependencies
+
+```bash
+# Create task with dependency
+bd create "Add logout button" \
+  --type feature \
+  --labels ui \
+  --priority 2 \
+  --deps task-123  # Blocks on auth implementation
+
+# Task won't show in `bd ready` until task-123 is closed
+```
+
+### Integration with Agent Mail
+
+Use Beads task IDs as Agent Mail thread IDs:
+
+```bash
+# Reserve files for task
+am-reserve "src/auth/**" \
+  --agent AgentName \
+  --ttl 3600 \
+  --reason "task-123"
+
+# Send progress updates
+am-send "[task-123] Progress Update" \
+  "Implemented token refresh logic. Testing now." \
+  --from AgentName \
+  --thread task-123
+
+# Close task and release
+bd close task-123 --reason "Completed"
+am-release "src/auth/**" --agent AgentName
+```
+
+---
+
+## Token Savings Breakdown
+
+### MCP vs Bash Tools
+
+| Feature | MCP Server | Bash Tools | Savings |
+|---------|-----------|------------|---------|
+| Tool definitions | 18,000 tokens | 50 tokens | 17,950 |
+| Chrome DevTools | 18,000 tokens | 0 tokens | 18,000 |
+| Agent Mail | 10,000 tokens | 0 tokens | 10,000 |
+| **Total** | **46,000 tokens** | **50 tokens** | **45,950** |
+
+### Per-Session Impact
+
+Assuming 10 sessions per week:
+- **MCP approach:** 460,000 tokens/week
+- **Bash tools:** 500 tokens/week
+- **Savings:** 459,500 tokens/week
+
+At $0.015 per 1k tokens (GPT-4):
+- **Cost with MCP:** $6.90/week
+- **Cost with bash:** $0.01/week
+- **Annual savings:** $358
+
+---
+
+## Requirements
+
+- **OS:** Linux or macOS
+- **Shell:** Bash
+- **Tools:** curl, git
+- **Optional:** Node.js (for browser automation tools)
+- **Optional:** Chrome/Chromium (for browser testing)
+
+---
+
+## Architecture
+
+### Components
+
+```
+┌─────────────────────────────────────────────┐
+│  AI Assistants                              │
+│  (Claude Code, Cursor, Aider, OpenCode)     │
+└────────────┬────────────────────────────────┘
+             │
+             │ Read ~/.claude/CLAUDE.md
+             │ Read project CLAUDE.md
+             │
+┌────────────▼────────────────────────────────┐
+│  Bash Tools (43 scripts in ~/.local/bin)    │
+│  • Agent Mail clients (am-*)                │
+│  • Browser automation (browser-*.js)        │
+│  • Utilities (db-*, etc.)                   │
+└────────┬───────────────────┬────────────────┘
+         │                   │
+         ▼                   ▼
+┌────────────────┐  ┌────────────────────────┐
+│  Agent Mail    │  │  Beads CLI (bd)        │
+│  Server        │  │  • Local .beads/ DB    │
+│  :3141         │  │  • Git-backed          │
+│  • Messaging   │  │  • Per-project         │
+│  • File locks  │  └────────────────────────┘
+└────────────────┘
+```
+
+### Directory Layout
+
+```
+~/.claude/
+└── CLAUDE.md                    # Global agent instructions
+
+~/.local/bin/
+├── am-register                  # Agent Mail tools (12)
+├── am-inbox
+├── browser-start.js            # Browser tools (7)
+├── browser-eval.js
+└── ...                         # Additional tools (24)
+
+~/code/myproject/
+├── .beads/                     # Per-project task database
+│   ├── beads.db               # SQLite database
+│   └── beads.base.jsonl       # Git-committable backup
+├── CLAUDE.md                   # Project-specific docs
+└── ...                         # Your code
+```
+
+---
+
+## Unified Dashboard (Chimaro)
+
+If you have Chimaro installed, you get a web-based dashboard that aggregates tasks from all projects:
+
+**URL:** `http://localhost:5173/account/development/beads` (when Chimaro is running)
+
+**Features:**
+- View tasks across all ~/code/* projects
+- Filter by project, status, priority, assignee, type, labels
+- Color-coded ID badges show project at a glance
+- Inline editing (update status, priority, assignee)
+- Create new tasks via web UI
+- Return completed tasks to queue
+
+---
+
+## Troubleshooting
+
+### Agent Mail Not Running
+
+```bash
+# Check status
+systemctl --user status agent-mail
+
+# Start manually
+systemctl --user start agent-mail
+
+# Enable at boot
+systemctl --user enable agent-mail
+
+# Check logs
+journalctl --user -u agent-mail -f
+```
+
+### Beads Command Not Found
+
+```bash
+# Check if bd is in PATH
+which bd
+
+# If not found, restart shell
+source ~/.bashrc
+
+# Or add to PATH manually
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+### Tools Not Found
+
+```bash
+# Check if tools are symlinked
+ls -la ~/.local/bin/am-*
+
+# Re-run symlink setup
+bash ~/code/jomarchy-agent-tools/scripts/symlink-tools.sh
+```
+
+### Per-Repo Setup Didn't Run
+
+```bash
+# Manually run per-repo setup
+bash ~/code/jomarchy-agent-tools/scripts/setup-repos.sh
+```
+
+---
+
+## Uninstallation
+
+```bash
+# Stop Agent Mail
+systemctl --user stop agent-mail
+systemctl --user disable agent-mail
+
+# Remove Beads CLI
+# (Method depends on how it was installed - see Beads docs)
+
+# Remove symlinked tools
+rm ~/.local/bin/am-*
+rm ~/.local/bin/browser-*.js
+
+# Remove global config (optional)
+rm ~/.claude/CLAUDE.md
+
+# Remove per-repo configs (optional)
+# Manually delete .beads/ directories and CLAUDE.md from projects
+```
+
+---
+
+## Contributing
+
+This project combines:
+- **Agent Mail Server:** [Dicklesworthstone/mcp_agent_mail](https://github.com/Dicklesworthstone/mcp_agent_mail)
+- **Beads CLI:** [steveyegge/beads](https://github.com/steveyegge/beads)
+- **Browser Tools:** [badlogic/browser-tools](https://github.com/badlogic/browser-tools)
+
+Contributions welcome! Please open issues or PRs.
+
+---
+
+## License
+
+MIT License - See individual component licenses:
+- Agent Mail: [License](https://github.com/Dicklesworthstone/mcp_agent_mail/blob/main/LICENSE)
+- Beads: [License](https://github.com/steveyegge/beads/blob/main/LICENSE)
+- Browser Tools: [License](https://github.com/badlogic/browser-tools/blob/main/LICENSE)
+
+---
+
+## Credits
+
+- **Agent Mail:** Created by [@Dicklesworthstone](https://github.com/Dicklesworthstone)
+- **Beads:** Created by [@steveyegge](https://github.com/steveyegge)
+- **Browser Tools:** Created by [@badlogic](https://github.com/badlogic)
+- **Philosophy:** Inspired by [Mario Zechner's "What if you don't need MCP?"](https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/)
+- **Integration:** Assembled by [@joewinke](https://github.com/joewinke) for [Jomarchy](https://github.com/joewinke/jomarchy)
+
+---
+
+## Related Projects
+
+- **Jomarchy:** [github.com/joewinke/jomarchy](https://github.com/joewinke/jomarchy) - Omarchy Linux configuration system
+- **Chimaro:** AI-powered application platform with unified Beads dashboard
+- **Agent Mail:** [github.com/Dicklesworthstone/mcp_agent_mail](https://github.com/Dicklesworthstone/mcp_agent_mail)
+- **Beads:** [github.com/steveyegge/beads](https://github.com/steveyegge/beads)
+- **Browser Tools:** [github.com/badlogic/browser-tools](https://github.com/badlogic/browser-tools)
+
+---
+
+**Built for AI-assisted development. Works with every AI coding assistant.**
+
+**[Install Now](#quick-start)** | **[Report Issue](https://github.com/joewinke/jomarchy-agent-tools/issues)** | **[Contribute](https://github.com/joewinke/jomarchy-agent-tools/pulls)**
