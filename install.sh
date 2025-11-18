@@ -46,7 +46,8 @@ echo "Complete AI-assisted development environment:"
 echo ""
 echo "  • Agent Mail (multi-agent coordination server)"
 echo "  • Beads CLI (dependency-aware task planning)"
-echo "  • 24 bash agent tools (am-*, browser-*, db-*, etc.)"
+echo "  • 24 generic bash tools (am-*, browser-*, db-*, etc.)"
+echo "  • Optional tech stack tools (SvelteKit + Supabase, etc.)"
 echo "  • Global ~/.claude/CLAUDE.md configuration"
 echo "  • Per-repository setup (bd init, CLAUDE.md templates)"
 echo ""
@@ -73,7 +74,7 @@ bash "$INSTALL_DIR/scripts/install-beads.sh"
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}Step 3/5: Symlinking Agent Tools${NC}"
+echo -e "${BOLD}Step 3/6: Symlinking Generic Tools${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
@@ -81,7 +82,39 @@ bash "$INSTALL_DIR/scripts/symlink-tools.sh"
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}Step 4/5: Setting Up Global Configuration${NC}"
+echo -e "${BOLD}Step 4/6: Optional Tech Stack Tools${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+
+# Check if gum is available
+if command -v gum &> /dev/null; then
+    echo "Select tech stack tools to install (Space to select, Enter to continue):"
+    echo ""
+
+    SELECTED_STACKS=$(gum choose --no-limit \
+        "SvelteKit + Supabase (11 tools: component-deps, route-list, error-log, etc.)" \
+        "Skip - No additional stacks")
+
+    if echo "$SELECTED_STACKS" | grep -q "SvelteKit"; then
+        echo ""
+        echo "Installing SvelteKit + Supabase stack..."
+        bash "$INSTALL_DIR/stacks/sveltekit-supabase/install.sh"
+    else
+        echo ""
+        echo "Skipping stack installation"
+    fi
+else
+    echo -e "${YELLOW}  ⊘ gum not available - skipping stack selection${NC}"
+    echo "  Install gum for interactive stack selection:"
+    echo "    https://github.com/charmbracelet/gum"
+    echo ""
+    echo "  Or install stacks manually:"
+    echo "    bash $INSTALL_DIR/stacks/sveltekit-supabase/install.sh"
+fi
+
+echo ""
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BOLD}Step 5/6: Setting Up Global Configuration${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
@@ -89,7 +122,7 @@ bash "$INSTALL_DIR/scripts/setup-global-claude-md.sh"
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}Step 5/5: Setting Up Repositories${NC}"
+echo -e "${BOLD}Step 6/6: Setting Up Repositories${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
@@ -107,7 +140,10 @@ echo "What was installed:"
 echo ""
 echo "  ✓ Agent Mail Server (http://localhost:3141)"
 echo "  ✓ Beads CLI (bd command)"
-echo "  ✓ 24 Agent Tools (am-*, browser-*, etc.)"
+echo "  ✓ 24 Generic Tools (am-*, browser-*, db-*, etc.)"
+if [ ! -z "$SELECTED_STACKS" ] && echo "$SELECTED_STACKS" | grep -q "SvelteKit"; then
+    echo "  ✓ SvelteKit + Supabase Stack (11 additional tools)"
+fi
 echo "  ✓ Global ~/.claude/CLAUDE.md (multi-project instructions)"
 echo "  ✓ Per-repo setup (bd init, CLAUDE.md templates)"
 echo ""

@@ -1,8 +1,8 @@
 # Jomarchy Agent Tools
 
-**A complete AI-assisted development environment in one command.**
+**Manage multiple agents across several projects in a complete AI-assisted development environment in one command.**
 
-Agent Mail (multi-agent coordination) + Beads (task planning) + 24 bash tools = 32,000+ token savings over MCP servers.
+Agent Mail (multi-agent coordination) + Beads (task planning) + 24 bash tools = Clear, fast integration that empowers agents with incredible capability—without the cost and bloat of MCP.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/joewinke/jomarchy-agent-tools/main/install.sh | bash
@@ -15,11 +15,12 @@ curl -fsSL https://raw.githubusercontent.com/joewinke/jomarchy-agent-tools/main/
 Jomarchy Agent Tools is a **zero-configuration AI development environment** that gives your coding assistants (Claude Code, Cursor, Aider, OpenCode, etc.) the ability to:
 
 - **Coordinate** across multiple agents without conflicts (Agent Mail)
+- **Transcend** project folders and context window bounds with cross-project communication
 - **Plan** work with dependency-aware task management (Beads)
-- **Execute** efficiently with 24 lightweight bash tools (32k+ token savings vs MCP)
+- **Execute** with 24 composable bash tools (no MCP bloat, instant integration)
 - **Scale** across all your projects with unified dashboard views
 
-**Philosophy:** Following [What if you don't need MCP?](https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/) by Mario Zechner - simple bash tools achieve 80x token reduction while being more composable and cross-CLI compatible.
+**Philosophy:** Following [What if you don't need MCP?](https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/) by Mario Zechner - control a swarm of agents across repositories with lightweight tools instead of heavyweight servers.
 
 ---
 
@@ -29,25 +30,25 @@ Jomarchy Agent Tools is a **zero-configuration AI development environment** that
 
 Modern AI coding assistants face three major challenges:
 
-1. **Coordination chaos**: Multiple agents editing the same files simultaneously
-2. **Token bloat**: MCP servers consume 30k+ tokens just for tool definitions
-3. **Task amnesia**: Agents lose context between sessions
+1. **Coordination chaos**: Multiple agents editing the same files simultaneously, no way to communicate across context windows
+2. **Project isolation**: Agents trapped in single folders, can't coordinate across repositories
+3. **Context amnesia**: Agents lose task state between sessions, repeat work unnecessarily
 
 ### The Solution
 
-**Jomarchy Agent Tools solves all three:**
+**Jomarchy Agent Tools breaks these boundaries:**
 
 | Challenge | Solution | Benefit |
 |-----------|----------|---------|
-| Coordination | Agent Mail (file reservations + messaging) | No more merge conflicts |
-| Token bloat | 24 bash tools instead of MCP | 32,425 token savings |
-| Task amnesia | Beads (git-backed task database) | Persistent multi-session memory |
+| Coordination chaos | Agent Mail (messaging + file reservations) | Swarm coordination without conflicts |
+| Project isolation | Cross-project communication threads | Agents coordinate across repositories |
+| Context amnesia | Beads (git-backed task database) | Persistent state transcends sessions |
 
 **Real-world impact:**
-- 80x token reduction (32,425 tokens saved)
-- Works across ALL AI coding assistants (Claude, Cursor, Aider, etc.)
-- Bash composability (pipes, jq, xargs)
-- Multi-project support with unified dashboard
+- **Control agent swarms** that span multiple projects and coding assistants
+- **No MCP bloat**: Simple bash tools, instant integration (32k+ token savings)
+- **Universal compatibility**: Works with Claude Code, Cursor, Aider, OpenCode, etc.
+- **Bash composability**: Pipe, filter, and chain tools with jq, xargs, grep
 
 ---
 
@@ -62,7 +63,8 @@ curl -fsSL https://raw.githubusercontent.com/joewinke/jomarchy-agent-tools/main/
 This installs:
 - ✅ Agent Mail Server (http://localhost:3141)
 - ✅ Beads CLI (`bd` command)
-- ✅ 24 bash agent tools (am-*, browser-*, db-*, etc.)
+- ✅ 24 generic bash tools (am-*, browser-*, db-*, etc.)
+- ✅ Optional tech stack tools (e.g., SvelteKit + Supabase with 11 additional tools)
 - ✅ Global ~/.claude/CLAUDE.md configuration
 - ✅ Per-repo setup (bd init, CLAUDE.md templates)
 
@@ -127,11 +129,13 @@ bd update task-id --status in_progress --assignee AgentName
 bd close task-id --reason "Completed"
 ```
 
-### 3. 43 Bash Agent Tools
+### 3. 24 Generic Bash Agent Tools
 
 **Location:** `~/.local/bin/` (globally available)
 
-#### Agent Mail Tools (12)
+**Philosophy:** Following [What if you don't need MCP?](https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/) by Mario Zechner - lightweight bash tools provide instant capability without MCP overhead. Clear, fast, composable.
+
+#### Agent Mail Tools (11)
 - `am-register` - Register agent identity
 - `am-inbox` - Check inbox (--unread, --json)
 - `am-send` - Send messages with threads
@@ -171,9 +175,47 @@ Based on [badlogic/browser-tools](https://github.com/badlogic/browser-tools)
 ```bash
 am-inbox --help
 browser-eval.js --help
+db-query --help
 ```
 
-### 4. Global Configuration
+### 4. Optional Tech Stack Tools
+
+During installation, you can select additional **tech-stack-specific tools** via an interactive menu (requires [gum](https://github.com/charmbracelet/gum)):
+
+#### SvelteKit + Supabase Stack (11 tools)
+
+**Database Schema Tools (3):**
+- `error-log` - Query error logs (assumes `error_logs` table)
+- `quota-check` - Check AI usage quotas (assumes `ai_usage_logs` table)
+- `job-monitor` - Monitor background jobs
+
+**SvelteKit-Specific (2):**
+- `component-deps` - Analyze Svelte component dependencies
+- `route-list` - List all SvelteKit routes
+
+**Project Development (6):**
+- `migration-status` - Check Supabase migration status
+- `type-check-fast` - Fast TypeScript type checking
+- `build-size` - Analyze bundle sizes
+- `cache-clear` - Clear application caches
+- `env-check` - Validate environment variables
+- `perf-check` - Performance analysis
+
+**When to use stacks:**
+- You're using SvelteKit + Supabase + TypeScript
+- You want project-specific tooling (schema-aware queries, component analysis)
+- You want to avoid duplicating tools across multiple projects with the same stack
+
+**Manual installation:**
+```bash
+# If you skip during install, you can add stacks later:
+bash ~/code/jomarchy-agent-tools/stacks/sveltekit-supabase/install.sh
+```
+
+**Documentation:**
+See `stacks/sveltekit-supabase/README.md` for detailed stack documentation.
+
+### 5. Global Configuration
 
 **File:** `~/.claude/CLAUDE.md`
 
@@ -185,7 +227,7 @@ Contains multi-project instructions for:
 
 **Automatically loaded by AI assistants in all projects.**
 
-### 5. Per-Repository Setup
+### 6. Per-Repository Setup
 
 For each git repository in `~/code/*`:
 
@@ -473,10 +515,9 @@ At $0.015 per 1k tokens (GPT-4):
              │ Read project CLAUDE.md
              │
 ┌────────────▼────────────────────────────────┐
-│  Bash Tools (24 scripts in ~/.local/bin)    │
-│  • Agent Mail clients (am-*)                │
-│  • Browser automation (browser-*.js)        │
-│  • Utilities (db-*, etc.)                   │
+│  Bash Tools (24+ scripts in ~/.local/bin)   │
+│  • 24 generic tools (am-*, browser-*, db-*) │
+│  • Optional stack tools (11+ per stack)     │
 └────────┬───────────────────┬────────────────┘
          │                   │
          ▼                   ▼
@@ -626,7 +667,7 @@ MIT License - See individual component licenses:
 - **Agent Mail:** Created by [@Dicklesworthstone](https://github.com/Dicklesworthstone)
 - **Beads:** Created by [@steveyegge](https://github.com/steveyegge)
 - **Browser Tools:** Created by [@badlogic](https://github.com/badlogic)
-- **Philosophy:** Inspired by [Mario Zechner's "What if you don't need MCP?"](https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/)
+- **Tools > MCP:** Inspired by [Mario Zechner's "What if you don't need MCP?"](https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/)
 - **Integration:** Assembled by [@joewinke](https://github.com/joewinke) for [Jomarchy](https://github.com/joewinke/jomarchy)
 
 ---
