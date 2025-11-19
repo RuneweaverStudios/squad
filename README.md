@@ -438,7 +438,7 @@ The installer **appends** comprehensive instructions to your global `~/.claude/C
 
 **What gets appended:**
 - 🤖 Agent Swarm Coordination Commands (10 slash commands)
-- 📬 MCP Agent Mail (coordination patterns, macros, pitfalls)
+- 📬 Agent Mail (coordination patterns, macros, pitfalls)
 - 📋 Beads Integration (workflow conventions, task mapping)
 - 🛠️ Agent Tools (28 bash tools with examples)
 

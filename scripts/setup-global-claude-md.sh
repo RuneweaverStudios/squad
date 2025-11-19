@@ -35,7 +35,7 @@ fi
 # Check if file exists
 if [ -f "$CLAUDE_MD" ]; then
     # Check if it already has our marker
-    if grep -q "## MCP Agent Mail: coordination for multi-agent workflows" "$CLAUDE_MD"; then
+    if grep -q "## Agent Mail: coordination for multi-agent workflows" "$CLAUDE_MD"; then
         echo -e "${YELLOW}  ⊘ ~/.claude/CLAUDE.md already configured${NC}"
         echo "  File: $CLAUDE_MD"
         exit 0
@@ -170,7 +170,7 @@ Commands leverage Agent Mail (messaging, file locks) and Beads (task queue, depe
 
 ---
 
-## MCP Agent Mail: coordination for multi-agent workflows
+## Agent Mail: coordination for multi-agent workflows
 
 What it is
 - A mail-like layer that lets coding agents coordinate asynchronously via MCP tools and resources.
@@ -205,7 +205,7 @@ Common pitfalls
 
 ## Integrating with Beads (dependency-aware task planning)
 
-Beads provides a lightweight, dependency-aware issue database and a CLI (`bd`) for selecting "ready work," setting priorities, and tracking status. It complements MCP Agent Mail's messaging, audit trail, and file-reservation signals. Project: [steveyegge/beads](https://github.com/steveyegge/beads)
+Beads provides a lightweight, dependency-aware issue database and a CLI (`bd`) for selecting "ready work," setting priorities, and tracking status. It complements Agent Mail's messaging, audit trail, and file-reservation signals. Project: [steveyegge/beads](https://github.com/steveyegge/beads)
 
 ### Multi-Project Architecture
 
@@ -385,7 +385,7 @@ EOF
 echo -e "${GREEN}  ✓ Configuration written to ~/.claude/CLAUDE.md${NC}"
 echo ""
 echo "  Added sections:"
-echo "    • MCP Agent Mail (coordination)"
+echo "    • Agent Mail (coordination)"
 echo "    • Beads (multi-project task planning)"
 echo "    • Agent Tools (28 generic bash tools)"
 echo ""
