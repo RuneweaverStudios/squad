@@ -313,7 +313,7 @@ bd-006 (P1): Add conflict resolution [depends: bd-005]
 
 **When you want to go faster, add more agents:**
 
-**Agent 1 (Claude Code):**
+**Agent 1 (Claude Code - window 1):**
 ```bash
 /register --name Frontend
 /start  # Gets: bd-004 "Build Canvas drawing component"
@@ -321,7 +321,7 @@ bd-006 (P1): Add conflict resolution [depends: bd-005]
         # Announces: "Starting bd-004" via Agent Mail
 ```
 
-**Agent 2 (Cline in separate window):**
+**Agent 2 (Claude Code - window 2):**
 ```bash
 /register --name Backend
 /start  # Gets: bd-005 "Implement real-time sync protocol"
@@ -329,7 +329,7 @@ bd-006 (P1): Add conflict resolution [depends: bd-005]
         # Announces: "Starting bd-005" via Agent Mail
 ```
 
-**Agent 3 (Roo Code in third window):**
+**Agent 3 (Cline - separate window):**
 ```bash
 /register --name Database
 /start  # Gets: bd-002 "Create PostgreSQL schema"
