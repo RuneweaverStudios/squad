@@ -1,5 +1,6 @@
 <script>
 	import TaskList from '$lib/components/TaskList.svelte';
+	import ThemeSelector from '$lib/components/ThemeSelector.svelte';
 
 	let selectedProject = $state('all');
 	let selectedPriority = $state('all');
@@ -9,8 +10,11 @@
 
 <div class="dashboard">
 	<header class="dashboard-header">
-		<h1>Beads Task Dashboard</h1>
-		<p>Multi-project task management powered by Beads + Agent Mail</p>
+		<div>
+			<h1>Beads Task Dashboard</h1>
+			<p>Multi-project task management powered by Beads + Agent Mail</p>
+		</div>
+		<ThemeSelector />
 	</header>
 
 	<div class="filters">
@@ -73,7 +77,9 @@
 		background: white;
 		border-bottom: 1px solid #e5e7eb;
 		padding: 2rem;
-		text-align: center;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
 	}
 
 	.dashboard-header h1 {
