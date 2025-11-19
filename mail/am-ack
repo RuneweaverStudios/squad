@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+# Acknowledge a message
+# Usage: am-ack MESSAGE_ID --agent AgentName
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/am-lib.sh"
+
+# Parse arguments
+MESSAGE_ID=""
+AGENT_NAME=""
+PROJECT="$PROJECT_KEY"
+
+show_help() {
+    cat <<EOF
+Usage: am-ack MESSAGE_ID --agent AGENT
+
+Acknowledge a message that requires acknowledgment.
+
+Arguments:
+  MESSAGE_ID          ID of the message to acknowledge (required)
+
+Options:
+  --agent AGENT       Agent name (required)
+  --project PATH      Project path (default: current directory)
+  --help, -h          Show this help
+
+Examples:
+  am-ack 5 --agent Bob
+  am-ack 12 --agent Alice
+
+Database: $AGENT_MAIL_DB
+EOF
+}
+
+# First positional arg is message ID
+if [[ $# -ge 1 ]] && [[ ! "$1" =~ ^-- ]]; then
+    MESSAGE_ID="$1"
+    shift
+fi
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --agent)
+            AGENT_NAME="$2"
+            shift 2
+            ;;
+        --project)
+            PROJECT="$2"
+            shift 2
+            ;;
+        --help|-h)
+            show_help
+            exit 0
+            ;;
+        *)
+            am_error "Unknown option: $1"
+            ;;
+    esac
+done
+
+# Validate required arguments
+if [[ -z "$MESSAGE_ID" ]]; then
+    am_error "Message ID is required"
+fi
+
+if [[ -z "$AGENT_NAME" ]]; then
+    am_error "--agent is required"
+fi
+
+# Validate message ID is a number
+if ! [[ "$MESSAGE_ID" =~ ^[0-9]+$ ]]; then
+    am_error "Message ID must be a number"
+fi
+
+# Get or create project
+PROJECT_ID=$(am_get_project "$AGENT_MAIL_DB" "$PROJECT")
+
+# Validate agent exists
+AGENT_ID=$(sqlite3 "$AGENT_MAIL_DB" "SELECT id FROM agents WHERE project_id = $PROJECT_ID AND name = '$AGENT_NAME';")
+if [[ -z "$AGENT_ID" ]]; then
+    am_error "Agent '$AGENT_NAME' not found. Run: am-register --name $AGENT_NAME"
+fi
+
+# Update agent's last_active
+am_touch_agent "$AGENT_MAIL_DB" "$AGENT_ID"
+
+# Verify message exists and agent is a recipient
+RECIPIENT_EXISTS=$(sqlite3 "$AGENT_MAIL_DB" "SELECT COUNT(*) FROM message_recipients WHERE message_id = $MESSAGE_ID AND agent_id = $AGENT_ID;")
+if [[ "$RECIPIENT_EXISTS" == "0" ]]; then
+    am_error "Message $MESSAGE_ID not found in your inbox"
+fi
+
+# Check if message requires acknowledgment
+ACK_REQUIRED=$(sqlite3 "$AGENT_MAIL_DB" "SELECT ack_required FROM messages WHERE id = $MESSAGE_ID;")
+if [[ "$ACK_REQUIRED" != "1" ]]; then
+    echo "⚠ Message $MESSAGE_ID does not require acknowledgment"
+fi
+
+# Check if already acknowledged
+ALREADY_ACKED=$(sqlite3 "$AGENT_MAIL_DB" "SELECT ack_ts FROM message_recipients WHERE message_id = $MESSAGE_ID AND agent_id = $AGENT_ID;")
+if [[ -n "$ALREADY_ACKED" ]] && [[ "$ALREADY_ACKED" != "" ]]; then
+    echo "✓ Already acknowledged at: $ALREADY_ACKED"
+    exit 0
+fi
+
+# Acknowledge the message
+sqlite3 "$AGENT_MAIL_DB" "UPDATE message_recipients SET ack_ts = datetime('now') WHERE message_id = $MESSAGE_ID AND agent_id = $AGENT_ID;"
+
+# Fetch message details
+MESSAGE_INFO=$(sqlite3 -json "$AGENT_MAIL_DB" <<SQL
+SELECT
+    m.subject,
+    a.name as sender_name
+FROM messages m
+JOIN agents a ON m.sender_id = a.id
+WHERE m.id = $MESSAGE_ID;
+SQL
+)
+
+SUBJECT=$(echo "$MESSAGE_INFO" | jq -r '.[0].subject')
+SENDER=$(echo "$MESSAGE_INFO" | jq -r '.[0].sender_name')
+
+am_success "Acknowledged message $MESSAGE_ID"
+echo "  From: $SENDER"
+echo "  Subject: $SUBJECT"

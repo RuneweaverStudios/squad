@@ -1,0 +1,208 @@
+#!/usr/bin/env bash
+# Send a message to other agents
+# Usage: am-send "Subject" "Body" --from Agent1 --to Agent2[,Agent3] [--cc Agent4] [--thread id] [--importance high] [--ack]
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/am-lib.sh"
+
+# Parse arguments
+SUBJECT=""
+BODY=""
+FROM_AGENT=""
+TO_AGENTS=""
+CC_AGENTS=""
+THREAD_ID=""
+IMPORTANCE="normal"
+ACK_REQUIRED=0
+PROJECT="$PROJECT_KEY"
+JSON_OUTPUT=false
+
+show_help() {
+    cat <<EOF
+Usage: am-send "Subject" "Body" [options]
+
+Send a message to other agents in Agent Mail.
+
+Arguments:
+  SUBJECT             Message subject (required)
+  BODY                Message body in markdown (required)
+
+Options:
+  --from AGENT        Sending agent name (required)
+  --to AGENTS         Comma-separated list of recipient agents (required)
+  --cc AGENTS         Comma-separated list of CC recipients (optional)
+  --thread ID         Thread identifier (e.g., bd-123) (optional)
+  --importance LEVEL  Message importance: normal | high | urgent (default: normal)
+  --ack               Require acknowledgment (default: false)
+  --project PATH      Project path (default: current directory)
+  --json              Output as JSON
+  --help, -h          Show this help
+
+Examples:
+  am-send "Hello" "Testing" --from Agent1 --to Agent2
+  am-send "[bd-123] Start work" "Beginning task..." --from Builder --to Team --thread bd-123 --ack
+  am-send "Update" "Progress report" --from Agent1 --to Agent2,Agent3 --cc Manager --importance high
+
+Database: $AGENT_MAIL_DB
+EOF
+}
+
+# First two positional args are subject and body
+if [[ $# -ge 2 ]] && [[ ! "$1" =~ ^-- ]]; then
+    SUBJECT="$1"
+    shift
+    BODY="$1"
+    shift
+fi
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --from)
+            FROM_AGENT="$2"
+            shift 2
+            ;;
+        --to)
+            TO_AGENTS="$2"
+            shift 2
+            ;;
+        --cc)
+            CC_AGENTS="$2"
+            shift 2
+            ;;
+        --thread)
+            THREAD_ID="$2"
+            shift 2
+            ;;
+        --importance)
+            IMPORTANCE="$2"
+            shift 2
+            ;;
+        --ack)
+            ACK_REQUIRED=1
+            shift
+            ;;
+        --project)
+            PROJECT="$2"
+            shift 2
+            ;;
+        --json)
+            JSON_OUTPUT=true
+            shift
+            ;;
+        --help|-h)
+            show_help
+            exit 0
+            ;;
+        *)
+            am_error "Unknown option: $1"
+            ;;
+    esac
+done
+
+# Validate required arguments
+if [[ -z "$SUBJECT" ]]; then
+    am_error "Subject is required"
+fi
+
+if [[ -z "$BODY" ]]; then
+    am_error "Body is required"
+fi
+
+if [[ -z "$FROM_AGENT" ]]; then
+    am_error "--from agent is required"
+fi
+
+if [[ -z "$TO_AGENTS" ]]; then
+    am_error "--to agents is required"
+fi
+
+# Validate importance level
+if [[ ! "$IMPORTANCE" =~ ^(normal|high|urgent)$ ]]; then
+    am_error "Importance must be: normal, high, or urgent"
+fi
+
+# Get or create project
+PROJECT_ID=$(am_get_project "$AGENT_MAIL_DB" "$PROJECT")
+
+# Validate from_agent exists
+SENDER_ID=$(sqlite3 "$AGENT_MAIL_DB" "SELECT id FROM agents WHERE project_id = $PROJECT_ID AND name = '$FROM_AGENT';")
+if [[ -z "$SENDER_ID" ]]; then
+    am_error "From agent '$FROM_AGENT' not found. Run: am-register --name $FROM_AGENT"
+fi
+
+# Update sender's last_active
+am_touch_agent "$AGENT_MAIL_DB" "$SENDER_ID"
+
+# Escape single quotes in subject and body for SQL
+SUBJECT_ESC="${SUBJECT//\'/\'\'}"
+BODY_ESC="${BODY//\'/\'\'}"
+THREAD_ID_ESC="${THREAD_ID//\'/\'\'}"
+
+# Create message and get ID in same connection
+MESSAGE_ID=$(sqlite3 "$AGENT_MAIL_DB" <<SQL
+INSERT INTO messages (project_id, sender_id, thread_id, subject, body_md, importance, ack_required)
+VALUES ($PROJECT_ID, $SENDER_ID, $([ -n "$THREAD_ID_ESC" ] && echo "'$THREAD_ID_ESC'" || echo "NULL"), '$SUBJECT_ESC', '$BODY_ESC', '$IMPORTANCE', $ACK_REQUIRED);
+SELECT last_insert_rowid();
+SQL
+)
+
+# Add TO recipients
+IFS=',' read -ra TO_ARRAY <<< "$TO_AGENTS"
+for agent_name in "${TO_ARRAY[@]}"; do
+    agent_name=$(echo "$agent_name" | xargs)  # trim whitespace
+    AGENT_ID=$(sqlite3 "$AGENT_MAIL_DB" "SELECT id FROM agents WHERE project_id = $PROJECT_ID AND name = '$agent_name';")
+    if [[ -z "$AGENT_ID" ]]; then
+        am_error "Recipient agent '$agent_name' not found. Run: am-register --name $agent_name"
+    fi
+    sqlite3 "$AGENT_MAIL_DB" "INSERT INTO message_recipients (message_id, agent_id, kind) VALUES ($MESSAGE_ID, $AGENT_ID, 'to');"
+done
+
+# Add CC recipients if provided
+if [[ -n "$CC_AGENTS" ]]; then
+    IFS=',' read -ra CC_ARRAY <<< "$CC_AGENTS"
+    for agent_name in "${CC_ARRAY[@]}"; do
+        agent_name=$(echo "$agent_name" | xargs)  # trim whitespace
+        AGENT_ID=$(sqlite3 "$AGENT_MAIL_DB" "SELECT id FROM agents WHERE project_id = $PROJECT_ID AND name = '$agent_name';")
+        if [[ -z "$AGENT_ID" ]]; then
+            am_error "CC agent '$agent_name' not found. Run: am-register --name $agent_name"
+        fi
+        sqlite3 "$AGENT_MAIL_DB" "INSERT INTO message_recipients (message_id, agent_id, kind) VALUES ($MESSAGE_ID, $AGENT_ID, 'cc');"
+    done
+fi
+
+# Fetch and display message details
+MESSAGE=$(sqlite3 -json "$AGENT_MAIL_DB" <<SQL
+SELECT
+    m.id,
+    m.subject,
+    m.thread_id,
+    m.importance,
+    m.ack_required,
+    m.created_ts,
+    a.name as sender_name
+FROM messages m
+JOIN agents a ON m.sender_id = a.id
+WHERE m.id = $MESSAGE_ID;
+SQL
+)
+
+if [[ "$JSON_OUTPUT" == "true" ]]; then
+    echo "$MESSAGE" | am_format_json
+else
+    SUBJECT_VAL=$(echo "$MESSAGE" | jq -r '.[0].subject')
+    THREAD_VAL=$(echo "$MESSAGE" | jq -r '.[0].thread_id // ""')
+    SENDER_VAL=$(echo "$MESSAGE" | jq -r '.[0].sender_name')
+    CREATED_VAL=$(echo "$MESSAGE" | jq -r '.[0].created_ts')
+
+    am_success "Message sent (ID: $MESSAGE_ID)"
+    echo "  From: $SENDER_VAL"
+    echo "  To: $TO_AGENTS"
+    [[ -n "$CC_AGENTS" ]] && echo "  CC: $CC_AGENTS"
+    echo "  Subject: $SUBJECT_VAL"
+    [[ -n "$THREAD_VAL" ]] && echo "  Thread: $THREAD_VAL"
+    echo "  Importance: $IMPORTANCE"
+    [[ "$ACK_REQUIRED" == "1" ]] && echo "  Acknowledgment: Required"
+    echo "  Sent: $CREATED_VAL"
+fi

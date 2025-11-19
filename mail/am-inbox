@@ -1,0 +1,174 @@
+#!/usr/bin/env bash
+# View inbox messages for an agent
+# Usage: am-inbox AgentName [--unread] [--thread id] [--limit N] [--mark-read] [--json]
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/am-lib.sh"
+
+# Parse arguments
+AGENT_NAME=""
+UNREAD_ONLY=false
+THREAD_FILTER=""
+LIMIT=""
+MARK_READ=false
+PROJECT="$PROJECT_KEY"
+JSON_OUTPUT=false
+
+show_help() {
+    cat <<EOF
+Usage: am-inbox AgentName [options]
+
+View inbox messages for an agent in Agent Mail.
+
+Arguments:
+  AGENT_NAME          Name of the agent (required)
+
+Options:
+  --unread            Show only unread messages
+  --thread ID         Filter by thread ID (e.g., bd-123)
+  --limit N           Limit number of messages shown (default: all)
+  --mark-read         Mark displayed messages as read
+  --project PATH      Project path (default: current directory)
+  --json              Output as JSON
+  --help, -h          Show this help
+
+Examples:
+  am-inbox Alice
+  am-inbox Bob --unread
+  am-inbox Carol --thread bd-123
+  am-inbox Alice --unread --limit 10 --mark-read
+  am-inbox Bob --json
+
+Database: $AGENT_MAIL_DB
+EOF
+}
+
+# First positional arg is agent name
+if [[ $# -ge 1 ]] && [[ ! "$1" =~ ^-- ]]; then
+    AGENT_NAME="$1"
+    shift
+fi
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --unread)
+            UNREAD_ONLY=true
+            shift
+            ;;
+        --thread)
+            THREAD_FILTER="$2"
+            shift 2
+            ;;
+        --limit)
+            LIMIT="$2"
+            shift 2
+            ;;
+        --mark-read)
+            MARK_READ=true
+            shift
+            ;;
+        --project)
+            PROJECT="$2"
+            shift 2
+            ;;
+        --json)
+            JSON_OUTPUT=true
+            shift
+            ;;
+        --help|-h)
+            show_help
+            exit 0
+            ;;
+        *)
+            am_error "Unknown option: $1"
+            ;;
+    esac
+done
+
+# Validate required arguments
+if [[ -z "$AGENT_NAME" ]]; then
+    am_error "Agent name is required"
+fi
+
+# Get or create project
+PROJECT_ID=$(am_get_project "$AGENT_MAIL_DB" "$PROJECT")
+
+# Validate agent exists
+AGENT_ID=$(sqlite3 "$AGENT_MAIL_DB" "SELECT id FROM agents WHERE project_id = $PROJECT_ID AND name = '$AGENT_NAME';")
+if [[ -z "$AGENT_ID" ]]; then
+    am_error "Agent '$AGENT_NAME' not found. Run: am-register --name $AGENT_NAME"
+fi
+
+# Update agent's last_active
+am_touch_agent "$AGENT_MAIL_DB" "$AGENT_ID"
+
+# Build query with filters
+QUERY="
+SELECT
+    m.id,
+    m.subject,
+    m.body_md,
+    m.thread_id,
+    m.importance,
+    m.ack_required,
+    m.created_ts,
+    a.name as sender_name,
+    mr.kind,
+    mr.read_ts,
+    mr.ack_ts
+FROM messages m
+JOIN agents a ON m.sender_id = a.id
+JOIN message_recipients mr ON m.id = mr.message_id
+WHERE mr.agent_id = $AGENT_ID"
+
+if [[ "$UNREAD_ONLY" == "true" ]]; then
+    QUERY="$QUERY AND mr.read_ts IS NULL"
+fi
+
+if [[ -n "$THREAD_FILTER" ]]; then
+    THREAD_ESC="${THREAD_FILTER//\'/\'\'}"
+    QUERY="$QUERY AND m.thread_id = '$THREAD_ESC'"
+fi
+
+QUERY="$QUERY ORDER BY m.created_ts DESC"
+
+if [[ -n "$LIMIT" ]]; then
+    QUERY="$QUERY LIMIT $LIMIT"
+fi
+
+# Fetch messages
+MESSAGES=$(sqlite3 -json "$AGENT_MAIL_DB" "$QUERY")
+
+# Mark as read if requested
+if [[ "$MARK_READ" == "true" ]]; then
+    MESSAGE_IDS=$(echo "$MESSAGES" | jq -r '.[].id' | tr '\n' ',' | sed 's/,$//')
+    if [[ -n "$MESSAGE_IDS" ]]; then
+        sqlite3 "$AGENT_MAIL_DB" "UPDATE message_recipients SET read_ts = datetime('now') WHERE agent_id = $AGENT_ID AND message_id IN ($MESSAGE_IDS);"
+    fi
+fi
+
+# Display messages
+if [[ "$JSON_OUTPUT" == "true" ]]; then
+    echo "$MESSAGES" | am_format_json
+else
+    MESSAGE_COUNT=$(echo "$MESSAGES" | jq '. | length')
+
+    if [[ "$MESSAGE_COUNT" == "0" ]]; then
+        echo "No messages found"
+        exit 0
+    fi
+
+    echo "Inbox for $AGENT_NAME ($MESSAGE_COUNT message(s)):"
+    echo ""
+
+    echo "$MESSAGES" | jq -r '.[] | "───────────────────────────────────────
+ID: \(.id) | \(if .read_ts then "READ" else "UNREAD" end) | \(.importance | ascii_upcase) | \(if .kind == "cc" then "CC" else "TO" end)
+From: \(.sender_name)
+Subject: \(.subject)
+\(if .thread_id then "Thread: \(.thread_id)\n" else "" end)Sent: \(.created_ts)
+\(if .ack_required == 1 then "⚠ Acknowledgment required\n" else "" end)
+\(.body_md)
+"'
+fi

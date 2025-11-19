@@ -1,0 +1,184 @@
+#!/usr/bin/env bash
+# Show current agent identity and context
+# Usage: am-whoami [--agent AgentName]
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/am-lib.sh"
+
+# Parse arguments
+AGENT_NAME="${AGENT_NAME:-}"  # Can be set from environment
+PROJECT="$PROJECT_KEY"
+JSON_OUTPUT=false
+
+show_help() {
+    cat <<EOF
+Usage: am-whoami [options]
+
+Show current agent identity and context information.
+
+Options:
+  --agent AGENT       Agent name (default: \$AGENT_NAME environment variable)
+  --project PATH      Project path (default: current directory)
+  --json              Output as JSON
+  --help, -h          Show this help
+
+Environment:
+  AGENT_NAME          Default agent name (overridden by --agent)
+  PROJECT_KEY         Default project path
+  AGENT_MAIL_DB       Database location
+
+Examples:
+  am-whoami
+  AGENT_NAME=Alice am-whoami
+  am-whoami --agent Bob --json
+
+Database: $AGENT_MAIL_DB
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --agent)
+            AGENT_NAME="$2"
+            shift 2
+            ;;
+        --project)
+            PROJECT="$2"
+            shift 2
+            ;;
+        --json)
+            JSON_OUTPUT=true
+            shift
+            ;;
+        --help|-h)
+            show_help
+            exit 0
+            ;;
+        *)
+            am_error "Unknown option: $1"
+            ;;
+    esac
+done
+
+# Get or create project
+PROJECT_ID=$(am_get_project "$AGENT_MAIL_DB" "$PROJECT")
+
+# Fetch project info
+PROJECT_INFO=$(sqlite3 -json "$AGENT_MAIL_DB" "SELECT slug, human_key FROM projects WHERE id = $PROJECT_ID;")
+PROJECT_SLUG=$(echo "$PROJECT_INFO" | jq -r '.[0].slug')
+PROJECT_PATH=$(echo "$PROJECT_INFO" | jq -r '.[0].human_key')
+
+if [[ -z "$AGENT_NAME" ]]; then
+    # No agent specified - show context only
+    if [[ "$JSON_OUTPUT" == "true" ]]; then
+        cat <<EOF | jq '.'
+{
+  "agent": null,
+  "project": {
+    "id": $PROJECT_ID,
+    "slug": "$PROJECT_SLUG",
+    "path": "$PROJECT_PATH"
+  },
+  "database": "$AGENT_MAIL_DB"
+}
+EOF
+    else
+        echo "Agent: (not set - use --agent or set AGENT_NAME environment variable)"
+        echo "Project: $PROJECT_SLUG ($PROJECT_PATH)"
+        echo "Database: $AGENT_MAIL_DB"
+    fi
+    exit 0
+fi
+
+# Validate agent exists
+AGENT_INFO=$(sqlite3 -json "$AGENT_MAIL_DB" <<SQL
+SELECT
+    id,
+    name,
+    program,
+    model,
+    task_description,
+    inception_ts,
+    last_active_ts
+FROM agents
+WHERE project_id = $PROJECT_ID AND name = '$AGENT_NAME';
+SQL
+)
+
+if [[ $(echo "$AGENT_INFO" | jq '. | length') == "0" ]]; then
+    am_error "Agent '$AGENT_NAME' not found in project. Run: am-register --name $AGENT_NAME"
+fi
+
+# Count unread messages
+UNREAD_COUNT=$(sqlite3 "$AGENT_MAIL_DB" <<SQL
+SELECT COUNT(*)
+FROM message_recipients mr
+WHERE mr.agent_id = (SELECT id FROM agents WHERE project_id = $PROJECT_ID AND name = '$AGENT_NAME')
+  AND mr.read_ts IS NULL;
+SQL
+)
+
+# Count active reservations
+RESERVATION_COUNT=$(sqlite3 "$AGENT_MAIL_DB" <<SQL
+SELECT COUNT(*)
+FROM file_reservations fr
+WHERE fr.agent_id = (SELECT id FROM agents WHERE project_id = $PROJECT_ID AND name = '$AGENT_NAME')
+  AND fr.released_ts IS NULL
+  AND datetime(fr.expires_ts) > datetime('now');
+SQL
+)
+
+if [[ "$JSON_OUTPUT" == "true" ]]; then
+    AGENT_ID=$(echo "$AGENT_INFO" | jq -r '.[0].id')
+    AGENT_PROGRAM=$(echo "$AGENT_INFO" | jq -r '.[0].program')
+    AGENT_MODEL=$(echo "$AGENT_INFO" | jq -r '.[0].model')
+    AGENT_TASK=$(echo "$AGENT_INFO" | jq -r '.[0].task_description // ""')
+    AGENT_INCEPTION=$(echo "$AGENT_INFO" | jq -r '.[0].inception_ts')
+    AGENT_LAST_ACTIVE=$(echo "$AGENT_INFO" | jq -r '.[0].last_active_ts')
+
+    cat <<EOF | jq '.'
+{
+  "agent": {
+    "id": $AGENT_ID,
+    "name": "$AGENT_NAME",
+    "program": "$AGENT_PROGRAM",
+    "model": "$AGENT_MODEL",
+    "task": "$AGENT_TASK",
+    "inception": "$AGENT_INCEPTION",
+    "last_active": "$AGENT_LAST_ACTIVE"
+  },
+  "project": {
+    "id": $PROJECT_ID,
+    "slug": "$PROJECT_SLUG",
+    "path": "$PROJECT_PATH"
+  },
+  "stats": {
+    "unread_messages": $UNREAD_COUNT,
+    "active_reservations": $RESERVATION_COUNT
+  },
+  "database": "$AGENT_MAIL_DB"
+}
+EOF
+else
+    AGENT_PROGRAM=$(echo "$AGENT_INFO" | jq -r '.[0].program')
+    AGENT_MODEL=$(echo "$AGENT_INFO" | jq -r '.[0].model')
+    AGENT_TASK=$(echo "$AGENT_INFO" | jq -r '.[0].task_description // "(none)"')
+    AGENT_LAST_ACTIVE=$(echo "$AGENT_INFO" | jq -r '.[0].last_active_ts')
+
+    echo "Agent: $AGENT_NAME"
+    echo "  Program: $AGENT_PROGRAM"
+    echo "  Model: $AGENT_MODEL"
+    echo "  Task: $AGENT_TASK"
+    echo "  Last active: $AGENT_LAST_ACTIVE"
+    echo ""
+    echo "Project: $PROJECT_SLUG"
+    echo "  Path: $PROJECT_PATH"
+    echo ""
+    echo "Status:"
+    echo "  Unread messages: $UNREAD_COUNT"
+    echo "  Active reservations: $RESERVATION_COUNT"
+    echo ""
+    echo "Database: $AGENT_MAIL_DB"
+fi

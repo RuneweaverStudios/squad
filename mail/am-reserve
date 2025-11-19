@@ -1,0 +1,238 @@
+#!/usr/bin/env bash
+# Reserve files or paths to prevent edit conflicts
+# Usage: am-reserve "glob/pattern" --agent AgentName --ttl 3600 [--exclusive] [--reason "bd-123"]
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/am-lib.sh"
+
+# Parse arguments
+PATH_PATTERN=""
+AGENT_NAME=""
+TTL_SECONDS=""
+EXCLUSIVE=1  # Default to exclusive
+REASON=""
+PROJECT="$PROJECT_KEY"
+JSON_OUTPUT=false
+
+show_help() {
+    cat <<EOF
+Usage: am-reserve "path/pattern" [options]
+
+Reserve files or paths to prevent edit conflicts between agents.
+
+Arguments:
+  PATH_PATTERN        File path or glob pattern (e.g., "src/**/*.ts") (required)
+
+Options:
+  --agent AGENT       Agent name (required)
+  --ttl SECONDS       Time-to-live in seconds (required)
+  --exclusive         Exclusive lock (default, blocks all others)
+  --shared            Shared lock (allows other shared locks)
+  --reason TEXT       Reason for reservation (e.g., "bd-123")
+  --project PATH      Project path (default: current directory)
+  --json              Output as JSON
+  --help, -h          Show this help
+
+Examples:
+  am-reserve "src/**/*.ts" --agent Alice --ttl 3600 --reason "bd-123"
+  am-reserve "lib/auth/**" --agent Bob --ttl 7200 --exclusive
+  am-reserve "docs/**" --agent Carol --ttl 1800 --shared
+
+Database: $AGENT_MAIL_DB
+EOF
+}
+
+# First positional arg is path pattern
+if [[ $# -ge 1 ]] && [[ ! "$1" =~ ^-- ]]; then
+    PATH_PATTERN="$1"
+    shift
+fi
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --agent)
+            AGENT_NAME="$2"
+            shift 2
+            ;;
+        --ttl)
+            TTL_SECONDS="$2"
+            shift 2
+            ;;
+        --exclusive)
+            EXCLUSIVE=1
+            shift
+            ;;
+        --shared)
+            EXCLUSIVE=0
+            shift
+            ;;
+        --reason)
+            REASON="$2"
+            shift 2
+            ;;
+        --project)
+            PROJECT="$2"
+            shift 2
+            ;;
+        --json)
+            JSON_OUTPUT=true
+            shift
+            ;;
+        --help|-h)
+            show_help
+            exit 0
+            ;;
+        *)
+            am_error "Unknown option: $1"
+            ;;
+    esac
+done
+
+# Validate required arguments
+if [[ -z "$PATH_PATTERN" ]]; then
+    am_error "Path pattern is required"
+fi
+
+if [[ -z "$AGENT_NAME" ]]; then
+    am_error "--agent is required"
+fi
+
+if [[ -z "$TTL_SECONDS" ]]; then
+    am_error "--ttl (time-to-live in seconds) is required"
+fi
+
+# Validate TTL is a positive integer
+if ! [[ "$TTL_SECONDS" =~ ^[0-9]+$ ]] || [[ "$TTL_SECONDS" -le 0 ]]; then
+    am_error "TTL must be a positive integer"
+fi
+
+# Get or create project
+PROJECT_ID=$(am_get_project "$AGENT_MAIL_DB" "$PROJECT")
+
+# Validate agent exists
+AGENT_ID=$(sqlite3 "$AGENT_MAIL_DB" "SELECT id FROM agents WHERE project_id = $PROJECT_ID AND name = '$AGENT_NAME';")
+if [[ -z "$AGENT_ID" ]]; then
+    am_error "Agent '$AGENT_NAME' not found. Run: am-register --name $AGENT_NAME"
+fi
+
+# Update agent's last_active
+am_touch_agent "$AGENT_MAIL_DB" "$AGENT_ID"
+
+# Escape single quotes in pattern and reason
+PATTERN_ESC="${PATH_PATTERN//\'/\'\'}"
+REASON_ESC="${REASON//\'/\'\'}"
+
+# Check for conflicts with existing active reservations
+# A conflict occurs if:
+# 1. We want exclusive and ANY active reservation exists on this pattern
+# 2. We want shared but an exclusive reservation exists on this pattern
+CONFLICTS=$(sqlite3 "$AGENT_MAIL_DB" <<SQL
+SELECT
+    fr.id,
+    a.name,
+    fr.path_pattern,
+    fr.exclusive,
+    fr.expires_ts
+FROM file_reservations fr
+JOIN agents a ON fr.agent_id = a.id
+WHERE fr.project_id = $PROJECT_ID
+  AND fr.released_ts IS NULL
+  AND datetime(fr.expires_ts) > datetime('now')
+  AND fr.path_pattern = '$PATTERN_ESC'
+  AND (
+    $EXCLUSIVE = 1  -- We want exclusive, so ANY active reservation is a conflict
+    OR fr.exclusive = 1  -- We want shared, but there's an exclusive lock
+  );
+SQL
+)
+
+if [[ -n "$CONFLICTS" ]]; then
+    CONFLICT_INFO=$(sqlite3 -json "$AGENT_MAIL_DB" <<SQL
+SELECT
+    a.name as agent,
+    fr.path_pattern,
+    fr.exclusive,
+    fr.reason,
+    fr.expires_ts
+FROM file_reservations fr
+JOIN agents a ON fr.agent_id = a.id
+WHERE fr.project_id = $PROJECT_ID
+  AND fr.released_ts IS NULL
+  AND datetime(fr.expires_ts) > datetime('now')
+  AND fr.path_pattern = '$PATTERN_ESC'
+  AND (
+    $EXCLUSIVE = 1
+    OR fr.exclusive = 1
+  )
+LIMIT 1;
+SQL
+    )
+
+    CONFLICT_AGENT=$(echo "$CONFLICT_INFO" | jq -r '.[0].agent')
+    CONFLICT_EXPIRES=$(echo "$CONFLICT_INFO" | jq -r '.[0].expires_ts')
+    CONFLICT_EXCLUSIVE=$(echo "$CONFLICT_INFO" | jq -r '.[0].exclusive')
+    CONFLICT_REASON=$(echo "$CONFLICT_INFO" | jq -r '.[0].reason // ""')
+
+    LOCK_TYPE="shared"
+    [[ "$CONFLICT_EXCLUSIVE" == "1" ]] && LOCK_TYPE="exclusive"
+
+    echo "✗ FILE_RESERVATION_CONFLICT" >&2
+    echo "  Pattern: $PATH_PATTERN" >&2
+    echo "  Held by: $CONFLICT_AGENT ($LOCK_TYPE lock)" >&2
+    [[ -n "$CONFLICT_REASON" ]] && echo "  Reason: $CONFLICT_REASON" >&2
+    echo "  Expires: $CONFLICT_EXPIRES" >&2
+    echo "" >&2
+    echo "Wait for expiry or contact $CONFLICT_AGENT to release." >&2
+    exit 1
+fi
+
+# Calculate expiry timestamp
+EXPIRES_TS=$(date -u -d "+${TTL_SECONDS} seconds" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date -u -v "+${TTL_SECONDS}S" '+%Y-%m-%d %H:%M:%S')
+
+# Create reservation and get ID
+RESERVATION_ID=$(sqlite3 "$AGENT_MAIL_DB" <<SQL
+INSERT INTO file_reservations (project_id, agent_id, path_pattern, exclusive, reason, expires_ts)
+VALUES ($PROJECT_ID, $AGENT_ID, '$PATTERN_ESC', $EXCLUSIVE, $([ -n "$REASON_ESC" ] && echo "'$REASON_ESC'" || echo "''"), '$EXPIRES_TS');
+SELECT last_insert_rowid();
+SQL
+)
+
+# Fetch and display reservation details
+RESERVATION=$(sqlite3 -json "$AGENT_MAIL_DB" <<SQL
+SELECT
+    fr.id,
+    fr.path_pattern,
+    fr.exclusive,
+    fr.reason,
+    fr.created_ts,
+    fr.expires_ts,
+    a.name as agent_name
+FROM file_reservations fr
+JOIN agents a ON fr.agent_id = a.id
+WHERE fr.id = $RESERVATION_ID;
+SQL
+)
+
+if [[ "$JSON_OUTPUT" == "true" ]]; then
+    echo "$RESERVATION" | am_format_json
+else
+    PATTERN_VAL=$(echo "$RESERVATION" | jq -r '.[0].path_pattern')
+    AGENT_VAL=$(echo "$RESERVATION" | jq -r '.[0].agent_name')
+    EXCLUSIVE_VAL=$(echo "$RESERVATION" | jq -r '.[0].exclusive')
+    REASON_VAL=$(echo "$RESERVATION" | jq -r '.[0].reason // ""')
+    CREATED_VAL=$(echo "$RESERVATION" | jq -r '.[0].created_ts')
+    EXPIRES_VAL=$(echo "$RESERVATION" | jq -r '.[0].expires_ts')
+
+    LOCK_TYPE="shared"
+    [[ "$EXCLUSIVE_VAL" == "1" ]] && LOCK_TYPE="exclusive"
+
+    am_success "File reservation created (ID: $RESERVATION_ID)"
+    echo "  Agent: $AGENT_VAL"
+    echo "  Pattern: $PATTERN_VAL"
+    echo "  Lock type: $LOCK_TYPE"
+    [[ -n "$REASON_VAL" ]] && echo "  Reason: $REASON_VAL"
+    echo "  Created: $CREATED_VAL"
+    echo "  Expires: $EXPIRES_VAL"
+fi

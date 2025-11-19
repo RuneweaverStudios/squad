@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+# Register or resume agent identity with Agent Mail
+# Usage: am-register [--name AgentName] [--program claude-code] [--model sonnet-4.5] [--task "Description"]
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/am-lib.sh"
+
+# Parse arguments
+NAME=""
+PROGRAM="claude-code"
+MODEL="sonnet-4.5"
+TASK=""
+PROJECT="$PROJECT_KEY"
+JSON_OUTPUT=false
+
+show_help() {
+    cat <<EOF
+Usage: am-register [options]
+
+Register or resume an agent identity in Agent Mail.
+
+Options:
+  --name NAME         Agent name (adjective+noun, omit to auto-generate)
+  --program PROGRAM   Program name (default: claude-code)
+  --model MODEL       Model name (default: sonnet-4.5)
+  --task TASK         Task description (default: "")
+  --project PATH      Project path (default: current directory)
+  --json              Output as JSON
+  --help, -h          Show this help
+
+Examples:
+  am-register
+  am-register --name BlueLake
+  am-register --program cursor --model gpt-4 --task "Bug fixes"
+  am-register --json
+
+Database: $AGENT_MAIL_DB
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --name)
+            NAME="$2"
+            shift 2
+            ;;
+        --program)
+            PROGRAM="$2"
+            shift 2
+            ;;
+        --model)
+            MODEL="$2"
+            shift 2
+            ;;
+        --task)
+            TASK="$2"
+            shift 2
+            ;;
+        --project)
+            PROJECT="$2"
+            shift 2
+            ;;
+        --json)
+            JSON_OUTPUT=true
+            shift
+            ;;
+        --help|-h)
+            show_help
+            exit 0
+            ;;
+        *)
+            am_error "Unknown option: $1"
+            ;;
+    esac
+done
+
+# Get or create project
+PROJECT_ID=$(am_get_project "$AGENT_MAIL_DB" "$PROJECT")
+
+# Generate name if not provided
+if [[ -z "$NAME" ]]; then
+    # Try to find an unused name
+    for attempt in {1..10}; do
+        NAME=$(am_generate_name)
+        existing=$(sqlite3 "$AGENT_MAIL_DB" "SELECT COUNT(*) FROM agents WHERE project_id = $PROJECT_ID AND name = '$NAME';")
+        if [[ "$existing" == "0" ]]; then
+            break
+        fi
+    done
+fi
+
+# Check if agent already exists
+AGENT_ID=$(sqlite3 "$AGENT_MAIL_DB" "SELECT id FROM agents WHERE project_id = $PROJECT_ID AND name = '$NAME';")
+
+if [[ -n "$AGENT_ID" ]]; then
+    # Agent exists - update it
+    sqlite3 "$AGENT_MAIL_DB" <<SQL
+UPDATE agents
+SET program = '$PROGRAM',
+    model = '$MODEL',
+    task_description = '$TASK',
+    last_active_ts = datetime('now')
+WHERE id = $AGENT_ID;
+SQL
+else
+    # Create new agent and get the ID in the same connection
+    AGENT_ID=$(sqlite3 "$AGENT_MAIL_DB" <<SQL
+INSERT INTO agents (project_id, name, program, model, task_description)
+VALUES ($PROJECT_ID, '$NAME', '$PROGRAM', '$MODEL', '$TASK');
+SELECT last_insert_rowid();
+SQL
+    )
+fi
+
+# Fetch and display agent details
+AGENT=$(sqlite3 -json "$AGENT_MAIL_DB" <<SQL
+SELECT
+    id,
+    name,
+    program,
+    model,
+    task_description,
+    inception_ts,
+    last_active_ts
+FROM agents
+WHERE id = $AGENT_ID;
+SQL
+)
+
+if [[ "$JSON_OUTPUT" == "true" ]]; then
+    echo "$AGENT" | am_format_json
+else
+    NAME_VAL=$(echo "$AGENT" | jq -r '.[0].name')
+    PROGRAM_VAL=$(echo "$AGENT" | jq -r '.[0].program')
+    MODEL_VAL=$(echo "$AGENT" | jq -r '.[0].model')
+    TASK_VAL=$(echo "$AGENT" | jq -r '.[0].task_description')
+    LAST_ACTIVE=$(echo "$AGENT" | jq -r '.[0].last_active_ts')
+
+    am_success "Registered: $NAME_VAL"
+    echo "  Program: $PROGRAM_VAL"
+    echo "  Model: $MODEL_VAL"
+    echo "  Task: ${TASK_VAL:-(none)}"
+    echo "  Last active: $LAST_ACTIVE"
+    echo "  Database: $AGENT_MAIL_DB"
+fi

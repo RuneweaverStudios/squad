@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# List all agents in a project
+# Usage: am-agents [--json]
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/am-lib.sh"
+
+# Parse arguments
+PROJECT="$PROJECT_KEY"
+JSON_OUTPUT=false
+
+show_help() {
+    cat <<EOF
+Usage: am-agents [options]
+
+List all agents registered in a project.
+
+Options:
+  --project PATH      Project path (default: current directory)
+  --json              Output as JSON
+  --help, -h          Show this help
+
+Examples:
+  am-agents
+  am-agents --json
+  am-agents --project /path/to/repo
+
+Database: $AGENT_MAIL_DB
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --project)
+            PROJECT="$2"
+            shift 2
+            ;;
+        --json)
+            JSON_OUTPUT=true
+            shift
+            ;;
+        --help|-h)
+            show_help
+            exit 0
+            ;;
+        *)
+            am_error "Unknown option: $1"
+            ;;
+    esac
+done
+
+# Get or create project
+PROJECT_ID=$(am_get_project "$AGENT_MAIL_DB" "$PROJECT")
+
+# Fetch all agents
+AGENTS=$(sqlite3 -json "$AGENT_MAIL_DB" <<SQL
+SELECT
+    name,
+    program,
+    model,
+    task_description,
+    inception_ts,
+    last_active_ts
+FROM agents
+WHERE project_id = $PROJECT_ID
+ORDER BY last_active_ts DESC;
+SQL
+)
+
+# Display agents
+if [[ "$JSON_OUTPUT" == "true" ]]; then
+    echo "$AGENTS" | am_format_json
+else
+    AGENT_COUNT=$(echo "$AGENTS" | jq '. | length')
+
+    if [[ "$AGENT_COUNT" == "0" ]]; then
+        echo "No agents registered in this project"
+        echo "Run: am-register --name AgentName"
+        exit 0
+    fi
+
+    echo "Agents in project ($AGENT_COUNT):"
+    echo ""
+
+    echo "$AGENTS" | jq -r '.[] | "  \(.name)
+    Program: \(.program)
+    Model: \(.model)
+    Task: \(.task_description // "(none)")
+    Last active: \(.last_active_ts)
+"'
+fi

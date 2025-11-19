@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+# List active file reservations
+# Usage: am-reservations [--agent AgentName] [--json]
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/am-lib.sh"
+
+# Parse arguments
+AGENT_FILTER=""
+PROJECT="$PROJECT_KEY"
+JSON_OUTPUT=false
+SHOW_ALL=false
+
+show_help() {
+    cat <<EOF
+Usage: am-reservations [options]
+
+List active file reservations in a project.
+
+Options:
+  --agent AGENT       Filter by agent name (optional)
+  --all               Show all reservations including expired/released
+  --project PATH      Project path (default: current directory)
+  --json              Output as JSON
+  --help, -h          Show this help
+
+Examples:
+  am-reservations
+  am-reservations --agent Alice
+  am-reservations --all --json
+
+Database: $AGENT_MAIL_DB
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --agent)
+            AGENT_FILTER="$2"
+            shift 2
+            ;;
+        --all)
+            SHOW_ALL=true
+            shift
+            ;;
+        --project)
+            PROJECT="$2"
+            shift 2
+            ;;
+        --json)
+            JSON_OUTPUT=true
+            shift
+            ;;
+        --help|-h)
+            show_help
+            exit 0
+            ;;
+        *)
+            am_error "Unknown option: $1"
+            ;;
+    esac
+done
+
+# Get or create project
+PROJECT_ID=$(am_get_project "$AGENT_MAIL_DB" "$PROJECT")
+
+# Build query
+QUERY="
+SELECT
+    fr.id,
+    a.name as agent_name,
+    fr.path_pattern,
+    fr.exclusive,
+    fr.reason,
+    fr.created_ts,
+    fr.expires_ts,
+    fr.released_ts
+FROM file_reservations fr
+JOIN agents a ON fr.agent_id = a.id
+WHERE fr.project_id = $PROJECT_ID"
+
+if [[ "$SHOW_ALL" != "true" ]]; then
+    QUERY="$QUERY
+  AND fr.released_ts IS NULL
+  AND datetime(fr.expires_ts) > datetime('now')"
+fi
+
+if [[ -n "$AGENT_FILTER" ]]; then
+    AGENT_ESC="${AGENT_FILTER//\'/\'\'}"
+    QUERY="$QUERY
+  AND a.name = '$AGENT_ESC'"
+fi
+
+QUERY="$QUERY
+ORDER BY fr.created_ts DESC"
+
+# Fetch reservations
+RESERVATIONS=$(sqlite3 -json "$AGENT_MAIL_DB" "$QUERY")
+
+# Display reservations
+if [[ "$JSON_OUTPUT" == "true" ]]; then
+    echo "$RESERVATIONS" | am_format_json
+else
+    RESERVATION_COUNT=$(echo "$RESERVATIONS" | jq '. | length')
+
+    if [[ "$RESERVATION_COUNT" == "0" ]]; then
+        if [[ "$SHOW_ALL" == "true" ]]; then
+            echo "No reservations found"
+        else
+            echo "No active reservations"
+        fi
+        exit 0
+    fi
+
+    if [[ "$SHOW_ALL" == "true" ]]; then
+        echo "File reservations ($RESERVATION_COUNT):"
+    else
+        echo "Active file reservations ($RESERVATION_COUNT):"
+    fi
+    echo ""
+
+    echo "$RESERVATIONS" | jq -r '.[] | "───────────────────────────────────────
+ID: \(.id) | Agent: \(.agent_name)
+Pattern: \(.path_pattern)
+Type: \(if .exclusive == 1 then "EXCLUSIVE" else "SHARED" end)
+\(if .reason != "" then "Reason: \(.reason)\n" else "" end)Created: \(.created_ts)
+Expires: \(.expires_ts)
+\(if .released_ts then "Released: \(.released_ts)\n" else "" end)"'
+fi
