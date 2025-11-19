@@ -1,5 +1,11 @@
 # Jomarchy Agent Tools
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Tools](https://img.shields.io/badge/Tools-28-blue)](#4-28-generic-bash-tools)
+[![Commands](https://img.shields.io/badge/Commands-10-purple)](#3-agent-swarm-coordination-commands)
+[![Agent Mail](https://img.shields.io/badge/Agent%20Mail-Enabled-green)](http://127.0.0.1:8765)
+[![Beads](https://img.shields.io/badge/Beads-CLI-orange)](https://github.com/steveyegge/beads)
+
 **Manage multiple agents across several projects in a complete AI-assisted development environment in one command.**
 
 Agent Mail (multi-agent coordination) + Beads (task planning) + 28 bash tools + 10 coordination commands = Full swarm orchestration that transcends context windows and project boundaries.
@@ -7,6 +13,23 @@ Agent Mail (multi-agent coordination) + Beads (task planning) + 28 bash tools + 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/joewinke/jomarchy-agent-tools/main/install.sh | bash
 ```
+
+---
+
+## ⚡ Quick Start
+
+```bash
+# 1. Install (one command)
+curl -fsSL https://raw.githubusercontent.com/joewinke/jomarchy-agent-tools/main/install.sh | bash
+
+# 2. Register your agent
+/register
+
+# 3. Start working
+/start
+```
+
+**First task in 60 seconds!** The installer sets up Agent Mail, Beads CLI, 28 tools, and 10 coordination commands. Your AI assistant gains swarm orchestration capabilities instantly.
 
 ---
 
@@ -20,6 +43,42 @@ Jomarchy Agent Tools is a **zero-configuration AI development environment** that
 - **Plan** work with dependency-aware task management (Beads)
 - **Execute** with 28 composable bash tools (no MCP bloat, instant integration)
 - **Scale** infinitely - add agents without coordination overhead
+
+### 🏗️ Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                       AI Assistants                             │
+│  (Claude Code, Cursor, Aider, Windsurf, Copilot, OpenCode)     │
+└─────────────────────┬───────────────────────────────────────────┘
+                      │
+                      ▼
+         ┌────────────────────────┐
+         │  Coordination Layer    │
+         │  10 Slash Commands     │  /register, /start, /complete,
+         │  ~/.claude/commands/   │  /handoff, /pause, /block,
+         └────────┬───────────────┘  /stop, /status, /verify, /plan
+                  │
+    ┌─────────────┼─────────────┐
+    │             │             │
+    ▼             ▼             ▼
+┌─────────┐  ┌─────────┐  ┌──────────┐
+│ Agent   │  │  Beads  │  │ 28 Tools │
+│  Mail   │◄─┤   CLI   │  │  (bash)  │
+└─────────┘  └─────────┘  └──────────┘
+    │             │             │
+    │             │             │
+    ▼             ▼             ▼
+Messages +    Task Queue +  Operations
+File Locks    Dependencies  (db, browser, etc)
+```
+
+**How it works:**
+1. **AI Assistants** use coordination commands (`/start`, `/complete`, etc.)
+2. **Commands** orchestrate the three layers below
+3. **Agent Mail** handles messaging and file reservation conflicts
+4. **Beads** manages task queue with dependency resolution
+5. **Tools** perform operations (database, browser, monitoring, etc.)
 
 ---
 
@@ -51,7 +110,84 @@ Modern AI coding assistants face three major challenges:
 
 ---
 
-## Quick Start
+## 🎯 Real-World Workflows
+
+### Scenario 1: Parallel Error Remediation
+
+**The Challenge:** 100 TypeScript errors across 20 files
+
+**The Swarm:**
+```bash
+# Agent 1
+/register
+/start  # Auto-picks: "Fix type errors in auth/"
+# ... fixes 15 errors in 8 minutes ...
+/complete  # ✅ Auto-starts next: "Fix type errors in ui/"
+
+# Agent 2 (parallel session)
+/register
+/start  # Gets: "Fix type errors in api/"
+# ... fixes 12 errors in 6 minutes ...
+/complete  # ✅ Continues to next chunk
+
+# Agent 3 (parallel session)
+/start  # Gets: "Fix type errors in lib/"
+```
+
+**Result:** All 100 errors fixed in 18 minutes across 3 agents with **zero conflicts** (file reservations prevent collisions).
+
+### Scenario 2: Multi-Agent Feature Development
+
+**The Challenge:** Implement Stripe payments (backend + frontend + tests)
+
+**The Coordination:**
+```bash
+# Backend Agent
+/start stripe-webhooks  # Implements webhook handling
+# ... builds /api/webhooks/stripe endpoint ...
+/complete  # ✅ Marks complete, unblocks frontend
+
+# Frontend Agent (waits for dependency)
+/start stripe-ui  # Shows as "blocked" until stripe-webhooks done
+# Once unblocked, starts automatically
+# ... builds PaymentForm component ...
+/complete
+
+# QA Agent
+/start stripe-tests  # Depends on both tasks
+# Runs integration tests across full flow
+```
+
+**Result:** Coordinated feature development with **automatic dependency resolution** and **zero rework**.
+
+### Scenario 3: Cross-Project Coordination
+
+**The Challenge:** Auth system spans 3 repos (backend, frontend, mobile)
+
+**The Architecture:**
+```bash
+# Backend Agent (in backend repo)
+am-register --project backend
+/start auth-api
+# ... implements JWT endpoints ...
+am-send Frontend "Auth API ready: /api/auth/login"
+
+# Frontend Agent (in frontend repo)
+am-inbox Frontend  # Sees message from Backend
+/start auth-ui
+# ... builds login form, connects to API ...
+
+# Mobile Agent (in mobile repo)
+am-inbox Mobile  # Gets notified
+/start auth-mobile
+# ... implements OAuth flow ...
+```
+
+**Result:** Three agents across three repositories **coordinate via Agent Mail** with shared context and **zero miscommunication**.
+
+---
+
+## Installation
 
 ### One-Line Install
 
@@ -791,6 +927,265 @@ This project combines:
 - **Browser Tools:** [badlogic/browser-tools](https://github.com/badlogic/browser-tools)
 
 Contributions welcome! Please open issues or PRs.
+
+---
+
+## ❓ FAQ
+
+### How is this different from MCP servers?
+
+**Key differences:**
+
+| Feature | JAT (Bash Tools) | MCP Servers |
+|---------|------------------|-------------|
+| **Token cost** | ~400 tokens | 32,000+ tokens |
+| **Startup time** | Instant | 2-5 seconds |
+| **Composability** | Full bash (pipes, jq, xargs) | Limited |
+| **Compatibility** | All CLIs (Claude, Cursor, Aider, etc.) | MCP-specific |
+| **Maintenance** | Simple shell scripts | Complex server processes |
+
+**JAT = 80x token reduction with universal compatibility.**
+
+### Can I use this with Cursor/Aider/Windsurf/Copilot?
+
+**Yes!** JAT works with **any** AI coding assistant:
+
+- ✅ **Claude Code** - Native integration (10 slash commands + MCP)
+- ✅ **Cursor** - Bash tools work directly
+- ✅ **Aider** - Bash tools work directly
+- ✅ **Windsurf** - Bash tools + MCP config provided
+- ✅ **GitHub Copilot** - Bash tools + MCP config provided
+- ✅ **OpenCode** - Native integration (bash + MCP)
+- ✅ **Codex CLI** - Full integration
+
+**The bash tools work everywhere.** MCP integration is optional for advanced features.
+
+### Can I use tools without swarm mode?
+
+**Absolutely!** JAT tools work standalone:
+
+```bash
+# Use tools directly without any coordination
+db-query "SELECT * FROM users LIMIT 10"
+am-inbox AgentName --unread
+browser-screenshot.js > /tmp/page.png
+
+# Or with simple bash composition
+am-inbox AgentName --json | jq '.[] | select(.importance=="urgent")'
+```
+
+**You don't need Agent Mail, Beads, or coordination commands to use the 28 tools.**
+
+### How do I coordinate across multiple repositories?
+
+**Agent Mail supports cross-repo coordination:**
+
+**Option A: Shared project key** (same team, different repos)
+```bash
+# In backend repo
+am-register --project "acme-platform"
+/start api-authentication
+
+# In frontend repo
+am-register --project "acme-platform"  # Same key!
+am-inbox Frontend  # Sees messages from backend
+```
+
+**Option B: Separate projects** (different teams)
+```bash
+# Contact handshake between projects
+am-contact BackendTeam --from FrontendTeam
+# Now they can message each other
+```
+
+### What happens if two agents edit the same file?
+
+**File reservations prevent conflicts:**
+
+1. **Agent 1** runs `/start auth-refactor`
+   - Reserves `src/auth/**` for 1 hour
+   - Works safely
+
+2. **Agent 2** runs `/start auth-tests`
+   - Tries to reserve `src/auth/**`
+   - Gets `FILE_RESERVATION_CONFLICT`
+   - Either waits or picks different work
+
+**Advisory locks = zero collisions.**
+
+### How do I add custom tools?
+
+**Just add bash scripts to the tools directory:**
+
+```bash
+cd ~/code/jomarchy-agent-tools/tools
+cat > my-custom-tool <<'EOF'
+#!/bin/bash
+# Your tool logic here
+echo "Hello from custom tool"
+EOF
+chmod +x my-custom-tool
+
+# Now available everywhere
+my-custom-tool
+```
+
+**JAT auto-discovers any executable in `tools/`.**
+
+### Does this work offline?
+
+**Partially:**
+
+- ✅ **Tools work offline** (db-query, browser-*, local operations)
+- ✅ **Beads works offline** (git-backed, no network needed)
+- ❌ **Agent Mail requires server** (but can self-host locally)
+
+**Most functionality works without internet.**
+
+### How do I update to the latest version?
+
+```bash
+cd ~/code/jomarchy-agent-tools
+git pull origin main
+
+# Re-run setup if commands/tools changed
+bash scripts/setup-global-claude-md.sh
+
+# Restart Agent Mail if needed
+systemctl --user restart agent-mail
+```
+
+**Updates are git-pull simple.**
+
+---
+
+## 🔧 Troubleshooting
+
+### Agent Mail Server Not Responding
+
+**Symptoms:** Commands timeout, tools fail with connection errors
+
+**Solution:**
+```bash
+# Check if server is running
+systemctl --user status agent-mail
+
+# If not running, start it
+systemctl --user start agent-mail
+
+# View logs
+journalctl --user -u agent-mail -f
+
+# If still failing, restart
+systemctl --user restart agent-mail
+```
+
+### FILE_RESERVATION_CONFLICT Error
+
+**Symptoms:** `/start` or `am-reserve` fails with conflict error
+
+**Cause:** Another agent has locked the files you need
+
+**Solutions:**
+
+1. **Check who has the lock:**
+   ```bash
+   am-reservations --all
+   # Shows: Agent "BackendDev" has src/api/** until 14:30
+   ```
+
+2. **Options:**
+   - **Wait:** Files auto-release after TTL expires
+   - **Work elsewhere:** `/start` picks different task
+   - **Coordinate:** `am-send BackendDev "Need src/api/auth.ts"`
+   - **Override (last resort):** `am-release src/api/** --force` (if agent is stale)
+
+3. **Prevent conflicts:**
+   - Reserve narrower patterns (not `**/*`)
+   - Use shorter TTLs (not 24 hours)
+   - Coordinate via Agent Mail before starting
+
+### Tools Not in PATH
+
+**Symptoms:** `bash: am-inbox: command not found`
+
+**Solution:**
+```bash
+# Add to ~/.bashrc
+echo 'export PATH="$HOME/code/jomarchy-agent-tools/tools:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+
+# Verify
+which am-inbox
+# Should show: /home/user/code/jomarchy-agent-tools/tools/am-inbox
+```
+
+### Beads Not Initialized
+
+**Symptoms:** `Error: no beads database found`
+
+**Solution:**
+```bash
+# Initialize in your project
+cd ~/code/your-project
+bd init
+
+# Answer prompts:
+# - Install git hooks? Y
+# - Configure merge driver? Y
+```
+
+### Commands Not Working (/start, /register, etc.)
+
+**Symptoms:** `/start` not recognized or does nothing
+
+**Cause:** Commands not installed in `~/.claude/commands/agent/`
+
+**Solution:**
+```bash
+# Re-run global setup
+cd ~/code/jomarchy-agent-tools
+bash scripts/setup-global-claude-md.sh
+
+# Verify installation
+ls ~/.claude/commands/agent/
+# Should show: register.md, start.md, complete.md, etc.
+```
+
+### Browser Tools Fail (Chrome Not Found)
+
+**Symptoms:** `browser-start.js` fails with "Chrome not found"
+
+**Solution:**
+```bash
+# Linux: Install Chrome/Chromium
+sudo apt install chromium-browser  # Debian/Ubuntu
+sudo pacman -S chromium             # Arch
+
+# macOS: Install Chrome
+brew install --cask google-chrome
+
+# Set custom Chrome path
+export CHROME_PATH="/path/to/chrome"
+```
+
+### Database Connection Errors (db-query fails)
+
+**Symptoms:** `db-query` fails with connection timeout
+
+**Cause:** Missing or invalid DATABASE_URL environment variable
+
+**Solution:**
+```bash
+# Check current value
+echo $DATABASE_URL
+
+# Set in ~/.bashrc or project .env
+export DATABASE_URL="postgresql://user:pass@host:5432/db"
+
+# Test connection
+db-connection-test
+```
 
 ---
 
