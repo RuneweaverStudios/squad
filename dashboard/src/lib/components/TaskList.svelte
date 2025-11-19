@@ -16,6 +16,7 @@
 	let projects = $state([]);
 	let loading = $state(true);
 	let error = $state(null);
+	let lastUpdated = $state(null);
 
 	// Priority colors
 	const priorityColors = {
@@ -50,8 +51,8 @@
 	);
 
 	// Fetch tasks
-	async function fetchTasks() {
-		loading = true;
+	async function fetchTasks(silent = false) {
+		if (!silent) loading = true;
 		error = null;
 		try {
 			const response = await fetch('/api/tasks');
@@ -59,16 +60,28 @@
 			const data = await response.json();
 			tasks = data.tasks;
 			projects = data.projects;
+			lastUpdated = new Date();
 		} catch (err) {
 			error = err.message;
 		} finally {
-			loading = false;
+			if (!silent) loading = false;
 		}
 	}
 
-	// Load tasks on mount
+	// Load tasks on mount and set up auto-refresh
 	$effect(() => {
+		// Initial load
 		fetchTasks();
+
+		// Set up polling for real-time updates (every 2 seconds)
+		const interval = setInterval(() => {
+			fetchTasks(true); // Silent refresh (no loading indicator)
+		}, 2000);
+
+		// Cleanup: clear interval when component unmounts
+		return () => {
+			clearInterval(interval);
+		};
 	});
 </script>
 
@@ -79,7 +92,12 @@
 		<div class="error">Error: {error}</div>
 	{:else}
 		<div class="task-count">
-			{filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''}
+			<span>{filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''}</span>
+			{#if lastUpdated}
+				<span class="last-updated">
+					• Updated {lastUpdated.toLocaleTimeString()}
+				</span>
+			{/if}
 		</div>
 
 		<div class="tasks">
@@ -147,6 +165,14 @@
 		margin-bottom: 1rem;
 		font-size: 0.875rem;
 		color: #6b7280;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.last-updated {
+		color: #9ca3af;
+		font-size: 0.8rem;
 	}
 
 	.tasks {
