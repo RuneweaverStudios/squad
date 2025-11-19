@@ -4,6 +4,8 @@
 	 * Displays Beads tasks with filtering using Svelte 5 $derived runes
 	 */
 
+	import TaskModal from './TaskModal.svelte';
+
 	// Props
 	let {
 		selectedProject = $bindable('all'),
@@ -18,6 +20,7 @@
 	let loading = $state(true);
 	let error = $state(null);
 	let lastUpdated = $state(null);
+	let selectedTask = $state(null);
 
 	// Priority colors
 	const priorityColors = {
@@ -78,6 +81,31 @@
 		}
 	}
 
+	// Handle task click - fetch full details and open modal
+	async function handleTaskClick(taskId) {
+		try {
+			const response = await fetch(`/api/tasks/${taskId}`);
+			if (!response.ok) throw new Error('Failed to fetch task details');
+			const taskData = await response.json();
+			selectedTask = taskData;
+		} catch (err) {
+			console.error('Error fetching task details:', err);
+		}
+	}
+
+	// Close modal
+	function closeModal() {
+		selectedTask = null;
+	}
+
+	// Handle keyboard events for accessibility
+	function handleKeyDown(event, taskId) {
+		if (event.key === 'Enter' || event.key === ' ') {
+			event.preventDefault();
+			handleTaskClick(taskId);
+		}
+	}
+
 	// Load tasks on mount and set up auto-refresh
 	$effect(() => {
 		// Initial load
@@ -115,7 +143,13 @@
 				{@const priorityStyle = priorityColors[task.priority] || priorityColors[2]}
 				{@const projectStyle = getProjectColor(task.project)}
 
-				<div class="task-item">
+				<div
+					class="task-item"
+					onclick={() => handleTaskClick(task.id)}
+					onkeydown={(e) => handleKeyDown(e, task.id)}
+					role="button"
+					tabindex="0"
+				>
 					<div class="task-header">
 						<span class="task-id {projectStyle.bg} {projectStyle.text} {projectStyle.border}">
 							{task.project}-{task.id.split('-').pop()}
@@ -150,6 +184,8 @@
 			{/each}
 		</div>
 	{/if}
+
+	<TaskModal bind:task={selectedTask} onClose={closeModal} />
 </div>
 
 <style>
@@ -196,11 +232,13 @@
 		border: 1px solid #e5e7eb;
 		border-radius: 0.5rem;
 		padding: 1rem;
-		transition: box-shadow 0.2s;
+		transition: box-shadow 0.2s, transform 0.2s;
+		cursor: pointer;
 	}
 
 	.task-item:hover {
 		box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+		transform: translateY(-2px);
 	}
 
 	.task-header {
