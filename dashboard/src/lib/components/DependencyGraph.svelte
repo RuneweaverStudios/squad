@@ -45,15 +45,21 @@
 			project: task.project || 'unknown'
 		}));
 
+		// Build links, but only for nodes that exist in the current filtered set
+		const nodeIds = new Set(nodes.map(n => n.id));
 		const links = [];
 		tasks.forEach(task => {
 			if (task.depends_on && Array.isArray(task.depends_on)) {
 				task.depends_on.forEach(dep => {
-					links.push({
-						source: dep.id || dep.depends_on_id,
-						target: task.id,
-						type: dep.type || 'depends'
-					});
+					const sourceId = dep.id || dep.depends_on_id;
+					// Only create link if both source and target nodes exist
+					if (nodeIds.has(sourceId) && nodeIds.has(task.id)) {
+						links.push({
+							source: sourceId,
+							target: task.id,
+							type: dep.type || 'depends'
+						});
+					}
 				});
 			}
 		});
