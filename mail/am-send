@@ -32,7 +32,7 @@ Arguments:
 Options:
   --from AGENT        Sending agent name (required)
   --to AGENTS         Comma-separated list of recipient agents (required)
-                      Special mentions: @active, @all
+                      Special mentions: @active, @recent, @all
   --cc AGENTS         Comma-separated list of CC recipients (optional)
   --thread ID         Thread identifier (e.g., bd-123) (optional)
   --importance LEVEL  Message importance: normal | high | urgent (default: normal)
@@ -51,6 +51,8 @@ Examples:
 Mentions:
   @active             Expands to all agents active in last 60 minutes
                       Shows: "✓ Expanded @active → N agent(s): Agent1,Agent2..."
+  @recent             Expands to all agents active in last 24 hours
+                      Shows: "✓ Expanded @recent → N agent(s): Agent1,Agent2..."
   @all                Expands to ALL registered agents (even offline)
                       Shows: "✓ Broadcasting to all agents: N"
 
@@ -165,6 +167,24 @@ if [[ "$TO_AGENTS" == *"@active"* ]]; then
 
     # Show expansion
     echo "✓ Expanded @active → $ACTIVE_COUNT agent(s): $ACTIVE_AGENTS"
+fi
+
+# Expand @recent mention to agents active in last 24 hours
+if [[ "$TO_AGENTS" == *"@recent"* ]]; then
+    RECENT_AGENTS=$(sqlite3 "$AGENT_MAIL_DB" "SELECT name FROM agents WHERE datetime(last_active_ts) > datetime('now', '-24 hours') ORDER BY name;" | tr '\n' ',' | sed 's/,$//')
+
+    if [[ -z "$RECENT_AGENTS" ]]; then
+        am_error "No recent agents found (last 24 hours). Cannot expand @recent mention."
+    fi
+
+    # Replace @recent with expanded list
+    TO_AGENTS="${TO_AGENTS//@recent/$RECENT_AGENTS}"
+
+    # Count agents for display
+    RECENT_COUNT=$(echo "$RECENT_AGENTS" | tr ',' '\n' | wc -l)
+
+    # Show expansion
+    echo "✓ Expanded @recent → $RECENT_COUNT agent(s): $RECENT_AGENTS"
 fi
 
 # Validate importance level
