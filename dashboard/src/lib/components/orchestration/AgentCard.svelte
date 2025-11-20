@@ -12,11 +12,17 @@
 		if (agent.active) {
 			return agent.in_progress_tasks > 0 ? 'active' : 'idle';
 		}
-		// Check if agent has been active recently (based on last_activity timestamp)
-		const lastActivity = agent.last_activity ? new Date(agent.last_activity) : null;
-		if (lastActivity && (Date.now() - lastActivity.getTime()) < 3600000) {
-			// Active within last hour
-			return 'idle';
+		// Check if agent has been active recently (based on last_active_ts timestamp)
+		// Database timestamps are in UTC without 'Z' suffix - convert to ISO format
+		if (agent.last_active_ts) {
+			const isoTimestamp = agent.last_active_ts.includes('T')
+				? agent.last_active_ts
+				: agent.last_active_ts.replace(' ', 'T') + 'Z';
+			const lastActivity = new Date(isoTimestamp);
+			if (Date.now() - lastActivity.getTime() < 3600000) {
+				// Active within last hour
+				return 'idle';
+			}
 		}
 		return 'offline';
 	});
@@ -92,7 +98,10 @@
 	// Format last activity time
 	function formatLastActivity(timestamp) {
 		if (!timestamp) return 'Never';
-		const date = new Date(timestamp);
+		// Database timestamps are in UTC but without 'Z' suffix
+		// Append 'Z' to parse as UTC, or replace space with 'T' and add 'Z'
+		const isoTimestamp = timestamp.includes('T') ? timestamp : timestamp.replace(' ', 'T') + 'Z';
+		const date = new Date(isoTimestamp);
 		const now = new Date();
 		const diffMs = now - date;
 		const diffMins = Math.floor(diffMs / 60000);
@@ -276,7 +285,7 @@
 					{agent.program || 'claude-code'} • {agent.model || 'unknown'}
 				</p>
 				<p class="text-xs text-base-content/40 mt-0.5">
-					Last active: {formatLastActivity(agent.last_activity)}
+					Last active: {formatLastActivity(agent.last_active_ts)}
 				</p>
 			</div>
 			<span class="badge badge-sm {getStatusBadge(agentStatus())}">
