@@ -22,10 +22,13 @@ curl -fsSL https://raw.githubusercontent.com/joewinke/jat/main/install.sh | bash
 # 1. Install (run in your terminal/bash)
 curl -fsSL https://raw.githubusercontent.com/joewinke/jat/main/install.sh | bash
 
-# 2. Start working (registers agent + picks task)
+# 2. Initialize Beads in your project (creates .beads/ directory)
+bd init
+
+# 3. Start working (registers agent + picks task)
 /agent:start
 
-# 3. Plan your feature (optional - if not already planned)
+# 4. Plan your feature (optional - if not already planned)
 # Option A - Conversational (recommended):
 #   "I want to build [feature]. It should [requirements]..."
 #   Agent asks questions, you discuss, then: /agent:plan
@@ -34,7 +37,7 @@ curl -fsSL https://raw.githubusercontent.com/joewinke/jat/main/install.sh | bash
 #   Paste written PRD, then: /agent:plan
 /agent:plan
 
-# 4. Complete tasks
+# 5. Complete tasks
 /agent:complete
 ```
 
