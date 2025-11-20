@@ -32,6 +32,7 @@ Arguments:
 Options:
   --from AGENT        Sending agent name (required)
   --to AGENTS         Comma-separated list of recipient agents (required)
+                      Special mentions: @active (expands to agents active in last 60 min)
   --cc AGENTS         Comma-separated list of CC recipients (optional)
   --thread ID         Thread identifier (e.g., bd-123) (optional)
   --importance LEVEL  Message importance: normal | high | urgent (default: normal)
@@ -44,6 +45,11 @@ Examples:
   am-send "Hello" "Testing" --from Agent1 --to Agent2
   am-send "[bd-123] Start work" "Beginning task..." --from Builder --to Team --thread bd-123 --ack
   am-send "Update" "Progress report" --from Agent1 --to Agent2,Agent3 --cc Manager --importance high
+  am-send "Announcement" "Server maintenance tonight" --from Admin --to @active --importance high
+
+Mentions:
+  @active             Expands to all agents active in last 60 minutes
+                      Shows: "✓ Expanded @active → N agent(s): Agent1,Agent2..."
 
 Database: $AGENT_MAIL_DB
 EOF
@@ -116,6 +122,24 @@ fi
 
 if [[ -z "$TO_AGENTS" ]]; then
     am_error "--to agents is required"
+fi
+
+# Expand @active mention to agents active in last 60 minutes
+if [[ "$TO_AGENTS" == *"@active"* ]]; then
+    ACTIVE_AGENTS=$(sqlite3 "$AGENT_MAIL_DB" "SELECT name FROM agents WHERE datetime(last_active_ts) > datetime('now', '-60 minutes') ORDER BY name;" | tr '\n' ',' | sed 's/,$//')
+
+    if [[ -z "$ACTIVE_AGENTS" ]]; then
+        am_error "No active agents found (last 60 minutes). Cannot expand @active mention."
+    fi
+
+    # Replace @active with expanded list
+    TO_AGENTS="${TO_AGENTS//@active/$ACTIVE_AGENTS}"
+
+    # Count agents for display
+    ACTIVE_COUNT=$(echo "$ACTIVE_AGENTS" | tr ',' '\n' | wc -l)
+
+    # Show expansion
+    echo "✓ Expanded @active → $ACTIVE_COUNT agent(s): $ACTIVE_AGENTS"
 fi
 
 # Validate importance level
