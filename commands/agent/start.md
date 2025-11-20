@@ -14,10 +14,11 @@ Get to work! Unified smart command that handles registration, task selection, co
 
 **What this command does:**
 1. **Smart Registration:** Categorizes existing agents by state (working/active/idle/offline) and offers resumption
-2. **Session Persistence:** Updates `.claude/agent-{session_id}.txt` for statusline
-3. **Task Selection:** From parameter, conversation context, or priority
-4. **Conflict Detection:** File locks, git changes, dependencies
-5. **Actually Starts Work:** Reserves files, sends Agent Mail, updates Beads
+2. **Duplicate Prevention:** Always checks if agent name exists before registering (resumes instead of creating duplicates)
+3. **Session Persistence:** Updates `.claude/agent-{session_id}.txt` for statusline
+4. **Task Selection:** From parameter, conversation context, or priority
+5. **Conflict Detection:** File locks, git changes, dependencies
+6. **Actually Starts Work:** Reserves files, sends Agent Mail, updates Beads
 
 ---
 
@@ -75,9 +76,17 @@ fi
 
 **If PARAM_TYPE == "agent-name":**
 ```bash
-# User explicitly requested an agent
+# User explicitly requested an agent - check if it exists first
 AGENT_NAME="$REQUESTED_AGENT"
-am-register --name "$AGENT_NAME" --program claude-code --model sonnet-4.5
+
+# Check if agent already exists in Agent Mail DB
+if am-agents | grep -q "^  ${AGENT_NAME}$"; then
+  echo "✅ Resuming existing agent: $AGENT_NAME"
+  # Don't re-register - agent already exists
+else
+  echo "✨ Creating new agent: $AGENT_NAME"
+  am-register --name "$AGENT_NAME" --program claude-code --model sonnet-4.5
+fi
 ```
 
 **Then use Read/Write tools (NOT bash command substitution):**
@@ -185,9 +194,15 @@ else
   echo "✨ Created new agent: $AGENT_NAME"
 fi
 
-# Register the selected/created agent (if not auto-created above)
+# Register the selected/created agent (if not auto-created above and doesn't exist)
 if [[ -n "$AGENT_NAME" ]]; then
-  am-register --name "$AGENT_NAME" --program claude-code --model sonnet-4.5
+  # Check if agent already exists before registering
+  if ! am-agents | grep -q "^  ${AGENT_NAME}$"; then
+    echo "✨ Registering agent: $AGENT_NAME"
+    am-register --name "$AGENT_NAME" --program claude-code --model sonnet-4.5
+  else
+    echo "✅ Agent $AGENT_NAME already exists, resuming"
+  fi
 fi
 ```
 
@@ -548,6 +563,7 @@ SESSION_ID=$(cat .claude/current-session-id.txt) && echo "Name" > ".claude/agent
 
 - **Session-first:** Always writes to session file before env var
 - **Use Read/Write tools:** NEVER use bash command substitution for session file paths
+- **Resume existing agents:** Always checks if agent name exists before registering to prevent duplicates
 - **Smart defaults:** Auto-detects recent agents, picks best task
 - **Conflict-aware:** Checks locks, git status, dependencies
 - **Actually starts:** Not just recommendations - reserves files and updates status
