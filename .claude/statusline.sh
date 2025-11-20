@@ -270,10 +270,11 @@ time_remaining=""
 if [[ -n "$agent_name" ]]; then
     # Count file locks
     if command -v am-reservations &>/dev/null; then
-        lock_count=$(am-reservations --agent "$agent_name" 2>/dev/null | grep -c "^ID:" || echo "0")
+        lock_count=$(am-reservations --agent "$agent_name" 2>/dev/null | grep -c "^ID:" 2>/dev/null || echo "0")
+        lock_count=$(echo "$lock_count" | tr -d '\n' | tr -d ' ')  # Clean up output
 
         # Calculate time remaining on shortest lock
-        if [[ $lock_count -gt 0 ]]; then
+        if [[ "$lock_count" != "0" ]] && [[ $lock_count -gt 0 ]]; then
             expires=$(am-reservations --agent "$agent_name" 2>/dev/null | grep "^Expires:" | head -1 | sed 's/^Expires: //')
             if [[ -n "$expires" ]]; then
                 expires_epoch=$(date -d "$expires" +%s 2>/dev/null || echo "0")
@@ -295,7 +296,8 @@ if [[ -n "$agent_name" ]]; then
 
     # Count unread messages
     if command -v am-inbox &>/dev/null; then
-        unread_count=$(am-inbox "$agent_name" --unread 2>/dev/null | grep -c "^ID:" || echo "0")
+        unread_count=$(am-inbox "$agent_name" --unread 2>/dev/null | grep -c "^ID:" 2>/dev/null || echo "0")
+        unread_count=$(echo "$unread_count" | tr -d '\n' | tr -d ' ')  # Clean up output
     fi
 fi
 

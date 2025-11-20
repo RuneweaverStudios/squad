@@ -2,13 +2,13 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tools](https://img.shields.io/badge/Tools-28-blue)](#4-28-generic-bash-tools)
-[![Commands](https://img.shields.io/badge/Commands-7-purple)](#3-agent-swarm-coordination-commands)
+[![Commands](https://img.shields.io/badge/Commands-8-purple)](#3-agent-swarm-coordination-commands)
 [![Agent Mail](https://img.shields.io/badge/Agent%20Mail-Bash%2BSQLite-green)](#1-agent-mail)
 [![Beads](https://img.shields.io/badge/Beads-CLI-orange)](https://github.com/steveyegge/beads)
 
 **Manage multiple agents across several projects in a complete AI-assisted development environment in one command.**
 
-Agent Mail (multi-agent coordination) + Beads (task planning) + 28 bash tools + 7 coordination commands = Full swarm orchestration that transcends context windows and project boundaries.
+Agent Mail (multi-agent coordination) + Beads (task planning) + 28 bash tools + 8 coordination commands = Full swarm orchestration that transcends context windows and project boundaries.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/joewinke/jat/main/install.sh | bash
