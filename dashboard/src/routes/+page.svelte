@@ -3,6 +3,7 @@
 	import TaskList from '$lib/components/TaskList.svelte';
 	import DependencyGraph from '$lib/components/DependencyGraph.svelte';
 	import ThemeSelector from '$lib/components/ThemeSelector.svelte';
+	import TaskDetailModal from '$lib/components/TaskDetailModal.svelte';
 
 	let selectedProject = $state('all');
 	let selectedPriority = $state('all');
@@ -27,8 +28,11 @@
 	// Handle node click in graph
 	function handleNodeClick(taskId) {
 		selectedTaskId = taskId;
-		// Could open task modal here
-		console.log('Clicked task:', taskId);
+	}
+
+	// Handle modal close
+	function handleModalClose() {
+		selectedTaskId = null;
 	}
 
 	// Fetch tasks when filters change
@@ -164,4 +168,7 @@
 			<DependencyGraph {tasks} onNodeClick={handleNodeClick} />
 		</div>
 	{/if}
+
+	<!-- Task Detail Modal -->
+	<TaskDetailModal taskId={selectedTaskId} onClose={handleModalClose} />
 </div>

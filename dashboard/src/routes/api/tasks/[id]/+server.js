@@ -19,7 +19,7 @@ export async function GET({ params }) {
 		return json({ error: 'Task not found' }, { status: 404 });
 	}
 
-	return json(task);
+	return json({ task });
 }
 
 /** @type {import('./$types').RequestHandler} */
