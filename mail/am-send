@@ -32,7 +32,7 @@ Arguments:
 Options:
   --from AGENT        Sending agent name (required)
   --to AGENTS         Comma-separated list of recipient agents (required)
-                      Special mentions: @active, @recent, @all
+                      Special mentions: @active, @recent, @all, @project:name
   --cc AGENTS         Comma-separated list of CC recipients (optional)
   --thread ID         Thread identifier (e.g., bd-123) (optional)
   --importance LEVEL  Message importance: normal | high | urgent (default: normal)
@@ -47,6 +47,7 @@ Examples:
   am-send "Update" "Progress report" --from Agent1 --to Agent2,Agent3 --cc Manager --importance high
   am-send "Announcement" "Server maintenance tonight" --from Admin --to @active --importance high
   am-send "Critical Alert" "System down" --from Monitor --to @all --importance urgent
+  am-send "Project Update" "Sprint completed" --from Lead --to @project:jat --importance high
 
 Mentions:
   @active             Expands to all agents active in last 60 minutes
@@ -55,6 +56,9 @@ Mentions:
                       Shows: "✓ Expanded @recent → N agent(s): Agent1,Agent2..."
   @all                Expands to ALL registered agents (even offline)
                       Shows: "✓ Broadcasting to all agents: N"
+  @project:name       Expands to all agents in specified project (by slug)
+                      Shows: "✓ Expanded @project:name → N agent(s): Agent1,Agent2..."
+                      Example: @project:jat, @project:chimaro
 
 Database: $AGENT_MAIL_DB
 EOF
@@ -185,6 +189,30 @@ if [[ "$TO_AGENTS" == *"@recent"* ]]; then
 
     # Show expansion
     echo "✓ Expanded @recent → $RECENT_COUNT agent(s): $RECENT_AGENTS"
+fi
+
+# Expand @project:name mention to all agents in specified project
+if [[ "$TO_AGENTS" =~ @project:([a-zA-Z0-9_-]+) ]]; then
+    PROJECT_NAME="${BASH_REMATCH[1]}"
+
+    # Query agents in this project using slug
+    PROJECT_AGENTS=$(sqlite3 "$AGENT_MAIL_DB" "SELECT a.name FROM agents a JOIN projects p ON a.project_id = p.id WHERE p.slug = '$PROJECT_NAME' ORDER BY a.name;" | tr '\n' ',' | sed 's/,$//')
+
+    if [[ -z "$PROJECT_AGENTS" ]]; then
+        available_projects=$(sqlite3 "$AGENT_MAIL_DB" "SELECT slug FROM projects ORDER BY slug;" | tr '\n' ', ' | sed 's/, $//')
+        echo "✗ Error: No agents found in project '$PROJECT_NAME'. Cannot expand @project:$PROJECT_NAME mention." >&2
+        echo "Available projects: $available_projects" >&2
+        exit 1
+    fi
+
+    # Replace @project:name with expanded list
+    TO_AGENTS="${TO_AGENTS//@project:$PROJECT_NAME/$PROJECT_AGENTS}"
+
+    # Count agents for display
+    PROJECT_COUNT=$(echo "$PROJECT_AGENTS" | tr ',' '\n' | wc -l)
+
+    # Show expansion
+    echo "✓ Expanded @project:$PROJECT_NAME → $PROJECT_COUNT agent(s): $PROJECT_AGENTS"
 fi
 
 # Validate importance level
