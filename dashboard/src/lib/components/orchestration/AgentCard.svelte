@@ -765,6 +765,19 @@
 				<span>⏸️</span>
 				Unassign Current Task
 			</button>
+
+			<div class="border-t border-base-300 my-1"></div>
+
+			<button
+				class="w-full px-3 py-2 text-left text-sm hover:bg-error hover:text-error-content transition-colors flex items-center gap-2"
+				onclick={() => {
+					showDeleteModal = true;
+					closeQuickActions();
+				}}
+			>
+				<span>🗑️</span>
+				Delete Agent
+			</button>
 		</div>
 	</div>
 {/if}
