@@ -591,19 +591,18 @@
 				</div>
 			{:else}
 				<div class="bg-base-200 rounded p-2 text-center">
-					<p class="text-xs text-base-content/50 italic">No active task</p>
+					<p class="text-xs text-base-content/50 italic">Drop task here to assign</p>
 				</div>
 			{/if}
 		</div>
 
+		{#if queuedTasks().length > 0}
 		<!-- Queued Tasks / Drop Zone (Unified) -->
 		<div class="mb-3">
 			<div class="text-xs font-medium text-base-content/70 mb-1">
 				Queue ({queuedTasks().length}):
 			</div>
 
-			{#if queuedTasks().length > 0}
-				<!-- Has tasks: Show task list -->
 				<div class="space-y-1">
 					{#each queuedTasks().slice(0, 3) as task}
 						<div class="bg-base-200 rounded px-2 py-1">
@@ -664,55 +663,8 @@
 						{/if}
 					</div>
 				{/if}
-			{:else}
-				<!-- Empty queue: Show drop zone state -->
-				<div class="bg-base-200 rounded p-3 text-center">
-					{#if isAssigning}
-						<div class="flex items-center justify-center gap-2">
-							<span class="loading loading-spinner loading-xs"></span>
-							<p class="text-xs text-base-content/70">Assigning task...</p>
-						</div>
-					{:else if isDragOver && hasDependencyBlock}
-						<div class="space-y-1">
-							<p class="text-xs text-error font-medium flex items-center justify-center gap-1">
-								<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 15.636 5.636m12.728 12.728L5.636 5.636" />
-								</svg>
-								Dependency Block!
-							</p>
-							<div class="text-xs text-error/80">
-								<p>🚫 {dependencyBlockReason}</p>
-								<p class="mt-1 text-base-content/60">Complete blocking tasks first</p>
-							</div>
-						</div>
-					{:else if isDragOver && hasConflict}
-						<div class="space-y-1">
-							<p class="text-xs text-error font-medium flex items-center justify-center gap-1">
-								<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-								</svg>
-								File Conflict!
-							</p>
-							<div class="text-xs text-error/80 max-h-20 overflow-y-auto">
-								{#each conflictReasons as reason}
-									<p class="truncate" title={reason}>• {reason}</p>
-								{/each}
-							</div>
-						</div>
-					{:else if isDragOver}
-						<p class="text-xs text-success font-medium flex items-center justify-center gap-1">
-							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-							</svg>
-							Drop to assign to {agent.name}
-						</p>
-					{:else}
-						<p class="text-xs text-base-content/50 italic">Drop task here to assign</p>
-					{/if}
-				</div>
-			{/if}
-		</div>
-
+			</div>
+		{/if}
 		<!-- File Locks -->
 		<div>
 			<div class="text-xs font-medium text-base-content/70 mb-1">
