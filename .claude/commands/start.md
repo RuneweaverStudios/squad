@@ -1,20 +1,22 @@
-# Smart Start - Auto-detect or Create Agent
+# Smart Start - Integrated Registration and Task Start
 
-**Usage:** `/start [AgentName]`
+**Usage:** `/start [parameter]`
 
 **Examples:**
-- `/start` - Auto-detect recent agents or create new
-- `/start MyAgent` - Quick register as specific agent (same as `/r MyAgent`)
+- `/start` - Resume current agent or auto-detect/create
+- `/start agent` - Force show agent menu (even if AGENT_NAME set)
+- `/start task-abc` - Start specific task (auto-registers if needed)
 
 **What this command does:**
-1. Detects agents active in the last hour using smart agent detection
-2. If recent agents found: offers to resume the most recent one
-3. If no recent agents: creates a new agent identity
-4. Reviews inbox and acknowledges messages
-5. Shows ready tasks from Beads
-6. Categorizes tasks and provides recommendations
+1. Checks AGENT_NAME environment variable
+2. If not set: detects agents active in last hour or auto-creates new agent
+3. If parameter is "agent": forces interactive agent selection menu
+4. If parameter is task ID: starts that specific task
+5. Reviews inbox and acknowledges messages
+6. Shows ready tasks from Beads
+7. Categorizes tasks and provides recommendations
 
-This is the "just get me working" command - optimized for quick session start.
+This is the "just get me working" command - seamlessly handles both registration and task start.
 
 ---
 
@@ -22,11 +24,35 @@ This is the "just get me working" command - optimized for quick session start.
 
 Follow these steps:
 
-### Step 1: Check for Explicit Agent Name
+### Step 0: Parse Parameter
 
-If user provided an agent name argument (e.g., `/start MyAgent`), skip to Step 6 with that name.
+Extract the parameter from command arguments:
+
+```bash
+PARAM="$1"  # Could be empty, "agent", or a task ID (e.g., "dirt-abc")
+```
+
+### Step 1: Check AGENT_NAME Environment Variable
+
+**CRITICAL:** Always check AGENT_NAME first:
+
+```bash
+if [ -n "$AGENT_NAME" ] && [ "$PARAM" != "agent" ]; then
+  # Agent already registered and not forcing menu
+  AGENT_REGISTERED=true
+  # Skip to Step 7 (if PARAM is task ID) or Step 8 (if no param)
+else
+  # Need to register agent
+  AGENT_REGISTERED=false
+  # Continue to Step 2
+fi
+```
+
+**Special case:** If `PARAM == "agent"`, force show agent menu even if AGENT_NAME is set.
 
 ### Step 2: Detect Recent Agents
+
+**Only run if AGENT_REGISTERED==false** (from Step 1):
 
 Use the smart agent detection utility to find agents active in the last hour:
 
@@ -84,10 +110,14 @@ Use `NEW_AGENT` as the agent name (continue to Step 6).
 
 ### Step 6: Register Agent
 
+**Only run if AGENT_REGISTERED==false:**
+
 ```bash
-AGENT_NAME={AgentName}  # From Step 1, 3, or 5
+AGENT_NAME={AgentName}  # From Step 3 or 5
 am-register --name $AGENT_NAME --program claude-code --model sonnet-4.5
 ```
+
+**If AGENT_REGISTERED==true:** Agent is already registered, use existing `$AGENT_NAME`.
 
 ### Step 7: Set Environment Variable for Statusline
 
@@ -97,7 +127,34 @@ am-register --name $AGENT_NAME --program claude-code --model sonnet-4.5
 export AGENT_NAME=$AGENT_NAME
 ```
 
+**Note:** If AGENT_REGISTERED==true, this variable is already set from previous session.
+
 This enables the statusline to show your agent identity, task progress, and indicators.
+
+### Step 7.5: Check if Starting Specific Task
+
+**If PARAM looks like a task ID** (e.g., matches pattern "dirt-*" or "project-*"):
+
+```bash
+# Assume PARAM is a task ID
+TASK_ID="$PARAM"
+
+# Verify task exists
+if bd show "$TASK_ID" --json >/dev/null 2>&1; then
+  # Valid task, proceed to task start flow (call /agent:start with task ID)
+  # This delegates to the comprehensive /agent:start command
+  echo "Starting task $TASK_ID..."
+  # Call /agent:start command with task ID
+  # (command execution continues there)
+  exit 0
+else
+  echo "❌ Error: Task '$TASK_ID' not found in Beads"
+  echo "💡 Use 'bd list' to see available tasks"
+  exit 1
+fi
+```
+
+**If PARAM is empty or "agent":** Continue to Step 8 (task recommendations).
 
 ### Step 8: Review Inbox
 
@@ -165,37 +222,53 @@ Use this output format:
 ## Decision Flow Summary
 
 ```
-/start [AgentName?]
+/start [parameter?]
     |
-    ├─ Has explicit name? ──YES──> Register {AgentName} → Continue
-    |
-    └─ NO → Detect recent agents (get-recent-agents 60)
-        |
-        ├─ Found recent agents? ──YES──> Ask user:
-        |                                  - Resume most recent (default)
-        |                                  - Create new
-        |                                  - Show all agents
-        |
-        └─ NO recent agents ──> Auto-create new → Continue
+    ├─ Check AGENT_NAME env var
+    |   |
+    |   ├─ Set AND param != "agent" ──YES──> Use existing agent → Check param type
+    |   |                                        |
+    |   |                                        ├─ Empty ──> Show task recommendations
+    |   |                                        └─ Task ID ──> Start specific task
+    |   |
+    |   └─ Not set OR param == "agent" ──> Need registration → Detect recent agents
+    |       |
+    |       ├─ Found recent agents? ──YES──> Ask user:
+    |       |                                  - Resume most recent (default)
+    |       |                                  - Create new
+    |       |                                  - Show all agents
+    |       |
+    |       └─ NO recent agents ──> Auto-create new → Continue
 
-Continue:
-    → Register agent
+Continue (after registration):
     → Set AGENT_NAME env var
-    → Review inbox
-    → Get ready tasks
-    → Categorize & recommend
-    → Report to user
+    → Check param type:
+        ├─ Empty or "agent" ──> Review inbox → Get ready tasks → Recommend
+        └─ Task ID ──> Delegate to /agent:start with task ID
 ```
 
 ---
 
 ## Notes
 
+- **AGENT_NAME aware:** Checks environment variable first to avoid re-registration
 - **Smart detection:** Automatically finds "closed then reopened" sessions
-- **One-command start:** Optimized for fastest path to productivity
+- **One-command workflow:** Handles both registration AND task start
+- **Task ID support:** `/start task-abc` delegates to full `/agent:start` flow
+- **Force menu:** `/start agent` shows agent selection even if already registered
 - **Sensible defaults:** Press Enter to resume most recent agent
-- **Flexible:** Still allows explicit agent name or new identity creation
 - **Statusline integration:** Sets AGENT_NAME for rich terminal UI
+
+---
+
+## Parameter Combinations
+
+| Command | Behavior |
+|---------|----------|
+| `/start` | Check AGENT_NAME → resume OR detect recent agents OR auto-create |
+| `/start agent` | Force show agent menu (ignore AGENT_NAME) |
+| `/start task-abc` | Auto-register if needed, then start task task-abc |
+| `/start task-abc` (with AGENT_NAME set) | Skip registration, start task immediately |
 
 ---
 
@@ -203,7 +276,9 @@ Continue:
 
 | Command | Use Case |
 |---------|----------|
-| `/start` | "Just get me working" - auto-detect or quick create |
-| `/start MyAgent` | "Resume as specific agent" - same as `/r MyAgent` |
-| `/r AgentName` | "I know which agent I want" - direct resume |
-| `/agent:register` | "Let me see all options" - full interactive menu |
+| `/start` | "Just get me working" - seamless registration + task recommendations |
+| `/start agent` | "Show me all agents" - force interactive menu |
+| `/start task-abc` | "Start this specific task" - auto-register if needed |
+| `/r AgentName` | "Resume specific agent" - explicit agent menu (deprecated quick-register) |
+| `/agent:register` | "Full registration flow" - comprehensive agent setup |
+| `/agent:start` | "Full task start flow" - comprehensive conflict checks + work start |
