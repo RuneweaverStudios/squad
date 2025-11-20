@@ -21,3 +21,4 @@ mcp_agent_mail/
 
 # Beads task database (per-developer, run 'bd init' after cloning)
 .beads/
+tools/
