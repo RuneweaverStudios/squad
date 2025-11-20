@@ -169,6 +169,15 @@
 					Agent View
 				</button>
 			</div>
+			<div class="w-48">
+				<ProjectSelector
+					{projects}
+					{selectedProject}
+					onProjectChange={handleProjectChange}
+					{taskCounts}
+					compact={true}
+				/>
+			</div>
 			<ThemeSelector />
 		</div>
 	</div>
