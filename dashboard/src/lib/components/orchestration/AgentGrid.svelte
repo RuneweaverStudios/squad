@@ -1,12 +1,80 @@
 <script>
 	import AgentCard from './AgentCard.svelte';
+	import AutoAssignModal from './AutoAssignModal.svelte';
+	import { generateAutoAssignments } from '$lib/utils/autoAssign';
 
 	let { agents = [], tasks = [], reservations = [], onTaskAssign = () => {} } = $props();
 
-	// Auto-assign button action (placeholder)
+	// Modal state
+	let showModal = $state(false);
+	let assignments = $state([]);
+	let isAssigning = $state(false);
+
+	// Get unassigned tasks (status='open' and no assignee)
+	const unassignedTasks = $derived(
+		tasks.filter(t => t.status === 'open' && !t.assignee)
+	);
+
+	// Auto-assign button action
 	function handleAutoAssign() {
-		console.log('Auto-assign logic will be implemented in P1 task');
-		// TODO: Implement in jomarchy-agent-tools-kpw
+		// Generate assignments using the algorithm
+		const proposed = generateAutoAssignments(unassignedTasks, agents, reservations);
+
+		if (proposed.length === 0) {
+			alert('No suitable assignments found. All agents may be at capacity or tasks are blocked.');
+			return;
+		}
+
+		// Show preview modal
+		assignments = proposed;
+		showModal = true;
+	}
+
+	// Confirm and apply assignments
+	async function confirmAssignments() {
+		isAssigning = true;
+
+		try {
+			// Batch assign all tasks via API
+			const promises = assignments.map(assignment =>
+				fetch('/api/orchestration', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						taskId: assignment.task.id,
+						agentName: assignment.agent.name
+					})
+				}).then(res => res.json())
+			);
+
+			const results = await Promise.all(promises);
+
+			// Check for errors
+			const errors = results.filter(r => r.error);
+			if (errors.length > 0) {
+				console.error('Some assignments failed:', errors);
+				alert(`${errors.length} assignment(s) failed. Check console for details.`);
+			} else {
+				console.log('All assignments successful!');
+			}
+
+			// Close modal
+			showModal = false;
+			assignments = [];
+
+			// Refresh data (parent component will handle via polling)
+		} catch (error) {
+			console.error('Error applying assignments:', error);
+			alert('Failed to apply assignments. See console for details.');
+		} finally {
+			isAssigning = false;
+		}
+	}
+
+	// Cancel assignment preview
+	function cancelAssignments() {
+		showModal = false;
+		assignments = [];
 	}
 
 	// Smart balance action (placeholder)
@@ -140,3 +208,13 @@
 		<progress class="progress progress-primary w-full" value="0" max="100"></progress>
 	</div>
 </div>
+
+<!-- Auto-Assign Preview Modal -->
+{#if showModal}
+	<AutoAssignModal
+		{assignments}
+		{isAssigning}
+		onConfirm={confirmAssignments}
+		onCancel={cancelAssignments}
+	/>
+{/if}
