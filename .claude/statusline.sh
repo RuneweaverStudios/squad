@@ -349,27 +349,27 @@ fi
 # Build indicators section (for line 2)
 indicators=""
 
-# Add lock count
+# Add lock count (cyan - file related)
 if [[ $lock_count -gt 0 ]]; then
-    indicators="${indicators}🔒${lock_count}"
+    indicators="${indicators}${CYAN}🔒 ${lock_count}${RESET}"
 fi
 
-# Add unread messages
+# Add unread messages (yellow - needs attention)
 if [[ $unread_count -gt 0 ]]; then
-    [[ -n "$indicators" ]] && indicators="${indicators} "
-    indicators="${indicators}📬${unread_count}"
+    [[ -n "$indicators" ]] && indicators="${indicators}  "
+    indicators="${indicators}${YELLOW}📬 ${unread_count}${RESET}"
 fi
 
-# Add time remaining
+# Add time remaining (gray - informational)
 if [[ -n "$time_remaining" ]]; then
-    [[ -n "$indicators" ]] && indicators="${indicators} "
-    indicators="${indicators}⏱${time_remaining}"
+    [[ -n "$indicators" ]] && indicators="${indicators}  "
+    indicators="${indicators}${GRAY}⏱ ${time_remaining}${RESET}"
 fi
 
-# Add progress if available
+# Add progress if available (green - positive progress)
 if [[ -n "$task_progress" ]] && [[ "$task_progress" != "null" ]]; then
-    [[ -n "$indicators" ]] && indicators="${indicators} "
-    indicators="${indicators}${task_progress}%"
+    [[ -n "$indicators" ]] && indicators="${indicators}  "
+    indicators="${indicators}${GREEN}${task_progress} %${RESET}"
 fi
 
 # Build second line with context battery, git branch, and indicators
@@ -399,7 +399,7 @@ fi
 # Add indicators
 if [[ -n "$indicators" ]]; then
     [[ -n "$second_line" ]] && second_line="${second_line} ${GRAY}|${RESET} "
-    second_line="${second_line}${GRAY}[${RESET}${indicators}${GRAY}]${RESET}"
+    second_line="${second_line}${indicators}"
 fi
 
 # Build third line with last user prompt
