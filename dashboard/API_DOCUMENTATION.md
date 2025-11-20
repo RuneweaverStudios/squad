@@ -40,7 +40,7 @@ Returns all registered agents from Agent Mail.
       "task_description": "Building Agent Orchestration data layer",
       "inception_ts": "2025-11-19 22:11:12",
       "last_active_ts": "2025-11-20 10:28:14",
-      "project_path": "/home/jw/code/jomarchy-agent-tools"
+      "project_path": "/home/jw/code/jat"
     }
   ]
 }
@@ -68,12 +68,12 @@ Returns active file reservations from Agent Mail.
       "id": 51,
       "path_pattern": "dashboard/src/routes/api/**",
       "exclusive": 1,
-      "reason": "jomarchy-agent-tools-ijo: Building data layer API",
+      "reason": "jat-ijo: Building data layer API",
       "created_ts": "2025-11-20 10:28:14",
       "expires_ts": "2025-11-20 12:28:14",
       "released_ts": null,
       "agent_name": "FreeMarsh",
-      "project_path": "/home/jw/code/jomarchy-agent-tools"
+      "project_path": "/home/jw/code/jat"
     }
   ]
 }
@@ -101,20 +101,20 @@ Returns tasks from all Beads project databases.
 {
   "tasks": [
     {
-      "id": "jomarchy-agent-tools-ijo",
+      "id": "jat-ijo",
       "title": "Create Agent Orchestration data layer",
       "description": "Build data access layer...",
       "status": "open",
       "priority": 0,
       "issue_type": "task",
-      "project": "jomarchy-agent-tools",
+      "project": "jat",
       "assignee": null,
       "labels": ["agent-coordination", "backend", "dashboard"],
       "created_at": "2025-11-20T05:25:45.343077188-05:00",
       "updated_at": "2025-11-20T05:25:45.343077188-05:00"
     }
   ],
-  "projects": ["jomarchy-agent-tools", "chimaro"],
+  "projects": ["jat", "chimaro"],
   "count": 485
 }
 ```
@@ -122,7 +122,7 @@ Returns tasks from all Beads project databases.
 **Example:**
 ```bash
 curl http://localhost:5174/api/tasks
-curl "http://localhost:5174/api/tasks?project=jomarchy-agent-tools&status=open"
+curl "http://localhost:5174/api/tasks?project=jat&status=open"
 curl "http://localhost:5174/api/tasks?priority=0"
 ```
 
@@ -133,18 +133,18 @@ curl "http://localhost:5174/api/tasks?priority=0"
 Returns detailed information for a specific task including dependencies.
 
 **Path Parameters:**
-- `id` - Task ID (e.g., `jomarchy-agent-tools-ijo`)
+- `id` - Task ID (e.g., `jat-ijo`)
 
 **Response:**
 ```json
 {
   "task": {
-    "id": "jomarchy-agent-tools-ijo",
+    "id": "jat-ijo",
     "title": "Create Agent Orchestration data layer",
     "description": "Build data access layer...",
     "status": "open",
     "priority": 0,
-    "project": "jomarchy-agent-tools",
+    "project": "jat",
     "depends_on": [],
     "blocked_by": [],
     "comments": [],
@@ -155,7 +155,7 @@ Returns detailed information for a specific task including dependencies.
 
 **Example:**
 ```bash
-curl http://localhost:5174/api/tasks/jomarchy-agent-tools-ijo
+curl http://localhost:5174/api/tasks/jat-ijo
 ```
 
 ---
@@ -229,7 +229,7 @@ Returns combined agent coordination data from all sources. **Recommended for fro
 **Example:**
 ```bash
 curl http://localhost:5174/api/orchestration
-curl "http://localhost:5174/api/orchestration?project=jomarchy-agent-tools"
+curl "http://localhost:5174/api/orchestration?project=jat"
 ```
 
 ---

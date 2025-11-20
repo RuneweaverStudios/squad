@@ -1,6 +1,6 @@
 # Statusline Feature Test Results
 
-**Task:** jomarchy-agent-tools-4ep
+**Task:** jat-4ep
 **Tester:** FreeMarsh
 **Date:** 2025-11-20
 **Feature Under Test:** Session-aware statusline with 5 indicators
@@ -111,12 +111,12 @@ reservation_info=$(am-reservations --agent "$agent_name" 2>/dev/null)
 if [[ -n "$reservation_info" ]]; then
     # Extract task ID from reason field (format: "task-id: description" or just "task-id")
     # Match exactly 3 alphanumeric characters after the prefix (standard Beads format)
-    task_id=$(echo "$reservation_info" | grep "^Reason:" | sed 's/^Reason: //' | grep -oE 'jomarchy-agent-tools-[a-z0-9]{3}\b' | head -1)
+    task_id=$(echo "$reservation_info" | grep "^Reason:" | sed 's/^Reason: //' | grep -oE 'jat-[a-z0-9]{3}\b' | head -1)
 fi
 ```
 
 **Pattern Matching:**
-- Regex: `jomarchy-agent-tools-[a-z0-9]{3}\b`
+- Regex: `jat-[a-z0-9]{3}\b`
 - Matches standard Beads format (project-abc)
 - Extracts from "Reason:" field in am-reservations output
 
@@ -328,14 +328,14 @@ AgentName | idle [📬2]
 ```bash
 # If no agent name, show "not registered" status
 if [[ -z "$agent_name" ]]; then
-    echo -e "${GRAY}jomarchy-agent-tools${RESET} ${GRAY}|${RESET} ${CYAN}no agent registered${RESET}"
+    echo -e "${GRAY}jat${RESET} ${GRAY}|${RESET} ${CYAN}no agent registered${RESET}"
     exit 0
 fi
 ```
 
 **Display Format:**
 ```
-jomarchy-agent-tools | no agent registered
+jat | no agent registered
 ```
 
 **Analysis:**
@@ -580,9 +580,9 @@ Fallback: $AGENT_NAME environment variable
 
 **Examples:**
 ```
-FreeMarsh | [P1] jomarchy-agent-tools-4ep - Testing... [🔒2 📬1 ⏱45m]
+FreeMarsh | [P1] jat-4ep - Testing... [🔒2 📬1 ⏱45m]
 PaleStar | idle [📬3]
-jomarchy-agent-tools | no agent registered
+jat | no agent registered
 ```
 
 ---
@@ -708,7 +708,7 @@ The statusline feature is ready for production use with no blocking issues. All 
 
 ### Next Steps
 
-1. Mark jomarchy-agent-tools-4ep as COMPLETE ✅
+1. Mark jat-4ep as COMPLETE ✅
 2. Consider documentation enhancements (P2)
 3. Health check command is optional (P3)
 4. Future enhancements can be tracked separately (P4-P5)

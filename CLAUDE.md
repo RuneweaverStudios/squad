@@ -5,15 +5,13 @@ Lightweight bash tools for agent orchestration, database operations, monitoring,
 ## Project Structure
 
 ```
-jomarchy-agent-tools/
-├── agent-mail/          # Agent Mail coordination system (11 tools)
+jat/
+├── mail/                # Agent Mail coordination system (11 tools)
 ├── commands/agent/      # Agent workflow commands (7 commands)
-├── database/            # Database tools (3 tools)
-├── monitoring/          # Monitoring tools (5 tools)
-├── development/         # Development tools (7 tools)
-├── browser/             # Browser automation tools (11 tools)
+├── browser-tools/       # Browser automation tools (11 tools)
+├── tools/               # Database & monitoring tools (6 tools)
 ├── dashboard/           # Beads Task Dashboard (SvelteKit app)
-├── tools/               # Shared utilities
+├── scripts/             # Installation and setup scripts
 └── install.sh           # Installation script
 ```
 
@@ -67,9 +65,9 @@ When you run `/agent:start` or `/agent:register`, it automatically:
 
 **Examples:**
 ```
-FreeMarsh | [P1] jomarchy-agent-tools-m95 - Update /start... [🔒2 📬1 ⏱45m]
+FreeMarsh | [P1] jat-m95 - Update /start... [🔒2 📬1 ⏱45m]
 FreeMarsh | idle [📬3]
-jomarchy-agent-tools | no agent registered
+jat | no agent registered
 ```
 
 ### Multi-Agent Sessions
@@ -202,7 +200,7 @@ session_id=$(cat .claude/current-session-id.txt | tr -d '\n') && cat ".claude/ag
 
 **3. Start Specific Task:**
 ```bash
-/agent:start jomarchy-agent-tools-abc
+/agent:start jat-abc
 ```
 - Auto-registers if needed (using 60-min detection)
 - Runs full conflict checks
@@ -230,11 +228,11 @@ session_id=$(cat .claude/current-session-id.txt | tr -d '\n') && cat ".claude/ag
 # → Auto-creates: "✨ Created new agent: BrightCove"
 
 # Scenario 3: Already registered, start specific task
-/agent:start jomarchy-agent-tools-zdl
+/agent:start jat-zdl
 # → Checks conflicts, reserves files, starts task
 
 # Scenario 4: Fast mode
-/agent:start jomarchy-agent-tools-zdl quick
+/agent:start jat-zdl quick
 # → Skips checks, starts immediately
 ```
 
@@ -609,7 +607,7 @@ am-register --name YourAgentName --program claude-code --model sonnet-4.5
 
 ### Browser tools not found
 ```bash
-cd /home/jw/code/jomarchy-agent-tools
+cd /home/jw/code/jat
 ./install.sh
 ```
 

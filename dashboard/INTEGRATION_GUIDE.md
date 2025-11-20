@@ -1,6 +1,6 @@
 # Agent Orchestration Frontend Integration Guide
 
-**Task:** jomarchy-agent-tools-4p0 (Frontend Integration)
+**Task:** jat-4p0 (Frontend Integration)
 **Status:** Complete
 **Created:** 2025-11-20
 **Demo:** http://localhost:5175/api-demo
@@ -277,7 +277,7 @@ Manually fetch data from the API once.
 
 ```typescript
 await orchestration.fetch();
-await orchestration.fetch({ project: 'jomarchy-agent-tools' });
+await orchestration.fetch({ project: 'jat' });
 await orchestration.fetch({ agent: 'FreeMarsh' });
 ```
 
@@ -408,7 +408,7 @@ const openTasksRes = await fetch('/api/tasks?status=open&priority=0');
 const { tasks: openTasks } = await openTasksRes.json();
 
 // Single task detail
-const taskRes = await fetch('/api/tasks/jomarchy-agent-tools-ijo');
+const taskRes = await fetch('/api/tasks/jat-ijo');
 const { task } = await taskRes.json();
 ```
 
@@ -597,9 +597,9 @@ $effect(() => {
 ## Credits
 
 **Built by:** FreeMarsh
-**Task:** jomarchy-agent-tools-4p0 (Frontend Integration)
+**Task:** jat-4p0 (Frontend Integration)
 **Date:** 2025-11-20
-**Dependencies:** jomarchy-agent-tools-ijo (Data Layer API)
+**Dependencies:** jat-ijo (Data Layer API)
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 

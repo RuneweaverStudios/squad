@@ -1,9 +1,9 @@
 # /start Command Test Results
 
-**Task:** jomarchy-agent-tools-vgt
+**Task:** jat-vgt
 **Tester:** FreeMarsh
 **Date:** 2025-11-20
-**Dependency:** jomarchy-agent-tools-m95 (Update /start with integrated registration) ✅ CLOSED
+**Dependency:** jat-m95 (Update /start with integrated registration) ✅ CLOSED
 
 ## Test Objective
 
@@ -488,7 +488,7 @@ Users should manually test these scenarios in real sessions:
 2. Clear AGENT_NAME when needed: `unset AGENT_NAME`
 3. Run the /start command variant
 4. Document behavior (matches expected?)
-5. Report issues to jomarchy-agent-tools repo
+5. Report issues to jat repo
 
 ---
 
@@ -521,7 +521,7 @@ The /start command implementation (task m95) is ready for use. All critical path
 
 ### Next Steps
 
-1. Mark jomarchy-agent-tools-vgt as COMPLETE ✅
+1. Mark jat-vgt as COMPLETE ✅
 2. Update documentation with edge case notes (optional)
 3. Create manual test checklist for users (optional)
 4. Consider parameter validation enhancement (P3 priority)

@@ -1,6 +1,6 @@
 # Tests
 
-Test suite for jomarchy-agent-tools.
+Test suite for jat.
 
 ## Beads + Agent Mail Integration Tests
 

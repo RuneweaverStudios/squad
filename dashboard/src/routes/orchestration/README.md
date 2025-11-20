@@ -6,7 +6,7 @@ Visual task assignment interface for Agent Mail + Beads coordination. Provides d
 
 ## Implementation Status
 
-**Task ID**: `jomarchy-agent-tools-dlj` (P0 - Complete)
+**Task ID**: `jat-dlj` (P0 - Complete)
 
 ### ✅ Completed (P0 - Foundation)
 
@@ -44,43 +44,43 @@ Visual task assignment interface for Agent Mail + Beads coordination. Provides d
 
 These features are **intentionally incomplete** and will be built in dependent tasks:
 
-- **Drag-and-Drop** (`jomarchy-agent-tools-c37`)
+- **Drag-and-Drop** (`jat-c37`)
   - Task cards are draggable (HTML5 drag API ready)
   - Agent cards have drop zones (event handlers stubbed)
   - Actual assignment logic not yet implemented
 
-- **Conflict Detection** (`jomarchy-agent-tools-0nu`)
+- **Conflict Detection** (`jat-0nu`)
   - File reservation checking during drag
   - Visual feedback (red overlay for conflicts, green for allowed)
   - Prevent invalid assignments
 
-- **Agent Status Display** (`jomarchy-agent-tools-5bk`)
+- **Agent Status Display** (`jat-5bk`)
   - Real-time agent status computation
   - Current task tracking
   - Queue management
   - File lock association
 
-- **Auto-Assign Logic** (`jomarchy-agent-tools-kpw`)
+- **Auto-Assign Logic** (`jat-kpw`)
   - Smart task assignment algorithm
   - Conflict avoidance
   - Preview before applying
 
-- **Task Queue Filtering** (`jomarchy-agent-tools-zdl`)
+- **Task Queue Filtering** (`jat-zdl`)
   - URL persistence for filter state
   - More advanced filtering options
 
 ### 🔮 Future (P2 Tasks - Enhancements)
 
-- **Capacity Visualization** (`jomarchy-agent-tools-m68`)
+- **Capacity Visualization** (`jat-m68`)
   - Per-agent capacity bars
   - Time estimates
   - Load balancing indicators
 
-- **Dependency Visualization** (`jomarchy-agent-tools-d6g`)
+- **Dependency Visualization** (`jat-d6g`)
   - Show blocking/blocked status on cards
   - Dependency chain tooltips
 
-- **Quick Actions** (`jomarchy-agent-tools-dz0`)
+- **Quick Actions** (`jat-dz0`)
   - Right-click context menu on agent cards
   - View inbox, file locks, send message, etc.
 
@@ -149,7 +149,7 @@ http://localhost:5174/orchestration
 
 ## Dependencies
 
-**Backend API** (Task `jomarchy-agent-tools-ijo`):
+**Backend API** (Task `jat-ijo`):
 - `/api/agent-data` - Unified endpoint for agents, tasks, reservations
 - Data structure TBD by backend team
 
@@ -184,20 +184,20 @@ http://localhost:5174/orchestration
 
 ## Next Steps
 
-1. **Wait for backend API** (`jomarchy-agent-tools-ijo`) to be completed
+1. **Wait for backend API** (`jat-ijo`) to be completed
 2. **Integrate data fetching** - Replace mock data with API calls
-3. **Implement drag-drop** (`jomarchy-agent-tools-c37`) - Make task assignment functional
-4. **Add conflict detection** (`jomarchy-agent-tools-0nu`) - Prevent invalid assignments
-5. **Build out agent status** (`jomarchy-agent-tools-5bk`) - Show real-time agent state
+3. **Implement drag-drop** (`jat-c37`) - Make task assignment functional
+4. **Add conflict detection** (`jat-0nu`) - Prevent invalid assignments
+5. **Build out agent status** (`jat-5bk`) - Show real-time agent state
 
 ## Related Tasks
 
-- `jomarchy-agent-tools-ijo` (P0) - Backend data layer (parallel work)
-- `jomarchy-agent-tools-c37` (P1) - Drag-and-drop implementation
-- `jomarchy-agent-tools-0nu` (P1) - Conflict detection
-- `jomarchy-agent-tools-5bk` (P1) - Agent status display
-- `jomarchy-agent-tools-kpw` (P1) - Auto-assign logic
-- `jomarchy-agent-tools-zdl` (P1) - Enhanced filtering
-- `jomarchy-agent-tools-dz0` (P2) - Quick actions menu
-- `jomarchy-agent-tools-m68` (P2) - Capacity visualization
-- `jomarchy-agent-tools-d6g` (P2) - Dependency visualization
+- `jat-ijo` (P0) - Backend data layer (parallel work)
+- `jat-c37` (P1) - Drag-and-drop implementation
+- `jat-0nu` (P1) - Conflict detection
+- `jat-5bk` (P1) - Agent status display
+- `jat-kpw` (P1) - Auto-assign logic
+- `jat-zdl` (P1) - Enhanced filtering
+- `jat-dz0` (P2) - Quick actions menu
+- `jat-m68` (P2) - Capacity visualization
+- `jat-d6g` (P2) - Dependency visualization

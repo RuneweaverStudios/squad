@@ -1,6 +1,6 @@
 # Dashboard Theme Testing Results
 
-**Task:** jomarchy-agent-tools-h2t
+**Task:** jat-h2t
 **Tester:** StrongShore (Agent)
 **Date:** 2025-11-19
 **Dashboard URL:** http://127.0.0.1:5173
@@ -169,7 +169,7 @@ light, dark, cupcake, bumblebee, emerald, corporate, synthwave, retro, cyberpunk
 
 **Status:** PASS
 
-**Task Dependency:** jomarchy-agent-tools-5p4 (Remove all custom CSS from components)
+**Task Dependency:** jat-5p4 (Remove all custom CSS from components)
 
 **Findings:**
 - ✅ No `<style>` blocks found in any component files
@@ -252,7 +252,7 @@ The following manual tests still need to be completed by a human tester:
 
 ```bash
 # 1. Start dashboard (already running)
-cd ~/code/jomarchy-agent-tools/dashboard
+cd ~/code/jat/dashboard
 npm run dev
 
 # 2. Open browser

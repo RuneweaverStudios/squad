@@ -41,7 +41,7 @@ If any are missing, install them first:
 ### One-Line Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/joewinke/jomarchy-agent-tools/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/joewinke/jat/main/install.sh | bash
 ```
 
 This installs:
@@ -54,8 +54,8 @@ This installs:
 
 ```bash
 # Clone the repository
-git clone https://github.com/joewinke/jomarchy-agent-tools.git ~/code/jomarchy-agent-tools
-cd ~/code/jomarchy-agent-tools
+git clone https://github.com/joewinke/jat.git ~/code/jat
+cd ~/code/jat
 
 # Run install script
 bash install.sh

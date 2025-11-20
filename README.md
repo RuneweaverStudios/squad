@@ -11,7 +11,7 @@
 Agent Mail (multi-agent coordination) + Beads (task planning) + 28 bash tools + 7 coordination commands = Full swarm orchestration that transcends context windows and project boundaries.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/joewinke/jomarchy-agent-tools/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/joewinke/jat/main/install.sh | bash
 ```
 
 ---
@@ -20,7 +20,7 @@ curl -fsSL https://raw.githubusercontent.com/joewinke/jomarchy-agent-tools/main/
 
 ```bash
 # 1. Install (run in your terminal/bash)
-curl -fsSL https://raw.githubusercontent.com/joewinke/jomarchy-agent-tools/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/joewinke/jat/main/install.sh | bash
 
 # 2. Start working (registers agent + picks task)
 /agent:start
@@ -502,7 +502,7 @@ Now that you understand the workflow:
 
 ```bash
 # 1. Install (terminal)
-curl -fsSL https://raw.githubusercontent.com/joewinke/jomarchy-agent-tools/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/joewinke/jat/main/install.sh | bash
 
 # 2. Register (AI assistant)
 /register
@@ -535,7 +535,7 @@ curl -fsSL https://raw.githubusercontent.com/joewinke/jomarchy-agent-tools/main/
 ### One-Line Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/joewinke/jomarchy-agent-tools/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/joewinke/jat/main/install.sh | bash
 ```
 
 This installs:
@@ -572,6 +572,34 @@ This installs:
 - ❌ No Node.js/Python runtimes
 - ❌ No ports to manage
 - ❌ No API keys or authentication
+
+**Repository Structure:**
+```
+~/code/jat/                          # Cloned by installer
+├── mail/                            # Agent Mail tools (11)
+│   ├── am-register
+│   ├── am-inbox
+│   └── ...
+├── browser-tools/                   # Browser automation (11)
+│   ├── browser-start.js
+│   ├── browser-eval.js
+│   └── ...
+├── tools/                           # Database & monitoring (6)
+│   ├── db-query
+│   ├── db-schema
+│   └── ...
+├── commands/agent/                  # Coordination commands (7)
+│   ├── register.md
+│   ├── start.md
+│   └── ...
+├── dashboard/                       # Beads visual dashboard (SvelteKit)
+├── scripts/                         # Installation scripts
+└── install.sh                       # Main installer
+```
+
+**Self-Contained:** JAT is a standalone framework. All tools live in the jat repository. The installer symlinks them to `~/.local/bin` for global access.
+
+**Sister Project:** [Jomarchy](https://github.com/joewinke/jomarchy) is an Omarchy Linux configuration system that can optionally install JAT as part of its DEV profile.
 
 ---
 
@@ -913,7 +941,7 @@ During installation, you can select additional **tech-stack-specific tools** via
 **Manual installation:**
 ```bash
 # If you skip during install, you can add stacks later:
-bash ~/code/jomarchy-agent-tools/stacks/sveltekit-supabase/install.sh
+bash ~/code/jat/stacks/sveltekit-supabase/install.sh
 ```
 
 **Documentation:**
@@ -943,7 +971,7 @@ jat-dashboard       # Alias for bd-dashboard
 
 **Manual start:**
 ```bash
-cd ~/code/jomarchy-agent-tools/dashboard
+cd ~/code/jat/dashboard
 npm install  # If needed
 npm run dev
 ```
@@ -995,7 +1023,7 @@ For each git repository in `~/code/*`:
 The statusline displays your agent name, current task, and real-time indicators directly in your terminal prompt:
 
 ```
-FreeMarsh | [P1] jomarchy-agent-tools-4p0 - Demo: Frontend... [🔒2 📬1 ⏱45m]
+FreeMarsh | [P1] jat-4p0 - Demo: Frontend... [🔒2 📬1 ⏱45m]
 ```
 
 **Features:**
@@ -1266,14 +1294,14 @@ export PATH="$HOME/.local/bin:$PATH"
 ls -la ~/.local/bin/am-*
 
 # Re-run symlink setup
-bash ~/code/jomarchy-agent-tools/scripts/symlink-tools.sh
+bash ~/code/jat/scripts/symlink-tools.sh
 ```
 
 ### Per-Repo Setup Didn't Run
 
 ```bash
 # Manually run per-repo setup
-bash ~/code/jomarchy-agent-tools/scripts/setup-repos.sh
+bash ~/code/jat/scripts/setup-repos.sh
 ```
 
 ---
@@ -1408,7 +1436,7 @@ am-contact BackendTeam --from FrontendTeam
 **Just add bash scripts to the tools directory:**
 
 ```bash
-cd ~/code/jomarchy-agent-tools/tools
+cd ~/code/jat/tools
 cat > my-custom-tool <<'EOF'
 #!/bin/bash
 # Your tool logic here
@@ -1435,7 +1463,7 @@ my-custom-tool
 ### How do I update to the latest version?
 
 ```bash
-cd ~/code/jomarchy-agent-tools
+cd ~/code/jat
 git pull origin main
 
 # Re-run setup if commands/tools changed
@@ -1462,7 +1490,7 @@ sqlite3 ~/.agent-mail.db "PRAGMA integrity_check;"
 
 # If corrupted, reinitialize (WARNING: loses data)
 mv ~/.agent-mail.db ~/.agent-mail.db.backup
-sqlite3 ~/.agent-mail.db < ~/code/jomarchy-agent-tools/mail/schema.sql
+sqlite3 ~/.agent-mail.db < ~/code/jat/mail/schema.sql
 
 # Check permissions
 chmod 644 ~/.agent-mail.db
@@ -1500,12 +1528,12 @@ chmod 644 ~/.agent-mail.db
 **Solution:**
 ```bash
 # Add to ~/.bashrc
-echo 'export PATH="$HOME/code/jomarchy-agent-tools/tools:$PATH"' >> ~/.bashrc
+echo 'export PATH="$HOME/code/jat/tools:$PATH"' >> ~/.bashrc
 source ~/.bashrc
 
 # Verify
 which am-inbox
-# Should show: /home/user/code/jomarchy-agent-tools/tools/am-inbox
+# Should show: /home/user/code/jat/tools/am-inbox
 ```
 
 ### Beads Not Initialized
@@ -1532,7 +1560,7 @@ bd init
 **Solution:**
 ```bash
 # Re-run global setup
-cd ~/code/jomarchy-agent-tools
+cd ~/code/jat
 bash scripts/setup-global-claude-md.sh
 
 # Verify installation
@@ -1582,7 +1610,7 @@ db-connection-test
 MIT License - See individual component licenses:
 - Agent Mail: [License](https://github.com/Dicklesworthstone/mcp_agent_mail/blob/main/LICENSE)
 - Beads: [License](https://github.com/steveyegge/beads/blob/main/LICENSE)
-- Browser Tools: Custom-built for jomarchy-agent-tools (MIT License)
+- Browser Tools: Custom-built for jat (MIT License)
 
 ---
 
@@ -1590,7 +1618,7 @@ MIT License - See individual component licenses:
 
 - **Agent Mail:** Created by [@Dicklesworthstone](https://github.com/Dicklesworthstone)
 - **Beads:** Created by [@steveyegge](https://github.com/steveyegge)
-- **Browser Tools:** Custom-built for jomarchy-agent-tools using Chrome DevTools Protocol and Puppeteer
+- **Browser Tools:** Custom-built for jat using Chrome DevTools Protocol and Puppeteer
 - **Tools > MCP:** Inspired by [Mario Zechner's "What if you don't need MCP?"](https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/)
 - **Integration:** Assembled by [@joewinke](https://github.com/joewinke) for [Jomarchy](https://github.com/joewinke/jomarchy)
 
@@ -1607,4 +1635,4 @@ MIT License - See individual component licenses:
 
 **Built for AI-assisted development. Works with every AI coding assistant.**
 
-**[Install Now](#quick-start)** | **[Report Issue](https://github.com/joewinke/jomarchy-agent-tools/issues)** | **[Contribute](https://github.com/joewinke/jomarchy-agent-tools/pulls)**
+**[Install Now](#quick-start)** | **[Report Issue](https://github.com/joewinke/jat/issues)** | **[Contribute](https://github.com/joewinke/jat/pulls)**

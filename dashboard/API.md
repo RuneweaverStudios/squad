@@ -28,14 +28,14 @@ Get all tasks from all projects with optional filtering.
 {
   "tasks": [
     {
-      "id": "jomarchy-agent-tools-42o",
+      "id": "jat-42o",
       "title": "Demo: Backend API setup",
       "status": "closed",
       "priority": 0,
       "labels": ["backend", "api"],
       "depends_on": [],
       "blocked_by": [],
-      "project": "jomarchy-agent-tools",
+      "project": "jat",
       "created_at": "2025-11-20T05:01:00Z",
       "updated_at": "2025-11-20T05:01:00Z"
     }
@@ -48,13 +48,13 @@ Get all tasks from all projects with optional filtering.
 Get detailed information for a specific task.
 
 **Path Parameters:**
-- `id`: Task ID (e.g., `jomarchy-agent-tools-42o`)
+- `id`: Task ID (e.g., `jat-42o`)
 
 **Response:**
 ```json
 {
   "task": {
-    "id": "jomarchy-agent-tools-42o",
+    "id": "jat-42o",
     "title": "Demo: Backend API setup",
     "description": "Set up Express server and database",
     "status": "closed",
@@ -63,15 +63,15 @@ Get detailed information for a specific task.
     "depends_on": [],
     "blocked_by": [
       {
-        "id": "jomarchy-agent-tools-4p0",
+        "id": "jat-4p0",
         "title": "Demo: Frontend integration",
         "status": "open",
         "priority": 1
       }
     ],
     "comments": [],
-    "project": "jomarchy-agent-tools",
-    "project_path": "/home/jw/code/jomarchy-agent-tools",
+    "project": "jat",
+    "project_path": "/home/jw/code/jat",
     "created_at": "2025-11-20T05:01:00Z",
     "updated_at": "2025-11-20T05:01:00Z",
     "assignee": null
@@ -119,12 +119,12 @@ Get active file reservations (locks) across all projects.
       "id": 1,
       "path_pattern": "src/**/*.ts",
       "exclusive": 1,
-      "reason": "jomarchy-agent-tools-ijo: Agent data layer",
+      "reason": "jat-ijo: Agent data layer",
       "created_ts": "2025-11-20T05:30:00Z",
       "expires_ts": "2025-11-20T06:30:00Z",
       "released_ts": null,
       "agent_name": "PaleStar",
-      "project_path": "/home/jw/code/jomarchy-agent-tools"
+      "project_path": "/home/jw/code/jat"
     }
   ]
 }

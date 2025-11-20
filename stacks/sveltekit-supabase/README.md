@@ -30,11 +30,11 @@
 
 ## Installation
 
-These tools are installed automatically when you select the "SvelteKit + Supabase" stack during jomarchy-agent-tools installation.
+These tools are installed automatically when you select the "SvelteKit + Supabase" stack during jat installation.
 
 Or install manually:
 ```bash
-cd ~/code/jomarchy-agent-tools/stacks/sveltekit-supabase
+cd ~/code/jat/stacks/sveltekit-supabase
 bash install.sh
 ```
 

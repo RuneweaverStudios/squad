@@ -1,7 +1,7 @@
 # DaisyUI Theme Testing Results
 
 **Date:** 2025-11-20
-**Task:** jomarchy-agent-tools-h2t
+**Task:** jat-h2t
 **Tester:** Claude (Sonnet 4.5)
 **Dashboard Version:** Latest (with D3 dependency graph + task modal)
 

@@ -71,7 +71,7 @@ After exploring these examples:
 
 ## Documentation
 
-- **Main README**: `../README.md` - Full jomarchy-agent-tools documentation
+- **Main README**: `../README.md` - Full jat documentation
 - **Installation**: Run `../install.sh` to set up Agent Mail
 - **API Reference**: Each `am-*` tool has `--help` flag
 
@@ -86,4 +86,4 @@ Have a workflow pattern to share? Add it to `workflows/` with:
 
 ## License
 
-Same as jomarchy-agent-tools (see ../LICENSE)
+Same as jat (see ../LICENSE)

@@ -13,7 +13,7 @@ Get to work! Unified smart command that handles registration, task selection, co
 - `/agent:start task-id quick` - Skip conflict checks (fast mode)
 
 **What this command does:**
-1. **Smart Registration:** Auto-detects recent agents (last 60 min) or creates new
+1. **Smart Registration:** Categorizes existing agents by state (working/active/idle/offline) and offers resumption
 2. **Session Persistence:** Updates `.claude/agent-{session_id}.txt` for statusline
 3. **Task Selection:** From parameter, conversation context, or priority
 4. **Conflict Detection:** File locks, git changes, dependencies
@@ -98,31 +98,76 @@ echo "✅ Resuming as $AGENT_NAME (session agent)"
 
 **If AGENT_REGISTERED == false AND no agent requested:**
 ```bash
-# Smart agent detection (1-hour window)
-RECENT_AGENTS=$(./scripts/get-recent-agents 60 2>/dev/null)
-AGENT_COUNT=$(echo "$RECENT_AGENTS" | jq 'length' 2>/dev/null || echo "0")
+# Get agents categorized by state (working/active/idle/offline)
+AGENTS_BY_STATE=$(~/code/jat/scripts/get-agents-by-state 2>/dev/null)
 
-if [[ "$AGENT_COUNT" -gt 0 ]]; then
-  # Found recent agents - offer menu
-  MOST_RECENT=$(echo "$RECENT_AGENTS" | jq -r '.[0].name')
+# Count agents in each category
+WORKING_COUNT=$(echo "$AGENTS_BY_STATE" | jq '.working | length')
+ACTIVE_COUNT=$(echo "$AGENTS_BY_STATE" | jq '.active | length')
+IDLE_COUNT=$(echo "$AGENTS_BY_STATE" | jq '.idle | length')
+OFFLINE_COUNT=$(echo "$AGENTS_BY_STATE" | jq '.offline | length')
+TOTAL_AGENTS=$((WORKING_COUNT + ACTIVE_COUNT + IDLE_COUNT + OFFLINE_COUNT))
 
-  # Use AskUserQuestion to show options:
-  # Option 1: Resume {MOST_RECENT} (default)
-  # Option 2: Create new agent
-  # Option 3: See all agents (redirect to /agent:register)
+if [[ "$TOTAL_AGENTS" -gt 0 ]]; then
+  # Found existing agents - offer categorized menu
+  echo "╔══════════════════════════════════════════════════════════════════════════╗"
+  echo "║                    🔍 Found Existing Agents                              ║"
+  echo "╚══════════════════════════════════════════════════════════════════════════╝"
+  echo ""
+
+  # Show agent summary
+  [[ $WORKING_COUNT -gt 0 ]] && echo "⚡ Working: $WORKING_COUNT agents (actively coding)"
+  [[ $ACTIVE_COUNT -gt 0 ]] && echo "✓ Active: $ACTIVE_COUNT agents (engaged, ready)"
+  [[ $IDLE_COUNT -gt 0 ]] && echo "○ Idle: $IDLE_COUNT agents (available)"
+  [[ $OFFLINE_COUNT -gt 0 ]] && echo "⏹ Offline: $OFFLINE_COUNT agents (disconnected)"
+  echo ""
+
+  # Build AskUserQuestion options dynamically
+  # Priority: NEW AGENT FIRST, then active > idle > offline (skip working agents - they're busy!)
+  OPTIONS=()
+
+  # Option 1: Create new agent (ALWAYS FIRST - most common action)
+  OPTIONS+=("Create new agent")
+
+  # Option 2: Most recent active agent (if any)
+  if [[ $ACTIVE_COUNT -gt 0 ]]; then
+    ACTIVE_AGENT=$(echo "$AGENTS_BY_STATE" | jq -r '.active[0].name')
+    ACTIVE_TIME=$(echo "$AGENTS_BY_STATE" | jq -r '.active[0].last_active')
+    OPTIONS+=("Resume $ACTIVE_AGENT (active $ACTIVE_TIME)")
+  fi
+
+  # Option 3: Most recent idle agent (if any)
+  if [[ $IDLE_COUNT -gt 0 ]]; then
+    IDLE_AGENT=$(echo "$AGENTS_BY_STATE" | jq -r '.idle[0].name')
+    IDLE_TIME=$(echo "$AGENTS_BY_STATE" | jq -r '.idle[0].last_active')
+    OPTIONS+=("Resume $IDLE_AGENT (idle $IDLE_TIME)")
+  fi
+
+  # Option 4: Most recent offline agent (if any)
+  if [[ $OFFLINE_COUNT -gt 0 ]]; then
+    OFFLINE_AGENT=$(echo "$AGENTS_BY_STATE" | jq -r '.offline[0].name')
+    OFFLINE_TIME=$(echo "$AGENTS_BY_STATE" | jq -r '.offline[0].last_active')
+    OPTIONS+=("Resume $OFFLINE_AGENT (offline $OFFLINE_TIME)")
+  fi
+
+  # Use AskUserQuestion to show options with descriptions:
+  # Example (NEW AGENT FIRST):
+  # - Create new agent → "Fresh identity" (ALWAYS FIRST)
+  # - Resume FreeMarsh (active 2m ago) → "Recently active agent, has locks"
+  # - Resume PaleStar (idle 30m ago) → "Available idle agent"
+  # - Resume ColdBay (offline 2h ago) → "Offline agent, may need cleanup"
 
   # Based on user selection:
-  # - If resume: AGENT_NAME=$MOST_RECENT
-  # - If create new: generate random name
-  # - If see all: redirect to /agent:register and exit
+  # - If resume active/idle/offline: AGENT_NAME=<selected>
+  # - If create new: generate random name via am-register
 
 else
-  # No recent agents - auto-create
+  # No existing agents - auto-create
   echo "╔══════════════════════════════════════════════════════════════════════════╗"
   echo "║                    🌟 Starting Fresh Session                             ║"
   echo "╚══════════════════════════════════════════════════════════════════════════╝"
   echo ""
-  echo "No agents active in the last hour. Creating new agent identity..."
+  echo "No existing agents found. Creating new agent identity..."
 
   AGENT_NAME=$(am-register --program claude-code --model sonnet-4.5 | \
     grep "Registered:" | awk '{print $3}')
@@ -130,8 +175,10 @@ else
   echo "✨ Created new agent: $AGENT_NAME"
 fi
 
-# Register the selected/created agent
-am-register --name "$AGENT_NAME" --program claude-code --model sonnet-4.5
+# Register the selected/created agent (if not auto-created above)
+if [[ -n "$AGENT_NAME" ]]; then
+  am-register --name "$AGENT_NAME" --program claude-code --model sonnet-4.5
+fi
 
 # CRITICAL: Write to session file (statusline reads this)
 if [[ -n "$SESSION_ID" ]]; then

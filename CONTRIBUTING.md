@@ -30,8 +30,8 @@ Thank you for your interest in contributing! This document provides guidelines f
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/joewinke/jomarchy-agent-tools.git
-cd jomarchy-agent-tools
+git clone https://github.com/joewinke/jat.git
+cd jat
 
 # 2. Run the installer locally
 ./install.sh
@@ -420,7 +420,7 @@ Brief description of what this PR does.
 ## Project Structure
 
 ```
-jomarchy-agent-tools/
+jat/
 ├── mail/                      # Agent Mail tools (am-*)
 │   ├── am-lib.sh             # Shared library
 │   ├── am-register           # Agent registration

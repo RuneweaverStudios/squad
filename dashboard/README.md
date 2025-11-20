@@ -30,7 +30,7 @@ The Beads Task Dashboard provides a unified web interface for viewing and managi
 ### Prerequisites
 
 - Node.js 18+ (or bun/pnpm)
-- [Jomarchy Agent Tools](https://github.com/joewinke/jomarchy-agent-tools) installed
+- [Jomarchy Agent Tools](https://github.com/joewinke/jat) installed
 - [Beads CLI](https://github.com/steveyegge/beads) installed and configured
 - Projects with `.beads/` directories in `~/code/*`
 
@@ -38,7 +38,7 @@ The Beads Task Dashboard provides a unified web interface for viewing and managi
 
 ```bash
 # Navigate to dashboard directory
-cd ~/code/jomarchy-agent-tools/dashboard
+cd ~/code/jat/dashboard
 
 # Install dependencies
 npm install
@@ -265,7 +265,7 @@ Returns aggregated task data from all Beads projects:
       "updated_at": "2025-11-19T15:45:00Z"
     }
   ],
-  "projects": ["chimaro", "jomarchy", "jomarchy-agent-tools"]
+  "projects": ["chimaro", "jomarchy", "jat"]
 }
 ```
 
@@ -400,11 +400,11 @@ MIT - See [LICENSE](../LICENSE) for details.
 ## Related Projects
 
 - [Beads CLI](https://github.com/steveyegge/beads) - Dependency-aware task planning
-- [Jomarchy Agent Tools](https://github.com/joewinke/jomarchy-agent-tools) - Multi-agent coordination
+- [Jomarchy Agent Tools](https://github.com/joewinke/jat) - Multi-agent coordination
 - [Agent Mail](../tools/am-*) - Bash-based agent messaging and file locks
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/joewinke/jomarchy-agent-tools/issues)
+- **Issues**: [GitHub Issues](https://github.com/joewinke/jat/issues)
 - **Docs**: [Main README](../README.md)
 - **Discord**: [Join Community](https://discord.gg/example) <!-- Update with real link -->

@@ -133,7 +133,7 @@ Example:
 **Test Command:** `./browser-hn-scraper.js`
 **Error:**
 ```
-Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'cheerio' imported from /home/jw/code/jomarchy-agent-tools/browser-tools/browser-hn-scraper.js
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'cheerio' imported from /home/jw/code/jat/browser-tools/browser-hn-scraper.js
 ```
 
 **Fix Required:**

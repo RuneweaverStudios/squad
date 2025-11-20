@@ -1,10 +1,10 @@
 # Smart Agent Detection Test Results
 
-**Task:** jomarchy-agent-tools-2vc
+**Task:** jat-2vc
 **Tester:** FreeMarsh
 **Date:** 2025-11-20
 **Script Under Test:** `scripts/get-recent-agents`
-**Dependency:** jomarchy-agent-tools-v1n (Add smart agent detection utility) ✅ CLOSED
+**Dependency:** jat-v1n (Add smart agent detection utility) ✅ CLOSED
 
 ## Test Objective
 
@@ -500,7 +500,7 @@ The script exceeds quality standards. All functionality works as specified, edge
 
 ### Next Steps
 
-1. Mark jomarchy-agent-tools-2vc as COMPLETE ✅
+1. Mark jat-2vc as COMPLETE ✅
 2. Optional enhancements (--human, --count flags) can be deferred to P3 tasks
 3. Document multi-session behavior in README (P2)
 
