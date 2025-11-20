@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+#
+# get-recent-agents - Detect agents active within last N minutes
+#
+# Usage: get-recent-agents [MINUTES] [PROJECT_PATH]
+#   MINUTES: Number of minutes to look back (default: 60)
+#   PROJECT_PATH: Project path (default: current directory)
+#
+# Returns: JSON array of recent agent names (sorted by last_active, most recent first)
+# Exit codes: 0=success, 1=error
+#
+# Examples:
+#   get-recent-agents              # Agents active in last 60 minutes
+#   get-recent-agents 30           # Agents active in last 30 minutes
+#   get-recent-agents 120 /path    # Agents in specific project, last 120 minutes
+#
+
+set -euo pipefail
+
+# Show help
+if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
+    cat <<EOF
+get-recent-agents - Detect agents active within last N minutes
+
+Usage: get-recent-agents [MINUTES] [PROJECT_PATH]
+
+Arguments:
+  MINUTES       Number of minutes to look back (default: 60)
+  PROJECT_PATH  Project path (default: current directory)
+
+Returns:
+  JSON array of agent names sorted by last_active (most recent first)
+
+Exit codes:
+  0 = Success (with or without agents found)
+  1 = Error (invalid input or command failure)
+
+Examples:
+  get-recent-agents              # Last 60 minutes
+  get-recent-agents 30           # Last 30 minutes
+  get-recent-agents 120 /path    # Specific project, last 120 minutes
+
+Output format:
+  ["AgentName1", "AgentName2", ...]
+
+Edge cases:
+  - No agents found: Returns []
+  - All agents older than threshold: Returns []
+  - Invalid MINUTES: Exits with error
+
+EOF
+    exit 0
+fi
+
+# Configuration
+MINUTES="${1:-60}"
+PROJECT_PATH="${2:-.}"
+
+# Validate input
+if ! [[ "$MINUTES" =~ ^[0-9]+$ ]]; then
+    echo "Error: MINUTES must be a positive integer" >&2
+    exit 1
+fi
+
+# Calculate threshold timestamp (N minutes ago)
+# Format: YYYY-MM-DD HH:MM:SS (matches am-agents output)
+THRESHOLD=$(date -d "$MINUTES minutes ago" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || \
+            date -v-"$MINUTES"M '+%Y-%m-%d %H:%M:%S' 2>/dev/null)
+
+if [[ -z "$THRESHOLD" ]]; then
+    echo "Error: Failed to calculate threshold timestamp" >&2
+    exit 1
+fi
+
+# Get all agents as JSON
+# Note: am-agents filters by current directory automatically, so we don't need --project
+if [[ "$PROJECT_PATH" == "." ]]; then
+    AGENTS_JSON=$(am-agents --json 2>/dev/null || echo "[]")
+else
+    AGENTS_JSON=$(am-agents --project "$PROJECT_PATH" --json 2>/dev/null || echo "[]")
+fi
+
+# Filter agents active after threshold and extract names
+# Using jq to parse timestamps and compare
+RECENT_AGENTS=$(echo "$AGENTS_JSON" | jq -r --arg threshold "$THRESHOLD" '
+    map(select(.last_active_ts >= $threshold))
+    | sort_by(.last_active_ts)
+    | reverse
+    | map(.name)
+')
+
+# Output result
+echo "$RECENT_AGENTS"
+
+# Exit with appropriate code
+AGENT_COUNT=$(echo "$RECENT_AGENTS" | jq 'length')
+if [[ "$AGENT_COUNT" -eq 0 ]]; then
+    exit 0  # Success, but no agents found
+else
+    exit 0  # Success with agents found
+fi
