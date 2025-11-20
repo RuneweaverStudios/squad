@@ -1,22 +1,61 @@
 #!/bin/bash
 # Get the session ID for the current Claude Code session
 #
-# Strategy: Find the most recently modified /tmp/claude-session-*.txt file
-# This works because the statusline updates the session file on every render,
-# so the active session will have the newest timestamp.
+# Strategy: Walk up process tree to find Claude Code parent, then read its session file
+# This provides true process isolation - each terminal gets its own session ID
 #
 # Returns: session ID (UUID) on stdout
 # Exit code: 0 on success, 1 if no session file found
 
 set -e
 
-# Find most recent session file
-session_file=$(ls -t /tmp/claude-session-*.txt 2>/dev/null | head -1)
+# Function to find Claude Code parent process by walking up the tree
+find_claude_ppid() {
+    local current_pid=$$
+    local max_depth=20
+    local depth=0
 
-if [[ -z "$session_file" ]] || [[ ! -f "$session_file" ]]; then
-    echo "Error: No Claude Code session file found in /tmp" >&2
-    echo "The statusline must run at least once to create the session file" >&2
-    exit 1
+    while [[ $depth -lt $max_depth ]]; do
+        # Get parent PID
+        local parent_pid=$(ps -o ppid= -p "$current_pid" 2>/dev/null | tr -d ' ')
+
+        if [[ -z "$parent_pid" ]] || [[ "$parent_pid" == "1" ]]; then
+            return 1
+        fi
+
+        # Get parent process name
+        local parent_name=$(ps -o comm= -p "$parent_pid" 2>/dev/null)
+
+        # Check if this is Claude Code (node process running claude)
+        if [[ "$parent_name" =~ (node|claude) ]]; then
+            # Check if session file exists for this PPID
+            if [[ -f "/tmp/claude-session-${parent_pid}.txt" ]]; then
+                echo "$parent_pid"
+                return 0
+            fi
+        fi
+
+        current_pid=$parent_pid
+        ((depth++))
+    done
+
+    return 1
+}
+
+# Try to find Claude Code PPID
+claude_ppid=$(find_claude_ppid)
+
+if [[ -z "$claude_ppid" ]]; then
+    # Fallback: use most recent session file (old behavior)
+    session_file=$(ls -t /tmp/claude-session-*.txt 2>/dev/null | head -1)
+
+    if [[ -z "$session_file" ]] || [[ ! -f "$session_file" ]]; then
+        echo "Error: No Claude Code session file found in /tmp" >&2
+        echo "The statusline must run at least once to create the session file" >&2
+        exit 1
+    fi
+else
+    session_file="/tmp/claude-session-${claude_ppid}.txt"
 fi
 
 # Read and output the session ID
