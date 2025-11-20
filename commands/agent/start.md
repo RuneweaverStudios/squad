@@ -58,19 +58,24 @@ fi
 
 #### 1A: Check Current Agent Status
 
-```bash
-# Get session ID
-SESSION_ID=$(cat .claude/current-session-id.txt 2>/dev/null | tr -d '\n')
+**Use Read tool to check session status** (NOT bash command substitution):
 
-# Check if agent already registered for this session
-if [[ -n "$SESSION_ID" ]] && [[ -f ".claude/agent-${SESSION_ID}.txt" ]]; then
-  CURRENT_AGENT=$(cat ".claude/agent-${SESSION_ID}.txt" 2>/dev/null | tr -d '\n')
-  AGENT_REGISTERED=true
-else
-  CURRENT_AGENT=""
-  AGENT_REGISTERED=false
-fi
-```
+1. **Read session ID file:**
+   - Use Read tool on `.claude/current-session-id.txt`
+   - Extract session ID and trim whitespace (e.g., "abc123")
+
+2. **Check if session agent file exists:**
+   - Compute filename: `.claude/agent-{session_id}.txt`
+   - Try to Read that file
+   - If exists: extract agent name → AGENT_REGISTERED=true
+   - If doesn't exist: AGENT_REGISTERED=false
+
+**Example:**
+- Read(.claude/current-session-id.txt) → extract "abc123"
+- Read(.claude/agent-abc123.txt) → if exists: get "SilverWind", set AGENT_REGISTERED=true
+- If file doesn't exist: set AGENT_REGISTERED=false
+
+**DO NOT use bash command substitution** - see Pattern #5 in ~/.claude/CLAUDE.md for details.
 
 #### 1B: Handle Agent Registration Based on Parameter
 
