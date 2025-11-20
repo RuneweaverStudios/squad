@@ -7,7 +7,7 @@ Lightweight bash tools for agent orchestration, database operations, monitoring,
 ```
 jat/
 ├── mail/                # Agent Mail coordination system (11 tools)
-├── commands/agent/      # Agent workflow commands (7 commands)
+├── commands/agent/      # Agent workflow commands (8 commands)
 ├── browser-tools/       # Browser automation tools (11 tools)
 ├── tools/               # Database & monitoring tools (6 tools)
 ├── dashboard/           # Beads Task Dashboard (SvelteKit app)
@@ -208,10 +208,11 @@ session_id=$(cat /tmp/claude-session-${PPID}.txt | tr -d '\n') && cat ".claude/a
 
 | Command | Purpose | Size |
 |---------|---------|------|
-| `/agent:start` | **Main command** - register + task start | 16K |
+| `/agent:start` | **Main command** - register + task start | 33K |
 | `/agent:register` | Explicit registration with full review | 11K |
 | `/agent:pause` | **Unified stop** - pause/block/handoff/abandon | 12K |
 | `/agent:complete` | Finish task, release files, close | 27K |
+| `/agent:finish` | **End session** - wrap up, clean state, goodbye | 16K |
 | `/agent:status` | Check current work status | 21K |
 | `/agent:plan` | Plan work strategy | 27K |
 | `/agent:verify` | Verify task completion | 29K |
@@ -418,6 +419,9 @@ session_id=$(cat /tmp/claude-session-${PPID}.txt | tr -d '\n') && cat ".claude/a
 
 # 5. Complete task
 /agent:complete task-xyz
+
+# 6. End session (going to bed)
+/agent:finish
 ```
 
 **Multi-Agent Coordination:**
@@ -435,6 +439,39 @@ session_id=$(cat /tmp/claude-session-${PPID}.txt | tr -d '\n') && cat ".claude/a
 /agent:start task-test-789
 ```
 
+### `/agent:finish` - End Session Command
+
+**End your work session gracefully.** Use this when going to bed or shutting down:
+
+```bash
+/agent:finish                # Full session wrap-up
+/agent:finish --skip-summary # Quick cleanup without summary
+/agent:finish --no-commit    # Don't auto-commit/stash changes
+```
+
+**What it does:**
+1. Handles in-progress work (pause, keep, or complete)
+2. Releases all file reservations
+3. Commits or stashes uncommitted changes
+4. Reviews and acknowledges unread messages
+5. Generates session summary
+6. Sends summary to Agent Mail (thread: daily-summaries)
+7. Shows tomorrow's top priorities
+8. Clears session state
+
+**When to use:**
+- End of work session
+- Going to bed
+- Shutting down computer
+- Want a clean slate for tomorrow
+
+**Output includes:**
+- Session duration
+- Completed tasks today
+- Git activity (commits, files changed)
+- Tomorrow's top 3 priorities
+- Cleanup confirmation
+
 **Troubleshooting:**
 ```bash
 # Statusline shows "no agent registered"?
@@ -445,6 +482,9 @@ session_id=$(cat /tmp/claude-session-${PPID}.txt | tr -d '\n') && cat ".claude/a
 
 # Need to hand off work?
 /agent:pause task-abc --handoff OtherAgent --reason "Need expert"
+
+# Going to bed?
+/agent:finish             # Full session wrap-up
 
 # Task blocked by dependency?
 /agent:pause task-abc --blocked --reason "Waiting for X"
