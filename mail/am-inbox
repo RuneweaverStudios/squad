@@ -10,6 +10,7 @@ source "$SCRIPT_DIR/am-lib.sh"
 # Parse arguments
 AGENT_NAME=""
 UNREAD_ONLY=false
+HIDE_ACKED=false
 THREAD_FILTER=""
 LIMIT=""
 MARK_READ=false
@@ -27,6 +28,7 @@ Arguments:
 
 Options:
   --unread            Show only unread messages
+  --hide-acked        Hide acknowledged messages (filter out ack_ts IS NOT NULL)
   --thread ID         Filter by thread ID (e.g., bd-123)
   --limit N           Limit number of messages shown (default: all)
   --mark-read         Mark displayed messages as read
@@ -39,6 +41,8 @@ Examples:
   am-inbox Bob --unread
   am-inbox Carol --thread bd-123
   am-inbox Alice --unread --limit 10 --mark-read
+  am-inbox Bob --hide-acked
+  am-inbox Alice --unread --hide-acked
   am-inbox Bob --json
 
 Database: $AGENT_MAIL_DB
@@ -55,6 +59,10 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --unread)
             UNREAD_ONLY=true
+            shift
+            ;;
+        --hide-acked)
+            HIDE_ACKED=true
             shift
             ;;
         --thread)
@@ -126,6 +134,10 @@ WHERE mr.agent_id = $AGENT_ID
 
 if [[ "$UNREAD_ONLY" == "true" ]]; then
     QUERY="$QUERY AND mr.read_ts IS NULL"
+fi
+
+if [[ "$HIDE_ACKED" == "true" ]]; then
+    QUERY="$QUERY AND mr.ack_ts IS NULL"
 fi
 
 if [[ -n "$THREAD_FILTER" ]]; then
