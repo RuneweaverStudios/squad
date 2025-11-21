@@ -419,7 +419,7 @@ create_reservation "TestAgent7" "test/**/*.ts" "jat-lck" 3600
 
 output=$(run_statusline_test "TestAgent7")
 
-assert_contains "$output" "🔒2" "Shows lock count indicator (2 locks)"
+assert_contains "$output" "🔒 2" "Shows lock count indicator (2 locks)"
 
 echo ""
 
