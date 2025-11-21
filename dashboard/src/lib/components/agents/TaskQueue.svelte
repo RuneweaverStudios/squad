@@ -442,7 +442,7 @@
 			{#each filteredTasks as task (task.id)}
 				{@const depStatus = analyzeDependencies(task)}
 				<div
-					class="card bg-base-100 border border-base-300 hover:border-primary cursor-pointer transition-all mb-1.5 {!dragDisabled ? 'opacity-50' : ''} {depStatus.hasBlockers ? 'opacity-60 border-error/30' : ''}"
+					class="card bg-base-100 border border-base-300 hover:border-primary cursor-pointer transition-all mb-4 {!dragDisabled ? 'opacity-50' : ''} {depStatus.hasBlockers ? 'opacity-60 border-error/30' : ''}"
 					draggable="true"
 					data-task-id={task.id}
 					ondragstart={handleDragStart}
@@ -467,7 +467,7 @@
 						</div>
 
 						<!-- Task Title -->
-						<div class="mb-2">
+						<div class="mt-1.5">
 							<h3 class="font-medium text-sm text-base-content truncate" title={task.title}>
 								{task.title}
 							</h3>

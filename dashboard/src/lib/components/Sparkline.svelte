@@ -120,26 +120,28 @@
 		return path;
 	});
 
-	/** Calculate color for a specific data point */
+	/** Calculate color for a specific data point based on relative position in range */
 	function getColorForValue(tokens: number): string {
 		if (colorMode === 'static') {
 			return staticColor;
 		}
 
-		const colorName = getUsageColor(tokens, 'today');
+		if (!data || data.length === 0) return '#3b82f6';
 
-		switch (colorName) {
-			case 'success':
-				return '#22c55e'; // Green
-			case 'info':
-				return '#3b82f6'; // Blue
-			case 'warning':
-				return '#f59e0b'; // Orange
-			case 'error':
-				return '#ef4444'; // Red
-			default:
-				return '#3b82f6'; // Blue
-		}
+		// Use relative thresholds based on actual data range
+		const allTokens = data.map((d) => d.tokens);
+		const min = Math.min(...allTokens);
+		const max = Math.max(...allTokens);
+		const range = max - min;
+
+		// Calculate percentile position (0-100)
+		const percentile = range > 0 ? ((tokens - min) / range) * 100 : 50;
+
+		// Color gradient based on percentile
+		if (percentile < 25) return '#22c55e'; // Green (bottom 25%)
+		if (percentile < 50) return '#3b82f6'; // Blue (25-50%)
+		if (percentile < 75) return '#f59e0b'; // Orange (50-75%)
+		return '#ef4444'; // Red (top 25%)
 	}
 
 	/** Calculate line color based on average usage */
