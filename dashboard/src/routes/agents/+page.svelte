@@ -236,5 +236,6 @@
 	</div>
 
 	<!-- System-Wide Capacity Bar (Fixed Bottom) -->
-	<SystemCapacityBar {agents} {tasks} />
+	<!-- Use allTasks for global capacity calculation (not filtered by project) -->
+	<SystemCapacityBar {agents} tasks={allTasks} />
 </div>
