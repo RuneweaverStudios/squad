@@ -27,8 +27,11 @@ Arguments:
   AGENT_NAME          Name of the agent (required)
 
 Options:
-  --unread            Show only unread messages
-  --hide-acked        Hide acknowledged messages (filter out ack_ts IS NOT NULL)
+  --unread            Show only unread messages (read_ts IS NULL)
+                      Useful for seeing new messages requiring attention
+  --hide-acked        Hide acknowledged messages (ack_ts IS NOT NULL)
+                      Useful for filtering out broadcasts you've already acknowledged
+                      Can combine with --unread for cleanest inbox view
   --thread ID         Filter by thread ID (e.g., bd-123)
   --limit N           Limit number of messages shown (default: all)
   --mark-read         Mark displayed messages as read
@@ -37,13 +40,19 @@ Options:
   --help, -h          Show this help
 
 Examples:
-  am-inbox Alice
-  am-inbox Bob --unread
-  am-inbox Carol --thread bd-123
-  am-inbox Alice --unread --limit 10 --mark-read
-  am-inbox Bob --hide-acked
-  am-inbox Alice --unread --hide-acked
-  am-inbox Bob --json
+  # Basic usage
+  am-inbox Alice                                    # All messages
+  am-inbox Bob --unread                             # Only unread messages
+  am-inbox Carol --thread bd-123                    # Thread-specific messages
+
+  # Broadcast filtering (clean inbox from @active, @all, @project broadcasts)
+  am-inbox Alice --hide-acked                       # Hide acknowledged broadcasts
+  am-inbox Bob --unread --hide-acked                # Only unread, unacked messages (cleanest view)
+  am-inbox Carol --hide-acked --thread bd-123       # Unacked messages in thread
+
+  # Other combinations
+  am-inbox Alice --unread --limit 10 --mark-read    # Read top 10, mark as read
+  am-inbox Bob --json                               # JSON output for scripting
 
 Database: $AGENT_MAIL_DB
 EOF

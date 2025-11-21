@@ -584,7 +584,9 @@ am-send "Critical" "System down" --from Monitor --to @all --importance urgent   
 am-send "Review needed" "PR ready" --from Dev --to @active,SeniorDev                   # Mixed (broadcast + specific)
 
 # Check inbox
-am-inbox AgentName --unread
+am-inbox AgentName --unread                                         # Only unread messages
+am-inbox AgentName --unread --hide-acked                            # Cleanest view (filters acknowledged broadcasts)
+am-inbox AgentName --hide-acked --thread task-abc                   # Unacked messages in specific thread
 ```
 
 ## Database Tools
