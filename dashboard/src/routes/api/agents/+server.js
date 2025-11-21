@@ -38,12 +38,22 @@ export async function GET({ url }) {
 		const projectFilter = url.searchParams.get('project');
 		const agentFilter = url.searchParams.get('agent');
 
+		console.log('🟠 [API /agents] Full orchestration request');
+		console.log('  → projectFilter:', projectFilter);
+		console.log('  → agentFilter:', agentFilter);
+
 		// Fetch all data sources in parallel for performance
+		console.log('  → Fetching data from agent-mail and beads...');
 		const [agents, reservations, tasks] = await Promise.all([
 			Promise.resolve(getAgents(projectFilter)),
 			Promise.resolve(getReservations(agentFilter, projectFilter)),
 			Promise.resolve(getTasks({ projectName: projectFilter }))
 		]);
+
+		console.log('  → Data fetched:');
+		console.log('    agents:', agents.length);
+		console.log('    reservations:', reservations.length);
+		console.log('    tasks:', tasks.length);
 
 		// Calculate agent statistics
 		const agentStats = agents.map(agent => {
@@ -108,6 +118,12 @@ export async function GET({ url }) {
 		);
 
 		// Return unified orchestration data
+		console.log('  → Preparing response:');
+		console.log('    agentStats:', agentStats.length);
+		console.log('    tasks:', tasks.length);
+		console.log('    unassigned_tasks:', unassignedTasks.length);
+		console.log('  ✓ Returning JSON response');
+
 		return json({
 			agents: agentStats,
 			reservations,

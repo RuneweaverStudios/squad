@@ -22,7 +22,12 @@
 
 	function handleChange(event: Event) {
 		const target = event.target as HTMLSelectElement;
+		console.log('🔵 [ProjectSelector] Dropdown changed');
+		console.log('  → Selected value:', target.value);
+		console.log('  → Previous value:', selectedProject);
+		console.log('  → Calling onProjectChange...');
 		onProjectChange(target.value);
+		console.log('  ✓ onProjectChange called');
 	}
 
 	// Format project option with task count if available
