@@ -204,46 +204,53 @@
 					System Usage Overview
 				</div>
 				<div class="collapse-content">
-					<!-- Concise System Stats -->
-					<div class="stats shadow bg-base-200 w-full">
-						<div class="stat">
-							<div class="stat-title">Tokens</div>
-							<div class="stat-value text-{getUsageColor(systemStats().tokensToday, 'today')}">
-								{formatTokens(systemStats().tokensToday)}
+					<!-- Two column layout: Stats on left, Top Agents on right -->
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+						<!-- Left: Concise System Stats -->
+						<div class="stats shadow bg-base-200">
+							<div class="stat">
+								<div class="stat-title">Tokens</div>
+								<div class="stat-value text-{getUsageColor(systemStats().tokensToday, 'today')}">
+									{formatTokens(systemStats().tokensToday)}
+								</div>
+							</div>
+
+							<div class="stat">
+								<div class="stat-title">Spend</div>
+								<div class="stat-value text-{getUsageColor(systemStats().tokensToday, 'today')}">
+									{formatCost(systemStats().costToday)}
+								</div>
+							</div>
+
+							<div class="stat">
+								<div class="stat-title">Agents</div>
+								<div class="stat-value text-primary">{systemStats().activeAgents}</div>
 							</div>
 						</div>
 
-						<div class="stat">
-							<div class="stat-title">Spend</div>
-							<div class="stat-value text-{getUsageColor(systemStats().tokensToday, 'today')}">
-								{formatCost(systemStats().costToday)}
+						<!-- Right: Top Agents -->
+						<div class="card bg-base-200 shadow">
+							<div class="card-body">
+								<h3 class="card-title text-base">Top Agents</h3>
+								{#if topConsumers().length > 0}
+									<div class="space-y-1">
+										{#each topConsumers() as consumer, index}
+											<div class="flex justify-between items-center text-sm">
+												<span class="font-medium">
+													{index + 1}. {consumer.name}
+												</span>
+												<span class="text-{getUsageColor(consumer.tokens, 'today')}">
+													{formatTokens(consumer.tokens)} · {formatCost(consumer.cost)}
+												</span>
+											</div>
+										{/each}
+									</div>
+								{:else}
+									<p class="text-sm text-base-content/60">No usage data</p>
+								{/if}
 							</div>
-						</div>
-
-						<div class="stat">
-							<div class="stat-title">Agents</div>
-							<div class="stat-value text-primary">{systemStats().activeAgents}</div>
 						</div>
 					</div>
-
-					<!-- Top Consumers (if any) -->
-					{#if topConsumers().length > 0}
-						<div class="mt-4">
-							<h3 class="text-sm font-semibold mb-2 text-base-content/70">Top Consumers</h3>
-							<div class="space-y-1">
-								{#each topConsumers() as consumer, index}
-									<div class="flex justify-between items-center text-sm">
-										<span class="font-medium">
-											{index + 1}. {consumer.name}
-										</span>
-										<span class="text-{getUsageColor(consumer.tokens, 'today')}">
-											{formatTokens(consumer.tokens)} · {formatCost(consumer.cost)}
-										</span>
-									</div>
-								{/each}
-							</div>
-						</div>
-					{/if}
 				</div>
 			</div>
 
