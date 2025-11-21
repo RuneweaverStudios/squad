@@ -52,8 +52,8 @@
 	// State
 	// ============================================================================
 
-	type VisualTheme = 'default' | 'lofi' | 'winamp' | 'nord';
-	let visualTheme = $state<VisualTheme>('default');
+	type ChartType = 'line' | 'bars' | 'area' | 'dots';
+	let chartType = $state<ChartType>('line');
 	let hoveredIndex = $state<number | null>(null);
 	let tooltipX = $state(0);
 	let tooltipY = $state(0);
@@ -120,70 +120,34 @@
 		return path;
 	});
 
-	/** Theme-based styling configuration */
-	const themeConfig = $derived.by(() => {
-		const avgTokens = data?.length
-			? data.reduce((sum, d) => sum + d.tokens, 0) / data.length
-			: 0;
-		const usageColorName = getUsageColor(avgTokens, 'today');
-
-		// Base colors for usage levels
-		const usageColors = {
-			success: '#22c55e',
-			info: '#3b82f6',
-			warning: '#f59e0b',
-			error: '#ef4444'
-		};
-		const baseColor = usageColors[usageColorName as keyof typeof usageColors] || '#3b82f6';
-
-		switch (visualTheme) {
-			case 'lofi':
-				// Lofi aesthetic: pastel colors, soft glow, dreamy vibe
-				return {
-					strokeColor: '#ff6b9d', // Pink/coral
-					strokeWidth: 2.5,
-					opacity: 0.9,
-					glow: true,
-					glowColor: '#ff6b9d',
-					glowBlur: 8,
-					bgGradient: 'linear-gradient(180deg, rgba(255,107,157,0.1) 0%, rgba(189,147,249,0.05) 100%)'
-				};
-
-			case 'winamp':
-				// Winamp equalizer: bright neon green, sharp, digital
-				return {
-					strokeColor: '#00ff00', // Classic Winamp green
-					strokeWidth: 1.5,
-					opacity: 1,
-					glow: true,
-					glowColor: '#00ff00',
-					glowBlur: 6,
-					bgGradient: 'linear-gradient(180deg, rgba(0,255,0,0.15) 0%, rgba(0,0,0,0.8) 100%)',
-					pixelated: true
-				};
-
-			case 'nord':
-				// Nord/Corporate: professional, muted, clean
-				return {
-					strokeColor: '#88c0d0', // Nord frost blue
-					strokeWidth: 2,
-					opacity: 0.85,
-					glow: false,
-					bgGradient: 'linear-gradient(180deg, rgba(136,192,208,0.08) 0%, rgba(76,86,106,0.05) 100%)'
-				};
-
-			default:
-				// Default: usage-based color
-				return {
-					strokeColor: baseColor,
-					strokeWidth: 2,
-					opacity: 1,
-					glow: false
-				};
+	/** Calculate color for a specific data point */
+	function getColorForValue(tokens: number): string {
+		if (colorMode === 'static') {
+			return staticColor;
 		}
-	});
 
-	const lineColor = $derived(themeConfig.strokeColor);
+		const colorName = getUsageColor(tokens, 'today');
+
+		switch (colorName) {
+			case 'success':
+				return '#22c55e'; // Green
+			case 'info':
+				return '#3b82f6'; // Blue
+			case 'warning':
+				return '#f59e0b'; // Orange
+			case 'error':
+				return '#ef4444'; // Red
+			default:
+				return '#3b82f6'; // Blue
+		}
+	}
+
+	/** Calculate line color based on average usage */
+	const lineColor = $derived.by(() => {
+		if (!data || data.length === 0) return '#3b82f6';
+		const avgTokens = data.reduce((sum, d) => sum + d.tokens, 0) / data.length;
+		return getColorForValue(avgTokens);
+	});
 
 	/** Hovered data point */
 	const hoveredPoint = $derived.by(() => {
@@ -245,36 +209,52 @@
 </script>
 
 <div class="sparkline-container" style="width: {typeof width === 'number' ? width + 'px' : width};">
-	<!-- Theme Toolbar -->
+	<!-- Chart Type Toolbar -->
 	{#if showStyleToolbar}
 		<div class="sparkline-toolbar">
 			<button
-				class="btn btn-xs {visualTheme === 'default' ? 'btn-primary' : 'btn-ghost'}"
-				onclick={() => (visualTheme = 'default')}
-				title="Default (usage-based colors)"
+				class="btn btn-xs {chartType === 'line' ? 'btn-primary' : 'btn-ghost'}"
+				onclick={() => (chartType = 'line')}
+				title="Line chart"
 			>
-				<span class="text-[10px] font-medium">Auto</span>
+				<svg class="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+					<path d="M2 12 L5 8 L8 10 L14 4" stroke-linecap="round" />
+				</svg>
 			</button>
 			<button
-				class="btn btn-xs {visualTheme === 'lofi' ? 'btn-primary' : 'btn-ghost'}"
-				onclick={() => (visualTheme = 'lofi')}
-				title="Lofi (dreamy pastel)"
+				class="btn btn-xs {chartType === 'bars' ? 'btn-primary' : 'btn-ghost'}"
+				onclick={() => (chartType = 'bars')}
+				title="Bar chart (equalizer style)"
 			>
-				<span class="text-[10px] font-medium">Lofi</span>
+				<svg class="w-3 h-3" viewBox="0 0 16 16" fill="currentColor">
+					<rect x="1" y="8" width="2" height="6" />
+					<rect x="4" y="4" width="2" height="10" />
+					<rect x="7" y="6" width="2" height="8" />
+					<rect x="10" y="2" width="2" height="12" />
+					<rect x="13" y="5" width="2" height="9" />
+				</svg>
 			</button>
 			<button
-				class="btn btn-xs {visualTheme === 'winamp' ? 'btn-primary' : 'btn-ghost'}"
-				onclick={() => (visualTheme = 'winamp')}
-				title="Winamp (neon green)"
+				class="btn btn-xs {chartType === 'area' ? 'btn-primary' : 'btn-ghost'}"
+				onclick={() => (chartType = 'area')}
+				title="Area chart (filled)"
 			>
-				<span class="text-[10px] font-medium">Winamp</span>
+				<svg class="w-3 h-3" viewBox="0 0 16 16" fill="currentColor" opacity="0.6">
+					<path d="M2 14 L2 12 L5 8 L8 10 L14 4 L14 14 Z" />
+				</svg>
 			</button>
 			<button
-				class="btn btn-xs {visualTheme === 'nord' ? 'btn-primary' : 'btn-ghost'}"
-				onclick={() => (visualTheme = 'nord')}
-				title="Nord (corporate blue)"
+				class="btn btn-xs {chartType === 'dots' ? 'btn-primary' : 'btn-ghost'}"
+				onclick={() => (chartType = 'dots')}
+				title="Dot plot"
 			>
-				<span class="text-[10px] font-medium">Nord</span>
+				<svg class="w-3 h-3" viewBox="0 0 16 16" fill="currentColor">
+					<circle cx="2" cy="12" r="1.5" />
+					<circle cx="5" cy="8" r="1.5" />
+					<circle cx="8" cy="10" r="1.5" />
+					<circle cx="11" cy="6" r="1.5" />
+					<circle cx="14" cy="4" r="1.5" />
+				</svg>
 			</button>
 		</div>
 	{/if}
@@ -283,7 +263,7 @@
 		bind:this={svgElement}
 		viewBox="0 0 {viewBoxWidth} {viewBoxHeight}"
 		preserveAspectRatio="none"
-		style="height: {height}px; width: 100%; background: {themeConfig.bgGradient || 'transparent'}; border-radius: 0.375rem;"
+		style="height: {height}px; width: 100%; border-radius: 0.375rem;"
 		onmousemove={handleMouseMove}
 		onmouseleave={handleMouseLeave}
 		role="img"
@@ -301,33 +281,70 @@
 			/>
 		{/if}
 
-		<!-- Sparkline path -->
+		<!-- Chart rendering -->
 		{#if data && data.length > 0}
-			<!-- Glow effect (if theme supports it) -->
-			{#if themeConfig.glow}
-				<defs>
-					<filter id="glow-{visualTheme}">
-						<feGaussianBlur stdDeviation="{themeConfig.glowBlur}" result="coloredBlur" />
-						<feMerge>
-							<feMergeNode in="coloredBlur" />
-							<feMergeNode in="SourceGraphic" />
-						</feMerge>
-					</filter>
-				</defs>
+			{#if chartType === 'line'}
+				<!-- Line chart (smooth curve) -->
+				<path
+					d={pathData}
+					fill="none"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					style="stroke: {lineColor}; transition: stroke 0.3s ease, d 0.3s ease;"
+				/>
+			{:else if chartType === 'bars'}
+				<!-- Bar chart (equalizer style) -->
+				{#each data as point, index}
+					{@const x = padding + (index / (data.length - 1 || 1)) * (viewBoxWidth - 2 * padding)}
+					{@const y = scaleY(point.tokens)}
+					{@const barWidth = (viewBoxWidth - 2 * padding) / data.length * 0.8}
+					{@const barHeight = viewBoxHeight - padding - y}
+					{@const color = getColorForValue(point.tokens)}
+					<rect
+						x={x - barWidth / 2}
+						y={y}
+						width={barWidth}
+						height={barHeight}
+						fill={color}
+						opacity="0.9"
+						rx="0.5"
+						style="transition: fill 0.3s ease, height 0.3s ease;"
+					/>
+				{/each}
+			{:else if chartType === 'area'}
+				<!-- Area chart (filled) -->
+				{@const points = data.map((point, index) => ({
+					x: padding + (index / (data.length - 1 || 1)) * (viewBoxWidth - 2 * padding),
+					y: scaleY(point.tokens)
+				}))}
+				{@const areaPath = `M ${points[0].x},${viewBoxHeight - padding} L ${points[0].x},${points[0].y} ${points.map(p => `L ${p.x},${p.y}`).join(' ')} L ${points[points.length - 1].x},${viewBoxHeight - padding} Z`}
+				<path
+					d={areaPath}
+					fill={lineColor}
+					fill-opacity="0.3"
+					stroke={lineColor}
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					style="transition: fill 0.3s ease, stroke 0.3s ease, d 0.3s ease;"
+				/>
+			{:else if chartType === 'dots'}
+				<!-- Dot plot -->
+				{#each data as point, index}
+					{@const x = padding + (index / (data.length - 1 || 1)) * (viewBoxWidth - 2 * padding)}
+					{@const y = scaleY(point.tokens)}
+					{@const color = getColorForValue(point.tokens)}
+					<circle
+						cx={x}
+						cy={y}
+						r="2"
+						fill={color}
+						opacity="0.9"
+						style="transition: fill 0.3s ease, cy 0.3s ease;"
+					/>
+				{/each}
 			{/if}
-
-			<!-- Line chart -->
-			<path
-				d={pathData}
-				fill="none"
-				stroke-width={themeConfig.strokeWidth}
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				opacity={themeConfig.opacity}
-				style="stroke: {themeConfig.strokeColor}; transition: stroke 0.3s ease, d 0.3s ease, opacity 0.3s ease; {themeConfig.glow
-					? `filter: url(#glow-${visualTheme}); drop-shadow(0 0 ${themeConfig.glowBlur}px ${themeConfig.glowColor});`
-					: ''}"
-			/>
 
 			<!-- Hover indicator -->
 			{#if hoveredIndex !== null}
