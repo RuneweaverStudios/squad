@@ -396,6 +396,8 @@
 		<div
 			class="sparkline-controls-panel"
 			transition:slide={{ duration: 200 }}
+			onmouseenter={() => (showControls = true)}
+			onmouseleave={() => (showControls = false)}
 		>
 			<div class="p-2 bg-base-200 rounded-lg shadow-lg border border-base-300 space-y-3">
 				<!-- Chart Type Section -->
