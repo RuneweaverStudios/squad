@@ -599,14 +599,30 @@
 	>
 		<!-- Optional grid lines -->
 		{#if internalShowGrid}
-			<line
-				x1={padding}
-				y1={viewBoxHeight / 2}
-				x2={viewBoxWidth - padding}
-				y2={viewBoxHeight / 2}
-				stroke="oklch(var(--bc) / 0.1)"
-				stroke-width="0.5"
-			/>
+			<!-- Horizontal grid lines (5 lines for better visibility) -->
+			{#each [0.2, 0.4, 0.5, 0.6, 0.8] as ratio}
+				<line
+					x1={padding}
+					y1={viewBoxHeight * ratio}
+					x2={viewBoxWidth - padding}
+					y2={viewBoxHeight * ratio}
+					stroke="oklch(var(--bc) / {ratio === 0.5 ? 0.15 : 0.08})"
+					stroke-width="0.5"
+					stroke-dasharray={ratio === 0.5 ? '0' : '2,2'}
+				/>
+			{/each}
+			<!-- Vertical grid lines (4 lines) -->
+			{#each [0.25, 0.5, 0.75] as ratio}
+				<line
+					x1={viewBoxWidth * ratio}
+					y1={padding}
+					x2={viewBoxWidth * ratio}
+					y2={viewBoxHeight - padding}
+					stroke="oklch(var(--bc) / 0.06)"
+					stroke-width="0.5"
+					stroke-dasharray="2,2"
+				/>
+			{/each}
 		{/if}
 
 		<!-- Chart rendering -->
