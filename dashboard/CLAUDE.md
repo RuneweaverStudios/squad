@@ -581,6 +581,111 @@ const contextConfig = {
 };
 ```
 
+### Breadcrumbs Navigation
+
+The Nav component integrates **breadcrumbs** to show the user's current location in the site hierarchy.
+
+**Implementation:**
+
+The Breadcrumbs component (`src/lib/components/Breadcrumbs.svelte`) is automatically integrated into Nav.svelte for non-home pages. It provides:
+- Context-aware navigation paths
+- Home icon for the first breadcrumb item
+- DaisyUI styling for consistent appearance
+- Support for deep navigation with `additionalPath` prop
+
+**Basic Usage (Automatic):**
+
+```svelte
+<!-- Nav component automatically shows breadcrumbs on non-home pages -->
+<Nav context="agents" />
+<!-- Renders: Home > Agents -->
+
+<Nav context="api-demo" />
+<!-- Renders: Home > API Demo -->
+```
+
+**With Additional Path (For Deep Navigation):**
+
+```svelte
+<script>
+  import Breadcrumbs from '$lib/components/Breadcrumbs.svelte';
+
+  // For a detail page
+  const additionalPath = [
+    { label: 'Task jat-abc', href: null } // null = current page
+  ];
+</script>
+
+<Breadcrumbs context="agents" {additionalPath} />
+<!-- Renders: Home > Agents > Task jat-abc -->
+```
+
+**Breadcrumb Paths by Context:**
+
+| Context | Breadcrumb Path | Notes |
+|---------|----------------|-------|
+| `home` | (none) | Breadcrumbs hidden on home page |
+| `agents` | Home > Agents | Home links to `/` |
+| `api-demo` | Home > API Demo | Home links to `/` |
+
+**Features:**
+
+- **Home Icon**: First breadcrumb item displays a home icon (Heroicons house icon)
+- **Link vs Current**: All items are linked except the last (current page)
+- **Responsive**: Uses `text-sm` for appropriate sizing on all screens
+- **DaisyUI Styled**: Uses `.breadcrumbs` class for consistent separators and spacing
+- **Extensible**: Use `additionalPath` prop for task detail pages, nested routes, etc.
+
+**Component API (`Breadcrumbs.svelte`):**
+
+```typescript
+interface Props {
+  context: 'home' | 'agents' | 'api-demo';  // Required
+  additionalPath?: AdditionalPathItem[];     // Optional
+}
+
+interface AdditionalPathItem {
+  label: string;     // Breadcrumb text
+  href?: string | null;  // Link URL (null for current page)
+}
+```
+
+**Example: Task Detail Page**
+
+```svelte
+<script>
+  import Nav from '$lib/components/Nav.svelte';
+  import Breadcrumbs from '$lib/components/Breadcrumbs.svelte';
+
+  let taskId = $state('jat-abc');
+</script>
+
+<!-- Override default breadcrumbs for deep navigation -->
+<Nav context="agents" />
+<div class="p-4">
+  <Breadcrumbs
+    context="agents"
+    additionalPath={[
+      { label: `Task ${taskId}`, href: null }
+    ]}
+  />
+  <!-- Task detail content -->
+</div>
+<!-- Renders: Home > Agents > Task jat-abc -->
+```
+
+**Styling:**
+
+Breadcrumbs use DaisyUI's breadcrumbs component with the following classes:
+- `.breadcrumbs` - Container with auto overflow
+- `.text-sm` - Appropriate text size
+- `.link-hover` - Hover effect on linked items
+
+**Files:**
+
+- `src/lib/components/Breadcrumbs.svelte` - Breadcrumbs component (93 lines)
+- `src/lib/components/Nav.svelte` - Integrates breadcrumbs (lines 95-100)
+
 ### Troubleshooting
 
 **Nav wrapping to multiple rows:**

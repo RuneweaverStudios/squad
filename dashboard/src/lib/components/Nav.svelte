@@ -21,6 +21,7 @@
 
 	import ThemeSelector from './ThemeSelector.svelte';
 	import ProjectSelector from './ProjectSelector.svelte';
+	import Breadcrumbs from './Breadcrumbs.svelte';
 
 	interface Props {
 		context: 'home' | 'agents' | 'api-demo';
@@ -84,13 +85,19 @@
 </script>
 
 <div class="navbar bg-base-100 border-b border-base-300">
-	<!-- Left: Title & Subtitle -->
+	<!-- Left: Title, Subtitle & Breadcrumbs -->
 	<div class="flex-1 min-w-0">
-		<div class="truncate">
-			<h1 class="text-2xl font-bold text-base-content">{config.title}</h1>
-			<p class="text-sm text-base-content/70 hidden sm:block">
+		<div class="w-full">
+			<h1 class="text-2xl font-bold text-base-content truncate">{config.title}</h1>
+			<p class="text-sm text-base-content/70 hidden sm:block truncate">
 				{config.subtitle}
 			</p>
+			<!-- Breadcrumbs (only show on non-home pages) -->
+			{#if context !== 'home'}
+				<div class="mt-1">
+					<Breadcrumbs {context} />
+				</div>
+			{/if}
 		</div>
 	</div>
 
