@@ -764,10 +764,14 @@ When `TASK_MODE=bulk` is detected:
 
 | Command | Behavior |
 |---------|----------|
-| `/agent:start` | Auto-detect/create agent → show task recommendations |
-| `/agent:start MyAgent` | Register as MyAgent → show task recommendations |
-| `/agent:start task-abc` | Auto-register if needed → start task-abc |
-| `/agent:start task-abc quick` | Auto-register → start task-abc (skip conflict checks) |
+| `/agent:start` | Auto-detect/create agent → **show** task recommendations (no auto-start) |
+| `/agent:start MyAgent` | Register as MyAgent → **show** task recommendations (no auto-start) |
+| `/agent:start task-abc` | Auto-register if needed → **actually start** task-abc (full flow) |
+| `/agent:start task-abc quick` | Auto-register → **actually start** task-abc (skip conflict checks) |
+
+**Key distinction:**
+- **Without task-id**: Shows recommendations, exits, waits for user to choose
+- **With task-id**: Actually starts work (reserves files, updates Beads, sends mail)
 
 ---
 
@@ -870,9 +874,9 @@ SESSION_ID=$(cat /tmp/claude-session-${PPID}.txt | tr -d '\n')  # BROKEN
 
 | Command | Use Case |
 |---------|----------|
-| `/agent:start` | "Just get me working" - registration + task start |
-| `/agent:start MyAgent` | "Work as specific agent" - explicit identity |
-| `/agent:start task-abc` | "Start this task" - direct task start |
-| `/agent:register` | "Show me all agents" - explicit registration with full review |
+| `/agent:start` | "Show me what to work on" - registration + show recommendations (no auto-start) |
+| `/agent:start MyAgent` | "Register as specific agent" - explicit identity + show recommendations |
+| `/agent:start task-abc` | "Start this specific task NOW" - direct task start (full flow) |
+| `/agent:register` | "Show me all agents" - explicit registration with full review (no tasks shown) |
 | `/agent:complete` | "I'm done with this task" - complete and release |
 | `/agent:status` | "What am I working on?" - current status check |
