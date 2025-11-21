@@ -121,8 +121,13 @@ if [[ -n "$cwd" ]] && [[ -d "$cwd/.git" ]]; then
     branch=$(git branch --show-current 2>/dev/null || echo "")
     if [[ -n "$branch" ]]; then
         folder_name=$(basename "$cwd")
-        # Format: folder@branch with branch in cyan
-        git_branch="${folder_name}@${CYAN}${branch}${RESET}"
+        # Check for uncommitted changes (dirty state)
+        git_dirty=""
+        if ! git diff-index --quiet HEAD -- 2>/dev/null; then
+            git_dirty="${RED}*${RESET}"
+        fi
+        # Format: folder@branch with branch in cyan, * if dirty
+        git_branch="${folder_name}@${CYAN}${branch}${RESET}${git_dirty}"
     fi
 fi
 
@@ -207,13 +212,31 @@ if [[ -z "$agent_name" ]]; then
     exit 0
 fi
 
-# Get current task - check BOTH Beads tasks AND file reservations
-# Priority 1: Check Beads for in_progress tasks assigned to this agent
-# Priority 2: Check file reservations for task ID
+# ============================================================================
+# STATUS CALCULATION ALGORITHM
+# ============================================================================
+# Determines what task/status to display based on priority-based decision tree:
+#
+# 1. Check Beads for in_progress tasks assigned to this agent (PRIORITY 1)
+#    - Source of truth for current work
+#    - Most accurate representation of agent state
+#
+# 2. Fall back to file reservations if no in_progress task found (PRIORITY 2)
+#    - Extract task ID from reservation reason field
+#    - Lookup task details in Beads
+#    - Handles case where agent has locks but forgot to update Beads
+#
+# 3. If neither found, show "idle" state
+#
+# See CLAUDE.md "Status Calculation Algorithm" section for full decision tree
+# ============================================================================
+
 task_id=""
 task_title=""
 task_priority=""
 task_progress=""
+task_type=""
+task_updated_at=""
 
 # Priority 1: Check Beads for in_progress tasks (matches dashboard logic)
 if command -v bd &>/dev/null; then
@@ -230,6 +253,8 @@ if command -v bd &>/dev/null; then
         task_title=$(echo "$task_json" | jq -r '.title // empty')
         task_priority=$(echo "$task_json" | jq -r '.priority // empty')
         task_progress=$(echo "$task_json" | jq -r '.progress // empty')
+        task_type=$(echo "$task_json" | jq -r '.issue_type // empty')
+        task_updated_at=$(echo "$task_json" | jq -r '.updated_at // empty')
 
         # Truncate title if too long
         if [[ ${#task_title} -gt 40 ]]; then
@@ -254,6 +279,8 @@ if [[ -z "$task_id" ]] && command -v am-reservations &>/dev/null; then
             task_title=$(echo "$task_json" | jq -r '.[0].title // empty')
             task_priority=$(echo "$task_json" | jq -r '.[0].priority // empty')
             task_progress=$(echo "$task_json" | jq -r '.[0].progress // empty')
+            task_type=$(echo "$task_json" | jq -r '.[0].issue_type // empty')
+            task_updated_at=$(echo "$task_json" | jq -r '.[0].updated_at // empty')
 
             # Truncate title if too long
             if [[ ${#task_title} -gt 40 ]]; then
@@ -302,6 +329,44 @@ if [[ -n "$agent_name" ]]; then
     fi
 fi
 
+# Calculate active time if task has updated_at
+active_time=""
+if [[ -n "$task_updated_at" ]]; then
+    # Parse timestamp (format: 2025-11-20T21:30:00Z or 2025-11-20 21:30:00)
+    task_epoch=$(date -d "$task_updated_at" +%s 2>/dev/null || echo "0")
+    if [[ $task_epoch -gt 0 ]]; then
+        now_epoch=$(date +%s)
+        seconds_active=$((now_epoch - task_epoch))
+        if [[ $seconds_active -gt 0 ]]; then
+            minutes_active=$((seconds_active / 60))
+            hours_active=$((minutes_active / 60))
+            if [[ $hours_active -gt 0 ]]; then
+                minutes_rem=$((minutes_active % 60))
+                active_time="${hours_active}h${minutes_rem}m"
+            else
+                active_time="${minutes_active}m"
+            fi
+        fi
+    fi
+fi
+
+# Get task type icon
+task_icon=""
+case "$task_type" in
+    bug)
+        task_icon="🐛"
+        ;;
+    feature)
+        task_icon="✨"
+        ;;
+    task|chore)
+        task_icon="🔧"
+        ;;
+    epic)
+        task_icon="🎯"
+        ;;
+esac
+
 # Build status line with all indicators
 status_line=""
 
@@ -330,6 +395,11 @@ if [[ -n "$task_id" ]]; then
         status_line="${status_line} ${GRAY}|${RESET}"
     fi
 
+    # Add task type icon if available
+    if [[ -n "$task_icon" ]]; then
+        status_line="${status_line} ${task_icon}"
+    fi
+
     # Add task ID
     status_line="${status_line} ${GREEN}${task_id}${RESET}"
 
@@ -338,9 +408,14 @@ if [[ -n "$task_id" ]]; then
         status_line="${status_line} ${GRAY}-${RESET} ${YELLOW}${task_title}${RESET}"
     fi
 
+    # Add active time if available
+    if [[ -n "$active_time" ]]; then
+        status_line="${status_line} ${GRAY}⏲${RESET} ${active_time}"
+    fi
+
 elif [[ -n "$agent_name" ]]; then
-    # Agent registered but no active task - show idle
-    status_line="${status_line} ${GRAY}|${RESET} ${CYAN}idle${RESET}"
+    # Agent registered but no active task - show idle (dimmed)
+    status_line="${status_line} ${GRAY}|${RESET} ${GRAY}idle${RESET}"
 else
     # Fallback
     status_line="${GRAY}jat${RESET}"
@@ -433,9 +508,9 @@ if [[ -n "$git_branch" ]]; then
     second_line="${second_line}${MAGENTA}⎇${RESET} ${git_branch}"
 fi
 
-# Add indicators
+# Add indicators (no pipe, just extra spacing)
 if [[ -n "$indicators" ]]; then
-    [[ -n "$second_line" ]] && second_line="${second_line} ${GRAY}|${RESET} "
+    [[ -n "$second_line" ]] && second_line="${second_line}  "
     second_line="${second_line}${indicators}"
 fi
 
