@@ -5,7 +5,7 @@
 	import DependencyIndicator from '$lib/components/DependencyIndicator.svelte';
 	import { analyzeDependencies } from '$lib/utils/dependencyUtils';
 
-	let { tasks = [], agents = [], reservations = [] } = $props();
+	let { tasks = [], agents = [], reservations = [], selectedProject = 'All Projects' } = $props();
 
 	// Initialize filters from URL params (default to open tasks)
 	let searchQuery = $state('');

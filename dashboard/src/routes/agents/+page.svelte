@@ -130,6 +130,7 @@
 				tasks={unassignedTasks}
 				{agents}
 				{reservations}
+				{selectedProject}
 			/>
 		</div>
 
