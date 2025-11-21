@@ -50,10 +50,10 @@
 
 			// Aggregate token usage (from usage field if available)
 			if (agent.usage) {
-				tokensToday += agent.usage.tokens_today || 0;
-				costToday += agent.usage.cost_today || 0;
-				tokensWeek += agent.usage.tokens_week || 0;
-				costWeek += agent.usage.cost_week || 0;
+				tokensToday += agent.usage.today?.total_tokens || 0;
+				costToday += agent.usage.today?.cost || 0;
+				tokensWeek += agent.usage.week?.total_tokens || 0;
+				costWeek += agent.usage.week?.cost || 0;
 			}
 		});
 
@@ -74,13 +74,13 @@
 
 		// Filter agents with usage data, sort by tokens today, take top 3
 		return agents
-			.filter(agent => agent.usage && agent.usage.tokens_today > 0)
-			.sort((a, b) => (b.usage?.tokens_today || 0) - (a.usage?.tokens_today || 0))
+			.filter(agent => agent.usage && agent.usage.today?.total_tokens > 0)
+			.sort((a, b) => (b.usage?.today?.total_tokens || 0) - (a.usage?.today?.total_tokens || 0))
 			.slice(0, 3)
 			.map(agent => ({
 				name: agent.name,
-				tokens: agent.usage?.tokens_today || 0,
-				cost: agent.usage?.cost_today || 0
+				tokens: agent.usage?.today?.total_tokens || 0,
+				cost: agent.usage?.today?.cost || 0
 			}));
 	});
 
