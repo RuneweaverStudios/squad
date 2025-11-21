@@ -7,6 +7,18 @@ const config = {
 	// for more information about preprocessors
 	preprocess: vitePreprocess(),
 
+	vitePlugin: {
+		inspector: {
+			toggleKeyCombo: 'control-shift',
+			showToggleButton: 'always',
+			toggleButtonPos: 'bottom-left',
+			holdMode: false
+		},
+		experimental: {
+			useVitePreprocess: true
+		}
+	},
+
 	kit: {
 		// Using adapter-node for server-side SQLite database queries
 		adapter: adapter()
