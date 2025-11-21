@@ -9,7 +9,7 @@
 	// State
 	let svgElement = $state(null);
 	let width = $state(1200);
-	let margin = { top: 40, right: 150, bottom: 60, left: 200 };
+	let margin = { top: 40, right: 400, bottom: 60, left: 200 };
 
 	// Dynamic height based on number of tasks (40px per task minimum)
 	const minRowHeight = 40;
