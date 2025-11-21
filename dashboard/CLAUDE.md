@@ -721,6 +721,589 @@ Breadcrumbs use DaisyUI's breadcrumbs component with the following classes:
 - `src/routes/agents/+page.svelte` - Agents page with project filter
 - `src/routes/api-demo/+page.svelte` - Simple page (no extras)
 
+## Unified Navigation Architecture
+
+### Overview
+
+The dashboard uses a **root layout pattern** for unified navigation. The Nav component is rendered once in `+layout.svelte` and appears on ALL pages automatically. This eliminates duplication and ensures consistency.
+
+**Key Principle:** Navigation lives in the root layout, NOT in individual pages.
+
+### Architecture: Root Layout Pattern
+
+**Pattern:**
+```
++layout.svelte (Root Layout)
+    ├── Nav Component (unified navigation)
+    ├── CommandPalette (Cmd+K)
+    ├── TaskCreationDrawer
+    └── {@render children()}  ← Page content renders here
+```
+
+**Why this pattern:**
+- ✅ Nav appears on ALL pages automatically
+- ✅ Zero duplication (one Nav, not per-page)
+- ✅ Shared state (project filter persists across pages)
+- ✅ Consistent UI (impossible to have different nav styles)
+- ✅ Easy to update (change Nav once, affects all pages)
+
+**File:** `src/routes/+layout.svelte`
+
+```svelte
+<script lang="ts">
+  import Nav from '$lib/components/Nav.svelte';
+  import { page } from '$app/stores';
+  import { replaceState } from '$app/navigation';
+
+  // Shared project state for entire app
+  let selectedProject = $state('All Projects');
+  let allTasks = $state([]);
+
+  // Derived project data
+  const projects = $derived(getProjectsFromTasks(allTasks));
+  const taskCounts = $derived(getTaskCountByProject(allTasks, 'open'));
+
+  // Sync selected project from URL parameter
+  $effect(() => {
+    const params = new URLSearchParams($page.url.searchParams);
+    const projectParam = params.get('project');
+    selectedProject = projectParam || 'All Projects';
+  });
+
+  // Handle project selection change
+  function handleProjectChange(project: string) {
+    selectedProject = project;
+
+    // Update URL parameter
+    const url = new URL(window.location.href);
+    if (project === 'All Projects') {
+      url.searchParams.delete('project');
+    } else {
+      url.searchParams.set('project', project);
+    }
+    replaceState(url, {});
+  }
+</script>
+
+<!-- Unified Navigation Bar (shown on all pages) -->
+<Nav
+  {projects}
+  {selectedProject}
+  onProjectChange={handleProjectChange}
+  {taskCounts}
+/>
+
+{@render children()}
+```
+
+**Key Features:**
+
+1. **Single Nav Instance:** Nav component rendered once in layout
+2. **Shared State:** Project filter state lives in layout, shared across all pages
+3. **URL Sync:** Project selection synced with `?project=` URL parameter
+4. **Auto-Load:** Tasks loaded once on mount to populate project dropdown
+5. **State Management:** Uses Svelte 5 `$state`, `$derived`, `$effect` runes
+
+### How Nav Works (Page-Agnostic)
+
+The Nav component is **completely page-agnostic**. It doesn't know or care which page it's on.
+
+**Implementation:** `src/lib/components/Nav.svelte`
+
+```svelte
+<script lang="ts">
+  import { page } from '$app/stores';
+  import { unifiedNavConfig } from '$lib/config/navConfig';
+
+  // Get current pathname for active state detection
+  const currentPath = $derived($page.url.pathname);
+
+  // Helper to check if nav item is active
+  function isActive(href: string): boolean {
+    // Exact match for home
+    if (href === '/' && currentPath === '/') {
+      return true;
+    }
+    // Prefix match for other routes
+    if (href !== '/' && currentPath.startsWith(href)) {
+      return true;
+    }
+    return false;
+  }
+</script>
+
+<div class="navbar bg-base-100 border-b border-base-300">
+  <!-- Left: Navigation Items -->
+  <div class="flex-1">
+    <div class="flex flex-nowrap items-center gap-1.5">
+      {#each unifiedNavConfig.navItems as navItem}
+        <a
+          href={navItem.href}
+          class="btn btn-sm {isActive(navItem.href) ? 'btn-primary' : 'btn-ghost'}"
+        >
+          <svg>...</svg>
+          <span class="hidden lg:inline ml-1">{navItem.label}</span>
+        </a>
+      {/each}
+    </div>
+  </div>
+
+  <!-- Right: Controls -->
+  <div class="flex-none flex flex-nowrap items-center gap-1.5">
+    <ProjectSelector ... />
+    <ThemeSelector ... />
+  </div>
+</div>
+```
+
+**How Active State Works:**
+
+- Nav reads `$page.url.pathname` (current route)
+- Compares with each nav item's `href`
+- Applies `btn-primary` class to active item
+- No page-specific logic needed
+
+**Example:**
+- User on `/agents` → `isActive('/agents')` returns `true` → Agents button is blue
+- User on `/` → `isActive('/')` returns `true` → List button is blue
+
+### Configuration-Driven Navigation
+
+**File:** `src/lib/config/navConfig.ts`
+
+```typescript
+export interface NavItem {
+  id: string;       // Unique identifier (e.g., 'list', 'graph', 'agents')
+  label: string;    // Display text (e.g., 'List', 'Graph', 'Agents')
+  href: string;     // Navigation target (e.g., '/', '/agents')
+  icon: string;     // Icon identifier (matches SVG paths in Nav.svelte)
+}
+
+export interface UnifiedNavConfig {
+  navItems: NavItem[];          // All navigation items
+  showProjectFilter: boolean;   // Show project selector
+  showThemeSelector: boolean;   // Show theme picker
+}
+
+export const unifiedNavConfig: UnifiedNavConfig = {
+  navItems: [
+    { id: 'list', label: 'List', href: '/', icon: 'list' },
+    { id: 'graph', label: 'Graph', href: '/graph', icon: 'graph' },
+    { id: 'agents', label: 'Agents', href: '/agents', icon: 'users' }
+  ],
+  showProjectFilter: true,
+  showThemeSelector: true
+};
+```
+
+**Adding a New Page:**
+
+1. Add route to navConfig.ts:
+```typescript
+{ id: 'settings', label: 'Settings', href: '/settings', icon: 'cog' }
+```
+
+2. Add icon SVG path to Nav.svelte (if new icon):
+```typescript
+const icons = {
+  list: '...',
+  graph: '...',
+  users: '...',
+  cog: 'M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55...' // New icon
+};
+```
+
+3. Create page route: `src/routes/settings/+page.svelte`
+
+4. Done! Nav automatically shows Settings button with active state.
+
+**No changes needed to:**
+- +layout.svelte (Nav already rendered)
+- Individual pages (Nav is global)
+- Active state logic (automatic via pathname matching)
+
+### Project Filter Integration
+
+**How Project Filtering Works:**
+
+1. **Layout loads all tasks** (once on mount):
+```typescript
+async function loadAllTasks() {
+  const response = await fetch('/api/agents?full=true');
+  const data = await response.json();
+  allTasks = data.tasks || [];
+}
+```
+
+2. **Extract projects from task IDs** (reactive):
+```typescript
+const projects = $derived(getProjectsFromTasks(allTasks));
+// → ["All Projects", "jat", "chimaro", "jomarchy"]
+
+const taskCounts = $derived(getTaskCountByProject(allTasks, 'open'));
+// → Map { "jat" => 15, "chimaro" => 8, "jomarchy" => 3 }
+```
+
+3. **Sync with URL parameter** (reactive):
+```typescript
+$effect(() => {
+  const params = new URLSearchParams($page.url.searchParams);
+  const projectParam = params.get('project');
+  selectedProject = projectParam || 'All Projects';
+});
+```
+
+4. **Update URL on selection change**:
+```typescript
+function handleProjectChange(project: string) {
+  selectedProject = project;
+
+  const url = new URL(window.location.href);
+  if (project === 'All Projects') {
+    url.searchParams.delete('project');
+  } else {
+    url.searchParams.set('project', project);
+  }
+  replaceState(url, {});
+}
+```
+
+5. **Pages read from URL** (each page handles filtering):
+```svelte
+<!-- src/routes/agents/+page.svelte -->
+<script>
+  import { page } from '$app/stores';
+  import { filterTasksByProject } from '$lib/utils/projectUtils';
+
+  const selectedProject = $derived($page.url.searchParams.get('project') || 'All Projects');
+  const filteredTasks = $derived(filterTasksByProject(allTasks, selectedProject));
+</script>
+```
+
+**Flow:**
+```
+User selects "jat" → handleProjectChange() → URL updates to ?project=jat
+→ Layout $effect() updates selectedProject → Pages see ?project=jat in URL
+→ Pages filter their data using projectUtils → UI shows only jat tasks
+```
+
+### URL Parameter State Management
+
+**Why URL Parameters (Not localStorage):**
+
+- ✅ **Bookmarkable:** `/agents?project=jat` is shareable link
+- ✅ **Browser-native:** Back/forward buttons work correctly
+- ✅ **Multi-tab:** Different tabs can show different projects
+- ✅ **No cleanup:** No stale localStorage data
+- ✅ **SSR-compatible:** URL params work server-side
+
+**Pattern:**
+```typescript
+// Layout: Write to URL
+function handleProjectChange(project: string) {
+  const url = new URL(window.location.href);
+  url.searchParams.set('project', project);
+  replaceState(url, {});
+}
+
+// Layout: Read from URL (reactive)
+$effect(() => {
+  const params = new URLSearchParams($page.url.searchParams);
+  selectedProject = params.get('project') || 'All Projects';
+});
+
+// Pages: Read from URL (reactive)
+const selectedProject = $derived($page.url.searchParams.get('project') || 'All Projects');
+```
+
+**Key API:**
+- `replaceState(url, {})` - Update URL without navigation (no history entry)
+- `$page.url.searchParams` - SvelteKit store for reading URL params
+- `$derived` - Reactively recompute when URL changes
+
+### Shared State vs Per-Page State
+
+**Shared in Layout:**
+- `selectedProject` - Current project filter (synced with URL)
+- `projects` - List of all projects (derived from all tasks)
+- `taskCounts` - Task counts per project (derived)
+- `allTasks` - All tasks (loaded once)
+
+**Per-Page State:**
+- Task filtering (each page filters based on `selectedProject`)
+- View mode (e.g., list vs graph on home page)
+- Search/sort state
+- Pagination
+
+**Why this split:**
+- Layout handles **global navigation state**
+- Pages handle **view-specific state**
+- Project filter affects multiple pages → lives in layout
+- View mode only affects one page → lives in that page
+
+### How Pages Use Unified Nav
+
+**Simple Page (No Special Logic):**
+```svelte
+<!-- src/routes/api-demo/+page.svelte -->
+<script>
+  // No Nav import needed! Nav is in +layout.svelte
+</script>
+
+<div class="p-8">
+  <h1>API Demo</h1>
+  <!-- Page content -->
+</div>
+```
+
+**Page with Project Filtering:**
+```svelte
+<!-- src/routes/agents/+page.svelte -->
+<script>
+  import { page } from '$app/stores';
+  import { filterTasksByProject } from '$lib/utils/projectUtils';
+
+  let allTasks = $state([]);
+
+  // Read project filter from URL (set by layout)
+  const selectedProject = $derived($page.url.searchParams.get('project') || 'All Projects');
+
+  // Filter tasks based on project
+  const filteredTasks = $derived(filterTasksByProject(allTasks, selectedProject));
+
+  // Load tasks
+  onMount(async () => {
+    const response = await fetch('/api/agents');
+    const data = await response.json();
+    allTasks = data.tasks || [];
+  });
+</script>
+
+<div class="p-8">
+  <TaskList tasks={filteredTasks} />
+</div>
+```
+
+**No Nav props needed** - Nav is global, pages just read URL params.
+
+### Testing Unified Nav
+
+**Browser Testing (see `docs/unified-nav-test-report.md`):**
+
+✅ **Navbar Visibility:** Nav appears on all pages (/, /graph, /agents, /api-demo)
+✅ **Active Indicator:** Correct button is blue on each page
+✅ **Project Filter:** ?project= param persists across navigation
+✅ **Theme Selector:** Theme accessible on all pages
+✅ **Responsive:** Single-row layout on all screen sizes
+✅ **No Console Errors:** Clean execution
+
+**Manual Testing Checklist:**
+```bash
+# 1. Start dev server
+npm run dev
+
+# 2. Test navigation
+- Click List → URL: / → List button blue
+- Click Graph → URL: /graph → Graph button blue
+- Click Agents → URL: /agents → Agents button blue
+
+# 3. Test project filter
+- Select "jat" → URL: /agents?project=jat
+- Click List → URL: /?project=jat (param persists)
+- Click Graph → URL: /graph?project=jat (param persists)
+
+# 4. Test browser back/forward
+- Navigate: / → /agents → /graph
+- Press back → /agents (correct)
+- Press back → / (correct)
+
+# 5. Test bookmarking
+- Bookmark /agents?project=jat
+- Close browser
+- Open bookmark → Shows jat tasks only (correct)
+
+# 6. Test multi-tab
+- Tab 1: /agents?project=jat
+- Tab 2: /agents?project=chimaro
+- Both tabs show correct project (independent state)
+```
+
+### Common Pitfalls
+
+**❌ WRONG: Adding Nav to individual pages**
+```svelte
+<!-- DON'T DO THIS -->
+<!-- src/routes/my-page/+page.svelte -->
+<script>
+  import Nav from '$lib/components/Nav.svelte';
+</script>
+
+<Nav ... />  <!-- Nav already in +layout.svelte! -->
+<div>Page content</div>
+```
+
+**✅ CORRECT: Just render page content**
+```svelte
+<!-- src/routes/my-page/+page.svelte -->
+<script>
+  // Nav is automatic from +layout.svelte
+</script>
+
+<div>Page content</div>  <!-- Nav appears above automatically -->
+```
+
+**❌ WRONG: Duplicating project filter logic**
+```svelte
+<!-- DON'T DO THIS -->
+<script>
+  let selectedProject = $state('All Projects');  // Duplicates layout state!
+
+  function handleProjectChange(project) {
+    selectedProject = project;  // Out of sync with layout!
+  }
+</script>
+```
+
+**✅ CORRECT: Read from URL (layout manages state)**
+```svelte
+<script>
+  import { page } from '$app/stores';
+
+  const selectedProject = $derived($page.url.searchParams.get('project') || 'All Projects');
+  // Layout updates URL → This recomputes automatically
+</script>
+```
+
+**❌ WRONG: Passing nav props to pages**
+```svelte
+<!-- DON'T DO THIS -->
+<Nav {projects} {selectedProject} />
+{@render children({ projects, selectedProject })}  <!-- Prop drilling! -->
+```
+
+**✅ CORRECT: Pages read from URL**
+```svelte
+<Nav {projects} {selectedProject} />
+{@render children()}  <!-- Pages use $page.url.searchParams -->
+```
+
+### Migration from Per-Page Nav
+
+**Before (Per-Page Pattern):**
+```
+src/routes/
+  ├── +page.svelte               # Has Nav import, 874 lines
+  │   └── <Nav context="home" />
+  ├── agents/+page.svelte        # Has Nav import, 874 lines
+  │   └── <Nav context="agents" />
+  └── api-demo/+page.svelte      # Has Nav import, 874 lines
+      └── <Nav context="api-demo" />
+```
+
+**After (Root Layout Pattern):**
+```
+src/routes/
+  ├── +layout.svelte             # Nav rendered once
+  │   └── <Nav ... />
+  ├── +page.svelte               # No Nav import, clean
+  ├── agents/+page.svelte        # No Nav import, clean
+  └── api-demo/+page.svelte      # No Nav import, clean
+```
+
+**Benefits:**
+- **2622 lines removed** (874 lines × 3 pages of duplicate Nav)
+- **Single source of truth** for navigation
+- **Impossible to have inconsistent nav** across pages
+- **Easy to add pages** (no Nav setup needed)
+
+### Architecture Decision Record
+
+**Decision:** Use root layout pattern for unified navigation
+
+**Context:**
+- Initial implementation had per-page Nav imports
+- Each page imported Nav and passed context prop
+- 874 lines of Nav HTML duplicated per page
+- Risk of inconsistency if one page updates Nav differently
+
+**Options Considered:**
+
+1. **Context-based Nav (initial approach)**
+   - ❌ Duplicate imports on every page
+   - ❌ Risk of inconsistency
+   - ❌ Harder to update (change 3+ files)
+
+2. **Root layout with Nav (chosen)**
+   - ✅ Single Nav instance
+   - ✅ Zero duplication
+   - ✅ Guaranteed consistency
+   - ✅ Easy to update (one file)
+
+3. **Header component imported by pages**
+   - ❌ Still requires per-page imports
+   - ❌ Shared state harder to manage
+   - ❌ Project filter would need prop drilling
+
+**Decision:** Root layout pattern (option 2)
+
+**Consequences:**
+- ✅ Nav appears on ALL pages automatically
+- ✅ Shared state (project filter) works seamlessly
+- ✅ Pages are simpler (no Nav imports)
+- ⚠️ All pages have Nav (can't hide on specific pages without conditional logic)
+- ⚠️ Layout must handle global state (project filter, tasks)
+
+**Status:** Implemented in tasks jat-6zm through jat-ef2
+
+### Files Reference
+
+**Core architecture files:**
+- `src/routes/+layout.svelte` - Root layout with Nav (86 lines)
+- `src/lib/components/Nav.svelte` - Nav component (173 lines)
+- `src/lib/config/navConfig.ts` - Navigation config (50 lines)
+
+**Related files:**
+- `src/lib/components/ProjectSelector.svelte` - Project dropdown
+- `src/lib/components/ThemeSelector.svelte` - Theme picker
+- `src/lib/utils/projectUtils.ts` - Project filtering utilities
+
+**Documentation:**
+- `dashboard/docs/unified-nav-test-report.md` - Test results
+- `dashboard/CLAUDE.md` - This file (architecture docs)
+
+### Future Considerations
+
+**Conditional Nav (if needed):**
+```svelte
+<!-- +layout.svelte -->
+{#if !$page.url.pathname.startsWith('/admin')}
+  <Nav ... />
+{/if}
+```
+
+**Page-specific Nav overrides (if needed):**
+```svelte
+<!-- +layout.svelte -->
+<Nav
+  {projects}
+  {selectedProject}
+  onProjectChange={handleProjectChange}
+  {taskCounts}
+  disableProjectFilter={$page.url.pathname === '/settings'}
+/>
+```
+
+**Nested layouts (if needed):**
+```
+src/routes/
+  ├── +layout.svelte              # Main nav
+  └── dashboard/
+      ├── +layout.svelte          # Dashboard-specific nav
+      └── analytics/+page.svelte  # Has both navs
+```
+
+Currently not needed, but the pattern supports these extensions.
+
 ## UI Patterns: Unified Queue/Drop Zone
 
 ### Overview
