@@ -3,10 +3,9 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import DependencyIndicator from '$lib/components/DependencyIndicator.svelte';
-	import ProjectSelector from '$lib/components/ProjectSelector.svelte';
 	import { analyzeDependencies } from '$lib/utils/dependencyUtils';
 
-	let { tasks = [], agents = [], reservations = [], selectedProject = 'All Projects', projects = [], onProjectChange = () => {}, taskCounts = new Map() } = $props();
+	let { tasks = [], agents = [], reservations = [] } = $props();
 
 	// Initialize filters from URL params (default to open tasks)
 	let searchQuery = $state('');
@@ -162,17 +161,6 @@
 	<!-- Header -->
 	<div class="p-4 border-b border-base-300">
 		<h2 class="text-lg font-semibold text-base-content mb-3">Task Queue</h2>
-
-		<!-- Project Filter -->
-		<div class="mb-3">
-			<ProjectSelector
-				{projects}
-				{selectedProject}
-				{onProjectChange}
-				{taskCounts}
-				compact={false}
-			/>
-		</div>
 
 		<!-- Search -->
 		<input

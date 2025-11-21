@@ -4,7 +4,6 @@
 	import TaskQueue from '$lib/components/agents/TaskQueue.svelte';
 	import AgentGrid from '$lib/components/agents/AgentGrid.svelte';
 	import SystemCapacityBar from '$lib/components/agents/SystemCapacityBar.svelte';
-	import Nav from '$lib/components/Nav.svelte';
 	import {
 		getProjectsFromTasks,
 		getTaskCountByProject
@@ -123,14 +122,6 @@
 </script>
 
 <div class="min-h-screen bg-base-200">
-	<!-- Header -->
-	<Nav
-		{projects}
-		{selectedProject}
-		onProjectChange={handleProjectChange}
-		{taskCounts}
-	/>
-
 	<!-- Main Content: Sidebar + Agent Grid -->
 	<div class="flex h-[calc(100vh-theme(spacing.20))] pb-20">
 		<!-- Left Sidebar: Task Queue -->
@@ -139,10 +130,6 @@
 				tasks={unassignedTasks}
 				{agents}
 				{reservations}
-				{selectedProject}
-				{projects}
-				onProjectChange={handleProjectChange}
-				{taskCounts}
 			/>
 		</div>
 

@@ -34,7 +34,7 @@ export const unifiedNavConfig: UnifiedNavConfig = {
 		{
 			id: 'graph',
 			label: 'Graph',
-			href: '/?view=graph',
+			href: '/graph',
 			icon: 'graph'
 		},
 		{
