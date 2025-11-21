@@ -587,9 +587,9 @@
 											<button
 												class="btn btn-xs {internalColorMode === 'usage' ? 'btn-primary' : 'btn-ghost'}"
 												onclick={() => (internalColorMode = 'usage')}
-												title="Usage-based percentile colors"
+												title="Auto percentile-based colors"
 											>
-												Usage
+												Auto
 											</button>
 											<button
 												class="btn btn-xs {internalColorMode === 'static' ? 'btn-primary' : 'btn-ghost'}"
