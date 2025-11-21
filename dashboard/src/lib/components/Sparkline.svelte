@@ -64,7 +64,7 @@
 	const padding = 2;
 
 	/** Calculate Y-axis range */
-	const yRange = $derived(() => {
+	const yRange = $derived.by(() => {
 		if (!data || data.length === 0) {
 			return { min: 0, max: 1 };
 		}
@@ -83,15 +83,14 @@
 
 	/** Scale Y value to SVG coordinates */
 	function scaleY(value: number): number {
-		const range = yRange();
-		if (range.max === range.min) return viewBoxHeight / 2;
+		if (yRange.max === yRange.min) return viewBoxHeight / 2;
 
-		const normalized = (value - range.min) / (range.max - range.min);
+		const normalized = (value - yRange.min) / (yRange.max - yRange.min);
 		return viewBoxHeight - padding - normalized * (viewBoxHeight - 2 * padding);
 	}
 
 	/** Generate SVG path from data points */
-	const pathData = $derived(() => {
+	const pathData = $derived.by(() => {
 		if (!data || data.length === 0) return '';
 
 		const points = data.map((point, index) => {
@@ -120,7 +119,7 @@
 	});
 
 	/** Calculate line color based on usage */
-	const lineColor = $derived(() => {
+	const lineColor = $derived.by(() => {
 		if (colorMode === 'static') {
 			return staticColor;
 		}
