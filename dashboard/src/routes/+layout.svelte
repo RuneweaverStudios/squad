@@ -8,6 +8,7 @@
 	import CommandPalette from '$lib/components/CommandPalette.svelte';
 	import TaskCreationDrawer from '$lib/components/TaskCreationDrawer.svelte';
 	import TopBar from '$lib/components/TopBar.svelte';
+	import Sidebar from '$lib/components/Sidebar.svelte';
 	import { getProjectsFromTasks, getTaskCountByProject } from '$lib/utils/projectUtils';
 
 	let { children } = $props();
@@ -70,12 +71,30 @@
 <!-- Task Creation Drawer (opens from command palette) -->
 <TaskCreationDrawer />
 
-<!-- Top Bar with utilities (shown on all pages) -->
-<TopBar
-	{projects}
-	{selectedProject}
-	onProjectChange={handleProjectChange}
-	{taskCounts}
-/>
+<!-- Drawer Structure -->
+<div class="drawer lg:drawer-open">
+	<!-- Drawer toggle (hidden checkbox for mobile sidebar) -->
+	<input id="main-drawer" type="checkbox" class="drawer-toggle" />
 
-{@render children()}
+	<!-- Main content area -->
+	<div class="drawer-content flex flex-col">
+		<!-- Top Bar -->
+		<TopBar
+			{projects}
+			{selectedProject}
+			onProjectChange={handleProjectChange}
+			{taskCounts}
+		/>
+
+		<!-- Page content -->
+		<main class="flex-1 overflow-y-auto">
+			{@render children()}
+		</main>
+	</div>
+
+	<!-- Sidebar -->
+	<div class="drawer-side">
+		<label for="main-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
+		<Sidebar />
+	</div>
+</div>
