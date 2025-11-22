@@ -2,10 +2,15 @@
 	/**
 	 * ThemeSelector Component
 	 * Supports all 32 DaisyUI themes with localStorage persistence
+	 *
+	 * @param compact - If true, shows icon-only mode suitable for sidebar
 	 */
 
 	import { onMount } from 'svelte';
 	import { setTheme } from '$lib/utils/themeManager';
+
+	// Props
+	let { compact = false } = $props();
 
 	// All DaisyUI themes with labels
 	const themes = [
@@ -73,9 +78,12 @@
 	<div
 		tabindex="0"
 		role="button"
-		class="flex items-center gap-2 cursor-pointer hover:bg-base-300 transition-colors px-2 py-1 rounded"
+		class="flex items-center gap-2 cursor-pointer hover:bg-base-300 transition-colors px-2 py-1 rounded {compact
+			? 'is-drawer-close:tooltip is-drawer-close:tooltip-right'
+			: ''}"
 		aria-label="Change Theme"
-		title="Change Theme"
+		title={compact ? currentThemeLabel : 'Change Theme'}
+		data-tip={compact ? currentThemeLabel : undefined}
 	>
 		<!-- Theme color preview blocks -->
 		<div
@@ -87,7 +95,9 @@
 			<div class="bg-secondary size-1 rounded-full"></div>
 			<div class="bg-accent size-1 rounded-full"></div>
 		</div>
-		<span class="text-sm font-medium">{currentThemeLabel}</span>
+		{#if !compact}
+			<span class="text-sm font-medium">{currentThemeLabel}</span>
+		{/if}
 	</div>
 
 	<div
