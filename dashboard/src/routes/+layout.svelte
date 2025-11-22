@@ -5,7 +5,6 @@
 	import { themeChange } from 'theme-change';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import CommandPalette from '$lib/components/CommandPalette.svelte';
 	import TaskCreationDrawer from '$lib/components/TaskCreationDrawer.svelte';
 	import TopBar from '$lib/components/TopBar.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
@@ -64,9 +63,6 @@
 <svelte:head>
 	<link rel="icon" href={favicon} />
 </svelte:head>
-
-<!-- Global Command Palette (Cmd+K / Ctrl+K) -->
-<CommandPalette />
 
 <!-- Task Creation Drawer (opens from command palette) -->
 <TaskCreationDrawer />

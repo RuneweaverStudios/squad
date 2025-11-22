@@ -20,6 +20,7 @@
 	import ProjectSelector from './ProjectSelector.svelte';
 	import ClaudeUsageBar from './ClaudeUsageBar.svelte';
 	import UserProfile from './UserProfile.svelte';
+	import CommandPalette from './CommandPalette.svelte';
 
 	interface Props {
 		projects?: string[];
@@ -37,21 +38,21 @@
 </script>
 
 <nav class="navbar w-full bg-base-100 border-b border-base-300">
-	<!-- Hamburger toggle (mobile only) -->
-	<label for="main-drawer" class="btn btn-square btn-ghost lg:hidden">
+	<!-- Sidebar toggle icon -->
+	<label for="main-drawer" aria-label="open sidebar" class="btn btn-square btn-ghost">
 		<svg
 			xmlns="http://www.w3.org/2000/svg"
-			fill="none"
 			viewBox="0 0 24 24"
-			stroke-width="1.5"
+			stroke-linejoin="round"
+			stroke-linecap="round"
+			stroke-width="2"
+			fill="none"
 			stroke="currentColor"
-			class="w-5 h-5"
+			class="my-1.5 inline-block size-4"
 		>
-			<path
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
-			/>
+			<path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z"></path>
+			<path d="M9 4v16"></path>
+			<path d="M14 10l2 2l-2 2"></path>
 		</svg>
 	</label>
 
@@ -68,6 +69,11 @@
 				/>
 			</div>
 		{/if}
+	</div>
+
+	<!-- Middle: Command Palette -->
+	<div class="flex-none">
+		<CommandPalette />
 	</div>
 
 	<!-- Right side utilities -->

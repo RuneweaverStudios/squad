@@ -14,8 +14,8 @@
 	 */
 
 	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
 	import { unifiedNavConfig } from '$lib/config/navConfig';
-	import ThemeSelector from './ThemeSelector.svelte';
 
 	// Helper to check if nav item is active
 	function isActive(href: string): boolean {
@@ -29,6 +29,11 @@
 			return true;
 		}
 		return false;
+	}
+
+	// Navigation handler for button clicks
+	function handleNavClick(href: string) {
+		goto(href);
 	}
 
 	// Icon SVG paths
@@ -51,23 +56,21 @@
 	}
 </script>
 
-<aside
-	class="drawer-side z-40 bg-base-200 border-r border-base-300 transition-all duration-300"
->
-	<!-- Drawer overlay (mobile only) -->
-	<label for="main-drawer" class="drawer-overlay lg:hidden"></label>
+<div class="drawer-side is-drawer-close:overflow-visible">
+	<!-- Drawer overlay -->
+	<label for="main-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
 
 	<!-- Sidebar content -->
-	<div
-		class="flex flex-col h-full bg-base-200 is-drawer-close:w-14 is-drawer-open:w-64 transition-all duration-300"
-	>
+	<div class="flex h-screen flex-col bg-base-200 overflow-hidden is-drawer-close:w-14 is-drawer-open:w-64">
 		<!-- Main navigation items -->
-		<ul class="menu p-2 grow gap-1">
+		<ul class="menu w-full p-2 flex-1 gap-1">
 			{#each unifiedNavConfig.navItems as navItem}
 				<li>
-					<a
-						href={navItem.href}
-						class="tooltip tooltip-right transition-all duration-200 {isActive(navItem.href)
+					<button
+						onclick={() => handleNavClick(navItem.href)}
+						class="mt-3 is-drawer-close:tooltip is-drawer-close:tooltip-right transition-all duration-200 {isActive(
+							navItem.href
+						)
 							? 'active bg-primary text-primary-content'
 							: ''}"
 						data-tip={navItem.label}
@@ -83,17 +86,17 @@
 							<path stroke-linecap="round" stroke-linejoin="round" d={icons[navItem.icon]} />
 						</svg>
 						<span class="is-drawer-close:hidden">{navItem.label}</span>
-					</a>
+					</button>
 				</li>
 			{/each}
 		</ul>
 
 		<!-- Bottom utilities -->
-		<ul class="menu p-2 gap-1">
+		<ul class="menu w-full p-2 gap-1">
 			<!-- Help button -->
 			<li>
 				<button
-					class="tooltip tooltip-right"
+					class="is-drawer-close:tooltip is-drawer-close:tooltip-right"
 					data-tip="Help & Shortcuts"
 					onclick={toggleHelp}
 					aria-label="Show help guide"
@@ -112,15 +115,9 @@
 				</button>
 			</li>
 
-			<!-- Theme Selector (compact mode when collapsed) -->
-			<li class="is-drawer-open:px-2">
-				<div class="is-drawer-close:tooltip is-drawer-close:tooltip-right" data-tip="Theme">
-					<ThemeSelector compact={true} />
-				</div>
-			</li>
 		</ul>
 	</div>
-</aside>
+</div>
 
 <!-- Help Guide Modal -->
 {#if showHelpModal}

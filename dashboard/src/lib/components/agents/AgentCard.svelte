@@ -697,17 +697,11 @@
 
 	<div class="card-body p-4">
 		<!-- Agent Header -->
-		<div class="flex items-start justify-between gap-2 mb-3">
+		<div class="flex items-start justify-between gap-2">
 			<div class="flex-1 min-w-0">
 				<h3 class="font-semibold text-base text-base-content truncate" title={agent.name}>
 					{agent.name || 'Unknown Agent'}
 				</h3>
-				<p class="text-xs text-base-content/50 font-mono truncate">
-					{agent.program || 'claude-code'} • {agent.model || 'unknown'}
-				</p>
-				<p class="text-xs text-base-content/40 mt-0.5">
-					Last active: {formatLastActivity(agent.last_active_ts)}
-				</p>
 			</div>
 			<button
 				class="badge badge-sm {getStatusBadge(agentStatus())} {agentStatus() === 'offline' ? 'cursor-pointer hover:badge-error hover:scale-110 transition-all' : 'cursor-default'} {agentStatus() === 'live' ? 'animate-pulse' : ''}"
@@ -720,6 +714,48 @@
 				</span>
 				{agentStatus().charAt(0).toUpperCase() + agentStatus().slice(1)}
 			</button>
+		</div>
+
+		<!-- Usage Trend Sparkline (full width) -->
+		<div class="mb-2">
+			{#if sparklineLoading && sparklineData.length === 0}
+				<!-- Placeholder line for loading -->
+				<div class="h-10 flex items-center">
+					<div class="w-full h-px bg-base-content/20"></div>
+				</div>
+			{:else if sparklineData.length === 0}
+				<!-- Placeholder line for no data -->
+				<div class="h-10 flex items-center">
+					<div class="w-full h-px bg-base-content/20"></div>
+				</div>
+			{:else}
+				<!-- Success: Show sparkline -->
+				<Sparkline
+					data={sparklineData}
+					height={40}
+					showTooltip={true}
+					colorMode="usage"
+				/>
+			{/if}
+		</div>
+
+		<!-- Last Seen (full width) -->
+		<div class="-mt-2">
+			<div class="flex items-center justify-between text-xs">
+			{#if agentStatus() === 'live'}
+				<div class="flex items-center gap-1 text-xs text-success mt-1">
+					<span class="inline-block w-1.5 h-1.5 bg-success rounded-full animate-pulse"></span>
+					<span class="font-semibold">Responsive now</span>
+				</div>
+			{:else if agentStatus() === 'working'}
+				<div class="text-xs text-info/70 mt-1">
+					Working on task
+				</div>
+			{/if}
+				<span class="font-medium {agentStatus() === 'live' ? 'text-success' : agentStatus() === 'working' ? 'text-info' : 'text-base-content/50'}">
+					{formatLastActivity(agent.current_activity?.ts || agent.last_active_ts)}
+				</span>
+			</div>
 		</div>
 
 		<!-- Current Task -->
@@ -1038,29 +1074,6 @@
 						</span>
 					</div>
 
-					<!-- Usage Trend Sparkline -->
-					<div class="my-1">
-						{#if sparklineLoading && sparklineData.length === 0}
-							<!-- Placeholder line for loading -->
-							<div class="h-10 flex items-center">
-								<div class="w-full h-px bg-base-content/20"></div>
-							</div>
-						{:else if sparklineData.length === 0}
-							<!-- Placeholder line for no data -->
-							<div class="h-10 flex items-center">
-								<div class="w-full h-px bg-base-content/20"></div>
-							</div>
-						{:else}
-							<!-- Success: Show sparkline -->
-							<Sparkline
-								data={sparklineData}
-								height={40}
-								showTooltip={true}
-								colorMode="usage"
-							/>
-						{/if}
-					</div>
-
 					<div
 						class="flex items-center gap-1 text-xs mt-1"
 						class:text-success={agentStatus() === 'live'}
@@ -1075,48 +1088,6 @@
 							{agent.current_activity.preview || agent.current_activity.content || 'Active'}
 						</span>
 					</div>
-				{:else}
-					<!-- Fallback to generic status if no activity log -->
-					<div class="flex items-center justify-between text-xs">
-						<span class="text-base-content/70">Last seen:</span>
-						<span class="font-medium {agentStatus() === 'live' ? 'text-success' : agentStatus() === 'working' ? 'text-info' : 'text-base-content/50'}">
-							{formatLastActivity(agent.last_active_ts)}
-						</span>
-					</div>
-
-					<!-- Usage Trend Sparkline -->
-					<div class="my-1">
-						{#if sparklineLoading && sparklineData.length === 0}
-							<!-- Placeholder line for loading -->
-							<div class="h-10 flex items-center">
-								<div class="w-full h-px bg-base-content/20"></div>
-							</div>
-						{:else if sparklineData.length === 0}
-							<!-- Placeholder line for no data -->
-							<div class="h-10 flex items-center">
-								<div class="w-full h-px bg-base-content/20"></div>
-							</div>
-						{:else}
-							<!-- Success: Show sparkline -->
-							<Sparkline
-								data={sparklineData}
-								height={40}
-								showTooltip={true}
-								colorMode="usage"
-							/>
-						{/if}
-					</div>
-
-					{#if agentStatus() === 'live'}
-						<div class="flex items-center gap-1 text-xs text-success mt-1">
-							<span class="inline-block w-1.5 h-1.5 bg-success rounded-full animate-pulse"></span>
-							<span class="font-semibold">Responsive now</span>
-						</div>
-					{:else if agentStatus() === 'working'}
-						<div class="text-xs text-info/70 mt-1">
-							Working on task
-						</div>
-					{/if}
 				{/if}
 
 				<!-- History Toggle Button -->
@@ -1151,6 +1122,10 @@
 				{/if}
 			</div>
 		</div>
+		<!-- Model info -->
+		<p class="text-xs text-base-content/50 font-mono ">
+			{agent.model || 'unknown'}
+		</p>
 
 
 	</div>

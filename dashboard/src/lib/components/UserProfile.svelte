@@ -2,13 +2,15 @@
 	/**
 	 * UserProfile Component
 	 *
-	 * Placeholder user profile dropdown for Nav component.
-	 * Shows avatar with user info (no menu items - placeholder links removed).
+	 * User profile dropdown with theme selector.
+	 * Shows avatar with user info and theme picker menu.
 	 * Uses DaisyUI dropdown component.
 	 *
 	 * Note: This is a placeholder component. No authentication system implemented yet.
 	 * Replace with real user data when auth is added.
 	 */
+
+	import ThemeSelector from './ThemeSelector.svelte';
 
 	// Placeholder user data
 	const user = {
@@ -52,6 +54,11 @@
 		<li class="menu-title">
 			<span class="text-base-content font-semibold">{user.name}</span>
 			<span class="text-xs text-base-content/60">{user.email}</span>
+		</li>
+
+		<!-- Theme Selector -->
+		<li>
+			<ThemeSelector compact={false} />
 		</li>
 	</ul>
 </div>
