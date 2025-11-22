@@ -723,12 +723,26 @@
 							</div>
 						</div>
 
-						<!-- Task History -->
+						<!-- Task Events (Beads) -->
 						<div class="border-t border-base-300 pt-4">
-							<h4 class="text-sm font-semibold mb-3 text-base-content/70">
-								Task History
+							<h4 class="text-sm font-semibold mb-3 text-base-content/70 flex items-center gap-2">
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									class="h-4 w-4 text-info"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
+									/>
+								</svg>
+								Task Events
 								{#if taskHistory}
-									<span class="badge badge-xs ml-2">{taskHistory.count.total}</span>
+									<span class="badge badge-xs badge-info">{taskHistory.count.beads_events}</span>
 								{/if}
 							</h4>
 
@@ -736,7 +750,7 @@
 								<!-- Loading state -->
 								<div class="flex items-center justify-center py-6">
 									<span class="loading loading-spinner loading-sm"></span>
-									<span class="ml-2 text-xs">Loading history...</span>
+									<span class="ml-2 text-xs">Loading events...</span>
 								</div>
 							{:else if historyError}
 								<!-- Error state -->
@@ -756,19 +770,14 @@
 									</svg>
 									<span class="text-xs">{historyError}</span>
 								</div>
-							{:else if taskHistory && taskHistory.timeline && taskHistory.timeline.length > 0}
-								<!-- Timeline display -->
-								<div class="space-y-3 max-h-96 overflow-y-auto">
-									{#each taskHistory.timeline as event}
-										<div
-											class="flex gap-3 text-xs p-3 rounded {event.type === 'beads_event'
-												? 'bg-info/10 border border-info/30'
-												: 'bg-warning/10 border border-warning/30'}"
-										>
-											<!-- Icon -->
-											<div class="flex-shrink-0">
-												{#if event.type === 'beads_event'}
-													<!-- Beads icon (database/task) -->
+							{:else if taskHistory && taskHistory.timeline}
+								{#if taskHistory.timeline.filter(e => e.type === 'beads_event').length > 0}
+									<!-- Beads events display -->
+									<div class="space-y-3 max-h-64 overflow-y-auto">
+										{#each taskHistory.timeline.filter(e => e.type === 'beads_event') as event}
+											<div class="flex gap-3 text-xs p-3 rounded bg-info/10 border border-info/30">
+												<!-- Icon -->
+												<div class="flex-shrink-0">
 													<svg
 														xmlns="http://www.w3.org/2000/svg"
 														class="h-4 w-4 text-info"
@@ -783,40 +792,21 @@
 															d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
 														/>
 													</svg>
-												{:else}
-													<!-- Agent Mail icon (mail/envelope) -->
-													<svg
-														xmlns="http://www.w3.org/2000/svg"
-														class="h-4 w-4 text-warning"
-														fill="none"
-														viewBox="0 0 24 24"
-														stroke="currentColor"
-													>
-														<path
-															stroke-linecap="round"
-															stroke-linejoin="round"
-															stroke-width="2"
-															d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-														/>
-													</svg>
-												{/if}
-											</div>
-
-											<!-- Content -->
-											<div class="flex-1 min-w-0">
-												<!-- Event description -->
-												<div class="font-semibold text-base-content">
-													{event.description}
 												</div>
 
-												<!-- Timestamp -->
-												<div class="text-base-content/60 mt-1">
-													{formatDate(event.timestamp)}
-												</div>
+												<!-- Content -->
+												<div class="flex-1 min-w-0">
+													<!-- Event description -->
+													<div class="font-semibold text-base-content">
+														{event.description}
+													</div>
 
-												<!-- Metadata details -->
-												{#if event.type === 'beads_event'}
-													<!-- Beads metadata -->
+													<!-- Timestamp -->
+													<div class="text-base-content/60 mt-1">
+														{formatDate(event.timestamp)}
+													</div>
+
+													<!-- Metadata badges -->
 													<div class="mt-2 flex flex-wrap gap-1">
 														{#if event.metadata.status}
 															<span class="badge badge-xs {statusColors[event.metadata.status]}">
@@ -841,7 +831,102 @@
 															</span>
 														{/if}
 													</div>
-												{:else}
+												</div>
+											</div>
+										{/each}
+									</div>
+								{:else}
+									<!-- Empty state -->
+									<div class="text-xs text-base-content/60 py-4 text-center">
+										No task events yet
+									</div>
+								{/if}
+							{/if}
+						</div>
+
+						<!-- Coordination Messages (Agent Mail) -->
+						<div class="border-t border-base-300 pt-4">
+							<h4 class="text-sm font-semibold mb-3 text-base-content/70 flex items-center gap-2">
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									class="h-4 w-4 text-warning"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+									/>
+								</svg>
+								Coordination Messages
+								{#if taskHistory}
+									<span class="badge badge-xs badge-warning">{taskHistory.count.agent_mail}</span>
+								{/if}
+							</h4>
+
+							{#if historyLoading}
+								<!-- Loading state -->
+								<div class="flex items-center justify-center py-6">
+									<span class="loading loading-spinner loading-sm"></span>
+									<span class="ml-2 text-xs">Loading messages...</span>
+								</div>
+							{:else if historyError}
+								<!-- Error state -->
+								<div class="alert alert-warning py-2">
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										class="stroke-current shrink-0 h-4 w-4"
+										fill="none"
+										viewBox="0 0 24 24"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+										/>
+									</svg>
+									<span class="text-xs">{historyError}</span>
+								</div>
+							{:else if taskHistory && taskHistory.timeline}
+								{#if taskHistory.timeline.filter(e => e.type === 'agent_mail').length > 0}
+									<!-- Agent Mail messages display -->
+									<div class="space-y-3 max-h-64 overflow-y-auto">
+										{#each taskHistory.timeline.filter(e => e.type === 'agent_mail') as event}
+											<div class="flex gap-3 text-xs p-3 rounded bg-warning/10 border border-warning/30">
+												<!-- Icon -->
+												<div class="flex-shrink-0">
+													<svg
+														xmlns="http://www.w3.org/2000/svg"
+														class="h-4 w-4 text-warning"
+														fill="none"
+														viewBox="0 0 24 24"
+														stroke="currentColor"
+													>
+														<path
+															stroke-linecap="round"
+															stroke-linejoin="round"
+															stroke-width="2"
+															d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+														/>
+													</svg>
+												</div>
+
+												<!-- Content -->
+												<div class="flex-1 min-w-0">
+													<!-- Event description -->
+													<div class="font-semibold text-base-content">
+														{event.description}
+													</div>
+
+													<!-- Timestamp -->
+													<div class="text-base-content/60 mt-1">
+														{formatDate(event.timestamp)}
+													</div>
+
 													<!-- Agent Mail metadata -->
 													<div class="mt-2 space-y-1">
 														{#if event.metadata.from_agent}
@@ -855,61 +940,25 @@
 																{event.metadata.body}
 															</div>
 														{/if}
-														{#if event.metadata.importance === 'urgent'}
-															<span class="badge badge-xs badge-error">urgent</span>
-														{/if}
-														{#if event.metadata.ack_required}
-															<span class="badge badge-xs badge-warning">ack required</span>
-														{/if}
+														<div class="flex gap-1">
+															{#if event.metadata.importance === 'urgent'}
+																<span class="badge badge-xs badge-error">urgent</span>
+															{/if}
+															{#if event.metadata.ack_required}
+																<span class="badge badge-xs badge-warning">ack required</span>
+															{/if}
+														</div>
 													</div>
-												{/if}
+												</div>
 											</div>
-										</div>
-									{/each}
-								</div>
-
-								<!-- Summary stats -->
-								<div class="mt-3 flex gap-3 text-xs text-base-content/60">
-									<div class="flex items-center gap-1">
-										<svg
-											xmlns="http://www.w3.org/2000/svg"
-											class="h-3 w-3 text-info"
-											fill="none"
-											viewBox="0 0 24 24"
-											stroke="currentColor"
-										>
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
-											/>
-										</svg>
-										<span>{taskHistory.count.beads_events} task events</span>
+										{/each}
 									</div>
-									<div class="flex items-center gap-1">
-										<svg
-											xmlns="http://www.w3.org/2000/svg"
-											class="h-3 w-3 text-warning"
-											fill="none"
-											viewBox="0 0 24 24"
-											stroke="currentColor"
-										>
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-											/>
-										</svg>
-										<span>{taskHistory.count.agent_mail} messages</span>
+								{:else}
+									<!-- Empty state -->
+									<div class="text-xs text-base-content/60 py-4 text-center">
+										No coordination messages yet
 									</div>
-								</div>
-							{:else}
-								<!-- Empty state -->
-								<div class="text-xs text-base-content/60 py-4 text-center">
-									No history available yet
-								</div>
+								{/if}
 							{/if}
 						</div>
 					</div>
