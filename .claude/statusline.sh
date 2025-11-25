@@ -8,7 +8,7 @@
 #
 # Line 1: Agent Name · [Priority] Task ID - Task Title ⏲ ActiveTime
 # Line 2: ▪▪▪▪▪▪▫▫▫▫ · ⎇ folder@branch · 🔒 N  📬 N  ⏱ Xm
-# Line 3: 💬 Last user prompt...                        🕐 Xm
+# Line 3: 💬 Xm Last user prompt...
 #
 # Features:
 #   Agent Status (Line 1):
@@ -46,7 +46,7 @@
 # Example output:
 #   GreatWind · [P1] 🔧 jat-4p0 - Demo: Frontend... ⏲ 1h23m
 #   ▪▪▪▪▪▪▫▫▫▫ · ⎇ jat@master* · 🔒 2  📬 1  ⏱ 45m
-#   💬 yes implement top 3                          🕐 12m
+#   💬 12m yes implement top 3
 #
 #   chimaro · no agent registered (new session, run /agent:start)
 #   ▪▪▪▪▪▪▪▪▪▫ · ⎇ chimaro@main
@@ -652,12 +652,11 @@ if [[ -n "$indicators" ]]; then
 fi
 
 # Build third line with last user prompt and activity timestamp
+# Format: 💬 12m yes implement top 3
 third_line=""
 if [[ -n "$last_prompt" ]]; then
-    third_line="${YELLOW}💬${RESET} ${last_prompt}"
-
-    # Add last activity indicator (shows when the prompt was sent)
-    # Color: green=<15m, yellow=15-60m, red=>60m (stale)
+    # Build activity time with color (green=<15m, yellow=15-60m, red=>60m)
+    activity_part=""
     if [[ -n "$last_activity" ]]; then
         if [[ $last_activity_minutes -gt 60 ]]; then
             activity_color="${RED}"
@@ -666,8 +665,9 @@ if [[ -n "$last_prompt" ]]; then
         else
             activity_color="${GREEN}"
         fi
-        third_line="${third_line}  ${activity_color}🕐 ${last_activity}${RESET}"
+        activity_part="${activity_color}${last_activity}${RESET} "
     fi
+    third_line="${YELLOW}💬${RESET} ${activity_part}${last_prompt}"
 fi
 
 # Output status line(s)
