@@ -461,12 +461,13 @@ show_help() {
 JAT CLI - Launch complete dev environments
 
 USAGE:
-    jat <project>              Launch full environment (VS Code + Claude + npm + browser)
+    jat <project>              Launch full environment (VS Code + Claude + npm + browser + dashboard)
     jat <project> [N]          Launch with N Claude Code sessions (default: 1)
     jat <project> --claude     Launch only Claude Code
     jat <project> --code       Launch only VS Code
     jat <project> --npm        Launch only dev server
     jat <project> --browser    Open browser to dev server
+    jat <project> --dashboard  Launch only JAT dashboard
 
 COMMANDS:
     jat list                   Show all configured projects
@@ -478,17 +479,21 @@ COMMANDS:
 OPTIONS:
     N               Number of Claude Code sessions to launch (1-10)
     --no-agent      Skip /agent:start prompt (raw Claude without auto-registration)
+    --no-dashboard  Skip JAT dashboard (launch project only)
     -c, --code      Launch VS Code only
     -l, --claude    Launch Claude Code only
     -n, --npm       Launch npm dev server only
     -b, --browser   Open browser only
-    -a, --all       Launch everything (default)
+    -d, --dashboard Launch JAT dashboard only
+    -a, --all       Launch everything (default, includes dashboard)
 
 EXAMPLES:
-    jat chimaro                # Full environment (1 Claude session)
+    jat chimaro                # Full environment (1 Claude session + dashboard)
     jat chimaro 4              # Full environment with 4 Claude sessions
     jat chimaro 4 --claude     # Only 4 Claude sessions (no VS Code/npm)
     jat chimaro --no-agent     # Claude without /agent:start auto-registration
+    jat chimaro --no-dashboard # Full environment without dashboard
+    jat chimaro --dashboard    # Launch only the JAT dashboard
     jat jat --code --npm       # VS Code + dev server
     jat init                   # Scan ~/code for projects
 
