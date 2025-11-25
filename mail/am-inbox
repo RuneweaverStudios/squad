@@ -16,6 +16,7 @@ LIMIT=""
 MARK_READ=false
 PROJECT="$PROJECT_KEY"
 JSON_OUTPUT=false
+COUNT_ONLY=false
 
 show_help() {
     cat <<EOF
@@ -32,6 +33,9 @@ Options:
   --hide-acked        Hide acknowledged messages (ack_ts IS NOT NULL)
                       Useful for filtering out broadcasts you've already acknowledged
                       Can combine with --unread for cleanest inbox view
+  --count             Output only the message count (no message content)
+                      More efficient for statusline/scripts that just need a number
+                      Can combine with --unread: am-inbox Agent --unread --count
   --thread ID         Filter by thread ID (e.g., bd-123)
   --limit N           Limit number of messages shown (default: all)
   --mark-read         Mark displayed messages as read
@@ -49,6 +53,11 @@ Examples:
   am-inbox Alice --hide-acked                       # Hide acknowledged broadcasts
   am-inbox Bob --unread --hide-acked                # Only unread, unacked messages (cleanest view)
   am-inbox Carol --hide-acked --thread bd-123       # Unacked messages in thread
+
+  # Count-only mode (efficient for statusline/scripts)
+  am-inbox Alice --count                            # Total message count
+  am-inbox Bob --unread --count                     # Unread count only (just a number)
+  am-inbox Carol --unread --hide-acked --count      # Unread, unacked count
 
   # Other combinations
   am-inbox Alice --unread --limit 10 --mark-read    # Read top 10, mark as read
@@ -94,6 +103,10 @@ while [[ $# -gt 0 ]]; do
             JSON_OUTPUT=true
             shift
             ;;
+        --count)
+            COUNT_ONLY=true
+            shift
+            ;;
         --help|-h)
             show_help
             exit 0
@@ -120,6 +133,33 @@ fi
 
 # Update agent's last_active
 am_touch_agent "$AGENT_MAIL_DB" "$AGENT_ID"
+
+# Count-only mode: run efficient COUNT(*) query and exit
+if [[ "$COUNT_ONLY" == "true" ]]; then
+    COUNT_QUERY="
+    SELECT COUNT(*)
+    FROM messages m
+    JOIN message_recipients mr ON m.id = mr.message_id
+    WHERE mr.agent_id = $AGENT_ID
+      AND (m.expires_ts IS NULL OR datetime('now') < datetime(m.expires_ts))"
+
+    if [[ "$UNREAD_ONLY" == "true" ]]; then
+        COUNT_QUERY="$COUNT_QUERY AND mr.read_ts IS NULL"
+    fi
+
+    if [[ "$HIDE_ACKED" == "true" ]]; then
+        COUNT_QUERY="$COUNT_QUERY AND mr.ack_ts IS NULL"
+    fi
+
+    if [[ -n "$THREAD_FILTER" ]]; then
+        THREAD_ESC="${THREAD_FILTER//\'/\'\'}"
+        COUNT_QUERY="$COUNT_QUERY AND m.thread_id = '$THREAD_ESC'"
+    fi
+
+    # Output just the count (no formatting, just a number)
+    sqlite3 "$AGENT_MAIL_DB" "$COUNT_QUERY"
+    exit 0
+fi
 
 # Build query with filters
 QUERY="

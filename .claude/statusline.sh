@@ -1,16 +1,19 @@
 #!/bin/bash
 #
-# Claude Code statusline for jat (Jomarchy Agent Tools)
+# Claude Code Global Statusline
+# Canonical source: ~/code/jat/.claude/statusline.sh
+# Installed to: ~/.claude/statusline.sh (global, works across all projects)
+#
 # Multi-line status display for agent orchestration workflows
 #
 # Line 1: Agent Name | [Priority] Task ID - Task Title [Indicators]
-# Line 2: ▪▪▪▪▪▪▫▫▫▫ Context | ⎇ /folder/branch | 💬 Last Prompt
+# Line 2: ▪▪▪▪▪▪▫▫▫▫ Context | ⎇ folder@branch | 💬 Last Prompt
 #
 # Features:
 #   Agent Status (Line 1):
-#     1. Agent identification (requires AGENT_NAME env var - set by /register)
+#     1. Agent identification (set by /agent:start via .claude/agent-{session_id}.txt)
 #     2. Task priority badge [P0/P1/P2] with color coding (Red/Yellow/Green)
-#     3. Task ID and title from Beads database
+#     3. Task ID and title from Beads database (dynamic project prefix)
 #     4. File lock count indicator (🔒N)
 #     5. Unread messages count (📬N)
 #     6. Time remaining on shortest lock (⏱Xm or Xh)
@@ -18,18 +21,28 @@
 #
 #   Context & Git (Line 2):
 #     8. Context remaining as battery bar (color-coded: >50% green, >25% yellow, <25% red)
-#     9. Git branch display with folder (⎇ /folder-name/branch-name)
+#     9. Git branch display: folder@branch (folder=blue, @=dim, branch=green, *=red)
 #    10. Last user prompt from transcript (truncated to 200 chars)
 #
-# IMPORTANT: Each session must explicitly set AGENT_NAME via /register.
-# New sessions will show "no agent registered" until /register is run.
+# Color Scheme (ANSI escape codes):
+#   Agent name:     Bold Blue   (\033[1m\033[0;34m)
+#   Project folder: Blue        (\033[0;34m)
+#   @ separator:    Dim Gray    (\033[0;90m)
+#   Git branch:     Green       (\033[0;32m)
+#   Dirty (*):      Red         (\033[0;31m)
+#   Priority P0:    Bold Red    (\033[1m\033[0;31m)
+#   Priority P1:    Bold Yellow (\033[1m\033[1;33m)
+#   Priority P2:    Bold Green  (\033[1m\033[0;32m)
+#   Task ID:        Green       (\033[0;32m)
+#   Task title:     Yellow      (\033[1;33m)
+#   Idle status:    Gray        (\033[0;37m)
 #
 # Example output:
-#   FreeMarsh | [P1] jomarchy-agent-tools-4p0 - Demo: Frontend... [🔒2 📬1 ⏱45m]
-#   ▪▪▪▪▪▪▫▫▫▫ | ⎇ /jat/master | 💬 yes implement top 3
+#   GreatWind | [P1] jat-4p0 - Demo: Frontend... [🔒2 📬1 ⏱45m]
+#   ▪▪▪▪▪▪▫▫▫▫ | ⎇ jat@master* | 💬 yes implement top 3
 #
-#   jat | no agent registered (new session, run /register)
-#   ▪▪▪▪▪▪▪▪▪▫ | ⎇ /chimaro/main
+#   chimaro | no agent registered (new session, run /agent:start)
+#   ▪▪▪▪▪▪▪▪▪▫ | ⎇ chimaro@main
 #
 
 # ANSI color codes
@@ -38,6 +51,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 GRAY='\033[0;37m'
+DIM='\033[0;90m'
 RED='\033[0;31m'
 MAGENTA='\033[0;35m'
 RESET='\033[0m'
@@ -126,8 +140,9 @@ if [[ -n "$cwd" ]] && [[ -d "$cwd/.git" ]]; then
         if ! git diff-index --quiet HEAD -- 2>/dev/null; then
             git_dirty="${RED}*${RESET}"
         fi
-        # Format: folder@branch with branch in cyan, * if dirty
-        git_branch="${folder_name}@${CYAN}${branch}${RESET}${git_dirty}"
+        # Format: folder@branch with distinct colors
+        # folder = blue, @ = dim gray, branch = green, * = red (if dirty)
+        git_branch="${BLUE}${folder_name}${DIM}@${GREEN}${branch}${RESET}${git_dirty}"
     fi
 fi
 
@@ -183,7 +198,9 @@ generate_battery_bar() {
 
 # If no agent name, show "not registered" status with git branch and context
 if [[ -z "$agent_name" ]]; then
-    base_status="${GRAY}jat${RESET} ${GRAY}·${RESET} ${CYAN}no agent registered${RESET}"
+    # Use project folder name instead of hardcoded "jat"
+    project_display=$(basename "$cwd" 2>/dev/null || echo "project")
+    base_status="${GRAY}${project_display}${RESET} ${GRAY}·${RESET} ${CYAN}no agent registered${RESET}"
 
     # Build second line with context battery and git branch
     second_line=""
@@ -270,8 +287,9 @@ if [[ -z "$task_id" ]] && command -v am-reservations &>/dev/null; then
 
     if [[ -n "$reservation_info" ]]; then
         # Extract task ID from reason field (format: "task-id: description" or just "task-id")
-        # Match new Beads format: jat-XXX (3 alphanumeric characters after jat-)
-        task_id=$(echo "$reservation_info" | grep "^Reason:" | sed 's/^Reason: //' | grep -oE 'jat-[a-z0-9]{3}\b' | head -1)
+        # Dynamic project prefix: extract from cwd (e.g., /home/jw/code/chimaro -> chimaro-xxx)
+        project_prefix=$(basename "$cwd")
+        task_id=$(echo "$reservation_info" | grep "^Reason:" | sed 's/^Reason: //' | grep -oE "${project_prefix}-[a-z0-9]{3}\b" | head -1)
 
         # If we found a task ID from reservation, get its details from Beads
         if [[ -n "$task_id" ]] && command -v bd &>/dev/null; then
@@ -322,9 +340,9 @@ if [[ -n "$agent_name" ]]; then
         fi
     fi
 
-    # Count unread messages
+    # Count unread messages (using --count for efficiency)
     if command -v am-inbox &>/dev/null; then
-        unread_count=$(am-inbox "$agent_name" --unread 2>/dev/null | grep -c "^ID:" 2>/dev/null || echo "0")
+        unread_count=$(am-inbox "$agent_name" --unread --count 2>/dev/null || echo "0")
         unread_count=$(echo "$unread_count" | tr -d '\n' | tr -d ' ')  # Clean up output
     fi
 fi
@@ -417,8 +435,9 @@ elif [[ -n "$agent_name" ]]; then
     # Agent registered but no active task - show idle (dimmed)
     status_line="${status_line} ${GRAY}·${RESET} ${GRAY}idle${RESET}"
 else
-    # Fallback
-    status_line="${GRAY}jat${RESET}"
+    # Fallback - use project folder name
+    project_fallback=$(basename "$cwd" 2>/dev/null || echo "project")
+    status_line="${GRAY}${project_fallback}${RESET}"
 fi
 
 # ============================================================================
