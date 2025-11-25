@@ -406,6 +406,27 @@ if [[ -n "$task_id" ]] && command -v bd &>/dev/null; then
     blocked_count=$(echo "$blocked_count" | tr -d '\n' | tr -d ' ')
 fi
 
+# Calculate last activity time (time since transcript was modified)
+# Helps identify stale/abandoned sessions
+last_activity=""
+last_activity_minutes=0
+if [[ -n "$transcript_path" ]] && [[ -f "$transcript_path" ]]; then
+    transcript_mtime=$(stat -c %Y "$transcript_path" 2>/dev/null || echo "0")
+    if [[ $transcript_mtime -gt 0 ]]; then
+        now_epoch=$(date +%s)
+        seconds_since_activity=$((now_epoch - transcript_mtime))
+        if [[ $seconds_since_activity -gt 0 ]]; then
+            last_activity_minutes=$((seconds_since_activity / 60))
+            if [[ $last_activity_minutes -lt 60 ]]; then
+                last_activity="${last_activity_minutes}m"
+            else
+                hours_since=$((last_activity_minutes / 60))
+                last_activity="${hours_since}h"
+            fi
+        fi
+    fi
+fi
+
 # Calculate active time if task has updated_at
 active_time=""
 if [[ -n "$task_updated_at" ]]; then
@@ -509,6 +530,7 @@ fi
 # ⏱ Time Left:  Green (>30min) → Yellow (10-30min) → Red (<10min)
 # 📊 Progress:   Red (<25%) → Yellow (25-75%) → Green (>75%)
 # ⛔ Blocked:    Cyan (1-2) → Yellow (3-5) → Red (>5) - tasks waiting on this
+# 🕐 Activity:   Green (<15m) → Yellow (15-60m) → Red (>60m stale)
 #
 # See CLAUDE.md "Status Calculation Algorithm" for full color matrix
 # ============================================================================
@@ -588,6 +610,20 @@ if [[ $blocked_count -gt 0 ]]; then
         blocked_color="${CYAN}"
     fi
     indicators="${indicators}${blocked_color}⛔ ${blocked_count}${RESET}"
+fi
+
+# Add last activity indicator (dynamic: green=<15m, yellow=15-60m, red=>60m)
+# Only show if activity is older than 5 minutes (to avoid clutter for active sessions)
+if [[ -n "$last_activity" ]] && [[ $last_activity_minutes -gt 5 ]]; then
+    [[ -n "$indicators" ]] && indicators="${indicators}  "
+    if [[ $last_activity_minutes -gt 60 ]]; then
+        activity_color="${RED}"
+    elif [[ $last_activity_minutes -gt 15 ]]; then
+        activity_color="${YELLOW}"
+    else
+        activity_color="${GREEN}"
+    fi
+    indicators="${indicators}${activity_color}🕐 ${last_activity}${RESET}"
 fi
 
 # Build second line with context battery, git branch, and indicators
