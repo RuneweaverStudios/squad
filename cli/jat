@@ -185,6 +185,33 @@ launch_browser() {
     ) &
 }
 
+launch_dashboard() {
+    local name="$1"
+    local dashboard_port="${2:-3333}"
+    local dashboard_path="$HOME/code/jat/dashboard"
+
+    # Check if dashboard directory exists
+    if [[ ! -d "$dashboard_path" ]]; then
+        echo -e "${YELLOW}  ⊘ Dashboard not found: $dashboard_path${NC}"
+        return 0
+    fi
+
+    echo -e "${DIM}  → Dashboard :$dashboard_port${NC}"
+
+    # Launch dashboard dev server in a terminal
+    $TERMINAL -T "$name: Dashboard :$dashboard_port" -e bash -c "cd '$dashboard_path' && npm run dev -- --port $dashboard_port; exec bash" &
+
+    # Open browser after delay for server to start
+    (
+        sleep 3
+        if command -v xdg-open &>/dev/null; then
+            xdg-open "http://localhost:$dashboard_port" &>/dev/null
+        elif command -v open &>/dev/null; then
+            open "http://localhost:$dashboard_port"
+        fi
+    ) &
+}
+
 launch_project() {
     local project="$1"
     shift
