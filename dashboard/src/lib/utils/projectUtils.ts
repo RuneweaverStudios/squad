@@ -199,3 +199,49 @@ export function filterTasksByProject(tasks: Task[], projectName: string): Task[]
     return taskProject === projectName;
   });
 }
+
+/**
+ * Filter tasks by multiple project names (Set-based filtering)
+ *
+ * @param tasks - Array of task objects
+ * @param projectNames - Set of project names to include (empty Set returns all tasks)
+ * @returns Filtered array of tasks belonging to any of the specified projects
+ *
+ * @example
+ * const tasks = [
+ *   { id: "chimaro-abc", title: "Task 1" },
+ *   { id: "jat-def", title: "Task 2" },
+ *   { id: "jomarchy-ghi", title: "Task 3" }
+ * ];
+ *
+ * // Empty set returns all tasks
+ * filterTasksByProjects(tasks, new Set())
+ * // [all 3 tasks]
+ *
+ * // Single project
+ * filterTasksByProjects(tasks, new Set(["chimaro"]))
+ * // [{ id: "chimaro-abc", title: "Task 1" }]
+ *
+ * // Multiple projects (union)
+ * filterTasksByProjects(tasks, new Set(["chimaro", "jat"]))
+ * // [{ id: "chimaro-abc", ... }, { id: "jat-def", ... }]
+ */
+export function filterTasksByProjects(tasks: Task[], projectNames: Set<string>): Task[] {
+  if (!Array.isArray(tasks)) {
+    return [];
+  }
+
+  // Empty set = no filter = return all tasks
+  if (projectNames.size === 0) {
+    return tasks;
+  }
+
+  return tasks.filter(task => {
+    if (!task || !task.id) {
+      return false;
+    }
+
+    const project = getProjectFromTaskId(task.id);
+    return project && projectNames.has(project);
+  });
+}
