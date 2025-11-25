@@ -57,6 +57,43 @@ MAGENTA='\033[0;35m'
 RESET='\033[0m'
 BOLD='\033[1m'
 
+# ============================================================================
+# CACHING LAYER
+# ============================================================================
+# Cache expensive queries (bd list, am-reservations, am-inbox) to reduce
+# statusline render latency from ~300ms to ~5ms for cached hits.
+#
+# Cache files stored in /tmp with TTL-based invalidation.
+# Format: /tmp/statusline-cache-{agent}-{type}.{ext}
+# ============================================================================
+
+CACHE_TTL_SECONDS=10  # How long cache entries remain valid
+
+# Get cached value or run command and cache result
+# Usage: cache_get_or_run "cache_key" "command to run"
+# Returns cached value if fresh, otherwise runs command and caches result
+cache_get_or_run() {
+    local cache_key="$1"
+    local command="$2"
+    local cache_file="/tmp/statusline-cache-${cache_key}"
+
+    # Check if cache exists and is fresh
+    if [[ -f "$cache_file" ]]; then
+        local cache_age=$(($(date +%s) - $(stat -c %Y "$cache_file" 2>/dev/null || echo "0")))
+        if [[ $cache_age -lt $CACHE_TTL_SECONDS ]]; then
+            # Cache hit - return cached value
+            cat "$cache_file"
+            return 0
+        fi
+    fi
+
+    # Cache miss or stale - run command and cache result
+    local result
+    result=$(eval "$command" 2>/dev/null)
+    echo "$result" > "$cache_file" 2>/dev/null
+    echo "$result"
+}
+
 # Read JSON from stdin (provided by Claude Code)
 json_input=$(cat)
 
@@ -262,8 +299,11 @@ if command -v bd &>/dev/null; then
         cd "$cwd" 2>/dev/null || true
     fi
 
-    # Get in_progress task assigned to this agent
-    task_json=$(bd list --json 2>/dev/null | jq -r --arg agent "$agent_name" '.[] | select(.assignee == $agent and .status == "in_progress") | @json' | head -1)
+    # Get in_progress task assigned to this agent (cached)
+    project_name=$(basename "$cwd")
+    bd_cache_key="${agent_name}-${project_name}-tasks"
+    bd_list_json=$(cache_get_or_run "$bd_cache_key" "bd list --json")
+    task_json=$(echo "$bd_list_json" | jq -r --arg agent "$agent_name" '.[] | select(.assignee == $agent and .status == "in_progress") | @json' 2>/dev/null | head -1)
 
     if [[ -n "$task_json" ]]; then
         task_id=$(echo "$task_json" | jq -r '.id // empty')
@@ -282,8 +322,9 @@ fi
 
 # Priority 2: Fall back to file reservations if no in_progress task found
 if [[ -z "$task_id" ]] && command -v am-reservations &>/dev/null; then
-    # Get the most recent reservation for this agent and extract task ID from reason
-    reservation_info=$(am-reservations --agent "$agent_name" 2>/dev/null)
+    # Get the most recent reservation for this agent and extract task ID from reason (cached)
+    reservations_cache_key="${agent_name}-reservations"
+    reservation_info=$(cache_get_or_run "$reservations_cache_key" "am-reservations --agent '$agent_name'")
 
     if [[ -n "$reservation_info" ]]; then
         # Extract task ID from reason field (format: "task-id: description" or just "task-id")
@@ -314,14 +355,20 @@ unread_count=0
 time_remaining=""
 
 if [[ -n "$agent_name" ]]; then
-    # Count file locks
+    # Count file locks (reuse cached reservation_info if available, otherwise cache it)
     if command -v am-reservations &>/dev/null; then
-        lock_count=$(am-reservations --agent "$agent_name" 2>/dev/null | grep -c "^ID:" 2>/dev/null || echo "0")
+        # Reuse cached reservations from earlier, or fetch if not set
+        if [[ -z "$reservation_info" ]]; then
+            reservations_cache_key="${agent_name}-reservations"
+            reservation_info=$(cache_get_or_run "$reservations_cache_key" "am-reservations --agent '$agent_name'")
+        fi
+
+        lock_count=$(echo "$reservation_info" | grep -c "^ID:" 2>/dev/null || echo "0")
         lock_count=$(echo "$lock_count" | tr -d '\n' | tr -d ' ')  # Clean up output
 
         # Calculate time remaining on shortest lock
         if [[ "$lock_count" != "0" ]] && [[ $lock_count -gt 0 ]]; then
-            expires=$(am-reservations --agent "$agent_name" 2>/dev/null | grep "^Expires:" | head -1 | sed 's/^Expires: //')
+            expires=$(echo "$reservation_info" | grep "^Expires:" | head -1 | sed 's/^Expires: //')
             if [[ -n "$expires" ]]; then
                 expires_epoch=$(date -d "$expires" +%s 2>/dev/null || echo "0")
                 now_epoch=$(date +%s)
@@ -340,9 +387,10 @@ if [[ -n "$agent_name" ]]; then
         fi
     fi
 
-    # Count unread messages (using --count for efficiency)
+    # Count unread messages (using --count for efficiency, cached)
     if command -v am-inbox &>/dev/null; then
-        unread_count=$(am-inbox "$agent_name" --unread --count 2>/dev/null || echo "0")
+        inbox_cache_key="${agent_name}-inbox-count"
+        unread_count=$(cache_get_or_run "$inbox_cache_key" "am-inbox '$agent_name' --unread --count")
         unread_count=$(echo "$unread_count" | tr -d '\n' | tr -d ' ')  # Clean up output
     fi
 fi
