@@ -141,6 +141,7 @@ fi
 # Auto-create new agent immediately (FAST!)
 am-register --program claude-code --model sonnet-4.5
 # → Extract agent name from output
+# → WAIT for success message before proceeding (avoid race condition with inbox)
 ```
 
 **If resume mode:**
@@ -187,10 +188,20 @@ am-reservations --agent "$AGENT_NAME" --json
 
 Do NOT silently batch-ack messages. Actually READ them and RESPOND if needed.
 
-#### 3A: Check Inbox
+#### 3A: Check Inbox (with registration fallback)
+
+**IMPORTANT:** Run `am-register` and `am-inbox` as separate sequential commands. If inbox fails with "Agent not found", the registration may not have fully committed - run register again, then retry inbox.
+
 ```bash
+# First attempt
 am-inbox "$AGENT_NAME" --unread
+
+# If it fails with "Agent not found":
+# 1. Run am-register again (it's idempotent - will just resume existing agent)
+# 2. Then retry am-inbox
 ```
+
+**Best practice:** Always run these as separate Bash tool calls, not chained with `;` or `&&` in the same command. This ensures each command fully completes before the next starts.
 
 #### 3B: Display Messages to User
 Show the user what messages are in the inbox. Read each message.

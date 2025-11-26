@@ -161,10 +161,20 @@ bd list --json | jq -r --arg agent "$agent_name" \
 
 Do NOT silently batch-ack messages. Actually READ them and RESPOND if needed.
 
-#### 3A: Check Inbox
+#### 3A: Check Inbox (with registration fallback)
+
+**IMPORTANT:** If inbox fails with "Agent not found", the agent may not be registered in this session. Run `am-register` first (it's idempotent), then retry inbox.
+
 ```bash
+# First attempt
 am-inbox "$agent_name" --unread
+
+# If it fails with "Agent not found":
+# 1. Run: am-register --name "$agent_name" --program claude-code --model sonnet-4.5
+# 2. Then retry: am-inbox "$agent_name" --unread
 ```
+
+**Best practice:** Run these as separate Bash tool calls, not chained together.
 
 #### 3B: Display Messages to User
 Show the user what messages are in the inbox. Read each message.
