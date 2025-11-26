@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { getProjectColor } from '$lib/utils/projectColors';
+	import TaskIdBadge from '$lib/components/TaskIdBadge.svelte';
 
 	// Types
 	interface Task {
 		id: string;
 		title: string;
-		status?: string;
+		status: string;
 		priority?: number;
 		assignee?: string;
 		labels?: string[];
@@ -102,9 +103,7 @@
 									<div class="card-body p-4">
 										<!-- Task ID + Priority -->
 										<div class="flex items-start justify-between gap-2 mb-2">
-											<code class="text-xs bg-base-200 px-2 py-1 rounded font-mono">
-												{task.id}
-											</code>
+											<TaskIdBadge {task} size="xs" showStatus={false} showType={false} copyOnly />
 											<span class="badge badge-sm {priorityColors[task.priority ?? 99]}">
 												P{task.priority ?? '?'}
 											</span>

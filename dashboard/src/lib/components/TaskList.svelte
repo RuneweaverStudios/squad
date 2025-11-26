@@ -5,6 +5,7 @@
 	 */
 
 	import TaskDetailDrawer from './TaskDetailDrawer.svelte';
+	import TaskIdBadge from './TaskIdBadge.svelte';
 
 	// Props
 	let {
@@ -143,9 +144,7 @@
 				>
 					<div class="card-body p-4">
 						<div class="flex items-center gap-2 mb-2 flex-wrap">
-							<span class="badge badge-ghost badge-sm">
-								{task.project}-{task.id.split('-').pop()}
-							</span>
+							<TaskIdBadge {task} size="xs" showStatus={false} showType={false} copyOnly />
 							<span class="badge {priorityClass} badge-sm">
 								{priorityLabel}
 							</span>

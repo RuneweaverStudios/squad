@@ -14,6 +14,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { isTaskDrawerOpen } from '$lib/stores/drawerStore';
+	import TaskIdBadge from '$lib/components/TaskIdBadge.svelte';
 
 	// Modal state
 	let isOpen = $state(false);
@@ -535,9 +536,7 @@
 												<!-- Task details -->
 												<div class="flex-1 text-left min-w-0">
 													<div class="flex items-center gap-2 mb-1">
-														<span class="font-mono text-xs {flatIndex === selectedIndex ? 'text-primary-content/70' : 'text-base-content/50'}">
-															{task.id}
-														</span>
+														<TaskIdBadge {task} size="xs" minimal />
 														<span class="font-medium truncate">{task.title}</span>
 													</div>
 													{#if task.description}

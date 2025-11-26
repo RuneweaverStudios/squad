@@ -1,6 +1,7 @@
 <script lang="ts">
 	import DependencyIndicator from '$lib/components/DependencyIndicator.svelte';
 	import LabelBadges from '$lib/components/LabelBadges.svelte';
+	import TaskIdBadge from '$lib/components/TaskIdBadge.svelte';
 	import { analyzeDependencies } from '$lib/utils/dependencyUtils';
 	import { getPriorityBadge, getTaskStatusBadge } from '$lib/utils/badgeHelpers';
 	import { formatRelativeTime, formatFullDate, getAgeColorClass } from '$lib/utils/dateFormatters';
@@ -75,9 +76,7 @@
 		<div class="card-body p-3 relative">
 			<!-- Task ID badge on left -->
 			<div class="absolute -top-2 left-2">
-				<span class="badge badge-sm badge-ghost text-xs text-base-content/50 font-mono">
-					{task.id}
-				</span>
+				<TaskIdBadge {task} size="xs" showStatus={false} showType={false} copyOnly />
 			</div>
 
 			<!-- Priority and Dependency badges on right -->
@@ -177,7 +176,7 @@
 		title={task.title}
 	>
 		<!-- Task ID -->
-		<span class="font-mono text-xs text-base-content/60 shrink-0">{task.id}</span>
+		<TaskIdBadge {task} size="xs" minimal showStatus={false} />
 
 		<!-- Status indicator -->
 		{#if task.status === 'in_progress'}
