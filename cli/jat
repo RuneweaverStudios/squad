@@ -143,9 +143,11 @@ launch_claude() {
 
         $TERMINAL -T "$window_title" -e bash -c "cd '$path' && $env_vars claude $claude_flags '$initial_prompt'" &
 
-        # Stagger launches by 7s so each agent sees previous agents' reservations
+        # Stagger launches so each agent sees previous agents' reservations
         if [[ $i -lt $count ]]; then
-            sleep 7
+            local stagger
+            stagger=$(jq -r '.defaults.agent_stagger // 30' "$CONFIG_FILE")
+            sleep "$stagger"
         fi
     done
 }
