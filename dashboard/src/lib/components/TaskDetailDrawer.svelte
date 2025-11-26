@@ -661,16 +661,25 @@
 								<div><span class="text-base-content/40">Updated:</span> {formatRelativeTimestamp(task.updated_at)}</div>
 								<div class="flex items-center justify-end gap-1">
 									<span class="text-base-content/40">Assignee:</span>
-									<InlineEdit
-										value={task.assignee || ''}
-										onSave={async (newValue) => {
-											await autoSave('assignee', newValue);
-										}}
-										type="text"
-										placeholder="Unassigned"
-										disabled={isSaving}
-										class="text-xs"
-									/>
+									{#if task.assignee}
+										<span class="inline-flex items-center gap-1">
+											<span>{task.assignee}</span>
+											<button
+												class="btn btn-ghost btn-xs btn-circle opacity-50 hover:opacity-100 hover:btn-error"
+												onclick={async () => {
+													await autoSave('assignee', '');
+												}}
+												disabled={isSaving}
+												title="Clear assignment"
+											>
+												<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+												</svg>
+											</button>
+										</span>
+									{:else}
+										<span class="text-base-content/50 italic">Unassigned</span>
+									{/if}
 								</div>
 							</div>
 						</div>

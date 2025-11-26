@@ -243,3 +243,75 @@ export function getTimeSinceMinutes(timestamp: string | null | undefined): numbe
 export function isWithinMinutes(timestamp: string | null | undefined, minutes: number): boolean {
 	return getTimeSinceMinutes(timestamp) < minutes;
 }
+
+/**
+ * Format relative time for save indicator.
+ * More human-readable format with "yesterday" for older saves.
+ *
+ * @param date - Date object
+ * @returns Formatted relative time string
+ *
+ * @example
+ * formatSavedTime(new Date()) // → "just now"
+ * formatSavedTime(twoMinutesAgo) // → "2m ago"
+ * formatSavedTime(threeHoursAgo) // → "3h ago"
+ * formatSavedTime(yesterday) // → "yesterday at 3:45 PM"
+ */
+export function formatSavedTime(date: Date | null): string {
+	if (!date) return '';
+
+	const now = new Date();
+	const diffMs = now.getTime() - date.getTime();
+	const diffMins = Math.floor(diffMs / 60000);
+	const diffHours = Math.floor(diffMs / 3600000);
+
+	if (diffMins < 1) return 'just now';
+	if (diffMins < 60) return `${diffMins}m ago`;
+	if (diffHours < 24) return `${diffHours}h ago`;
+
+	// More than 24 hours - show "yesterday at X:XX PM" or date
+	const yesterday = new Date(now);
+	yesterday.setDate(yesterday.getDate() - 1);
+
+	const timeStr = date.toLocaleTimeString('en-US', {
+		hour: 'numeric',
+		minute: '2-digit',
+		hour12: true
+	});
+
+	// Check if it was yesterday
+	if (
+		date.getDate() === yesterday.getDate() &&
+		date.getMonth() === yesterday.getMonth() &&
+		date.getFullYear() === yesterday.getFullYear()
+	) {
+		return `yesterday at ${timeStr}`;
+	}
+
+	// Older than yesterday - show date
+	const dateStr = date.toLocaleDateString('en-US', {
+		month: 'short',
+		day: 'numeric'
+	});
+	return `${dateStr} at ${timeStr}`;
+}
+
+/**
+ * Format relative time from a timestamp string.
+ * Wrapper around formatSavedTime that parses timestamp strings.
+ *
+ * @param timestamp - Timestamp string (ISO format or database format)
+ * @returns Formatted relative time string or 'N/A' if invalid
+ *
+ * @example
+ * formatRelativeTimestamp("2024-11-21T15:30:00Z") // → "2h ago"
+ * formatRelativeTimestamp("2024-11-21 15:30:00") // → "yesterday at 3:30 PM"
+ */
+export function formatRelativeTimestamp(timestamp: string | null | undefined): string {
+	if (!timestamp) return 'N/A';
+
+	const date = parseTimestamp(timestamp);
+	if (!date) return 'N/A';
+
+	return formatSavedTime(date);
+}
