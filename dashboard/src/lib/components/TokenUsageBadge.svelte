@@ -99,8 +99,8 @@
 		<!-- Separator -->
 		<span class="text-base-content/30">|</span>
 
-		<!-- Mini Sparkline (60-120px flexible width) -->
-		<div class="hidden sm:flex flex-shrink min-w-[60px] max-w-[120px] w-full h-[20px]">
+		<!-- Mini Sparkline (120px default, shrinks to 60px if needed) -->
+		<div class="hidden sm:block flex-shrink w-[120px] min-w-[60px] h-[20px]">
 			<Sparkline
 				data={sparklineData}
 				width="100%"
