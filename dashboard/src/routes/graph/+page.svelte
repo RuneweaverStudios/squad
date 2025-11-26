@@ -4,12 +4,25 @@
 	import DependencyGraph from '$lib/components/DependencyGraph.svelte';
 	import TaskDetailDrawer from '$lib/components/TaskDetailDrawer.svelte';
 
+	// Task type compatible with DependencyGraph component
+	interface Task {
+		id: string;
+		title?: string;
+		description?: string;
+		status?: string;
+		priority?: number;
+		project?: string;
+		assignee?: string;
+		depends_on?: Array<{ id?: string; depends_on_id?: string; type?: string }>;
+		labels?: string[];
+	}
+
 	// Task data
-	let tasks = $state([]);
-	let allTasks = $state([]);
+	let tasks = $state<Task[]>([]);
+	let allTasks = $state<Task[]>([]);
 	let loading = $state(true);
-	let error = $state(null);
-	let selectedTaskId = $state(null);
+	let error = $state<string | null>(null);
+	let selectedTaskId = $state<string | null>(null);
 	let drawerOpen = $state(false);
 	let drawerMode = $state<'view' | 'edit'>('view');
 
@@ -52,8 +65,8 @@
 
 			const data = await response.json();
 			allTasks = data.tasks || [];
-		} catch (err) {
-			error = err.message;
+		} catch (err: unknown) {
+			error = err instanceof Error ? err.message : 'Unknown error';
 			console.error('Failed to fetch tasks:', err);
 		} finally {
 			loading = false;
@@ -61,7 +74,7 @@
 	}
 
 	// Handle node click in graph
-	function handleNodeClick(taskId) {
+	function handleNodeClick(taskId: string) {
 		selectedTaskId = taskId;
 		drawerMode = 'view';
 		drawerOpen = true;

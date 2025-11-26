@@ -4,12 +4,24 @@
 	import KanbanBoard from '$lib/components/graph/KanbanBoard.svelte';
 	import TaskDetailDrawer from '$lib/components/TaskDetailDrawer.svelte';
 
+	// Task type
+	interface Task {
+		id: string;
+		title: string;
+		description?: string;
+		status: string;
+		priority: number;
+		assignee?: string;
+		depends_on?: string[];
+		labels?: string[];
+	}
+
 	// Task data
-	let tasks = $state([]);
-	let allTasks = $state([]);
+	let tasks = $state<Task[]>([]);
+	let allTasks = $state<Task[]>([]);
 	let loading = $state(true);
-	let error = $state(null);
-	let selectedTaskId = $state(null);
+	let error = $state<string | null>(null);
+	let selectedTaskId = $state<string | null>(null);
 	let drawerOpen = $state(false);
 	let drawerMode = $state<'view' | 'edit'>('view');
 
@@ -27,7 +39,7 @@
 	});
 
 	// Toggle priority selection
-	function togglePriority(priority) {
+	function togglePriority(priority: string) {
 		if (selectedPriorities.has(priority)) {
 			selectedPriorities.delete(priority);
 		} else {
@@ -74,8 +86,8 @@
 
 			const data = await response.json();
 			allTasks = data.tasks || [];
-		} catch (err) {
-			error = err.message;
+		} catch (err: unknown) {
+			error = err instanceof Error ? err.message : 'Unknown error';
 			console.error('Failed to fetch tasks:', err);
 		} finally {
 			loading = false;
@@ -83,7 +95,7 @@
 	}
 
 	// Handle card click in kanban board
-	function handleTaskClick(taskId) {
+	function handleTaskClick(taskId: string) {
 		selectedTaskId = taskId;
 		drawerMode = 'view';
 		drawerOpen = true;

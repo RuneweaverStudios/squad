@@ -29,7 +29,7 @@
 
 	// Drawer state for TaskDetailDrawer
 	let drawerOpen = $state(false);
-	let selectedTaskId = $state(null);
+	let selectedTaskId = $state<string | null>(null);
 	let drawerMode = $state('view');
 
 	// Extract unique projects from ALL tasks (unfiltered)
@@ -184,7 +184,7 @@
 	}
 
 	// Handle task assignment via drag-and-drop
-	async function handleTaskAssign(taskId, agentName) {
+	async function handleTaskAssign(taskId: string, agentName: string) {
 		try {
 			const response = await fetch('/api/agents', {
 				method: 'POST',
@@ -210,7 +210,7 @@
 	}
 
 	// Handle task click from TaskQueue - open drawer
-	function handleTaskClick(taskId) {
+	function handleTaskClick(taskId: string) {
 		selectedTaskId = taskId;
 		drawerMode = 'view';
 		drawerOpen = true;
