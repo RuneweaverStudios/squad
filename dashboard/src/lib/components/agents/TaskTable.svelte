@@ -4,29 +4,19 @@
 	import { analyzeDependencies } from '$lib/utils/dependencyUtils';
 	import { getProjectFromTaskId } from '$lib/utils/projectUtils';
 	import { getPriorityBadge, getTaskStatusBadge, getTypeBadge } from '$lib/utils/badgeHelpers';
-	import { formatRelativeTime, formatFullDate, normalizeTimestamp, getTimeSinceMinutes, getAgeColorClass } from '$lib/utils/dateFormatters';
+	import { formatRelativeTime, formatFullDate, normalizeTimestamp, getAgeColorClass } from '$lib/utils/dateFormatters';
 	import { toggleSetItem } from '$lib/utils/filterHelpers';
+	import { getActivityStatusConfig } from '$lib/config/activityStatusConfig';
+	import { isAgentWorking as checkAgentWorking } from '$lib/utils/agentStatusUtils';
 
 	let { tasks = [], allTasks = [], agents = [], reservations = [], ontaskclick = () => {} } = $props();
 
-	// Check if an agent is actively working (live or working status)
+	// Check if an agent is actively working (uses shared utility)
 	function isAgentWorking(agentName) {
 		if (!agentName || !agents.length) return false;
 		const agent = agents.find(a => a.name === agentName);
 		if (!agent) return false;
-
-		// Calculate agent status (same logic as AgentCard)
-		const hasActiveLocks = agent.reservation_count > 0;
-		const hasInProgressTask = agent.in_progress_tasks > 0;
-
-		// Use shared date formatter for timestamp parsing
-		const timeSinceActive = getTimeSinceMinutes(agent.last_active_ts);
-
-		// Live: < 1 minute, Working: 1-10 minutes with activity
-		if (timeSinceActive < 1) return true; // live
-		if (timeSinceActive < 10 && (hasActiveLocks || hasInProgressTask)) return true; // working
-
-		return false;
+		return checkAgentWorking(agent);
 	}
 
 	// Initialize filters from URL params (default to open + in_progress tasks)
@@ -945,20 +935,19 @@
 									<td class="whitespace-nowrap">
 										{#if task.status === 'in_progress' && task.assignee}
 											<!-- In progress: show assignee with activity indicator instead of status badge -->
+											{@const statusConfig = getActivityStatusConfig('in_progress')}
 											<span class="flex items-center gap-1.5">
 												{#if isAgentWorking(task.assignee)}
-													<!-- Working: pulsing dot + spinning gear -->
-													<span class="relative flex h-2 w-2">
-														<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
-														<span class="relative inline-flex rounded-full h-2 w-2 bg-success"></span>
-													</span>
-													<span class="text-sm font-medium text-success">{task.assignee}</span>
-													<svg class="w-3.5 h-3.5 text-success animate-spin" viewBox="0 0 24 24" fill="currentColor" title="Actively working">
-														<path d="M4.5 12a7.5 7.5 0 0015 0m-15 0a7.5 7.5 0 1115 0m-15 0H3m16.5 0H21m-1.5 0H12m-8.457 3.077l1.41-.513m14.095-5.13l1.41-.513M5.106 17.785l1.15-.964m11.49-9.642l1.149-.964M7.501 19.795l.75-1.3m7.5-12.99l.75-1.3m-6.063 16.658l.26-1.477m2.605-14.772l.26-1.477m0 17.726l-.26-1.477M10.698 4.614l-.26-1.477M16.5 19.794l-.75-1.299M7.5 4.205L12 12m0 0l4.5 7.795m-4.5-7.795L12 3" />
+													<!-- Working: spinning gear + agent name -->
+													<svg class="shrink-0 w-4 h-4 text-info animate-spin origin-center" viewBox="0 0 24 24" fill="currentColor" title={statusConfig.description}>
+														<path d={statusConfig.icon} />
 													</svg>
+													<span class="text-sm font-medium text-info">{task.assignee}</span>
 												{:else}
 													<!-- Assigned but not actively working -->
-													<span class="inline-flex h-2 w-2 rounded-full bg-warning"></span>
+													<svg class="shrink-0 w-4 h-4 text-warning" viewBox="0 0 24 24" fill="currentColor" title="Assigned but inactive">
+														<path d={statusConfig.icon} />
+													</svg>
 													<span class="text-sm text-warning">{task.assignee}</span>
 												{/if}
 											</span>

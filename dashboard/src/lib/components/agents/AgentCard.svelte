@@ -5,7 +5,8 @@
 	import { getActivityStatusConfig } from '$lib/config/activityStatusConfig';
 	import Sparkline from '$lib/components/Sparkline.svelte';
 	import { getAgentStatusBadge, getAgentStatusIcon } from '$lib/utils/badgeHelpers';
-	import { formatLastActivity, getTimeSinceMs } from '$lib/utils/dateFormatters';
+	import { formatLastActivity } from '$lib/utils/dateFormatters';
+	import { computeAgentStatus } from '$lib/utils/agentStatusUtils';
 
 	let { agent, tasks = [], allTasks = [], reservations = [], onTaskAssign = () => {}, ontaskclick = () => {}, draggedTaskId = null } = $props();
 
@@ -47,44 +48,9 @@
 	let sparklineError = $state(null);
 	let sparklineInterval = null;
 
-	// Compute agent status using $derived
+	// Compute agent status using shared utility
 	// States: live (< 1m, truly responsive) > working (1-10m with task) > active (recent activity) > idle (within 1h) > offline (>1h)
-	const agentStatus = $derived(() => {
-		const hasActiveLocks = agent.reservation_count > 0;
-		const hasInProgressTask = agent.in_progress_tasks > 0;
-
-		// Calculate time since last activity using shared formatter
-		const timeSinceActive = getTimeSinceMs(agent.last_active_ts);
-
-		// Priority 1: WORKING - Has active task or file locks
-		// Agent has work in progress (takes priority over recency)
-		if (hasInProgressTask || hasActiveLocks) {
-			return 'working';
-		}
-
-		// Priority 2: LIVE - Very recent activity (< 1 minute) without active work
-		// Agent is truly responsive right now but not actively working
-		if (timeSinceActive < 60000) { // < 1 minute
-			return 'live';
-		}
-
-		// Priority 3: ACTIVE - Recent activity (< 10 minutes) but no current work
-		// OR has locks but not super recent
-		if (timeSinceActive < 600000) { // < 10 minutes
-			return 'active';
-		}
-		if (hasActiveLocks && timeSinceActive < 3600000) { // has locks, within hour
-			return 'active';
-		}
-
-		// Priority 4: IDLE - Within 1 hour but not active
-		if (timeSinceActive < 3600000) { // 1 hour
-			return 'idle';
-		}
-
-		// Priority 5: OFFLINE - Over 1 hour or never active
-		return 'offline';
-	});
+	const agentStatus = $derived(() => computeAgentStatus(agent));
 
 	// Compute current task (in-progress tasks assigned to this agent)
 	const currentTask = $derived(() => {
