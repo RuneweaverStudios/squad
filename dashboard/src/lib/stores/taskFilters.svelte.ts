@@ -28,11 +28,11 @@ export interface TaskFilterState {
  * Components can provide custom defaults.
  */
 export interface FilterDefaults {
-	priorities?: string[];
-	statuses?: string[];
-	types?: string[];
-	labels?: string[];
-	projects?: string[];
+	priorities?: readonly string[] | string[];
+	statuses?: readonly string[] | string[];
+	types?: readonly string[] | string[];
+	labels?: readonly string[] | string[];
+	projects?: readonly string[] | string[];
 }
 
 /**

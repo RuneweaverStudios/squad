@@ -12,8 +12,7 @@ import {
 	calculateCost,
 	getAgentUsage,
 	getAllAgentUsage,
-	getAllSessionIds,
-	getSystemTotalUsage,
+	getSystemUsage,
 	type TokenUsage,
 	type SessionUsage
 } from './tokenUsage';
@@ -468,42 +467,14 @@ describe('getAllAgentUsage', () => {
 });
 
 // ============================================================================
-// Tests: getAllSessionIds
+// Tests: getSystemUsage
 // ============================================================================
 
-describe('getAllSessionIds', () => {
-	beforeEach(resetMocks);
-
-	it('should return all session IDs', async () => {
-		vi.mocked(readdir).mockResolvedValue([
-			'session1.jsonl',
-			'session2.jsonl',
-			'other-file.txt'
-		] as any);
-
-		const sessionIds = await getAllSessionIds('/test/project');
-
-		expect(sessionIds).toEqual(['session1', 'session2']);
-	});
-
-	it('should return empty array when directory does not exist', async () => {
-		vi.mocked(readdir).mockRejectedValue(new Error('Directory not found'));
-
-		const sessionIds = await getAllSessionIds('/test/project');
-
-		expect(sessionIds).toEqual([]);
-	});
-});
-
-// ============================================================================
-// Tests: getSystemTotalUsage
-// ============================================================================
-
-describe('getSystemTotalUsage', () => {
+describe('getSystemUsage', () => {
 	beforeEach(resetMocks);
 
 	it('should aggregate total usage across all agents', async () => {
-		// getSystemTotalUsage calls getAllAgentUsage, which calls buildSessionAgentMap + getAgentUsage per agent
+		// getSystemUsage calls getAllAgentUsage, which calls buildSessionAgentMap + getAgentUsage per agent
 		// Same mocking pattern as getAllAgentUsage test
 		vi.mocked(readdir)
 			.mockResolvedValueOnce(['agent-session1.txt', 'agent-session2.txt'] as any) // Initial buildSessionAgentMap
@@ -520,7 +491,7 @@ describe('getSystemTotalUsage', () => {
 			.mockResolvedValueOnce('AgentBeta') // AgentBeta's buildSessionAgentMap: session2
 			.mockResolvedValueOnce(MOCK_JSONL_VALID); // AgentBeta's parseSessionUsage: session2.jsonl
 
-		const totalUsage = await getSystemTotalUsage('all', '/test/project');
+		const totalUsage = await getSystemUsage('all', '/test/project');
 
 		expect(totalUsage.input_tokens).toBe(500); // 250 * 2
 		expect(totalUsage.total_tokens).toBe(1760); // 880 * 2
@@ -531,7 +502,7 @@ describe('getSystemTotalUsage', () => {
 	it('should return zero usage when no agents exist', async () => {
 		vi.mocked(readdir).mockResolvedValue([] as any);
 
-		const totalUsage = await getSystemTotalUsage('all', '/test/project');
+		const totalUsage = await getSystemUsage('all', '/test/project');
 
 		expect(totalUsage.input_tokens).toBe(0);
 		expect(totalUsage.total_tokens).toBe(0);

@@ -66,8 +66,8 @@ export interface Task {
 	project: string;
 	assignee?: string;
 	labels: string[];
-	depends_on?: Array<{ id: string; title: string; status: string }>;
-	blocked_by?: Array<{ id: string; title: string; status: string }>;
+	depends_on?: Array<{ id: string; title: string; status: string; priority: number }>;
+	blocked_by?: Array<{ id: string; title: string; status: string; priority: number }>;
 }
 
 export interface AgentsData {

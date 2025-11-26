@@ -7,6 +7,7 @@
 	import { getAgentStatusBadge, getAgentStatusIcon, getAgentStatusVisual } from '$lib/utils/badgeHelpers';
 	import { formatLastActivity } from '$lib/utils/dateFormatters';
 	import { computeAgentStatus } from '$lib/utils/agentStatusUtils';
+	import { createModalState } from '$lib/utils/modalStateHelpers.svelte';
 	import type { Agent, Task, Reservation } from '$lib/stores/agents.svelte';
 
 	// Extended types for inbox messages
@@ -51,8 +52,8 @@
 	let conflictReasons = $state<string[]>([]);
 	let hasDependencyBlock = $state(false);
 	let dependencyBlockReason = $state('');
-	let showDeleteModal = $state(false);
-	let isDeleting = $state(false);
+	// Delete modal using shared helper (example of modalStateHelpers usage)
+	const deleteModal = createModalState();
 
 	// Quick actions menu state
 	let showQuickActions = $state(false);
@@ -325,7 +326,7 @@
 
 	// Handle agent deletion
 	async function handleDeleteAgent(): Promise<void> {
-		isDeleting = true;
+		deleteModal.setLoading(true);
 		try {
 			const response = await fetch(`/api/agents/${agent.name}`, {
 				method: 'DELETE'
@@ -333,26 +334,22 @@
 
 			if (!response.ok) {
 				const error = await response.json();
-				console.error('Failed to delete agent:', error);
-				alert(`Failed to delete agent: ${error.message || 'Unknown error'}`);
+				deleteModal.setError(error.message || 'Failed to delete agent');
 				return;
 			}
 
 			// Success - close modal and refresh page
-			showDeleteModal = false;
+			deleteModal.close();
 			window.location.reload();
 		} catch (error: unknown) {
-			console.error('Error deleting agent:', error);
-			alert(`Error deleting agent: ${error instanceof Error ? error.message : 'Unknown error'}`);
-		} finally {
-			isDeleting = false;
+			deleteModal.setError(error instanceof Error ? error.message : 'Unknown error');
 		}
 	}
 
 	// Handle badge click for offline agents
 	function handleBadgeClick(): void {
 		if (agentStatus() === 'offline') {
-			showDeleteModal = true;
+			deleteModal.open();
 		}
 	}
 
@@ -1078,8 +1075,8 @@
 	</div>
 </div>
 
-<!-- Delete Agent Confirmation Modal -->
-{#if showDeleteModal}
+<!-- Delete Agent Confirmation Modal (uses modalStateHelpers) -->
+{#if deleteModal.isOpen}
 	<div class="modal modal-open">
 		<div class="modal-box">
 			<h3 class="font-bold text-lg mb-4">Delete Agent?</h3>
@@ -1098,6 +1095,11 @@
 						<strong>Status:</strong> Offline (inactive for over 1 hour)
 					</p>
 				</div>
+				{#if deleteModal.error}
+					<div class="alert alert-error">
+						<span>{deleteModal.error}</span>
+					</div>
+				{/if}
 				<div class="alert alert-warning">
 					<svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-5 w-5" fill="none" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -1112,17 +1114,17 @@
 			<div class="modal-action">
 				<button
 					class="btn btn-ghost"
-					onclick={() => { showDeleteModal = false; }}
-					disabled={isDeleting}
+					onclick={() => { deleteModal.close(); }}
+					disabled={deleteModal.loading}
 				>
 					Cancel
 				</button>
 				<button
 					class="btn btn-error"
 					onclick={handleDeleteAgent}
-					disabled={isDeleting}
+					disabled={deleteModal.loading}
 				>
-					{#if isDeleting}
+					{#if deleteModal.loading}
 						<span class="loading loading-spinner loading-sm"></span>
 						Deleting...
 					{:else}
@@ -1131,7 +1133,7 @@
 				</button>
 			</div>
 		</div>
-		<div class="modal-backdrop" onclick={() => { if (!isDeleting) showDeleteModal = false; }}></div>
+		<div class="modal-backdrop" onclick={() => { if (!deleteModal.loading) deleteModal.close(); }}></div>
 	</div>
 {/if}
 
@@ -1207,7 +1209,7 @@
 			<button
 				class="w-full px-3 py-2 text-left text-sm hover:bg-error hover:text-error-content transition-colors flex items-center gap-2"
 				onclick={() => {
-					showDeleteModal = true;
+					deleteModal.open();
 					closeQuickActions();
 				}}
 			>
