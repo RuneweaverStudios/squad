@@ -30,6 +30,8 @@
 		rows?: number;
 		/** Show save/cancel buttons instead of auto-save on blur */
 		showButtons?: boolean;
+		/** Truncate long text with ellipsis (shows full text on hover) */
+		truncate?: boolean;
 	}
 
 	let {
@@ -40,7 +42,8 @@
 		disabled = false,
 		class: className = '',
 		rows = 3,
-		showButtons = false
+		showButtons = false,
+		truncate = false
 	}: Props = $props();
 
 	// Internal state
@@ -183,16 +186,17 @@
 {:else}
 	<!-- Display mode -->
 	<button
-		class="inline-edit-display text-left w-full rounded px-2 py-1 transition-colors {disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-base-200'} {className}"
+		class="inline-edit-display text-left w-full rounded px-2 py-1 transition-colors {disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-base-200'} {truncate ? 'inline-edit-truncate' : ''} {className}"
 		onclick={startEditing}
 		disabled={disabled}
 		type="button"
+		title={truncate && value ? value : undefined}
 	>
 		{#if value}
 			{#if type === 'textarea'}
 				<span class="whitespace-pre-wrap">{value}</span>
 			{:else}
-				<span>{value}</span>
+				<span class={truncate ? 'truncate-text' : ''}>{value}</span>
 			{/if}
 		{:else}
 			<span class="text-base-content/50 italic">{placeholder}</span>
@@ -209,5 +213,19 @@
 		min-height: 2rem;
 		display: flex;
 		align-items: center;
+	}
+
+	/* Truncation styles */
+	.inline-edit-truncate {
+		max-width: 100%;
+		overflow: hidden;
+	}
+
+	.truncate-text {
+		display: block;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 100%;
 	}
 </style>

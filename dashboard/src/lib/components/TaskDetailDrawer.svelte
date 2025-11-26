@@ -14,7 +14,7 @@
 
 	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
-	import { formatDate, formatSavedTime } from '$lib/utils/dateFormatters';
+	import { formatDate, formatSavedTime, formatRelativeTimestamp } from '$lib/utils/dateFormatters';
 	import InlineEdit from '$lib/components/InlineEdit.svelte';
 	import InlineSelect from '$lib/components/InlineSelect.svelte';
 
@@ -657,8 +657,8 @@
 							</div>
 							<!-- Metadata (compact, right-aligned) -->
 							<div class="text-xs text-base-content/60 text-right shrink-0">
-								<div><span class="text-base-content/40">Created:</span> {formatDate(task.created_at)}</div>
-								<div><span class="text-base-content/40">Updated:</span> {formatDate(task.updated_at)}</div>
+								<div><span class="text-base-content/40">Created:</span> {formatRelativeTimestamp(task.created_at)}</div>
+								<div><span class="text-base-content/40">Updated:</span> {formatRelativeTimestamp(task.updated_at)}</div>
 								<div class="flex items-center justify-end gap-1">
 									<span class="text-base-content/40">Assignee:</span>
 									<InlineEdit
