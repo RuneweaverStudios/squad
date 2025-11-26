@@ -1,0 +1,86 @@
+#!/bin/sh
+#
+# JAT pre-commit hook
+#
+# 1. Ensures agent is registered (prevents "Claude" orphan commits)
+# 2. Flushes bd (beads) changes to JSONL before commit
+#
+# Install: cp this file to .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+# Or run: jat hooks [path]
+#
+
+# ============================================================
+# AGENT REGISTRATION CHECK
+# ============================================================
+# Ensures commits are attributed to a registered agent, not "Claude"
+
+check_agent_registered() {
+    # Skip if not in a Claude Code session (no PPID-based session file)
+    if [ ! -f "/tmp/claude-session-${PPID}.txt" ]; then
+        return 0
+    fi
+
+    SESSION_ID=$(cat "/tmp/claude-session-${PPID}.txt" 2>/dev/null | tr -d '\n')
+    if [ -z "$SESSION_ID" ]; then
+        return 0
+    fi
+
+    # Check if agent file exists
+    AGENT_FILE=".claude/agent-${SESSION_ID}.txt"
+    if [ ! -f "$AGENT_FILE" ]; then
+        echo "❌ No agent registered for this session!" >&2
+        echo "" >&2
+        echo "Run /jat:start to register before committing." >&2
+        echo "This ensures your work is properly tracked." >&2
+        echo "" >&2
+        echo "To skip this check: git commit --no-verify" >&2
+        return 1
+    fi
+
+    AGENT_NAME=$(cat "$AGENT_FILE" 2>/dev/null | tr -d '\n')
+    if [ -z "$AGENT_NAME" ] || [ "$AGENT_NAME" = "Claude" ]; then
+        echo "❌ Invalid agent registration ('$AGENT_NAME')!" >&2
+        echo "" >&2
+        echo "Run /jat:start to register properly." >&2
+        return 1
+    fi
+
+    return 0
+}
+
+if ! check_agent_registered; then
+    exit 1
+fi
+
+# ============================================================
+# BEADS SYNC
+# ============================================================
+# Flushes pending bd changes to .beads/issues.jsonl
+
+# Check if bd is available
+if ! command -v bd >/dev/null 2>&1; then
+    # bd not installed, skip beads sync
+    exit 0
+fi
+
+# Check if we're in a bd workspace
+if [ ! -d .beads ]; then
+    # Not a bd workspace, nothing to do
+    exit 0
+fi
+
+# Flush pending changes to JSONL
+# Use --flush-only to skip git operations (we're already in a git hook)
+# Suppress output unless there's an error
+if ! bd sync --flush-only >/dev/null 2>&1; then
+    echo "Error: Failed to flush bd changes to JSONL" >&2
+    echo "Run 'bd sync --flush-only' manually to diagnose" >&2
+    exit 1
+fi
+
+# If the JSONL file was modified, stage it
+if [ -f .beads/issues.jsonl ]; then
+    git add .beads/issues.jsonl 2>/dev/null || true
+fi
+
+exit 0

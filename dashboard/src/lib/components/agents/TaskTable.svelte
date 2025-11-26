@@ -5,6 +5,7 @@
 	import LabelBadges from '$lib/components/LabelBadges.svelte';
 	import { analyzeDependencies } from '$lib/utils/dependencyUtils';
 	import { getProjectFromTaskId } from '$lib/utils/projectUtils';
+	import { getProjectColor } from '$lib/utils/projectConfig';
 	import { getPriorityBadge, getTaskStatusBadge, getTypeBadge } from '$lib/utils/badgeHelpers';
 	import { formatRelativeTime, formatFullDate, normalizeTimestamp, getAgeColorClass } from '$lib/utils/dateFormatters';
 	import { toggleSetItem } from '$lib/utils/filterHelpers';
@@ -853,7 +854,10 @@
 										</th>
 										<th class="{taskIsActive ? 'bg-info/10' : ''}">
 											<div class="flex flex-col gap-0.5">
-												<span class="font-mono text-xs text-base-content/70">{task.id}</span>
+												<kbd
+													class="kbd kbd-xs font-mono text-base-content/70"
+													style="border-left: 3px solid {getProjectColor(getProjectFromTaskId(task.id) || '')};"
+												>{task.id}</kbd>
 												{#if task.status === 'in_progress' && task.assignee}
 													<!-- In progress: show assignee with spinning gear -->
 													<span class="flex items-center gap-1">
@@ -915,7 +919,10 @@
 												<div class="flex flex-col gap-0.5">
 													<span class="flex items-center gap-1">
 														<span class="text-base-content/50 font-mono text-xs">{depIndex === task.depends_on.length - 1 ? '└──' : '├──'}</span>
-														<span class="font-mono text-xs text-base-content/60">{dep.id}</span>
+														<kbd
+															class="kbd kbd-xs font-mono text-base-content/60"
+															style="border-left: 3px solid {getProjectColor(getProjectFromTaskId(dep.id) || '')};"
+														>{dep.id}</kbd>
 													</span>
 													<span class="badge badge-xs badge-ghost {getTaskStatusBadge(dep.status)} ml-4">
 														{dep.status?.replace('_', ' ')}

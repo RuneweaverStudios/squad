@@ -64,7 +64,7 @@ read
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}Step 1/5: Installing Agent Mail (bash + SQLite)${NC}"
+echo -e "${BOLD}Step 1/7: Installing Agent Mail (bash + SQLite)${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
@@ -72,7 +72,7 @@ bash "$INSTALL_DIR/scripts/install-agent-mail.sh"
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}Step 2/5: Installing Beads CLI${NC}"
+echo -e "${BOLD}Step 2/7: Installing Beads CLI${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
@@ -160,6 +160,7 @@ if [ ! -z "$SELECTED_STACKS" ] && echo "$SELECTED_STACKS" | grep -q "SvelteKit";
 fi
 echo "  ✓ Multi-line statusline (agent, task, git, context)"
 echo "  ✓ Real-time hooks (auto-refresh on am-*/bd commands)"
+echo "  ✓ Git pre-commit hook (agent registration check)"
 echo "  ✓ Global ~/.claude/CLAUDE.md (multi-project instructions)"
 echo "  ✓ Per-repo setup (bd init, CLAUDE.md templates)"
 echo ""

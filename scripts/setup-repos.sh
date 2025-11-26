@@ -50,6 +50,7 @@ echo ""
 
 REPOS_FOUND=0
 BEADS_INITIALIZED=0
+HOOKS_INSTALLED=0
 IMPORTS_ADDED=0
 SKIPPED=0
 
@@ -97,6 +98,25 @@ for repo_dir in "$CODE_DIR"/*; do
         fi
     else
         echo -e "  ${GREEN}✓${NC} Beads already initialized"
+    fi
+
+    # Install git hooks
+    HOOKS_SOURCE="$HOME/code/jat/scripts/hooks/pre-commit"
+    HOOKS_TARGET="$repo_dir/.git/hooks/pre-commit"
+
+    if [ -f "$HOOKS_SOURCE" ]; then
+        if [ -f "$HOOKS_TARGET" ] && grep -q "AGENT REGISTRATION CHECK" "$HOOKS_TARGET" 2>/dev/null; then
+            echo -e "  ${GREEN}✓${NC} Git hooks already installed"
+        else
+            if [ -f "$HOOKS_TARGET" ]; then
+                cp "$HOOKS_TARGET" "$HOOKS_TARGET.backup"
+                echo -e "  ${YELLOW}⚠${NC} Backed up existing pre-commit hook"
+            fi
+            cp "$HOOKS_SOURCE" "$HOOKS_TARGET"
+            chmod +x "$HOOKS_TARGET"
+            echo -e "  ${GREEN}✓ Installed git hooks${NC}"
+            ((HOOKS_INSTALLED++))
+        fi
     fi
 
     # Handle CLAUDE.md
@@ -171,6 +191,7 @@ echo -e "${GREEN}=========================================${NC}"
 echo ""
 echo "  Total repos found: $REPOS_FOUND"
 echo "  Beads initialized: $BEADS_INITIALIZED"
+echo "  Git hooks installed: $HOOKS_INSTALLED"
 echo "  jat imports added: $IMPORTS_ADDED"
 echo "  Skipped (not git repos): $SKIPPED"
 echo ""

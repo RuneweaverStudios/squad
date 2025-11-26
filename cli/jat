@@ -653,6 +653,7 @@ COMMANDS:
     jat edit                   Edit config file
     jat colors                 Recolor all Hyprland windows
     jat cleanup [--dry-run]    Delete stale agent session files
+    jat hooks [path]           Install git hooks to repo (default: current dir)
 
 OPTIONS:
     N               Number of Claude Code sessions to launch (1-10)
@@ -934,6 +935,63 @@ cleanup_agents() {
 }
 
 #------------------------------------------------------------------------------
+# Install Git Hooks
+#------------------------------------------------------------------------------
+
+install_hooks() {
+    local target="${1:-.}"
+
+    # Resolve to absolute path
+    target="$(cd "$target" 2>/dev/null && pwd)" || {
+        echo -e "${RED}Error: Cannot access directory: $1${NC}" >&2
+        return 1
+    }
+
+    # Check if target is a git repo
+    if [[ ! -d "$target/.git" ]]; then
+        echo -e "${RED}Error: Not a git repository: $target${NC}" >&2
+        return 1
+    fi
+
+    local hooks_source="$HOME/code/jat/scripts/hooks"
+    local hooks_target="$target/.git/hooks"
+
+    if [[ ! -d "$hooks_source" ]]; then
+        echo -e "${RED}Error: JAT hooks not found at $hooks_source${NC}" >&2
+        return 1
+    fi
+
+    echo ""
+    echo -e "${BOLD}Installing JAT git hooks to: $target${NC}"
+    echo ""
+
+    # Install pre-commit hook
+    if [[ -f "$hooks_target/pre-commit" ]]; then
+        # Check if it's already our hook
+        if grep -q "AGENT REGISTRATION CHECK" "$hooks_target/pre-commit" 2>/dev/null; then
+            echo -e "  ${GREEN}✓${NC} pre-commit hook already installed (updating)"
+        else
+            echo -e "  ${YELLOW}⚠${NC} Existing pre-commit hook found, backing up to pre-commit.backup"
+            cp "$hooks_target/pre-commit" "$hooks_target/pre-commit.backup"
+        fi
+    fi
+
+    cp "$hooks_source/pre-commit" "$hooks_target/pre-commit"
+    chmod +x "$hooks_target/pre-commit"
+    echo -e "  ${GREEN}✓${NC} Installed pre-commit hook"
+
+    echo ""
+    echo -e "${GREEN}✓ JAT hooks installed!${NC}"
+    echo ""
+    echo "The pre-commit hook will:"
+    echo "  • Block commits if no agent is registered (run /jat:start first)"
+    echo "  • Auto-sync beads changes before commit"
+    echo ""
+    echo "To bypass: git commit --no-verify"
+    echo ""
+}
+
+#------------------------------------------------------------------------------
 # Main
 #------------------------------------------------------------------------------
 
@@ -969,6 +1027,9 @@ main() {
             ;;
         cleanup)
             cleanup_agents "$@"
+            ;;
+        hooks)
+            install_hooks "$@"
             ;;
         *)
             # Assume it's a project name
