@@ -23,7 +23,6 @@
 	let error = $state<string | null>(null);
 	let selectedTaskId = $state<string | null>(null);
 	let drawerOpen = $state(false);
-	let drawerMode = $state<'view' | 'edit'>('view');
 
 	// Filters
 	let selectedPriority = $state('all');
@@ -75,7 +74,6 @@
 	// Handle node click in timeline
 	function handleNodeClick(taskId: string) {
 		selectedTaskId = taskId;
-		drawerMode = 'view';
 		drawerOpen = true;
 	}
 
@@ -181,5 +179,5 @@
 	{/if}
 
 	<!-- Task Detail Modal -->
-	<TaskDetailDrawer bind:taskId={selectedTaskId} bind:mode={drawerMode} bind:isOpen={drawerOpen} />
+	<TaskDetailDrawer bind:taskId={selectedTaskId} bind:isOpen={drawerOpen} />
 </div>

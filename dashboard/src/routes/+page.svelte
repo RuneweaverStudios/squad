@@ -11,7 +11,6 @@
 	let allTasks = $state<any[]>([]);
 	let selectedTaskId = $state<string | null>(null);
 	let drawerOpen = $state(false);
-	let drawerMode = $state<'view' | 'edit'>('view');
 
 	// Read project from URL parameter
 	const projectParam = $derived($page.url.searchParams.get('project'));
@@ -101,5 +100,5 @@
 	/>
 
 	<!-- Task Detail Modal -->
-	<TaskDetailDrawer bind:taskId={selectedTaskId} bind:mode={drawerMode} bind:isOpen={drawerOpen} />
+	<TaskDetailDrawer bind:taskId={selectedTaskId} bind:isOpen={drawerOpen} />
 </div>

@@ -23,7 +23,6 @@
 
 	// Drawer state (replacing modal)
 	let selectedTaskId = $state(null);
-	let drawerMode = $state('view');
 	let drawerOpen = $state(false);
 
 	// Priority badge classes - using DaisyUI semantic colors
@@ -83,7 +82,6 @@
 	// Handle task click - open drawer (drawer fetches data itself)
 	function handleTaskClick(taskId) {
 		selectedTaskId = taskId;
-		drawerMode = 'view';
 		drawerOpen = true;
 	}
 
@@ -180,6 +178,6 @@
 		</div>
 	{/if}
 
-	<TaskDetailDrawer bind:taskId={selectedTaskId} bind:mode={drawerMode} bind:isOpen={drawerOpen} />
+	<TaskDetailDrawer bind:taskId={selectedTaskId} bind:isOpen={drawerOpen} />
 </div>
 

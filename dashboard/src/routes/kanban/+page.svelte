@@ -23,7 +23,6 @@
 	let error = $state<string | null>(null);
 	let selectedTaskId = $state<string | null>(null);
 	let drawerOpen = $state(false);
-	let drawerMode = $state<'view' | 'edit'>('view');
 
 	// Filters
 	let selectedPriorities = $state(new Set(['0', '1', '2', '3'])); // All priorities by default
@@ -97,7 +96,6 @@
 	// Handle card click in kanban board
 	function handleTaskClick(taskId: string) {
 		selectedTaskId = taskId;
-		drawerMode = 'view';
 		drawerOpen = true;
 	}
 
@@ -189,5 +187,5 @@
 	{/if}
 
 	<!-- Task Detail Modal -->
-	<TaskDetailDrawer bind:taskId={selectedTaskId} bind:mode={drawerMode} bind:isOpen={drawerOpen} />
+	<TaskDetailDrawer bind:taskId={selectedTaskId} bind:isOpen={drawerOpen} />
 </div>

@@ -1,26 +1,25 @@
 <script lang="ts">
 	/**
 	 * TaskDetailDrawer Component
-	 * DaisyUI drawer for viewing/editing task details
+	 * DaisyUI drawer for viewing task details with inline editing
 	 *
 	 * Features:
 	 * - Side panel drawer (doesn't block view)
-	 * - Dual mode: view and edit
-	 * - Auto-save edit mode (debounced 500ms)
+	 * - All fields editable inline (click to edit)
+	 * - Auto-save on field changes (debounced 500ms)
 	 * - Fetches task data on mount
-	 * - Mode toggle button
 	 * - Optimistic updates with rollback
-	 * - Keyboard shortcuts (Esc, E, M, Cmd/Ctrl+Enter, A, ?)
+	 * - Keyboard shortcuts (Esc, M, ?)
 	 */
 
-	import { tick, onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
 	import { formatDate } from '$lib/utils/dateFormatters';
 	import InlineEdit from '$lib/components/InlineEdit.svelte';
 	import InlineSelect from '$lib/components/InlineSelect.svelte';
 
 	// Props
-	let { taskId = $bindable(null), mode = $bindable('view'), isOpen = $bindable(false) } = $props();
+	let { taskId = $bindable(null), isOpen = $bindable(false) } = $props();
 
 	// Task data state
 	let task = $state(null);
@@ -53,17 +52,6 @@
 	let historyLoading = $state(false);
 	let historyError = $state<string | null>(null);
 
-	// Edit mode state
-	let formData = $state({
-		title: '',
-		description: '',
-		priority: 1,
-		type: 'task',
-		status: 'open',
-		project: '',
-		labels: '',
-		assignee: ''
-	});
 
 	// Auto-save state
 	let isSaving = $state(false);
@@ -73,7 +61,6 @@
 	let isUpdatingFromServer = $state(false); // Flag to prevent effect loops during server updates
 
 	// UI state
-	let validationErrors = $state({});
 	let toastMessage = $state<{ type: 'success' | 'error'; text: string } | null>(null);
 	let showHelp = $state(false);
 	let copiedTaskId = $state(false);
@@ -146,21 +133,7 @@
 			}
 			const data = await response.json();
 			task = data.task;
-
-			// Populate form data for edit mode WITH DEFAULTS
-			formData = {
-				title: task.title || '',
-				description: task.description || '',
-				priority: task.priority ?? 1,
-				type: task.type || 'task',
-				status: task.status || 'open',
-				project: task.project || '',
-				labels: task.labels ? task.labels.join(', ') : '',
-				assignee: task.assignee || ''
-			};
-
-			// Store original with SAME DEFAULTS as formData to prevent false change detection
-			originalTask = { ...formData };
+			originalTask = { ...data.task };
 
 			// Fetch task history in parallel
 			fetchTaskHistory(id);
@@ -226,38 +199,30 @@
 
 	// Debounced auto-save function
 	async function autoSave(field: string, value: any) {
-		console.log(`[AutoSave] Called for field="${field}", value=`, value);
-		console.log(`[AutoSave] Current state: isSaving=${isSaving}, isUpdatingFromServer=${isUpdatingFromServer}, mode=${mode}`);
-		console.log(`[AutoSave] formData.${field}=`, formData[field], `originalTask.${field}=`, originalTask?.[field]);
-
 		// Clear any pending save
 		if (saveTimeout) {
-			console.log('[AutoSave] Clearing previous timeout');
 			clearTimeout(saveTimeout);
 		}
 
 		// Debounce for 500ms
 		saveTimeout = setTimeout(async () => {
-			console.log(`[AutoSave] Executing save for field="${field}" after debounce`);
 			isSaving = true;
-			isUpdatingFromServer = true; // Prevent effects from triggering
+			isUpdatingFromServer = true;
 			saveError = null;
 
 			// Create backup of current task for rollback
-			const taskBackup = { ...task };
+			const taskBackup = task ? { ...task } : null;
 
 			try {
 				// Optimistic update - update UI immediately
 				if (task) {
-					console.log(`[AutoSave] Optimistic update: task.${field} = ${value}`);
 					task = { ...task, [field]: value };
 				}
 
 				// Prepare PATCH request body (only the changed field)
-				const updateData: any = {};
+				const updateData: Record<string, any> = {};
 				updateData[field] = value;
 
-				console.log('[AutoSave] Making PATCH request:', updateData);
 				// Make PATCH request
 				const response = await fetch(`/api/tasks/${taskId}`, {
 					method: 'PATCH',
@@ -272,75 +237,33 @@
 
 				const data = await response.json();
 
-				console.log('[AutoSave] Server response received, updating task');
 				// Update task with server response
 				task = data.task;
 
-				// Update formData to match saved values (prevents further auto-saves)
-				formData = {
-					title: task.title || '',
-					description: task.description || '',
-					priority: task.priority ?? 1,
-					type: task.type || 'task',
-					status: task.status || 'open',
-					project: task.project || '',
-					labels: task.labels ? task.labels.join(', ') : '',
-					assignee: task.assignee || ''
-				};
-
-				// Update originalTask to match saved state (breaks the loop)
-				originalTask = { ...formData };
+				// Update originalTask to match saved state
+				originalTask = { ...task };
 
 				lastSaved = new Date();
 
 				// Show success toast
 				showToast('success', '✓ Saved');
-				console.log('[AutoSave] Save completed successfully');
 
 			} catch (error: any) {
-				console.error('[AutoSave] Error:', error);
-
 				// Rollback on error
-				task = taskBackup;
+				if (taskBackup) {
+					task = taskBackup;
+				}
 				saveError = error.message;
 
 				// Show error toast
 				showToast('error', `✗ ${error.message}`);
 			} finally {
-				console.log('[AutoSave] Cleanup: setting isSaving=false, isUpdatingFromServer=false');
 				isSaving = false;
 				isUpdatingFromServer = false;
 			}
 		}, 500);
 	}
 
-	// Toggle between view and edit modes
-	function toggleMode() {
-		// Clear any pending save when toggling modes
-		if (saveTimeout) {
-			clearTimeout(saveTimeout);
-			saveTimeout = null;
-		}
-
-		if (mode === 'view') {
-			mode = 'edit';
-		} else {
-			mode = 'view';
-			// Reset form data to task data when switching back to view
-			if (task) {
-				formData = {
-					title: task.title || '',
-					description: task.description || '',
-					priority: task.priority ?? 1,
-					type: task.type || 'task',
-					status: task.status || 'open',
-					project: task.project || '',
-					labels: task.labels ? task.labels.join(', ') : '',
-					assignee: task.assignee || ''
-				};
-			}
-		}
-	}
 
 	// Delete task with confirmation
 	async function handleDelete() {
@@ -384,75 +307,6 @@
 		}
 	}
 
-	// Auto-save watchers for each field (only in edit mode)
-	// Only trigger when formData actually changes from user interaction
-	// IMPORTANT: Don't compare against task.field because autoSave updates task,
-	// which would trigger this effect again, creating an infinite loop
-	$effect(() => {
-		console.log(`[Effect:title] Triggered. mode=${mode}, originalTask exists=${!!originalTask}, isUpdatingFromServer=${isUpdatingFromServer}, isSaving=${isSaving}`);
-		if (mode === 'edit' && originalTask && !isUpdatingFromServer) {
-			const changed = formData.title !== originalTask.title;
-			console.log(`[Effect:title] changed=${changed}, formData.title="${formData.title}", originalTask.title="${originalTask.title}"`);
-			if (changed && !isSaving) {
-				console.log('[Effect:title] Triggering auto-save');
-				autoSave('title', formData.title);
-			}
-		}
-	});
-
-	$effect(() => {
-		if (mode === 'edit' && originalTask && !isUpdatingFromServer) {
-			const changed = formData.description !== originalTask.description;
-			if (changed && !isSaving) {
-				autoSave('description', formData.description);
-			}
-		}
-	});
-
-	$effect(() => {
-		if (mode === 'edit' && originalTask && !isUpdatingFromServer) {
-			const changed = formData.priority !== originalTask.priority;
-			if (changed && !isSaving) {
-				autoSave('priority', formData.priority);
-			}
-		}
-	});
-
-	$effect(() => {
-		if (mode === 'edit' && originalTask && !isUpdatingFromServer) {
-			const changed = formData.type !== originalTask.type;
-			if (changed && !isSaving) {
-				autoSave('type', formData.type);
-			}
-		}
-	});
-
-	$effect(() => {
-		if (mode === 'edit' && originalTask && !isUpdatingFromServer) {
-			const changed = formData.status !== originalTask.status;
-			if (changed && !isSaving) {
-				autoSave('status', formData.status);
-			}
-		}
-	});
-
-	$effect(() => {
-		if (mode === 'edit' && originalTask && !isUpdatingFromServer) {
-			const changed = formData.project !== originalTask.project;
-			if (changed && !isSaving) {
-				autoSave('project', formData.project);
-			}
-		}
-	});
-
-	$effect(() => {
-		if (mode === 'edit' && originalTask && !isUpdatingFromServer) {
-			const changed = formData.assignee !== originalTask.assignee;
-			if (changed && !isSaving) {
-				autoSave('assignee', formData.assignee);
-			}
-		}
-	});
 
 	// Keyboard shortcut handler
 	function handleKeyDown(event: KeyboardEvent) {
@@ -480,38 +334,11 @@
 			return;
 		}
 
-		// E: Toggle edit mode
-		if (event.key === 'e' || event.key === 'E') {
-			if (!loading && !error && task) {
-				event.preventDefault();
-				toggleMode();
-			}
-			return;
-		}
-
 		// M: Mark complete (close task)
 		if (event.key === 'm' || event.key === 'M') {
-			if (!loading && !error && task && mode === 'view') {
+			if (!loading && !error && task) {
 				event.preventDefault();
 				markComplete();
-			}
-			return;
-		}
-
-		// A: Assign to me
-		if (event.key === 'a' || event.key === 'A') {
-			if (!loading && !error && task && mode === 'edit') {
-				event.preventDefault();
-				assignToMe();
-			}
-			return;
-		}
-
-		// Cmd/Ctrl+Enter: Save in edit mode
-		if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-			if (mode === 'edit' && !isSaving) {
-				event.preventDefault();
-				toggleMode(); // This will save and switch to view mode
 			}
 			return;
 		}
@@ -550,20 +377,6 @@
 		}
 	}
 
-	// Assign task to current user
-	function assignToMe() {
-		if (!task) return;
-
-		// Get current username from environment (placeholder for now)
-		// In production, this would come from auth context
-		const currentUser = 'me'; // TODO: Get from auth context
-
-		formData.assignee = currentUser;
-
-		// Auto-save will handle the update
-		autoSave('assignee', currentUser);
-	}
-
 	// Handle drawer close
 	function handleClose() {
 		// Clear any pending save
@@ -574,8 +387,6 @@
 
 		if (!isSaving) {
 			isOpen = false;
-			// Reset to view mode on close
-			mode = 'view';
 			task = null;
 			originalTask = null;
 			error = null;
@@ -619,10 +430,8 @@
 			<div class="flex items-center justify-between p-6 border-b border-base-300">
 				<div class="flex-1">
 					<div class="flex items-center gap-3">
-						<h2 class="text-2xl font-bold text-base-content">
-							{mode === 'view' ? 'Task Details' : 'Edit Task'}
-						</h2>
-						{#if task && mode === 'view'}
+						<h2 class="text-2xl font-bold text-base-content">Task Details</h2>
+						{#if task}
 							<button
 								class="badge badge-lg badge-outline gap-1 cursor-pointer hover:badge-primary transition-colors"
 								onclick={copyTaskIdToClipboard}
@@ -642,9 +451,7 @@
 						{/if}
 					</div>
 					<p class="text-sm text-base-content/70 mt-1">
-						{#if mode === 'view'}
-							Viewing task details
-						{:else if isSaving}
+						{#if isSaving}
 							<span class="loading loading-spinner loading-xs"></span>
 							Saving...
 						{:else if lastSaved}
@@ -652,67 +459,19 @@
 								? 'just now'
 								: 'at ' + lastSaved.toLocaleTimeString()}
 						{:else}
-							Changes save automatically
+							Click any field to edit
 						{/if}
 					</p>
 				</div>
 				<div class="flex items-center gap-2">
-					<!-- Mode toggle button -->
+					<!-- Delete button -->
 					{#if !loading && !error && task}
-						<div class="tooltip tooltip-bottom" data-tip="{mode === 'view' ? 'Edit (E)' : 'View (E)'}">
-							<button
-								class="btn btn-sm btn-circle {mode === 'edit' ? 'btn-ghost' : 'btn-primary'}"
-								onclick={toggleMode}
-								disabled={isSaving}
-								aria-label="{mode === 'view' ? 'Edit task (E)' : 'View task (E)'}"
-							>
-								{#if mode === 'view'}
-									<svg
-										xmlns="http://www.w3.org/2000/svg"
-										class="h-4 w-4"
-										fill="none"
-										viewBox="0 0 24 24"
-										stroke="currentColor"
-									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-										/>
-									</svg>
-								{:else}
-									<svg
-										xmlns="http://www.w3.org/2000/svg"
-										class="h-4 w-4"
-										fill="none"
-										viewBox="0 0 24 24"
-										stroke="currentColor"
-									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-										/>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-										/>
-									</svg>
-								{/if}
-							</button>
-						</div>
-
-						<!-- Delete button -->
-						<div class="tooltip tooltip-bottom" data-tip="Delete task (Del)">
+						<div class="tooltip tooltip-bottom" data-tip="Delete task">
 							<button
 								class="btn btn-sm btn-circle btn-ghost text-error hover:btn-error"
 								onclick={handleDelete}
 								disabled={isSaving}
-								aria-label="Delete task (Del)"
+								aria-label="Delete task"
 							>
 								<svg
 									xmlns="http://www.w3.org/2000/svg"
@@ -798,7 +557,7 @@
 							Retry
 						</button>
 					</div>
-				{:else if task && mode === 'view'}
+				{:else if task}
 					<!-- View Mode -->
 					<div class="flex flex-col gap-6 h-full">
 						<!-- Title (Inline Editable) -->
@@ -1175,153 +934,6 @@
 							{/if}
 						</div>
 					</div>
-				{:else if mode === 'edit'}
-					<!-- Edit Mode - Auto-save (no form submission needed) -->
-					<div class="space-y-6">
-						<!-- Title (Required) -->
-						<div class="form-control">
-							<label class="label" for="edit-task-title">
-								<span class="label-text font-semibold">
-									Title
-									<span class="text-error">*</span>
-								</span>
-							</label>
-							<input
-								id="edit-task-title"
-								type="text"
-								placeholder="Enter task title..."
-								class="input input-bordered w-full {validationErrors.title ? 'input-error' : ''}"
-								bind:value={formData.title}
-								disabled={isSaving}
-							/>
-							{#if validationErrors.title}
-								<label class="label">
-									<span class="label-text-alt text-error">{validationErrors.title}</span>
-								</label>
-							{/if}
-						</div>
-
-						<!-- Description -->
-						<div class="form-control">
-							<label class="label" for="edit-task-description">
-								<span class="label-text font-semibold">Description</span>
-							</label>
-							<textarea
-								id="edit-task-description"
-								placeholder="Enter task description..."
-								class="textarea textarea-bordered w-full h-32"
-								bind:value={formData.description}
-								disabled={isSaving}
-							></textarea>
-						</div>
-
-						<!-- Status, Priority, Type Row -->
-						<div class="grid grid-cols-3 gap-4">
-							<!-- Status -->
-							<div class="form-control">
-								<label class="label" for="edit-task-status">
-									<span class="label-text font-semibold">Status</span>
-								</label>
-								<select
-									id="edit-task-status"
-									class="select select-bordered w-full"
-									bind:value={formData.status}
-									disabled={isSaving}
-								>
-									{#each statusOptions as option}
-										<option value={option.value}>{option.label}</option>
-									{/each}
-								</select>
-							</div>
-
-							<!-- Priority -->
-							<div class="form-control">
-								<label class="label" for="edit-task-priority">
-									<span class="label-text font-semibold">Priority</span>
-								</label>
-								<select
-									id="edit-task-priority"
-									class="select select-bordered w-full"
-									bind:value={formData.priority}
-									disabled={isSaving}
-								>
-									{#each priorityOptions as option}
-										<option value={option.value}>{option.label}</option>
-									{/each}
-								</select>
-							</div>
-
-							<!-- Type -->
-							<div class="form-control">
-								<label class="label" for="edit-task-type">
-									<span class="label-text font-semibold">Type</span>
-								</label>
-								<select
-									id="edit-task-type"
-									class="select select-bordered w-full"
-									bind:value={formData.type}
-									disabled={isSaving}
-								>
-									{#each typeOptions as option}
-										<option value={option.value}>{option.label}</option>
-									{/each}
-								</select>
-							</div>
-						</div>
-
-						<!-- Project -->
-						<div class="form-control">
-							<label class="label" for="edit-task-project">
-								<span class="label-text font-semibold">Project</span>
-							</label>
-							<select
-								id="edit-task-project"
-								class="select select-bordered w-full"
-								bind:value={formData.project}
-								disabled={isSaving}
-							>
-								<option value="">No project</option>
-								{#each projectOptions as project}
-									<option value={project}>{project}</option>
-								{/each}
-							</select>
-						</div>
-
-						<!-- Labels -->
-						<div class="form-control">
-							<label class="label" for="edit-task-labels">
-								<span class="label-text font-semibold">Labels</span>
-							</label>
-							<input
-								id="edit-task-labels"
-								type="text"
-								placeholder="e.g., frontend, urgent, bug-fix"
-								class="input input-bordered w-full"
-								bind:value={formData.labels}
-								disabled={isSaving}
-							/>
-							<label class="label">
-								<span class="label-text-alt text-base-content/60">
-									Comma-separated list of labels
-								</span>
-							</label>
-						</div>
-
-						<!-- Assignee -->
-						<div class="form-control">
-							<label class="label" for="edit-task-assignee">
-								<span class="label-text font-semibold">Assignee</span>
-							</label>
-							<input
-								id="edit-task-assignee"
-								type="text"
-								placeholder="Enter assignee name..."
-								class="input input-bordered w-full"
-								bind:value={formData.assignee}
-								disabled={isSaving}
-							/>
-						</div>
-					</div>
 				{/if}
 
 				<!-- Keyboard Shortcuts Help Panel -->
@@ -1347,7 +959,6 @@
 						<div class="space-y-2 text-sm">
 							<!-- General -->
 							<div>
-								<div class="text-xs font-semibold text-base-content/70 mb-1">General</div>
 								<div class="flex justify-between items-center py-1">
 									<span>Close drawer</span>
 									<kbd class="kbd kbd-sm">Esc</kbd>
@@ -1356,47 +967,11 @@
 									<span>Show/hide shortcuts</span>
 									<kbd class="kbd kbd-sm">?</kbd>
 								</div>
+								<div class="flex justify-between items-center py-1">
+									<span>Mark task complete</span>
+									<kbd class="kbd kbd-sm">M</kbd>
+								</div>
 							</div>
-
-							<!-- View Mode -->
-							{#if mode === 'view'}
-								<div class="divider my-2"></div>
-								<div>
-									<div class="text-xs font-semibold text-base-content/70 mb-1">View Mode</div>
-									<div class="flex justify-between items-center py-1">
-										<span>Enter edit mode</span>
-										<kbd class="kbd kbd-sm">E</kbd>
-									</div>
-									<div class="flex justify-between items-center py-1">
-										<span>Mark task complete</span>
-										<kbd class="kbd kbd-sm">M</kbd>
-									</div>
-								</div>
-							{/if}
-
-							<!-- Edit Mode -->
-							{#if mode === 'edit'}
-								<div class="divider my-2"></div>
-								<div>
-									<div class="text-xs font-semibold text-base-content/70 mb-1">Edit Mode</div>
-									<div class="flex justify-between items-center py-1">
-										<span>Return to view mode</span>
-										<kbd class="kbd kbd-sm">E</kbd>
-									</div>
-									<div class="flex justify-between items-center py-1">
-										<span>Save and exit edit mode</span>
-										<span class="flex gap-1">
-											<kbd class="kbd kbd-sm">Cmd</kbd>
-											<span>+</span>
-											<kbd class="kbd kbd-sm">Enter</kbd>
-										</span>
-									</div>
-									<div class="flex justify-between items-center py-1">
-										<span>Assign to me</span>
-										<kbd class="kbd kbd-sm">A</kbd>
-									</div>
-								</div>
-							{/if}
 
 							<!-- Tip -->
 							<div class="divider my-2"></div>
@@ -1414,7 +989,7 @@
 										d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
 									></path>
 								</svg>
-								<span>Shortcuts don't work while typing in form fields</span>
+								<span>Click any field to edit inline</span>
 							</div>
 						</div>
 					</div>
@@ -1424,35 +999,10 @@
 			<!-- Footer Actions -->
 			{#if !loading && !error && task}
 				<div class="p-6 border-t border-base-300 bg-base-200">
-					<div class="flex justify-end gap-3">
+					<div class="flex justify-end">
 						<button type="button" class="btn btn-ghost" onclick={handleClose}>
 							Close
 						</button>
-						{#if mode === 'edit'}
-							<button type="button" class="btn btn-primary" onclick={toggleMode} disabled={isSaving}>
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									class="h-4 w-4"
-									fill="none"
-									viewBox="0 0 24 24"
-									stroke="currentColor"
-								>
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="2"
-										d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-									/>
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="2"
-										d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-									/>
-								</svg>
-								View Mode
-							</button>
-						{/if}
 					</div>
 				</div>
 			{/if}

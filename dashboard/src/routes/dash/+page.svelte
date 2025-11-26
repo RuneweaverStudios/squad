@@ -16,7 +16,6 @@
 	// Drawer state for TaskDetailDrawer
 	let drawerOpen = $state(false);
 	let selectedTaskId = $state<string | null>(null);
-	let drawerMode = $state('view');
 
 	// Sync selectedProject from URL params (REACTIVE using $page store)
 	$effect(() => {
@@ -116,7 +115,6 @@
 	// Handle task click from TaskQueue - open drawer
 	function handleTaskClick(taskId: string) {
 		selectedTaskId = taskId;
-		drawerMode = 'view';
 		drawerOpen = true;
 	}
 
@@ -186,7 +184,6 @@
 	<!-- Task Detail Drawer -->
 	<TaskDetailDrawer
 		bind:taskId={selectedTaskId}
-		bind:mode={drawerMode}
 		bind:isOpen={drawerOpen}
 	/>
 </div>
