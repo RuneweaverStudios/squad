@@ -848,7 +848,7 @@
 					height={40}
 					showTooltip={true}
 					showLegend={false}
-					showStyleToolbar={false}
+					showStyleToolbar={true}
 				/>
 				<!-- Compact project legend below sparkline -->
 				{#if activeProjects.length > 0}
@@ -874,7 +874,7 @@
 					height={40}
 					showTooltip={true}
 					colorMode="usage"
-					showStyleToolbar={false}
+					showStyleToolbar={true}
 				/>
 			{/if}
 		</div>
