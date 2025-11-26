@@ -734,18 +734,31 @@ cleanup_agents() {
                 keep_reason="active session"
             fi
 
-            # Check 2: Does the agent have assigned tasks in Beads?
-            if [[ "$keep" == "false" ]] && command -v bd &>/dev/null; then
-                local assigned_tasks
-                assigned_tasks=$(bd list --json 2>/dev/null | jq -r --arg agent "$agent_name" \
-                    '[.[] | select(.assignee == $agent and (.status == "open" or .status == "in_progress"))] | length' 2>/dev/null)
-                if [[ "$assigned_tasks" -gt 0 ]]; then
-                    keep=true
-                    keep_reason="has $assigned_tasks assigned task(s)"
+            # Check 2: Does the agent have ANY messages ever? (message history)
+            if [[ "$keep" == "false" ]] && [[ -f "$db_path" ]]; then
+                local agent_id_lookup message_count
+                agent_id_lookup=$(sqlite3 "$db_path" "SELECT id FROM agents WHERE name = '$agent_name'" 2>/dev/null)
+                if [[ -n "$agent_id_lookup" ]]; then
+                    message_count=$(sqlite3 "$db_path" "SELECT COUNT(*) FROM message_recipients WHERE agent_id = $agent_id_lookup" 2>/dev/null || echo "0")
+                    if [[ "$message_count" -gt 0 ]]; then
+                        keep=true
+                        keep_reason="has message history ($message_count messages)"
+                    fi
                 fi
             fi
 
-            # Check 3: Does the agent have file reservations?
+            # Check 3: Does the agent have ANY tasks ever assigned in Beads? (task history)
+            if [[ "$keep" == "false" ]] && command -v bd &>/dev/null; then
+                local task_history
+                task_history=$(bd list --json 2>/dev/null | jq -r --arg agent "$agent_name" \
+                    '[.[] | select(.assignee == $agent)] | length' 2>/dev/null || echo "0")
+                if [[ "$task_history" -gt 0 ]]; then
+                    keep=true
+                    keep_reason="has task history ($task_history tasks)"
+                fi
+            fi
+
+            # Check 4: Does the agent have file reservations?
             if [[ "$keep" == "false" ]] && command -v am-reservations &>/dev/null; then
                 local reservation_count
                 reservation_count=$(am-reservations --agent "$agent_name" --json 2>/dev/null | jq 'length' 2>/dev/null || echo "0")
@@ -759,13 +772,13 @@ cleanup_agents() {
                 project_kept=$((project_kept + 1))
                 total_session_kept=$((total_session_kept + 1))
                 if $dry_run; then
-                    echo -e "  ${DIM}[keep]${NC} $agent_name ($keep_reason)"
+                    echo -e "  ${GREEN}[preserved]${NC} $agent_name - $keep_reason"
                 fi
             else
                 project_deleted=$((project_deleted + 1))
                 total_session_deleted=$((total_session_deleted + 1))
                 if $dry_run; then
-                    echo -e "  ${YELLOW}[delete]${NC} $agent_name (stale session)"
+                    echo -e "  ${YELLOW}[orphan]${NC} $agent_name - stale session file"
                 else
                     rm -f "$agent_file"
                     echo -e "  ${RED}deleted${NC} $agent_name"
@@ -843,18 +856,34 @@ cleanup_agents() {
                 local keep=false
                 local keep_reason=""
 
-                # Check 1: Does the agent have assigned tasks in Beads?
-                if [[ -n "$beads_tasks" ]] && [[ "$beads_tasks" != "[]" ]]; then
-                    local assigned_tasks
-                    assigned_tasks=$(echo "$beads_tasks" | jq -r --arg agent "$agent_name" \
-                        '[.[] | select(.assignee == $agent and (.status == "open" or .status == "in_progress"))] | length' 2>/dev/null || echo "0")
-                    if [[ "$assigned_tasks" -gt 0 ]]; then
+                # Check 1: Does the agent have a session file anywhere? (active session)
+                if [[ -n "$session_agents" ]] && echo "$session_agents" | grep -qF "$agent_name"; then
+                    keep=true
+                    keep_reason="active session"
+                fi
+
+                # Check 2: Does the agent have ANY messages ever? (message history)
+                if [[ "$keep" == "false" ]]; then
+                    local message_count
+                    message_count=$(sqlite3 "$db_path" "SELECT COUNT(*) FROM message_recipients WHERE agent_id = $agent_id" 2>/dev/null || echo "0")
+                    if [[ "$message_count" -gt 0 ]]; then
                         keep=true
-                        keep_reason="has $assigned_tasks assigned task(s)"
+                        keep_reason="has message history ($message_count messages)"
                     fi
                 fi
 
-                # Check 2: Does the agent have active file reservations?
+                # Check 3: Does the agent have ANY tasks ever assigned in Beads? (task history)
+                if [[ "$keep" == "false" ]] && [[ -n "$beads_tasks" ]] && [[ "$beads_tasks" != "[]" ]]; then
+                    local task_history
+                    task_history=$(echo "$beads_tasks" | jq -r --arg agent "$agent_name" \
+                        '[.[] | select(.assignee == $agent)] | length' 2>/dev/null || echo "0")
+                    if [[ "$task_history" -gt 0 ]]; then
+                        keep=true
+                        keep_reason="has task history ($task_history tasks)"
+                    fi
+                fi
+
+                # Check 4: Does the agent have active file reservations?
                 if [[ "$keep" == "false" ]]; then
                     local active_reservations
                     active_reservations=$(sqlite3 "$db_path" "SELECT COUNT(*) FROM file_reservations WHERE agent_id = $agent_id AND released_ts IS NULL AND expires_ts > datetime('now')" 2>/dev/null || echo "0")
@@ -864,23 +893,15 @@ cleanup_agents() {
                     fi
                 fi
 
-                # Check 3: Does the agent have a session file anywhere?
-                if [[ "$keep" == "false" ]]; then
-                    if [[ -n "$session_agents" ]] && echo "$session_agents" | grep -qF "$agent_name"; then
-                        keep=true
-                        keep_reason="has active session file"
-                    fi
-                fi
-
                 if [[ "$keep" == "true" ]]; then
                     total_db_kept=$((total_db_kept + 1))
                     if $dry_run; then
-                        echo -e "  ${DIM}[keep]${NC} $agent_name ($keep_reason)"
+                        echo -e "  ${GREEN}[preserved]${NC} $agent_name - $keep_reason"
                     fi
                 else
                     total_db_deleted=$((total_db_deleted + 1))
                     if $dry_run; then
-                        echo -e "  ${YELLOW}[delete]${NC} $agent_name (stale, no activity)"
+                        echo -e "  ${YELLOW}[orphan]${NC} $agent_name - no session, no messages, no tasks"
                     else
                         # Delete agent and related records from Agent Mail database
                         sqlite3 "$db_path" "DELETE FROM message_recipients WHERE agent_id = $agent_id" 2>/dev/null
