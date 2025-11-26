@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 	import { dndzone } from 'svelte-dnd-action';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
@@ -7,17 +7,33 @@
 	import { analyzeDependencies } from '$lib/utils/dependencyUtils';
 	import { getPriorityBadge } from '$lib/utils/badgeHelpers';
 	import { toggleSetItem } from '$lib/utils/filterHelpers';
+	import type { Task, Agent, Reservation } from '$lib/stores/agents.svelte';
 
-	let { tasks = [], agents = [], reservations = [], selectedProject = 'All Projects', ontaskclick } = $props();
+	// Types
+	interface FilterOption {
+		value: string;
+		label: string;
+		count: number;
+	}
+
+	interface Props {
+		tasks?: Task[];
+		agents?: Agent[];
+		reservations?: Reservation[];
+		selectedProject?: string;
+		ontaskclick?: (taskId: string) => void;
+	}
+
+	let { tasks = [], agents = [], reservations = [], selectedProject = 'All Projects', ontaskclick }: Props = $props();
 
 	// Initialize filters from URL params (default to open tasks)
-	let searchQuery = $state('');
-	let selectedPriorities = $state(new Set(['0', '1', '2', '3'])); // All priorities by default
-	let selectedStatuses = $state(new Set(['open'])); // Default to open tasks only
-	let selectedTypes = $state(new Set()); // Empty = all types
-	let selectedLabels = $state(new Set());
-	let dragDisabled = $state(true);
-	let isDragging = $state(false);
+	let searchQuery = $state<string>('');
+	let selectedPriorities = $state<Set<string>>(new Set(['0', '1', '2', '3'])); // All priorities by default
+	let selectedStatuses = $state<Set<string>>(new Set(['open'])); // Default to open tasks only
+	let selectedTypes = $state<Set<string>>(new Set()); // Empty = all types
+	let selectedLabels = $state<Set<string>>(new Set());
+	let dragDisabled = $state<boolean>(true);
+	let isDragging = $state<boolean>(false);
 
 	// Sync filters with URL on mount and page changes
 	$effect(() => {
@@ -54,7 +70,7 @@
 	});
 
 	// Update URL when filters change
-	function updateURL() {
+	function updateURL(): void {
 		const params = new URLSearchParams();
 
 		if (searchQuery) params.set('search', searchQuery);
@@ -116,17 +132,17 @@
 	});
 
 	// Get unique labels from tasks
-	const availableLabels = $derived.by(() => {
-		const labelsSet = new Set();
+	const availableLabels = $derived.by((): string[] => {
+		const labelsSet = new Set<string>();
 		tasks.forEach((task) => {
-			task.labels?.forEach((label) => labelsSet.add(label));
+			task.labels?.forEach((label: string) => labelsSet.add(label));
 		});
 		return Array.from(labelsSet).sort();
 	});
 
 	// Get unique types from tasks
-	const availableTypes = $derived.by(() => {
-		const typesSet = new Set();
+	const availableTypes = $derived.by((): string[] => {
+		const typesSet = new Set<string>();
 		tasks.forEach((task) => {
 			if (task.issue_type) typesSet.add(task.issue_type);
 		});
@@ -159,28 +175,28 @@
 	})));
 
 	// Toggle functions using shared helper
-	function togglePriority(priority) {
+	function togglePriority(priority: string): void {
 		selectedPriorities = toggleSetItem(selectedPriorities, priority);
 		updateURL();
 	}
 
-	function toggleStatus(status) {
+	function toggleStatus(status: string): void {
 		selectedStatuses = toggleSetItem(selectedStatuses, status);
 		updateURL();
 	}
 
-	function toggleType(type) {
+	function toggleType(type: string): void {
 		selectedTypes = toggleSetItem(selectedTypes, type);
 		updateURL();
 	}
 
-	function toggleLabel(label) {
+	function toggleLabel(label: string): void {
 		selectedLabels = toggleSetItem(selectedLabels, label);
 		updateURL();
 	}
 
 	// Clear all filters
-	function clearAllFilters() {
+	function clearAllFilters(): void {
 		searchQuery = '';
 		selectedPriorities = new Set(['0', '1', '2', '3']); // Reset to all priorities
 		selectedStatuses = new Set(['open']); // Reset to open only
@@ -190,19 +206,20 @@
 	}
 
 	// Handle drag start - enable dragging
-	function handleDragStart(event) {
+	function handleDragStart(event: DragEvent): void {
 		isDragging = true;
 		dragDisabled = false;
 		// Store task data for drop handling
-		const taskId = event.target.closest('[data-task-id]')?.dataset.taskId;
-		if (taskId) {
+		const target = event.target as HTMLElement;
+		const taskId = target.closest('[data-task-id]')?.getAttribute('data-task-id');
+		if (taskId && event.dataTransfer) {
 			event.dataTransfer.setData('text/plain', taskId);
 			event.dataTransfer.effectAllowed = 'move';
 		}
 	}
 
 	// Handle drag end - disable dragging
-	function handleDragEnd() {
+	function handleDragEnd(): void {
 		dragDisabled = true;
 		// Delay resetting isDragging to prevent click event firing
 		setTimeout(() => {
@@ -211,7 +228,7 @@
 	}
 
 	// Handle task click - open drawer
-	function handleTaskClick(taskId) {
+	function handleTaskClick(taskId: string): void {
 		// Don't trigger click if we're dragging
 		if (isDragging) return;
 
