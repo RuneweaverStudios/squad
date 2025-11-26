@@ -4,6 +4,7 @@
 	import { page } from '$app/stores';
 	import DependencyIndicator from '$lib/components/DependencyIndicator.svelte';
 	import FilterDropdown from '$lib/components/FilterDropdown.svelte';
+	import LabelBadges from '$lib/components/LabelBadges.svelte';
 	import { analyzeDependencies } from '$lib/utils/dependencyUtils';
 	import { getPriorityBadge } from '$lib/utils/badgeHelpers';
 	import { toggleSetItem } from '$lib/utils/filterHelpers';
@@ -462,14 +463,7 @@
 
 						<!-- Labels -->
 						{#if task.labels && task.labels.length > 0}
-							<div class="flex flex-wrap gap-1 mt-2">
-								{#each task.labels.slice(0, 3) as label}
-									<span class="badge badge-ghost badge-xs">{label}</span>
-								{/each}
-								{#if task.labels.length > 3}
-									<span class="badge badge-ghost badge-xs">+{task.labels.length - 3}</span>
-								{/if}
-							</div>
+							<LabelBadges labels={task.labels} maxDisplay={3} class="mt-2" />
 						{/if}
 					</div>
 				</div>

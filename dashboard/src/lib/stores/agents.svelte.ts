@@ -16,59 +16,17 @@
  * ```
  */
 
-export interface AgentActivity {
-	ts: string;
-	agent: string;
-	type: 'command' | 'prompt' | 'tool' | 'status';
-	preview?: string;
-	content?: string;
-	cmd?: string;
-	task?: string;
-	tool?: string;
-	file?: string;
-}
+import type {
+	Agent,
+	AgentActivity,
+	Reservation,
+	Task,
+	TaskStats,
+	ApiMeta
+} from '$lib/types/api.types';
 
-export interface Agent {
-	id: number;
-	name: string;
-	program: string;
-	model: string;
-	task_description: string;
-	last_active_ts: string;
-	reservation_count: number;
-	task_count: number;
-	open_tasks: number;
-	in_progress_tasks: number;
-	active: boolean;
-	activities?: AgentActivity[];
-	current_activity?: AgentActivity | null;
-}
-
-export interface Reservation {
-	id: number;
-	path_pattern: string;
-	exclusive: number;
-	reason: string;
-	created_ts: string;
-	expires_ts: string;
-	released_ts: string | null;
-	agent_name: string;
-	project_path: string;
-}
-
-export interface Task {
-	id: string;
-	title: string;
-	description: string;
-	status: string;
-	priority: number;
-	issue_type: string;
-	project: string;
-	assignee?: string;
-	labels: string[];
-	depends_on?: Array<{ id: string; title: string; status: string; priority: number }>;
-	blocked_by?: Array<{ id: string; title: string; status: string; priority: number }>;
-}
+// Re-export types for backward compatibility
+export type { Agent, AgentActivity, Reservation, Task };
 
 export interface AgentsData {
 	agents: Agent[];
@@ -76,28 +34,11 @@ export interface AgentsData {
 	reservations_by_agent: Record<string, Reservation[]>;
 	tasks: Task[];
 	unassigned_tasks: Task[];
-	task_stats: {
-		total: number;
-		open: number;
-		in_progress: number;
-		blocked: number;
-		closed: number;
-		by_priority: {
-			p0: number;
-			p1: number;
-			p2: number;
-			p3: number;
-			p4: number;
-		};
-	};
+	task_stats: TaskStats;
 	tasks_with_deps_count: number;
 	tasks_with_deps: Task[];
 	timestamp: string;
-	meta: {
-		poll_interval_ms: number;
-		data_sources: string[];
-		cache_ttl_ms: number;
-	};
+	meta: ApiMeta;
 }
 
 class AgentsStore {

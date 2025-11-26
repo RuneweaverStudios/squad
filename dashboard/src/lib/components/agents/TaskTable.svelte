@@ -1,7 +1,8 @@
-<script>
+<script lang="ts">
 	import { page } from '$app/stores';
 	import DependencyIndicator from '$lib/components/DependencyIndicator.svelte';
 	import FilterDropdown from '$lib/components/FilterDropdown.svelte';
+	import LabelBadges from '$lib/components/LabelBadges.svelte';
 	import { analyzeDependencies } from '$lib/utils/dependencyUtils';
 	import { getProjectFromTaskId } from '$lib/utils/projectUtils';
 	import { getPriorityBadge, getTaskStatusBadge, getTypeBadge } from '$lib/utils/badgeHelpers';
@@ -17,10 +18,45 @@
 		createDeleteRequest
 	} from '$lib/utils/bulkApiHelpers';
 
-	let { tasks = [], allTasks = [], agents = [], reservations = [], ontaskclick = () => {} } = $props();
+	// Type definitions
+	interface Task {
+		id: string;
+		title?: string;
+		description?: string;
+		status: string;
+		priority: number;
+		issue_type?: string;
+		assignee?: string;
+		labels?: string[];
+		depends_on?: Array<{ id: string }>;
+		created_at?: string;
+		updated_at?: string;
+	}
+
+	interface Agent {
+		name: string;
+		last_active_ts?: string;
+		task?: string | null;
+	}
+
+	interface Reservation {
+		agent_name: string;
+		path_pattern: string;
+		expires_ts: string;
+	}
+
+	interface Props {
+		tasks?: Task[];
+		allTasks?: Task[];
+		agents?: Agent[];
+		reservations?: Reservation[];
+		ontaskclick?: (taskId: string) => void;
+	}
+
+	let { tasks = [], allTasks = [], agents = [], reservations = [], ontaskclick = () => {} }: Props = $props();
 
 	// Check if an agent is actively working (uses shared utility)
-	function isAgentWorking(agentName) {
+	function isAgentWorking(agentName: string | undefined | null): boolean {
 		if (!agentName || !agents.length) return false;
 		const agent = agents.find(a => a.name === agentName);
 		if (!agent) return false;
@@ -29,21 +65,21 @@
 
 	// Initialize filters from URL params (default to open + in_progress tasks)
 	let searchQuery = $state('');
-	let selectedProjects = $state(new Set());
-	let selectedPriorities = $state(new Set(['0', '1', '2', '3']));
-	let selectedStatuses = $state(new Set(['open', 'in_progress']));
-	let selectedTypes = $state(new Set());
-	let selectedLabels = $state(new Set());
+	let selectedProjects = $state<Set<string>>(new Set());
+	let selectedPriorities = $state<Set<string>>(new Set(['0', '1', '2', '3']));
+	let selectedStatuses = $state<Set<string>>(new Set(['open', 'in_progress']));
+	let selectedTypes = $state<Set<string>>(new Set());
+	let selectedLabels = $state<Set<string>>(new Set());
 
 	// Sorting state
 	let sortColumn = $state('priority');
 	let sortDirection = $state('asc'); // 'asc' or 'desc'
 
 	// Selection state
-	let selectedTasks = $state(new Set());
+	let selectedTasks = $state<Set<string>>(new Set());
 
 	// Toggle single task selection
-	function toggleTask(taskId) {
+	function toggleTask(taskId: string) {
 		if (selectedTasks.has(taskId)) {
 			selectedTasks.delete(taskId);
 		} else {
@@ -167,7 +203,7 @@
 
 		// Filter by type
 		if (selectedTypes.size > 0) {
-			result = result.filter((task) => selectedTypes.has(task.issue_type));
+			result = result.filter((task) => task.issue_type && selectedTypes.has(task.issue_type));
 		}
 
 		// Filter by labels
@@ -186,7 +222,7 @@
 
 	// Sort function used within each group
 	// Priority: 1) Tasks with working agents first, 2) Then by selected sort column
-	function sortTasks(tasksToSort) {
+	function sortTasks(tasksToSort: Task[]): Task[] {
 		return [...tasksToSort].sort((a, b) => {
 			// First priority: tasks with working agents come first
 			const aWorking = isAgentWorking(a.assignee);
@@ -306,15 +342,15 @@
 
 	// Get unique labels and types from tasks
 	const availableLabels = $derived.by(() => {
-		const labelsSet = new Set();
+		const labelsSet = new Set<string>();
 		tasks.forEach((task) => {
-			task.labels?.forEach((label) => labelsSet.add(label));
+			task.labels?.forEach((label: string) => labelsSet.add(label));
 		});
 		return Array.from(labelsSet).sort();
 	});
 
 	const availableTypes = $derived.by(() => {
-		const typesSet = new Set();
+		const typesSet = new Set<string>();
 		tasks.forEach((task) => {
 			if (task.issue_type) typesSet.add(task.issue_type);
 		});
@@ -322,7 +358,7 @@
 	});
 
 	const availableProjects = $derived.by(() => {
-		const projectsSet = new Set();
+		const projectsSet = new Set<string>();
 		tasks.forEach((task) => {
 			const project = getProjectFromTaskId(task.id);
 			if (project) projectsSet.add(project);
@@ -362,27 +398,27 @@
 	})));
 
 	// Toggle functions using shared helper
-	function toggleProject(project) {
+	function toggleProject(project: string) {
 		selectedProjects = toggleSetItem(selectedProjects, project);
 		updateURL();
 	}
 
-	function togglePriority(priority) {
+	function togglePriority(priority: string) {
 		selectedPriorities = toggleSetItem(selectedPriorities, priority);
 		updateURL();
 	}
 
-	function toggleStatus(status) {
+	function toggleStatus(status: string) {
 		selectedStatuses = toggleSetItem(selectedStatuses, status);
 		updateURL();
 	}
 
-	function toggleType(type) {
+	function toggleType(type: string) {
 		selectedTypes = toggleSetItem(selectedTypes, type);
 		updateURL();
 	}
 
-	function toggleLabel(label) {
+	function toggleLabel(label: string) {
 		selectedLabels = toggleSetItem(selectedLabels, label);
 		updateURL();
 	}
@@ -398,7 +434,7 @@
 	}
 
 	// Sorting
-	function handleSort(column) {
+	function handleSort(column: string) {
 		if (sortColumn === column) {
 			sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
 		} else {
@@ -409,7 +445,7 @@
 
 
 	// Handle row click
-	function handleRowClick(taskId) {
+	function handleRowClick(taskId: string) {
 		ontaskclick(taskId);
 	}
 
@@ -418,7 +454,7 @@
 	let bulkActionError = $state('');
 
 	// Helper to run bulk operations with consistent state management
-	async function runBulkOperation(operation) {
+	async function runBulkOperation(operation: (taskId: string) => Promise<void>) {
 		bulkActionLoading = true;
 		bulkActionError = '';
 
@@ -441,7 +477,7 @@
 	async function handleBulkDelete() {
 		if (!confirm(`Delete ${selectedTasks.size} task(s)? This cannot be undone.`)) return;
 
-		await runBulkOperation(async (taskId) => {
+		await runBulkOperation(async (taskId: string) => {
 			const response = await fetchWithTimeout(`/api/tasks/${taskId}`, createDeleteRequest());
 			if (!response.ok) {
 				throw new Error(await handleApiError(response, `delete task ${taskId}`));
@@ -450,7 +486,7 @@
 	}
 
 	async function handleBulkRelease() {
-		await runBulkOperation(async (taskId) => {
+		await runBulkOperation(async (taskId: string) => {
 			const response = await fetchWithTimeout(
 				`/api/tasks/${taskId}`,
 				createPutRequest({ assignee: null, status: 'open' })
@@ -465,7 +501,7 @@
 		const agentName = prompt('Enter agent name to assign tasks to:');
 		if (!agentName) return;
 
-		await runBulkOperation(async (taskId) => {
+		await runBulkOperation(async (taskId: string) => {
 			const response = await fetchWithTimeout(
 				`/api/tasks/${taskId}`,
 				createPutRequest({ assignee: agentName, status: 'in_progress' })
@@ -476,8 +512,8 @@
 		});
 	}
 
-	async function handleBulkChangePriority(priority) {
-		await runBulkOperation(async (taskId) => {
+	async function handleBulkChangePriority(priority: number) {
+		await runBulkOperation(async (taskId: string) => {
 			const response = await fetchWithTimeout(
 				`/api/tasks/${taskId}`,
 				createPutRequest({ priority })
@@ -488,8 +524,8 @@
 		});
 	}
 
-	async function handleBulkChangeStatus(status) {
-		await runBulkOperation(async (taskId) => {
+	async function handleBulkChangeStatus(status: string) {
+		await runBulkOperation(async (taskId: string) => {
 			const response = await fetchWithTimeout(
 				`/api/tasks/${taskId}`,
 				createPutRequest({ status })
@@ -844,7 +880,8 @@
 										{#if task.status === 'in_progress' && task.assignee}
 											<!-- In progress: show assignee with spinning gear -->
 											<span class="flex items-center gap-1.5">
-												<svg class="shrink-0 w-4 h-4 text-info animate-spin origin-center" viewBox="0 0 24 24" fill="currentColor" title="Currently in progress">
+												<svg class="shrink-0 w-4 h-4 text-info animate-spin origin-center" viewBox="0 0 24 24" fill="currentColor" aria-label="Currently in progress">
+													<title>Currently in progress</title>
 													<path d={STATUS_ICONS.gear} />
 												</svg>
 												<span class="text-sm font-medium text-info">{task.assignee}</span>
@@ -858,14 +895,7 @@
 									</td>
 									<td>
 										{#if task.labels && task.labels.length > 0}
-											<div class="flex flex-wrap gap-0.5">
-												{#each task.labels.slice(0, 2) as label}
-													<span class="badge badge-ghost badge-xs">{label}</span>
-												{/each}
-												{#if task.labels.length > 2}
-													<span class="badge badge-ghost badge-xs">+{task.labels.length - 2}</span>
-												{/if}
-											</div>
+											<LabelBadges labels={task.labels} maxDisplay={2} />
 										{:else}
 											<span class="text-base-content/30">-</span>
 										{/if}
