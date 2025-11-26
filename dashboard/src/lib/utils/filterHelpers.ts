@@ -64,6 +64,35 @@ export const DEFAULT_FILTER_CONFIG: FilterConfig = {
 };
 
 /**
+ * Default filter values - represents "no active filtering" state.
+ * Used to determine when to show the Active Filters row.
+ *
+ * - Priorities: All priorities selected (P0-P3)
+ * - Statuses: Only 'open' selected (default view)
+ * - Types: Empty (show all types)
+ * - Labels: Empty (no label filtering)
+ * - Projects: Empty (show all projects, handled by project selector)
+ */
+export const DEFAULT_FILTER_VALUES: Record<string, Set<string>> = {
+	priorities: new Set(['0', '1', '2', '3']),
+	statuses: new Set(['open']),
+	types: new Set(),
+	labels: new Set(),
+	projects: new Set()
+};
+
+/**
+ * Check if two Sets are equal (same size and same elements).
+ */
+function setsAreEqual<T>(a: Set<T>, b: Set<T>): boolean {
+	if (a.size !== b.size) return false;
+	for (const item of a) {
+		if (!b.has(item)) return false;
+	}
+	return true;
+}
+
+/**
  * Build URL search params from filter Sets.
  * Each Set value becomes a comma-separated list in the URL.
  *
@@ -163,16 +192,44 @@ export function syncFiltersToURL(
 }
 
 /**
- * Check if any filters are active (non-empty).
+ * Check if any filters are active (differ from default values).
+ * This is smarter than checking if filters are non-empty - it compares
+ * against the baseline "default" state to determine if user has actively filtered.
+ *
+ * @param filters - Record of filter Sets
+ * @param defaults - Default filter values to compare against (defaults to DEFAULT_FILTER_VALUES)
+ * @returns true if any filter differs from its default value
+ *
+ * @example
+ * // With default priorities (all selected) - NOT active
+ * hasActiveFilters({ priorities: new Set(['0', '1', '2', '3']), statuses: new Set(['open']) })
+ * // → false
+ *
+ * // With filtered priorities - IS active
+ * hasActiveFilters({ priorities: new Set(['0', '1']), statuses: new Set(['open']) })
+ * // → true
+ */
+export function hasActiveFilters(
+	filters: Record<string, Set<any>>,
+	defaults: Record<string, Set<any>> = DEFAULT_FILTER_VALUES
+): boolean {
+	for (const [filterName, filterSet] of Object.entries(filters)) {
+		const defaultSet = defaults[filterName] || new Set();
+		if (!setsAreEqual(filterSet, defaultSet)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * Check if any filters have ANY values (simple non-empty check).
+ * Use this when you need the simpler "any values present" logic.
  *
  * @param filters - Record of filter Sets
  * @returns true if at least one filter has values
- *
- * @example
- * hasActiveFilters({ priorities: new Set(['P0']), statuses: new Set() })
- * // → true
  */
-export function hasActiveFilters(filters: Record<string, Set<any>>): boolean {
+export function hasAnyFilterValues(filters: Record<string, Set<any>>): boolean {
 	return Object.values(filters).some(set => set.size > 0);
 }
 
@@ -200,4 +257,153 @@ export function clearAllFilters(
  */
 export function countActiveFilters(filters: Record<string, Set<any>>): number {
 	return Object.values(filters).reduce((sum, set) => sum + set.size, 0);
+}
+
+/**
+ * Represents a single active filter chip for UI display.
+ */
+export interface FilterChip {
+	/** Filter category (e.g., 'priorities', 'statuses') */
+	filterName: string;
+	/** The specific value being filtered */
+	value: string;
+	/** Human-readable label for display */
+	label: string;
+	/** Badge CSS class for styling */
+	badgeClass?: string;
+}
+
+/**
+ * Get active filter chips that differ from default values.
+ * Returns an array of chips representing active filters for UI display.
+ *
+ * @param filters - Current filter state
+ * @param defaults - Default filter values to compare against
+ * @param labelFn - Optional function to generate human-readable labels
+ * @returns Array of FilterChip objects for rendering
+ *
+ * @example
+ * const chips = getActiveFilterChips(
+ *   { priorities: new Set(['0', '1']), statuses: new Set(['open']) },
+ *   DEFAULT_FILTER_VALUES,
+ *   (filterName, value) => filterName === 'priorities' ? `P${value}` : value
+ * );
+ * // → [{ filterName: 'priorities', value: '2', label: 'P2' }, ...]
+ */
+export function getActiveFilterChips(
+	filters: Record<string, Set<any>>,
+	defaults: Record<string, Set<any>> = DEFAULT_FILTER_VALUES,
+	labelFn?: (filterName: string, value: string) => string
+): FilterChip[] {
+	const chips: FilterChip[] = [];
+
+	for (const [filterName, filterSet] of Object.entries(filters)) {
+		const defaultSet = defaults[filterName] || new Set();
+
+		// For priorities: chip shows what's EXCLUDED (defaults minus current)
+		// For other filters: chip shows what's INCLUDED (current values)
+		if (filterName === 'priorities') {
+			// Show chips for priorities that are filtered OUT
+			for (const defaultValue of defaultSet) {
+				if (!filterSet.has(defaultValue)) {
+					const label = labelFn
+						? labelFn(filterName, defaultValue)
+						: `P${defaultValue}`;
+					chips.push({
+						filterName,
+						value: defaultValue,
+						label: `−${label}`, // Minus sign indicates "excluded"
+						badgeClass: 'badge-ghost'
+					});
+				}
+			}
+		} else if (filterName === 'statuses') {
+			// For statuses: show non-default selections
+			// If default is 'open' only and user selected more/different, show them
+			if (!setsAreEqual(filterSet, defaultSet)) {
+				for (const value of filterSet) {
+					if (!defaultSet.has(value)) {
+						const label = labelFn
+							? labelFn(filterName, value)
+							: formatStatusLabel(value);
+						chips.push({
+							filterName,
+							value,
+							label,
+							badgeClass: 'badge-info'
+						});
+					}
+				}
+				// Also show if default status is excluded
+				for (const defaultValue of defaultSet) {
+					if (!filterSet.has(defaultValue)) {
+						const label = labelFn
+							? labelFn(filterName, defaultValue)
+							: formatStatusLabel(defaultValue);
+						chips.push({
+							filterName,
+							value: defaultValue,
+							label: `−${label}`,
+							badgeClass: 'badge-ghost'
+						});
+					}
+				}
+			}
+		} else {
+			// For types, labels, projects: show all active values
+			for (const value of filterSet) {
+				const label = labelFn
+					? labelFn(filterName, value)
+					: formatFilterLabel(filterName, value);
+				chips.push({
+					filterName,
+					value,
+					label,
+					badgeClass: getBadgeClassForFilter(filterName)
+				});
+			}
+		}
+	}
+
+	return chips;
+}
+
+/**
+ * Format a status value for display.
+ */
+function formatStatusLabel(status: string): string {
+	switch (status) {
+		case 'open': return 'Open';
+		case 'in_progress': return 'In Progress';
+		case 'blocked': return 'Blocked';
+		case 'closed': return 'Closed';
+		default: return status;
+	}
+}
+
+/**
+ * Format a filter value for display based on filter type.
+ */
+function formatFilterLabel(filterName: string, value: string): string {
+	switch (filterName) {
+		case 'types':
+			return value.charAt(0).toUpperCase() + value.slice(1);
+		case 'labels':
+		case 'projects':
+			return value;
+		default:
+			return value;
+	}
+}
+
+/**
+ * Get badge CSS class for a filter type.
+ */
+function getBadgeClassForFilter(filterName: string): string {
+	switch (filterName) {
+		case 'types': return 'badge-secondary';
+		case 'labels': return 'badge-accent';
+		case 'projects': return 'badge-primary';
+		default: return 'badge-ghost';
+	}
 }
