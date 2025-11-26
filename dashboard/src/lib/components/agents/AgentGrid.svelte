@@ -3,7 +3,22 @@
 	import AutoAssignModal from './AutoAssignModal.svelte';
 	import { generateAutoAssignments } from '$lib/utils/autoAssign';
 
-	let { agents = [], tasks = [], allTasks = [], reservations = [], sparklineData = [], onTaskAssign = () => {}, ontaskclick = () => {} } = $props();
+	let { agents = [], tasks = [], allTasks = [], reservations = [], sparklineData = [], onTaskAssign = () => {}, ontaskclick = () => {}, selectedDateRange = 'all', customDateFrom = null, customDateTo = null } = $props();
+
+	// Determine if we're viewing historical data (not "all" or "today")
+	const isHistoricalView = $derived(() => {
+		if (selectedDateRange === 'all' || selectedDateRange === 'today') return false;
+		if (selectedDateRange === 'custom') {
+			// Check if custom range ends before today
+			if (customDateTo) {
+				const today = new Date().toISOString().split('T')[0];
+				return customDateTo < today;
+			}
+			return false;
+		}
+		// For preset ranges like 'week', 'month' - not historical by default
+		return false;
+	});
 
 	// Modal state
 	let showModal = $state(false);
@@ -200,7 +215,7 @@
 			<div class="flex gap-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-base-300 scrollbar-track-transparent">
 				{#each sortedAgents() as agent (agent.id || agent.name)}
 					<div class="flex-shrink-0 w-80 h-72">
-						<AgentCard {agent} {tasks} {allTasks} {reservations} {onTaskAssign} {ontaskclick} />
+						<AgentCard {agent} {tasks} {allTasks} {reservations} {onTaskAssign} {ontaskclick} {selectedDateRange} {customDateFrom} {customDateTo} isHistoricalView={isHistoricalView()} />
 					</div>
 				{/each}
 			</div>

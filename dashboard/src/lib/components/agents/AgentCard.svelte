@@ -8,7 +8,7 @@
 	import { formatLastActivity } from '$lib/utils/dateFormatters';
 	import { computeAgentStatus } from '$lib/utils/agentStatusUtils';
 
-	let { agent, tasks = [], allTasks = [], reservations = [], onTaskAssign = () => {}, ontaskclick = () => {}, draggedTaskId = null } = $props();
+	let { agent, tasks = [], allTasks = [], reservations = [], onTaskAssign = () => {}, ontaskclick = () => {}, draggedTaskId = null, selectedDateRange = 'all', customDateFrom = null, customDateTo = null, isHistoricalView = false } = $props();
 
 	let isDragOver = $state(false);
 	let isAssigning = $state(false);
@@ -573,6 +573,33 @@
 		return match ? match[1] : null;
 	}
 
+	// Format date range for historical view display
+	function formatDateRangeLabel() {
+		if (selectedDateRange === 'today') return 'Today';
+		if (selectedDateRange === 'week') return 'This Week';
+		if (selectedDateRange === 'month') return 'This Month';
+		if (selectedDateRange === 'custom' && customDateFrom && customDateTo) {
+			const from = new Date(customDateFrom).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+			const to = new Date(customDateTo).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+			return `${from} - ${to}`;
+		}
+		if (selectedDateRange === 'custom' && customDateFrom) {
+			return `From ${new Date(customDateFrom).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+		}
+		if (selectedDateRange === 'custom' && customDateTo) {
+			return `Until ${new Date(customDateTo).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+		}
+		return null;
+	}
+
+	// Check if agent was active in the selected date range
+	const wasActiveInRange = $derived(() => {
+		// If we have activities, agent was active in the range
+		if (agent.activities && agent.activities.length > 0) return true;
+		if (agent.current_activity) return true;
+		return false;
+	});
+
 	// Handle activity item click
 	// If the activity contains a task ID, call the parent's ontaskclick handler
 	function handleActivityClick(activity) {
@@ -584,7 +611,7 @@
 </script>
 
 <div
-	class="card bg-base-100 border-2 transition-all relative h-full flex flex-col {isDragOver && hasConflict ? 'border-error border-dashed bg-error/10 scale-105' : isDragOver ? 'border-success border-dashed bg-success/10 scale-105' : assignSuccess ? 'border-success bg-success/5 animate-pulse' : 'border-base-300 hover:border-primary'} {isAssigning || assignSuccess ? 'pointer-events-none' : ''} {agentStatus() === 'offline' ? 'opacity-60 grayscale-[30%] hover:opacity-90 hover:grayscale-[5%]' : ''}"
+	class="card bg-base-100 border-2 transition-all relative h-full flex flex-col {isDragOver && hasConflict ? 'border-error border-dashed bg-error/10 scale-105' : isDragOver ? 'border-success border-dashed bg-success/10 scale-105' : assignSuccess ? 'border-success bg-success/5 animate-pulse' : isHistoricalView ? 'border-info/30 border-dashed' : 'border-base-300 hover:border-primary'} {isAssigning || assignSuccess ? 'pointer-events-none' : ''} {agentStatus() === 'offline' && !isHistoricalView ? 'opacity-60 grayscale-[30%] hover:opacity-90 hover:grayscale-[5%]' : ''} {isHistoricalView && !wasActiveInRange() ? 'opacity-40 grayscale-[50%]' : ''}"
 	role="button"
 	tabindex="0"
 	ondrop={handleDrop}
@@ -678,9 +705,25 @@
 		{#if agent.current_activity || (agent.activities && agent.activities.length > 0)}
 			{@const firstActivity = agent.current_activity || (agent.activities && agent.activities.length > 0 ? agent.activities[0] : null)}
 			{@const isActiveTask = firstActivity && firstActivity.status !== 'closed'}
-			{@const currentActivity = isActiveTask ? firstActivity : null}
+			{@const currentActivity = isHistoricalView ? null : (isActiveTask ? firstActivity : null)}
 			{@const historyActivities = currentActivity ? agent.activities.slice(1) : agent.activities}
-			<div class="flex-1 min-h-0 mb-3 bg-base-200 rounded px-2 py-1.5 overflow-y-auto">
+			{@const dateRangeLabel = formatDateRangeLabel()}
+			<div class="flex-1 min-h-0 mb-3 bg-base-200 rounded px-2 py-1.5 overflow-y-auto {isHistoricalView ? 'border border-base-300' : ''}">
+				<!-- Historical View Indicator -->
+				{#if isHistoricalView || (dateRangeLabel && selectedDateRange !== 'all')}
+					<div class="flex items-center gap-1.5 mb-1.5 pb-1.5 border-b border-base-300">
+						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5 text-info">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+						</svg>
+						<span class="text-[10px] font-medium text-info">
+							{#if isHistoricalView}
+								Was active on {dateRangeLabel}
+							{:else}
+								Activity: {dateRangeLabel}
+							{/if}
+						</span>
+					</div>
+				{/if}
 				<!-- Current Activity -->
 				{#if currentActivity}
 					{@const taskId = extractTaskId(currentActivity.preview)}

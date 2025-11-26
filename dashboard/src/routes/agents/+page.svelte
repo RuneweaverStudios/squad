@@ -6,6 +6,7 @@
 	import AgentGrid from '$lib/components/agents/AgentGrid.svelte';
 	import Sparkline from '$lib/components/Sparkline.svelte';
 	import TaskDetailDrawer from '$lib/components/TaskDetailDrawer.svelte';
+	import DateRangePicker from '$lib/components/DateRangePicker.svelte';
 	import {
 		getProjectsFromTasks,
 		getTaskCountByProject
@@ -20,6 +21,11 @@
 	let selectedProject = $state('All Projects');
 	let sparklineData = $state([]);
 	let isInitialLoad = $state(true);
+
+	// Date range state
+	let selectedDateRange = $state('all');
+	let customDateFrom = $state<string | null>(null);
+	let customDateTo = $state<string | null>(null);
 
 	// Drawer state for TaskDetailDrawer
 	let drawerOpen = $state(false);
@@ -49,6 +55,34 @@
 		fetchData();
 	}
 
+	// Handle date range selection change
+	function handleDateRangeChange(range: string, from?: string, to?: string) {
+		selectedDateRange = range;
+		customDateFrom = from || null;
+		customDateTo = to || null;
+
+		// Update URL parameters
+		const url = new URL(window.location.href);
+
+		// Clear existing date params
+		url.searchParams.delete('range');
+		url.searchParams.delete('from');
+		url.searchParams.delete('to');
+
+		// Set new params based on selection
+		if (range === 'custom') {
+			if (from) url.searchParams.set('from', from);
+			if (to) url.searchParams.set('to', to);
+		} else if (range !== 'all') {
+			url.searchParams.set('range', range);
+		}
+
+		replaceState(url, {});
+
+		// Refetch data with new date range filter
+		fetchData();
+	}
+
 	// Sync selectedProject from URL params (REACTIVE using $page store)
 	$effect(() => {
 		const projectParam = $page.url.searchParams.get('project');
@@ -56,6 +90,27 @@
 			selectedProject = projectParam;
 		} else {
 			selectedProject = 'All Projects';
+		}
+	});
+
+	// Sync date range from URL params (REACTIVE using $page store)
+	$effect(() => {
+		const rangeParam = $page.url.searchParams.get('range');
+		const fromParam = $page.url.searchParams.get('from');
+		const toParam = $page.url.searchParams.get('to');
+
+		if (fromParam || toParam) {
+			selectedDateRange = 'custom';
+			customDateFrom = fromParam;
+			customDateTo = toParam;
+		} else if (rangeParam) {
+			selectedDateRange = rangeParam;
+			customDateFrom = null;
+			customDateTo = null;
+		} else {
+			selectedDateRange = 'all';
+			customDateFrom = null;
+			customDateTo = null;
 		}
 	});
 
@@ -73,6 +128,14 @@
 			let url = '/api/agents?full=true&usage=true&activities=true';
 			if (selectedProject && selectedProject !== 'All Projects') {
 				url += `&project=${encodeURIComponent(selectedProject)}`;
+			}
+
+			// Add date range parameters
+			if (selectedDateRange === 'custom') {
+				if (customDateFrom) url += `&from=${encodeURIComponent(customDateFrom)}`;
+				if (customDateTo) url += `&to=${encodeURIComponent(customDateTo)}`;
+			} else if (selectedDateRange && selectedDateRange !== 'all') {
+				url += `&range=${encodeURIComponent(selectedDateRange)}`;
 			}
 
 			const response = await fetch(url);
@@ -214,7 +277,7 @@
 					</div>
 				</div>
 			{:else}
-				<AgentGrid {agents} {tasks} {allTasks} {reservations} {sparklineData} onTaskAssign={handleTaskAssign} ontaskclick={handleTaskClick} />
+				<AgentGrid {agents} {tasks} {allTasks} {reservations} {sparklineData} onTaskAssign={handleTaskAssign} ontaskclick={handleTaskClick} {selectedDateRange} {customDateFrom} {customDateTo} />
 			{/if}
 		</div>
 	</div>

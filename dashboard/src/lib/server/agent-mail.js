@@ -4,6 +4,8 @@
  */
 
 import agentMail from '../../../../lib/agent-mail.js';
+import { readdirSync, readFileSync } from 'fs';
+import { join } from 'path';
 
 /**
  * Get all messages in a thread
@@ -126,4 +128,64 @@ export function searchMessages(query) {
  */
 export function getReservations(agentName = null, projectPath = null) {
 	return agentMail.getReservations(agentName, projectPath);
+}
+
+/**
+ * Get active agents from session files (.claude/agent-*.txt)
+ * These are agents currently running in Claude Code sessions
+ * @param {string} projectPath - Project root path containing .claude directory
+ * @returns {{ activeAgents: string[], activeCount: number }} - Active agent info
+ */
+export function getActiveAgents(projectPath) {
+	try {
+		const claudeDir = join(projectPath, '.claude');
+		const files = readdirSync(claudeDir);
+
+		// Filter for agent-*.txt files (not agent-identity files)
+		const agentFiles = files.filter(f =>
+			f.startsWith('agent-') &&
+			f.endsWith('.txt') &&
+			!f.includes('identity')
+		);
+
+		// Read agent names from each file
+		const activeAgents = new Set();
+		for (const file of agentFiles) {
+			try {
+				const content = readFileSync(join(claudeDir, file), 'utf8').trim();
+				if (content) {
+					activeAgents.add(content);
+				}
+			} catch {
+				// Skip unreadable files
+			}
+		}
+
+		return {
+			activeAgents: Array.from(activeAgents),
+			activeCount: activeAgents.size
+		};
+	} catch {
+		return { activeAgents: [], activeCount: 0 };
+	}
+}
+
+/**
+ * Get agent counts: active (reactive) and total (historical)
+ * @param {string} projectPath - Project root path
+ * @returns {{ activeCount: number, totalCount: number, activeAgents: string[] }}
+ */
+export function getAgentCounts(projectPath) {
+	// Get total count from Agent Mail DB (all ever registered)
+	const allAgents = agentMail.getAgents(null); // null = no project filter
+	const totalCount = allAgents.length;
+
+	// Get active count from session files
+	const { activeAgents, activeCount } = getActiveAgents(projectPath);
+
+	return {
+		activeCount,
+		totalCount,
+		activeAgents
+	};
 }

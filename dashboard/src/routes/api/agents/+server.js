@@ -26,7 +26,7 @@
  */
 
 import { json } from '@sveltejs/kit';
-import { getAgents, getReservations, getBeadsActivities } from '$lib/server/agent-mail.js';
+import { getAgents, getReservations, getBeadsActivities, getAgentCounts } from '$lib/server/agent-mail.js';
 import { getTasks } from '$lib/server/beads.js';
 import { getAllAgentUsage, getHourlyUsage } from '$lib/utils/tokenUsage.js';
 import { exec } from 'child_process';
@@ -376,6 +376,9 @@ export async function GET({ url }) {
 			);
 		}
 
+		// Get agent counts (active sessions vs total registered)
+		const agentCounts = getAgentCounts(projectPath);
+
 		// Return unified orchestration data
 		return json({
 			agents: filteredAgentStats,
@@ -387,6 +390,7 @@ export async function GET({ url }) {
 			tasks_with_deps_count: tasksWithDeps.length,
 			tasks_with_deps: tasksWithDeps,
 			hourlyUsage: hourlyUsage, // Raw hourly token usage (last 24 hours)
+			agent_counts: agentCounts, // Active vs total agent counts
 			timestamp: new Date().toISOString(),
 			meta
 		});
