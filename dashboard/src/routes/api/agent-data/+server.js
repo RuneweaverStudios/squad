@@ -10,8 +10,8 @@ import { getTasks } from '$lib/server/beads.js';
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ url }) {
 	try {
-		const projectFilter = url.searchParams.get('project');
-		const agentFilter = url.searchParams.get('agent');
+		const projectFilter = url.searchParams.get('project') ?? undefined;
+		const agentFilter = url.searchParams.get('agent') ?? undefined;
 
 		// Fetch all data sources
 		const agents = getAgents(projectFilter);
@@ -39,6 +39,7 @@ export async function GET({ url }) {
 		});
 
 		// Calculate reservation statistics
+		/** @type {Record<string, typeof reservations>} */
 		const reservationsByAgent = {};
 		reservations.forEach(r => {
 			if (!reservationsByAgent[r.agent_name]) {
@@ -81,7 +82,7 @@ export async function GET({ url }) {
 		console.error('Error fetching agent data:', error);
 		return json({
 			error: 'Failed to fetch agent data',
-			message: error.message,
+			message: error instanceof Error ? error.message : String(error),
 			agents: [],
 			reservations: [],
 			tasks: [],

@@ -46,9 +46,13 @@ export async function POST({ params, request }) {
 		} catch (execError) {
 			console.error('am-send error:', execError);
 
+			// Parse error message
+			const execErr = /** @type {{ stderr?: string, message?: string }} */ (execError);
+			const errorMessage = execErr.stderr || execErr.message || String(execError);
+
 			return json({
 				error: 'Failed to send message',
-				message: execError.stderr || execError.message,
+				message: errorMessage,
 				agentName
 			}, { status: 500 });
 		}
@@ -56,7 +60,7 @@ export async function POST({ params, request }) {
 		console.error('Error in POST /api/agents/[name]/message:', error);
 		return json({
 			error: 'Internal server error',
-			message: error.message
+			message: error instanceof Error ? error.message : String(error)
 		}, { status: 500 });
 	}
 }

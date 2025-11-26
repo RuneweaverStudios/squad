@@ -55,7 +55,8 @@ export async function DELETE({ params }) {
 			console.error('am-delete-agent error:', execError);
 
 			// Parse error message
-			const errorMessage = execError.stderr || execError.message;
+			const execErr = /** @type {{ stderr?: string, message?: string }} */ (execError);
+			const errorMessage = execErr.stderr || execErr.message || String(execError);
 
 			// Check if agent not found
 			if (errorMessage.includes('not found')) {
@@ -76,7 +77,7 @@ export async function DELETE({ params }) {
 		console.error('Error in DELETE /api/agents/[name]:', error);
 		return json({
 			error: 'Internal server error',
-			message: error.message
+			message: error instanceof Error ? error.message : String(error)
 		}, { status: 500 });
 	}
 }

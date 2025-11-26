@@ -47,8 +47,12 @@ export async function GET({ params }) {
 		} catch (execError) {
 			console.error('am-inbox error:', execError);
 
+			// Parse error message
+			const execErr = /** @type {{ stderr?: string, message?: string }} */ (execError);
+			const errorMessage = execErr.stderr || execErr.message || String(execError);
+
 			// If agent not found or no inbox, return empty array
-			if (execError.stderr?.includes('not found') || execError.stderr?.includes('No messages')) {
+			if (execErr.stderr?.includes('not found') || execErr.stderr?.includes('No messages')) {
 				return json({
 					success: true,
 					agentName,
@@ -60,7 +64,7 @@ export async function GET({ params }) {
 
 			return json({
 				error: 'Failed to fetch inbox',
-				message: execError.stderr || execError.message,
+				message: errorMessage,
 				agentName
 			}, { status: 500 });
 		}
@@ -68,7 +72,7 @@ export async function GET({ params }) {
 		console.error('Error in GET /api/agents/[name]/inbox:', error);
 		return json({
 			error: 'Internal server error',
-			message: error.message
+			message: error instanceof Error ? error.message : String(error)
 		}, { status: 500 });
 	}
 }

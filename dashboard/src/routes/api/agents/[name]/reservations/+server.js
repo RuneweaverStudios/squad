@@ -25,8 +25,8 @@ export async function GET({ params }) {
 			}, { status: 400 });
 		}
 
-		// Get reservations globally (projectPath = null) since agents are globally unique
-		const reservations = getReservations(agentName, null);
+		// Get reservations globally (projectPath = undefined) since agents are globally unique
+		const reservations = getReservations(agentName, undefined);
 
 		return json({
 			success: true,
@@ -39,7 +39,7 @@ export async function GET({ params }) {
 		console.error('Error in GET /api/agents/[name]/reservations:', error);
 		return json({
 			error: 'Internal server error',
-			message: error.message
+			message: error instanceof Error ? error.message : String(error)
 		}, { status: 500 });
 	}
 }
@@ -120,7 +120,7 @@ export async function DELETE({ params, url }) {
 		console.error('Error in DELETE /api/agents/[name]/reservations:', error);
 		return json({
 			error: 'Internal server error',
-			message: error.message
+			message: error instanceof Error ? error.message : String(error)
 		}, { status: 500 });
 	}
 }

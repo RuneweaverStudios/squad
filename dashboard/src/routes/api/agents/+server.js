@@ -113,11 +113,18 @@ function isInDateRange(timestamp, from, to) {
 }
 
 /**
+ * @typedef {{ ts: string, preview: string, content: string, type: string, status?: string }} Activity
+ * @typedef {{ id: number, name: string, program: string, model: string, task_description: string, inception_ts: string, last_active_ts: string, project_path: string }} Agent
+ * @typedef {{ id: number, path_pattern: string, exclusive: boolean, reason: string, created_ts: string, expires_ts: string, released_ts: string, agent_name: string, project_path: string }} Reservation
+ * @typedef {{ id: string, title: string, description: string, status: string, priority: number, issue_type: string, assignee: string, created_at: string, updated_at: string, project: string, project_path: string, labels: string[], depends_on: any[], blocked_by: any[], comments?: any[] }} Task
+ */
+
+/**
  * Filter activities by date range
- * @param {Array} activities - Activities array
+ * @param {Activity[]} activities - Activities array
  * @param {Date | null} from - Range start
  * @param {Date | null} to - Range end
- * @returns {Array} Filtered activities
+ * @returns {Activity[]} Filtered activities
  */
 function filterActivitiesByDateRange(activities, from, to) {
 	if (!from && !to) return activities;
@@ -134,7 +141,7 @@ export async function GET({ url }) {
 	if (!fullData) {
 		// Simple agent list (backward compatible)
 		try {
-			const projectFilter = url.searchParams.get('project');
+			const projectFilter = url.searchParams.get('project') ?? undefined;
 			const agents = getAgents(projectFilter);
 			return json({ agents });
 		} catch (error) {
@@ -145,8 +152,8 @@ export async function GET({ url }) {
 
 	// Full orchestration data
 	try {
-		const projectFilter = url.searchParams.get('project');
-		const agentFilter = url.searchParams.get('agent');
+		const projectFilter = url.searchParams.get('project') ?? undefined;
+		const agentFilter = url.searchParams.get('agent') ?? undefined;
 		const includeUsage = url.searchParams.get('usage') === 'true';
 		const includeHourly = url.searchParams.get('hourly') === 'true';
 		const includeActivities = url.searchParams.get('activities') === 'true';
@@ -154,37 +161,34 @@ export async function GET({ url }) {
 		// Parse date range parameters
 		const dateRange = parseDateRange(url.searchParams);
 
-		// Fetch all data sources in parallel for performance
-		// NOTE: Agents and reservations are NOT filtered by project
-		// because agents work across multiple projects. Only tasks are filtered.
-		const promises = [
-			Promise.resolve(getAgents(null)),  // Show all agents (don't filter by project)
-			Promise.resolve(getReservations(agentFilter, null)),  // Show all reservations
-			Promise.resolve(getTasks({ projectName: projectFilter }))  // Filter tasks only
-		];
-
 		const projectPath = process.cwd().replace('/dashboard', '');
 
+		// Fetch core data (agents, reservations, tasks) - always needed
+		/** @type {Agent[]} */
+		const agents = getAgents(undefined);  // Show all agents (don't filter by project)
+		/** @type {Reservation[]} */
+		const reservations = getReservations(agentFilter, undefined);  // Show all reservations
+		/** @type {Task[]} */
+		const tasks = getTasks({ projectName: projectFilter });  // Filter tasks only
+
 		// Optionally fetch token usage data
+		/** @type {Map<string, import('$lib/utils/tokenUsage.js').TokenUsage> | null} */
+		let usageToday = null;
+		/** @type {Map<string, import('$lib/utils/tokenUsage.js').TokenUsage> | null} */
+		let usageWeek = null;
 		if (includeUsage) {
-			promises.push(
+			[usageToday, usageWeek] = await Promise.all([
 				getAllAgentUsage('today', projectPath),
 				getAllAgentUsage('week', projectPath)
-			);
+			]);
 		}
 
 		// Optionally fetch hourly token usage data (raw data for sparklines)
+		/** @type {import('$lib/utils/tokenUsage.js').HourlyUsage[] | null} */
+		let hourlyUsage = null;
 		if (includeHourly) {
-			promises.push(getHourlyUsage(projectPath));
+			hourlyUsage = await getHourlyUsage(projectPath);
 		}
-
-		const results = await Promise.all(promises);
-		const agents = results[0];
-		const reservations = results[1];
-		const tasks = results[2];
-		const usageToday = includeUsage ? results[3] : null;
-		const usageWeek = includeUsage ? results[4] : null;
-		const hourlyUsage = includeHourly ? results[includeUsage ? 5 : 3] : null;
 
 		// Calculate agent statistics
 		const agentStats = agents.map(agent => {
@@ -203,19 +207,23 @@ export async function GET({ url }) {
 			});
 
 			// Get recent activities from Beads task history (last 10 task updates)
+			/** @type {Activity[]} */
 			let activities = [];
 			if (includeActivities) {
 				try {
 					activities = getBeadsActivities(agent.name, tasks);
-				} catch (error) {
-					console.error(`Failed to fetch activities for agent ${agent.name}:`, error);
+				} catch (err) {
+					console.error(`Failed to fetch activities for agent ${agent.name}:`, err);
 					// Continue with empty activities array
 				}
 			}
 
 			// Apply date range filtering to activities if requested
+			/** @type {Activity[]} */
 			let filteredActivities = activities;
+			/** @type {number | null} */
 			let activityInRange = null;
+			/** @type {string | null} */
 			let lastActiveInRange = null;
 
 			if (dateRange.hasRange && activities.length > 0) {
@@ -278,6 +286,7 @@ export async function GET({ url }) {
 				}
 			}
 
+			/** @type {any} */
 			const baseStats = {
 				...agent,
 				reservation_count: agentReservations.length,
@@ -317,6 +326,7 @@ export async function GET({ url }) {
 		});
 
 		// Group reservations by agent for easy lookup
+		/** @type {Record<string, Reservation[]>} */
 		const reservationsByAgent = {};
 		reservations.forEach(r => {
 			if (!reservationsByAgent[r.agent_name]) {
@@ -353,6 +363,7 @@ export async function GET({ url }) {
 		);
 
 		// Build meta object with optional date range
+		/** @type {{ poll_interval_ms: number, data_sources: string[], cache_ttl_ms: number, dateRange?: { from: string | null, to: string | null } }} */
 		const meta = {
 			poll_interval_ms: 3000, // Recommended poll interval for frontend
 			data_sources: ['agent-mail', 'beads'],
@@ -396,12 +407,14 @@ export async function GET({ url }) {
 		});
 	} catch (error) {
 		console.error('Error fetching agent data:', error);
-		console.error('Error stack:', error.stack);
+		const errorMsg = error instanceof Error ? error.message : String(error);
+		const errorStack = error instanceof Error ? error.stack : undefined;
+		console.error('Error stack:', errorStack);
 
 		return json({
 			error: 'Failed to fetch agent data',
-			message: error.message,
-			stack: error.stack,
+			message: errorMsg,
+			stack: errorStack,
 			agents: [],
 			reservations: [],
 			reservations_by_agent: {},
@@ -462,7 +475,7 @@ export async function POST({ request }) {
 
 		// Assign task to agent using bd CLI
 		try {
-			const { stdout, stderr } = await execAsync(
+			await execAsync(
 				`bd update "${taskId}" --assignee "${agentName}"`
 			);
 
@@ -475,18 +488,18 @@ export async function POST({ request }) {
 				message: `Task ${taskId} assigned to ${agentName}`,
 				task: updatedTask[0]
 			});
-		} catch (error) {
-			console.error('Failed to assign task:', error);
+		} catch (err) {
+			console.error('Failed to assign task:', err);
 			return json({
 				error: 'Failed to assign task',
-				message: error.message || 'Unknown error occurred'
+				message: err instanceof Error ? err.message : 'Unknown error occurred'
 			}, { status: 500 });
 		}
-	} catch (error) {
-		console.error('Error in POST /api/agents:', error);
+	} catch (err) {
+		console.error('Error in POST /api/agents:', err);
 		return json({
 			error: 'Invalid request',
-			message: error.message || 'Failed to parse request body'
+			message: err instanceof Error ? err.message : 'Failed to parse request body'
 		}, { status: 400 });
 	}
 }

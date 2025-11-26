@@ -6,12 +6,16 @@
 import { getTasks as getTasksFromBeads, getTaskById as getTaskByIdFromBeads } from '../../../../lib/beads.js';
 
 /**
+ * @typedef {import('../../../../lib/beads.js').Task} Task
+ */
+
+/**
  * Get all tasks from all projects
- * @param {Object} options - Query options
+ * @param {Object} [options] - Query options
  * @param {string} [options.status] - Filter by status
  * @param {number} [options.priority] - Filter by priority
  * @param {string} [options.projectName] - Filter by project
- * @returns {Array<Object>} List of tasks
+ * @returns {Task[]} List of tasks
  */
 export function getTasks(options = {}) {
 	return getTasksFromBeads(options);
@@ -20,7 +24,7 @@ export function getTasks(options = {}) {
 /**
  * Get a specific task by ID
  * @param {string} taskId - Task ID
- * @returns {Object|null} Task object or null
+ * @returns {Task | null} Task object or null
  */
 export function getTaskById(taskId) {
 	return getTaskByIdFromBeads(taskId);
