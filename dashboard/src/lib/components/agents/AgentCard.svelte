@@ -681,7 +681,7 @@
 </script>
 
 <div
-	class="card bg-base-100 border-2 transition-all relative h-full flex flex-col {isDragOver && hasConflict ? 'border-error border-dashed bg-error/10 scale-105' : isDragOver ? 'border-success border-dashed bg-success/10 scale-105' : assignSuccess ? 'border-success bg-success/5 animate-pulse' : 'border-base-300 hover:border-primary'} {isAssigning || assignSuccess ? 'pointer-events-none' : ''}"
+	class="card bg-base-100 border-2 transition-all relative h-full flex flex-col {isDragOver && hasConflict ? 'border-error border-dashed bg-error/10 scale-105' : isDragOver ? 'border-success border-dashed bg-success/10 scale-105' : assignSuccess ? 'border-success bg-success/5 animate-pulse' : 'border-base-300 hover:border-primary'} {isAssigning || assignSuccess ? 'pointer-events-none' : ''} {agentStatus() === 'offline' ? 'opacity-60 grayscale-[30%] hover:opacity-90 hover:grayscale-[5%]' : ''}"
 	role="button"
 	tabindex="0"
 	ondrop={handleDrop}
