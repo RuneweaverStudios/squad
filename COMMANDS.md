@@ -1,6 +1,6 @@
 # Agent Command Quick Reference
 
-**8 commands for multi-agent orchestration**
+**9 commands for multi-agent orchestration**
 
 ## Getting Help
 
@@ -13,7 +13,7 @@
 ```
 
 **What it shows:**
-- All 8 agent commands with examples
+- All 9 agent commands with examples
 - Quick tips and common patterns
 - Links to full documentation
 
@@ -130,7 +130,7 @@
 
 ---
 
-## Support Commands (4 commands)
+## Support Commands (5 commands)
 
 ### `/agent:status` - Check Current Work
 
@@ -178,6 +178,53 @@
 - Creates Beads tasks with proper dependency chains
 - Sets priorities (P0 = foundation, P1 = features, P2 = polish)
 - Generates task descriptions with acceptance criteria
+
+---
+
+### `/agent:doctor` - Diagnose and Repair jat Setup
+
+**Usage:**
+```bash
+/agent:doctor                   # Check installation health, fix issues
+```
+
+**What it checks:**
+- ✅ jat repo exists at `~/code/jat`
+- ✅ All 7 shared doc files present (`~/code/jat/shared/*.md`)
+- ✅ CLAUDE.md has correct imports
+- ✅ Statusline installed (`~/.claude/statusline.sh`)
+- ✅ Agent commands installed (`~/.claude/commands/agent/*.md`)
+- ✅ Tools symlinked to `~/bin`
+- ✅ Beads initialized in project (`.beads/` directory)
+
+**What it repairs:**
+- 🔧 Missing imports in CLAUDE.md (adds all 7)
+- 🔧 Malformed imports (fixes paths, typos)
+- 🔧 Duplicate imports (removes extras)
+- 🔧 Missing statusline (copies from jat)
+- 🔧 Missing Beads (runs `bd init`)
+
+**When to use:**
+- After cloning a new project
+- When jat features aren't working
+- After updating jat
+- Periodic health check
+
+**Output:**
+```
+## jat Doctor Report
+
+### Status: HEALTHY
+
+### Checks:
+✓ jat repo exists
+✓ 7 shared docs present
+✓ CLAUDE.md has all imports
+✓ Statusline installed
+✓ Agent commands installed (9)
+✓ Tools available
+✓ Beads initialized
+```
 
 ---
 
@@ -257,8 +304,8 @@
 ## See Also
 
 - **Full Documentation:** `README.md`
+- **Shared Docs:** `~/code/jat/shared/*.md` (imported by all projects)
 - **Project-Specific Docs:** `CLAUDE.md`
 - **Command Implementations:** `commands/agent/*.md`
 - **Dashboard:** Run `bd-dashboard` to see tasks visually
-- **Agent Mail:** See `~/.claude/CLAUDE.md` for full messaging docs
 - **Beads:** See `README.md` section on Beads command reference
