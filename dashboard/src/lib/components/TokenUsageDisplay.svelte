@@ -20,6 +20,8 @@
 
 	import { formatTokens, formatCost, getUsageColor } from '$lib/utils/numberFormat';
 	import { getTokenColorClass } from '$lib/config/tokenUsageConfig';
+	import AnimatedDigits from './AnimatedDigits.svelte';
+	import AnimatedCost from './AnimatedCost.svelte';
 
 	// Component Props
 	interface Props {
@@ -98,7 +100,7 @@
 						<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
 					</svg>
 				{/if}
-				<span class="font-medium">{formatTokensCompact(tokens)}</span>
+				<AnimatedDigits value={formatTokensCompact(tokens)} class="font-medium" />
 			</span>
 		{/if}
 
@@ -113,7 +115,7 @@
 						<path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
 					</svg>
 				{/if}
-				<span class="font-medium">{formatCostCompact(cost)}</span>
+				<AnimatedCost value={cost} format={formatCostCompact} class="font-medium" />
 			</span>
 		{/if}
 	</div>
@@ -123,13 +125,11 @@
 	<div class="flex items-center justify-between text-xs {className}">
 		{#if showTokens}
 			<span class="font-mono text-base-content/70">
-				{formatTokens(tokens)}
+				<AnimatedDigits value={formatTokens(tokens)} />
 			</span>
 		{/if}
 		{#if showCost}
-			<span class="font-mono font-medium {tokenColorClass}">
-				{formatCost(cost)}
-			</span>
+			<AnimatedCost value={cost} format={formatCost} class="font-mono font-medium {tokenColorClass}" />
 		{/if}
 	</div>
 
@@ -147,11 +147,11 @@
 	<!-- Compact Variant: Single-line minimal display -->
 	<span class="text-xs font-mono {tokenColorClass} {className}">
 		{#if showTokens && showCost}
-			{formatTokensCompact(tokens)} · {formatCostCompact(cost)}
+			<AnimatedDigits value={formatTokensCompact(tokens)} /> · <AnimatedCost value={cost} format={formatCostCompact} />
 		{:else if showTokens}
-			{formatTokensCompact(tokens)}
+			<AnimatedDigits value={formatTokensCompact(tokens)} />
 		{:else if showCost}
-			{formatCostCompact(cost)}
+			<AnimatedCost value={cost} format={formatCostCompact} />
 		{/if}
 	</span>
 
@@ -168,9 +168,7 @@
 				<span class="text-sm">Tokens {timeRangeLabel}</span>
 			</div>
 			{#if showTokens}
-				<span class="font-mono text-sm font-semibold {usageColorClass}">
-					{formatTokens(tokens)}
-				</span>
+				<AnimatedDigits value={formatTokens(tokens)} class="font-mono text-sm font-semibold {usageColorClass}" />
 			{/if}
 		</div>
 
@@ -184,9 +182,7 @@
 				<span class="text-sm">Spend {timeRangeLabel}</span>
 			</div>
 			{#if showCost}
-				<span class="font-mono text-sm font-semibold {usageColorClass}">
-					{formatCost(cost)}
-				</span>
+				<AnimatedCost value={cost} format={formatCost} class="font-mono text-sm font-semibold {usageColorClass}" />
 			{/if}
 		</div>
 
