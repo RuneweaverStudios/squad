@@ -143,9 +143,9 @@ launch_claude() {
 
         $TERMINAL -T "$window_title" -e bash -c "cd '$path' && $env_vars claude $claude_flags '$initial_prompt'" &
 
-        # Stagger launches by 0.5s to avoid race conditions
+        # Stagger launches by 7s so each agent sees previous agents' reservations
         if [[ $i -lt $count ]]; then
-            sleep 0.5
+            sleep 7
         fi
     done
 }
