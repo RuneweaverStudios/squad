@@ -1,9 +1,12 @@
 /**
  * Project Color Utilities
  * Provides consistent, visually distinct colors for projects
+ *
+ * Colors are assigned dynamically based on a hash of the project name.
+ * This ensures the same project always gets the same color across sessions.
  */
 
-// Vibrant color palette for project borders
+// Visually distinct color palette for projects
 const projectColorPalette = [
 	'#3b82f6', // blue
 	'#8b5cf6', // purple
@@ -20,20 +23,20 @@ const projectColorPalette = [
 	'#fb923c', // orange-400
 	'#4ade80', // green-400
 	'#c084fc', // purple-400
-	'#fb7185'  // rose-400
+	'#fb7185' // rose-400
 ];
 
 /**
- * Get consistent color for a project
- * Uses simple hash to ensure same project always gets same color
+ * Get consistent color for a project based on hash of project name
+ * Same project name always produces the same color
  */
 export function getProjectColor(taskId: string): string {
 	if (!taskId) return '#6b7280'; // gray for unknown
 
 	// Extract project prefix (e.g., "jat-abc" → "jat")
-	const projectPrefix = taskId.split('-')[0];
+	const projectPrefix = taskId.split('-')[0].toLowerCase();
 
-	// Simple hash function to get consistent color
+	// Hash-based color assignment
 	let hash = 0;
 	for (let i = 0; i < projectPrefix.length; i++) {
 		hash = projectPrefix.charCodeAt(i) + ((hash << 5) - hash);

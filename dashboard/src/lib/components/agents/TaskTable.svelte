@@ -5,7 +5,7 @@
 	import LabelBadges from '$lib/components/LabelBadges.svelte';
 	import { analyzeDependencies } from '$lib/utils/dependencyUtils';
 	import { getProjectFromTaskId } from '$lib/utils/projectUtils';
-	import { getProjectColor } from '$lib/utils/projectConfig';
+	import { getProjectColor } from '$lib/utils/projectColors';
 	import { getPriorityBadge, getTaskStatusBadge, getTypeBadge } from '$lib/utils/badgeHelpers';
 	import { formatRelativeTime, formatFullDate, normalizeTimestamp, getAgeColorClass } from '$lib/utils/dateFormatters';
 	import { toggleSetItem } from '$lib/utils/filterHelpers';
@@ -444,6 +444,21 @@
 		}
 	}
 
+	// Copy to clipboard
+	let copiedTaskId = $state<string | null>(null);
+	async function copyTaskId(taskId: string, event: MouseEvent) {
+		event.stopPropagation(); // Don't trigger row click
+		try {
+			await navigator.clipboard.writeText(taskId);
+			copiedTaskId = taskId;
+			setTimeout(() => {
+				copiedTaskId = null;
+			}, 1500);
+		} catch (err) {
+			console.error('Failed to copy:', err);
+		}
+	}
+
 
 	// Handle row click
 	function handleRowClick(taskId: string) {
@@ -854,10 +869,27 @@
 										</th>
 										<th class="{taskIsActive ? 'bg-info/10' : ''}">
 											<div class="flex flex-col gap-0.5">
-												<kbd
-													class="kbd kbd-xs font-mono text-base-content/70"
-													style="border-left: 3px solid {getProjectColor(getProjectFromTaskId(task.id) || '')};"
-												>{task.id}</kbd>
+												<div class="flex items-center gap-1 group/taskid">
+													<kbd
+														class="kbd kbd-xs font-mono text-base-content/70"
+														style="border-left: 3px solid {getProjectColor(task.id)};"
+													>{task.id}</kbd>
+													<button
+														class="opacity-0 group-hover/taskid:opacity-100 transition-opacity btn btn-xs btn-ghost btn-square p-0 h-5 w-5 min-h-0"
+														title="Copy task ID"
+														onclick={(e) => copyTaskId(task.id, e)}
+													>
+														{#if copiedTaskId === task.id}
+															<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3 text-success">
+																<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+															</svg>
+														{:else}
+															<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3 h-3">
+																<path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+															</svg>
+														{/if}
+													</button>
+												</div>
 												{#if task.status === 'in_progress' && task.assignee}
 													<!-- In progress: show assignee with spinning gear -->
 													<span class="flex items-center gap-1">
@@ -921,7 +953,7 @@
 														<span class="text-base-content/50 font-mono text-xs">{depIndex === task.depends_on.length - 1 ? '└──' : '├──'}</span>
 														<kbd
 															class="kbd kbd-xs font-mono text-base-content/60"
-															style="border-left: 3px solid {getProjectColor(getProjectFromTaskId(dep.id) || '')};"
+															style="border-left: 3px solid {getProjectColor(dep.id)};"
 														>{dep.id}</kbd>
 													</span>
 													<span class="badge badge-xs badge-ghost {getTaskStatusBadge(dep.status)} ml-4">
