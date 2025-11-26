@@ -133,7 +133,148 @@ bd list --json | jq -r --arg agent "$agent_name" \
 **Error handling:**
 - If no session ID found → error "No active session. Run /agent:start first"
 - If no agent name found → error "No agent registered. Run /agent:start first"
-- If no in_progress task → error "No task in progress. Run /agent:start to begin work"
+- If no in_progress task → **continue to Step 1D** (spontaneous work detection)
+
+---
+
+### STEP 1D: Spontaneous Work Detection (If No Task Found)
+
+**Only execute if Step 1C found no `in_progress` task.**
+
+This step detects ad-hoc work done without a formal Beads task and offers to create a backfilled task record for proper attribution and audit trail.
+
+#### Analyze Conversation Context
+
+Review recent conversation for **completed work signals**:
+
+1. **Work completion phrases:**
+   - "I added...", "I fixed...", "I implemented...", "I refactored..."
+   - "Built...", "Created...", "Removed...", "Changed...", "Updated..."
+   - "Done with...", "Finished...", "Completed..."
+   - "The fix...", "The solution...", "Root cause was..."
+
+2. **File/code references:**
+   - File paths mentioned in tool calls or discussion
+   - Code snippets shared or modified
+   - Technical details of implementation
+
+3. **Problem/solution context:**
+   - What problem was being solved?
+   - What was the approach taken?
+   - Any decisions or trade-offs made?
+
+#### Analyze Git State
+
+```bash
+# Check for uncommitted changes
+git status --porcelain
+
+# Get summary of what changed
+git diff --stat
+
+# Recent commits (may include work from this session)
+git log --oneline -5
+```
+
+#### Synthesize Work Summary
+
+Combine conversation signals + git state to infer:
+- **Title**: Verb + noun describing the work (e.g., "Fix jat CLI -p flag causing non-interactive sessions")
+- **Type**: `bug`, `feature`, `task`, or `chore` based on nature of work
+- **Description**: What was done and why
+- **Files touched**: From git diff + conversation context
+
+#### Present Proposal
+
+**If work detected**, display proposal and ask for confirmation:
+
+```
+╔══════════════════════════════════════════════════════════════════════════╗
+║               🔍 SPONTANEOUS WORK DETECTED                               ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+No formal task was in progress, but I detected work in this session:
+
+📋 Proposed Task:
+   Title: [inferred title]
+   Type: [task/bug/feature/chore]
+   Description: [inferred description]
+
+📁 Files Changed:
+   [list from git status/diff]
+
+Would you like me to create a backfilled task record and complete it?
+This preserves attribution and maintains the audit trail.
+
+[Proceed? Y/n]
+```
+
+#### If User Confirms
+
+```bash
+# Create the backfilled task (already in_progress since work is done)
+bd create "[title]" \
+  --type [type] \
+  --description "[description]" \
+  --assignee "$agent_name" \
+  --status in_progress
+
+# Extract task_id from output
+# Set $task_id and $task_title variables
+# Continue to Step 2 (Read & Respond to Mail)
+```
+
+#### If User Declines
+
+```
+Understood. No task record created.
+
+Options:
+  • /agent:start - Pick up a new task
+  • bd create "..." - Manually create a task
+  • Just commit your changes directly with git
+```
+
+**Exit the /agent:complete flow** - do not continue to Step 2.
+
+#### If No Work Detected
+
+```
+No task in progress and no spontaneous work detected.
+
+Options:
+  • /agent:start - Pick a task to work on
+  • bd list - View available tasks
+```
+
+**Exit the /agent:complete flow** - do not continue to Step 2.
+
+---
+
+#### Real Example: Spontaneous Bug Fix
+
+**Conversation signals detected:**
+```
+User: "jat jat 4 crashed all terminals"
+Agent: "I see the issue... The -p flag makes Claude non-interactive..."
+Agent: "Let me update the jat script..."
+Agent: "Now try running jat jat 4 again"
+```
+
+**Git state:**
+```
+M cli/jat
+```
+
+**Proposed backfill:**
+```
+Title: Fix jat CLI -p flag causing non-interactive sessions
+Type: bug
+Description: The -p flag was causing Claude Code to run in print mode
+             (non-interactive), exiting immediately after processing.
+             Removed -p and pass prompt as positional argument instead.
+Files: cli/jat
+```
 
 ---
 
@@ -291,9 +432,66 @@ For quick completion without verification, use `/agent:next quick` instead.
 
 ---
 
-## Output Example
+## Output Examples
 
-**Successful completion:**
+**Spontaneous work completion (no prior task):**
+```
+📋 Checking for in_progress task...
+   No task found for SwiftMoon
+
+🔍 Analyzing session for spontaneous work...
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║               🔍 SPONTANEOUS WORK DETECTED                               ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+No formal task was in progress, but I detected work in this session:
+
+📋 Proposed Task:
+   Title: Fix jat CLI -p flag causing non-interactive sessions
+   Type: bug
+   Description: The -p flag was causing Claude Code to run in print mode
+                (non-interactive), exiting immediately after processing.
+                Removed -p and pass prompt as positional argument instead.
+
+📁 Files Changed:
+   M cli/jat
+
+Would you like me to create a backfilled task record and complete it?
+This preserves attribution and maintains the audit trail.
+
+[Proceed? Y/n] Y
+
+✓ Created backfill task: jat-abc "Fix jat CLI -p flag causing non-interactive sessions"
+
+📬 Checking Agent Mail...
+  No unread messages
+
+🔍 Verifying task before completion...
+   ✅ No tests configured
+   ✅ Lint clean
+
+💾 Committing changes...
+   ✅ Committed: "bug: Fix jat CLI -p flag causing non-interactive sessions"
+
+✅ Marking task complete in Beads...
+   ✅ Closed jat-abc
+
+📢 Announcing task completion...
+   ✅ Sent to @active
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Task Completed: jat-abc "Fix jat CLI -p flag causing non-interactive sessions"
+👤 Agent: SwiftMoon
+📝 Note: Backfilled from spontaneous work
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[Available tasks menu follows...]
+```
+
+---
+
+**Standard completion (existing task):**
 ```
 📬 Checking Agent Mail...
   1 unread message
@@ -357,9 +555,17 @@ No active session detected.
 Run /agent:start to begin working
 ```
 
-**No task in progress:**
+**No task in progress (with spontaneous work):**
 ```
-No task currently in progress.
+🔍 SPONTANEOUS WORK DETECTED
+[Proposal displayed, user confirms]
+✓ Created backfill task: jat-xyz
+[Continues to normal completion flow]
+```
+
+**No task in progress (no work detected):**
+```
+No task in progress and no spontaneous work detected.
 Run /agent:start to pick a task
 ```
 
@@ -379,8 +585,9 @@ Or run /agent:verify to see detailed error report
 
 | Step | Name | When |
 |------|------|------|
-| 1 | Get Task and Agent Identity | ALWAYS |
-| 2 | Read & Respond to Mail | ALWAYS |
+| 1A-C | Get Task and Agent Identity | ALWAYS |
+| 1D | Spontaneous Work Detection | If no in_progress task found |
+| 2 | Read & Respond to Mail | ALWAYS (after task identified) |
 | 3 | Verify Task | ALWAYS |
 | 4 | Commit Changes | ALWAYS |
 | 5 | Mark Task Complete | ALWAYS |
