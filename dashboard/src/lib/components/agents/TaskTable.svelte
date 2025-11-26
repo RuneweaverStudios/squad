@@ -3,11 +3,13 @@
 	import DependencyIndicator from '$lib/components/DependencyIndicator.svelte';
 	import { analyzeDependencies } from '$lib/utils/dependencyUtils';
 	import { openTaskDrawer } from '$lib/stores/drawerStore';
+	import { getProjectFromTaskId } from '$lib/utils/projectUtils';
 
 	let { tasks = [], allTasks = [], agents = [], reservations = [], ontaskclick = () => {} } = $props();
 
 	// Initialize filters from URL params (default to open tasks)
 	let searchQuery = $state('');
+	let selectedProjects = $state(new Set());
 	let selectedPriorities = $state(new Set(['0', '1', '2', '3']));
 	let selectedStatuses = $state(new Set(['open']));
 	let selectedTypes = $state(new Set());
@@ -49,6 +51,13 @@
 		const params = new URLSearchParams(window.location.search);
 		searchQuery = params.get('search') || '';
 
+		const projects = params.get('projects');
+		if (projects) {
+			selectedProjects = new Set(projects.split(','));
+		} else {
+			selectedProjects = new Set();
+		}
+
 		const priorities = params.get('priorities');
 		if (priorities) {
 			selectedPriorities = new Set(priorities.split(','));
@@ -83,6 +92,9 @@
 		const params = new URLSearchParams();
 
 		if (searchQuery) params.set('search', searchQuery);
+		if (selectedProjects.size > 0) {
+			params.set('projects', Array.from(selectedProjects).join(','));
+		}
 		if (selectedPriorities.size > 0 && selectedPriorities.size < 4) {
 			params.set('priorities', Array.from(selectedPriorities).join(','));
 		}
@@ -113,6 +125,14 @@
 					task.description?.toLowerCase().includes(query) ||
 					task.id?.toLowerCase().includes(query)
 			);
+		}
+
+		// Filter by project
+		if (selectedProjects.size > 0) {
+			result = result.filter((task) => {
+				const project = getProjectFromTaskId(task.id);
+				return project && selectedProjects.has(project);
+			});
 		}
 
 		// Filter by priority
@@ -220,7 +240,26 @@
 		return Array.from(typesSet).sort();
 	});
 
+	const availableProjects = $derived.by(() => {
+		const projectsSet = new Set();
+		tasks.forEach((task) => {
+			const project = getProjectFromTaskId(task.id);
+			if (project) projectsSet.add(project);
+		});
+		return Array.from(projectsSet).sort();
+	});
+
 	// Toggle functions
+	function toggleProject(project) {
+		if (selectedProjects.has(project)) {
+			selectedProjects.delete(project);
+		} else {
+			selectedProjects.add(project);
+		}
+		selectedProjects = new Set(selectedProjects);
+		updateURL();
+	}
+
 	function togglePriority(priority) {
 		if (selectedPriorities.has(priority)) {
 			selectedPriorities.delete(priority);
@@ -263,6 +302,7 @@
 
 	function clearAllFilters() {
 		searchQuery = '';
+		selectedProjects = new Set();
 		selectedPriorities = new Set(['0', '1', '2', '3']);
 		selectedStatuses = new Set(['open']);
 		selectedTypes = new Set();
@@ -511,6 +551,35 @@
 				oninput={() => updateURL()}
 			/>
 
+			<!-- Project Filter -->
+			{#if availableProjects.length > 0}
+				<div class="dropdown dropdown-hover">
+					<div tabindex="0" role="button" class="btn btn-sm btn-ghost gap-1">
+						Project
+						<span class="badge badge-sm {selectedProjects.size > 0 ? 'badge-primary' : 'badge-ghost'}">{selectedProjects.size || 'all'}</span>
+						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+						</svg>
+					</div>
+					<ul tabindex="0" class="dropdown-content z-50 menu p-2 shadow bg-base-100 rounded-box w-44">
+						{#each availableProjects as project}
+							<li>
+								<label class="label cursor-pointer justify-start gap-2">
+									<input
+										type="checkbox"
+										class="checkbox checkbox-sm"
+										checked={selectedProjects.has(project)}
+										onchange={() => toggleProject(project)}
+									/>
+									<span>{project}</span>
+									<span class="text-xs opacity-60">({tasks.filter(t => getProjectFromTaskId(t.id) === project).length})</span>
+								</label>
+							</li>
+						{/each}
+					</ul>
+				</div>
+			{/if}
+
 			<!-- Priority Filter -->
 			<div class="dropdown dropdown-hover">
 				<div tabindex="0" role="button" class="btn btn-sm btn-ghost gap-1">
@@ -623,7 +692,7 @@
 			{/if}
 
 			<!-- Clear Filters -->
-			{#if searchQuery || selectedPriorities.size < 4 || selectedStatuses.size !== 1 || !selectedStatuses.has('open') || selectedTypes.size > 0 || selectedLabels.size > 0}
+			{#if searchQuery || selectedProjects.size > 0 || selectedPriorities.size < 4 || selectedStatuses.size !== 1 || !selectedStatuses.has('open') || selectedTypes.size > 0 || selectedLabels.size > 0}
 				<button class="btn btn-sm btn-ghost text-error" onclick={clearAllFilters}>
 					Clear filters
 				</button>
@@ -834,7 +903,7 @@
 									<path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
 								</svg>
 								<p>No tasks found</p>
-								{#if searchQuery || selectedPriorities.size < 4 || selectedStatuses.size !== 1 || !selectedStatuses.has('open') || selectedTypes.size > 0 || selectedLabels.size > 0}
+								{#if searchQuery || selectedProjects.size > 0 || selectedPriorities.size < 4 || selectedStatuses.size !== 1 || !selectedStatuses.has('open') || selectedTypes.size > 0 || selectedLabels.size > 0}
 									<button class="btn btn-sm btn-ghost mt-2" onclick={clearAllFilters}>
 										Clear filters
 									</button>
