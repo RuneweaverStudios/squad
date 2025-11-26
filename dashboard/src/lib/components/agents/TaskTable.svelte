@@ -3,6 +3,7 @@
 	import DependencyIndicator from '$lib/components/DependencyIndicator.svelte';
 	import FilterDropdown from '$lib/components/FilterDropdown.svelte';
 	import LabelBadges from '$lib/components/LabelBadges.svelte';
+	import TaskIdBadge from '$lib/components/TaskIdBadge.svelte';
 	import { analyzeDependencies } from '$lib/utils/dependencyUtils';
 	import { getProjectFromTaskId } from '$lib/utils/projectUtils';
 	import { getProjectColor } from '$lib/utils/projectColors';
@@ -29,7 +30,7 @@
 		issue_type?: string;
 		assignee?: string;
 		labels?: string[];
-		depends_on?: Array<{ id: string }>;
+		depends_on?: Array<{ id: string; status?: string; title?: string; priority?: number; issue_type?: string; assignee?: string }>;
 		created_at?: string;
 		updated_at?: string;
 	}
@@ -855,11 +856,11 @@
 									{@const depStatus = analyzeDependencies(task)}
 									{@const taskIsActive = task.status === 'in_progress' && task.assignee}
 									<tr
-										class="hover:bg-base-200 cursor-pointer transition-colors {depStatus.hasBlockers ? 'opacity-60' : ''} {selectedTasks.has(task.id) ? 'bg-primary/10' : ''} {taskIsActive ? 'bg-info/10' : ''}"
+										class="hover:bg-base-200/50 cursor-pointer transition-colors group overflow-visible {depStatus.hasBlockers ? 'opacity-60' : ''} {selectedTasks.has(task.id) ? 'bg-primary/10' : ''} {taskIsActive ? 'bg-info/10' : ''}"
 										onclick={() => handleRowClick(task.id)}
 										title={depStatus.hasBlockers ? `Blocked: ${depStatus.blockingReason}` : ''}
 									>
-										<th class="{taskIsActive ? 'bg-info/10' : ''}" onclick={(e) => e.stopPropagation()}>
+										<th class="border-l-2 border-l-transparent group-hover:border-l-primary group-hover:bg-base-200/50 transition-colors {taskIsActive ? 'bg-info/10' : ''}" onclick={(e) => e.stopPropagation()}>
 											<input
 												type="checkbox"
 												class="checkbox checkbox-sm"
@@ -867,45 +868,8 @@
 												onchange={() => toggleTask(task.id)}
 											/>
 										</th>
-										<th class="{taskIsActive ? 'bg-info/10' : ''}">
-											<div class="flex flex-col gap-0.5">
-												<div class="flex items-center gap-1 group/taskid">
-													<kbd
-														class="kbd kbd-xs font-mono text-base-content/70"
-														style="border-left: 3px solid {getProjectColor(task.id)};"
-													>{task.id}</kbd>
-													<button
-														class="opacity-0 group-hover/taskid:opacity-100 transition-opacity btn btn-xs btn-ghost btn-square p-0 h-5 w-5 min-h-0"
-														title="Copy task ID"
-														onclick={(e) => copyTaskId(task.id, e)}
-													>
-														{#if copiedTaskId === task.id}
-															<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3 text-success">
-																<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-															</svg>
-														{:else}
-															<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3 h-3">
-																<path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
-															</svg>
-														{/if}
-													</button>
-												</div>
-												{#if task.status === 'in_progress' && task.assignee}
-													<!-- In progress: show assignee with spinning gear -->
-													<span class="flex items-center gap-1">
-														<svg class="shrink-0 w-3 h-3 text-info animate-spin origin-center" viewBox="0 0 24 24" fill="currentColor" aria-label="Currently in progress">
-															<title>Currently in progress</title>
-															<path d={STATUS_ICONS.gear} />
-														</svg>
-														<span class="text-xs font-medium text-info">{task.assignee}</span>
-													</span>
-												{:else}
-													<!-- Other statuses: show regular badge -->
-													<span class="badge badge-xs {getTaskStatusBadge(task.status)}">
-														{task.status?.replace('_', ' ')}
-													</span>
-												{/if}
-											</div>
+										<th class="group-hover:bg-base-200/50 {taskIsActive ? 'bg-info/10' : ''}">
+											<TaskIdBadge {task} size="xs" showType={false} showAssignee={true} copyOnly />
 										</th>
 										<td class="{taskIsActive ? 'bg-info/10' : ''}">
 											<div>
@@ -941,39 +905,32 @@
 								<!-- Render dependencies as indented child rows -->
 								{#if task.depends_on && task.depends_on.length > 0}
 									{#each task.depends_on as dep, depIndex (dep.id)}
+										{@const depIsActive = dep.status === 'in_progress' && dep.assignee}
 										<tr
-											class="hover:bg-base-200/50 cursor-pointer transition-colors opacity-80 bg-base-200/20"
+											class="hover:bg-base-200/50 cursor-pointer transition-colors group {depIsActive ? 'bg-info/10' : 'opacity-80 bg-base-200/20'}"
 											onclick={() => handleRowClick(dep.id)}
 											title="Dependency: {dep.title}"
 										>
-											<th class="bg-base-100"></th>
-											<th class="bg-base-100">
-												<div class="flex flex-col gap-0.5">
-													<span class="flex items-center gap-1">
-														<span class="text-base-content/50 font-mono text-xs">{depIndex === task.depends_on.length - 1 ? '└──' : '├──'}</span>
-														<kbd
-															class="kbd kbd-xs font-mono text-base-content/60"
-															style="border-left: 3px solid {getProjectColor(dep.id)};"
-														>{dep.id}</kbd>
-													</span>
-													<span class="badge badge-xs badge-ghost {getTaskStatusBadge(dep.status)} ml-4">
-														{dep.status?.replace('_', ' ')}
-													</span>
+											<th class="border-l-2 border-l-transparent group-hover:border-l-primary group-hover:bg-base-200/50 transition-colors {depIsActive ? 'bg-info/10' : ''}"></th>
+											<th class="group-hover:bg-base-200/50 {depIsActive ? 'bg-info/10' : ''}">
+												<div class="flex items-center gap-1">
+													<span class="text-base-content/50 font-mono text-xs">{depIndex === task.depends_on.length - 1 ? '└──' : '├──'}</span>
+													<TaskIdBadge task={{ id: dep.id, status: dep.status, issue_type: dep.issue_type, assignee: dep.assignee }} size="xs" showType={false} showAssignee={true} copyOnly />
 												</div>
 											</th>
-											<td>
+											<td class="{depIsActive ? 'bg-info/10' : ''}">
 												<div class="pl-4">
 													<div class="text-xs text-base-content/70">{dep.title}</div>
 												</div>
 											</td>
-											<td class="text-center">
+											<td class="text-center {depIsActive ? 'bg-info/10' : ''}">
 												<span class="badge badge-sm badge-ghost {getPriorityBadge(dep.priority)}">
 													P{dep.priority}
 												</span>
 											</td>
-											<td></td>
-											<td></td>
-											<td></td>
+											<td class="{depIsActive ? 'bg-info/10' : ''}"></td>
+											<td class="{depIsActive ? 'bg-info/10' : ''}"></td>
+											<td class="{depIsActive ? 'bg-info/10' : ''}"></td>
 										</tr>
 									{/each}
 								{/if}
