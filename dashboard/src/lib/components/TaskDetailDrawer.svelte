@@ -444,9 +444,10 @@
 					{:else}
 						<h2 class="text-2xl font-bold text-base-content">Task Details</h2>
 					{/if}
-					<!-- Task ID + Save Status -->
+					<!-- Task ID + Project + Status + Save Status -->
 					<div class="flex items-center gap-2 mt-1">
 						{#if task}
+							<!-- Task ID (clickable to copy) -->
 							<button
 								class="badge badge-sm badge-outline gap-1 cursor-pointer hover:badge-primary transition-colors"
 								onclick={copyTaskIdToClipboard}
@@ -463,6 +464,12 @@
 									</svg>
 								{/if}
 							</button>
+							<!-- Project badge (quick context) -->
+							{#if task.project}
+								<span class="badge badge-sm badge-primary">{task.project}</span>
+							{/if}
+							<!-- Status badge (quick context) -->
+							<span class="badge badge-sm {statusColors[task.status] || 'badge-ghost'}">{task.status || 'unknown'}</span>
 						{/if}
 						{#if isSaving}
 							<span class="text-sm text-base-content/70">
