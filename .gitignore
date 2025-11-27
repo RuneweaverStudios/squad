@@ -17,8 +17,9 @@ mcp_agent_mail/
 # Claude Code session-specific files (per-developer, don't commit)
 .claude/agent-*.txt
 .claude/agent-*-activity.jsonl
+.mcp.json
 # Note: Session IDs now in /tmp/claude-session-${PPID}.txt (PPID-based, not in repo)
 
-# Beads task database (per-developer, run 'bd init' after cloning)
-.beads/
+# Beads: JSONL files are committed (source of truth), SQLite is local cache
+# The .beads/.gitignore handles ignoring db files while tracking jsonl
 tools/
