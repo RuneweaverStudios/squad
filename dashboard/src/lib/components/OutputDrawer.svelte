@@ -65,6 +65,38 @@
 	// Polling interval reference
 	let pollInterval: ReturnType<typeof setInterval> | null = null;
 
+	/**
+	 * Extract agent name from session output by parsing the statusline
+	 * Looks for patterns like "AgentName · [P1]" or ANSI-colored version
+	 */
+	function extractAgentName(output: string, fallback: string): string {
+		if (!output) return fallback;
+
+		// Pattern 1: Look for statusline format "   AgentName · [P" (with ANSI codes stripped)
+		// The statusline shows: "   AgentName · [P1] task-id - title"
+		const stripped = output.replace(/\x1b\[[0-9;]*m/g, '');
+
+		// Match agent name at start of statusline (after whitespace, before " · [P")
+		const statuslineMatch = stripped.match(/^\s{2,}([A-Z][a-zA-Z]+)\s+·\s+\[P/m);
+		if (statuslineMatch) {
+			return statuslineMatch[1];
+		}
+
+		// Pattern 2: Look for "AgentName | [P" format (older statusline)
+		const pipeMatch = stripped.match(/^\s{2,}([A-Z][a-zA-Z]+)\s+\|\s+\[P/m);
+		if (pipeMatch) {
+			return pipeMatch[1];
+		}
+
+		// Pattern 3: Look for agent identity in output like "Agent: AgentName"
+		const agentMatch = stripped.match(/Agent:\s+([A-Z][a-zA-Z]+)/);
+		if (agentMatch) {
+			return agentMatch[1];
+		}
+
+		return fallback;
+	}
+
 	// Get currently selected session data
 	const currentSession = $derived(() => {
 		if (!sessions.length) return null;
@@ -198,11 +230,16 @@
 				try {
 					const outputResponse = await fetch(`/api/sessions/${session.name}/output?lines=100`);
 					const outputData = await outputResponse.json();
+					const output = outputData.success ? outputData.output : '';
+
+					// Try to extract real agent name from statusline in output
+					const fallbackName = session.name.replace('jat-', '');
+					const agentName = extractAgentName(output, fallbackName);
 
 					return {
 						name: session.name,
-						agentName: session.name.replace('jat-', ''),
-						output: outputData.success ? outputData.output : '',
+						agentName,
+						output,
 						lineCount: outputData.success ? outputData.lineCount : 0,
 						lastUpdated: new Date().toISOString()
 					};
