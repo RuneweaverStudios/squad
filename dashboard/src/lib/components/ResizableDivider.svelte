@@ -61,8 +61,7 @@
 </script>
 
 <div
-	class="flex items-center justify-center cursor-row-resize select-none transition-colors {className}"
-	class:bg-primary/20={isDragging}
+	class="flex items-center justify-center cursor-row-resize select-none transition-colors {className} {isDragging ? 'bg-primary/20' : ''}"
 	role="separator"
 	aria-orientation="horizontal"
 	tabindex="0"
