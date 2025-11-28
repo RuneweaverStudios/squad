@@ -21,10 +21,13 @@
 	 * - cost: Cost in USD for today
 	 */
 
+	import { onMount, onDestroy } from 'svelte';
+	import { fade, fly } from 'svelte/transition';
 	import { ansiToHtml } from '$lib/utils/ansiToHtml';
 	import TokenUsageDisplay from '$lib/components/TokenUsageDisplay.svelte';
 	import TaskIdBadge from '$lib/components/TaskIdBadge.svelte';
 	import AgentAvatar from '$lib/components/AgentAvatar.svelte';
+	import { playTaskCompleteSound } from '$lib/utils/soundEffects';
 
 	// Props
 	interface Task {
@@ -43,11 +46,14 @@
 		lineCount?: number;
 		tokens?: number;
 		cost?: number;
+		isComplete?: boolean; // Task completion state
+		startTime?: Date | null; // When work started (for elapsed time)
 		onKillSession?: () => void;
 		onInterrupt?: () => void;
 		onContinue?: () => void;
 		onTaskClick?: (taskId: string) => void;
 		onSendInput?: (input: string, type: 'text' | 'key') => Promise<void>;
+		onDismiss?: () => void; // Called when completion banner auto-dismisses
 		class?: string;
 	}
 
@@ -59,13 +65,71 @@
 		lineCount = 0,
 		tokens = 0,
 		cost = 0,
+		isComplete = false,
+		startTime = null,
 		onKillSession,
 		onInterrupt,
 		onContinue,
 		onTaskClick,
 		onSendInput,
+		onDismiss,
 		class: className = ''
 	}: Props = $props();
+
+	// Completion state
+	let showCompletionBanner = $state(false);
+	let completionDismissTimer: ReturnType<typeof setTimeout> | null = null;
+	let previousIsComplete = $state(false);
+
+	// Track when completion state changes to trigger banner
+	$effect(() => {
+		if (isComplete && !previousIsComplete) {
+			// Task just completed - show banner and play sound
+			showCompletionBanner = true;
+			playTaskCompleteSound();
+
+			// Auto-dismiss after 4 seconds
+			completionDismissTimer = setTimeout(() => {
+				showCompletionBanner = false;
+				onDismiss?.();
+			}, 4000);
+		}
+		previousIsComplete = isComplete;
+	});
+
+	// Cleanup timer on destroy
+	onDestroy(() => {
+		if (completionDismissTimer) {
+			clearTimeout(completionDismissTimer);
+		}
+	});
+
+	// Calculate elapsed time
+	const elapsedTime = $derived((): string => {
+		if (!startTime) return '';
+		const elapsed = Date.now() - startTime.getTime();
+		const seconds = Math.floor(elapsed / 1000);
+		const minutes = Math.floor(seconds / 60);
+		const hours = Math.floor(minutes / 60);
+
+		if (hours > 0) {
+			return `${hours}h ${minutes % 60}m`;
+		} else if (minutes > 0) {
+			return `${minutes}m ${seconds % 60}s`;
+		} else {
+			return `${seconds}s`;
+		}
+	});
+
+	// Format token count for display
+	function formatTokens(t: number): string {
+		if (t >= 1_000_000) {
+			return `${(t / 1_000_000).toFixed(1)}M`;
+		} else if (t >= 1_000) {
+			return `${(t / 1_000).toFixed(1)}K`;
+		}
+		return t.toString();
+	}
 
 	// Auto-scroll state
 	let autoScroll = $state(true);
@@ -89,7 +153,7 @@
 	}
 
 	// Parse Claude Code prompt options from output
-	const detectedOptions = $derived((): PromptOption[] => {
+	const detectedOptions = $derived.by((): PromptOption[] => {
 		if (!output) return [];
 
 		const options: PromptOption[] = [];
@@ -235,9 +299,70 @@
 </script>
 
 <div
-	class="card bg-base-100 shadow-lg border border-base-300 overflow-hidden {className}"
+	class="card bg-base-100 shadow-lg border overflow-hidden {className}"
+	class:border-base-300={!showCompletionBanner}
+	class:border-success={showCompletionBanner}
 	style="min-height: 300px;"
 >
+	<!-- Completion Success Banner -->
+	{#if showCompletionBanner}
+		<div
+			class="relative overflow-hidden"
+			style="background: linear-gradient(135deg, oklch(0.45 0.18 145) 0%, oklch(0.38 0.15 160) 100%);"
+			transition:fly={{ y: -20, duration: 300 }}
+		>
+			<!-- Subtle shimmer effect -->
+			<div
+				class="absolute inset-0 opacity-30"
+				style="background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent); animation: shimmer 2s infinite;"
+			></div>
+
+			<div class="relative px-4 py-3">
+				<div class="flex items-center justify-between">
+					<div class="flex items-center gap-3">
+						<!-- Success checkmark icon -->
+						<div class="flex items-center justify-center w-8 h-8 rounded-full bg-white/20">
+							<svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+							</svg>
+						</div>
+						<div>
+							<h3 class="font-bold text-white text-lg">Task Complete!</h3>
+							{#if task}
+								<p class="text-white/80 text-sm truncate max-w-xs">{task.title}</p>
+							{/if}
+						</div>
+					</div>
+
+					<!-- Summary stats -->
+					<div class="flex items-center gap-4 text-white/90 text-sm">
+						{#if elapsedTime}
+							<div class="flex items-center gap-1.5">
+								<svg class="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+								</svg>
+								<span class="font-mono">{elapsedTime}</span>
+							</div>
+						{/if}
+						{#if tokens > 0}
+							<div class="flex items-center gap-1.5">
+								<svg class="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+								</svg>
+								<span class="font-mono">{formatTokens(tokens)}</span>
+							</div>
+						{/if}
+						{#if cost > 0}
+							<div class="flex items-center gap-1.5">
+								<span class="font-mono font-semibold">${cost.toFixed(2)}</span>
+							</div>
+						{/if}
+					</div>
+				</div>
+			</div>
+		</div>
+	{/if}
+
 	<!-- Header: Task-first design -->
 	<div class="card-body p-4 pb-2">
 		<!-- Task Title (Primary) -->
@@ -460,3 +585,14 @@
 		</div>
 	</div>
 </div>
+
+<style>
+	@keyframes shimmer {
+		0% {
+			transform: translateX(-100%);
+		}
+		100% {
+			transform: translateX(100%);
+		}
+	}
+</style>
