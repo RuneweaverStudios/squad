@@ -49,6 +49,9 @@
 		expires_ts: string;
 	}
 
+	// Grouping mode for task table - determines how tasks are grouped in the view
+	type GroupingMode = 'type' | 'parent' | 'label';
+
 	interface Props {
 		tasks?: Task[];
 		allTasks?: Task[];
@@ -70,6 +73,12 @@
 	let exitingTasks = $state<Task[]>([]);
 	let startingTaskIds = $state<string[]>([]);
 	let completedTaskIds = $state<string[]>([]);
+
+	// Grouping mode - how tasks are grouped in the table view
+	// 'type' - group by issue_type (bug, task, feature, etc.)
+	// 'parent' - group by parent task ID (for epic/subtask hierarchies)
+	// 'label' - group by first label
+	let groupingMode = $state<GroupingMode>('type');
 
 	// Detect new, removed, and status-changed tasks when tasks array changes
 	// Using $effect.pre to set animation state BEFORE rendering
