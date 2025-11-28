@@ -228,75 +228,107 @@
 		return options;
 	});
 
-	// Detect JAT workflow commands in output (e.g., "Next steps: /jat:complete, /jat:next")
-	// Only looks at recent output to detect dynamically when agent is waiting for input
+	// Detect JAT workflow state from structured markers in output
+	// Markers: [JAT:READY actions=...], [JAT:WORKING task=...], [JAT:IDLE actions=...]
 	const detectedWorkflowCommands = $derived.by((): WorkflowCommand[] => {
 		if (!output) return [];
 
-		// Only look at the last ~2500 characters (recent output)
-		const recentOutput = output.slice(-2500);
+		// Only look at the last ~3000 characters (recent output)
+		const recentOutput = output.slice(-3000);
 
 		const commands: WorkflowCommand[] = [];
 
-		// Look for /jat: commands in the output
-		// Match patterns like "• /jat:complete - Complete this task" or just "/jat:next"
-		const commandPatterns: { regex: RegExp; label: string; variant: WorkflowCommand['variant'] }[] = [
-			{
-				regex: /\/jat:complete\b/,
-				label: 'Complete',
-				variant: 'success'
-			},
-			{
-				regex: /\/jat:next\b/,
-				label: 'Next',
-				variant: 'primary'
-			},
-			{
-				regex: /\/jat:pause\b/,
-				label: 'Pause',
-				variant: 'warning'
-			},
-			{
-				regex: /\/jat:status\b/,
-				label: 'Status',
-				variant: 'info'
+		// Check for structured JAT markers (most reliable detection)
+		const readyMatch = recentOutput.match(/\[JAT:READY actions=([^\]]+)\]/);
+		const workingMatch = recentOutput.match(/\[JAT:WORKING task=([^\]]+)\]/);
+		const idleMatch = recentOutput.match(/\[JAT:IDLE actions=([^\]]+)\]/);
+
+		// If WORKING marker is more recent than READY/IDLE, agent is actively working
+		if (workingMatch) {
+			const workingIndex = recentOutput.lastIndexOf('[JAT:WORKING');
+			const readyIndex = recentOutput.lastIndexOf('[JAT:READY');
+			const idleIndex = recentOutput.lastIndexOf('[JAT:IDLE');
+
+			// If WORKING is the most recent marker, no workflow buttons
+			if (workingIndex > readyIndex && workingIndex > idleIndex) {
+				return [];
 			}
-		];
+		}
 
-		// Check if we're in a "work complete" context (look for "Next steps" or similar patterns)
-		const hasNextStepsContext =
-			/next\s*steps?:/i.test(recentOutput) ||
-			/ready\s*for\s*review/i.test(recentOutput) ||
-			/work\s*complete/i.test(recentOutput) ||
-			/task\s*complete/i.test(recentOutput);
+		// Parse READY marker actions
+		if (readyMatch) {
+			const readyIndex = recentOutput.lastIndexOf('[JAT:READY');
+			const workingIndex = recentOutput.lastIndexOf('[JAT:WORKING');
 
-		// Check if work has resumed (these patterns indicate agent is working again)
-		const hasResumedWork =
-			/Starting work on/i.test(recentOutput) ||
-			/STARTING WORK:/i.test(recentOutput) ||
-			/Get to work!/i.test(recentOutput) ||
-			/I'll help/i.test(recentOutput) ||
-			/Let me/i.test(recentOutput) ||
-			/I'm going to/i.test(recentOutput) ||
-			/╔.*STARTING/i.test(recentOutput);
+			// Only use READY if it's more recent than WORKING
+			if (readyIndex > workingIndex) {
+				const actions = readyMatch[1].split(',').map((a) => a.trim());
 
-		// Only show workflow buttons if we detect completion context AND work hasn't resumed
-		if (!hasNextStepsContext || hasResumedWork) return [];
+				if (actions.includes('complete')) {
+					commands.push({
+						command: '/jat:complete',
+						label: 'Done',
+						description: 'Complete this task and see menu',
+						variant: 'success'
+					});
+				}
+				if (actions.includes('next')) {
+					commands.push({
+						command: '/jat:next',
+						label: 'Next',
+						description: 'Complete and start next task',
+						variant: 'primary'
+					});
+				}
+			}
+		}
 
-		for (const pattern of commandPatterns) {
-			if (pattern.regex.test(recentOutput)) {
-				// Extract description if available (text after the command)
-				const descMatch = recentOutput.match(
-					new RegExp(pattern.regex.source + '\\s*[-–—]\\s*([^\\n]+)')
-				);
-				const description = descMatch ? descMatch[1].trim() : '';
+		// Parse IDLE marker actions
+		if (idleMatch && commands.length === 0) {
+			const idleIndex = recentOutput.lastIndexOf('[JAT:IDLE');
+			const workingIndex = recentOutput.lastIndexOf('[JAT:WORKING');
 
-				commands.push({
-					command: `/jat:${pattern.label.toLowerCase()}`,
-					label: pattern.label,
-					description,
-					variant: pattern.variant
-				});
+			if (idleIndex > workingIndex) {
+				const actions = idleMatch[1].split(',').map((a) => a.trim());
+
+				if (actions.includes('start')) {
+					commands.push({
+						command: '/jat:start',
+						label: 'Start',
+						description: 'Pick up a task',
+						variant: 'primary'
+					});
+				}
+			}
+		}
+
+		// Fallback: detect old-style patterns if no markers found
+		if (commands.length === 0) {
+			const hasNextStepsContext =
+				/next\s*steps?:/i.test(recentOutput) && /\/jat:(complete|next)\b/.test(recentOutput);
+
+			const hasResumedWork =
+				/\[JAT:WORKING/.test(recentOutput) ||
+				/Get to work!/i.test(recentOutput) ||
+				/╔.*STARTING WORK/i.test(recentOutput);
+
+			if (hasNextStepsContext && !hasResumedWork) {
+				if (/\/jat:next\b/.test(recentOutput)) {
+					commands.push({
+						command: '/jat:next',
+						label: 'Next',
+						description: 'Complete and start next task',
+						variant: 'primary'
+					});
+				}
+				if (/\/jat:complete\b/.test(recentOutput)) {
+					commands.push({
+						command: '/jat:complete',
+						label: 'Done',
+						description: 'Complete this task',
+						variant: 'success'
+					});
+				}
 			}
 		}
 

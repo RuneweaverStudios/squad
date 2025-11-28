@@ -553,7 +553,11 @@ This preserves attribution and maintains the audit trail.
    • /jat:start <task-id> - Start different task
    • /jat:status - Review current state
    • Close terminal if done for the day
+
+[JAT:IDLE actions=start]
 ```
+
+**The `[JAT:IDLE ...]` marker tells the dashboard this agent completed work and is waiting for next task selection.**
 
 ---
 

@@ -435,7 +435,11 @@ Display comprehensive start summary:
 │  🔗 Dependencies: {NONE or list}                                       │
 │                                                                        │
 └────────────────────────────────────────────────────────────────────────┘
+
+[JAT:WORKING task={TASK_ID}]
 ```
+
+**The `[JAT:WORKING ...]` marker tells the dashboard this agent is actively working.**
 
 ---
 
@@ -464,7 +468,11 @@ Next steps:
   • Review the changes above
   • /jat:complete - Complete this task and see menu
   • /jat:next - Complete this task and auto-start next
+
+[JAT:READY actions=complete,next]
 ```
+
+**The `[JAT:READY ...]` marker is machine-readable** - the dashboard detects it to show appropriate action buttons.
 
 **NEVER say "Task Complete" until AFTER the user runs `/jat:complete` or `/jat:next`.**
 

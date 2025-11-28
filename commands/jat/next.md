@@ -56,7 +56,11 @@ Next steps:
   • Review the changes above
   • /jat:complete - Complete this task and see menu
   • /jat:next - Complete this task and auto-start next
+
+[JAT:READY actions=complete,next]
 ```
+
+**The `[JAT:READY ...]` marker is machine-readable** - the dashboard detects it to show action buttons.
 
 **Only after running completion steps, display:**
 ```
@@ -425,6 +429,8 @@ Reserving files...
 Announcing start...
   ✓ Sent to @active
 
+[JAT:WORKING task=jat-xyz]
+
 [Task details displayed, ready to work]
 ```
 
@@ -447,6 +453,8 @@ Reserving files...
 
 Announcing start...
   ✓ Sent to @active
+
+[JAT:WORKING task=jat-xyz]
 
 [Task details displayed, ready to work]
 ```
