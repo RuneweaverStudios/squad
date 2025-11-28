@@ -308,7 +308,7 @@
 	<!-- Completion Success Banner -->
 	{#if showCompletionBanner}
 		<div
-			class="relative overflow-hidden"
+			class="relative overflow-hidden flex-shrink-0"
 			style="background: linear-gradient(135deg, oklch(0.45 0.18 145) 0%, oklch(0.38 0.15 160) 100%);"
 			transition:fly={{ y: -20, duration: 300 }}
 		>
@@ -365,7 +365,7 @@
 	{/if}
 
 	<!-- Header: Task-first design -->
-	<div class="card-body p-4 pb-2">
+	<div class="card-body p-4 pb-2 flex-shrink-0">
 		<!-- Task Title (Primary) -->
 		<div class="flex items-start justify-between gap-3">
 			<div class="flex-1 min-w-0">
