@@ -44,9 +44,12 @@
 		onKillSession?: (sessionName: string) => Promise<void>;
 		onInterrupt?: (sessionName: string) => Promise<void>;
 		onContinue?: (sessionName: string) => Promise<void>;
+		onAttachTerminal?: (sessionName: string) => Promise<void>;
 		onSendInput?: (sessionName: string, input: string, type: 'text' | 'key') => Promise<void>;
 		onTaskClick?: (taskId: string) => void;
 		class?: string;
+		/** Currently highlighted agent name (for scroll-to-agent feature) */
+		highlightedAgent?: string | null;
 	}
 
 	let {
@@ -55,9 +58,11 @@
 		onKillSession,
 		onInterrupt,
 		onContinue,
+		onAttachTerminal,
 		onSendInput,
 		onTaskClick,
-		class: className = ''
+		class: className = '',
+		highlightedAgent = null
 	}: Props = $props();
 
 	// Sort sessions by task priority (P0 first, then P1, etc.)
@@ -105,6 +110,14 @@
 		};
 	}
 
+	function createAttachTerminalHandler(sessionName: string) {
+		return async () => {
+			if (onAttachTerminal) {
+				await onAttachTerminal(sessionName);
+			}
+		};
+	}
+
 	function createSendInputHandler(sessionName: string) {
 		return async (input: string, type: 'text' | 'key') => {
 			if (onSendInput) {
@@ -140,8 +153,10 @@
 						onKillSession={createKillHandler(session.sessionName)}
 						onInterrupt={createInterruptHandler(session.sessionName)}
 						onContinue={createContinueHandler(session.sessionName)}
+						onAttachTerminal={createAttachTerminalHandler(session.sessionName)}
 						onSendInput={createSendInputHandler(session.sessionName)}
 						onTaskClick={onTaskClick}
+						isHighlighted={highlightedAgent === session.agentName}
 					/>
 					</div>
 				{/each}

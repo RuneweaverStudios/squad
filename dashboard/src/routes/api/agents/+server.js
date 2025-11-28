@@ -171,6 +171,23 @@ export async function GET({ url }) {
 		/** @type {Task[]} */
 		const tasks = getTasks({ projectName: projectFilter });  // Filter tasks only
 
+		// Fetch tmux session status to determine which agents have active sessions
+		/** @type {Set<string>} */
+		const agentsWithSessions = new Set();
+		try {
+			const { stdout } = await execAsync(
+				'tmux list-sessions -F "#{session_name}" 2>/dev/null'
+			);
+			stdout.trim().split('\n').forEach(sessionName => {
+				// Extract agent name from session name (jat-AgentName -> AgentName)
+				if (sessionName.startsWith('jat-')) {
+					agentsWithSessions.add(sessionName.replace('jat-', ''));
+				}
+			});
+		} catch {
+			// No tmux server or no sessions - that's fine, set will be empty
+		}
+
 		// Optionally fetch token usage data
 		/** @type {Map<string, import('$lib/utils/tokenUsage.js').TokenUsage> | null} */
 		let usageToday = null;
@@ -294,6 +311,7 @@ export async function GET({ url }) {
 				open_tasks: openTasks,
 				in_progress_tasks: inProgressTasks,
 				active: hasActiveReservations || inProgressTasks > 0,
+				hasSession: agentsWithSessions.has(agent.name),
 				activities: filteredActivities
 			};
 

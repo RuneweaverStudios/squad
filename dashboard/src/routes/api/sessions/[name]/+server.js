@@ -11,6 +11,12 @@ import { promisify } from 'util';
 const execAsync = promisify(exec);
 
 /**
+ * Session name prefix for JAT agent sessions
+ * Sessions are named: jat-{AgentName}
+ */
+const SESSION_PREFIX = 'jat-';
+
+/**
  * PATCH /api/sessions/[name]
  * Rename a tmux session
  * Body: { newName: string }
@@ -18,14 +24,15 @@ const execAsync = promisify(exec);
 /** @type {import('./$types').RequestHandler} */
 export async function PATCH({ params, request }) {
 	try {
-		const sessionName = params.name;
+		const agentName = params.name;
+		const sessionName = `${SESSION_PREFIX}${agentName}`;
 		const body = await request.json();
 		const { newName } = body;
 
-		if (!sessionName) {
+		if (!agentName) {
 			return json({
-				error: 'Missing session name',
-				message: 'Session name is required'
+				error: 'Missing agent name',
+				message: 'Agent name is required'
 			}, { status: 400 });
 		}
 
@@ -36,27 +43,32 @@ export async function PATCH({ params, request }) {
 			}, { status: 400 });
 		}
 
-		// Rename the tmux session
-		const command = `tmux rename-session -t "${sessionName}" "${newName}" 2>&1`;
+		// Rename the tmux session (add prefix to new name as well)
+		const newSessionName = `${SESSION_PREFIX}${newName}`;
+		const command = `tmux rename-session -t "${sessionName}" "${newSessionName}" 2>&1`;
 
 		try {
 			await execAsync(command);
 
 			return json({
 				success: true,
-				oldName: sessionName,
-				newName,
-				message: `Session renamed from '${sessionName}' to '${newName}'`,
+				oldAgentName: agentName,
+				newAgentName: newName,
+				oldSessionName: sessionName,
+				newSessionName,
+				message: `Session renamed from '${agentName}' to '${newName}'`,
 				timestamp: new Date().toISOString()
 			});
 		} catch (execError) {
-			const execErr = /** @type {{ stderr?: string, message?: string }} */ (execError);
-			const errorMessage = execErr.stderr || execErr.message || String(execError);
+			const execErr = /** @type {{ stderr?: string, stdout?: string, message?: string }} */ (execError);
+			// With 2>&1, stderr goes to stdout, so check both
+			const errorMessage = execErr.stdout || execErr.stderr || execErr.message || String(execError);
 
 			if (errorMessage.includes("can't find session") || errorMessage.includes('no server running')) {
 				return json({
 					error: 'Session not found',
-					message: `Session '${sessionName}' does not exist`,
+					message: `No active session for agent '${agentName}' (looked for tmux session '${sessionName}')`,
+					agentName,
 					sessionName
 				}, { status: 404 });
 			}
@@ -65,7 +77,7 @@ export async function PATCH({ params, request }) {
 				return json({
 					error: 'Name already exists',
 					message: `A session named '${newName}' already exists`,
-					sessionName,
+					agentName,
 					newName
 				}, { status: 409 });
 			}
@@ -73,6 +85,7 @@ export async function PATCH({ params, request }) {
 			return json({
 				error: 'Failed to rename session',
 				message: errorMessage,
+				agentName,
 				sessionName
 			}, { status: 500 });
 		}
@@ -88,16 +101,17 @@ export async function PATCH({ params, request }) {
 /** @type {import('./$types').RequestHandler} */
 export async function DELETE({ params }) {
 	try {
-		const sessionName = params.name;
+		const agentName = params.name;
+		const sessionName = `${SESSION_PREFIX}${agentName}`;
 
-		if (!sessionName) {
+		if (!agentName) {
 			return json({
-				error: 'Missing session name',
-				message: 'Session name is required'
+				error: 'Missing agent name',
+				message: 'Agent name is required'
 			}, { status: 400 });
 		}
 
-		// Kill the tmux session
+		// Kill the tmux session (with jat- prefix)
 		const command = `tmux kill-session -t "${sessionName}" 2>&1`;
 
 		try {
@@ -105,19 +119,22 @@ export async function DELETE({ params }) {
 
 			return json({
 				success: true,
+				agentName,
 				sessionName,
-				message: `Session ${sessionName} killed successfully`,
+				message: `Session for ${agentName} killed successfully`,
 				timestamp: new Date().toISOString()
 			});
 		} catch (execError) {
-			const execErr = /** @type {{ stderr?: string, message?: string }} */ (execError);
-			const errorMessage = execErr.stderr || execErr.message || String(execError);
+			const execErr = /** @type {{ stderr?: string, stdout?: string, message?: string }} */ (execError);
+			// With 2>&1, stderr goes to stdout, so check both
+			const errorMessage = execErr.stdout || execErr.stderr || execErr.message || String(execError);
 
 			// Check if session not found
 			if (errorMessage.includes("can't find session") || errorMessage.includes('no server running')) {
 				return json({
 					error: 'Session not found',
-					message: `Session '${sessionName}' does not exist`,
+					message: `No active session for agent '${agentName}' (looked for tmux session '${sessionName}')`,
+					agentName,
 					sessionName
 				}, { status: 404 });
 			}
@@ -125,6 +142,7 @@ export async function DELETE({ params }) {
 			return json({
 				error: 'Failed to kill session',
 				message: errorMessage,
+				agentName,
 				sessionName
 			}, { status: 500 });
 		}

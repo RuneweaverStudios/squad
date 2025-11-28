@@ -558,34 +558,30 @@
 
 				<!-- Control Buttons -->
 				<div class="flex items-center gap-0.5">
+					<!-- Auto-scroll toggle -->
 					<button
-						class="btn btn-xs btn-ghost hover:btn-warning"
-						onclick={handleInterrupt}
-						disabled={interruptLoading || !onInterrupt}
-						title="Send Ctrl+C (interrupt)"
+						class="btn btn-xs"
+						class:btn-primary={autoScroll}
+						class:btn-ghost={!autoScroll}
+						onclick={toggleAutoScroll}
+						title={autoScroll ? 'Auto-scroll ON' : 'Auto-scroll OFF'}
 					>
-						{#if interruptLoading}
-							<span class="loading loading-spinner loading-xs"></span>
-						{:else}
-							<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
-							</svg>
-						{/if}
+						<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 13.5L12 21m0 0l-7.5-7.5M12 21V3" />
+						</svg>
 					</button>
+					<!-- Attach Terminal -->
 					<button
-						class="btn btn-xs btn-ghost hover:btn-success"
-						onclick={handleContinue}
-						disabled={continueLoading || !onContinue}
-						title="Send 'continue'"
+						class="btn btn-xs btn-ghost hover:btn-info"
+						onclick={onAttachTerminal}
+						disabled={!onAttachTerminal}
+						title="Open in terminal"
 					>
-						{#if continueLoading}
-							<span class="loading loading-spinner loading-xs"></span>
-						{:else}
-							<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
-							</svg>
-						{/if}
+						<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" />
+						</svg>
 					</button>
+					<!-- Kill Session -->
 					<button
 						class="btn btn-xs btn-ghost hover:btn-error"
 						onclick={handleKill}
@@ -607,13 +603,6 @@
 
 	<!-- Output Section -->
 	<div class="flex-1 flex flex-col min-h-0" style="border-top: 1px solid oklch(0.5 0 0 / 0.08);">
-		<!-- Output Header -->
-		<div
-			class="px-3 py-1.5 flex items-center justify-between flex-shrink-0"
-			style="background: linear-gradient(90deg, oklch(0.60 0.14 250 / 0.1) 0%, oklch(0.18 0.01 250) 100%);"
-		>
-			<span class="font-mono text-[10px] tracking-wider uppercase" style="color: oklch(0.55 0.02 250);">Output</span>
-		</div>
 		<!-- Output Content -->
 		<div
 			bind:this={scrollContainerRef}
@@ -629,86 +618,119 @@
 		</div>
 
 		<!-- Input Section -->
-		<div class="px-3 py-2 space-y-2 flex-shrink-0" style="border-top: 1px solid oklch(0.5 0 0 / 0.08); background: oklch(0.18 0.01 250);">
-			<!-- Combined control row: Quick actions | Line count + auto-scroll | Workflow buttons -->
-			<div class="flex items-center justify-between gap-2">
-				<!-- Left: Quick action buttons (when prompt detected) -->
-				<div class="flex items-center gap-1.5">
-					{#if detectedOptions.length > 0}
-						{#each detectedOptions as opt (opt.number)}
-							{#if opt.type === 'yes'}
-								<button
-									onclick={() => sendOptionNumber(opt.number)}
-									class="btn btn-xs font-mono text-[10px] tracking-wider uppercase"
-									style="background: oklch(0.30 0.12 150); border: none; color: oklch(0.95 0.02 250);"
-									title={`Option ${opt.number}: ${opt.text}`}
-									disabled={sendingInput || !onSendInput}
-								>
-									<span class="opacity-60 mr-0.5">{opt.number}.</span>Yes
-								</button>
-							{:else if opt.type === 'yes-remember'}
-								<button
-									onclick={() => sendOptionNumber(opt.number)}
-									class="btn btn-xs font-mono text-[10px] tracking-wider uppercase"
-									style="background: oklch(0.28 0.10 200); border: none; color: oklch(0.95 0.02 250);"
-									title={`Option ${opt.number}: ${opt.text}`}
-									disabled={sendingInput || !onSendInput}
-								>
-									<span class="opacity-60 mr-0.5">{opt.number}.</span>Yes+✓
-								</button>
-							{:else if opt.type === 'custom'}
-								<button
-									onclick={() => sendOptionNumber(opt.number)}
-									class="btn btn-xs font-mono text-[10px] tracking-wider uppercase"
-									style="background: oklch(0.25 0.08 280); border: none; color: oklch(0.85 0.02 250);"
-									title={`Option ${opt.number}: ${opt.text}`}
-									disabled={sendingInput || !onSendInput}
-								>
-									<span class="opacity-60 mr-0.5">{opt.number}.</span>Custom
-								</button>
-							{/if}
-						{/each}
+		<div class="px-3 py-2 flex-shrink-0" style="border-top: 1px solid oklch(0.5 0 0 / 0.08); background: oklch(0.18 0.01 250);">
+			<!-- Text input with dynamic button area -->
+			<div class="flex gap-2">
+				<input
+					type="text"
+					bind:value={inputText}
+					onkeydown={handleInputKeydown}
+					placeholder="Type and press Enter... {lineCount} lines"
+					class="input input-xs flex-1 font-mono"
+					style="background: oklch(0.22 0.02 250); border: 1px solid oklch(0.30 0.02 250); color: oklch(0.80 0.02 250);"
+					disabled={sendingInput || !onSendInput}
+				/>
+				<!-- Dynamic button area: quick actions when empty, Send when typing -->
+				{#if inputText.trim()}
+					<!-- User is typing: show Send button -->
+					<button
+						onclick={sendTextInput}
+						class="btn btn-xs btn-primary"
+						disabled={sendingInput || !onSendInput}
+					>
+						{#if sendingInput}
+							<span class="loading loading-spinner loading-xs"></span>
+						{:else}
+							Send
+						{/if}
+					</button>
+				{:else if !task}
+					<!-- No task: show Start (unregistered) or Next (idle after completing work) -->
+					{@const isIdle = output && /is now idle|work complete|task complete/i.test(output)}
+					{#if isIdle}
 						<button
-							onclick={() => sendKey('escape')}
-							class="btn btn-xs font-mono text-[10px] tracking-wider uppercase"
-							style="background: oklch(0.25 0.05 250); border: none; color: oklch(0.80 0.02 250);"
-							title="Escape (cancel prompt)"
+							onclick={() => sendWorkflowCommand('/jat:next')}
+							class="btn btn-xs gap-1"
+							style="background: linear-gradient(135deg, oklch(0.50 0.18 250) 0%, oklch(0.42 0.15 265) 100%); border: none; color: white; font-weight: 600;"
+							title="Pick up next task"
 							disabled={sendingInput || !onSendInput}
 						>
-							Esc
+							<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+							</svg>
+							Next
 						</button>
+					{:else}
 						<button
-							onclick={() => sendKey('ctrl-c')}
-							class="btn btn-xs font-mono text-[10px] tracking-wider uppercase"
-							style="background: oklch(0.30 0.12 25); border: none; color: oklch(0.95 0.02 250);"
-							title="Send Ctrl+C (interrupt)"
+							onclick={() => sendWorkflowCommand('/jat:start')}
+							class="btn btn-xs gap-1"
+							style="background: linear-gradient(135deg, oklch(0.50 0.18 250) 0%, oklch(0.42 0.15 265) 100%); border: none; color: white; font-weight: 600;"
+							title="Start working on a task"
 							disabled={sendingInput || !onSendInput}
 						>
-							^C
+							<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+							</svg>
+							Start
 						</button>
 					{/if}
-				</div>
-
-				<!-- Right: Line count + auto-scroll + workflow buttons -->
-				<div class="flex items-center gap-2">
-					<span class="text-xs font-mono text-base-content/60">
-						{lineCount} lines
-					</span>
-					<button
-						class="btn btn-xs"
-						class:btn-primary={autoScroll}
-						class:btn-ghost={!autoScroll}
-						onclick={toggleAutoScroll}
-						title={autoScroll ? 'Auto-scroll ON' : 'Auto-scroll OFF'}
-					>
-						<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 13.5L12 21m0 0l-7.5-7.5M12 21V3" />
-						</svg>
-					</button>
-
-					<!-- Workflow buttons (when work is complete) -->
-					{#if detectedWorkflowCommands.length > 0}
-						<div class="flex gap-1.5 items-center ml-2">
+				{:else if detectedOptions.length > 0 || detectedWorkflowCommands.length > 0}
+					<!-- Has task and actions available: show quick actions -->
+					<div class="flex items-center gap-1">
+						{#if detectedOptions.length > 0}
+							{#each detectedOptions as opt (opt.number)}
+								{#if opt.type === 'yes'}
+									<button
+										onclick={() => sendOptionNumber(opt.number)}
+										class="btn btn-xs font-mono text-[10px] tracking-wider uppercase"
+										style="background: oklch(0.30 0.12 150); border: none; color: oklch(0.95 0.02 250);"
+										title={`Option ${opt.number}: ${opt.text}`}
+										disabled={sendingInput || !onSendInput}
+									>
+										<span class="opacity-60 mr-0.5">{opt.number}.</span>Yes
+									</button>
+								{:else if opt.type === 'yes-remember'}
+									<button
+										onclick={() => sendOptionNumber(opt.number)}
+										class="btn btn-xs font-mono text-[10px] tracking-wider uppercase"
+										style="background: oklch(0.28 0.10 200); border: none; color: oklch(0.95 0.02 250);"
+										title={`Option ${opt.number}: ${opt.text}`}
+										disabled={sendingInput || !onSendInput}
+									>
+										<span class="opacity-60 mr-0.5">{opt.number}.</span>Yes+✓
+									</button>
+								{:else if opt.type === 'custom'}
+									<button
+										onclick={() => sendOptionNumber(opt.number)}
+										class="btn btn-xs font-mono text-[10px] tracking-wider uppercase"
+										style="background: oklch(0.25 0.08 280); border: none; color: oklch(0.85 0.02 250);"
+										title={`Option ${opt.number}: ${opt.text}`}
+										disabled={sendingInput || !onSendInput}
+									>
+										<span class="opacity-60 mr-0.5">{opt.number}.</span>Custom
+									</button>
+								{/if}
+							{/each}
+							<button
+								onclick={() => sendKey('escape')}
+								class="btn btn-xs font-mono text-[10px] tracking-wider uppercase"
+								style="background: oklch(0.25 0.05 250); border: none; color: oklch(0.80 0.02 250);"
+								title="Escape (cancel prompt)"
+								disabled={sendingInput || !onSendInput}
+							>
+								Esc
+							</button>
+							<button
+								onclick={() => sendKey('ctrl-c')}
+								class="btn btn-xs font-mono text-[10px] tracking-wider uppercase"
+								style="background: oklch(0.30 0.12 25); border: none; color: oklch(0.95 0.02 250);"
+								title="Send Ctrl+C (interrupt)"
+								disabled={sendingInput || !onSendInput}
+							>
+								^C
+							</button>
+						{/if}
+						{#if detectedWorkflowCommands.length > 0}
 							{#each detectedWorkflowCommands as cmd (cmd.command)}
 								{#if cmd.variant === 'success'}
 									<button
@@ -761,33 +783,17 @@
 									</button>
 								{/if}
 							{/each}
-						</div>
-					{/if}
-				</div>
-			</div>
-
-			<!-- Text input -->
-			<div class="flex gap-2">
-				<input
-					type="text"
-					bind:value={inputText}
-					onkeydown={handleInputKeydown}
-					placeholder="Type and press Enter..."
-					class="input input-xs flex-1 font-mono"
-					style="background: oklch(0.22 0.02 250); border: 1px solid oklch(0.30 0.02 250); color: oklch(0.80 0.02 250);"
-					disabled={sendingInput || !onSendInput}
-				/>
-				<button
-					onclick={sendTextInput}
-					class="btn btn-xs btn-primary"
-					disabled={sendingInput || !inputText.trim() || !onSendInput}
-				>
-					{#if sendingInput}
-						<span class="loading loading-spinner loading-xs"></span>
-					{:else}
+						{/if}
+					</div>
+				{:else}
+					<!-- Has task but no actions: show disabled Send -->
+					<button
+						class="btn btn-xs btn-ghost"
+						disabled
+					>
 						Send
-					{/if}
-				</button>
+					</button>
+				{/if}
 			</div>
 		</div>
 	</div>

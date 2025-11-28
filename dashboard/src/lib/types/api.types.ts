@@ -43,6 +43,7 @@ export interface Agent {
 	open_tasks: number;
 	in_progress_tasks: number;
 	active: boolean;
+	hasSession?: boolean;  // True if agent has an active tmux session (jat-{name})
 	activities?: AgentActivity[];
 	current_activity?: AgentActivity | null;
 }

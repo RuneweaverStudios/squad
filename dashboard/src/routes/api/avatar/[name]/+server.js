@@ -23,8 +23,11 @@ const AVATAR_GENERATE_SCRIPT = '/home/jw/code/jat/media/avatar-generate';
 const generatingAvatars = new Set();
 
 /** @type {import('./$types').RequestHandler} */
-export async function GET({ params }) {
+export async function GET({ params, url }) {
 	const { name } = params;
+	const version = url.searchParams.get('v');
+	console.log(`[Avatar API] Request: ${name} (v=${version})`);
+
 
 	// Sanitize name to prevent path traversal
 	if (!name || name.includes('/') || name.includes('..') || name.includes('\\')) {
@@ -79,12 +82,14 @@ export async function GET({ params }) {
 
 	try {
 		const svgContent = await readFile(avatarPath, 'utf-8');
+		console.log(`[Avatar API] Serving ${name}: ${svgContent.length} bytes, hasText=${svgContent.includes('<text')}`);
 
 		return new Response(svgContent, {
 			status: 200,
 			headers: {
 				'Content-Type': 'image/svg+xml',
-				'Cache-Control': 'public, max-age=31536000, immutable'
+				'Cache-Control': 'public, max-age=86400',  // 1 day instead of 1 year
+				'Vary': 'Accept'  // Vary by Accept header for proper cache handling
 			}
 		});
 	} catch (err) {

@@ -62,9 +62,11 @@
 		onTaskAssign?: (taskId: string, agentName: string) => Promise<void>;
 		ontaskclick?: (taskId: string) => void;
 		draggedTaskId?: string | null;
+		/** Whether this agent is currently highlighted (e.g., from clicking avatar elsewhere) */
+		isHighlighted?: boolean;
 	}
 
-	let { agent, tasks = [], allTasks = [], reservations = [], onTaskAssign = async () => {}, ontaskclick = () => {}, draggedTaskId = null }: Props = $props();
+	let { agent, tasks = [], allTasks = [], reservations = [], onTaskAssign = async () => {}, ontaskclick = () => {}, draggedTaskId = null, isHighlighted = false }: Props = $props();
 
 	let isDragOver = $state(false);
 	let isAssigning = $state(false);
@@ -942,7 +944,8 @@
 	class="ml-0.5 mt-0.5 relative h-full flex flex-col rounded-lg overflow-hidden transition-all duration-200
 		{isDragOver && hasConflict ? 'scale-[1.02]' : isDragOver ? 'scale-[1.02]' : ''}
 		{isAssigning || assignSuccess ? 'pointer-events-none' : ''}
-		{agentStatus === 'offline' ? 'opacity-50 hover:opacity-90' : ''}"
+		{agentStatus === 'offline' ? 'opacity-50 hover:opacity-90' : ''}
+		{isHighlighted ? 'agent-highlight-flash ring-2 ring-info ring-offset-2 ring-offset-base-100' : ''}"
 	style="
 		background: linear-gradient(135deg, {statusVisual.bgTint} 0%, transparent 50%);
 		border: 1px solid oklch(0.5 0 0 / 0.15);
@@ -950,6 +953,7 @@
 	"
 	role="button"
 	tabindex="0"
+	data-agent-name={agent.name}
 	ondrop={handleDrop}
 	ondragover={handleDragOver}
 	ondragleave={handleDragLeave}
@@ -1070,8 +1074,8 @@
 			{/if}
 
 			<!-- ═══ SESSION CONTROL BUTTONS ═══ -->
-			<!-- Only show for non-offline agents (those with active sessions) -->
-			{#if agentStatus !== 'offline'}
+			<!-- Only show for agents with active tmux sessions -->
+			{#if agent.hasSession}
 				<div class="flex items-center gap-0.5 ml-1">
 					<!-- Ctrl+C / Interrupt button -->
 					<button
@@ -1163,21 +1167,23 @@
 						{/if}
 					</div>
 
-					<!-- Kill button (X icon) -->
-					<button
-						class="p-1 rounded hover:bg-error/20 transition-colors group"
-						onclick={killSession}
-						disabled={sessionControlLoading !== null}
-						title="Kill session"
-					>
-						{#if sessionControlLoading === 'kill'}
-							<span class="loading loading-spinner loading-xs"></span>
-						{:else}
-							<svg class="w-3.5 h-3.5 text-base-content/40 group-hover:text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-							</svg>
-						{/if}
-					</button>
+					<!-- Kill button (X icon) - only show if agent has active tmux session -->
+					{#if agent.hasSession}
+						<button
+							class="p-1 rounded hover:bg-error/20 transition-colors group"
+							onclick={killSession}
+							disabled={sessionControlLoading !== null}
+							title="Kill session"
+						>
+							{#if sessionControlLoading === 'kill'}
+								<span class="loading loading-spinner loading-xs"></span>
+							{:else}
+								<svg class="w-3.5 h-3.5 text-base-content/40 group-hover:text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+								</svg>
+							{/if}
+						</button>
+					{/if}
 				</div>
 			{/if}
 		</div>

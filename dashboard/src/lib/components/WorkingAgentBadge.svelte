@@ -22,6 +22,8 @@
 		startTime?: string | number | null;
 		/** Display variant: 'avatar' | 'name' | 'timer' */
 		variant?: 'avatar' | 'name' | 'timer';
+		/** Callback when badge is clicked */
+		onClick?: (agentName: string) => void;
 		/** Additional CSS classes */
 		class?: string;
 	}
@@ -32,8 +34,16 @@
 		isWorking = true,
 		startTime = null,
 		variant = 'timer',
+		onClick,
 		class: className = ''
 	}: Props = $props();
+
+	function handleClick(event: MouseEvent) {
+		if (onClick) {
+			event.stopPropagation();
+			onClick(name);
+		}
+	}
 
 	// Working time counter
 	let now = $state(Date.now());
@@ -79,7 +89,13 @@
 
 {#if variant === 'avatar'}
 	<!-- Avatar only with ring -->
-	<div class="avatar {isWorking ? 'online' : ''} {className}" title={tooltipText}>
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div
+		class="avatar {isWorking ? 'online' : ''} {onClick ? 'cursor-pointer hover:scale-110 transition-transform' : ''} {className}"
+		title={tooltipText}
+		onclick={handleClick}
+	>
 		<div
 			class="rounded-full {isWorking ? 'ring-2 ring-info ring-offset-base-100 ring-offset-1' : ''}"
 			style="width: {size}px; height: {size}px;"
@@ -89,7 +105,12 @@
 	</div>
 {:else}
 	<!-- Avatar + name (+ timer if variant === 'timer') -->
-	<div class="inline-flex items-center gap-1.5 {className}">
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div
+		class="inline-flex items-center gap-1.5 {onClick ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''} {className}"
+		onclick={handleClick}
+	>
 		<div class="avatar {isWorking ? 'online' : ''}" title={name}>
 			<div
 				class="rounded-full {isWorking ? 'ring-2 ring-info ring-offset-base-100 ring-offset-1' : ''}"

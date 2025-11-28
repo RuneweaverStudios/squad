@@ -22,6 +22,8 @@
 		color?: string;
 		/** Callback when user clicks "Open Task" in dropdown */
 		onOpenTask?: (taskId: string) => void;
+		/** Callback when user clicks on the agent avatar/name/timer */
+		onAgentClick?: (agentName: string) => void;
 		/** Dropdown alignment - 'start' opens to the right, 'end' opens to the left */
 		dropdownAlign?: 'start' | 'end';
 		/** If true, just click-to-copy without dropdown (useful when info is already visible in context) */
@@ -34,7 +36,7 @@
 		showDependencies?: boolean;
 	}
 
-	let { task, size = 'sm', showStatus = true, showType = true, showCopyIcon = false, showAssignee = false, minimal = false, color, onOpenTask, dropdownAlign = 'start', copyOnly = false, blockedBy = [], blocks = [], showDependencies = false }: Props = $props();
+	let { task, size = 'sm', showStatus = true, showType = true, showCopyIcon = false, showAssignee = false, minimal = false, color, onOpenTask, onAgentClick, dropdownAlign = 'start', copyOnly = false, blockedBy = [], blocks = [], showDependencies = false }: Props = $props();
 
 	// Show assignee when task is in_progress and has an assignee
 	const shouldShowAssignee = $derived(showAssignee && task.status === 'in_progress' && task.assignee);
@@ -181,6 +183,7 @@
 				isWorking={true}
 				startTime={task.updated_at}
 				variant="timer"
+				onClick={onAgentClick}
 			/>
 		{/if}
 
@@ -250,16 +253,6 @@
 					>
 						<path stroke-linecap="round" stroke-linejoin="round" d={iconPath} />
 					</svg>
-				{/if}
-
-				{#if shouldShowAssignee && workingDuration}
-					<span class="countdown font-mono text-xs tabular-nums text-info" title="Working for {workingDuration.hours > 0 ? `${workingDuration.hours}h ${workingDuration.mins}m` : `${workingDuration.mins}m`}">
-						{#if workingDuration.hours > 0}
-							<span style="--value:{workingDuration.hours};"></span>h<span style="--value:{workingDuration.mins};"></span>m
-						{:else}
-							<span style="--value:{workingDuration.mins};"></span>m
-						{/if}
-					</span>
 				{/if}
 
 				{#if copied}
@@ -333,6 +326,7 @@
 				isWorking={true}
 				startTime={task.updated_at}
 				variant="timer"
+				onClick={onAgentClick}
 			/>
 		{/if}
 

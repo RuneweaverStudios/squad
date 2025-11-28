@@ -60,9 +60,11 @@
 		agents?: Agent[];
 		reservations?: Reservation[];
 		ontaskclick?: (taskId: string) => void;
+		/** Callback when user clicks on an agent avatar/name */
+		onagentclick?: (agentName: string) => void;
 	}
 
-	let { tasks = [], allTasks = [], agents = [], reservations = [], ontaskclick = () => {} }: Props = $props();
+	let { tasks = [], allTasks = [], agents = [], reservations = [], ontaskclick = () => {}, onagentclick }: Props = $props();
 
 	// Track previously seen task IDs and statuses for animations
 	// Using regular variables (not $state) to avoid effect loops
@@ -1452,6 +1454,7 @@
 														size={20}
 														isWorking={true}
 														variant="avatar"
+														onClick={onagentclick}
 													/>
 												{/each}
 												{#if workingAgents.length > 4}
@@ -1526,6 +1529,7 @@
 												blocks={blockedTasks}
 												showDependencies={true}
 												onOpenTask={handleRowClick}
+												onAgentClick={onagentclick}
 											/>
 										</th>
 										<td style="background: inherit;">

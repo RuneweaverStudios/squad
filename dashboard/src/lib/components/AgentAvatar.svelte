@@ -31,47 +31,93 @@
 	// Cache for avatar SVGs (module-level to persist across instances)
 	const avatarCache = new Map<string, string>();
 
+	// Pending fetches to deduplicate in-flight requests
+	const pendingFetches = new Map<string, Promise<string | null>>();
+
 	// Cache version - increment to bust all avatar caches
-	const CACHE_VERSION = 2;
+	// Bump this when avatars are regenerated or cache logic changes
+	const CACHE_VERSION = 4;
+
+	// Actual fetch implementation
+	async function doFetch(agentName: string, cacheKey: string): Promise<string | null> {
+		const url = `/api/avatar/${encodeURIComponent(agentName)}?v=${CACHE_VERSION}`;
+		console.log(`[AgentAvatar] Fetching: ${url}`);
+
+		try {
+			const response = await fetch(url);
+			console.log(`[AgentAvatar] Response for ${agentName}: status=${response.status}`);
+
+			if (response.ok) {
+				const svg = await response.text();
+				console.log(`[AgentAvatar] Got SVG for ${agentName}: ${svg.length} bytes, starts with: ${svg.substring(0, 50)}`);
+				// Only cache if it's a real generated avatar, not a fallback with initials
+				const isFallback = svg.includes('<text');
+				if (!isFallback) {
+					avatarCache.set(cacheKey, svg);
+					console.log(`[AgentAvatar] Cached ${agentName}`);
+				} else {
+					console.log(`[AgentAvatar] NOT caching ${agentName} (is fallback)`);
+				}
+				return svg;
+			}
+			console.log(`[AgentAvatar] Failed for ${agentName}: status=${response.status}`);
+			return null;
+		} catch (err) {
+			console.error(`[AgentAvatar] Fetch error for ${agentName}:`, err);
+			return null;
+		}
+	}
 
 	// Fetch avatar - called by effect when name changes
 	async function fetchAvatar(agentName: string): Promise<void> {
+		console.log(`[AgentAvatar] fetchAvatar called for: ${agentName}`);
 		if (!agentName) {
 			loadState = 'error';
 			svgContent = null;
 			return;
 		}
 
-		// Check cache first (with version key)
 		const cacheKey = `${agentName}:v${CACHE_VERSION}`;
+
+		// Check cache first
 		const cached = avatarCache.get(cacheKey);
 		if (cached) {
+			console.log(`[AgentAvatar] Cache HIT for ${agentName}`);
 			svgContent = cached;
 			loadState = 'success';
 			currentFetchedName = agentName;
 			return;
+		}
+		console.log(`[AgentAvatar] Cache MISS for ${agentName}, fetching...`);
+
+		// Check if there's already a pending fetch for this avatar
+		let fetchPromise = pendingFetches.get(cacheKey);
+		if (!fetchPromise) {
+			// No pending fetch, start one
+			fetchPromise = doFetch(agentName, cacheKey);
+			pendingFetches.set(cacheKey, fetchPromise);
 		}
 
 		loadState = 'loading';
 		svgContent = null;
 
 		try {
-			// Add cache-busting query param to force fresh fetch from browser
-			const response = await fetch(`/api/avatar/${encodeURIComponent(agentName)}?v=${CACHE_VERSION}`);
-			if (response.ok) {
-				const svg = await response.text();
-				// Only cache if it looks like a real avatar (has multiple elements, not just initials)
-				const isRealAvatar = svg.includes('circle') || svg.includes('path') || svg.split('<').length > 5;
-				if (isRealAvatar) {
-					avatarCache.set(cacheKey, svg);
-				}
+			const svg = await fetchPromise;
+			console.log(`[AgentAvatar] Fetch complete for ${agentName}: got ${svg ? svg.length + ' bytes' : 'null'}`);
+			if (svg) {
 				svgContent = svg;
 				loadState = 'success';
+				console.log(`[AgentAvatar] Set loadState=success for ${agentName}`);
 			} else {
 				loadState = 'error';
+				console.log(`[AgentAvatar] Set loadState=error for ${agentName} (null svg)`);
 			}
-		} catch {
+		} catch (err) {
 			loadState = 'error';
+			console.error(`[AgentAvatar] Set loadState=error for ${agentName} (exception):`, err);
+		} finally {
+			// Clean up pending fetch after a short delay (allow other waiters to complete)
+			setTimeout(() => pendingFetches.delete(cacheKey), 100);
 		}
 
 		currentFetchedName = agentName;

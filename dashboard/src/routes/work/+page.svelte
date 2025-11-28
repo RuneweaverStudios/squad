@@ -161,6 +161,19 @@
 		await sendEnter(sessionName);
 	}
 
+	async function handleAttachTerminal(sessionName: string) {
+		try {
+			const response = await fetch(`/api/work/${sessionName}/attach`, {
+				method: 'POST'
+			});
+			if (!response.ok) {
+				console.error('Failed to attach terminal:', await response.text());
+			}
+		} catch (error) {
+			console.error('Failed to attach terminal:', error);
+		}
+	}
+
 	async function handleSendInput(sessionName: string, input: string, type: 'text' | 'key') {
 		const inputType = type === 'key' ? 'raw' : 'text';
 		await sendInput(sessionName, input, inputType);
@@ -246,6 +259,7 @@
 				onKillSession={handleKillSession}
 				onInterrupt={handleInterrupt}
 				onContinue={handleContinue}
+				onAttachTerminal={handleAttachTerminal}
 				onSendInput={handleSendInput}
 				onTaskClick={handleTaskClick}
 				{highlightedAgent}

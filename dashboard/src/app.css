@@ -249,3 +249,29 @@
 	opacity: 0;
 	animation: sparkline-area-fade 0.8s ease-out 0.3s forwards;
 }
+
+/* Agent highlight flash animation (when navigating from task badge click) */
+@keyframes agent-highlight-flash {
+	0% {
+		box-shadow: 0 0 0 0 oklch(0.70 0.18 220 / 0);
+	}
+	20% {
+		box-shadow: 0 0 30px 10px oklch(0.70 0.18 220 / 0.5);
+	}
+	40% {
+		box-shadow: 0 0 20px 5px oklch(0.70 0.18 220 / 0.3);
+	}
+	60% {
+		box-shadow: 0 0 25px 8px oklch(0.70 0.18 220 / 0.4);
+	}
+	80% {
+		box-shadow: 0 0 15px 3px oklch(0.70 0.18 220 / 0.2);
+	}
+	100% {
+		box-shadow: 0 0 0 0 oklch(0.70 0.18 220 / 0);
+	}
+}
+
+.agent-highlight-flash {
+	animation: agent-highlight-flash 1.5s ease-out forwards;
+}

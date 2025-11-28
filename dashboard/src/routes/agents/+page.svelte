@@ -26,6 +26,9 @@
 	let drawerOpen = $state(false);
 	let selectedTaskId = $state<string | null>(null);
 
+	// Highlighted agent for scroll-to-agent feature
+	let highlightedAgent = $state<string | null>(null);
+
 	// Extract unique projects from ALL tasks (unfiltered)
 	const projects = $derived(getProjectsFromTasks(allTasks));
 
@@ -162,6 +165,24 @@
 		}
 	}
 
+	// Handle agent click - scroll to agent card and highlight it
+	function handleAgentClick(agentName: string) {
+		// Find the agent card element using data-agent-name attribute
+		const agentCard = document.querySelector(`[data-agent-name="${agentName}"]`);
+		if (agentCard) {
+			// Scroll the agent card into view smoothly
+			agentCard.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+
+			// Set highlighted state to trigger animation
+			highlightedAgent = agentName;
+
+			// Clear highlight after animation completes (1.5s matches CSS animation duration)
+			setTimeout(() => {
+				highlightedAgent = null;
+			}, 1500);
+		}
+	}
+
 	// Auto-refresh data every 15 seconds (layout also polls at 30s, so total coverage is good)
 	$effect(() => {
 		const interval = setInterval(fetchData, 15000);
@@ -230,7 +251,7 @@
 				</div>
 			{:else}
 				<div class="flex-1 overflow-auto">
-					<AgentGrid {agents} {tasks} {allTasks} {reservations} {sparklineData} onTaskAssign={handleTaskAssign} ontaskclick={handleTaskClick} />
+					<AgentGrid {agents} {tasks} {allTasks} {reservations} {sparklineData} onTaskAssign={handleTaskAssign} ontaskclick={handleTaskClick} {highlightedAgent} />
 				</div>
 			{/if}
 		</div>
