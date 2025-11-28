@@ -1363,11 +1363,11 @@
 					</tr>
 				</tbody>
 			{:else}
-				<!-- Grouped tasks by type with sticky headers -->
-				{#each Array.from(groupedTasks.entries()) as [type, typeTasks]}
+				<!-- Grouped tasks with sticky headers -->
+				{#each Array.from(groupedTasks.entries()) as [groupKey, typeTasks]}
 					{#if typeTasks.length > 0}
-						<!-- Type group header (pinned when scrolling) - Industrial/Terminal style -->
-						{@const typeVisual = getIssueTypeVisual(type)}
+						<!-- Group header (pinned when scrolling) - Industrial/Terminal style -->
+						{@const typeVisual = getGroupHeaderInfo(groupingMode, groupKey)}
 						<thead>
 							<tr>
 								<th
