@@ -116,7 +116,27 @@
 	</button>
 {:else if copyOnly}
 	<!-- Copy-only mode: just a clickable badge, no dropdown (for use in tables where info is already visible) -->
-	<div class="inline-flex flex-col items-center gap-0.5 relative">
+	<div class="inline-flex flex-col items-start gap-0.5 relative">
+		<!-- Blocked by (ABOVE badge) -->
+		{#if hasBlockers}
+			<div class="text-xs" style="color: oklch(0.65 0.20 25);">
+				<span class="opacity-70">blocked by:</span>
+				<div class="pl-3 flex flex-wrap items-center gap-1">
+					{#each unresolvedBlockers.slice(0, 2) as dep, i}
+						<button
+							class="font-mono hover:underline"
+							onclick={(e) => { e.stopPropagation(); if (onOpenTask) onOpenTask(dep.id); }}
+							title={dep.title || dep.id}
+						>{dep.id}</button>{#if i < Math.min(unresolvedBlockers.length, 2) - 1}<span>,</span>{/if}
+					{/each}
+					{#if unresolvedBlockers.length > 2}
+						<span class="opacity-60">+{unresolvedBlockers.length - 2}</span>
+					{/if}
+				</div>
+			</div>
+		{/if}
+
+		<!-- Main badge -->
 		<button
 			class="inline-flex items-center font-mono rounded cursor-pointer
 				   bg-base-100 hover:bg-base-200 transition-colors group border border-base-300 {sizeClasses[size]}"
@@ -167,47 +187,47 @@
 			</span>
 		{/if}
 
-		<!-- Dependency indicators (copyOnly mode) -->
-		{#if hasBlockers || hasBlocks}
-			<div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs mt-0.5">
-				{#if hasBlockers}
-					<span class="inline-flex items-center gap-1" style="color: oklch(0.65 0.20 25);">
-						<span class="font-mono">↑</span>
-						<span class="opacity-70">blocked by:</span>
-						{#each unresolvedBlockers.slice(0, 2) as dep, i}
-							<button
-								class="font-mono hover:underline"
-								onclick={(e) => { e.stopPropagation(); if (onOpenTask) onOpenTask(dep.id); }}
-								title={dep.title || dep.id}
-							>{dep.id}</button>{#if i < Math.min(unresolvedBlockers.length, 2) - 1},{/if}
-						{/each}
-						{#if unresolvedBlockers.length > 2}
-							<span class="opacity-60">+{unresolvedBlockers.length - 2}</span>
-						{/if}
-					</span>
-				{/if}
-				{#if hasBlocks}
-					<span class="inline-flex items-center gap-1" style="color: oklch(0.60 0.15 200);">
-						<span class="font-mono">↓</span>
-						<span class="opacity-70">blocks:</span>
-						{#each activeBlocks.slice(0, 2) as dep, i}
-							<button
-								class="font-mono hover:underline"
-								onclick={(e) => { e.stopPropagation(); if (onOpenTask) onOpenTask(dep.id); }}
-								title={dep.title || dep.id}
-							>{dep.id}</button>{#if i < Math.min(activeBlocks.length, 2) - 1},{/if}
-						{/each}
-						{#if activeBlocks.length > 2}
-							<span class="opacity-60">+{activeBlocks.length - 2}</span>
-						{/if}
-					</span>
-				{/if}
+		<!-- Blocks (BELOW badge) -->
+		{#if hasBlocks}
+			<div class="text-xs" style="color: oklch(0.60 0.15 200);">
+				<span class="opacity-70">blocks:</span>
+				<div class="pl-3 flex flex-wrap items-center gap-1">
+					{#each activeBlocks.slice(0, 2) as dep, i}
+						<button
+							class="font-mono hover:underline"
+							onclick={(e) => { e.stopPropagation(); if (onOpenTask) onOpenTask(dep.id); }}
+							title={dep.title || dep.id}
+						>{dep.id}</button>{#if i < Math.min(activeBlocks.length, 2) - 1}<span>,</span>{/if}
+					{/each}
+					{#if activeBlocks.length > 2}
+						<span class="opacity-60">+{activeBlocks.length - 2}</span>
+					{/if}
+				</div>
 			</div>
 		{/if}
 	</div>
 {:else}
 	<!-- Full mode: badge with type icon, project-colored ID, status icon, and dropdown -->
-	<div class="inline-flex flex-col items-center gap-0.5 relative">
+	<div class="inline-flex flex-col items-start gap-0.5 relative">
+		<!-- Blocked by (ABOVE badge) -->
+		{#if hasBlockers}
+			<div class="text-xs" style="color: oklch(0.65 0.20 25);">
+				<span class="opacity-70">blocked by:</span>
+				<div class="pl-3 flex flex-wrap items-center gap-1">
+					{#each unresolvedBlockers.slice(0, 2) as dep, i}
+						<button
+							class="font-mono hover:underline"
+							onclick={(e) => { e.stopPropagation(); if (onOpenTask) onOpenTask(dep.id); }}
+							title={dep.title || dep.id}
+						>{dep.id}</button>{#if i < Math.min(unresolvedBlockers.length, 2) - 1}<span>,</span>{/if}
+					{/each}
+					{#if unresolvedBlockers.length > 2}
+						<span class="opacity-60">+{unresolvedBlockers.length - 2}</span>
+					{/if}
+				</div>
+			</div>
+		{/if}
+
 		<div class="dropdown dropdown-hover {dropdownAlign === 'end' ? 'dropdown-left' : 'dropdown-right'}">
 			<button
 				class="inline-flex items-center font-mono rounded cursor-pointer
@@ -312,41 +332,22 @@
 			</span>
 		{/if}
 
-		<!-- Dependency indicators (full mode) -->
-		{#if hasBlockers || hasBlocks}
-			<div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs mt-0.5">
-				{#if hasBlockers}
-					<span class="inline-flex items-center gap-1" style="color: oklch(0.65 0.20 25);">
-						<span class="font-mono">↑</span>
-						<span class="opacity-70">blocked by:</span>
-						{#each unresolvedBlockers.slice(0, 2) as dep, i}
-							<button
-								class="font-mono hover:underline"
-								onclick={(e) => { e.stopPropagation(); if (onOpenTask) onOpenTask(dep.id); }}
-								title={dep.title || dep.id}
-							>{dep.id}</button>{#if i < Math.min(unresolvedBlockers.length, 2) - 1},{/if}
-						{/each}
-						{#if unresolvedBlockers.length > 2}
-							<span class="opacity-60">+{unresolvedBlockers.length - 2}</span>
-						{/if}
-					</span>
-				{/if}
-				{#if hasBlocks}
-					<span class="inline-flex items-center gap-1" style="color: oklch(0.60 0.15 200);">
-						<span class="font-mono">↓</span>
-						<span class="opacity-70">blocks:</span>
-						{#each activeBlocks.slice(0, 2) as dep, i}
-							<button
-								class="font-mono hover:underline"
-								onclick={(e) => { e.stopPropagation(); if (onOpenTask) onOpenTask(dep.id); }}
-								title={dep.title || dep.id}
-							>{dep.id}</button>{#if i < Math.min(activeBlocks.length, 2) - 1},{/if}
-						{/each}
-						{#if activeBlocks.length > 2}
-							<span class="opacity-60">+{activeBlocks.length - 2}</span>
-						{/if}
-					</span>
-				{/if}
+		<!-- Blocks (BELOW badge) -->
+		{#if hasBlocks}
+			<div class="text-xs" style="color: oklch(0.60 0.15 200);">
+				<span class="opacity-70">blocks:</span>
+				<div class="pl-3 flex flex-wrap items-center gap-1">
+					{#each activeBlocks.slice(0, 2) as dep, i}
+						<button
+							class="font-mono hover:underline"
+							onclick={(e) => { e.stopPropagation(); if (onOpenTask) onOpenTask(dep.id); }}
+							title={dep.title || dep.id}
+						>{dep.id}</button>{#if i < Math.min(activeBlocks.length, 2) - 1}<span>,</span>{/if}
+					{/each}
+					{#if activeBlocks.length > 2}
+						<span class="opacity-60">+{activeBlocks.length - 2}</span>
+					{/if}
+				</div>
 			</div>
 		{/if}
 	</div>
