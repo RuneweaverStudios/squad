@@ -17,6 +17,29 @@ const execAsync = promisify(exec);
 const SESSION_PREFIX = 'jat-';
 
 /**
+ * Get the full tmux session name from a name parameter.
+ * Handles both:
+ * - Agent name (e.g., "DullGrove") → "jat-DullGrove"
+ * - Full session name (e.g., "jat-DullGrove") → "jat-DullGrove" (no double prefix)
+ * @param {string} name - Agent name or full session name
+ * @returns {{ agentName: string, sessionName: string }}
+ */
+function resolveSessionName(name) {
+	if (name.startsWith(SESSION_PREFIX)) {
+		// Already has prefix - extract agent name
+		return {
+			agentName: name.slice(SESSION_PREFIX.length),
+			sessionName: name
+		};
+	}
+	// Add prefix
+	return {
+		agentName: name,
+		sessionName: `${SESSION_PREFIX}${name}`
+	};
+}
+
+/**
  * PATCH /api/sessions/[name]
  * Rename a tmux session
  * Body: { newName: string }
@@ -24,8 +47,7 @@ const SESSION_PREFIX = 'jat-';
 /** @type {import('./$types').RequestHandler} */
 export async function PATCH({ params, request }) {
 	try {
-		const agentName = params.name;
-		const sessionName = `${SESSION_PREFIX}${agentName}`;
+		const { agentName, sessionName } = resolveSessionName(params.name);
 		const body = await request.json();
 		const { newName } = body;
 
@@ -101,8 +123,7 @@ export async function PATCH({ params, request }) {
 /** @type {import('./$types').RequestHandler} */
 export async function DELETE({ params }) {
 	try {
-		const agentName = params.name;
-		const sessionName = `${SESSION_PREFIX}${agentName}`;
+		const { agentName, sessionName } = resolveSessionName(params.name);
 
 		if (!agentName) {
 			return json({

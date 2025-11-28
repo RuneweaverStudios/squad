@@ -274,6 +274,7 @@
 		const hasResumedWork =
 			/Starting work on/i.test(recentOutput) ||
 			/STARTING WORK:/i.test(recentOutput) ||
+			/Get to work!/i.test(recentOutput) ||
 			/I'll help/i.test(recentOutput) ||
 			/Let me/i.test(recentOutput) ||
 			/I'm going to/i.test(recentOutput) ||
@@ -765,8 +766,14 @@
 						</button>
 					</div>
 				{:else}
-					<!-- No actions detected: show placeholder -->
-					<span class="text-xs opacity-40 font-mono">...</span>
+					<!-- No specific actions: show Send button (disabled until user types) -->
+					<button
+						onclick={sendTextInput}
+						class="btn btn-xs btn-ghost"
+						disabled={!inputText.trim() || sendingInput || !onSendInput}
+					>
+						Send
+					</button>
 				{/if}
 			</div>
 		</div>

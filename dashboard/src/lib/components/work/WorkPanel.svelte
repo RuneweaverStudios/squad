@@ -137,7 +137,7 @@
 		</div>
 	{:else}
 		<!-- WorkCards -->
-		<div class="flex-1 overflow-hidden p-4">
+		<div class="flex-1 overflow-hidden pt-2 px-2 pb-0">
 			<!-- Horizontal scrolling row (630px per card for full terminal output) -->
 			<div class="flex gap-4 overflow-x-auto h-full pb-2 scrollbar-thin scrollbar-thumb-base-300 scrollbar-track-transparent">
 				{#each sortedSessions as session (session.sessionName)}
