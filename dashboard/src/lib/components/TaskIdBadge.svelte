@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { getProjectColor as getProjectColorFromHash } from '$lib/utils/projectColors';
 	import { TASK_STATUS_VISUALS, STATUS_ICONS, getIssueTypeVisual } from '$lib/config/statusColors';
+	import AgentAvatar from '$lib/components/AgentAvatar.svelte';
 
 	/** Dependency task info */
 	interface DepTask {
@@ -174,18 +175,14 @@
 		</button>
 
 		{#if shouldShowAssignee}
-			<span class="inline-flex items-center gap-1 text-xs font-medium text-info">
-				<svg
-					class="{iconSizes[size]} animate-spin shrink-0"
-					viewBox="0 0 24 24"
-					fill="currentColor"
-					stroke="currentColor"
-					stroke-width="2"
-				>
-					<path stroke-linecap="round" stroke-linejoin="round" d={STATUS_ICONS.gear} />
-				</svg>
-				{task.assignee}
-			</span>
+			<div class="inline-flex items-center gap-1.5 text-xs">
+				<!-- Avatar with animated working indicator ring -->
+				<div class="relative">
+					<div class="absolute -inset-0.5 rounded-full animate-pulse" style="background: oklch(0.70 0.15 220 / 0.3);"></div>
+					<AgentAvatar name={task.assignee || ''} size={16} class="relative rounded-full ring-1 ring-info/50" />
+				</div>
+				<span class="font-medium" style="color: oklch(0.70 0.12 220);">{task.assignee}</span>
+			</div>
 		{/if}
 
 		<!-- Blocks (BELOW badge) -->
@@ -321,18 +318,14 @@
 		</div>
 
 		{#if shouldShowAssignee}
-			<span class="inline-flex items-center gap-1 text-xs font-medium text-info">
-				<svg
-					class="{iconSizes[size]} animate-spin shrink-0"
-					viewBox="0 0 24 24"
-					fill="currentColor"
-					stroke="currentColor"
-					stroke-width="2"
-				>
-					<path stroke-linecap="round" stroke-linejoin="round" d={STATUS_ICONS.gear} />
-				</svg>
-				{task.assignee}
-			</span>
+			<div class="inline-flex items-center gap-1.5 text-xs">
+				<!-- Avatar with animated working indicator ring -->
+				<div class="relative">
+					<div class="absolute -inset-0.5 rounded-full animate-pulse" style="background: oklch(0.70 0.15 220 / 0.3);"></div>
+					<AgentAvatar name={task.assignee || ''} size={16} class="relative rounded-full ring-1 ring-info/50" />
+				</div>
+				<span class="font-medium" style="color: oklch(0.70 0.12 220);">{task.assignee}</span>
+			</div>
 		{/if}
 
 		<!-- Blocks (BELOW badge) -->
