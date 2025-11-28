@@ -1,27 +1,47 @@
 <script lang="ts">
 	/**
 	 * OutputDrawer Component
-	 * Global slide-out drawer showing combined output from all active Claude Code sessions.
+	 * Global slide-out drawer showing output from active Claude Code sessions.
 	 *
 	 * Features:
-	 * - Collapsible sections per session
+	 * - Tab bar for session selection (horizontal scrollable)
+	 * - Single session view (no collapsing, cleaner UI)
 	 * - Auto-scroll with pause toggle
 	 * - Polls all sessions every 500ms when open
+	 * - Syncs selected session with store for targeting
 	 * - Persists open/closed state in localStorage
 	 */
 
 	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
 	import { slide } from 'svelte/transition';
-	import { isOutputDrawerOpen, toggleOutputDrawer } from '$lib/stores/drawerStore';
+	import {
+		isOutputDrawerOpen,
+		toggleOutputDrawer,
+		selectedOutputSession,
+		clearOutputSessionSelection
+	} from '$lib/stores/drawerStore';
 
-	// Drawer open state - now synced with store
+	// Drawer open state - synced with store
 	let isOpen = $state(false);
 
-	// Sync with store
+	// Selected session - synced with store (null = auto-select first)
+	let selectedSession = $state<string | null>(null);
+
+	// Sync open state with store
 	$effect(() => {
 		const unsubscribe = isOutputDrawerOpen.subscribe(value => {
 			isOpen = value;
+		});
+		return unsubscribe;
+	});
+
+	// Sync selected session with store
+	$effect(() => {
+		const unsubscribe = selectedOutputSession.subscribe(value => {
+			if (value) {
+				selectedSession = value;
+			}
 		});
 		return unsubscribe;
 	});
@@ -33,10 +53,8 @@
 		output: string;
 		lineCount: number;
 		lastUpdated: string;
-		collapsed: boolean;
 	}
 	let sessions = $state<SessionOutput[]>([]);
-	let loading = $state(false);
 	let error = $state<string | null>(null);
 
 	// Auto-scroll state
@@ -46,23 +64,22 @@
 	// Polling interval reference
 	let pollInterval: ReturnType<typeof setInterval> | null = null;
 
+	// Get currently selected session data
+	const currentSession = $derived(() => {
+		if (!sessions.length) return null;
+		// If selected session exists in sessions, return it
+		const found = sessions.find(s => s.name === selectedSession);
+		if (found) return found;
+		// Otherwise return first session (auto-select)
+		return sessions[0];
+	});
+
 	// Load persisted state from localStorage
 	onMount(() => {
 		if (browser) {
 			const persisted = localStorage.getItem('output-drawer-open');
 			if (persisted === 'true') {
-				isOpen = true;
-			}
-
-			// Load collapsed state per session
-			const collapsedState = localStorage.getItem('output-drawer-collapsed');
-			if (collapsedState) {
-				try {
-					const parsed = JSON.parse(collapsedState);
-					// Will apply when sessions load
-				} catch (e) {
-					// Ignore parse errors
-				}
+				isOutputDrawerOpen.set(true);
 			}
 		}
 	});
@@ -90,6 +107,18 @@
 		}
 	});
 
+	// Handle selected session disappearing
+	$effect(() => {
+		if (selectedSession && sessions.length > 0) {
+			const exists = sessions.some(s => s.name === selectedSession);
+			if (!exists) {
+				// Selected session disappeared, auto-select first
+				selectedSession = sessions[0]?.name || null;
+				selectedOutputSession.set(selectedSession);
+			}
+		}
+	});
+
 	// Cleanup on unmount
 	onDestroy(() => {
 		if (pollInterval) {
@@ -112,30 +141,23 @@
 			// Fetch output for each session in parallel
 			const outputPromises = sessionsData.sessions.map(async (session: { name: string }) => {
 				try {
-					const outputResponse = await fetch(`/api/sessions/${session.name}/output?lines=50`);
+					const outputResponse = await fetch(`/api/sessions/${session.name}/output?lines=100`);
 					const outputData = await outputResponse.json();
-
-					// Find existing session to preserve collapsed state
-					const existing = sessions.find(s => s.name === session.name);
 
 					return {
 						name: session.name,
 						agentName: session.name.replace('jat-', ''),
 						output: outputData.success ? outputData.output : '',
 						lineCount: outputData.success ? outputData.lineCount : 0,
-						lastUpdated: new Date().toISOString(),
-						collapsed: existing?.collapsed ?? false
+						lastUpdated: new Date().toISOString()
 					};
 				} catch (e) {
-					// Return empty output on error
-					const existing = sessions.find(s => s.name === session.name);
 					return {
 						name: session.name,
 						agentName: session.name.replace('jat-', ''),
 						output: '',
 						lineCount: 0,
-						lastUpdated: new Date().toISOString(),
-						collapsed: existing?.collapsed ?? false
+						lastUpdated: new Date().toISOString()
 					};
 				}
 			});
@@ -143,6 +165,12 @@
 			const results = await Promise.all(outputPromises);
 			sessions = results;
 			error = null;
+
+			// Auto-select first session if none selected
+			if (!selectedSession && sessions.length > 0) {
+				selectedSession = sessions[0].name;
+				selectedOutputSession.set(selectedSession);
+			}
 
 			// Auto-scroll to bottom if enabled
 			if (autoScroll && scrollContainerRef) {
@@ -157,28 +185,15 @@
 		}
 	}
 
-	// Toggle drawer open/closed (now updates store)
+	// Toggle drawer open/closed
 	function toggleDrawer() {
 		toggleOutputDrawer();
 	}
 
-	// Toggle session collapsed state
-	function toggleSession(sessionName: string) {
-		sessions = sessions.map(s => {
-			if (s.name === sessionName) {
-				return { ...s, collapsed: !s.collapsed };
-			}
-			return s;
-		});
-
-		// Persist collapsed state
-		if (browser) {
-			const collapsedState: Record<string, boolean> = {};
-			sessions.forEach(s => {
-				collapsedState[s.name] = s.collapsed;
-			});
-			localStorage.setItem('output-drawer-collapsed', JSON.stringify(collapsedState));
-		}
+	// Select a session
+	function selectSession(sessionName: string) {
+		selectedSession = sessionName;
+		selectedOutputSession.set(sessionName);
 	}
 
 	// Toggle auto-scroll
@@ -186,14 +201,52 @@
 		autoScroll = !autoScroll;
 	}
 
-	// Expand all sessions
-	function expandAll() {
-		sessions = sessions.map(s => ({ ...s, collapsed: false }));
+	// Input state
+	let inputText = $state('');
+	let sendingInput = $state(false);
+
+	// Send input to selected session
+	async function sendInput(type: 'text' | 'ctrl-c' | 'raw' = 'text') {
+		if (type === 'text' && !inputText.trim()) return;
+		const target = currentSession();
+		if (!target) return;
+
+		sendingInput = true;
+
+		try {
+			const body = type === 'ctrl-c'
+				? { type: 'ctrl-c' }
+				: { type, input: inputText };
+
+			await fetch(`/api/sessions/${target.name}/input`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(body)
+			});
+
+			// Clear input after sending
+			if (type === 'text') {
+				inputText = '';
+			}
+		} catch (e) {
+			console.error('Failed to send input:', e);
+		} finally {
+			sendingInput = false;
+		}
 	}
 
-	// Collapse all sessions
-	function collapseAll() {
-		sessions = sessions.map(s => ({ ...s, collapsed: true }));
+	// Quick send "1" (Yes)
+	async function sendYes() {
+		inputText = '1';
+		await sendInput('text');
+	}
+
+	// Handle Enter key in input
+	function handleInputKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter' && !e.shiftKey) {
+			e.preventDefault();
+			sendInput('text');
+		}
 	}
 </script>
 
@@ -254,30 +307,6 @@
 			</div>
 
 			<div class="flex items-center gap-1">
-				<!-- Expand/Collapse All -->
-				<button
-					onclick={expandAll}
-					class="btn btn-xs btn-ghost"
-					title="Expand All"
-					style="color: oklch(0.55 0.02 250);"
-				>
-					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
-					</svg>
-				</button>
-				<button
-					onclick={collapseAll}
-					class="btn btn-xs btn-ghost"
-					title="Collapse All"
-					style="color: oklch(0.55 0.02 250);"
-				>
-					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
-					</svg>
-				</button>
-
-				<div class="divider divider-horizontal mx-0"></div>
-
 				<!-- Auto-scroll toggle -->
 				<button
 					onclick={toggleAutoScroll}
@@ -305,14 +334,36 @@
 			</div>
 		</div>
 
+		<!-- Tab Bar -->
+		{#if sessions.length > 0}
+			<div
+				class="flex gap-1 px-2 py-2 overflow-x-auto border-b"
+				style="background: oklch(0.16 0.01 250); border-color: oklch(0.25 0.02 250);"
+			>
+				{#each sessions as session (session.name)}
+					<button
+						onclick={() => selectSession(session.name)}
+						class="flex-shrink-0 px-3 py-1.5 rounded-md font-mono text-xs transition-all"
+						class:active-tab={selectedSession === session.name}
+						style={selectedSession === session.name
+							? 'background: oklch(0.30 0.15 240); color: oklch(0.95 0.02 250);'
+							: 'background: oklch(0.20 0.01 250); color: oklch(0.60 0.02 250); hover:background: oklch(0.25 0.02 250);'
+						}
+					>
+						{session.agentName}
+					</button>
+				{/each}
+			</div>
+		{/if}
+
 		<!-- Content -->
 		<div
 			bind:this={scrollContainerRef}
-			class="flex-1 overflow-y-auto p-2"
+			class="flex-1 overflow-y-auto p-3"
 			style="background: oklch(0.12 0.01 250);"
 		>
 			{#if error}
-				<div class="alert alert-error m-2">
+				<div class="alert alert-error">
 					<span>{error}</span>
 				</div>
 			{:else if sessions.length === 0}
@@ -336,65 +387,98 @@
 						Sessions will appear when agents start working
 					</p>
 				</div>
-			{:else}
-				<!-- Session Sections -->
-				{#each sessions as session (session.name)}
-					<div
-						class="mb-2 rounded-lg overflow-hidden"
-						style="background: oklch(0.16 0.01 250); border: 1px solid oklch(0.25 0.02 250);"
-					>
-						<!-- Session Header -->
-						<button
-							onclick={() => toggleSession(session.name)}
-							class="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-opacity-80 transition-colors"
-							style="background: oklch(0.20 0.01 250);"
-						>
-							<div class="flex items-center gap-2">
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									fill="none"
-									viewBox="0 0 24 24"
-									stroke-width="1.5"
-									stroke="currentColor"
-									class="w-4 h-4 transition-transform"
-									class:rotate-90={!session.collapsed}
-									style="color: oklch(0.55 0.02 250);"
-								>
-									<path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-								</svg>
-								<span class="font-mono text-sm font-semibold" style="color: oklch(0.80 0.15 200);">
-									{session.agentName}
-								</span>
-							</div>
-							<span class="text-xs font-mono" style="color: oklch(0.45 0.02 250);">
-								{session.lineCount} lines
-							</span>
-						</button>
-
-						<!-- Session Output -->
-						{#if !session.collapsed}
-							<div
-								class="p-2 overflow-x-auto"
-								transition:slide={{ duration: 150 }}
-							>
-								<pre
-									class="text-xs font-mono whitespace-pre-wrap break-words leading-relaxed"
-									style="color: oklch(0.70 0.02 250);"
-								>{session.output || 'No output yet...'}</pre>
-							</div>
-						{/if}
+			{:else if currentSession()}
+				<!-- Single Session Output -->
+				<div class="rounded-lg p-3" style="background: oklch(0.16 0.01 250); border: 1px solid oklch(0.25 0.02 250);">
+					<div class="flex items-center justify-between mb-2">
+						<span class="font-mono text-sm font-semibold" style="color: oklch(0.80 0.15 200);">
+							{currentSession()?.agentName}
+						</span>
+						<span class="text-xs font-mono" style="color: oklch(0.45 0.02 250);">
+							{currentSession()?.lineCount} lines
+						</span>
 					</div>
-				{/each}
+					<pre
+						class="text-xs font-mono whitespace-pre-wrap break-words leading-relaxed"
+						style="color: oklch(0.70 0.02 250);"
+					>{currentSession()?.output || 'No output yet...'}</pre>
+				</div>
 			{/if}
+		</div>
+
+		<!-- Input Section -->
+		<div
+			class="border-t px-3 py-2"
+			style="background: oklch(0.18 0.01 250); border-color: oklch(0.30 0.02 250);"
+		>
+			<!-- Target display + Quick actions -->
+			<div class="flex items-center gap-2 mb-2">
+				<div
+					class="flex-1 px-2 py-1 rounded text-xs font-mono"
+					style="background: oklch(0.22 0.02 250); border: 1px solid oklch(0.30 0.02 250); color: oklch(0.60 0.02 250);"
+				>
+					To: <span style="color: oklch(0.80 0.15 200);">{currentSession()?.agentName || 'No session'}</span>
+				</div>
+
+				<!-- Quick action buttons -->
+				<button
+					onclick={sendYes}
+					class="btn btn-xs"
+					style="background: oklch(0.30 0.10 150); border: none; color: oklch(0.95 0.02 250);"
+					title="Send '1' (Yes) to answer prompts"
+					disabled={sendingInput || !currentSession()}
+				>
+					Yes
+				</button>
+				<button
+					onclick={() => sendInput('ctrl-c')}
+					class="btn btn-xs"
+					style="background: oklch(0.30 0.10 25); border: none; color: oklch(0.95 0.02 250);"
+					title="Send Ctrl+C (interrupt)"
+					disabled={sendingInput || !currentSession()}
+				>
+					Ctrl+C
+				</button>
+			</div>
+
+			<!-- Text input -->
+			<div class="flex gap-2">
+				<input
+					type="text"
+					bind:value={inputText}
+					onkeydown={handleInputKeydown}
+					placeholder="Type message and press Enter..."
+					class="input input-xs flex-1 font-mono"
+					style="background: oklch(0.22 0.02 250); border: 1px solid oklch(0.30 0.02 250); color: oklch(0.80 0.02 250);"
+					disabled={sendingInput || !currentSession()}
+				/>
+				<button
+					onclick={() => sendInput('text')}
+					class="btn btn-xs btn-primary"
+					disabled={sendingInput || !inputText.trim() || !currentSession()}
+				>
+					{#if sendingInput}
+						<span class="loading loading-spinner loading-xs"></span>
+					{:else}
+						Send
+					{/if}
+				</button>
+			</div>
 		</div>
 
 		<!-- Footer -->
 		<div
-			class="flex items-center justify-between px-4 py-2 border-t text-xs font-mono"
-			style="background: oklch(0.18 0.01 250); border-color: oklch(0.30 0.02 250); color: oklch(0.45 0.02 250);"
+			class="flex items-center justify-between px-4 py-1 border-t text-xs font-mono"
+			style="background: oklch(0.16 0.01 250); border-color: oklch(0.30 0.02 250); color: oklch(0.45 0.02 250);"
 		>
 			<span>Polling: 500ms</span>
 			<span>{autoScroll ? 'Auto-scroll ON' : 'Auto-scroll paused'}</span>
 		</div>
 	</div>
 {/if}
+
+<style>
+	.active-tab {
+		box-shadow: 0 0 8px oklch(0.50 0.15 240 / 0.3);
+	}
+</style>
