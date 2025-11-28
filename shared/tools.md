@@ -234,6 +234,39 @@ Following Mario Zechner's "prompts are code" philosophy, each tool is documented
 - State: Read-only
 - Example: `browser-hn-scraper.js --limit 10`
 
+**Media / Image Generation (3 tools)**
+
+`gemini-image`
+- Input: Text prompt, optional output path, --model, --aspect, --size
+- Output: Generated image file path
+- State: Creates image file (default: /tmp/gemini-TIMESTAMP.png)
+- Models: gemini-2.5-flash-image (fast, default), gemini-3-pro-image-preview (quality, 4K)
+- Examples:
+  - Basic: `gemini-image "A sunset over mountains"`
+  - With options: `gemini-image "Product photo of a coffee mug" product.png --aspect 1:1`
+  - High quality: `gemini-image "Detailed art" art.png --model gemini-3-pro-image-preview --size 2K`
+
+`gemini-edit`
+- Input: Input image path, instruction text, optional output path, --model
+- Output: Edited image file path
+- State: Creates new image file (default: /tmp/gemini-edit-TIMESTAMP.png)
+- Examples:
+  - Basic: `gemini-edit photo.png "Remove the background"`
+  - With output: `gemini-edit portrait.jpg "Make it look like a Van Gogh painting" art.png`
+  - Pro model: `gemini-edit product.png "Add a subtle shadow" --model gemini-3-pro-image-preview`
+
+`gemini-compose`
+- Input: 2-14 image files, instruction text, optional --output, --model
+- Output: Composed image file path
+- State: Creates new image file (default: /tmp/gemini-compose-TIMESTAMP.png)
+- Detection: Arguments that exist as files are treated as images; first non-file argument is the instruction
+- Examples:
+  - Basic: `gemini-compose bg.png person.png "Place person on background"`
+  - With output: `gemini-compose style.jpg photo.jpg "Apply art style" --output styled.png`
+  - Multiple: `gemini-compose a.png b.png c.png "Combine into collage"`
+
+**Environment:** All gemini-* tools require `GEMINI_API_KEY` environment variable.
+
 ### Tool Composition & Workflows
 
 Following Mario's "prompts are code" philosophy, tools are designed to compose via pipes, redirects, and sequential execution:
