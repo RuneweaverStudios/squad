@@ -13,9 +13,18 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
 	import { slide } from 'svelte/transition';
+	import { isOutputDrawerOpen, toggleOutputDrawer } from '$lib/stores/drawerStore';
 
-	// Drawer open state
+	// Drawer open state - now synced with store
 	let isOpen = $state(false);
+
+	// Sync with store
+	$effect(() => {
+		const unsubscribe = isOutputDrawerOpen.subscribe(value => {
+			isOpen = value;
+		});
+		return unsubscribe;
+	});
 
 	// Session data
 	interface SessionOutput {
@@ -148,9 +157,9 @@
 		}
 	}
 
-	// Toggle drawer open/closed
+	// Toggle drawer open/closed (now updates store)
 	function toggleDrawer() {
-		isOpen = !isOpen;
+		toggleOutputDrawer();
 	}
 
 	// Toggle session collapsed state
