@@ -132,9 +132,18 @@
 		return priorities[status] || 999;
 	}
 
-	// Sort agents by status priority (live > working > active > idle > offline)
+	// Filter out offline agents (> 1 hour inactive) - they just add clutter
+	// Users can manage offline agents through agent-mail CLI if needed
+	const activeAgents = $derived(() => {
+		return agents.filter(a => getAgentStatus(a) !== 'offline');
+	});
+
+	// Count of hidden offline agents (for UI feedback)
+	const offlineCount = $derived(() => agents.length - activeAgents().length);
+
+	// Sort agents by status priority (live > working > active > idle)
 	const sortedAgents = $derived(() => {
-		return [...agents].sort((a, b) => {
+		return [...activeAgents()].sort((a, b) => {
 			const statusA = getAgentStatus(a);
 			const statusB = getAgentStatus(b);
 			const priorityA = getStatusPriority(statusA);
@@ -238,7 +247,7 @@
 <div class="flex flex-col h-full">
 	<!-- Agent Grid - Horizontal Scrolling Row - Industrial -->
 	<div class="p-4" style="background: oklch(0.14 0.01 250);">
-		{#if agents.length === 0}
+		{#if sortedAgents().length === 0}
 			<!-- Empty State - Industrial -->
 			<div
 				class="flex flex-col items-center justify-center h-48 text-center rounded-lg"
@@ -262,11 +271,15 @@
 						d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"
 					/>
 				</svg>
-				<h3 class="text-lg font-medium font-mono mb-2" style="color: oklch(0.55 0.02 250);">No Agents Online</h3>
+				<h3 class="text-lg font-medium font-mono mb-2" style="color: oklch(0.55 0.02 250);">No Active Agents</h3>
 				<p class="text-sm max-w-md" style="color: oklch(0.45 0.02 250);">
-					Agents will appear here when they register and start working. Use Agent Mail's
-					<code class="text-xs px-1 py-0.5 rounded font-mono" style="background: oklch(0.22 0.01 250); color: oklch(0.70 0.18 240);">am-register</code> command to create
-					agents.
+					{#if offlineCount() > 0}
+						{offlineCount()} agent{offlineCount() === 1 ? '' : 's'} offline (inactive > 1 hour).
+						Active agents will appear here when they start working.
+					{:else}
+						Agents will appear here when they register and start working. Use Agent Mail's
+						<code class="text-xs px-1 py-0.5 rounded font-mono" style="background: oklch(0.22 0.01 250); color: oklch(0.70 0.18 240);">am-register</code> command to create agents.
+					{/if}
 				</p>
 			</div>
 		{:else}
@@ -277,6 +290,15 @@
 						<AgentCard {agent} {tasks} {allTasks} {reservations} {onTaskAssign} {ontaskclick} />
 					</div>
 				{/each}
+				<!-- Offline count indicator -->
+				{#if offlineCount() > 0}
+					<div class="flex-shrink-0 w-48 h-72 flex items-center justify-center">
+						<div class="text-center p-4 rounded-lg" style="background: oklch(0.16 0.01 250); border: 1px dashed oklch(0.25 0.02 250);">
+							<p class="font-mono text-2xl mb-1" style="color: oklch(0.40 0.02 250);">{offlineCount()}</p>
+							<p class="font-mono text-xs uppercase tracking-wider" style="color: oklch(0.35 0.02 250);">offline</p>
+						</div>
+					</div>
+				{/if}
 			</div>
 		{/if}
 	</div>
