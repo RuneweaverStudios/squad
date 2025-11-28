@@ -1,0 +1,208 @@
+#!/usr/bin/env bash
+# Generate stylized SVG avatar for an agent name using Claude API
+# Usage: avatar-generate AGENT_NAME [options]
+
+set -euo pipefail
+
+AVATARS_DIR="${AVATARS_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../avatars" && pwd)}"
+
+show_help() {
+    cat <<'EOF'
+Usage: avatar-generate AGENT_NAME [options]
+
+Generate a stylized 32x32 SVG avatar for an agent name.
+Agent names are parsed as Adjective+Noun (e.g., BlueStream → Blue, Stream).
+
+Arguments:
+  AGENT_NAME          Agent name to generate avatar for (required)
+
+Options:
+  --output PATH       Custom output path (default: avatars/{name}.svg)
+  --force             Regenerate even if avatar exists
+  --help, -h          Show this help
+
+Examples:
+  avatar-generate BlueStream
+  avatar-generate DarkBay --force
+  avatar-generate NewCoast --output /tmp/test.svg
+
+Environment:
+  ANTHROPIC_API_KEY   Required. Your Anthropic API key.
+  AVATARS_DIR         Override avatars directory (default: ../avatars relative to script)
+EOF
+}
+
+error() {
+    echo "✗ Error: $1" >&2
+    exit 1
+}
+
+success() {
+    echo "✓ $1"
+}
+
+# Parse camelCase agent name into adjective and noun
+parse_agent_name() {
+    local name="$1"
+    # Find where lowercase transitions to uppercase (second word starts)
+    # BlueStream -> Blue Stream, DarkBay -> Dark Bay
+    local adjective noun
+
+    # Use sed to insert space before each uppercase letter after the first
+    local parsed
+    parsed=$(echo "$name" | sed 's/\([a-z]\)\([A-Z]\)/\1 \2/g')
+
+    adjective=$(echo "$parsed" | awk '{print $1}')
+    noun=$(echo "$parsed" | awk '{print $2}')
+
+    echo "$adjective" "$noun"
+}
+
+# Defaults
+AGENT_NAME=""
+OUTPUT=""
+FORCE=false
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --output)
+            OUTPUT="$2"
+            shift 2
+            ;;
+        --force)
+            FORCE=true
+            shift
+            ;;
+        --help|-h)
+            show_help
+            exit 0
+            ;;
+        --*)
+            error "Unknown option: $1"
+            ;;
+        *)
+            if [[ -z "$AGENT_NAME" ]]; then
+                AGENT_NAME="$1"
+            else
+                error "Unexpected argument: $1"
+            fi
+            shift
+            ;;
+    esac
+done
+
+# Validate
+if [[ -z "$AGENT_NAME" ]]; then
+    error "Agent name required. Usage: avatar-generate AGENT_NAME"
+fi
+
+if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
+    error "ANTHROPIC_API_KEY environment variable required"
+fi
+
+# Check dependencies
+if ! command -v curl &>/dev/null; then
+    error "curl is required but not installed"
+fi
+if ! command -v jq &>/dev/null; then
+    error "jq is required but not installed"
+fi
+
+# Default output path
+if [[ -z "$OUTPUT" ]]; then
+    mkdir -p "$AVATARS_DIR"
+    OUTPUT="$AVATARS_DIR/${AGENT_NAME}.svg"
+fi
+
+# Check if already exists
+if [[ -f "$OUTPUT" && "$FORCE" != "true" ]]; then
+    echo "Avatar already exists: $OUTPUT"
+    echo "Use --force to regenerate"
+    exit 0
+fi
+
+# Parse agent name
+read -r ADJECTIVE NOUN < <(parse_agent_name "$AGENT_NAME")
+
+if [[ -z "$NOUN" ]]; then
+    # Single word name - use the whole thing as noun
+    NOUN="$ADJECTIVE"
+    ADJECTIVE=""
+fi
+
+echo "Generating avatar for: $AGENT_NAME"
+if [[ -n "$ADJECTIVE" ]]; then
+    echo "  Parsed as: $ADJECTIVE + $NOUN"
+else
+    echo "  Using: $NOUN"
+fi
+
+# Build prompt
+PROMPT="Generate a simple, stylized 32x32 SVG icon for an AI agent named \"$AGENT_NAME\".
+
+The name suggests:
+- Adjective/descriptor: ${ADJECTIVE:-none}
+- Noun/concept: $NOUN
+
+Create a minimalist icon that visually represents these concepts. Use a simple color palette inspired by the adjective (if present). The icon should work well at small sizes.
+
+Requirements:
+- Output ONLY valid SVG code, nothing else
+- Start with <svg and end with </svg>
+- Use viewBox=\"0 0 32 32\"
+- Keep it simple (no complex paths, gradients optional)
+- Use 2-4 colors maximum
+- Make it distinctive and memorable"
+
+# Build API request payload
+PAYLOAD=$(jq -n \
+    --arg prompt "$PROMPT" \
+    '{
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1024,
+        messages: [{role: "user", content: $prompt}]
+    }')
+
+# Call Claude API
+echo "Calling Claude API..."
+RESPONSE=$(curl -s -X POST "https://api.anthropic.com/v1/messages" \
+    -H "Content-Type: application/json" \
+    -H "x-api-key: $ANTHROPIC_API_KEY" \
+    -H "anthropic-version: 2023-06-01" \
+    -d "$PAYLOAD")
+
+# Check for API errors
+if echo "$RESPONSE" | jq -e '.error' &>/dev/null; then
+    ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message // .error.type // "Unknown error"')
+    error "API error: $ERROR_MSG"
+fi
+
+# Extract text content
+SVG_CONTENT=$(echo "$RESPONSE" | jq -r '.content[0].text // empty')
+
+if [[ -z "$SVG_CONTENT" ]]; then
+    error "No content in API response"
+fi
+
+# Extract just the SVG part (in case there's extra text)
+SVG_ONLY=$(echo "$SVG_CONTENT" | sed -n '/<svg/,/<\/svg>/p')
+
+if [[ -z "$SVG_ONLY" ]]; then
+    error "Response does not contain valid SVG (no <svg tag found)"
+fi
+
+# Validate it starts with <svg
+if [[ ! "$SVG_ONLY" =~ ^\<svg ]]; then
+    error "SVG validation failed: does not start with <svg"
+fi
+
+# Validate it ends with </svg>
+if [[ ! "$SVG_ONLY" =~ \</svg\>$ ]]; then
+    error "SVG validation failed: does not end with </svg>"
+fi
+
+# Save to file
+echo "$SVG_ONLY" > "$OUTPUT"
+
+success "Avatar saved: $OUTPUT"

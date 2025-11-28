@@ -114,8 +114,8 @@
 		staticColor?: string;
 		/** Show style toolbar (default: true) - DEPRECATED: use showStyleToolbar for backward compatibility */
 		showStyleToolbar?: boolean;
-		/** Default time range for initial display (default: '24h') */
-		defaultTimeRange?: '1h' | '24h' | '7d' | '30d' | 'all';
+		/** Default time range for initial display (default: '12h') */
+		defaultTimeRange?: '12h' | '24h' | '7d' | '30d' | 'all';
 		/** Default color mode for initial display (default: 'usage') */
 		defaultColorMode?: 'usage' | 'static';
 		/** Show compact legend for multi-series (default: false) */
@@ -133,7 +133,7 @@
 		colorMode = 'usage',
 		staticColor = '#10b981',
 		showStyleToolbar = true,
-		defaultTimeRange = '24h',
+		defaultTimeRange = '12h',
 		defaultColorMode = 'usage',
 		showLegend = false
 	}: Props = $props();
@@ -146,7 +146,7 @@
 	// ============================================================================
 
 	type ChartType = 'line' | 'bars' | 'area' | 'dots';
-	type TimeRange = '1h' | '24h' | '7d' | '30d' | 'all' | 'custom';
+	type TimeRange = '12h' | '24h' | '7d' | '30d' | 'all' | 'custom';
 	let chartType = $state<ChartType>('line');
 	let timeRange = $state<TimeRange>(defaultTimeRange); // Initialize from prop
 
@@ -214,8 +214,8 @@
 		let cutoffTime: Date;
 
 		switch (timeRange) {
-			case '1h':
-				cutoffTime = new Date(now.getTime() - 60 * 60 * 1000); // 1 hour ago
+			case '12h':
+				cutoffTime = new Date(now.getTime() - 12 * 60 * 60 * 1000); // 12 hours ago
 				break;
 			case '24h':
 				cutoffTime = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 24 hours ago
@@ -283,8 +283,8 @@
 		let cutoffTime: Date;
 
 		switch (timeRange) {
-			case '1h':
-				cutoffTime = new Date(now.getTime() - 60 * 60 * 1000);
+			case '12h':
+				cutoffTime = new Date(now.getTime() - 12 * 60 * 60 * 1000);
 				break;
 			case '24h':
 				cutoffTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -455,8 +455,8 @@
 	/** Time range label for badge based on selected timeRange */
 	const timeRangeLabel = $derived(() => {
 		switch (timeRange) {
-			case '1h':
-				return '1hr';
+			case '12h':
+				return '12hr';
 			case '24h':
 				return '24hr';
 			case '7d':
@@ -704,14 +704,14 @@
 				<div>
 					<div class="flex items-center gap-1 flex-wrap">
 						<button
-							class="btn btn-xs {timeRange === '1h' ? 'btn-primary' : 'btn-ghost'}"
+							class="btn btn-xs {timeRange === '12h' ? 'btn-primary' : 'btn-ghost'}"
 							onclick={() => {
-								timeRange = '1h';
+								timeRange = '12h';
 								showCustomDatePicker = false;
 							}}
-							title="Last 1 hour"
+							title="Last 12 hours"
 						>
-							1hr
+							12hr
 						</button>
 						<button
 							class="btn btn-xs {timeRange === '24h' ? 'btn-primary' : 'btn-ghost'}"

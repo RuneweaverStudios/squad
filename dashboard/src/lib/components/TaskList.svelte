@@ -99,10 +99,10 @@
 		// Initial load
 		fetchTasks();
 
-		// Set up polling for real-time updates (every 2 seconds)
+		// Set up polling for real-time updates (every 15 seconds)
 		const interval = setInterval(() => {
 			fetchTasks(true); // Silent refresh (no loading indicator)
-		}, 2000);
+		}, 15000);
 
 		// Cleanup: clear interval when component unmounts
 		return () => {
