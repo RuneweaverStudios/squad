@@ -426,7 +426,7 @@
 <!-- Drawer Panel -->
 {#if isOpen}
 	<div
-		class="fixed right-0 top-0 h-screen w-[500px] z-50 flex flex-col shadow-2xl"
+		class="fixed right-0 top-0 h-screen w-[630px] z-50 flex flex-col shadow-2xl"
 		style="background: oklch(0.14 0.01 250); border-left: 1px solid oklch(0.30 0.02 250);"
 		transition:slide={{ axis: 'x', duration: 200 }}
 	>
