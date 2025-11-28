@@ -44,6 +44,49 @@ bd create "Build browser-wait.js - Smart waiting capability" \
 # Open Chimaro dashboard in browser to see aggregated view with filtering
 ```
 
+### Git Integration and .gitignore Best Practices
+
+**Important: Do NOT add `.beads/` to your root `.gitignore`.**
+
+Beads is designed to sync task data via git. The `.beads/` directory contains:
+- **JSONL files** (source of truth) - These ARE committed and synced via git
+- **SQLite database** (local cache) - These are NOT committed
+
+The `.beads/.gitignore` file (created by `bd init`) handles this automatically by ignoring the SQLite files while allowing JSONL tracking.
+
+**Standard .gitignore patterns for JAT projects:**
+
+Add these patterns to your project's root `.gitignore`:
+
+```gitignore
+# Claude Code session-specific files (per-developer, don't commit)
+.claude/agent-*.txt
+.claude/agent-*-activity.jsonl
+.mcp.json
+
+# Beads: JSONL files are committed (source of truth), SQLite is local cache
+# The .beads/.gitignore handles ignoring db files while tracking jsonl
+```
+
+**What gets committed vs ignored:**
+
+| Path | Committed? | Purpose |
+|------|------------|---------|
+| `.beads/issues.jsonl` | ✅ Yes | Task data - syncs across machines |
+| `.beads/config.yaml` | ✅ Yes | Project Beads configuration |
+| `.beads/metadata.json` | ✅ Yes | Repository and clone IDs |
+| `.beads/.gitignore` | ✅ Yes | Ignore rules for SQLite files |
+| `.beads/beads.db*` | ❌ No | Local SQLite cache (auto-rebuilt) |
+| `.claude/agent-*.txt` | ❌ No | Per-session agent identity |
+| `.claude/agent-*-activity.jsonl` | ❌ No | Session activity logs |
+| `.mcp.json` | ❌ No | Local MCP server configuration |
+
+**Why this matters:**
+- Task assignments, priorities, and status sync across all developers
+- No merge conflicts on binary SQLite files
+- Each developer's local cache rebuilds automatically from JSONL
+- Session-specific files stay local (different agents per terminal)
+
 ### Beads Commands
 
 **Quick reference for agents to avoid common command errors.**
