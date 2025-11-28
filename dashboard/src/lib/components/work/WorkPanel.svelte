@@ -167,9 +167,10 @@
 				class="mb-4 min-h-[80px]"
 			/>
 
-			<!-- Fixed-width Grid (630px per card for full terminal output) -->
-			<div class="grid gap-4" style="grid-template-columns: repeat(auto-fill, 630px);">
+			<!-- Horizontal scrolling row (630px per card for full terminal output) -->
+			<div class="flex gap-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-base-300 scrollbar-track-transparent">
 				{#each sortedSessions as session (session.sessionName)}
+					<div class="flex-shrink-0" style="width: 630px;">
 					<WorkCard
 						sessionName={session.sessionName}
 						agentName={session.agentName}
@@ -184,6 +185,7 @@
 						onSendInput={createSendInputHandler(session.sessionName)}
 						onTaskClick={onTaskClick}
 					/>
+					</div>
 				{/each}
 			</div>
 		</div>
