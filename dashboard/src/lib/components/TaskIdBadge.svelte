@@ -120,8 +120,9 @@
 		<!-- Blocked by (ABOVE badge) -->
 		{#if hasBlockers}
 			<div class="text-xs" style="color: oklch(0.65 0.20 25);">
+				<span class="font-mono opacity-50">┌─</span>
 				<span class="opacity-70">blocked by:</span>
-				<div class="pl-3 flex flex-wrap items-center gap-1">
+				<div class="pl-5 flex flex-wrap items-center gap-1">
 					{#each unresolvedBlockers.slice(0, 2) as dep, i}
 						<button
 							class="font-mono hover:underline"
@@ -190,8 +191,9 @@
 		<!-- Blocks (BELOW badge) -->
 		{#if hasBlocks}
 			<div class="text-xs" style="color: oklch(0.60 0.15 200);">
+				<span class="font-mono opacity-50">└─</span>
 				<span class="opacity-70">blocks:</span>
-				<div class="pl-3 flex flex-wrap items-center gap-1">
+				<div class="pl-5 flex flex-wrap items-center gap-1">
 					{#each activeBlocks.slice(0, 2) as dep, i}
 						<button
 							class="font-mono hover:underline"
@@ -212,8 +214,9 @@
 		<!-- Blocked by (ABOVE badge) -->
 		{#if hasBlockers}
 			<div class="text-xs" style="color: oklch(0.65 0.20 25);">
+				<span class="font-mono opacity-50">┌─</span>
 				<span class="opacity-70">blocked by:</span>
-				<div class="pl-3 flex flex-wrap items-center gap-1">
+				<div class="pl-5 flex flex-wrap items-center gap-1">
 					{#each unresolvedBlockers.slice(0, 2) as dep, i}
 						<button
 							class="font-mono hover:underline"
@@ -335,8 +338,9 @@
 		<!-- Blocks (BELOW badge) -->
 		{#if hasBlocks}
 			<div class="text-xs" style="color: oklch(0.60 0.15 200);">
+				<span class="font-mono opacity-50">└─</span>
 				<span class="opacity-70">blocks:</span>
-				<div class="pl-3 flex flex-wrap items-center gap-1">
+				<div class="pl-5 flex flex-wrap items-center gap-1">
 					{#each activeBlocks.slice(0, 2) as dep, i}
 						<button
 							class="font-mono hover:underline"

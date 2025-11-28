@@ -1424,7 +1424,7 @@
 							</tr>
 						</thead>
 						<tbody>
-							{#each typeTasks as task (task.id)}
+							{#each typeTasks as task, taskIndex (task.id)}
 								{@const depStatus = analyzeDependencies(task)}
 									{@const taskIsActive = task.status === 'in_progress' && task.assignee}
 									{@const isNewTask = newTaskIds.includes(task.id)}
@@ -1433,6 +1433,8 @@
 									{@const unresolvedBlockers = task.depends_on?.filter(d => d.status !== 'closed') || []}
 									{@const allTasksList = allTasks.length > 0 ? allTasks : tasks}
 									{@const blockedTasks = allTasksList.filter(t => t.depends_on?.some(d => d.id === task.id) && t.status !== 'closed')}
+									{@const isChildTask = groupingMode === 'parent' && extractParentId(task.id) !== null && extractParentId(task.id) !== task.id}
+									{@const isLastChild = isChildTask && taskIndex === typeTasks.length - 1}
 									<!-- Main task row -->
 									<tr
 										class="cursor-pointer group overflow-visible industrial-row {depStatus.hasBlockers ? 'opacity-70' : ''} {isNewTask ? 'task-new-entrance' : ''} {isStarting ? 'task-starting' : ''} {isCompleted ? 'task-completed' : ''}"
@@ -1448,15 +1450,37 @@
 											style="background: inherit;"
 											onclick={(e) => e.stopPropagation()}
 										>
-											<input
-												type="checkbox"
-												class="checkbox checkbox-sm"
-												checked={selectedTasks.has(task.id)}
-												onchange={() => toggleTask(task.id)}
-												style="border-color: oklch(0.45 0.02 250);"
-											/>
+											<!-- Tree connector for child tasks in parent mode -->
+											{#if isChildTask}
+												<div class="flex items-center">
+													<div class="relative w-5 h-full flex items-center justify-center">
+														<!-- Vertical line -->
+														<div
+															class="absolute left-2 w-px bg-base-content/20"
+															style="top: {isLastChild ? '-50%' : '-50%'}; height: {isLastChild ? '50%' : '100%'};"
+														></div>
+														<!-- Horizontal connector -->
+														<div class="absolute left-2 w-2 h-px bg-base-content/20"></div>
+													</div>
+													<input
+														type="checkbox"
+														class="checkbox checkbox-sm"
+														checked={selectedTasks.has(task.id)}
+														onchange={() => toggleTask(task.id)}
+														style="border-color: oklch(0.45 0.02 250);"
+													/>
+												</div>
+											{:else}
+												<input
+													type="checkbox"
+													class="checkbox checkbox-sm"
+													checked={selectedTasks.has(task.id)}
+													onchange={() => toggleTask(task.id)}
+													style="border-color: oklch(0.45 0.02 250);"
+												/>
+											{/if}
 										</th>
-										<th style="background: inherit;">
+										<th style="background: inherit; {isChildTask ? 'padding-left: 0.5rem;' : ''}">
 											<TaskIdBadge
 												{task}
 												size="xs"
