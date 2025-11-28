@@ -35,16 +35,17 @@ export async function GET({ params, url }) {
 
 		// Build tmux capture-pane command
 		// -p: Print to stdout
+		// -e: Include escape sequences (ANSI colors)
 		// -t: Target session
 		// -S: Start line (negative = history, 0 = visible start)
 		// -E: End line (empty = end of visible)
 		let command;
 		if (includeHistory) {
 			// Capture from start of history to current position
-			command = `tmux capture-pane -p -t "${sessionName}" -S -${lines}`;
+			command = `tmux capture-pane -p -e -t "${sessionName}" -S -${lines}`;
 		} else {
 			// Capture only visible pane content
-			command = `tmux capture-pane -p -t "${sessionName}"`;
+			command = `tmux capture-pane -p -e -t "${sessionName}"`;
 		}
 
 		try {
