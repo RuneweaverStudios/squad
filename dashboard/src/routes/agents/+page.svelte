@@ -10,6 +10,7 @@
 		getProjectsFromTasks,
 		getTaskCountByProject
 	} from '$lib/utils/projectUtils';
+	import { spawn } from '$lib/stores/workSessions.svelte.js';
 
 	let tasks = $state([]);
 	let allTasks = $state([]);  // Unfiltered tasks for project list calculation
@@ -152,6 +153,15 @@
 		drawerOpen = true;
 	}
 
+	// Handle spawn for task from TaskQueue
+	async function handleSpawnForTask(taskId: string) {
+		const session = await spawn(taskId);
+		if (session) {
+			// Refetch data to show updated task status
+			await fetchData();
+		}
+	}
+
 	// Auto-refresh data every 15 seconds (layout also polls at 30s, so total coverage is good)
 	$effect(() => {
 		const interval = setInterval(fetchData, 15000);
@@ -203,6 +213,7 @@
 					{reservations}
 					{selectedProject}
 					ontaskclick={handleTaskClick}
+					onspawnfortask={handleSpawnForTask}
 				/>
 			{/if}
 		</div>

@@ -25,9 +25,10 @@
 		reservations?: Reservation[];
 		selectedProject?: string;
 		ontaskclick?: (taskId: string) => void;
+		onspawnfortask?: (taskId: string) => Promise<void>;
 	}
 
-	let { tasks = [], agents = [], reservations = [], selectedProject = 'All Projects', ontaskclick }: Props = $props();
+	let { tasks = [], agents = [], reservations = [], selectedProject = 'All Projects', ontaskclick, onspawnfortask }: Props = $props();
 
 	// Initialize filters from URL params (default to open tasks)
 	let searchQuery = $state<string>('');
@@ -256,6 +257,23 @@
 			console.error('Failed to copy:', err);
 		}
 	}
+
+	// Start Work button state
+	let spawningTaskId = $state<string | null>(null);
+
+	async function handleStartWork(taskId: string, event: MouseEvent): Promise<void> {
+		event.stopPropagation(); // Don't trigger card click
+		if (!onspawnfortask || spawningTaskId) return;
+
+		spawningTaskId = taskId;
+		try {
+			await onspawnfortask(taskId);
+		} catch (err) {
+			console.error('Failed to start work:', err);
+		} finally {
+			spawningTaskId = null;
+		}
+	}
 </script>
 
 <div class="flex flex-col h-full">
@@ -480,6 +498,29 @@
 						<!-- Labels -->
 						{#if task.labels && task.labels.length > 0}
 							<LabelBadges labels={task.labels} maxDisplay={3} class="mt-2" />
+						{/if}
+
+						<!-- Start Work Button -->
+						{#if onspawnfortask && !depStatus.hasBlockers}
+							<div class="mt-2 flex justify-end">
+								<button
+									class="btn btn-xs btn-primary gap-1"
+									onclick={(e) => handleStartWork(task.id, e)}
+									disabled={spawningTaskId === task.id}
+									title="Start work on this task"
+								>
+									{#if spawningTaskId === task.id}
+										<span class="loading loading-spinner loading-xs"></span>
+										Starting...
+									{:else}
+										<!-- Play icon -->
+										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+										</svg>
+										Start Work
+									{/if}
+								</button>
+							</div>
 						{/if}
 					</div>
 				</div>
