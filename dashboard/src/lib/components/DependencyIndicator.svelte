@@ -21,10 +21,10 @@
 	let tooltipX = $state(0);
 	let tooltipY = $state(0);
 
-	// Analyze dependencies
-	const depStatus = $derived(() => analyzeDependencies(task));
-	const badge = $derived(() => getDependencyBadge(depStatus()));
-	const dependencyChain = $derived(() => buildDependencyChain(task, allTasks));
+	// Analyze dependencies - use $derived.by() for proper reactivity tracking
+	const depStatus = $derived.by(() => analyzeDependencies(task));
+	const badge = $derived.by(() => getDependencyBadge(depStatus));
+	const dependencyChain = $derived.by(() => buildDependencyChain(task, allTasks));
 
 	function handleMouseEnter(event: MouseEvent) {
 		showTooltip = true;
@@ -47,7 +47,7 @@
 	}
 </script>
 
-{#if badge().show}
+{#if badge.show}
 	<div
 		class="inline-block"
 		onmouseenter={handleMouseEnter}
@@ -55,10 +55,10 @@
 		onmouseleave={handleMouseLeave}
 	>
 		<span
-			class="badge badge-{size} {badge().color} gap-1 cursor-help"
-			title={badge().tooltip}
+			class="badge badge-{size} {badge.color} gap-1 cursor-help"
+			title={badge.tooltip}
 		>
-			{badge().text}
+			{badge.text}
 		</span>
 	</div>
 
@@ -72,26 +72,26 @@
 				<div class="space-y-2">
 					<!-- Header -->
 					<div class="flex items-center gap-2 pb-2 border-b border-base-300">
-						<span class="text-lg">{badge().icon}</span>
+						<span class="text-lg">{badge.icon}</span>
 						<div>
 							<div class="text-sm font-semibold text-base-content">
-								{depStatus().hasBlockers ? 'Blocked By' : 'Blocking'}
+								{depStatus.hasBlockers ? 'Blocked By' : 'Blocking'}
 							</div>
 							<div class="text-xs text-base-content/70">
-								{depStatus().hasBlockers
-									? `${depStatus().blockerCount} ${depStatus().blockerCount === 1 ? 'task' : 'tasks'} must be completed first`
-									: `${depStatus().blockedCount} ${depStatus().blockedCount === 1 ? 'task is' : 'tasks are'} waiting on this`}
+								{depStatus.hasBlockers
+									? `${depStatus.blockerCount} ${depStatus.blockerCount === 1 ? 'task' : 'tasks'} must be completed first`
+									: `${depStatus.blockedCount} ${depStatus.blockedCount === 1 ? 'task is' : 'tasks are'} waiting on this`}
 							</div>
 						</div>
 					</div>
 
 					<!-- Blockers List (if blocked) -->
-					{#if depStatus().hasBlockers}
+					{#if depStatus.hasBlockers}
 						<div class="space-y-1 max-h-64 overflow-y-auto">
 							<div class="text-xs font-medium text-base-content/70 mb-1">
 								Must Complete First:
 							</div>
-							{#each depStatus().unresolvedBlockers as blocker}
+							{#each depStatus.unresolvedBlockers as blocker}
 								<div
 									class="flex items-start justify-between gap-2 text-xs bg-error/10 rounded px-2 py-1.5 border border-error/20"
 								>
@@ -133,12 +133,12 @@
 					{/if}
 
 					<!-- Blocked Tasks List (if blocking) -->
-					{#if depStatus().hasBlockedTasks}
+					{#if depStatus.hasBlockedTasks}
 						<div class="space-y-1 max-h-64 overflow-y-auto">
 							<div class="text-xs font-medium text-base-content/70 mb-1">
 								Tasks Waiting:
 							</div>
-							{#each depStatus().blockedTasks as blocked}
+							{#each depStatus.blockedTasks as blocked}
 								<div
 									class="flex items-start justify-between gap-2 text-xs bg-warning/10 rounded px-2 py-1.5 border border-warning/20"
 								>
@@ -178,14 +178,14 @@
 					{/if}
 
 					<!-- Dependency Chain (if blocked and has chain) -->
-					{#if depStatus().hasBlockers && dependencyChain().length > 1}
+					{#if depStatus.hasBlockers && dependencyChain.length > 1}
 						<div class="pt-2 border-t border-base-300">
 							<div class="text-xs font-medium text-base-content/70 mb-1">
 								Full Dependency Chain:
 							</div>
 							<div class="bg-base-200 rounded p-2 font-mono text-xs text-base-content/80 space-y-0.5">
 								<div class="text-primary font-semibold">Current: {task.id}</div>
-								{#each dependencyChain() as { level, task: depTask }}
+								{#each dependencyChain as { level, task: depTask }}
 									<div class="pl-{level * 2}">
 										{'  '.repeat(level - 1)}{level > 1 ? '↳' : '→'}
 										<span

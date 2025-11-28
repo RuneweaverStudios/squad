@@ -174,13 +174,13 @@
 	// Check if we have multi-project data to display
 	const hasMultiProjectData = $derived(multiSeriesData && multiSeriesData.length > 0 && projectMeta && projectMeta.length > 0);
 
-	// Compute agent status using shared utility
+	// Compute agent status using shared utility - use $derived.by() for proper reactivity
 	// States: live (< 1m, truly responsive) > working (1-10m with task) > active (recent activity) > idle (within 1h) > offline (>1h)
-	const agentStatus = $derived(() => computeAgentStatus(agent));
-	const statusVisual = $derived(() => getAgentStatusVisual(agentStatus()));
+	const agentStatus = $derived.by(() => computeAgentStatus(agent));
+	const statusVisual = $derived.by(() => getAgentStatusVisual(agentStatus));
 
 	// Compute current task (in-progress tasks assigned to this agent)
-	const currentTask = $derived(() => {
+	const currentTask = $derived.by(() => {
 		const inProgressTasks = tasks.filter(
 			(t) => t.assignee === agent.name && t.status === 'in_progress'
 		);
@@ -188,12 +188,12 @@
 	});
 
 	// Compute queued tasks (open tasks assigned to this agent)
-	const queuedTasks = $derived(() => {
+	const queuedTasks = $derived.by(() => {
 		return tasks.filter((t) => t.assignee === agent.name && t.status === 'open');
 	});
 
 	// Compute file locks held by this agent
-	const agentLocks = $derived(() => {
+	const agentLocks = $derived.by(() => {
 		return reservations.filter(
 			(r) =>
 				(r.agent_name === agent.name || r.agent === agent.name) &&
@@ -350,7 +350,7 @@
 		}
 
 		// Get agent's active reservations
-		const agentReservations = agentLocks();
+		const agentReservations = agentLocks;
 		if (agentReservations.length === 0) {
 			return { hasConflict: false, reasons: [] };
 		}
@@ -440,7 +440,7 @@
 
 	// Handle badge click for offline agents
 	function handleBadgeClick(): void {
-		if (agentStatus() === 'offline') {
+		if (agentStatus === 'offline') {
 			deleteModal.open();
 		}
 	}
@@ -632,7 +632,7 @@
 
 	// Quick Action: Unassign current task
 	function confirmUnassignTask(): void {
-		if (!currentTask()) {
+		if (!currentTask) {
 			alert('No current task to unassign');
 			closeQuickActions();
 			return;
@@ -642,7 +642,7 @@
 	}
 
 	async function unassignCurrentTask(): Promise<void> {
-		const task = currentTask();
+		const task = currentTask;
 		if (!task) return;
 
 		try {
@@ -864,7 +864,7 @@
 
 	// Fetch output from the agent's session
 	async function fetchOutput(): Promise<void> {
-		if (agentStatus() === 'offline') {
+		if (agentStatus === 'offline') {
 			outputContent = '';
 			outputError = 'Agent is offline - no active session';
 			return;
@@ -942,9 +942,9 @@
 	class="ml-0.5 mt-0.5 relative h-full flex flex-col rounded-lg overflow-hidden transition-all duration-200
 		{isDragOver && hasConflict ? 'scale-[1.02]' : isDragOver ? 'scale-[1.02]' : ''}
 		{isAssigning || assignSuccess ? 'pointer-events-none' : ''}
-		{agentStatus() === 'offline' ? 'opacity-50 hover:opacity-90' : ''}"
+		{agentStatus === 'offline' ? 'opacity-50 hover:opacity-90' : ''}"
 	style="
-		background: linear-gradient(135deg, {statusVisual().bgTint} 0%, transparent 50%);
+		background: linear-gradient(135deg, {statusVisual.bgTint} 0%, transparent 50%);
 		border: 1px solid oklch(0.5 0 0 / 0.15);
 		box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.05), 0 2px 8px oklch(0 0 0 / 0.1);
 	"
@@ -958,7 +958,7 @@
 	<!-- Status accent bar (left edge) -->
 	<div
 		class="absolute left-0 top-0 bottom-0 w-1 transition-all duration-300"
-		style="background: {statusVisual().accent}; box-shadow: 0 0 12px {statusVisual().glow};"
+		style="background: {statusVisual.accent}; box-shadow: 0 0 12px {statusVisual.glow};"
 	></div>
 
 	<!-- Drag-over border overlay -->
@@ -973,7 +973,7 @@
 	{#if isAssigning}
 		<div class="absolute inset-0 bg-base-300/80 backdrop-blur-sm rounded-lg z-50 flex items-center justify-center">
 			<div class="text-center">
-				<span class="loading loading-spinner loading-lg" style="color: {statusVisual().accent};"></span>
+				<span class="loading loading-spinner loading-lg" style="color: {statusVisual.accent};"></span>
 				<p class="text-sm font-medium text-base-content mt-2">Assigning task...</p>
 			</div>
 		</div>
@@ -1001,26 +1001,26 @@
 			<!-- Status indicator (inline with name) -->
 			<div
 				class="flex items-center justify-center w-6 h-6 rounded shrink-0"
-				style="background: {statusVisual().bgTint}; box-shadow: 0 0 8px {statusVisual().glow};"
-				title={statusVisual().description}
+				style="background: {statusVisual.bgTint}; box-shadow: 0 0 8px {statusVisual.glow};"
+				title={statusVisual.description}
 			>
-				{#if agentStatus() === 'working'}
-					<svg class="w-3.5 h-3.5 animate-spin" style="color: {statusVisual().accent};" viewBox="0 0 24 24" fill="currentColor">
+				{#if agentStatus === 'working'}
+					<svg class="w-3.5 h-3.5 animate-spin" style="color: {statusVisual.accent};" viewBox="0 0 24 24" fill="currentColor">
 						<path d={STATUS_ICONS.gear} />
 					</svg>
-				{:else if agentStatus() === 'live'}
-					<span class="loading loading-dots loading-xs" style="color: {statusVisual().accent};"></span>
-				{:else if agentStatus() === 'active'}
+				{:else if agentStatus === 'live'}
+					<span class="loading loading-dots loading-xs" style="color: {statusVisual.accent};"></span>
+				{:else if agentStatus === 'active'}
 					<span class="relative flex h-2 w-2">
-						<span class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style="background: {statusVisual().accent};"></span>
-						<span class="relative inline-flex rounded-full h-2 w-2" style="background: {statusVisual().accent};"></span>
+						<span class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style="background: {statusVisual.accent};"></span>
+						<span class="relative inline-flex rounded-full h-2 w-2" style="background: {statusVisual.accent};"></span>
 					</span>
-				{:else if agentStatus() === 'idle'}
-					<svg class="w-3.5 h-3.5" style="color: {statusVisual().accent};" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				{:else if agentStatus === 'idle'}
+					<svg class="w-3.5 h-3.5" style="color: {statusVisual.accent};" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 						<circle cx="12" cy="12" r="6" />
 					</svg>
-				{:else if agentStatus() === 'offline'}
-					<svg class="w-3.5 h-3.5" style="color: {statusVisual().accent};" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				{:else if agentStatus === 'offline'}
+					<svg class="w-3.5 h-3.5" style="color: {statusVisual.accent};" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 						<path stroke-linecap="round" stroke-linejoin="round" d={STATUS_ICONS['power-off']} />
 					</svg>
 				{/if}
@@ -1037,7 +1037,7 @@
 				<div class="flex-1 min-w-0 text-left">
 					<h3
 						class="font-mono font-bold text-sm tracking-wide truncate group-hover:opacity-80 transition-opacity"
-						style="color: {statusVisual().accent}; text-shadow: 0 0 20px {statusVisual().glow};"
+						style="color: {statusVisual.accent}; text-shadow: 0 0 20px {statusVisual.glow};"
 					>
 						{agent.name?.toUpperCase() || 'UNKNOWN'}
 					</h3>
@@ -1045,10 +1045,10 @@
 			</button>
 
 			<!-- Task badge or status label -->
-			{#if agentStatus() === 'working' && currentTask()}
-				{@const taskProjectKey = currentTask().id.split('-')[0].toLowerCase()}
+			{#if agentStatus === 'working' && currentTask}
+				{@const taskProjectKey = currentTask.id.split('-')[0].toLowerCase()}
 				<TaskIdBadge
-					task={{ id: currentTask().id, status: currentTask().status, issue_type: currentTask().issue_type, title: currentTask().title }}
+					task={{ id: currentTask.id, status: currentTask.status, issue_type: currentTask.issue_type, title: currentTask.title }}
 					size="xs"
 					showType={false}
 					showStatus={true}
@@ -1059,19 +1059,19 @@
 			{:else}
 				<button
 					class="font-mono text-[10px] tracking-widest uppercase px-2 py-0.5 rounded transition-all
-						{agentStatus() === 'offline' ? 'cursor-pointer hover:scale-105' : 'cursor-default'}"
-					style="color: {statusVisual().accent}; background: {statusVisual().bgTint};"
+						{agentStatus === 'offline' ? 'cursor-pointer hover:scale-105' : 'cursor-default'}"
+					style="color: {statusVisual.accent}; background: {statusVisual.bgTint};"
 					onclick={handleBadgeClick}
-					disabled={agentStatus() !== 'offline'}
-					title={statusVisual().description}
+					disabled={agentStatus !== 'offline'}
+					title={statusVisual.description}
 				>
-					{statusVisual().label}
+					{statusVisual.label}
 				</button>
 			{/if}
 
 			<!-- ═══ SESSION CONTROL BUTTONS ═══ -->
 			<!-- Only show for non-offline agents (those with active sessions) -->
-			{#if agentStatus() !== 'offline'}
+			{#if agentStatus !== 'offline'}
 				<div class="flex items-center gap-0.5 ml-1">
 					<!-- Ctrl+C / Interrupt button -->
 					<button
@@ -1185,7 +1185,7 @@
 		<!-- Usage Trend Sparkline (full width, multi-project) -->
 		<!-- PERF: Skip heavy Sparkline component entirely for offline agents -->
 		<div class="">
-			{#if agentStatus() === 'offline'}
+			{#if agentStatus === 'offline'}
 				<!-- Minimal placeholder for offline agents - no Sparkline component -->
 				<div class="h-10 flex items-center">
 					<div class="w-full h-px bg-base-content/10"></div>
@@ -1236,7 +1236,7 @@
 			<button
 				class="flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded transition-colors font-mono text-[10px] tracking-wider uppercase
 					{activeTab === 'activity' ? 'bg-base-content/10' : 'hover:bg-base-content/5'}"
-				style="color: {activeTab === 'activity' ? statusVisual().accent : 'oklch(0.5 0 0 / 0.5)'};"
+				style="color: {activeTab === 'activity' ? statusVisual.accent : 'oklch(0.5 0 0 / 0.5)'};"
 				onclick={() => setActiveTab('activity')}
 				title="View activity and queue"
 			>
@@ -1244,12 +1244,12 @@
 					<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
 				</svg>
 				<span class="hidden sm:inline">Activity</span>
-				{#if queuedTasks().length > 0}
+				{#if queuedTasks.length > 0}
 					<span
 						class="w-4 h-4 text-[9px] rounded-full flex items-center justify-center"
 						style="background: oklch(0.70 0.14 250 / 0.2); color: oklch(0.70 0.14 250);"
 					>
-						{queuedTasks().length}
+						{queuedTasks.length}
 					</span>
 				{/if}
 			</button>
@@ -1266,12 +1266,12 @@
 					<path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
 				</svg>
 				<span class="hidden sm:inline">Locks</span>
-				{#if agentLocks().length > 0}
+				{#if agentLocks.length > 0}
 					<span
 						class="w-4 h-4 text-[9px] rounded-full flex items-center justify-center"
 						style="background: oklch(0.70 0.16 85 / 0.2); color: oklch(0.70 0.16 85);"
 					>
-						{agentLocks().length}
+						{agentLocks.length}
 					</span>
 				{/if}
 			</button>
@@ -1329,9 +1329,9 @@
 				<!-- Activity header -->
 				<div
 					class="flex items-center gap-2 px-2 py-1 sticky top-0 z-10"
-					style="background: linear-gradient(90deg, {statusVisual().bgTint} 0%, oklch(0.18 0.01 250) 100%); border-bottom: 1px solid oklch(0.5 0 0 / 0.08);"
+					style="background: linear-gradient(90deg, {statusVisual.bgTint} 0%, oklch(0.18 0.01 250) 100%); border-bottom: 1px solid oklch(0.5 0 0 / 0.08);"
 				>
-					<div class="w-0.5 h-3 rounded-full" style="background: {statusVisual().accent};"></div>
+					<div class="w-0.5 h-3 rounded-full" style="background: {statusVisual.accent};"></div>
 					<span class="font-mono text-[10px] tracking-widest uppercase text-base-content/50">Activity</span>
 				</div>
 
@@ -1344,10 +1344,10 @@
 						{@const activityStatusVisual = getTaskStatusVisual(currentActivity.status || 'in_progress')}
 						<div
 							class="flex items-start gap-2 py-1.5 px-2 rounded mb-1"
-							style="background: {statusVisual().bgTint}; border-left: 2px solid {statusVisual().accent};"
+							style="background: {statusVisual.bgTint}; border-left: 2px solid {statusVisual.accent};"
 						>
 							{#if currentActivity.status === 'in_progress'}
-								<svg class="shrink-0 w-4 h-4 animate-spin mt-0.5" style="color: {statusVisual().accent};" viewBox="0 0 24 24" fill="currentColor">
+								<svg class="shrink-0 w-4 h-4 animate-spin mt-0.5" style="color: {statusVisual.accent};" viewBox="0 0 24 24" fill="currentColor">
 									<path d={STATUS_ICONS.gear} />
 								</svg>
 							{:else if currentActivity.status === 'closed'}
@@ -1365,7 +1365,7 @@
 							{/if}
 							<div class="flex-1 min-w-0">
 								{#if taskId}
-									<span class="font-mono text-[10px] font-bold" style="color: {statusVisual().accent};">{taskId}</span>
+									<span class="font-mono text-[10px] font-bold" style="color: {statusVisual.accent};">{taskId}</span>
 								{/if}
 								<p class="text-xs font-medium text-base-content truncate">{textWithoutTaskId}</p>
 							</div>
@@ -1417,7 +1417,7 @@
 			{/if}
 
 			<!-- Queue Section (inline if has items) -->
-			{#if queuedTasks().length > 0}
+			{#if queuedTasks.length > 0}
 				<div style="border-top: 1px solid oklch(0.5 0 0 / 0.08);">
 					<!-- Queue header -->
 					<div
@@ -1427,12 +1427,12 @@
 						<div class="w-0.5 h-3 rounded-full" style="background: oklch(0.70 0.14 250);"></div>
 						<span class="font-mono text-[10px] tracking-widest uppercase text-base-content/50">Queue</span>
 						<span class="font-mono text-[10px] tabular-nums ml-auto" style="color: oklch(0.70 0.14 250);">
-							<AnimatedDigits value={queuedTasks().length.toString()} />
+							<AnimatedDigits value={queuedTasks.length.toString()} />
 						</span>
 					</div>
 
 					<div class="px-2 py-1 space-y-0.5">
-						{#each queuedTasks().slice(0, 2) as task}
+						{#each queuedTasks.slice(0, 2) as task}
 							<div class="flex items-center gap-2 group/queueitem rounded px-1.5 py-0.5 hover:bg-base-content/5 transition-colors">
 								<span class="font-mono text-[9px] text-base-content/40 truncate max-w-[70px]" title={task.id}>{task.id}</span>
 								<button
@@ -1453,9 +1453,9 @@
 								<p class="text-[11px] text-base-content/70 truncate flex-1" title={task.title}>{task.title}</p>
 							</div>
 						{/each}
-						{#if queuedTasks().length > 2}
+						{#if queuedTasks.length > 2}
 							<div class="font-mono text-[9px] text-base-content/30 text-center py-0.5 flex items-center justify-center gap-1">
-								<span>+</span><AnimatedDigits value={(queuedTasks().length - 2).toString()} /><span>more</span>
+								<span>+</span><AnimatedDigits value={(queuedTasks.length - 2).toString()} /><span>more</span>
 							</div>
 						{/if}
 					</div>
@@ -1463,7 +1463,7 @@
 			{/if}
 
 				<!-- Empty state if no activity and no queue -->
-				{#if !agent.current_activity && (!agent.activities || agent.activities.length === 0) && queuedTasks().length === 0}
+				{#if !agent.current_activity && (!agent.activities || agent.activities.length === 0) && queuedTasks.length === 0}
 					<div class="p-3 text-center">
 						<p class="font-mono text-[10px] tracking-wider uppercase text-base-content/40">Drop task to assign</p>
 					</div>
@@ -1471,7 +1471,7 @@
 
 			<!-- ═══ LOCKS TAB ═══ -->
 			{:else if activeTab === 'locks'}
-				{#if agentLocks().length > 0}
+				{#if agentLocks.length > 0}
 					<!-- Locks header -->
 					<div
 						class="flex items-center gap-2 px-2 py-1 sticky top-0 z-10"
@@ -1482,7 +1482,7 @@
 						</svg>
 						<span class="font-mono text-[10px] tracking-widest uppercase" style="color: oklch(0.70 0.16 85);">File Locks</span>
 						<span class="font-mono text-[10px] tabular-nums ml-auto" style="color: oklch(0.70 0.16 85);">
-							<AnimatedDigits value={agentLocks().length.toString()} />
+							<AnimatedDigits value={agentLocks.length.toString()} />
 						</span>
 						<button
 							class="btn btn-xs btn-ghost"
@@ -1497,7 +1497,7 @@
 
 					<!-- Lock patterns list -->
 					<div class="px-2 py-1.5 space-y-1">
-						{#each agentLocks() as lock}
+						{#each agentLocks as lock}
 							<div
 								class="flex items-start gap-2 py-1.5 px-2 rounded"
 								style="background: oklch(0.70 0.16 85 / 0.08); border: 1px solid oklch(0.70 0.16 85 / 0.15);"
@@ -1556,7 +1556,7 @@
 							<path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" />
 						</svg>
 						<p class="font-mono text-[10px] tracking-wider uppercase text-base-content/40">{outputError}</p>
-						{#if agentStatus() !== 'offline'}
+						{#if agentStatus !== 'offline'}
 							<button
 								class="btn btn-xs btn-ghost mt-2"
 								onclick={fetchOutput}
@@ -1593,7 +1593,7 @@
 				>
 					{#if isAssigning}
 						<div class="flex items-center gap-2">
-							<span class="loading loading-spinner loading-sm" style="color: {statusVisual().accent};"></span>
+							<span class="loading loading-spinner loading-sm" style="color: {statusVisual.accent};"></span>
 							<p class="font-mono text-xs tracking-wider uppercase text-base-content/80">Assigning...</p>
 						</div>
 					{:else if hasDependencyBlock}
@@ -1645,7 +1645,7 @@
 		>
 			<span
 				class="font-mono text-[10px] tabular-nums"
-				style="color: {statusVisual().accent};"
+				style="color: {statusVisual.accent};"
 			>
 				{formatLastActivity(agent.current_activity?.ts || agent.last_active_ts)}
 			</span>
@@ -1780,7 +1780,7 @@
 			<button
 				class="w-full px-3 py-2 text-left text-sm hover:bg-warning hover:text-warning-content transition-colors flex items-center gap-2"
 				onclick={confirmUnassignTask}
-				disabled={!currentTask()}
+				disabled={!currentTask}
 			>
 				<span>⏸️</span>
 				Unassign Current Task
@@ -1938,14 +1938,14 @@
 	<div class="modal modal-open">
 		<div class="modal-box">
 			<h3 class="font-bold text-lg mb-4">Unassign Current Task?</h3>
-			{#if currentTask()}
+			{#if currentTask}
 				<div class="space-y-3">
 					<p class="text-base-content/80">
-						Unassign task <strong class="text-warning">{currentTask().id}</strong> from {agent.name}?
+						Unassign task <strong class="text-warning">{currentTask.id}</strong> from {agent.name}?
 					</p>
 					<div class="bg-base-200 rounded p-3">
-						<p class="text-sm font-semibold">{currentTask().title}</p>
-						<p class="text-xs text-base-content/50 mt-1">{currentTask().id}</p>
+						<p class="text-sm font-semibold">{currentTask.title}</p>
+						<p class="text-xs text-base-content/50 mt-1">{currentTask.id}</p>
 					</div>
 					<div class="alert alert-info">
 						<svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-5 w-5" fill="none" viewBox="0 0 24 24">

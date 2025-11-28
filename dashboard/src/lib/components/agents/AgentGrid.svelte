@@ -136,16 +136,16 @@
 
 	// Filter out offline agents (> 1 hour inactive) - they just add clutter
 	// Users can manage offline agents through agent-mail CLI if needed
-	const activeAgents = $derived(() => {
+	const activeAgents = $derived.by(() => {
 		return agents.filter(a => getAgentStatus(a) !== 'offline');
 	});
 
 	// Count of hidden offline agents (for UI feedback)
-	const offlineCount = $derived(() => agents.length - activeAgents().length);
+	const offlineCount = $derived.by(() => agents.length - activeAgents.length);
 
 	// Sort agents by status priority (live > working > active > idle)
-	const sortedAgents = $derived(() => {
-		return [...activeAgents()].sort((a, b) => {
+	const sortedAgents = $derived.by(() => {
+		return [...activeAgents].sort((a, b) => {
 			const statusA = getAgentStatus(a);
 			const statusB = getAgentStatus(b);
 			const priorityA = getStatusPriority(statusA);
@@ -249,7 +249,7 @@
 <div class="flex flex-col h-full">
 	<!-- Agent Grid - Horizontal Scrolling Row - Industrial -->
 	<div class="p-4" style="background: oklch(0.14 0.01 250);">
-		{#if sortedAgents().length === 0}
+		{#if sortedAgents.length === 0}
 			<!-- Empty State - Industrial -->
 			<div
 				class="flex flex-col items-center justify-center h-48 text-center rounded-lg"
@@ -275,8 +275,8 @@
 				</svg>
 				<h3 class="text-lg font-medium font-mono mb-2" style="color: oklch(0.55 0.02 250);">No Active Agents</h3>
 				<p class="text-sm max-w-md" style="color: oklch(0.45 0.02 250);">
-					{#if offlineCount() > 0}
-						{offlineCount()} agent{offlineCount() === 1 ? '' : 's'} offline (inactive > 1 hour).
+					{#if offlineCount > 0}
+						{offlineCount} agent{offlineCount === 1 ? '' : 's'} offline (inactive > 1 hour).
 						Active agents will appear here when they start working.
 					{:else}
 						Agents will appear here when they register and start working. Use Agent Mail's
@@ -287,7 +287,7 @@
 		{:else}
 			<!-- Horizontal Scrolling Row - Industrial -->
 			<div class="flex gap-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-base-300 scrollbar-track-transparent">
-				{#each sortedAgents() as agent (agent.id || agent.name)}
+				{#each sortedAgents as agent (agent.id || agent.name)}
 					<div
 						class="flex-shrink-0 w-80 h-72 {newAgentNames.includes(agent.name) ? 'agent-new-entrance' : ''}"
 						animate:flip={{ duration: 300 }}
@@ -297,10 +297,10 @@
 					</div>
 				{/each}
 				<!-- Offline count indicator -->
-				{#if offlineCount() > 0}
+				{#if offlineCount > 0}
 					<div class="flex-shrink-0 w-48 h-72 flex items-center justify-center">
 						<div class="text-center p-4 rounded-lg" style="background: oklch(0.16 0.01 250); border: 1px dashed oklch(0.25 0.02 250);">
-							<p class="font-mono text-2xl mb-1" style="color: oklch(0.40 0.02 250);">{offlineCount()}</p>
+							<p class="font-mono text-2xl mb-1" style="color: oklch(0.40 0.02 250);">{offlineCount}</p>
 							<p class="font-mono text-xs uppercase tracking-wider" style="color: oklch(0.35 0.02 250);">offline</p>
 						</div>
 					</div>
