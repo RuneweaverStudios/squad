@@ -1,0 +1,249 @@
+/**
+ * Work Sessions Store
+ * Manages state for active Claude Code work sessions using Svelte 5 runes.
+ *
+ * Interface:
+ * - sessions: WorkSession[] - Array of active sessions
+ * - isLoading: boolean - Loading state
+ * - error: string | null - Error message
+ * - fetch() - Fetch all active sessions
+ * - spawn(taskId) - Spawn new agent for task
+ * - kill(sessionName) - Kill a session
+ * - sendInput(sessionName, input) - Send input to session
+ * - startPolling(intervalMs) - Start auto-refresh
+ * - stopPolling() - Stop auto-refresh
+ */
+
+/**
+ * WorkSession represents an active Claude Code session with task context
+ */
+export interface WorkSession {
+	sessionName: string;
+	agentName: string;
+	task: {
+		id: string;
+		title?: string;
+		status?: string;
+		priority?: number;
+		issue_type?: string;
+	} | null;
+	output: string;
+	lineCount: number;
+	tokens: number;
+	cost: number;
+	created: string;
+	attached: boolean;
+}
+
+interface WorkSessionsState {
+	sessions: WorkSession[];
+	isLoading: boolean;
+	error: string | null;
+	lastFetch: Date | null;
+}
+
+// Reactive state using Svelte 5 runes
+let state = $state<WorkSessionsState>({
+	sessions: [],
+	isLoading: false,
+	error: null,
+	lastFetch: null
+});
+
+// Polling interval reference
+let pollingInterval: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Fetch all active work sessions from the API
+ */
+export async function fetch(lines: number = 50): Promise<void> {
+	state.isLoading = true;
+	state.error = null;
+
+	try {
+		const response = await globalThis.fetch(`/api/work?lines=${lines}`);
+		const data = await response.json();
+
+		if (!response.ok) {
+			throw new Error(data.message || data.error || 'Failed to fetch sessions');
+		}
+
+		state.sessions = data.sessions || [];
+		state.lastFetch = new Date();
+	} catch (err) {
+		state.error = err instanceof Error ? err.message : 'Failed to fetch sessions';
+		console.error('workSessions.fetch error:', err);
+	} finally {
+		state.isLoading = false;
+	}
+}
+
+/**
+ * Spawn a new agent for a specific task
+ */
+export async function spawn(taskId: string): Promise<WorkSession | null> {
+	try {
+		const response = await globalThis.fetch('/api/work/spawn', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ taskId })
+		});
+
+		const data = await response.json();
+
+		if (!response.ok) {
+			throw new Error(data.message || data.error || 'Failed to spawn agent');
+		}
+
+		// Add the new session to state
+		if (data.session) {
+			state.sessions = [...state.sessions, data.session];
+		}
+
+		return data.session || null;
+	} catch (err) {
+		state.error = err instanceof Error ? err.message : 'Failed to spawn agent';
+		console.error('workSessions.spawn error:', err);
+		return null;
+	}
+}
+
+/**
+ * Kill a tmux session
+ */
+export async function kill(sessionName: string): Promise<boolean> {
+	try {
+		const response = await globalThis.fetch(`/api/sessions/${sessionName}`, {
+			method: 'DELETE'
+		});
+
+		if (!response.ok) {
+			const data = await response.json();
+			throw new Error(data.message || data.error || 'Failed to kill session');
+		}
+
+		// Remove from state
+		state.sessions = state.sessions.filter(s => s.sessionName !== sessionName);
+		return true;
+	} catch (err) {
+		state.error = err instanceof Error ? err.message : 'Failed to kill session';
+		console.error('workSessions.kill error:', err);
+		return false;
+	}
+}
+
+/**
+ * Send input to a session (e.g., "continue", "yes", or arbitrary text)
+ * @param type - Input type: 'text' (default), 'enter', 'up', 'down', 'escape', 'ctrl-c', 'ctrl-d', 'raw'
+ */
+export async function sendInput(
+	sessionName: string,
+	input: string,
+	type: 'text' | 'enter' | 'up' | 'down' | 'escape' | 'ctrl-c' | 'ctrl-d' | 'raw' = 'text'
+): Promise<boolean> {
+	try {
+		const response = await globalThis.fetch(`/api/sessions/${sessionName}/input`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ input, type })
+		});
+
+		if (!response.ok) {
+			const data = await response.json();
+			throw new Error(data.message || data.error || 'Failed to send input');
+		}
+
+		return true;
+	} catch (err) {
+		state.error = err instanceof Error ? err.message : 'Failed to send input';
+		console.error('workSessions.sendInput error:', err);
+		return false;
+	}
+}
+
+/**
+ * Send Ctrl+C to interrupt a session
+ */
+export async function interrupt(sessionName: string): Promise<boolean> {
+	return sendInput(sessionName, '', 'ctrl-c');
+}
+
+/**
+ * Send Enter key to accept highlighted option
+ */
+export async function sendEnter(sessionName: string): Promise<boolean> {
+	return sendInput(sessionName, '', 'enter');
+}
+
+/**
+ * Send Escape key
+ */
+export async function sendEscape(sessionName: string): Promise<boolean> {
+	return sendInput(sessionName, '', 'escape');
+}
+
+/**
+ * Start polling for session updates
+ */
+export function startPolling(intervalMs: number = 500): void {
+	stopPolling(); // Clear any existing interval
+
+	// Initial fetch
+	fetch();
+
+	// Set up polling
+	pollingInterval = setInterval(() => {
+		fetch();
+	}, intervalMs);
+}
+
+/**
+ * Stop polling
+ */
+export function stopPolling(): void {
+	if (pollingInterval) {
+		clearInterval(pollingInterval);
+		pollingInterval = null;
+	}
+}
+
+/**
+ * Clear error state
+ */
+export function clearError(): void {
+	state.error = null;
+}
+
+/**
+ * Get a specific session by name
+ */
+export function getSession(sessionName: string): WorkSession | undefined {
+	return state.sessions.find(s => s.sessionName === sessionName);
+}
+
+/**
+ * Get session by agent name
+ */
+export function getSessionByAgent(agentName: string): WorkSession | undefined {
+	return state.sessions.find(s => s.agentName === agentName);
+}
+
+// Export reactive getters
+export function getSessions(): WorkSession[] {
+	return state.sessions;
+}
+
+export function getIsLoading(): boolean {
+	return state.isLoading;
+}
+
+export function getError(): string | null {
+	return state.error;
+}
+
+export function getLastFetch(): Date | null {
+	return state.lastFetch;
+}
+
+// Export state for direct reactive access in components
+export { state as workSessionsState };
