@@ -6,6 +6,8 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import TaskCreationDrawer from '$lib/components/TaskCreationDrawer.svelte';
+	import SpawnModal from '$lib/components/SpawnModal.svelte';
+	import OutputDrawer from '$lib/components/OutputDrawer.svelte';
 	import TopBar from '$lib/components/TopBar.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import { getProjectsFromTasks, getTaskCountByProject } from '$lib/utils/projectUtils';
@@ -235,9 +237,15 @@
 		<TaskCreationDrawer />
 	</div>
 
+	<!-- Spawn Modal (must be inside drawer for proper z-index) -->
+	<SpawnModal />
+
 	<!-- Sidebar (Sidebar component provides the drawer-side wrapper) -->
 	<Sidebar />
 </div>
+
+<!-- Output Drawer (global session output panel) -->
+<OutputDrawer />
 
 <!-- Sound Permission Toast -->
 {#if showSoundPrompt}
