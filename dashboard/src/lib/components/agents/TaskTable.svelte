@@ -1368,6 +1368,7 @@
 					{#if typeTasks.length > 0}
 						<!-- Group header (pinned when scrolling) - Industrial/Terminal style -->
 						{@const typeVisual = getGroupHeaderInfo(groupingMode, groupKey)}
+						{@const parentTask = groupingMode === 'parent' && groupKey ? [...(allTasks.length > 0 ? allTasks : tasks)].find(t => t.id === groupKey) : null}
 						<thead>
 							<tr>
 								<th
@@ -1397,6 +1398,13 @@
 										>
 											{typeVisual.label}
 										</span>
+
+										<!-- Parent task title (shown in parent mode) -->
+										{#if groupingMode === 'parent' && parentTask?.title}
+											<span class="ml-2 text-sm text-base-content/70 truncate max-w-md" title={parentTask.title}>
+												{parentTask.title}
+											</span>
+										{/if}
 
 										<!-- Decorative line -->
 										<div
