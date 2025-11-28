@@ -22,7 +22,7 @@ export async function GET({ url }) {
 		const filter = url.searchParams.get('filter') || 'jat';
 
 		// List tmux sessions with format: name:created:attached:windows
-		const command = `tmux list-sessions -F "#{session_name}:#{session_created}:#{session_attached}:#{session_windows}" 2>&1`;
+		const command = `tmux list-sessions -F "#{session_name}:#{session_created}:#{session_attached}:#{session_windows}"`;
 
 		try {
 			const { stdout } = await execAsync(command);
@@ -53,11 +53,12 @@ export async function GET({ url }) {
 				timestamp: new Date().toISOString()
 			});
 		} catch (execError) {
-			const execErr = /** @type {{ stderr?: string, message?: string }} */ (execError);
-			const errorMessage = execErr.stderr || execErr.message || String(execError);
+			const execErr = /** @type {{ stderr?: string, stdout?: string, message?: string }} */ (execError);
+			// Check both stderr and stdout (some error messages go to stdout)
+			const errorMessage = execErr.stderr || execErr.stdout || execErr.message || String(execError);
 
-			// No server running = no sessions
-			if (errorMessage.includes('no server running')) {
+			// No server running = no sessions (this is normal, not an error)
+			if (errorMessage.includes('no server running') || errorMessage.includes('no sessions')) {
 				return json({
 					success: true,
 					sessions: [],
