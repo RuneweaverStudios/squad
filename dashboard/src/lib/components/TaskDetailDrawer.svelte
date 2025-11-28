@@ -417,6 +417,8 @@
 	}
 
 	// Delete task with confirmation
+	let isDeleting = $state(false);
+
 	async function handleDelete() {
 		if (!task || !taskId) return;
 
@@ -427,6 +429,7 @@
 
 		if (!confirmed) return;
 
+		isDeleting = true;
 		isUpdatingFromServer = true;
 
 		try {
@@ -453,6 +456,7 @@
 		} catch (error: any) {
 			console.error('Delete error:', error);
 			showToast('error', `✗ ${error.message}`);
+			isDeleting = false;
 		} finally {
 			isUpdatingFromServer = false;
 		}
@@ -536,7 +540,7 @@
 			saveTimeout = null;
 		}
 
-		if (!isSaving) {
+		if (!isSaving && !isDeleting) {
 			isOpen = false;
 			task = null;
 			originalTask = null;
@@ -754,7 +758,7 @@
 				<button
 					class="btn btn-sm btn-circle btn-ghost"
 					onclick={handleClose}
-					disabled={isSaving}
+					disabled={isSaving || isDeleting}
 					aria-label="Close drawer (Esc)"
 					title="Close (Esc)"
 				>
@@ -1271,23 +1275,28 @@
 						<button
 							class="btn btn-sm btn-ghost text-error hover:btn-error gap-1"
 							onclick={handleDelete}
-							disabled={isSaving}
+							disabled={isSaving || isDeleting}
 						>
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								class="h-4 w-4"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-								/>
-							</svg>
-							Delete
+							{#if isDeleting}
+								<span class="loading loading-spinner loading-xs"></span>
+								Deleting...
+							{:else}
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									class="h-4 w-4"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+									/>
+								</svg>
+								Delete
+							{/if}
 						</button>
 						<!-- Right side buttons -->
 						<div class="flex items-center gap-2">
@@ -1313,7 +1322,7 @@
 								Shortcuts
 							</button>
 							<!-- Close button -->
-							<button type="button" class="btn btn-ghost" onclick={handleClose}>
+							<button type="button" class="btn btn-ghost" onclick={handleClose} disabled={isSaving || isDeleting}>
 								Close
 							</button>
 						</div>
