@@ -2,6 +2,7 @@
 	import AgentCard from './AgentCard.svelte';
 	import AutoAssignModal from './AutoAssignModal.svelte';
 	import { generateAutoAssignments } from '$lib/utils/autoAssign';
+	import { playAgentJoinSound } from '$lib/utils/soundEffects';
 	import type { Agent, Task, Reservation } from '$lib/stores/agents.svelte';
 
 	// Assignment type from autoAssign utility
@@ -20,32 +21,57 @@
 		sparklineData?: unknown[];
 		onTaskAssign?: (taskId: string, agentName: string) => Promise<void>;
 		ontaskclick?: (taskId: string) => void;
-		selectedDateRange?: string;
-		customDateFrom?: string | null;
-		customDateTo?: string | null;
 	}
 
-	let { agents = [], tasks = [], allTasks = [], reservations = [], sparklineData = [], onTaskAssign = async () => {}, ontaskclick = () => {}, selectedDateRange = 'all', customDateFrom = null, customDateTo = null }: Props = $props();
-
-	// Determine if we're viewing historical data (not "all" or "today")
-	const isHistoricalView = $derived(() => {
-		if (selectedDateRange === 'all' || selectedDateRange === 'today') return false;
-		if (selectedDateRange === 'custom') {
-			// Check if custom range ends before today
-			if (customDateTo) {
-				const today = new Date().toISOString().split('T')[0];
-				return customDateTo < today;
-			}
-			return false;
-		}
-		// For preset ranges like 'week', 'month' - not historical by default
-		return false;
-	});
+	let { agents = [], tasks = [], allTasks = [], reservations = [], sparklineData = [], onTaskAssign = async () => {}, ontaskclick = () => {} }: Props = $props();
 
 	// Modal state
 	let showModal = $state(false);
 	let assignments = $state<Assignment[]>([]);
 	let isAssigning = $state(false);
+
+	// Track previously seen agent names for entrance animation
+	// Using regular variables (not $state) to avoid effect loops
+	let previousAgentNames: Set<string> = new Set();
+	let isInitialLoad = true;
+
+	// Reactive state for animation triggers
+	let newAgentNames = $state<string[]>([]);
+
+	// Detect new agents when agents array changes
+	// Using $effect.pre to set animation state BEFORE rendering
+	$effect.pre(() => {
+		const currentNames = new Set(agents.map(a => a.name));
+
+		// Skip animation on initial load
+		if (isInitialLoad) {
+			previousAgentNames = currentNames;
+			isInitialLoad = false;
+			return;
+		}
+
+		// Find agents that weren't in the previous set (new agents)
+		const newNames: string[] = [];
+		for (const name of currentNames) {
+			if (!previousAgentNames.has(name)) {
+				newNames.push(name);
+			}
+		}
+
+		// Update tracking for next comparison
+		previousAgentNames = currentNames;
+
+		// If we found new agents, trigger animation and sound
+		if (newNames.length > 0) {
+			newAgentNames = newNames;
+			playAgentJoinSound();
+
+			// Clear the new agent highlight after animation completes
+			setTimeout(() => {
+				newAgentNames = [];
+			}, 1500);
+		}
+	});
 
 	// Get unassigned tasks (status='open' and no assignee)
 	const unassignedTasks = $derived(
@@ -208,19 +234,27 @@
 	}
 </script>
 
+<!-- Industrial Agent Grid -->
 <div class="flex flex-col h-full">
-	<!-- Agent Grid - Horizontal Scrolling Row -->
-	<div class="p-4">
+	<!-- Agent Grid - Horizontal Scrolling Row - Industrial -->
+	<div class="p-4" style="background: oklch(0.14 0.01 250);">
 		{#if agents.length === 0}
-			<!-- Empty State -->
-			<div class="flex flex-col items-center justify-center h-48 text-center">
+			<!-- Empty State - Industrial -->
+			<div
+				class="flex flex-col items-center justify-center h-48 text-center rounded-lg"
+				style="
+					background: oklch(0.16 0.01 250);
+					border: 1px dashed oklch(0.30 0.02 250);
+				"
+			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
 					fill="none"
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
 					stroke="currentColor"
-					class="w-16 h-16 text-base-content/20 mb-4"
+					class="w-16 h-16 mb-4"
+					style="color: oklch(0.30 0.02 250);"
 				>
 					<path
 						stroke-linecap="round"
@@ -228,19 +262,19 @@
 						d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"
 					/>
 				</svg>
-				<h3 class="text-lg font-medium text-base-content/70 mb-2">No Agents Online</h3>
-				<p class="text-sm text-base-content/50 max-w-md">
+				<h3 class="text-lg font-medium font-mono mb-2" style="color: oklch(0.55 0.02 250);">No Agents Online</h3>
+				<p class="text-sm max-w-md" style="color: oklch(0.45 0.02 250);">
 					Agents will appear here when they register and start working. Use Agent Mail's
-					<code class="text-xs bg-base-300 px-1 py-0.5 rounded">am-register</code> command to create
+					<code class="text-xs px-1 py-0.5 rounded font-mono" style="background: oklch(0.22 0.01 250); color: oklch(0.70 0.18 240);">am-register</code> command to create
 					agents.
 				</p>
 			</div>
 		{:else}
-			<!-- Horizontal Scrolling Row -->
+			<!-- Horizontal Scrolling Row - Industrial -->
 			<div class="flex gap-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-base-300 scrollbar-track-transparent">
 				{#each sortedAgents() as agent (agent.id || agent.name)}
-					<div class="flex-shrink-0 w-80 h-72">
-						<AgentCard {agent} {tasks} {allTasks} {reservations} {onTaskAssign} {ontaskclick} {selectedDateRange} {customDateFrom} {customDateTo} isHistoricalView={isHistoricalView()} />
+					<div class="flex-shrink-0 w-80 h-72 {newAgentNames.includes(agent.name) ? 'agent-new-entrance' : ''}">
+						<AgentCard {agent} {tasks} {allTasks} {reservations} {onTaskAssign} {ontaskclick} />
 					</div>
 				{/each}
 			</div>
