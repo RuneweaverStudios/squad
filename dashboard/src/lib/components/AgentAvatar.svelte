@@ -50,14 +50,14 @@
 			if (response.ok) {
 				const svg = await response.text();
 				console.log(`[AgentAvatar] Got SVG for ${agentName}: ${svg.length} bytes, starts with: ${svg.substring(0, 50)}`);
-				// Only cache if it's a real generated avatar, not a fallback with initials
+				// Only use real generated avatars, not fallbacks with initials
 				const isFallback = svg.includes('<text');
-				if (!isFallback) {
-					avatarCache.set(cacheKey, svg);
-					console.log(`[AgentAvatar] Cached ${agentName}`);
-				} else {
-					console.log(`[AgentAvatar] NOT caching ${agentName} (is fallback)`);
+				if (isFallback) {
+					console.log(`[AgentAvatar] Fallback detected for ${agentName}, using generic icon`);
+					return null; // Return null so generic avatar icon is shown
 				}
+				avatarCache.set(cacheKey, svg);
+				console.log(`[AgentAvatar] Cached ${agentName}`);
 				return svg;
 			}
 			console.log(`[AgentAvatar] Failed for ${agentName}: status=${response.status}`);
