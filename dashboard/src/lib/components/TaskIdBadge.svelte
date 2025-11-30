@@ -34,9 +34,11 @@
 		blocks?: DepTask[];
 		/** Show dependency indicators below badge */
 		showDependencies?: boolean;
+		/** Elapsed time data for in_progress tasks (shown instead of assignee in compact mode) */
+		elapsed?: { display: string; color: string; minutes: number } | null;
 	}
 
-	let { task, size = 'sm', showStatus = true, showType = true, showCopyIcon = false, showAssignee = false, minimal = false, color, onOpenTask, onAgentClick, dropdownAlign = 'start', copyOnly = false, blockedBy = [], blocks = [], showDependencies = false }: Props = $props();
+	let { task, size = 'sm', showStatus = true, showType = true, showCopyIcon = false, showAssignee = false, minimal = false, color, onOpenTask, onAgentClick, dropdownAlign = 'start', copyOnly = false, blockedBy = [], blocks = [], showDependencies = false, elapsed = null }: Props = $props();
 
 	// Show assignee when task is in_progress and has an assignee
 	const shouldShowAssignee = $derived(showAssignee && task.status === 'in_progress' && task.assignee);
@@ -176,13 +178,18 @@
 			{/if}
 		</button>
 
-		{#if shouldShowAssignee}
+		{#if elapsed}
+			<!-- Elapsed time display (shown when elapsed prop is provided, replaces assignee) -->
+			<div class="text-[10px] font-mono tabular-nums" style="color: {elapsed.color};">
+				{elapsed.display}
+			</div>
+		{:else if shouldShowAssignee}
 			<WorkingAgentBadge
 				name={task.assignee || ''}
 				size={16}
 				isWorking={true}
 				startTime={task.updated_at}
-				variant="timer"
+				variant="name"
 				onClick={onAgentClick}
 			/>
 		{/if}
@@ -319,13 +326,18 @@
 			</div>
 		</div>
 
-		{#if shouldShowAssignee}
+		{#if elapsed}
+			<!-- Elapsed time display (shown when elapsed prop is provided, replaces assignee) -->
+			<div class="text-[10px] font-mono tabular-nums" style="color: {elapsed.color};">
+				{elapsed.display}
+			</div>
+		{:else if shouldShowAssignee}
 			<WorkingAgentBadge
 				name={task.assignee || ''}
 				size={16}
 				isWorking={true}
 				startTime={task.updated_at}
-				variant="timer"
+				variant="name"
 				onClick={onAgentClick}
 			/>
 		{/if}

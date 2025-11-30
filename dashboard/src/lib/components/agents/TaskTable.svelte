@@ -1891,7 +1891,8 @@
 												{task}
 												size="xs"
 												showType={false}
-												showAssignee={true}
+												showAssignee={false}
+												{elapsed}
 												copyOnly
 												blockedBy={unresolvedBlockers}
 												blocks={blockedTasks}
@@ -1909,7 +1910,6 @@
 												blockingReason={depStatus.blockingReason}
 												onspawn={handleSpawnSingle}
 												{fireScale}
-												{elapsed}
 												onattach={(sessionName) => {
 													// Open tmux session in new terminal
 													const command = `tmux attach-session -t "${sessionName}"`;
