@@ -136,6 +136,7 @@ launch_claude() {
     fi
 
     # Launch N Claude sessions with staggered timing
+    # Each session runs inside tmux so dashboard can track it
     for ((i=1; i<=count; i++)); do
         local window_title
         if [[ $count -eq 1 ]]; then
@@ -146,7 +147,27 @@ launch_claude() {
             echo -e "${DIM}  → Claude Code #$i${NC}"
         fi
 
-        $TERMINAL -T "$window_title" -e bash -c "cd '$path' && $env_vars claude $claude_flags '$initial_prompt'" &
+        # Create unique session name using PID + counter
+        # /jat:start will rename to jat-{AgentName} after registration
+        local session_name="jat-pending-$$-$i"
+
+        # Create logs directory if it doesn't exist
+        local logs_dir="$path/.beads/logs"
+        mkdir -p "$logs_dir"
+
+        # Log file starts with session name, will be renamed when task is claimed
+        local log_file="$logs_dir/session-${session_name}-$(date +%Y%m%d-%H%M%S).log"
+
+        # Launch terminal with tmux session containing Claude
+        # This allows dashboard to track the session via tmux
+        # pipe-pane logs all output to file for later reference
+        $TERMINAL -T "$window_title" -e bash -c "
+            cd '$path'
+            tmux new-session -d -s '$session_name' -c '$path'
+            tmux pipe-pane -t '$session_name' -o 'cat >> \"$log_file\"'
+            tmux send-keys -t '$session_name' '$env_vars claude $claude_flags \"$initial_prompt\"' Enter
+            tmux attach-session -t '$session_name'
+        " &
 
         # Stagger launches so each agent sees previous agents' reservations
         if [[ $i -lt $count ]]; then

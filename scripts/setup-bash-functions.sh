@@ -57,7 +57,18 @@ for repo_dir in "$CODE_DIR"/*; do
     echo -e "  ${GREEN}✓${NC} $FUNC_NAME() -> ~/code/$REPO_NAME"
 
     FUNCTIONS_BLOCK+="$FUNC_NAME() {
-    (cd ~/code/$REPO_NAME && AGENT_MAIL_URL=\"http://localhost:8765\" claude --dangerously-skip-permissions \"/jat:start\" \"\$@\")
+    local session_name=\"jat-pending-\$\$\"
+    local logs_dir=~/code/$REPO_NAME/.beads/logs
+    local log_file=\"\$logs_dir/session-\${session_name}-\$(date +%Y%m%d-%H%M%S).log\"
+
+    cd ~/code/$REPO_NAME
+    mkdir -p \"\$logs_dir\"
+
+    # Create tmux session with logging, run Claude - session gets renamed by /jat:start
+    tmux new-session -d -s \"\$session_name\" -c ~/code/$REPO_NAME
+    tmux pipe-pane -t \"\$session_name\" -o \"cat >> '\$log_file'\"
+    tmux send-keys -t \"\$session_name\" \"AGENT_MAIL_URL=http://localhost:8765 claude --dangerously-skip-permissions '/jat:start' \$*\" Enter
+    tmux attach-session -t \"\$session_name\"
 }
 
 "
