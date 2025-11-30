@@ -64,11 +64,14 @@ for repo_dir in "$CODE_DIR"/*; do
     cd ~/code/$REPO_NAME
     mkdir -p \"\$logs_dir\"
 
-    # Create tmux session with logging, run Claude - session gets renamed by /jat:start
+    # Create tmux session, run Claude - session gets renamed by /jat:start
+    # Capture scrollback buffer on exit (not pipe-pane which logs every redraw)
     tmux new-session -d -s \"\$session_name\" -c ~/code/$REPO_NAME
-    tmux pipe-pane -t \"\$session_name\" -o \"cat >> '\$log_file'\"
+    tmux set-option -t \"\$session_name\" history-limit 50000
     tmux send-keys -t \"\$session_name\" \"AGENT_MAIL_URL=http://localhost:8765 claude --dangerously-skip-permissions '/jat:start' \$*\" Enter
     tmux attach-session -t \"\$session_name\"
+    # After detach/exit, capture scrollback to log file
+    tmux capture-pane -t \"\$session_name\" -p -S -50000 > \"\$log_file\" 2>/dev/null || true
 }
 
 "

@@ -160,13 +160,16 @@ launch_claude() {
 
         # Launch terminal with tmux session containing Claude
         # This allows dashboard to track the session via tmux
-        # pipe-pane logs all output to file for later reference
+        # Capture scrollback buffer on exit (not pipe-pane which logs every redraw)
         $TERMINAL -T "$window_title" -e bash -c "
             cd '$path'
             tmux new-session -d -s '$session_name' -c '$path'
-            tmux pipe-pane -t '$session_name' -o 'cat >> \"$log_file\"'
+            # Set large scrollback buffer to capture full session history
+            tmux set-option -t '$session_name' history-limit 50000
             tmux send-keys -t '$session_name' '$env_vars claude $claude_flags \"$initial_prompt\"' Enter
             tmux attach-session -t '$session_name'
+            # After detach/exit, capture the scrollback buffer to log file
+            tmux capture-pane -t '$session_name' -p -S -50000 > \"$log_file\" 2>/dev/null || true
         " &
 
         # Stagger launches so each agent sees previous agents' reservations
