@@ -100,5 +100,5 @@
 	/>
 
 	<!-- Task Detail Modal -->
-	<TaskDetailDrawer bind:taskId={selectedTaskId} bind:isOpen={drawerOpen} />
+	<TaskDetailDrawer bind:taskId={selectedTaskId} bind:isOpen={drawerOpen} ondelete={fetchTasks} />
 </div>

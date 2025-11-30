@@ -261,5 +261,6 @@
 	<TaskDetailDrawer
 		bind:taskId={selectedTaskId}
 		bind:isOpen={drawerOpen}
+		ondelete={fetchData}
 	/>
 </div>

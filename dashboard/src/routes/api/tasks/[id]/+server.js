@@ -6,8 +6,53 @@ import { json } from '@sveltejs/kit';
 import { getTaskById } from '../../../../../../lib/beads.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { readFile, writeFile, unlink } from 'fs/promises';
+import { existsSync } from 'fs';
+import { join } from 'path';
 
 const execAsync = promisify(exec);
+
+// Path to task images store
+const getImageStorePath = () => {
+	const projectPath = process.cwd().replace('/dashboard', '');
+	return join(projectPath, '.beads', 'task-images.json');
+};
+
+/**
+ * Clean up attachments for a task
+ * Removes image files and clears entry from task-images.json
+ */
+async function cleanupTaskAttachments(taskId) {
+	try {
+		const storePath = getImageStorePath();
+		if (!existsSync(storePath)) return;
+
+		const content = await readFile(storePath, 'utf-8');
+		const images = JSON.parse(content);
+
+		if (!images[taskId]) return;
+
+		// Delete actual image files
+		const taskImages = Array.isArray(images[taskId]) ? images[taskId] : [images[taskId]];
+		for (const img of taskImages) {
+			if (img.path && existsSync(img.path)) {
+				try {
+					await unlink(img.path);
+					console.log(`Deleted attachment: ${img.path}`);
+				} catch (err) {
+					console.error(`Failed to delete attachment ${img.path}:`, err.message);
+				}
+			}
+		}
+
+		// Remove from task-images.json
+		delete images[taskId];
+		await writeFile(storePath, JSON.stringify(images, null, 2), 'utf-8');
+		console.log(`Cleaned up attachments for task ${taskId}`);
+	} catch (err) {
+		console.error('Error cleaning up attachments:', err);
+	}
+}
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ params }) {
@@ -192,6 +237,12 @@ export async function PATCH({ params, request }) {
 			args.push(`--assignee "${sanitizedAssignee.replace(/"/g, '\\"')}"`);
 		}
 
+		// Update notes (used for image attachments and other metadata)
+		if (updates.notes !== undefined) {
+			const sanitizedNotes = updates.notes ? updates.notes.trim() : '';
+			args.push(`--notes "${sanitizedNotes.replace(/"/g, '\\"')}"`);
+		}
+
 		// Note: Labels are NOT supported by bd update command
 		// Labels can only be set during task creation (bd create --labels)
 		// To update labels, you would need to use a different bd command (if available)
@@ -335,6 +386,9 @@ export async function DELETE({ params }) {
 				{ status: 500 }
 			);
 		}
+
+		// Permanently delete attachments since this is a DELETE (not just close)
+		await cleanupTaskAttachments(taskId);
 
 		return json({
 			success: true,

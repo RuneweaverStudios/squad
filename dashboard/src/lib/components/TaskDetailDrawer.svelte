@@ -20,7 +20,7 @@
 	import TaskDependencyGraph from '$lib/components/TaskDependencyGraph.svelte';
 
 	// Props
-	let { taskId = $bindable(null), isOpen = $bindable(false) } = $props();
+	let { taskId = $bindable(null), isOpen = $bindable(false), ondelete = () => {} } = $props();
 
 	// Task data state
 	let task = $state(null);
@@ -77,6 +77,15 @@
 	let showHelp = $state(false);
 	let copiedTaskId = $state(false);
 	let editingLabels = $state(false);
+
+	// Task attachments state
+	interface TaskAttachment {
+		id: string;
+		path: string;
+		uploadedAt: string;
+	}
+	let attachments = $state<TaskAttachment[]>([]);
+	let attachmentsLoading = $state(false);
 
 	// Autofocus action for inputs
 	function autofocusAction(node: HTMLElement) {
@@ -158,8 +167,9 @@
 			task = data.task;
 			originalTask = { ...data.task };
 
-			// Fetch task history and available tasks in parallel
+			// Fetch task history, attachments, and available tasks in parallel
 			fetchTaskHistory(id);
+			fetchAttachments(id);
 			fetchAvailableTasks(id);
 		} catch (err: any) {
 			error = err.message;
@@ -188,6 +198,27 @@
 			console.error('Error fetching task history:', err);
 		} finally {
 			historyLoading = false;
+		}
+	}
+
+	// Fetch task attachments
+	async function fetchAttachments(id: string) {
+		if (!id) return;
+
+		attachmentsLoading = true;
+
+		try {
+			const response = await fetch(`/api/tasks/${id}/image`);
+			if (!response.ok) {
+				throw new Error(`Failed to fetch attachments: ${response.statusText}`);
+			}
+			const data = await response.json();
+			attachments = data.images || [];
+		} catch (err: any) {
+			console.error('Error fetching attachments:', err);
+			attachments = [];
+		} finally {
+			attachmentsLoading = false;
 		}
 	}
 
@@ -447,17 +478,22 @@
 			// Show success message
 			showToast('success', '✓ Task deleted');
 
-			// Close drawer after short delay
+			// Reset state and close drawer
+			isDeleting = false;
+			isUpdatingFromServer = false;
+
+			// Close drawer after short delay for toast visibility
 			setTimeout(() => {
-				handleClose();
-				// Trigger page reload to update task list
-				window.location.reload();
+				isOpen = false;
+				task = null;
+				taskId = null;
+				// Notify parent to refresh task list
+				ondelete();
 			}, 500);
 		} catch (error: any) {
 			console.error('Delete error:', error);
 			showToast('error', `✗ ${error.message}`);
 			isDeleting = false;
-		} finally {
 			isUpdatingFromServer = false;
 		}
 	}
@@ -847,6 +883,54 @@
 										<span class="text-sm text-base-content/50 italic">Add labels...</span>
 									{/if}
 								</button>
+							{/if}
+						</div>
+
+						<!-- Attachments - Industrial -->
+						<div>
+							<h4 class="text-xs font-semibold mb-2 font-mono uppercase tracking-wider" style="color: oklch(0.55 0.02 250);">
+								Attachments
+								{#if attachments.length > 0}
+									<span class="ml-1 badge badge-xs" style="background: oklch(0.30 0.02 250); color: oklch(0.70 0.02 250);">{attachments.length}</span>
+								{/if}
+							</h4>
+							{#if attachmentsLoading}
+								<div class="flex items-center gap-2 p-3 rounded" style="background: oklch(0.18 0.01 250);">
+									<span class="loading loading-spinner loading-sm"></span>
+									<span class="text-sm" style="color: oklch(0.55 0.02 250);">Loading attachments...</span>
+								</div>
+							{:else if attachments.length > 0}
+								<div class="grid grid-cols-3 gap-2 p-2 rounded" style="background: oklch(0.18 0.01 250);">
+									{#each attachments as attachment (attachment.id)}
+										<div class="relative group">
+											<a
+												href={`/api/work/image${attachment.path}`}
+												target="_blank"
+												rel="noopener noreferrer"
+												class="block"
+											>
+												<img
+													src={`/api/work/image${attachment.path}`}
+													alt="Task attachment"
+													class="w-full h-20 object-cover rounded border cursor-pointer hover:border-primary transition-colors"
+													style="border-color: oklch(0.35 0.02 250);"
+												/>
+											</a>
+											<div
+												class="absolute bottom-0 left-0 right-0 px-1 py-0.5 text-[10px] truncate opacity-0 group-hover:opacity-100 transition-opacity rounded-b"
+												style="background: oklch(0.15 0.01 250 / 0.9); color: oklch(0.60 0.02 250);"
+												title={attachment.path}
+											>
+												{attachment.path.split('/').pop()}
+											</div>
+										</div>
+									{/each}
+								</div>
+							{:else}
+								<div class="p-3 rounded text-center" style="background: oklch(0.18 0.01 250);">
+									<span class="text-sm" style="color: oklch(0.45 0.02 250);">No attachments</span>
+									<p class="text-xs mt-1" style="color: oklch(0.40 0.02 250);">Drop images on the task row in the table to attach</p>
+								</div>
 							{/if}
 						</div>
 

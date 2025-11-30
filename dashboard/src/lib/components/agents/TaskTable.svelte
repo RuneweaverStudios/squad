@@ -14,6 +14,7 @@
 	import { formatRelativeTime, formatFullDate, normalizeTimestamp, getAgeColorClass } from '$lib/utils/dateFormatters';
 	import { toggleSetItem } from '$lib/utils/filterHelpers';
 	import { getTaskStatusVisual, STATUS_ICONS, getIssueTypeVisual, getGroupHeaderInfo, type GroupingMode } from '$lib/config/statusColors';
+	import { getElapsedTimeColor, getFireScale, formatElapsedTime } from '$lib/config/rocketConfig';
 	import { isAgentWorking as checkAgentWorking } from '$lib/utils/agentStatusUtils';
 	import {
 		bulkApiOperation,
@@ -23,6 +24,14 @@
 		createDeleteRequest
 	} from '$lib/utils/bulkApiHelpers';
 	import { playNewTaskChime, playTaskExitSound, playTaskStartSound, playTaskCompleteSound } from '$lib/utils/soundEffects';
+
+	// Type definitions for task images
+	interface TaskImage {
+		blob: Blob;
+		preview: string; // Object URL for thumbnail
+		path: string;    // Server path after upload
+		id: string;      // Unique ID for this image (for removal)
+	}
 
 	// Type definitions
 	interface Task {
@@ -77,6 +86,32 @@
 	let exitingTasks = $state<Task[]>([]);
 	let startingTaskIds = $state<string[]>([]);
 	let completedTaskIds = $state<string[]>([]);
+
+	// Timer state for elapsed time display under rockets
+	let now = $state(Date.now());
+
+	// Update timer every 30 seconds
+	onMount(() => {
+		const timerInterval = setInterval(() => {
+			now = Date.now();
+		}, 30000);
+		return () => clearInterval(timerInterval);
+	});
+
+	// Calculate elapsed time from a timestamp with color coding
+	// Uses config from $lib/config/rocketConfig.ts
+	function getElapsedTime(timestamp: string | undefined): { display: string; color: string; minutes: number } | null {
+		if (!timestamp) return null;
+		const start = new Date(timestamp).getTime();
+		const elapsed = now - start;
+		if (elapsed < 0 || isNaN(elapsed)) return null;
+
+		const totalMinutes = Math.floor(elapsed / 60000);
+		const color = getElapsedTimeColor(totalMinutes);
+		const display = formatElapsedTime(totalMinutes);
+
+		return { display, color, minutes: totalMinutes };
+	}
 
 	// Grouping mode - how tasks are grouped in the table view
 	// 'type' - group by issue_type (bug, task, feature, etc.)
@@ -200,13 +235,35 @@
 
 		// If tasks were removed, trigger exit animation and sound
 		if (removedTasks.length > 0) {
-			exitingTasks = removedTasks;
-			playTaskExitSound();
+			// Check allTasks for current status (task might be closed but filtered out of `tasks`)
+			const allTasksMap = new Map(allTasks.map(t => [t.id, t]));
+
+			// Update removed tasks with current status from allTasks
+			const exitTasksWithStatus = removedTasks.map(t => {
+				const currentTask = allTasksMap.get(t.id);
+				if (currentTask && currentTask.status === 'closed') {
+					return { ...t, status: 'closed' };
+				}
+				// Also check closedIds in case allTasks isn't updated yet
+				if (closedIds.includes(t.id)) {
+					return { ...t, status: 'closed' };
+				}
+				return t;
+			});
+			exitingTasks = exitTasksWithStatus;
+
+			// Only play exit sound for non-completed tasks (completed tasks have their own sound)
+			const nonCompletedExits = exitTasksWithStatus.filter(t => t.status !== 'closed');
+			if (nonCompletedExits.length > 0) {
+				playTaskExitSound();
+			}
 
 			// Clear exiting tasks after animation completes
+			// Use longer timeout if any tasks are completed (to allow landing animation)
+			const hasCompletedTasks = exitTasksWithStatus.some(t => t.status === 'closed');
 			setTimeout(() => {
 				exitingTasks = [];
-			}, 600);
+			}, hasCompletedTasks ? 2000 : 600);
 		}
 
 		// If tasks started (status -> in_progress), play start sound
@@ -220,15 +277,25 @@
 			}, 1500);
 		}
 
-		// If tasks completed (status -> closed), play completion sound
+		// If tasks completed (status -> closed), play completion sound and trigger landing animation
 		if (closedIds.length > 0) {
 			completedTaskIds = closedIds;
 			playTaskCompleteSound();
 
-			// Clear completed highlight after animation
+			// Add completed tasks to exitingTasks so they show landing animation
+			// (since they get filtered out of the main table view)
+			const completedTasks = tasks.filter(t => closedIds.includes(t.id));
+			if (completedTasks.length > 0) {
+				// Add to existing exitingTasks (don't overwrite removed tasks)
+				exitingTasks = [...exitingTasks.filter(t => !closedIds.includes(t.id)), ...completedTasks];
+			}
+
+			// Clear completed highlight and exitingTasks after landing animation
+			// (0.8s landing + 0.6s delay + 0.4s checkmark + buffer)
 			setTimeout(() => {
 				completedTaskIds = [];
-			}, 1500);
+				exitingTasks = exitingTasks.filter(t => !closedIds.includes(t.id));
+			}, 2000);
 		}
 	});
 
@@ -671,9 +738,15 @@
 	let spawningSingle = $state<string | null>(null); // Task ID being spawned, or null
 	let spawningBulk = $state(false); // True when bulk spawn is in progress
 
+	// Task images state - tracks images attached to tasks (for bug screenshots etc.)
+	let taskImages = $state<Map<string, TaskImage[]>>(new Map());
+	let uploadingImage = $state<string | null>(null); // Task ID currently uploading image
+	let dragOverTask = $state<string | null>(null); // Task ID being dragged over
+
 	/**
 	 * Spawn a single agent to work on a specific task
 	 * Calls POST /api/work/spawn with the task ID
+	 * If an image is attached to the task, it will be passed to the agent
 	 * @param taskId - The ID of the task to spawn an agent for
 	 * @returns Promise that resolves when spawn completes
 	 */
@@ -682,10 +755,16 @@
 
 		spawningSingle = taskId;
 		try {
+			// Check if this task has attached images
+			const taskImageArray = taskImages.get(taskId) || [];
+			const imagePaths = taskImageArray.map(img => img.path).filter(Boolean);
+			// Pass first image for backward compatibility, all images stored in task notes
+			const imagePath = imagePaths.length > 0 ? imagePaths[0] : null;
+
 			const response = await fetch('/api/work/spawn', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ taskId })
+				body: JSON.stringify({ taskId, imagePath })
 			});
 
 			const data = await response.json();
@@ -699,8 +778,15 @@
 			// 1. Registered a new agent
 			// 2. Updated task status to in_progress
 			// 3. Created tmux session with Claude Code
+			// 4. Sent the image path if one was attached
 			// Parent page polling will pick up the updated task state
-			console.log(`Spawned agent ${data.session?.agentName} for task ${taskId}`);
+			console.log(`Spawned agent ${data.session?.agentName} for task ${taskId}${imagePath ? ' (with image)' : ''}`);
+
+			// Clear the image after successful spawn (it's been sent)
+			if (imagePath) {
+				removeTaskImage(taskId, new MouseEvent('click'));
+			}
+
 			return true;
 		} catch (err) {
 			console.error('Spawn request failed:', err);
@@ -873,6 +959,273 @@
 				}
 			}
 		});
+	}
+
+	// ========== Task Image Handling ==========
+
+	/**
+	 * Load all task images from server on mount
+	 * Enables cross-session reactivity - images persist across browser sessions
+	 * Supports multiple images per task
+	 */
+	async function loadTaskImagesFromServer() {
+		try {
+			const response = await fetch('/api/tasks/images');
+			if (!response.ok) {
+				console.warn('Failed to load task images from server');
+				return;
+			}
+			const { images } = await response.json();
+
+			// Convert server images to local state format
+			const newMap = new Map<string, TaskImage[]>();
+			for (const [taskId, imageData] of Object.entries(images)) {
+				// Handle both old format (single object) and new format (array)
+				const dataArray = Array.isArray(imageData) ? imageData : [imageData];
+				const taskImageArray: TaskImage[] = dataArray.map((data: { path: string; uploadedAt: string; id?: string }, index: number) => ({
+					blob: new Blob(), // Placeholder - actual file is on disk
+					preview: `/api/work/image${data.path}`, // API endpoint serves the image
+					path: data.path,
+					id: data.id || `img-${index}-${Date.now()}`
+				}));
+				if (taskImageArray.length > 0) {
+					newMap.set(taskId, taskImageArray);
+				}
+			}
+			taskImages = newMap;
+		} catch (err) {
+			console.error('Error loading task images:', err);
+		}
+	}
+
+	/**
+	 * Save task image path to server for persistence
+	 * Appends to existing images for this task
+	 */
+	async function saveTaskImageToServer(taskId: string, path: string, imageId: string) {
+		try {
+			await fetch(`/api/tasks/${taskId}/image`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ path, id: imageId, action: 'add' })
+			});
+		} catch (err) {
+			console.error('Failed to save task image to server:', err);
+		}
+	}
+
+	/**
+	 * Remove a specific task image from server
+	 */
+	async function removeTaskImageFromServer(taskId: string, imageId: string) {
+		try {
+			await fetch(`/api/tasks/${taskId}/image`, {
+				method: 'DELETE',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ id: imageId })
+			});
+		} catch (err) {
+			console.error('Failed to remove task image from server:', err);
+		}
+	}
+
+	// Load task images on mount
+	onMount(() => {
+		loadTaskImagesFromServer();
+	});
+
+	// Track last image refresh time to avoid excessive reloads
+	let lastImageRefreshTime = 0;
+	const IMAGE_REFRESH_INTERVAL = 10000; // 10 seconds minimum between refreshes
+
+	// Periodically refresh task images for cross-session reactivity
+	// This runs when tasks update (from parent polling) but throttles refreshes
+	$effect(() => {
+		// Dependency on tasks array (when parent fetches new tasks)
+		const taskCount = tasks.length;
+		if (taskCount > 0) {
+			const now = Date.now();
+			if (now - lastImageRefreshTime >= IMAGE_REFRESH_INTERVAL) {
+				lastImageRefreshTime = now;
+				loadTaskImagesFromServer();
+			}
+		}
+	});
+
+	/**
+	 * Handle image drop on a task row
+	 * Uploads the image and stores the path for use when spawning
+	 */
+	async function handleImageDrop(event: DragEvent, taskId: string) {
+		event.preventDefault();
+		event.stopPropagation();
+		dragOverTask = null;
+
+		if (!event.dataTransfer) return;
+
+		// Get ALL image files from the drop
+		const files = Array.from(event.dataTransfer.files);
+		const imageFiles = files.filter(f => f.type.startsWith('image/'));
+
+		if (imageFiles.length > 0) {
+			// Upload all image files sequentially
+			for (const imageFile of imageFiles) {
+				await uploadTaskImage(taskId, imageFile);
+			}
+			return;
+		}
+
+		// Check for image data (e.g., pasted from clipboard via drag)
+		const items = Array.from(event.dataTransfer.items);
+		for (const item of items) {
+			if (item.type.startsWith('image/')) {
+				const blob = item.getAsFile();
+				if (blob) {
+					await uploadTaskImage(taskId, blob);
+				}
+			}
+		}
+	}
+
+	/**
+	 * Upload an image for a task and store the path
+	 * Appends to existing images (supports multiple images per task)
+	 * Also saves to server for cross-session persistence
+	 */
+	async function uploadTaskImage(taskId: string, blob: Blob) {
+		uploadingImage = taskId;
+
+		try {
+			// Create preview URL
+			const preview = URL.createObjectURL(blob);
+
+			// Upload to server
+			const formData = new FormData();
+			formData.append('image', blob, `task-${taskId}-${Date.now()}.png`);
+			formData.append('sessionName', `task-${taskId}`);
+
+			const response = await fetch('/api/work/upload-image', {
+				method: 'POST',
+				body: formData
+			});
+
+			if (!response.ok) {
+				throw new Error('Failed to upload image');
+			}
+
+			const { filePath } = await response.json();
+
+			// Generate unique ID for this image
+			const imageId = `img-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+
+			// Create new image object
+			const newImage: TaskImage = { blob, preview, path: filePath, id: imageId };
+
+			// Append to existing images for this task
+			const newMap = new Map(taskImages);
+			const existingImages = newMap.get(taskId) || [];
+			newMap.set(taskId, [...existingImages, newImage]);
+			taskImages = newMap;
+
+			// Save to server for persistence across browser sessions
+			await saveTaskImageToServer(taskId, filePath, imageId);
+
+			// Update task notes with all image paths
+			await updateTaskNotesWithImages(taskId);
+
+			console.log(`Attached image to task ${taskId}: ${filePath} (total: ${existingImages.length + 1})`);
+		} catch (err) {
+			console.error('Failed to upload task image:', err);
+		} finally {
+			uploadingImage = null;
+		}
+	}
+
+	/**
+	 * Update task notes with all image paths so agents see them via bd show
+	 */
+	async function updateTaskNotesWithImages(taskId: string) {
+		try {
+			const images = taskImages.get(taskId) || [];
+			if (images.length === 0) {
+				// Clear notes if no images
+				await fetch(`/api/tasks/${taskId}`, {
+					method: 'PATCH',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ notes: '' })
+				});
+				return;
+			}
+
+			const imagePaths = images.map((img, i) => `  ${i + 1}. ${img.path}`).join('\n');
+			const noteText = `📷 Attached screenshots:\n${imagePaths}\n(Use Read tool to view these images)`;
+			await fetch(`/api/tasks/${taskId}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ notes: noteText })
+			});
+		} catch (err) {
+			console.error('Failed to update task notes with images:', err);
+		}
+	}
+
+	/**
+	 * Remove a specific image from a task
+	 * Also removes from server for cross-session persistence
+	 */
+	async function removeTaskImage(taskId: string, imageId: string, event: MouseEvent) {
+		event.stopPropagation();
+
+		const images = taskImages.get(taskId) || [];
+		const imgToRemove = images.find(img => img.id === imageId);
+
+		// Revoke object URL if it's not a file path
+		if (imgToRemove && imgToRemove.preview && !imgToRemove.preview.startsWith('/api')) {
+			URL.revokeObjectURL(imgToRemove.preview);
+		}
+
+		// Filter out the removed image
+		const newMap = new Map(taskImages);
+		const remainingImages = images.filter(img => img.id !== imageId);
+		if (remainingImages.length > 0) {
+			newMap.set(taskId, remainingImages);
+		} else {
+			newMap.delete(taskId);
+		}
+		taskImages = newMap;
+
+		// Remove from server for persistence
+		await removeTaskImageFromServer(taskId, imageId);
+
+		// Update task notes
+		await updateTaskNotesWithImages(taskId);
+	}
+
+	/**
+	 * Handle drag over a task row
+	 */
+	function handleImageDragOver(event: DragEvent, taskId: string) {
+		event.preventDefault();
+		event.stopPropagation();
+
+		// Check if dragging an image
+		if (event.dataTransfer) {
+			const hasImage = Array.from(event.dataTransfer.types).some(t =>
+				t === 'Files' || t.startsWith('image/')
+			);
+			if (hasImage) {
+				event.dataTransfer.dropEffect = 'copy';
+				dragOverTask = taskId;
+			}
+		}
+	}
+
+	/**
+	 * Handle drag leave from a task row
+	 */
+	function handleImageDragLeave(event: DragEvent) {
+		event.preventDefault();
+		dragOverTask = null;
 	}
 </script>
 
@@ -1176,7 +1529,13 @@
 	{/if}
 
 	<!-- Table - Industrial Style -->
-	<div class="flex-1 overflow-x-auto overflow-y-auto" style="background: oklch(0.16 0.01 250);">
+	<!-- ondragover/ondrop prevent browser from navigating to dropped files -->
+	<div
+		class="flex-1 overflow-x-auto overflow-y-auto"
+		style="background: oklch(0.16 0.01 250);"
+		ondragover={(e) => e.preventDefault()}
+		ondrop={(e) => e.preventDefault()}
+	>
 		<table class="table table-xs table-pin-rows table-pin-cols w-full">
 			<!-- Main column headers (always pinned at top) - Industrial -->
 			<thead>
@@ -1204,6 +1563,9 @@
 							{/if}
 						</div>
 					</th>
+					<td class="w-10" style="background: inherit;">
+						<span class="font-mono text-xs tracking-wider uppercase" style="color: oklch(0.60 0.02 250);"></span>
+					</td>
 					<td
 						class="cursor-pointer industrial-hover"
 						style="background: inherit;"
@@ -1216,6 +1578,13 @@
 							{/if}
 						</div>
 					</td>
+					<th class="w-28" style="background: inherit;">
+						<span class="font-mono text-xs tracking-wider uppercase" style="color: oklch(0.60 0.02 250);" title="Drag & drop images to attach screenshots">
+							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+								<path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+							</svg>
+						</span>
+					</th>
 					<td
 						class="cursor-pointer w-16 text-center industrial-hover"
 						style="background: inherit;"
@@ -1246,9 +1615,6 @@
 							{/if}
 						</div>
 					</td>
-					<td class="w-10" style="background: inherit;">
-						<span class="font-mono text-xs tracking-wider uppercase" style="color: oklch(0.60 0.02 250);"></span>
-					</td>
 				</tr>
 			</thead>
 
@@ -1256,7 +1622,7 @@
 				<!-- Empty state - Mission Control Style -->
 				<tbody>
 					<tr>
-						<td colspan="8" class="p-0">
+						<td colspan="9" class="p-0">
 							<div
 								class="relative flex flex-col items-center justify-center py-16 overflow-hidden"
 								style="
@@ -1401,7 +1767,7 @@
 								title={isCollapsed ? 'Click to expand' : 'Click to collapse'}
 							>
 								<th
-									colspan="8"
+									colspan="9"
 									class="p-0 border-b border-base-content/10"
 									style="background: linear-gradient(90deg, {typeVisual.bgTint} 0%, transparent 60%);"
 								>
@@ -1495,15 +1861,20 @@
 									{@const unresolvedBlockers = task.depends_on?.filter(d => d.status !== 'closed') || []}
 									{@const allTasksList = allTasks.length > 0 ? allTasks : tasks}
 									{@const blockedTasks = allTasksList.filter(t => t.depends_on?.some(d => d.id === task.id) && t.status !== 'closed')}
+									{@const elapsed = task.status === 'in_progress' ? getElapsedTime(task.updated_at) : null}
+									{@const fireScale = elapsed ? getFireScale(elapsed.minutes) : 1}
 									<!-- Main task row -->
 									<tr
 										class="cursor-pointer group overflow-visible industrial-row {depStatus.hasBlockers ? 'opacity-70' : ''} {isNewTask ? 'task-new-entrance' : ''} {isStarting ? 'task-starting' : ''} {isCompleted ? 'task-completed' : ''}"
 										style="
-											background: {selectedTasks.has(task.id) ? 'oklch(0.70 0.18 240 / 0.1)' : taskIsActive ? 'oklch(0.70 0.18 240 / 0.05)' : 'oklch(0.16 0.01 250)'};
+											background: {dragOverTask === task.id ? 'oklch(0.70 0.18 240 / 0.15)' : selectedTasks.has(task.id) ? 'oklch(0.70 0.18 240 / 0.1)' : taskIsActive ? 'oklch(0.70 0.18 240 / 0.05)' : 'oklch(0.16 0.01 250)'};
 											border-bottom: 1px solid oklch(0.25 0.01 250);
-											border-left: 2px solid {selectedTasks.has(task.id) ? 'oklch(0.70 0.18 240)' : unresolvedBlockers.length > 0 ? 'oklch(0.55 0.18 30 / 0.4)' : taskIsActive ? 'oklch(0.70 0.18 240 / 0.5)' : 'transparent'};
+											border-left: 2px solid {dragOverTask === task.id ? 'oklch(0.70 0.18 240)' : selectedTasks.has(task.id) ? 'oklch(0.70 0.18 240)' : unresolvedBlockers.length > 0 ? 'oklch(0.55 0.18 30 / 0.4)' : taskIsActive ? 'oklch(0.70 0.18 240 / 0.5)' : 'transparent'};
 										"
 										onclick={() => handleRowClick(task.id)}
+										ondrop={(e) => handleImageDrop(e, task.id)}
+										ondragover={(e) => handleImageDragOver(e, task.id)}
+										ondragleave={handleImageDragLeave}
 										title={depStatus.hasBlockers ? `Blocked: ${depStatus.blockingReason}` : ''}
 									>
 										<th
@@ -1532,6 +1903,73 @@
 												onAgentClick={onagentclick}
 											/>
 										</th>
+										<td style="background: inherit;" onclick={(e) => e.stopPropagation()}>
+										<button
+												class="btn btn-xs btn-ghost hover:btn-primary rocket-btn {spawningSingle === task.id ? 'rocket-launching' : isCompleted ? 'rocket-landing' : task.status === 'in_progress' ? 'rocket-cruising' : ''}"
+												onclick={() => handleSpawnSingle(task.id)}
+												disabled={spawningSingle !== null || spawningBulk || task.status === 'in_progress' || task.status === 'closed' || task.status === 'blocked' || depStatus.hasBlockers}
+												title={task.status === 'in_progress' ? 'Task already in progress' : task.status === 'closed' ? 'Task is closed' : (task.status === 'blocked' || depStatus.hasBlockers) ? `Blocked: ${depStatus.blockingReason || 'resolve dependencies first'}` : 'Launch agent'}
+											>
+												<!-- Rocket with fire, smoke, and debris effects -->
+												<div class="relative w-5 h-5 flex items-center justify-center overflow-visible">
+													<!-- Debris/particles flying past (appear during flight) -->
+													<div class="rocket-debris-1 absolute w-1 h-1 rounded-full bg-warning/80 left-1/2 top-1/2 opacity-0"></div>
+													<div class="rocket-debris-2 absolute w-0.5 h-0.5 rounded-full bg-info/60 left-1/2 top-1/3 opacity-0"></div>
+													<div class="rocket-debris-3 absolute w-1 h-0.5 rounded-full bg-base-content/40 left-1/2 top-2/3 opacity-0"></div>
+
+													<!-- Smoke puffs (behind rocket) -->
+													<div class="rocket-smoke absolute w-2 h-2 rounded-full bg-base-content/30 bottom-0 left-1/2 -translate-x-1/2 opacity-0"></div>
+													<div class="rocket-smoke-2 absolute w-1.5 h-1.5 rounded-full bg-base-content/20 bottom-0 left-1/2 -translate-x-1/2 translate-x-1 opacity-0"></div>
+
+													<!-- Engine sparks (emitted during flight) -->
+													<div class="engine-spark-1 absolute w-1.5 h-1.5 rounded-full bg-orange-400 left-1/2 top-1/2 opacity-0"></div>
+													<div class="engine-spark-2 absolute w-1 h-1 rounded-full bg-yellow-300 left-1/2 top-1/2 opacity-0"></div>
+													<div class="engine-spark-3 absolute w-[5px] h-[5px] rounded-full bg-amber-500 left-1/2 top-1/2 opacity-0"></div>
+													<div class="engine-spark-4 absolute w-1 h-1 rounded-full bg-red-400 left-1/2 top-1/2 opacity-0"></div>
+
+													<!-- Fire/exhaust (behind rocket) - scales with elapsed time -->
+													<div class="rocket-fire absolute bottom-0 left-1/2 -translate-x-1/2 w-2 origin-top opacity-0">
+														<svg viewBox="0 0 12 20" class="w-full" style="transform: scaleY({fireScale}); transform-origin: top center;">
+															<path d="M6 0 L9 8 L7 6 L6 12 L5 6 L3 8 Z" fill="url(#fireGradient-{task.id})" />
+															<defs>
+																<linearGradient id="fireGradient-{task.id}" x1="0%" y1="0%" x2="0%" y2="100%">
+																	<stop offset="0%" style="stop-color:#f0932b" />
+																	<stop offset="50%" style="stop-color:#f39c12" />
+																	<stop offset="100%" style="stop-color:#e74c3c" />
+																</linearGradient>
+															</defs>
+														</svg>
+													</div>
+
+													<!-- Rocket body -->
+													<svg class="rocket-icon w-4 h-4" viewBox="0 0 24 24" fill="none">
+														<!-- Rocket body -->
+														<path d="M12 2C12 2 8 6 8 12C8 15 9 17 10 18L10 21C10 21.5 10.5 22 11 22H13C13.5 22 14 21.5 14 21L14 18C15 17 16 15 16 12C16 6 12 2 12 2Z" fill="currentColor" />
+														<!-- Window -->
+														<circle cx="12" cy="10" r="2" fill="oklch(0.75 0.15 200)" />
+														<!-- Left fin -->
+														<path d="M8 14L5 17L6 18L8 16Z" fill="currentColor" />
+														<!-- Right fin -->
+														<path d="M16 14L19 17L18 18L16 16Z" fill="currentColor" />
+														<!-- Nose cone highlight -->
+														<path d="M12 2C12 2 10 5 10 8" stroke="oklch(0.9 0.05 200)" stroke-width="0.5" stroke-linecap="round" opacity="0.5" />
+													</svg>
+
+													<!-- Landing sparkle effect -->
+													<div class="landing-sparkle absolute w-4 h-4 rounded-full left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0" style="background: radial-gradient(circle, oklch(0.85 0.2 145) 0%, transparent 70%);"></div>
+
+													<!-- Checkmark appears after landing -->
+													<svg class="landing-checkmark absolute w-4 h-4 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" viewBox="0 0 24 24" fill="none">
+														<path d="M5 13l4 4L19 7" stroke="oklch(0.72 0.19 145)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+													</svg>
+												</div>
+											</button>
+											{#if elapsed}
+												<div class="text-[10px] font-mono tabular-nums text-center" style="color: {elapsed.color}; margin-top: 1px;">
+													{elapsed.display}
+												</div>
+											{/if}
+										</td>
 										<td style="background: inherit;">
 											<div>
 												<div class="font-medium text-sm" style="color: oklch(0.85 0.02 250);">{task.title}</div>
@@ -1540,6 +1978,53 @@
 														{task.description}
 													</div>
 												{/if}
+											</div>
+										</td>
+										<!-- Image drop zone cell - supports multiple images -->
+										<td
+											style="background: inherit;"
+											onclick={(e) => e.stopPropagation()}
+											ondrop={(e) => handleImageDrop(e, task.id)}
+											ondragover={(e) => handleImageDragOver(e, task.id)}
+											ondragleave={handleImageDragLeave}
+											class="relative w-28"
+										>
+											<div class="flex items-center gap-1 overflow-x-auto">
+												{#if uploadingImage === task.id}
+													<!-- Uploading state -->
+													<div class="w-6 h-6 flex items-center justify-center">
+														<span class="loading loading-spinner loading-xs"></span>
+													</div>
+												{/if}
+												{#each taskImages.get(task.id) || [] as img (img.id)}
+													<!-- Image thumbnail with remove button -->
+													<div class="relative group flex-shrink-0">
+														<img
+															src={img.preview}
+															alt="Task attachment"
+															class="w-6 h-6 object-cover rounded border border-base-content/20 cursor-pointer hover:border-primary transition-colors"
+															title={img.path || 'Attached image'}
+														/>
+														<!-- Remove button on hover -->
+														<button
+															class="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-error text-error-content flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[8px] leading-none"
+															onclick={(e) => removeTaskImage(task.id, img.id, e)}
+															title="Remove image"
+														>
+															×
+														</button>
+													</div>
+												{/each}
+												<!-- Add more button / empty drop zone -->
+												<div
+													class="w-6 h-6 rounded border border-dashed flex items-center justify-center transition-all flex-shrink-0"
+													style="border-color: {dragOverTask === task.id ? 'oklch(0.70 0.18 240)' : 'oklch(0.35 0.02 250)'}; background: {dragOverTask === task.id ? 'oklch(0.70 0.18 240 / 0.1)' : 'transparent'};"
+													title={(taskImages.get(task.id) || []).length > 0 ? 'Drop to add another image' : 'Drop image here to attach'}
+												>
+													<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3 h-3" style="color: {dragOverTask === task.id ? 'oklch(0.70 0.18 240)' : 'oklch(0.45 0.02 250)'};">
+														<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+													</svg>
+												</div>
 											</div>
 										</td>
 									<td class="text-center" style="background: inherit;">
@@ -1562,23 +2047,6 @@
 											{formatRelativeTime(task.updated_at)}
 										</span>
 									</td>
-									<td style="background: inherit;" onclick={(e) => e.stopPropagation()}>
-										<button
-											class="btn btn-xs btn-ghost hover:btn-primary"
-											onclick={() => handleSpawnSingle(task.id)}
-											disabled={spawningSingle !== null || spawningBulk || task.status === 'in_progress' || task.status === 'closed' || task.status === 'blocked' || depStatus.hasBlockers}
-											title={task.status === 'in_progress' ? 'Task already in progress' : task.status === 'closed' ? 'Task is closed' : (task.status === 'blocked' || depStatus.hasBlockers) ? `Blocked: ${depStatus.blockingReason || 'resolve dependencies first'}` : 'Spawn agent for this task'}
-										>
-											{#if spawningSingle === task.id}
-												<span class="loading loading-spinner loading-xs"></span>
-											{:else}
-												<!-- Rocket icon -->
-												<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-													<path stroke-linecap="round" stroke-linejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
-												</svg>
-											{/if}
-										</button>
-									</td>
 								</tr>
 							{/each}
 						</tbody>
@@ -1590,12 +2058,13 @@
 				{#if exitingTasks.length > 0}
 					<tbody>
 						{#each exitingTasks as task (task.id)}
+							{@const isTaskCompleted = task.status === 'closed'}
 							<tr
-								class="task-exit"
+								class="{isTaskCompleted ? 'task-completed-exit' : 'task-exit'}"
 								style="
-									background: oklch(0.70 0.20 25 / 0.1);
+									background: {isTaskCompleted ? 'oklch(0.70 0.19 145 / 0.1)' : 'oklch(0.70 0.20 25 / 0.1)'};
 									border-bottom: 1px solid oklch(0.25 0.01 250);
-									border-left: 2px solid oklch(0.70 0.20 25 / 0.5);
+									border-left: 2px solid {isTaskCompleted ? 'oklch(0.70 0.19 145 / 0.5)' : 'oklch(0.70 0.20 25 / 0.5)'};
 								"
 							>
 								<th style="background: inherit;"></th>
@@ -1603,14 +2072,49 @@
 									<TaskIdBadge {task} size="xs" showType={false} showAssignee={false} copyOnly />
 								</th>
 								<td style="background: inherit;">
+									{#if isTaskCompleted}
+										<!-- Rocket landing animation for completed tasks -->
+										<div class="rocket-btn rocket-landing">
+											<div class="relative w-5 h-5 flex items-center justify-center overflow-visible">
+												<!-- Rocket body -->
+												<svg class="rocket-icon w-4 h-4" viewBox="0 0 24 24" fill="none">
+													<path d="M12 2C12 2 8 6 8 12C8 15 9 17 10 18L10 21C10 21.5 10.5 22 11 22H13C13.5 22 14 21.5 14 21L14 18C15 17 16 15 16 12C16 6 12 2 12 2Z" fill="currentColor" />
+													<circle cx="12" cy="10" r="2" fill="oklch(0.75 0.15 200)" />
+													<path d="M8 14L5 17L6 18L8 16Z" fill="currentColor" />
+													<path d="M16 14L19 17L18 18L16 16Z" fill="currentColor" />
+												</svg>
+												<!-- Fire (fading out) -->
+												<div class="rocket-fire absolute bottom-0 left-1/2 -translate-x-1/2 w-2 origin-top opacity-0">
+													<svg viewBox="0 0 12 20" class="w-full">
+														<path d="M6 0 L9 8 L7 6 L6 12 L5 6 L3 8 Z" fill="url(#fireGradientExit-{task.id})" />
+														<defs>
+															<linearGradient id="fireGradientExit-{task.id}" x1="0%" y1="0%" x2="0%" y2="100%">
+																<stop offset="0%" style="stop-color:#f0932b" />
+																<stop offset="50%" style="stop-color:#f39c12" />
+																<stop offset="100%" style="stop-color:#e74c3c" />
+															</linearGradient>
+														</defs>
+													</svg>
+												</div>
+												<!-- Landing sparkle -->
+												<div class="landing-sparkle absolute w-4 h-4 rounded-full left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0" style="background: radial-gradient(circle, oklch(0.85 0.2 145) 0%, transparent 70%);"></div>
+												<!-- Checkmark -->
+												<svg class="landing-checkmark absolute w-4 h-4 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" viewBox="0 0 24 24" fill="none">
+													<path d="M5 13l4 4L19 7" stroke="oklch(0.72 0.19 145)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+												</svg>
+											</div>
+										</div>
+									{/if}
+								</td>
+								<td style="background: inherit;">
 									<div class="font-medium text-sm" style="color: oklch(0.65 0.02 250);">{task.title}</div>
 								</td>
+								<td class="w-28" style="background: inherit;"></td><!-- Image column -->
 								<td class="text-center" style="background: inherit;">
 									<span class="badge badge-sm {getPriorityBadge(task.priority)}">
 										P{task.priority}
 									</span>
 								</td>
-								<td style="background: inherit;"></td>
 								<td style="background: inherit;"></td>
 								<td style="background: inherit;"></td>
 								<td style="background: inherit;"></td>
