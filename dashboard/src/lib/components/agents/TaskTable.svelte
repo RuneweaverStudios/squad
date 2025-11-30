@@ -2,7 +2,6 @@
 	import { page } from '$app/stores';
 	import { replaceState } from '$app/navigation';
 	import { onMount } from 'svelte';
-	import DependencyIndicator from '$lib/components/DependencyIndicator.svelte';
 	import WorkingAgentBadge from '$lib/components/WorkingAgentBadge.svelte';
 	import FilterDropdown from '$lib/components/FilterDropdown.svelte';
 	import LabelBadges from '$lib/components/LabelBadges.svelte';
@@ -15,7 +14,8 @@
 	import { toggleSetItem } from '$lib/utils/filterHelpers';
 	import { getTaskStatusVisual, STATUS_ICONS, getIssueTypeVisual, getGroupHeaderInfo, type GroupingMode } from '$lib/config/statusColors';
 	import { getElapsedTimeColor, getFireScale, formatElapsedTime } from '$lib/config/rocketConfig';
-	import { isAgentWorking as checkAgentWorking } from '$lib/utils/agentStatusUtils';
+	import { isAgentWorking as checkAgentWorking, computeAgentStatus } from '$lib/utils/agentStatusUtils';
+	import TaskActionButton from './TaskActionButton.svelte';
 	import {
 		bulkApiOperation,
 		fetchWithTimeout,
@@ -117,7 +117,7 @@
 	// 'type' - group by issue_type (bug, task, feature, etc.)
 	// 'parent' - group by parent task ID (for epic/subtask hierarchies)
 	// 'label' - group by first label
-	let groupingMode = $state<GroupingMode>('type');
+	let groupingMode = $state<GroupingMode>('parent');
 
 	// Track collapsed groups (by group key)
 	let collapsedGroups = $state<Set<string | null>>(new Set());
@@ -291,11 +291,11 @@
 			}
 
 			// Clear completed highlight and exitingTasks after landing animation
-			// (0.8s landing + 0.6s delay + 0.4s checkmark + buffer)
+			// (0.8s landing + 0.6s delay + 0.4s checkmark + 1.7s linger)
 			setTimeout(() => {
 				completedTaskIds = [];
 				exitingTasks = exitingTasks.filter(t => !closedIds.includes(t.id));
-			}, 2000);
+			}, 3500);
 		}
 	});
 
@@ -1335,6 +1335,19 @@
 
 			<!-- Grouping Mode Toggle - Industrial btn-group -->
 			<div class="join rounded" style="border: 1px solid oklch(0.35 0.02 250);">
+				<!-- Parent grouping (folder icon) - DEFAULT -->
+				<button
+					class="join-item btn btn-xs px-2"
+					style={groupingMode === 'parent'
+						? 'background: oklch(0.50 0.18 240); color: oklch(0.95 0.02 250); border: none;'
+						: 'background: oklch(0.22 0.01 250); color: oklch(0.55 0.02 250); border: none;'}
+					onclick={() => setGroupingMode('parent')}
+					title="Group by Parent Epic"
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+					</svg>
+				</button>
 				<!-- Type grouping (list icon) -->
 				<button
 					class="join-item btn btn-xs px-2"
@@ -1346,19 +1359,6 @@
 				>
 					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-					</svg>
-				</button>
-				<!-- Parent grouping (folder icon) -->
-				<button
-					class="join-item btn btn-xs px-2"
-					style={groupingMode === 'parent'
-						? 'background: oklch(0.50 0.18 240); color: oklch(0.95 0.02 250); border: none;'
-						: 'background: oklch(0.22 0.01 250); color: oklch(0.55 0.02 250); border: none;'}
-					onclick={() => setGroupingMode('parent')}
-					title="Group by Parent Epic"
-				>
-					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
 					</svg>
 				</button>
 				<!-- Label grouping (tag icon) -->
@@ -1600,9 +1600,6 @@
 					<td class="w-32" style="background: inherit;">
 						<span class="font-mono text-xs tracking-wider uppercase" style="color: oklch(0.60 0.02 250);">Labels</span>
 					</td>
-					<td class="w-10 whitespace-nowrap" style="background: inherit;">
-						<span class="font-mono text-xs tracking-wider uppercase" style="color: oklch(0.60 0.02 250);">Deps</span>
-					</td>
 					<td
 						class="cursor-pointer w-16 industrial-hover"
 						style="background: inherit;"
@@ -1622,7 +1619,7 @@
 				<!-- Empty state - Mission Control Style -->
 				<tbody>
 					<tr>
-						<td colspan="9" class="p-0">
+						<td colspan="8" class="p-0">
 							<div
 								class="relative flex flex-col items-center justify-center py-16 overflow-hidden"
 								style="
@@ -1767,7 +1764,7 @@
 								title={isCollapsed ? 'Click to expand' : 'Click to collapse'}
 							>
 								<th
-									colspan="9"
+									colspan="8"
 									class="p-0 border-b border-base-content/10"
 									style="background: linear-gradient(90deg, {typeVisual.bgTint} 0%, transparent 60%);"
 								>
@@ -1904,71 +1901,22 @@
 											/>
 										</th>
 										<td style="background: inherit;" onclick={(e) => e.stopPropagation()}>
-										<button
-												class="btn btn-xs btn-ghost hover:btn-primary rocket-btn {spawningSingle === task.id ? 'rocket-launching' : isCompleted ? 'rocket-landing' : task.status === 'in_progress' ? 'rocket-cruising' : ''}"
-												onclick={() => handleSpawnSingle(task.id)}
-												disabled={spawningSingle !== null || spawningBulk || task.status === 'in_progress' || task.status === 'closed' || task.status === 'blocked' || depStatus.hasBlockers}
-												title={task.status === 'in_progress' ? 'Task already in progress' : task.status === 'closed' ? 'Task is closed' : (task.status === 'blocked' || depStatus.hasBlockers) ? `Blocked: ${depStatus.blockingReason || 'resolve dependencies first'}` : 'Launch agent'}
-											>
-												<!-- Rocket with fire, smoke, and debris effects -->
-												<div class="relative w-5 h-5 flex items-center justify-center overflow-visible">
-													<!-- Debris/particles flying past (appear during flight) -->
-													<div class="rocket-debris-1 absolute w-1 h-1 rounded-full bg-warning/80 left-1/2 top-1/2 opacity-0"></div>
-													<div class="rocket-debris-2 absolute w-0.5 h-0.5 rounded-full bg-info/60 left-1/2 top-1/3 opacity-0"></div>
-													<div class="rocket-debris-3 absolute w-1 h-0.5 rounded-full bg-base-content/40 left-1/2 top-2/3 opacity-0"></div>
-
-													<!-- Smoke puffs (behind rocket) -->
-													<div class="rocket-smoke absolute w-2 h-2 rounded-full bg-base-content/30 bottom-0 left-1/2 -translate-x-1/2 opacity-0"></div>
-													<div class="rocket-smoke-2 absolute w-1.5 h-1.5 rounded-full bg-base-content/20 bottom-0 left-1/2 -translate-x-1/2 translate-x-1 opacity-0"></div>
-
-													<!-- Engine sparks (emitted during flight) -->
-													<div class="engine-spark-1 absolute w-1.5 h-1.5 rounded-full bg-orange-400 left-1/2 top-1/2 opacity-0"></div>
-													<div class="engine-spark-2 absolute w-1 h-1 rounded-full bg-yellow-300 left-1/2 top-1/2 opacity-0"></div>
-													<div class="engine-spark-3 absolute w-[5px] h-[5px] rounded-full bg-amber-500 left-1/2 top-1/2 opacity-0"></div>
-													<div class="engine-spark-4 absolute w-1 h-1 rounded-full bg-red-400 left-1/2 top-1/2 opacity-0"></div>
-
-													<!-- Fire/exhaust (behind rocket) - scales with elapsed time -->
-													<div class="rocket-fire absolute bottom-0 left-1/2 -translate-x-1/2 w-2 origin-top opacity-0">
-														<svg viewBox="0 0 12 20" class="w-full" style="transform: scaleY({fireScale}); transform-origin: top center;">
-															<path d="M6 0 L9 8 L7 6 L6 12 L5 6 L3 8 Z" fill="url(#fireGradient-{task.id})" />
-															<defs>
-																<linearGradient id="fireGradient-{task.id}" x1="0%" y1="0%" x2="0%" y2="100%">
-																	<stop offset="0%" style="stop-color:#f0932b" />
-																	<stop offset="50%" style="stop-color:#f39c12" />
-																	<stop offset="100%" style="stop-color:#e74c3c" />
-																</linearGradient>
-															</defs>
-														</svg>
-													</div>
-
-													<!-- Rocket body -->
-													<svg class="rocket-icon w-4 h-4" viewBox="0 0 24 24" fill="none">
-														<!-- Rocket body -->
-														<path d="M12 2C12 2 8 6 8 12C8 15 9 17 10 18L10 21C10 21.5 10.5 22 11 22H13C13.5 22 14 21.5 14 21L14 18C15 17 16 15 16 12C16 6 12 2 12 2Z" fill="currentColor" />
-														<!-- Window -->
-														<circle cx="12" cy="10" r="2" fill="oklch(0.75 0.15 200)" />
-														<!-- Left fin -->
-														<path d="M8 14L5 17L6 18L8 16Z" fill="currentColor" />
-														<!-- Right fin -->
-														<path d="M16 14L19 17L18 18L16 16Z" fill="currentColor" />
-														<!-- Nose cone highlight -->
-														<path d="M12 2C12 2 10 5 10 8" stroke="oklch(0.9 0.05 200)" stroke-width="0.5" stroke-linecap="round" opacity="0.5" />
-													</svg>
-
-													<!-- Landing sparkle effect -->
-													<div class="landing-sparkle absolute w-4 h-4 rounded-full left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0" style="background: radial-gradient(circle, oklch(0.85 0.2 145) 0%, transparent 70%);"></div>
-
-													<!-- Checkmark appears after landing -->
-													<svg class="landing-checkmark absolute w-4 h-4 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" viewBox="0 0 24 24" fill="none">
-														<path d="M5 13l4 4L19 7" stroke="oklch(0.72 0.19 145)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
-													</svg>
-												</div>
-											</button>
-											{#if elapsed}
-												<div class="text-[10px] font-mono tabular-nums text-center" style="color: {elapsed.color}; margin-top: 1px;">
-													{elapsed.display}
-												</div>
-											{/if}
+											<TaskActionButton
+												{task}
+												{agents}
+												spawning={spawningSingle === task.id}
+												hasBlockers={depStatus.hasBlockers}
+												blockingReason={depStatus.blockingReason}
+												onspawn={handleSpawnSingle}
+												{fireScale}
+												{elapsed}
+												onattach={(sessionName) => {
+													// Open tmux session in new terminal
+													const command = `tmux attach-session -t "${sessionName}"`;
+													navigator.clipboard.writeText(command);
+													alert(`Command copied to clipboard:\n${command}\n\nPaste in terminal to attach.`);
+												}}
+											/>
 										</td>
 										<td style="background: inherit;">
 											<div>
@@ -2038,9 +1986,6 @@
 										{:else}
 											<span style="color: oklch(0.40 0.02 250);">-</span>
 										{/if}
-									</td>
-									<td class="whitespace-nowrap" style="background: inherit;">
-										<DependencyIndicator {task} allTasks={allTasks.length > 0 ? allTasks : tasks} size="sm" />
 									</td>
 									<td style="background: inherit;">
 										<span class="text-xs font-mono {getAgeColorClass(task.updated_at)}" title={formatFullDate(task.updated_at)}>
