@@ -54,6 +54,7 @@
 		output: string;
 		lineCount: number;
 		lastUpdated: string;
+		hasFullHistory: boolean;  // True if we've fetched scrollback history
 	}
 	let sessions = $state<SessionOutput[]>([]);
 	let error = $state<string | null>(null);
@@ -61,6 +62,9 @@
 	// Auto-scroll state
 	let autoScroll = $state(true);
 	let scrollContainerRef: HTMLDivElement | null = null;
+
+	// History loading state
+	let loadingHistory = $state(false);
 
 	// Polling interval reference
 	let pollInterval: ReturnType<typeof setInterval> | null = null;
@@ -121,7 +125,8 @@
 		if (!session?.output) return [];
 
 		const output = session.output;
-		const options: PromptOption[] = [];
+		// Use Map to deduplicate by option number (keeps last occurrence)
+		const optionsMap = new Map<number, PromptOption>();
 
 		// Look for "Do you want to proceed?" or similar prompts
 		// Match lines like "❯ 1. Yes" or "  2. Yes, and don't ask again..."
@@ -150,10 +155,12 @@
 			}
 			keySequence.push('enter');
 
-			options.push({ number: num, text, type, keySequence });
+			// Overwrite any existing entry with same number (keeps last occurrence)
+			optionsMap.set(num, { number: num, text, type, keySequence });
 		}
 
-		return options;
+		// Convert map values to array, sorted by option number
+		return Array.from(optionsMap.values()).sort((a, b) => a.number - b.number);
 	});
 
 	// Get specific option by type
@@ -225,10 +232,21 @@
 				return;
 			}
 
+			// Build a map of existing sessions to preserve history state
+			const existingSessionMap = new Map(sessions.map(s => [s.name, s]));
+
 			// Fetch output for each session in parallel
 			const outputPromises = sessionsData.sessions.map(async (session: { name: string }) => {
+				const existing = existingSessionMap.get(session.name);
+
+				// If session already has full history, fetch with history=true to keep it updated
+				const includeHistory = existing?.hasFullHistory ?? false;
+
 				try {
-					const outputResponse = await fetch(`/api/sessions/${session.name}/output?lines=100`);
+					const url = includeHistory
+						? `/api/sessions/${session.name}/output?lines=500&history=true`
+						: `/api/sessions/${session.name}/output?lines=100`;
+					const outputResponse = await fetch(url);
 					const outputData = await outputResponse.json();
 					const output = outputData.success ? outputData.output : '';
 
@@ -241,7 +259,8 @@
 						agentName,
 						output,
 						lineCount: outputData.success ? outputData.lineCount : 0,
-						lastUpdated: new Date().toISOString()
+						lastUpdated: new Date().toISOString(),
+						hasFullHistory: includeHistory  // Preserve history state
 					};
 				} catch (e) {
 					return {
@@ -249,7 +268,8 @@
 						agentName: session.name.replace('jat-', ''),
 						output: '',
 						lineCount: 0,
-						lastUpdated: new Date().toISOString()
+						lastUpdated: new Date().toISOString(),
+						hasFullHistory: false
 					};
 				}
 			});
@@ -274,6 +294,63 @@
 			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to fetch sessions';
+		}
+	}
+
+	// Fetch full history for the current session (triggered on scroll up)
+	async function fetchFullHistory() {
+		const session = currentSession();
+		if (!session || session.hasFullHistory || loadingHistory) return;
+
+		loadingHistory = true;
+		try {
+			const outputResponse = await fetch(`/api/sessions/${session.name}/output?lines=500&history=true`);
+			const outputData = await outputResponse.json();
+
+			if (outputData.success) {
+				// Preserve scroll position relative to bottom
+				const scrollBottom = scrollContainerRef
+					? scrollContainerRef.scrollHeight - scrollContainerRef.scrollTop
+					: 0;
+
+				// Update the session with full history
+				sessions = sessions.map(s =>
+					s.name === session.name
+						? {
+								...s,
+								output: outputData.output,
+								lineCount: outputData.lineCount,
+								hasFullHistory: true
+							}
+						: s
+				);
+
+				// Restore scroll position (keep same distance from bottom)
+				requestAnimationFrame(() => {
+					if (scrollContainerRef) {
+						scrollContainerRef.scrollTop = scrollContainerRef.scrollHeight - scrollBottom;
+					}
+				});
+			}
+		} catch (e) {
+			console.error('Failed to fetch full history:', e);
+		} finally {
+			loadingHistory = false;
+		}
+	}
+
+	// Handle scroll to detect when user scrolls near top
+	function handleScroll(event: Event) {
+		const target = event.target as HTMLDivElement;
+
+		// Disable auto-scroll if user scrolled up significantly
+		if (target.scrollTop < target.scrollHeight - target.clientHeight - 50) {
+			autoScroll = false;
+		}
+
+		// If scrolled near top (within 100px), fetch full history
+		if (target.scrollTop < 100) {
+			fetchFullHistory();
 		}
 	}
 
@@ -546,6 +623,7 @@
 		<!-- Content -->
 		<div
 			bind:this={scrollContainerRef}
+			onscroll={handleScroll}
 			class="flex-1 overflow-y-auto p-3"
 			style="background: oklch(0.12 0.01 250);"
 		>
@@ -577,12 +655,23 @@
 			{:else if currentSession()}
 				<!-- Single Session Output -->
 				<div class="rounded-lg p-3" style="background: oklch(0.16 0.01 250); border: 1px solid oklch(0.25 0.02 250);">
+					<!-- Loading history indicator -->
+					{#if loadingHistory}
+						<div class="flex items-center justify-center gap-2 py-2 mb-2 rounded" style="background: oklch(0.20 0.02 250);">
+							<span class="loading loading-spinner loading-xs"></span>
+							<span class="text-xs font-mono" style="color: oklch(0.55 0.02 250);">Loading history...</span>
+						</div>
+					{:else if !currentSession()?.hasFullHistory}
+						<div class="text-center py-1 mb-2">
+							<span class="text-xs font-mono" style="color: oklch(0.40 0.02 250);">Scroll up for more history</span>
+						</div>
+					{/if}
 					<div class="flex items-center justify-between mb-2">
 						<span class="font-mono text-sm font-semibold" style="color: oklch(0.80 0.15 200);">
 							{currentSession()?.agentName}
 						</span>
 						<span class="text-xs font-mono" style="color: oklch(0.45 0.02 250);">
-							{currentSession()?.lineCount} lines
+							{currentSession()?.lineCount} lines{#if currentSession()?.hasFullHistory} (full){/if}
 						</span>
 					</div>
 					<pre
