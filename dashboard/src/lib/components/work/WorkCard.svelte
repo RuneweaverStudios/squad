@@ -273,6 +273,14 @@
 
 	// Input state
 	let inputText = $state('');
+	let inputRef: HTMLInputElement | null = null;
+
+	// Focus input when hovering over the card
+	function handleCardMouseEnter() {
+		if (inputRef && !sendingInput) {
+			inputRef.focus();
+		}
+	}
 
 	// Attached images (pending upload)
 	interface AttachedImage {
@@ -598,10 +606,11 @@
 	 * - 'working': Has active in_progress task with [JAT:WORKING] marker
 	 * - 'needs-input': Agent blocked, needs user to provide clarification (orange)
 	 * - 'ready-for-review': Work done, awaiting user review (yellow)
+	 * - 'completing': User triggered /jat:complete, agent running completion steps (teal)
 	 * - 'completed': Task was closed, showing completion summary (green)
 	 * - 'idle': No task, new session (gray)
 	 */
-	type SessionState = 'starting' | 'working' | 'needs-input' | 'ready-for-review' | 'completed' | 'idle';
+	type SessionState = 'starting' | 'working' | 'needs-input' | 'ready-for-review' | 'completing' | 'completed' | 'idle';
 
 	const sessionState = $derived.by((): SessionState => {
 		// Check for markers in recent output
@@ -633,7 +642,23 @@
 			/Type something\s*\n\s*Next/,  // "Type something" option in questions
 		]);
 		const workingPos = findLastPos([/\[JAT:WORKING\s+task=/]);
-		const reviewPos = findLastPos([/\[JAT:NEEDS_REVIEW\]/, /\[JAT:READY\s+actions=/, /🔍\s*READY FOR REVIEW/]);
+		const reviewPos = findLastPos([
+			/\[JAT:NEEDS_REVIEW\]/,
+			/\[JAT:READY\s+actions=/,
+			/🔍\s*READY FOR REVIEW/,
+			// Natural language patterns indicating agent is presenting work for review
+			/ready to mark.*complete/i,
+			/want me to mark.*complete/i,
+			/shall I mark.*complete/i,
+			/mark.*as complete\??/i,
+			/should I.*complete.*task/i,
+		]);
+		const completingPos = findLastPos([
+			// Triggered when user runs /jat:complete command
+			/jat:complete is running/i,
+			/✅\s*Marking task complete/i,
+			/Committing changes/i,
+		]);
 
 		// Boolean flags for no-task state checking
 		const hasCompletionMarker = /\[JAT:IDLE\]/.test(recentOutput) || /✅\s*TASK COMPLETE/.test(recentOutput);
@@ -650,6 +675,7 @@
 				{ state: 'needs-input' as const, pos: needsInputPos },
 				{ state: 'working' as const, pos: workingPos },
 				{ state: 'ready-for-review' as const, pos: reviewPos },
+				{ state: 'completing' as const, pos: completingPos },
 			].filter(p => p.pos >= 0);
 
 			if (positions.length > 0) {
@@ -658,7 +684,12 @@
 				return positions[0].state;
 			}
 
-			// No markers found - agent is starting/initializing (hasn't emitted [JAT:WORKING] yet)
+			// No markers found - check Beads task status
+			// If task is in_progress in Beads, agent is working (handles resumed sessions after context compaction)
+			// Otherwise, agent is still starting/initializing
+			if (task.status === 'in_progress') {
+				return 'working';
+			}
 			return 'starting';
 		}
 
@@ -726,6 +757,13 @@
 			glow: 'oklch(0.70 0.20 85 / 0.4)',
 			icon: 'eye',
 			label: 'Review'
+		},
+		completing: {
+			accent: 'oklch(0.65 0.15 175)',      // Teal - completing in progress
+			bgTint: 'oklch(0.65 0.15 175 / 0.08)',
+			glow: 'oklch(0.65 0.15 175 / 0.4)',
+			icon: 'gear',
+			label: 'Completing'
 		},
 		completed: {
 			accent: 'oklch(0.70 0.20 145)',      // Green
@@ -1159,6 +1197,7 @@
 	data-agent-name={agentName}
 	in:fly={{ x: 50, duration: 300, delay: 50 }}
 	out:fade={{ duration: 200 }}
+	onmouseenter={handleCardMouseEnter}
 >
 	<!-- Status accent bar - left edge (color reflects session state) -->
 	<div
@@ -1168,25 +1207,29 @@
 				? 'oklch(0.70 0.20 45)'   /* Orange for needs input - urgent attention */
 				: sessionState === 'ready-for-review'
 					? 'oklch(0.65 0.20 85)'  /* Yellow/amber for review */
-					: sessionState === 'completed' || showCompletionBanner
-						? 'oklch(0.65 0.20 145)'  /* Green for completed */
-						: sessionState === 'working'
-							? 'oklch(0.60 0.18 250)'  /* Blue for working */
-							: sessionState === 'starting'
-								? 'oklch(0.70 0.15 200)'  /* Cyan for starting */
-								: 'oklch(0.50 0.05 250)'  /* Gray for idle */
+					: sessionState === 'completing'
+						? 'oklch(0.65 0.15 175)'  /* Teal for completing */
+						: sessionState === 'completed' || showCompletionBanner
+							? 'oklch(0.65 0.20 145)'  /* Green for completed */
+							: sessionState === 'working'
+								? 'oklch(0.60 0.18 250)'  /* Blue for working */
+								: sessionState === 'starting'
+									? 'oklch(0.70 0.15 200)'  /* Cyan for starting */
+									: 'oklch(0.50 0.05 250)'  /* Gray for idle */
 			};
 			box-shadow: {sessionState === 'needs-input'
 				? '0 0 12px oklch(0.70 0.20 45 / 0.6)'  /* Stronger glow for attention */
 				: sessionState === 'ready-for-review'
 					? '0 0 8px oklch(0.65 0.20 85 / 0.5)'
-					: sessionState === 'completed' || showCompletionBanner
-						? '0 0 8px oklch(0.65 0.20 145 / 0.5)'
-						: sessionState === 'working'
-							? '0 0 8px oklch(0.60 0.18 250 / 0.5)'
-							: sessionState === 'starting'
-								? '0 0 8px oklch(0.70 0.15 200 / 0.5)'  /* Cyan glow for starting */
-								: 'none'
+					: sessionState === 'completing'
+						? '0 0 8px oklch(0.65 0.15 175 / 0.5)'  /* Teal glow for completing */
+						: sessionState === 'completed' || showCompletionBanner
+							? '0 0 8px oklch(0.65 0.20 145 / 0.5)'
+							: sessionState === 'working'
+								? '0 0 8px oklch(0.60 0.18 250 / 0.5)'
+								: sessionState === 'starting'
+									? '0 0 8px oklch(0.70 0.15 200 / 0.5)'  /* Cyan glow for starting */
+									: 'none'
 			};
 		"
 	></div>
@@ -1283,6 +1326,32 @@
 			<div class="flex items-center gap-2 min-w-0">
 				<StatusActionBadge
 					sessionState="ready-for-review"
+					{sessionName}
+					onAction={handleStatusAction}
+					disabled={sendingInput}
+				/>
+				<TaskIdBadge
+					task={{ id: displayTask.id, status: displayTask.status || 'in_progress', issue_type: displayTask.issue_type, title: displayTask.title || displayTask.id }}
+					size="sm"
+					showType={false}
+					showStatus={false}
+					onOpenTask={onTaskClick}
+				/>
+				<span
+					class="font-mono text-[10px] tracking-wider px-1 py-0.5 rounded flex-shrink-0"
+					style="background: oklch(0.5 0 0 / 0.1); color: oklch(0.70 0.10 50);"
+				>
+					P{displayTask.priority ?? 2}
+				</span>
+				<h3 class="font-mono font-bold text-sm tracking-wide truncate min-w-0 flex-1" style="color: oklch(0.90 0.02 250);" title={displayTask.title || displayTask.id}>
+					{displayTask.title || displayTask.id}
+				</h3>
+			</div>
+		{:else if sessionState === 'completing' && displayTask}
+			<!-- Completing state - /jat:complete is running -->
+			<div class="flex items-center gap-2 min-w-0">
+				<StatusActionBadge
+					sessionState="completing"
 					{sessionName}
 					onAction={handleStatusAction}
 					disabled={sendingInput}
@@ -1780,6 +1849,7 @@
 				<div class="relative flex-1 min-w-0">
 					<input
 						type="text"
+						bind:this={inputRef}
 						bind:value={inputText}
 						onkeydown={handleInputKeydown}
 						onpaste={handlePaste}
@@ -1845,6 +1915,20 @@
 						>
 							✓ Done
 						</span>
+					{:else if sessionState === 'ready-for-review'}
+						<!-- Ready for review: show Complete button -->
+						<button
+							onclick={() => sendWorkflowCommand('/jat:complete')}
+							class="btn btn-xs gap-1"
+							style="background: linear-gradient(135deg, oklch(0.50 0.18 145) 0%, oklch(0.42 0.15 160) 100%); border: none; color: white; font-weight: 600;"
+							title="Mark task as complete"
+							disabled={sendingInput || !onSendInput}
+						>
+							<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+							</svg>
+							Complete
+						</button>
 					{:else if sessionState === 'idle'}
 						<!-- Idle state: show Start button -->
 						<button

@@ -5,6 +5,19 @@
     "padding": 1
   },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^AskUserQuestion$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./.claude/hooks/pre-ask-user-question.sh",
+            "statusMessage": "",
+            "streamStdinJson": true
+          }
+        ]
+      }
+    ],
     "PreCompact": [
       {
         "matcher": ".*",
