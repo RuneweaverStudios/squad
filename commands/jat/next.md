@@ -6,6 +6,20 @@ Find the highest priority ready task and start working. If you have a task in pr
 
 # Agent Next - Drive Mode
 
+> **⚠️ ADVANCED COMMAND - Not recommended for typical workflows**
+>
+> The standard model is **one agent = one session = one task**.
+> - Agent starts → works on task → completes → session ends
+> - User spawns new agent from dashboard for next task
+>
+> This command chains tasks in the same session, which:
+> - Accumulates context and can degrade performance
+> - Makes it harder to track which agent did what
+> - Blurs the clean "one task per session" model
+>
+> **Use `/jat:complete` instead** - it properly closes the task and ends the session.
+> Only use `/jat:next` if you specifically want to chain multiple tasks in one session.
+
 **Usage:**
 - `/jat:next` - **Complete current task + auto-start next** (full verification)
 - `/jat:next quick` - Same but skip verification
@@ -23,10 +37,10 @@ Find the highest priority ready task and start working. If you have a task in pr
 - **ALWAYS check Agent Mail** - even if no current task
 - **Always respect dependencies** - `bd ready` only shows unblocked tasks
 
-**When to use:**
-- Flow state / drive mode - keep working without pause
-- "What should I work on?" - finds the best available task
-- After displaying "🔍 READY FOR REVIEW" and user wants to continue
+**When to use (advanced scenarios only):**
+- Long coding sessions where context accumulation is acceptable
+- Batch processing multiple small tasks
+- When you specifically want to chain tasks without spawning new agents
 
 ---
 
@@ -48,17 +62,18 @@ Find the highest priority ready task and start working. If you have a task in pr
 **When you finish coding work, display:**
 ```
 🔍 READY FOR REVIEW: jat-xyz
+[JAT:READY actions=complete]
+[JAT:NEEDS_REVIEW]
 
 Changes made:
   - [summary of changes]
 
 Next steps:
   • Review the changes above
-  • /jat:complete - Complete this task and see menu
-  • /jat:next - Complete this task and auto-start next
+  • /jat:complete - Complete this task (recommended)
 ```
 
-**The `[JAT:READY ...]` marker should be embedded in your "Ready for Review" header** - see `/jat:start` for the full template.
+**See `/jat:start` for the full "Ready for Review" template with all markers.**
 
 **Only after running completion steps, display:**
 ```

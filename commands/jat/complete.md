@@ -35,8 +35,8 @@ Complete current task properly with full verification, then show menu of availab
 - **End of work**: Last task before closing terminal
 
 **When NOT to use:**
-- Want to keep going automatically → use `/jat:next` instead
 - Need to pivot quickly → use `/jat:pause` instead
+- (Advanced) Want to chain tasks in same session → `/jat:next` exists but not recommended
 
 ---
 
@@ -410,23 +410,21 @@ Agent is now available for next task." \
 
 ---
 
-### STEP 8: Show Final Summary + Available Tasks Menu
+### STEP 8: Show Final Summary
 
 ```bash
 echo ""
 echo "┌──────────────────────────────────────────────────────────────────────────┐"
 echo "│  ✅ Task Completed: $task_id \"$task_title\""
 echo "│  👤 Agent: $agent_name"
-echo "│  [JAT:IDLE actions=start]"
+echo "│  [JAT:IDLE]"
 echo "└──────────────────────────────────────────────────────────────────────────┘"
 echo ""
-
-# Get available tasks
-bd ready --json
-
-# Display recommended next task (highest priority)
-# Display full task menu
-# Show next steps
+echo "This session has completed its task. One agent = one session = one task."
+echo ""
+echo "💡 What's next:"
+echo "   • Close this terminal (session complete)"
+echo "   • Spawn a new agent from dashboard for next task"
 ```
 
 ---
@@ -435,7 +433,7 @@ bd ready --json
 
 **This command does NOT have a quick mode.**
 
-For quick completion without verification, use `/jat:next quick` instead.
+Full verification ensures quality before task closure.
 
 **Still done (NEVER skip these):**
 - STEP 2: Read & respond to Agent Mail
@@ -534,31 +532,21 @@ This preserves attribution and maintains the audit trail.
 ┌──────────────────────────────────────────────────────────────────────────┐
 │  ✅ Task Completed: jat-abc "Add user settings page"                     │
 │  👤 Agent: JustGrove                                                     │
-│  [JAT:IDLE actions=start]                                                │
+│  [JAT:IDLE]                                                              │
+│  [JAT:AUTO_PROCEED]  ← Only if in autopilot mode                         │
 └──────────────────────────────────────────────────────────────────────────┘
 
-📋 Recommended Next Task:
-   → jat-xyz "Update documentation for new API" (Priority: P1, Type: task)
+This session has completed its task. One agent = one session = one task.
 
-   Type: /jat:start jat-xyz
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📋 Available Tasks (8 total):
-
-   [1] jat-xyz - Update documentation for new API (task)
-   [1] jat-def - Fix authentication timeout bug (bug)
-   [2] jat-ghi - Add dark mode toggle (feature)
-   ...
-
-💡 Next steps:
-   • /jat:start jat-xyz - Start recommended task
-   • /jat:start <task-id> - Start different task
-   • /jat:status - Review current state
-   • Close terminal if done for the day
+💡 What's next:
+   • Close this terminal (session complete)
+   • Spawn a new agent from dashboard for next task
+   • Or stay here and run /jat:start if you want to continue in this session
 ```
 
-**The `[JAT:IDLE ...]` marker is embedded in the completion box** - the dashboard detects it to show the agent is ready for a new task.
+**Markers explained:**
+- `[JAT:IDLE]` - Dashboard shows completion state, session can be closed
+- `[JAT:AUTO_PROCEED]` - (Autopilot mode) Dashboard may auto-spawn next agent
 
 ---
 
@@ -608,7 +596,7 @@ Or run /jat:verify to see detailed error report
 | 5 | Mark Task Complete | ALWAYS |
 | 6 | Release Reservations | ALWAYS |
 | 7 | Announce Completion | ALWAYS |
-| 8 | Show Menu + Recommended | ALWAYS |
+| 8 | Show Final Summary | ALWAYS |
 
 ---
 
@@ -621,9 +609,9 @@ Or run /jat:verify to see detailed error report
 
 2. **Full verification required**
    - No quick mode for this command
-   - Use `/jat:next quick` if you need speed
+   - Quality over speed
 
-3. **Show menu, don't auto-start**
-   - User chooses next task
-   - Recommend highest priority
-   - Different from `/jat:next` which auto-continues
+3. **One agent = one session = one task**
+   - Session typically ends after completion
+   - User spawns new agent for next task
+   - Keeps context clean and focused

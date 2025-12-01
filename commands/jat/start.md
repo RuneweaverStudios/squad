@@ -536,7 +536,69 @@ Display comprehensive start summary:
 
 ---
 
-### STEP 11: Begin Work
+### STEP 11: Evaluate Task Clarity
+
+**Before diving into work, assess if the task is clear enough to proceed.**
+
+Check the task description for:
+- **Unclear requirements**: Vague language like "improve", "fix", "update" without specifics
+- **Missing context**: References to things not explained
+- **Ambiguous scope**: Could mean multiple different things
+- **Missing acceptance criteria**: No way to know when "done"
+
+**If task is CLEAR → proceed to Step 12 (Begin Work)**
+
+**If task is UNCLEAR → request clarification:**
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│  ❓ NEED CLARIFICATION: {TASK_ID}                                        │
+│  [JAT:NEEDS_INPUT]                                                       │
+└──────────────────────────────────────────────────────────────────────────┘
+
+I've picked up this task but need some clarification before I can start:
+
+📋 Task: {TASK_TITLE}
+
+❓ Questions:
+  1. [Specific question about unclear requirement]
+  2. [Another question if needed]
+
+Please provide more details so I can proceed effectively.
+```
+
+**The `[JAT:NEEDS_INPUT]` marker alerts the dashboard** - the user will see this session needs attention (orange highlight).
+
+**Wait for user response before proceeding.**
+
+---
+
+### STEP 11B: Resume After Input (When User Responds)
+
+**When the user provides clarification, output the WORKING marker to signal you're resuming:**
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│  ✅ Got it! Resuming work on {TASK_ID}                                   │
+│  [JAT:WORKING task={TASK_ID}]                                            │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+**This is critical for the triage queue interface.** When you output `[JAT:WORKING]`, the dashboard:
+- Removes this session from the "needs attention" queue
+- Shows the session as actively working (blue state)
+- Allows the operator to move on to the next agent needing input
+
+**State transitions:**
+```
+needs-input  ──[user responds]──►  [JAT:WORKING task=xxx]  ──►  working
+```
+
+**Then continue to Step 12 (Begin Work).**
+
+---
+
+### STEP 12: Begin Work
 
 ```bash
 bd show "$TASK_ID"
@@ -553,7 +615,8 @@ Display full task details to the user and begin working on the task.
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
 │  🔍 READY FOR REVIEW: {TASK_ID}                                          │
-│  [JAT:READY actions=complete,next]                                       │
+│  [JAT:READY actions=complete]                                            │
+│  [JAT:NEEDS_REVIEW]                                                      │
 └──────────────────────────────────────────────────────────────────────────┘
 
 Changes made:
@@ -562,13 +625,16 @@ Changes made:
 
 Next steps:
   • Review the changes above
-  • /jat:complete - Complete this task and see menu
-  • /jat:next - Complete this task and auto-start next
+  • /jat:complete - Complete this task (commits, closes, releases locks)
 ```
 
-**The `[JAT:READY ...]` marker is embedded in the header box** - the dashboard detects it to show appropriate action buttons.
+**Markers explained:**
+- `[JAT:READY actions=complete]` - Dashboard shows "Done" button
+- `[JAT:NEEDS_REVIEW]` - Dashboard shows review state (yellow accent), waits for user
 
-**NEVER say "Task Complete" until AFTER the user runs `/jat:complete` or `/jat:next`.**
+**One agent = one session = one task.** When this task completes, the session ends or user spawns a new agent for the next task.
+
+**NEVER say "Task Complete" until AFTER the user runs `/jat:complete`.**
 
 Why? Because:
 - Other agents check Beads to see task status
@@ -579,6 +645,71 @@ Why? Because:
 |-------|---------|--------------|
 | 🔍 Ready for Review | Code done, awaiting user decision | `in_progress` |
 | ✅ Task Complete | Closed, reservations released | `closed` |
+
+---
+
+## Session State Machine (Dashboard Triage)
+
+**The dashboard detects session states from markers in terminal output.** This enables a triage/queue interface for operators managing multiple agents.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        SESSION STATE MACHINE                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│    ┌───────┐                                                                │
+│    │ idle  │ ◄─────────────────────────────────────────────────────────┐    │
+│    └───┬───┘                                                           │    │
+│        │                                                               │    │
+│        │ [JAT:WORKING task=xxx] (task assigned)                        │    │
+│        ▼                                                               │    │
+│    ┌─────────┐                                                         │    │
+│    │ working │ ◄──────────────────────────────┐                        │    │
+│    └────┬────┘                                │                        │    │
+│         │                                     │                        │    │
+│         │ [JAT:NEEDS_INPUT]                   │ [JAT:WORKING task=xxx] │    │
+│         ▼                                     │ (user responded)       │    │
+│    ┌─────────────┐                            │                        │    │
+│    │ needs-input │ ───────────────────────────┘                        │    │
+│    └─────────────┘                                                     │    │
+│         ▲                                                              │    │
+│         │                                                              │    │
+│    ┌────┴────┐                                                         │    │
+│    │ working │                                                         │    │
+│    └────┬────┘                                                         │    │
+│         │                                                              │    │
+│         │ [JAT:NEEDS_REVIEW]                                           │    │
+│         ▼                                                              │    │
+│    ┌──────────────────┐                                                │    │
+│    │ ready-for-review │                                                │    │
+│    └────────┬─────────┘                                                │    │
+│             │                                                          │    │
+│             │ [JAT:IDLE] (after /jat:complete)                         │    │
+│             ▼                                                          │    │
+│    ┌───────────┐                                                       │    │
+│    │ completed │ ──────────────────────────────────────────────────────┘    │
+│    └───────────┘                                                            │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**States and Markers:**
+
+| State | Dashboard Color | Marker | Meaning |
+|-------|----------------|--------|---------|
+| `idle` | Gray | (none) | No task assigned, new session |
+| `working` | Blue | `[JAT:WORKING task=xxx]` | Agent actively coding |
+| `needs-input` | Orange | `[JAT:NEEDS_INPUT]` | Agent blocked, needs user clarification |
+| `ready-for-review` | Yellow | `[JAT:NEEDS_REVIEW]` | Agent finished, awaiting user review |
+| `completed` | Green | `[JAT:IDLE]` | Task closed, session can end |
+
+**Triage Queue Interface:**
+- Shows only agents in `needs-input` or `ready-for-review` states
+- Operator responds to one → agent outputs `[JAT:WORKING]` → drops from queue
+- Operator moves to next agent needing attention
+- Agents in `working` state run quietly in background
+
+**Key: Most recent marker wins.** If an agent outputs `[JAT:NEEDS_INPUT]` then later `[JAT:WORKING]`, the dashboard shows `working` state.
 
 ---
 
@@ -757,7 +888,8 @@ Options:
 | 8 | Create Reservations | If task-id provided |
 | 9 | Announce Task Start | If task-id provided |
 | 10 | Display Task Details | If task-id provided |
-| 11 | Begin Work | If task-id provided |
+| 11 | Evaluate Task Clarity | If task-id provided (may output `[JAT:NEEDS_INPUT]`) |
+| 12 | Begin Work | If task is clear |
 
 ---
 
