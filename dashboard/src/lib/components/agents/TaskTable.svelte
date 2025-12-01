@@ -784,7 +784,7 @@
 
 			// Clear the image after successful spawn (it's been sent)
 			if (imagePath) {
-				removeTaskImage(taskId, new MouseEvent('click'));
+				clearAllTaskImages(taskId);
 			}
 
 			return true;
@@ -1167,6 +1167,34 @@
 		} catch (err) {
 			console.error('Failed to update task notes with images:', err);
 		}
+	}
+
+	/**
+	 * Clear all images from a task
+	 * Used after successful spawn when images have been sent to the agent
+	 */
+	async function clearAllTaskImages(taskId: string) {
+		const images = taskImages.get(taskId) || [];
+
+		// Revoke all object URLs
+		for (const img of images) {
+			if (img.preview && !img.preview.startsWith('/api')) {
+				URL.revokeObjectURL(img.preview);
+			}
+		}
+
+		// Remove all images from local state
+		const newMap = new Map(taskImages);
+		newMap.delete(taskId);
+		taskImages = newMap;
+
+		// Remove from server for persistence (all images)
+		for (const img of images) {
+			await removeTaskImageFromServer(taskId, img.id);
+		}
+
+		// Update task notes
+		await updateTaskNotesWithImages(taskId);
 	}
 
 	/**
