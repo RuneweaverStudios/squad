@@ -396,36 +396,50 @@
 		// Check for markers in recent output
 		const recentOutput = output ? output.slice(-3000) : '';
 
-		// Needs input marker - agent blocked, waiting for user clarification (highest priority)
-		const hasNeedsInputMarker = /\[JAT:NEEDS_INPUT\]/.test(recentOutput);
-		const hasNeedsClarificationEmoji = /❓\s*NEED CLARIFICATION/.test(recentOutput);
-		const needsInput = hasNeedsInputMarker || hasNeedsClarificationEmoji;
+		// Find LAST position of each marker type (most recent wins)
+		// This allows state transitions: needs-input → working → review → completed
+		const findLastPos = (patterns: RegExp[]): number => {
+			let maxPos = -1;
+			for (const pattern of patterns) {
+				const match = recentOutput.match(new RegExp(pattern.source, 'g'));
+				if (match) {
+					const lastMatch = match[match.length - 1];
+					const pos = recentOutput.lastIndexOf(lastMatch);
+					if (pos > maxPos) maxPos = pos;
+				}
+			}
+			return maxPos;
+		};
 
-		// Review markers - agent finished work, awaiting user decision
-		const hasNeedsReviewMarker = /\[JAT:NEEDS_REVIEW\]/.test(recentOutput);
-		const hasReadyMarker = /\[JAT:READY\s+actions=/.test(recentOutput);
-		const hasReadyForReviewEmoji = /🔍\s*READY FOR REVIEW/.test(recentOutput);
-		const hasReadyForReviewMarker = hasNeedsReviewMarker || hasReadyMarker || hasReadyForReviewEmoji;
+		// Find last position of each marker type
+		const needsInputPos = findLastPos([/\[JAT:NEEDS_INPUT\]/, /❓\s*NEED CLARIFICATION/]);
+		const workingPos = findLastPos([/\[JAT:WORKING\s+task=/]);
+		const reviewPos = findLastPos([/\[JAT:NEEDS_REVIEW\]/, /\[JAT:READY\s+actions=/, /🔍\s*READY FOR REVIEW/]);
 
-		// Completion markers - task closed, session can end
-		const hasIdleMarker = /\[JAT:IDLE\]/.test(recentOutput);
-		const hasTaskCompleteEmoji = /✅\s*TASK COMPLETE/.test(recentOutput);
-		const hasCompletionMarker = hasIdleMarker || hasTaskCompleteEmoji;
+		// Boolean flags for no-task state checking
+		const hasCompletionMarker = /\[JAT:IDLE\]/.test(recentOutput) || /✅\s*TASK COMPLETE/.test(recentOutput);
+		const hasReadyForReviewMarker = reviewPos >= 0;
 
 		// Autopilot marker - can proceed automatically (future: trigger auto-spawn)
 		const hasAutoProceedMarker = /\[JAT:AUTO_PROCEED\]/.test(recentOutput);
 
-		// Check for needs-input first (highest priority - agent is blocked)
-		if (needsInput && task) {
-			return 'needs-input';
-		}
-
-		// If we have an active task
+		// Determine state based on most recent marker
+		// Priority when positions are equal: completed > review > needs-input > working
 		if (task) {
-			// Check if agent has finished and is ready for review
-			if (hasReadyForReviewMarker) {
-				return 'ready-for-review';
+			// Find which marker appeared most recently
+			const positions = [
+				{ state: 'needs-input' as const, pos: needsInputPos },
+				{ state: 'working' as const, pos: workingPos },
+				{ state: 'ready-for-review' as const, pos: reviewPos },
+			].filter(p => p.pos >= 0);
+
+			if (positions.length > 0) {
+				// Sort by position descending (most recent first)
+				positions.sort((a, b) => b.pos - a.pos);
+				return positions[0].state;
 			}
+
+			// No markers found, default to working if we have a task
 			return 'working';
 		}
 
@@ -1162,19 +1176,14 @@
 							{/if}
 						</button>
 					{:else if sessionState === 'completed'}
-						<!-- Completed state: show prominent "Next Task" button -->
-						<button
-							onclick={() => sendWorkflowCommand('/jat:start')}
-							class="btn btn-xs gap-1"
-							style="background: linear-gradient(135deg, oklch(0.50 0.18 250) 0%, oklch(0.42 0.15 265) 100%); border: none; color: white; font-weight: 600;"
-							title="Start the next task"
-							disabled={sendingInput || !onSendInput}
+						<!-- Completed state: session done, user should close or spawn new agent from dashboard -->
+						<span
+							class="font-mono text-[10px] tracking-wider uppercase px-2 py-1 rounded"
+							style="background: oklch(0.30 0.12 145); color: oklch(0.90 0.05 145);"
+							title="Task complete - close session or spawn new agent from dashboard"
 						>
-							<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-							</svg>
-							Next
-						</button>
+							✓ Done
+						</span>
 					{:else if sessionState === 'idle'}
 						<!-- Idle state: show Start button -->
 						<button
