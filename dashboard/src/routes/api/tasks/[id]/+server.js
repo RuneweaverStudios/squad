@@ -102,13 +102,20 @@ export async function PUT({ params, request }) {
 			args.push(`--status ${updates.status}`);
 		}
 
+		// Update assignee if changed (including clearing with null)
+		if (updates.assignee !== undefined) {
+			const sanitizedAssignee = updates.assignee ? updates.assignee.trim() : '';
+			args.push(`--assignee "${sanitizedAssignee.replace(/"/g, '\\"')}"`);
+		}
+
 		// Execute bd update command in correct project directory
 		if (args.length > 0) {
 			const projectPath = existingTask.project_path;
 			const command = `cd "${projectPath}" && bd update ${taskId} ${args.join(' ')}`;
 			const { stdout, stderr } = await execAsync(command);
 
-			if (stderr && !stderr.includes('✓')) {
+			// Check for errors in stderr (bd CLI uses stderr for some output like warnings)
+			if (stderr && stderr.includes('Error:')) {
 				console.error('bd update error:', stderr);
 				return json({ error: 'Failed to update task', details: stderr }, { status: 500 });
 			}
