@@ -15,6 +15,7 @@
 	import { tick, onMount, onDestroy } from 'svelte';
 	import { isTaskDrawerOpen } from '$lib/stores/drawerStore';
 	import { broadcastTaskEvent } from '$lib/stores/taskEvents';
+	import VoiceInput from './VoiceInput.svelte';
 
 	// Type for pending attachments (before upload)
 	interface PendingAttachment {
@@ -110,6 +111,67 @@
 	let successMessage = $state(null);
 	let titleInput: HTMLInputElement;
 
+	// AI suggestion state
+	let isLoadingSuggestions = $state(false);
+	let suggestionsApplied = $state(false);
+	let suggestionReasoning = $state('');
+	let suggestionError = $state<string | null>(null);
+
+	// Track if user has manually changed fields (to avoid overwriting)
+	let userModifiedFields = $state<Set<string>>(new Set());
+
+	// Pre-fetched open tasks for AI suggestions (loaded when drawer opens)
+	let prefetchedOpenTasks = $state<any[]>([]);
+
+	// Prefetch open tasks when drawer opens (so they're ready for AI suggestions)
+	$effect(() => {
+		if (isOpen && prefetchedOpenTasks.length === 0) {
+			// Fetch in background - don't block UI
+			fetch('/api/tasks?status=open')
+				.then(res => res.json())
+				.then(data => {
+					prefetchedOpenTasks = (data.tasks || []).slice(0, 30);
+				})
+				.catch(err => console.error('Failed to prefetch tasks:', err));
+		}
+	});
+
+	// Voice input state
+	let voiceInputError = $state<string | null>(null);
+	let isTitleRecording = $state(false);
+	let isDescriptionRecording = $state(false);
+
+	// Voice input handlers
+	function handleTitleTranscription(event: CustomEvent<string>) {
+		const text = event.detail;
+		if (text) {
+			// Append to existing title with space if needed
+			formData.title = formData.title
+				? formData.title + ' ' + text
+				: text;
+		}
+		voiceInputError = null;
+	}
+
+	function handleDescriptionTranscription(event: CustomEvent<string>) {
+		const text = event.detail;
+		if (text) {
+			// Append to existing description with space if needed
+			formData.description = formData.description
+				? formData.description + ' ' + text
+				: text;
+		}
+		voiceInputError = null;
+	}
+
+	function handleVoiceInputError(event: CustomEvent<string>) {
+		voiceInputError = event.detail;
+		// Auto-clear error after 5 seconds
+		setTimeout(() => {
+			voiceInputError = null;
+		}, 5000);
+	}
+
 	// Available options
 	const priorityOptions = [
 		{ value: 0, label: 'P0 (Critical)' },
@@ -138,6 +200,104 @@
 		3: 'badge-ghost', // P3 - Low
 		4: 'badge-ghost' // P4 - Lowest
 	};
+
+	// Fetch AI suggestions for task metadata
+	async function fetchSuggestions() {
+		// Only fetch if we have both title and description
+		if (!formData.title.trim() || !formData.description.trim()) {
+			return;
+		}
+
+		// Don't fetch if already loading or already applied
+		if (isLoadingSuggestions || suggestionsApplied) {
+			return;
+		}
+
+		isLoadingSuggestions = true;
+		suggestionError = null;
+
+		try {
+			const response = await fetch('/api/tasks/suggest', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					title: formData.title.trim(),
+					description: formData.description.trim(),
+					openTasks: prefetchedOpenTasks // Pass pre-fetched tasks
+				})
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.message || 'Failed to get suggestions');
+			}
+
+			const data = await response.json();
+			const suggestions = data.suggestions;
+
+			// Apply suggestions to fields that user hasn't manually modified
+			if (suggestions) {
+				// Priority
+				if (!userModifiedFields.has('priority') && suggestions.priority !== undefined) {
+					formData.priority = suggestions.priority;
+				}
+
+				// Type
+				if (!userModifiedFields.has('type') && suggestions.type) {
+					formData.type = suggestions.type;
+				}
+
+				// Project
+				if (!userModifiedFields.has('project') && suggestions.project) {
+					formData.project = suggestions.project;
+					// This will trigger fetchAvailableTasks via $effect
+				}
+
+				// Labels
+				if (!userModifiedFields.has('labels') && suggestions.labels?.length > 0) {
+					formData.labels = suggestions.labels.join(', ');
+				}
+
+				// Dependencies - add to selected list
+				if (suggestions.dependencies?.length > 0) {
+					// Wait for available tasks to load if project was just set
+					await tick();
+					setTimeout(async () => {
+						if (suggestions.dependencies?.length > 0) {
+							// Fetch task details for suggested dependencies
+							for (const depId of suggestions.dependencies) {
+								const existingTask = availableTasks.find(t => t.id === depId);
+								if (existingTask && !selectedDependencies.some(d => d.id === depId)) {
+									addDependency(existingTask);
+								}
+							}
+						}
+					}, 500); // Give time for available tasks to load
+				}
+
+				suggestionReasoning = suggestions.reasoning || '';
+				suggestionsApplied = true;
+			}
+		} catch (err: any) {
+			console.error('Error fetching suggestions:', err);
+			suggestionError = err.message || 'Failed to get AI suggestions';
+		} finally {
+			isLoadingSuggestions = false;
+		}
+	}
+
+	// Handle description blur - trigger AI suggestions
+	function handleDescriptionBlur() {
+		// Small delay to avoid triggering on tab-through
+		setTimeout(() => {
+			fetchSuggestions();
+		}, 100);
+	}
+
+	// Track field changes to avoid overwriting user input
+	function markFieldModified(field: string) {
+		userModifiedFields = new Set([...userModifiedFields, field]);
+	}
 
 	// Fetch available tasks for dependencies dropdown when project changes
 	async function fetchAvailableTasks(project: string) {
@@ -434,16 +594,47 @@
 					}
 				}, 800);
 			} else if (pendingSaveAction === 'start') {
-				// Save and Start: Close drawer and navigate to task (start working)
-				// For now, just close - actual "start" would trigger /jat:start
-				setTimeout(() => {
-					resetForm();
-					isTaskDrawerOpen.set(false);
-					successMessage = null;
-					// TODO: Could trigger task start workflow here
-					// For now, broadcast an additional event
+				// Save and Start: Close drawer and spawn an agent for the task
+				successMessage = `Task ${taskId} created! Spawning agent...`;
+
+				try {
+					// Spawn an agent for the newly created task via /api/work/spawn
+					// This endpoint properly registers the agent, assigns the task, and starts Claude
+					const spawnResponse = await fetch('/api/work/spawn', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							taskId: taskId
+						})
+					});
+
+					if (!spawnResponse.ok) {
+						const spawnError = await spawnResponse.json();
+						throw new Error(spawnError.message || 'Failed to spawn agent');
+					}
+
+					const spawnData = await spawnResponse.json();
+					successMessage = `Agent spawned for ${taskId}!`;
+
+					// Broadcast both events
+					broadcastTaskEvent('task-created', taskId);
 					broadcastTaskEvent('task-start-requested', taskId);
-				}, 800);
+
+					setTimeout(() => {
+						resetForm();
+						isTaskDrawerOpen.set(false);
+						successMessage = null;
+					}, 1200);
+				} catch (spawnError: any) {
+					// Task was created but spawn failed - show warning but don't treat as full failure
+					console.error('Spawn error:', spawnError);
+					successMessage = `Task ${taskId} created but agent spawn failed: ${spawnError.message}`;
+					setTimeout(() => {
+						resetForm();
+						isTaskDrawerOpen.set(false);
+						successMessage = null;
+					}, 2500);
+				}
 			} else {
 				// Save and Close (default): Reset form and close drawer
 				setTimeout(() => {
@@ -478,6 +669,14 @@
 		selectedDependencies = [];
 		availableTasks = [];
 		showDependencyDropdown = false;
+
+		// Reset AI suggestion state
+		isLoadingSuggestions = false;
+		suggestionsApplied = false;
+		suggestionReasoning = '';
+		suggestionError = null;
+		userModifiedFields = new Set();
+		prefetchedOpenTasks = []; // Will re-fetch next time drawer opens
 
 		// Cleanup and reset attachments
 		pendingAttachments.forEach(att => {
@@ -523,6 +722,13 @@
 			event.preventDefault();
 			if (!isSubmitting) {
 				submitWithAction('new');
+			}
+		}
+		// Alt + Enter = Save and Start (spawn agent)
+		else if (event.altKey && event.key === 'Enter') {
+			event.preventDefault();
+			if (!isSubmitting) {
+				submitWithAction('start');
 			}
 		}
 		// Cmd/Ctrl + Enter = Save and Close (default)
@@ -594,18 +800,28 @@
 								<span class="text-error">*</span>
 							</span>
 						</label>
-						<input
-							id="task-title"
-							type="text"
-							placeholder="Enter task title..."
-							class="input w-full font-mono {validationErrors.title ? 'input-error' : ''}"
-							style="background: oklch(0.18 0.01 250); border: 1px solid oklch(0.35 0.02 250); color: oklch(0.80 0.02 250);"
-							bind:this={titleInput}
-							bind:value={formData.title}
-							disabled={isSubmitting}
-							required
-							autofocus={isOpen}
-						/>
+						<div class="flex items-center gap-2">
+							<input
+								id="task-title"
+								type="text"
+								placeholder="Enter task title or use voice..."
+								class="input flex-1 font-mono {validationErrors.title ? 'input-error' : ''}"
+								style="background: oklch(0.18 0.01 250); border: 1px solid oklch(0.35 0.02 250); color: oklch(0.80 0.02 250);"
+								bind:this={titleInput}
+								bind:value={formData.title}
+								disabled={isSubmitting}
+								required
+								autofocus={isOpen}
+							/>
+							<VoiceInput
+								size="sm"
+								disabled={isSubmitting}
+								ontranscription={handleTitleTranscription}
+								onerror={handleVoiceInputError}
+								onstart={() => isTitleRecording = true}
+								onend={() => isTitleRecording = false}
+							/>
+						</div>
 						{#if validationErrors.title}
 							<label class="label">
 								<span class="label-text-alt text-error">{validationErrors.title}</span>
@@ -617,21 +833,122 @@
 					<div class="form-control">
 						<label class="label" for="task-description">
 							<span class="label-text text-xs font-semibold font-mono uppercase tracking-wider" style="color: oklch(0.55 0.02 250);">Description</span>
+							<span class="flex items-center gap-1.5">
+								{#if isLoadingSuggestions}
+									<span class="flex items-center gap-1.5 text-xs" style="color: oklch(0.70 0.18 240);">
+										<span class="loading loading-spinner loading-xs"></span>
+										Analyzing...
+									</span>
+								{/if}
+								<VoiceInput
+									size="sm"
+									disabled={isSubmitting}
+									ontranscription={handleDescriptionTranscription}
+									onerror={handleVoiceInputError}
+									onstart={() => isDescriptionRecording = true}
+									onend={() => isDescriptionRecording = false}
+								/>
+							</span>
 						</label>
 						<textarea
 							id="task-description"
-							placeholder="Enter task description (optional)..."
-							class="textarea w-full h-32 font-mono"
-							style="background: oklch(0.18 0.01 250); border: 1px solid oklch(0.35 0.02 250); color: oklch(0.80 0.02 250);"
+							placeholder="Enter task description or use voice input..."
+							class="textarea w-full h-32 font-mono {isDescriptionRecording ? 'textarea-primary' : ''}"
+							style="background: oklch(0.18 0.01 250); border: 1px solid {isDescriptionRecording ? 'oklch(0.70 0.18 240)' : 'oklch(0.35 0.02 250)'}; color: oklch(0.80 0.02 250);"
 							bind:value={formData.description}
+							onblur={handleDescriptionBlur}
 							disabled={isSubmitting}
 						></textarea>
 						<label class="label">
 							<span class="label-text-alt" style="color: oklch(0.50 0.02 250);">
-								Supports markdown formatting
+								{#if suggestionsApplied}
+									AI suggestions applied - adjust as needed
+								{:else}
+									Supports markdown • Tab out to auto-fill fields
+								{/if}
 							</span>
 						</label>
 					</div>
+
+					<!-- Voice Input Error Message -->
+					{#if voiceInputError}
+						<div
+							class="rounded-lg p-3"
+							style="background: oklch(0.25 0.10 25 / 0.2); border: 1px solid oklch(0.50 0.15 25 / 0.3);"
+						>
+							<div class="flex items-center gap-2">
+								<svg class="w-4 h-4 flex-shrink-0" style="color: oklch(0.65 0.20 25);" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+								</svg>
+								<span class="text-sm" style="color: oklch(0.80 0.02 250);">
+									{voiceInputError}
+								</span>
+								<button
+									type="button"
+									class="btn btn-xs btn-ghost ml-auto"
+									onclick={() => voiceInputError = null}
+								>
+									Dismiss
+								</button>
+							</div>
+						</div>
+					{/if}
+
+					<!-- AI Suggestion Reasoning - Show when suggestions applied -->
+					{#if suggestionReasoning}
+						<div
+							class="rounded-lg p-3"
+							style="background: oklch(0.22 0.08 240 / 0.15); border: 1px solid oklch(0.50 0.15 240 / 0.3);"
+						>
+							<div class="flex items-start gap-2">
+								<svg class="w-4 h-4 mt-0.5 flex-shrink-0" style="color: oklch(0.70 0.18 240);" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+								</svg>
+								<div>
+									<p class="text-xs font-semibold font-mono uppercase tracking-wider mb-1" style="color: oklch(0.70 0.18 240);">
+										AI Analysis
+									</p>
+									<p class="text-sm" style="color: oklch(0.75 0.02 250);">
+										{suggestionReasoning}
+									</p>
+								</div>
+								<button
+									type="button"
+									class="btn btn-xs btn-ghost btn-circle ml-auto"
+									onclick={() => suggestionReasoning = ''}
+									title="Dismiss"
+								>
+									<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+									</svg>
+								</button>
+							</div>
+						</div>
+					{/if}
+
+					<!-- AI Suggestion Error -->
+					{#if suggestionError}
+						<div
+							class="rounded-lg p-3"
+							style="background: oklch(0.25 0.10 25 / 0.2); border: 1px solid oklch(0.50 0.15 25 / 0.3);"
+						>
+							<div class="flex items-center gap-2">
+								<svg class="w-4 h-4 flex-shrink-0" style="color: oklch(0.65 0.20 25);" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+								</svg>
+								<span class="text-sm" style="color: oklch(0.80 0.02 250);">
+									{suggestionError}
+								</span>
+								<button
+									type="button"
+									class="btn btn-xs btn-ghost ml-auto"
+									onclick={() => { suggestionError = null; suggestionsApplied = false; fetchSuggestions(); }}
+								>
+									Retry
+								</button>
+							</div>
+						</div>
+					{/if}
 
 					<!-- Priority & Type Row - Industrial -->
 					<div class="grid grid-cols-2 gap-4">
@@ -641,6 +958,9 @@
 								<span class="label-text text-xs font-semibold font-mono uppercase tracking-wider" style="color: oklch(0.55 0.02 250);">
 									Priority
 									<span class="text-error">*</span>
+									{#if suggestionsApplied && !userModifiedFields.has('priority')}
+										<span class="badge badge-xs ml-1" style="background: oklch(0.35 0.15 240); color: oklch(0.90 0.02 250);">AI</span>
+									{/if}
 								</span>
 							</label>
 							<select
@@ -648,6 +968,7 @@
 								class="select w-full font-mono"
 								style="background: oklch(0.18 0.01 250); border: 1px solid oklch(0.35 0.02 250); color: oklch(0.80 0.02 250);"
 								bind:value={formData.priority}
+								onchange={() => markFieldModified('priority')}
 								disabled={isSubmitting}
 								required
 							>
@@ -663,6 +984,9 @@
 								<span class="label-text text-xs font-semibold font-mono uppercase tracking-wider" style="color: oklch(0.55 0.02 250);">
 									Type
 									<span class="text-error">*</span>
+									{#if suggestionsApplied && !userModifiedFields.has('type')}
+										<span class="badge badge-xs ml-1" style="background: oklch(0.35 0.15 240); color: oklch(0.90 0.02 250);">AI</span>
+									{/if}
 								</span>
 							</label>
 							<select
@@ -670,6 +994,7 @@
 								class="select w-full font-mono {validationErrors.type ? 'select-error' : ''}"
 								style="background: oklch(0.18 0.01 250); border: 1px solid oklch(0.35 0.02 250); color: oklch(0.80 0.02 250);"
 								bind:value={formData.type}
+								onchange={() => markFieldModified('type')}
 								disabled={isSubmitting}
 								required
 							>
@@ -688,13 +1013,19 @@
 					<!-- Project (Optional) - Industrial -->
 					<div class="form-control">
 						<label class="label" for="task-project">
-							<span class="label-text text-xs font-semibold font-mono uppercase tracking-wider" style="color: oklch(0.55 0.02 250);">Project</span>
+							<span class="label-text text-xs font-semibold font-mono uppercase tracking-wider" style="color: oklch(0.55 0.02 250);">
+								Project
+								{#if suggestionsApplied && !userModifiedFields.has('project') && formData.project}
+									<span class="badge badge-xs ml-1" style="background: oklch(0.35 0.15 240); color: oklch(0.90 0.02 250);">AI</span>
+								{/if}
+							</span>
 						</label>
 						<select
 							id="task-project"
 							class="select w-full font-mono"
 							style="background: oklch(0.18 0.01 250); border: 1px solid oklch(0.35 0.02 250); color: oklch(0.80 0.02 250);"
 							bind:value={formData.project}
+							onchange={() => markFieldModified('project')}
 							disabled={isSubmitting}
 						>
 							<option value="">Select project (optional)</option>
@@ -712,7 +1043,12 @@
 					<!-- Labels (Optional) - Industrial -->
 					<div class="form-control">
 						<label class="label" for="task-labels">
-							<span class="label-text text-xs font-semibold font-mono uppercase tracking-wider" style="color: oklch(0.55 0.02 250);">Labels</span>
+							<span class="label-text text-xs font-semibold font-mono uppercase tracking-wider" style="color: oklch(0.55 0.02 250);">
+								Labels
+								{#if suggestionsApplied && !userModifiedFields.has('labels') && formData.labels}
+									<span class="badge badge-xs ml-1" style="background: oklch(0.35 0.15 240); color: oklch(0.90 0.02 250);">AI</span>
+								{/if}
+							</span>
 						</label>
 						<input
 							id="task-labels"
@@ -721,6 +1057,7 @@
 							class="input w-full font-mono"
 							style="background: oklch(0.18 0.01 250); border: 1px solid oklch(0.35 0.02 250); color: oklch(0.80 0.02 250);"
 							bind:value={formData.labels}
+							oninput={() => markFieldModified('labels')}
 							disabled={isSubmitting}
 						/>
 						<label class="label">
@@ -1015,11 +1352,9 @@
 				"
 			>
 				<div class="flex items-center justify-between">
-					<!-- Keyboard shortcuts hint (shows on hover) -->
+					<!-- Keyboard shortcuts hint -->
 					<div class="text-xs font-mono hidden sm:block" style="color: oklch(0.45 0.02 250);">
-						<span class="opacity-0 group-hover:opacity-100 transition-opacity">
-							⌘↵ Save · ⌘⇧↵ Save & New
-						</span>
+						⌘↵ Save · ⌥↵ Start · ⌘⇧↵ New
 					</div>
 
 					<div class="flex gap-3">
@@ -1109,6 +1444,7 @@
 												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
 											</svg>
 											Save & Start
+											<span class="ml-auto text-xs" style="color: oklch(0.50 0.02 250);">⌥↵</span>
 										</button>
 									</li>
 								</ul>
