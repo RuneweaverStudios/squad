@@ -1,24 +1,32 @@
 <script lang="ts">
 	/**
-	 * WorkCard Component
-	 * Task-first view of active Claude Code session work.
+	 * SessionCard Component
+	 * Unified card for displaying tmux sessions (agent work or server sessions).
 	 *
-	 * Design Philosophy:
+	 * Mode: 'agent' (default)
+	 * - Task-first view of active Claude Code session work
 	 * - Task is primary (headline), agent is secondary (metadata badge)
-	 * - Focus on what work is being done, not who is doing it
 	 * - Inline output with ANSI rendering
 	 * - Kill session and control buttons
 	 * - Prompt detection with quick action buttons
 	 * - Text input for sending commands
 	 *
+	 * Mode: 'server'
+	 * - Server session view (dev servers like npm run dev)
+	 * - Project name as headline with port status
+	 * - Start/Stop server controls
+	 * - Terminal output display
+	 *
 	 * Props:
-	 * - sessionName: tmux session name (e.g., "jat-WisePrairie")
-	 * - agentName: Agent name (e.g., "WisePrairie")
-	 * - task: Current task object (id, title, status, priority)
+	 * - mode: 'agent' | 'server' (default: 'agent')
+	 * - sessionName: tmux session name (e.g., "jat-WisePrairie" or "chimaro-server")
+	 * - agentName: Agent name (for agent mode)
+	 * - task: Current task object (for agent mode)
+	 * - projectName, displayName, port, portRunning: Server session props
 	 * - output: Terminal output string with ANSI codes
 	 * - lineCount: Number of output lines
-	 * - tokens: Token usage for today
-	 * - cost: Cost in USD for today
+	 * - tokens: Token usage for today (agent mode)
+	 * - cost: Cost in USD for today (agent mode)
 	 */
 
 	import { onMount, onDestroy } from 'svelte';
@@ -32,7 +40,15 @@
 	import { playTaskCompleteSound } from '$lib/utils/soundEffects';
 	import VoiceInput from '$lib/components/VoiceInput.svelte';
 	import StatusActionBadge from './StatusActionBadge.svelte';
-	import { SESSION_STATE_VISUALS, type SessionStateVisual } from '$lib/config/statusColors';
+	import ServerStatusBadge from './ServerStatusBadge.svelte';
+	import {
+		SESSION_STATE_VISUALS,
+		SERVER_STATE_VISUALS,
+		type SessionStateVisual,
+		type ServerStateVisual,
+		type ServerState,
+		getServerStateVisual
+	} from '$lib/config/statusColors';
 	import HorizontalResizeHandle from '$lib/components/HorizontalResizeHandle.svelte';
 
 	// Props - aligned with workSessions.svelte.ts types
@@ -57,25 +73,44 @@
 	}
 
 	interface Props {
+		/** Mode: 'agent' for work sessions, 'server' for dev server sessions */
+		mode?: 'agent' | 'server';
 		sessionName: string;
-		agentName: string;
-		task: Task | null;
+		agentName?: string; // Required for agent mode
+		task?: Task | null; // Agent mode only
 		/** Most recently closed task by this agent (for completion state display) */
-		lastCompletedTask: CompletedTask | null;
+		lastCompletedTask?: CompletedTask | null; // Agent mode only
+		// Server mode props
+		projectName?: string; // Server mode: project name
+		displayName?: string; // Server mode: display name
+		port?: number | null; // Server mode: port number
+		portRunning?: boolean; // Server mode: is port listening
+		serverStatus?: 'running' | 'starting' | 'stopped'; // Server mode status
+		projectPath?: string; // Server mode: path to project
+		command?: string; // Server mode: command being run
+		// Shared props
 		output?: string;
 		lineCount?: number;
-		tokens?: number;
-		cost?: number;
-		sparklineData?: SparklineDataPoint[]; // Hourly token usage for sparkline
-		isComplete?: boolean; // Task completion state
+		tokens?: number; // Agent mode only
+		cost?: number; // Agent mode only
+		sparklineData?: SparklineDataPoint[]; // Agent mode: hourly token usage
+		isComplete?: boolean; // Agent mode: task completion state
 		startTime?: Date | null; // When work started (for elapsed time)
+		created?: string; // Session creation timestamp
+		attached?: boolean; // Whether session is attached
+		// Callbacks
 		onKillSession?: () => void;
 		onInterrupt?: () => void;
 		onContinue?: () => void;
 		onAttachTerminal?: () => void; // Open tmux session in terminal
-		onTaskClick?: (taskId: string) => void;
+		onTaskClick?: (taskId: string) => void; // Agent mode only
 		onSendInput?: (input: string, type: 'text' | 'key' | 'raw') => Promise<void>;
-		onDismiss?: () => void; // Called when completion banner auto-dismisses
+		onDismiss?: () => void; // Agent mode: called when completion banner auto-dismisses
+		// Server mode callbacks
+		onStopServer?: () => Promise<void>;
+		onRestartServer?: () => Promise<void>;
+		onStartServer?: () => Promise<void>;
+		// Shared
 		class?: string;
 		/** Whether this work card is currently highlighted (e.g., from clicking avatar elsewhere) */
 		isHighlighted?: boolean;
@@ -86,10 +121,20 @@
 	}
 
 	let {
+		mode = 'agent',
 		sessionName,
-		agentName,
+		agentName = '',
 		task = null,
 		lastCompletedTask = null,
+		// Server mode props
+		projectName = '',
+		displayName = '',
+		port = null,
+		portRunning = false,
+		serverStatus = 'stopped',
+		projectPath = '',
+		command = '',
+		// Shared props
 		output = '',
 		lineCount = 0,
 		tokens = 0,
@@ -97,6 +142,9 @@
 		sparklineData = [],
 		isComplete = false,
 		startTime = null,
+		created = '',
+		attached = false,
+		// Callbacks
 		onKillSession,
 		onInterrupt,
 		onContinue,
@@ -104,11 +152,20 @@
 		onTaskClick,
 		onSendInput,
 		onDismiss,
+		// Server mode callbacks
+		onStopServer,
+		onRestartServer,
+		onStartServer,
+		// Shared
 		class: className = '',
 		isHighlighted = false,
 		cardWidth,
 		onWidthChange
 	}: Props = $props();
+
+	// Derived mode helpers
+	const isAgentMode = $derived(mode === 'agent');
+	const isServerMode = $derived(mode === 'server');
 
 	// Completion state
 	let showCompletionBanner = $state(false);
@@ -233,7 +290,7 @@
 		window.addEventListener('terminal-height-changed', handleHeightEvent as EventListener);
 
 		// Set up ResizeObserver after a short delay to ensure DOM is fully ready
-		// This auto-resizes tmux session to match the WorkCard width
+		// This auto-resizes tmux session to match the SessionCard width
 		setTimeout(() => {
 			if (scrollContainerRef && typeof ResizeObserver !== 'undefined' && !resizeObserverSetup) {
 				resizeObserverInstance = new ResizeObserver(handleContainerResize);
@@ -1263,6 +1320,39 @@
 		}
 	}
 
+	// Handle server status badge actions
+	async function handleServerAction(actionId: string) {
+		switch (actionId) {
+			case 'stop':
+				// Stop the server
+				await onStopServer?.();
+				break;
+
+			case 'restart':
+				// Restart the server
+				await onRestartServer?.();
+				break;
+
+			case 'start':
+				// Start the server
+				await onStartServer?.();
+				break;
+
+			case 'attach':
+				// Attach terminal to server session
+				onAttachTerminal?.();
+				break;
+
+			case 'kill':
+				// Kill server session
+				await onKillSession?.();
+				break;
+
+			default:
+				console.warn('Unknown server action:', actionId);
+		}
+	}
+
 	// Send a key to the session
 	async function sendKey(keyType: string) {
 		if (!onSendInput) return;
@@ -1697,87 +1787,145 @@
 		</div>
 	{/if}
 
-	<!-- Agent Tab - positioned at top-right, pulled up to top of container -->
-	<!-- Combines: Agent Info + Status Dropdown into unified tab -->
-	<div
-		class="absolute right-3 top-0 -mt-9.5 z-10 flex items-center gap-0 rounded-lg rounded-bl-none rounded-br-none"
-		style="background: oklch(0.20 0.02 250); border-left: 1px solid oklch(0.35 0.02 250); border-right: 1px solid oklch(0.35 0.02 250); border-top: 1px solid oklch(0.35 0.02 250);"
-	>
-		<!-- Agent Info Section -->
-		<div class="flex items-center gap-1.5 pl-2 pr-1.5 py-1">
-			<AgentAvatar
-				name={agentName}
-				size={18}
-				class="shrink-0 {sessionState === 'starting'
-					? 'ring-2 ring-secondary ring-offset-base-100 ring-offset-1'
-					: sessionState === 'working'
-						? 'ring-2 ring-info ring-offset-base-100 ring-offset-1'
-						: sessionState === 'needs-input'
-							? 'ring-2 ring-warning ring-offset-base-100 ring-offset-1'
-							: sessionState === 'ready-for-review'
-								? 'ring-2 ring-accent ring-offset-base-100 ring-offset-1'
-								: sessionState === 'completed'
-									? 'ring-2 ring-success ring-offset-base-100 ring-offset-1'
-									: ''}"
-			/>
-			<div class="flex flex-col min-w-0">
-				<div class="flex items-center gap-1">
-					<span
-						class="font-mono text-[11px] font-semibold tracking-wider uppercase"
-						style="color: {stateVisual.accent}; text-shadow: 0 0 12px {stateVisual.glow};"
-					>
-						{agentName}
-					</span>
-					{#if sparklineData && sparklineData.length > 0}
-						<div class="-mt-3 flex-shrink-0" style="width: 45px; height: 14px;">
-							<Sparkline
-								data={sparklineData}
-								height={14}
-								showTooltip={true}
-								showStyleToolbar={false}
-								defaultTimeRange="24h"
-								animate={false}
-							/>
-						</div>
-					{/if}
-				</div>
-				<div
-					class="flex items-center gap-1 font-mono text-[9px]"
-					style="color: oklch(0.55 0.03 250);"
-				>
-					{#if startTime}
-						{@const elapsed = elapsedTimeFormatted()!}
-						<span class="flex items-center gap-0.5" title="Session duration">
-							{#if elapsed.showHours}
-								<AnimatedDigits value={elapsed.hours} class="text-[9px]" />
-								<span class="opacity-60">:</span>
-							{/if}
-							<AnimatedDigits value={elapsed.minutes} class="text-[9px]" />
-							<span class="opacity-60">:</span>
-							<AnimatedDigits value={elapsed.seconds} class="text-[9px]" />
+	{#if isAgentMode}
+		<!-- Agent Tab - positioned at top-right, pulled up to top of container -->
+		<!-- Combines: Agent Info + Status Dropdown into unified tab -->
+		<div
+			class="absolute right-3 top-0 -mt-9.5 z-10 flex items-center gap-0 rounded-lg rounded-bl-none rounded-br-none"
+			style="background: oklch(0.20 0.02 250); border-left: 1px solid oklch(0.35 0.02 250); border-right: 1px solid oklch(0.35 0.02 250); border-top: 1px solid oklch(0.35 0.02 250);"
+		>
+			<!-- Agent Info Section -->
+			<div class="flex items-center gap-1.5 pl-2 pr-1.5 py-1">
+				<AgentAvatar
+					name={agentName}
+					size={18}
+					class="shrink-0 {sessionState === 'starting'
+						? 'ring-2 ring-secondary ring-offset-base-100 ring-offset-1'
+						: sessionState === 'working'
+							? 'ring-2 ring-info ring-offset-base-100 ring-offset-1'
+							: sessionState === 'needs-input'
+								? 'ring-2 ring-warning ring-offset-base-100 ring-offset-1'
+								: sessionState === 'ready-for-review'
+									? 'ring-2 ring-accent ring-offset-base-100 ring-offset-1'
+									: sessionState === 'completed'
+										? 'ring-2 ring-success ring-offset-base-100 ring-offset-1'
+										: ''}"
+				/>
+				<div class="flex flex-col min-w-0">
+					<div class="flex items-center gap-1">
+						<span
+							class="font-mono text-[11px] font-semibold tracking-wider uppercase"
+							style="color: {stateVisual.accent}; text-shadow: 0 0 12px {stateVisual.glow};"
+						>
+							{agentName}
 						</span>
+						{#if sparklineData && sparklineData.length > 0}
+							<div class="-mt-3 flex-shrink-0" style="width: 45px; height: 14px;">
+								<Sparkline
+									data={sparklineData}
+									height={14}
+									showTooltip={true}
+									showStyleToolbar={false}
+									defaultTimeRange="24h"
+									animate={false}
+								/>
+							</div>
+						{/if}
+					</div>
+					<div
+						class="flex items-center gap-1 font-mono text-[9px]"
+						style="color: oklch(0.55 0.03 250);"
+					>
+						{#if startTime}
+							{@const elapsed = elapsedTimeFormatted()!}
+							<span class="flex items-center gap-0.5" title="Session duration">
+								{#if elapsed.showHours}
+									<AnimatedDigits value={elapsed.hours} class="text-[9px]" />
+									<span class="opacity-60">:</span>
+								{/if}
+								<AnimatedDigits value={elapsed.minutes} class="text-[9px]" />
+								<span class="opacity-60">:</span>
+								<AnimatedDigits value={elapsed.seconds} class="text-[9px]" />
+							</span>
+							<span class="opacity-40">·</span>
+						{/if}
+						<span style="color: oklch(0.60 0.05 250);">{formatTokens(tokens)}</span>
 						<span class="opacity-40">·</span>
-					{/if}
-					<span style="color: oklch(0.60 0.05 250);">{formatTokens(tokens)}</span>
-					<span class="opacity-40">·</span>
-					<span style="color: oklch(0.65 0.10 145);">${cost.toFixed(2)}</span>
+						<span style="color: oklch(0.65 0.10 145);">${cost.toFixed(2)}</span>
+					</div>
 				</div>
 			</div>
+			<!-- Status Dropdown Section (divider + badge) -->
+			<div class="flex items-center">
+				<!-- Shorter, neutral divider -->
+				<div class="w-px h-4 mx-1.5" style="background: oklch(0.40 0.01 250);"></div>
+				<StatusActionBadge
+					{sessionState}
+					{sessionName}
+					onAction={handleStatusAction}
+					disabled={sendingInput}
+					alignRight={true}
+					variant="integrated"
+				/>
+				</div>
 		</div>
-		<!-- Status Dropdown Section (divider + badge) -->
-		<div class="flex items-center">
-			<!-- Shorter, neutral divider -->
-			<div class="w-px h-4 mx-1.5" style="background: oklch(0.40 0.01 250);"></div>
-			<StatusActionBadge
-				{sessionState}
-				{sessionName}
-				onAction={handleStatusAction}
-				disabled={sendingInput}
-				alignRight={true}
-				variant="integrated"
-			/>
+	{:else}
+		<!-- Server Tab - positioned at top-right, pulled up to top of container -->
+		<!-- Shows: Project Name + Port + Status Dropdown -->
+		{@const serverVisual = getServerStateVisual(serverStatus)}
+		<div
+			class="absolute right-3 top-0 -mt-9.5 z-10 flex items-center gap-0 rounded-lg rounded-bl-none rounded-br-none"
+			style="background: oklch(0.20 0.02 250); border-left: 1px solid oklch(0.35 0.02 250); border-right: 1px solid oklch(0.35 0.02 250); border-top: 1px solid oklch(0.35 0.02 250);"
+		>
+			<!-- Server Info Section -->
+			<div class="flex items-center gap-1.5 pl-2 pr-1.5 py-1">
+				<!-- Server icon -->
+				<div
+					class="flex items-center justify-center w-5 h-5 rounded"
+					style="background: {serverVisual.bgTint};"
+				>
+					<svg class="w-3 h-3" style="color: {serverVisual.accent};" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+						<path stroke-linecap="round" stroke-linejoin="round" d={serverVisual.icon} />
+					</svg>
+				</div>
+				<div class="flex flex-col min-w-0">
+					<span
+						class="font-mono text-[11px] font-semibold tracking-wider uppercase"
+						style="color: {serverVisual.accent}; text-shadow: 0 0 12px {serverVisual.glow};"
+					>
+						{displayName || projectName}
+					</span>
+					<div
+						class="flex items-center gap-1 font-mono text-[9px]"
+						style="color: oklch(0.55 0.03 250);"
+					>
+						{#if port}
+							<span style="color: {portRunning ? 'oklch(0.70 0.20 145)' : 'oklch(0.50 0.05 250)'};">
+								:{port}
+							</span>
+							<span class="opacity-40">·</span>
+						{/if}
+						<span style="color: {serverVisual.textColor};">{serverVisual.shortLabel}</span>
+					</div>
+				</div>
+			</div>
+			<!-- Status Dropdown Section (divider + badge) -->
+			<div class="flex items-center">
+				<!-- Shorter, neutral divider -->
+				<div class="w-px h-4 mx-1.5" style="background: oklch(0.40 0.01 250);"></div>
+				<ServerStatusBadge
+					{serverStatus}
+					{sessionName}
+					{port}
+					{portRunning}
+					onAction={handleServerAction}
+					disabled={sendingInput}
+					alignRight={true}
+					variant="integrated"
+				/>
+			</div>
 		</div>
-	</div>
+	{/if}
 
 	<!-- Header: Full-width task content
 		 Row 1: [id][title - full width]
@@ -1856,7 +2004,7 @@
 		<!-- Output Content -->
 		<div
 			bind:this={scrollContainerRef}
-			class="overflow-y-auto p-3 font-mono text-xs leading-relaxed flex-1 min-h-0"
+			class="overflow-y-auto px-3 font-mono text-xs leading-relaxed flex-1 min-h-0"
 			style="background: oklch(0.12 0.01 250);"
 			onscroll={handleScroll}
 		>

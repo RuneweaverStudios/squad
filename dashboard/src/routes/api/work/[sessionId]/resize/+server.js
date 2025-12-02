@@ -2,7 +2,7 @@
  * Resize tmux session window
  * POST /api/work/[sessionId]/resize
  *
- * Resizes the tmux window to match the WorkCard display width.
+ * Resizes the tmux window to match the SessionCard display width.
  * This allows Claude Code's output (statusline, prompts) to format correctly
  * for the dashboard display.
  *
