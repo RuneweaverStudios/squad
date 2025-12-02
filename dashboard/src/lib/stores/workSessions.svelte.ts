@@ -33,6 +33,7 @@ export interface WorkSession {
 	task: {
 		id: string;
 		title?: string;
+		description?: string;
 		status?: string;
 		priority?: number;
 		issue_type?: string;
@@ -41,6 +42,7 @@ export interface WorkSession {
 	lastCompletedTask: {
 		id: string;
 		title?: string;
+		description?: string;
 		status?: string;
 		priority?: number;
 		issue_type?: string;

@@ -577,6 +577,13 @@ export const SESSION_STATE_ACTIONS: Record<string, SessionStateAction[]> = {
 			icon: 'M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z',
 			variant: 'info',
 			description: 'Open session in terminal to review'
+		},
+		{
+			id: 'kill',
+			label: 'Kill Session',
+			icon: 'M6 18L18 6M6 6l12 12',
+			variant: 'error',
+			description: 'Terminate tmux session'
 		}
 	],
 	completing: [
@@ -586,6 +593,13 @@ export const SESSION_STATE_ACTIONS: Record<string, SessionStateAction[]> = {
 			icon: 'M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z',
 			variant: 'info',
 			description: 'Watch completion progress'
+		},
+		{
+			id: 'kill',
+			label: 'Kill Session',
+			icon: 'M6 18L18 6M6 6l12 12',
+			variant: 'error',
+			description: 'Terminate tmux session'
 		}
 	],
 	'needs-input': [
@@ -602,6 +616,13 @@ export const SESSION_STATE_ACTIONS: Record<string, SessionStateAction[]> = {
 			icon: 'M9 9l6 6m0-6l-6 6m12-3a9 9 0 11-18 0 9 9 0 0118 0z',
 			variant: 'default',
 			description: 'Send Esc key to cancel prompt'
+		},
+		{
+			id: 'kill',
+			label: 'Kill Session',
+			icon: 'M6 18L18 6M6 6l12 12',
+			variant: 'error',
+			description: 'Terminate tmux session'
 		}
 	],
 	working: [
@@ -618,6 +639,13 @@ export const SESSION_STATE_ACTIONS: Record<string, SessionStateAction[]> = {
 			icon: 'M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z',
 			variant: 'info',
 			description: 'Open session in terminal'
+		},
+		{
+			id: 'kill',
+			label: 'Kill Session',
+			icon: 'M6 18L18 6M6 6l12 12',
+			variant: 'error',
+			description: 'Terminate tmux session'
 		}
 	],
 	starting: [
@@ -631,9 +659,16 @@ export const SESSION_STATE_ACTIONS: Record<string, SessionStateAction[]> = {
 		{
 			id: 'interrupt',
 			label: 'Cancel Start',
+			icon: 'M15.75 5.25v13.5m-7.5-13.5v13.5',
+			variant: 'warning',
+			description: 'Send Ctrl+C to cancel'
+		},
+		{
+			id: 'kill',
+			label: 'Kill Session',
 			icon: 'M6 18L18 6M6 6l12 12',
 			variant: 'error',
-			description: 'Send Ctrl+C to cancel'
+			description: 'Terminate tmux session'
 		}
 	],
 	idle: [

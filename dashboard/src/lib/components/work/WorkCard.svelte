@@ -22,7 +22,7 @@
 	 */
 
 	import { onMount, onDestroy } from 'svelte';
-	import { fade, fly } from 'svelte/transition';
+	import { fade, fly, slide } from 'svelte/transition';
 	import { ansiToHtml } from '$lib/utils/ansiToHtml';
 	import TokenUsageDisplay from '$lib/components/TokenUsageDisplay.svelte';
 	import TaskIdBadge from '$lib/components/TaskIdBadge.svelte';
@@ -38,6 +38,7 @@
 	interface Task {
 		id: string;
 		title?: string;
+		description?: string;
 		status?: string;
 		priority?: number;
 		issue_type?: string;
@@ -197,6 +198,9 @@
 		if (questionPollInterval) {
 			clearInterval(questionPollInterval);
 		}
+		if (hoverTimeout) {
+			clearTimeout(hoverTimeout);
+		}
 	});
 
 	// Calculate elapsed time (uses currentTime to trigger reactive updates)
@@ -275,6 +279,81 @@
 	// Input state
 	let inputText = $state('');
 	let inputRef: HTMLTextAreaElement | null = null;
+
+	// Task description hover-expand state
+	let taskHovered = $state(false);
+	let hoverTimeout: ReturnType<typeof setTimeout> | null = null;
+	const HOVER_DELAY = 300; // ms before expanding
+
+	function handleTaskMouseEnter() {
+		hoverTimeout = setTimeout(() => {
+			taskHovered = true;
+		}, HOVER_DELAY);
+	}
+
+	function handleTaskMouseLeave() {
+		if (hoverTimeout) {
+			clearTimeout(hoverTimeout);
+			hoverTimeout = null;
+		}
+		taskHovered = false;
+	}
+
+	// Inline title editing state
+	let editingTitle = $state(false);
+	let editedTitle = $state('');
+	let titleInputRef: HTMLInputElement | null = null;
+	let savingTitle = $state(false);
+
+	function startEditingTitle(event: MouseEvent) {
+		event.stopPropagation(); // Don't trigger parent button click
+		editedTitle = displayTask?.title || displayTask?.id || '';
+		editingTitle = true;
+		// Focus input after DOM update
+		setTimeout(() => titleInputRef?.focus(), 0);
+	}
+
+	async function saveTitle() {
+		if (!displayTask || savingTitle) return;
+
+		const newTitle = editedTitle.trim();
+		if (!newTitle || newTitle === displayTask.title) {
+			editingTitle = false;
+			return;
+		}
+
+		savingTitle = true;
+		try {
+			const response = await fetch(`/api/tasks/${displayTask.id}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ title: newTitle })
+			});
+
+			if (response.ok) {
+				// Update local state
+				if (displayTask) {
+					displayTask.title = newTitle;
+				}
+			} else {
+				console.error('Failed to save title:', await response.text());
+			}
+		} catch (err) {
+			console.error('Error saving title:', err);
+		} finally {
+			savingTitle = false;
+			editingTitle = false;
+		}
+	}
+
+	function handleTitleKeydown(event: KeyboardEvent) {
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			saveTitle();
+		} else if (event.key === 'Escape') {
+			editingTitle = false;
+		}
+	}
 
 	// Auto-resize textarea to fit content
 	function autoResizeTextarea() {
@@ -841,6 +920,11 @@
 				await sendWorkflowCommand('/jat:start');
 				break;
 
+			case 'kill':
+				// Kill tmux session
+				await onKillSession?.();
+				break;
+
 			default:
 				console.warn('Unknown status action:', actionId);
 		}
@@ -1149,10 +1233,10 @@
 </script>
 
 <div
-	class="card overflow-hidden h-full flex flex-col relative {className} {isHighlighted ? 'agent-highlight-flash ring-2 ring-info ring-offset-2 ring-offset-base-100' : ''}"
+	class="card h-full flex flex-col relative {className} {isHighlighted ? 'agent-highlight-flash ring-2 ring-info ring-offset-2 ring-offset-base-100' : ''}"
 	style="
 		background: linear-gradient(135deg, oklch(0.22 0.02 250) 0%, oklch(0.18 0.01 250) 50%, oklch(0.16 0.01 250) 100%);
-		border: 1px solid {showCompletionBanner ? 'oklch(0.65 0.20 145)' : 'oklch(0.5 0 0 / 0.15)'};
+		border: 1px solid {showCompletionBanner ? 'oklch(0.65 0.20 145)' : 'oklch(0.35 0.02 250)'};
 		box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.05), 0 2px 8px oklch(0 0 0 / 0.1);
 	"
 	data-agent-name={agentName}
@@ -1253,18 +1337,97 @@
 		</div>
 	{/if}
 
-	<!-- Header: Compact 2-row design -->
+	<!-- Agent Tab - positioned at top-right, pulled up to top of container -->
+	<!-- Combines: Agent Info + Status Dropdown into unified tab -->
+	<div
+		class="absolute right-3 top-0 -mt-9.5 z-10 flex items-center gap-0 rounded-lg rounded-bl-none rounded-br-none"
+		style="background: oklch(0.20 0.02 250); border-left: 1px solid oklch(0.35 0.02 250); border-right: 1px solid oklch(0.35 0.02 250); border-top: 1px solid oklch(0.35 0.02 250);"
+	>
+		<!-- Agent Info Section -->
+		<div class="flex items-center gap-1.5 pl-2 pr-1.5 py-1">
+			<AgentAvatar
+				name={agentName}
+				size={18}
+				class="shrink-0 {sessionState === 'starting'
+					? 'ring-2 ring-secondary ring-offset-base-100 ring-offset-1'
+					: sessionState === 'working'
+						? 'ring-2 ring-info ring-offset-base-100 ring-offset-1'
+						: sessionState === 'needs-input'
+							? 'ring-2 ring-warning ring-offset-base-100 ring-offset-1'
+							: sessionState === 'ready-for-review'
+								? 'ring-2 ring-accent ring-offset-base-100 ring-offset-1'
+								: sessionState === 'completed'
+									? 'ring-2 ring-success ring-offset-base-100 ring-offset-1'
+									: ''}"
+			/>
+			<div class="flex flex-col min-w-0">
+				<div class="flex items-center gap-1">
+					<span
+						class="font-mono text-[11px] font-semibold tracking-wider uppercase"
+						style="color: {stateVisual.accent}; text-shadow: 0 0 12px {stateVisual.glow};"
+					>
+						{agentName}
+					</span>
+					{#if sparklineData && sparklineData.length > 0}
+						<div class="-mt-3 flex-shrink-0" style="width: 45px; height: 14px;">
+							<Sparkline
+								data={sparklineData}
+								height={14}
+								showTooltip={true}
+								showStyleToolbar={false}
+								defaultTimeRange="24h"
+								animate={false}
+							/>
+						</div>
+					{/if}
+				</div>
+				<div
+					class="flex items-center gap-1 font-mono text-[9px]"
+					style="color: oklch(0.55 0.03 250);"
+				>
+					{#if startTime}
+						{@const elapsed = elapsedTimeFormatted()!}
+						<span class="flex items-center gap-0.5" title="Session duration">
+							{#if elapsed.showHours}
+								<AnimatedDigits value={elapsed.hours} class="text-[9px]" />
+								<span class="opacity-60">:</span>
+							{/if}
+							<AnimatedDigits value={elapsed.minutes} class="text-[9px]" />
+							<span class="opacity-60">:</span>
+							<AnimatedDigits value={elapsed.seconds} class="text-[9px]" />
+						</span>
+						<span class="opacity-40">·</span>
+					{/if}
+					<span style="color: oklch(0.60 0.05 250);">{formatTokens(tokens)}</span>
+					<span class="opacity-40">·</span>
+					<span style="color: oklch(0.65 0.10 145);">${cost.toFixed(2)}</span>
+				</div>
+			</div>
+		</div>
+		<!-- Status Dropdown Section (divider + badge) -->
+		<div class="flex items-center">
+			<!-- Shorter, neutral divider -->
+			<div class="w-px h-4 mx-1.5" style="background: oklch(0.40 0.01 250);"></div>
+			<StatusActionBadge
+				{sessionState}
+				{sessionName}
+				onAction={handleStatusAction}
+				disabled={sendingInput}
+				alignRight={true}
+				variant="integrated"
+			/>
+		</div>
+	</div>
+
+	<!-- Header: Full-width task content
+		 Row 1: [id][title - full width]
+		 Row 2: [description - full width]
+	-->
 	<div class="pl-3 pr-3 pt-2 pb-2 flex-shrink-0 flex-grow-0">
-		<!-- Row 1: State indicator + TaskIdBadge + Priority + Task Title -->
-		{#if sessionState === 'needs-input' && displayTask}
-			<!-- Needs Input state - agent blocked, needs user clarification -->
-			<div class="flex items-center gap-2 min-w-0">
-				<StatusActionBadge
-					sessionState="needs-input"
-					{sessionName}
-					onAction={handleStatusAction}
-					disabled={sendingInput}
-				/>
+		{#if displayTask}
+			<!-- Row 1: Task ID + Title (full width now that agent info is in tab) -->
+			<div class="flex items-center gap-2 mb-1">
+				<!-- Task ID -->
 				<TaskIdBadge
 					task={{ id: displayTask.id, status: displayTask.status || 'in_progress', issue_type: displayTask.issue_type, title: displayTask.title || displayTask.id }}
 					size="sm"
@@ -1272,274 +1435,60 @@
 					showStatus={false}
 					onOpenTask={onTaskClick}
 				/>
-				<span
-					class="font-mono text-[10px] tracking-wider px-1 py-0.5 rounded flex-shrink-0"
-					style="background: oklch(0.5 0 0 / 0.1); color: oklch(0.70 0.10 50);"
-				>
-					P{displayTask.priority ?? 2}
-				</span>
-				<h3 class="font-mono font-bold text-sm tracking-wide truncate min-w-0 flex-1" style="color: oklch(0.90 0.02 250);" title={displayTask.title || displayTask.id}>
-					{displayTask.title || displayTask.id}
-				</h3>
+				<!-- Task Title (click to edit) - now full width -->
+				{#if editingTitle}
+					<input
+						bind:this={titleInputRef}
+						bind:value={editedTitle}
+						onblur={saveTitle}
+						onkeydown={handleTitleKeydown}
+						class="font-mono font-bold text-sm tracking-wide min-w-0 flex-1 bg-transparent border-b border-info outline-none"
+						style="color: oklch(0.90 0.02 250);"
+						disabled={savingTitle}
+					/>
+				{:else}
+					<h3
+						class="font-mono font-bold text-sm tracking-wide truncate min-w-0 flex-1 cursor-text hover:border-b hover:border-dashed hover:border-base-content/30"
+						style="color: {sessionState === 'completed' ? 'oklch(0.75 0.02 250)' : 'oklch(0.90 0.02 250)'};"
+						onclick={startEditingTitle}
+						role="button"
+						tabindex="0"
+						title="Click to edit title"
+					>
+						{displayTask.title || displayTask.id}
+					</h3>
+				{/if}
 			</div>
-		{:else if sessionState === 'ready-for-review' && displayTask}
-			<!-- Ready for Review state - show prominent review banner -->
-			<div class="flex items-center gap-2 min-w-0">
-				<StatusActionBadge
-					sessionState="ready-for-review"
-					{sessionName}
-					onAction={handleStatusAction}
-					disabled={sendingInput}
-				/>
-				<TaskIdBadge
-					task={{ id: displayTask.id, status: displayTask.status || 'in_progress', issue_type: displayTask.issue_type, title: displayTask.title || displayTask.id }}
-					size="sm"
-					showType={false}
-					showStatus={false}
-					onOpenTask={onTaskClick}
-				/>
-				<span
-					class="font-mono text-[10px] tracking-wider px-1 py-0.5 rounded flex-shrink-0"
-					style="background: oklch(0.5 0 0 / 0.1); color: oklch(0.70 0.10 50);"
+
+			<!-- Row 2: Description (full width, hover to expand) -->
+			<button
+				type="button"
+				class="w-full text-left cursor-pointer"
+				onclick={() => onTaskClick?.(displayTask.id)}
+				onmouseenter={handleTaskMouseEnter}
+				onmouseleave={handleTaskMouseLeave}
+				title="Click to view task details"
+			>
+				<div
+					class="overflow-hidden transition-all duration-300 ease-out"
+					style="max-height: {taskHovered ? '50vh' : '2.6rem'};"
 				>
-					P{displayTask.priority ?? 2}
-				</span>
-				<h3 class="font-mono font-bold text-sm tracking-wide truncate min-w-0 flex-1" style="color: oklch(0.90 0.02 250);" title={displayTask.title || displayTask.id}>
-					{displayTask.title || displayTask.id}
-				</h3>
-			</div>
-		{:else if sessionState === 'completing' && displayTask}
-			<!-- Completing state - /jat:complete is running -->
-			<div class="flex items-center gap-2 min-w-0">
-				<StatusActionBadge
-					sessionState="completing"
-					{sessionName}
-					onAction={handleStatusAction}
-					disabled={sendingInput}
-				/>
-				<TaskIdBadge
-					task={{ id: displayTask.id, status: displayTask.status || 'in_progress', issue_type: displayTask.issue_type, title: displayTask.title || displayTask.id }}
-					size="sm"
-					showType={false}
-					showStatus={false}
-					onOpenTask={onTaskClick}
-				/>
-				<span
-					class="font-mono text-[10px] tracking-wider px-1 py-0.5 rounded flex-shrink-0"
-					style="background: oklch(0.5 0 0 / 0.1); color: oklch(0.70 0.10 50);"
-				>
-					P{displayTask.priority ?? 2}
-				</span>
-				<h3 class="font-mono font-bold text-sm tracking-wide truncate min-w-0 flex-1" style="color: oklch(0.90 0.02 250);" title={displayTask.title || displayTask.id}>
-					{displayTask.title || displayTask.id}
-				</h3>
-			</div>
-		{:else if sessionState === 'completed' && displayTask}
-			<!-- Completed state - show task that was completed -->
-			<div class="flex items-center gap-2 min-w-0">
-				<StatusActionBadge
-					sessionState="completed"
-					{sessionName}
-					onAction={handleStatusAction}
-					disabled={sendingInput}
-				/>
-				<TaskIdBadge
-					task={{ id: displayTask.id, status: displayTask.status || 'closed', issue_type: displayTask.issue_type, title: displayTask.title || displayTask.id }}
-					size="sm"
-					showType={false}
-					showStatus={false}
-					onOpenTask={onTaskClick}
-				/>
-				<span
-					class="font-mono text-[10px] tracking-wider px-1 py-0.5 rounded flex-shrink-0"
-					style="background: oklch(0.5 0 0 / 0.1); color: oklch(0.70 0.10 50);"
-				>
-					P{displayTask.priority ?? 2}
-				</span>
-				<h3 class="font-mono font-bold text-sm tracking-wide truncate min-w-0 flex-1" style="color: oklch(0.75 0.02 250);" title={displayTask.title || displayTask.id}>
-					{displayTask.title || displayTask.id}
-				</h3>
-			</div>
-		{:else if sessionState === 'starting' && displayTask}
-			<!-- Starting state - agent initializing, no [JAT:WORKING] marker yet -->
-			<div class="flex items-center gap-2 min-w-0">
-				<StatusActionBadge
-					sessionState="starting"
-					{sessionName}
-					onAction={handleStatusAction}
-					disabled={sendingInput}
-				/>
-				<TaskIdBadge
-					task={{ id: displayTask.id, status: displayTask.status || 'in_progress', issue_type: displayTask.issue_type, title: displayTask.title || displayTask.id }}
-					size="sm"
-					showType={false}
-					showStatus={false}
-					onOpenTask={onTaskClick}
-				/>
-				<span
-					class="font-mono text-[10px] tracking-wider px-1 py-0.5 rounded flex-shrink-0"
-					style="background: oklch(0.5 0 0 / 0.1); color: oklch(0.70 0.10 50);"
-				>
-					P{displayTask.priority ?? 2}
-				</span>
-				<h3 class="font-mono font-bold text-sm tracking-wide truncate min-w-0 flex-1" style="color: oklch(0.90 0.02 250);" title={displayTask.title || displayTask.id}>
-					{displayTask.title || displayTask.id}
-				</h3>
-			</div>
-		{:else if sessionState === 'working' && displayTask}
-			<!-- Working state - active task with [JAT:WORKING] marker -->
-			<div class="flex items-center gap-2 min-w-0">
-				<StatusActionBadge
-					sessionState="working"
-					{sessionName}
-					onAction={handleStatusAction}
-					disabled={sendingInput}
-				/>
-				<TaskIdBadge
-					task={{ id: displayTask.id, status: displayTask.status || 'in_progress', issue_type: displayTask.issue_type, title: displayTask.title || displayTask.id }}
-					size="sm"
-					showType={false}
-					showStatus={false}
-					onOpenTask={onTaskClick}
-				/>
-				<span
-					class="font-mono text-[10px] tracking-wider px-1 py-0.5 rounded flex-shrink-0"
-					style="background: oklch(0.5 0 0 / 0.1); color: oklch(0.70 0.10 50);"
-				>
-					P{displayTask.priority ?? 2}
-				</span>
-				<h3 class="font-mono font-bold text-sm tracking-wide truncate min-w-0 flex-1" style="color: oklch(0.90 0.02 250);" title={displayTask.title || displayTask.id}>
-					{displayTask.title || displayTask.id}
-				</h3>
-			</div>
+					<p
+						class="text-xs leading-relaxed"
+						style="color: oklch(0.65 0.02 250);"
+					>
+						{displayTask.description || 'No description'}
+					</p>
+				</div>
+			</button>
 		{:else}
-			<!-- Idle state - no task, show prompt to start -->
-			<div class="flex items-center gap-2 min-w-0">
-				<StatusActionBadge
-					sessionState="idle"
-					{sessionName}
-					onAction={handleStatusAction}
-					disabled={sendingInput}
-				/>
+			<!-- Idle state - no task (agent info is in tab, so just show idle message) -->
+			<div class="flex items-center gap-2 mb-1">
 				<h3 class="font-mono font-bold text-sm tracking-wide" style="color: oklch(0.5 0 0 / 0.5);">
 					Ready to start work
 				</h3>
 			</div>
 		{/if}
-
-		<!-- Row 2: Agent info (avatar + name + stats) + Controls -->
-		<div class="flex items-center justify-between mt-1 gap-2">
-			<!-- Agent Info Badge: [Avatar] [Name + Sparkline] / [Time · Tokens · Cost] -->
-			<div
-				class="flex items-center gap-1.5 min-w-0 px-2 pt-1 rounded-lg"
-				style="background: {stateVisual.bgTint}; border: 1px solid {stateVisual.accent}40;"
-			>
-				<!-- Avatar with ring color based on state -->
-				<AgentAvatar
-					name={agentName}
-					size={20}
-					class="-mt-1 shrink-0 {sessionState === 'starting'
-						? 'ring-2 ring-secondary ring-offset-base-100 ring-offset-1'
-						: sessionState === 'working'
-							? 'ring-2 ring-info ring-offset-base-100 ring-offset-1'
-							: sessionState === 'needs-input'
-								? 'ring-2 ring-warning ring-offset-base-100 ring-offset-1'
-								: sessionState === 'ready-for-review'
-									? 'ring-2 ring-accent ring-offset-base-100 ring-offset-1'
-									: sessionState === 'completed'
-										? 'ring-2 ring-success ring-offset-base-100 ring-offset-1'
-										: ''}"
-				/>
-				<!-- Agent name + sparkline on top, stats below -->
-				<div class="flex flex-col min-w-0 flex-1">
-					<!-- Top row: Name + Sparkline -->
-					<div class="flex items-center gap-1">
-						<span
-							class="font-mono text-xs font-semibold tracking-wider uppercase"
-							style="color: {stateVisual.accent}; text-shadow: 0 0 12px {stateVisual.glow};"
-						>
-							{agentName}
-						</span>
-						{#if sparklineData && sparklineData.length > 0}
-							<div class="-mt-2.5 flex-shrink-0" style="width: 55px; height: 16px;">
-								<Sparkline
-									data={sparklineData}
-									height={16}
-									showTooltip={true}
-									showStyleToolbar={false}
-									defaultTimeRange="24h"
-									animate={false}
-								/>
-							</div>
-						{/if}
-					</div>
-					<!-- Bottom row: Time · Tokens · Cost -->
-					<div
-						class="flex items-center gap-1 font-mono text-[10px]"
-						style="color: oklch(0.55 0.03 250);"
-					>
-						{#if startTime}
-							{@const elapsed = elapsedTimeFormatted()!}
-							<span class="flex items-center gap-0.5" title="Session duration">
-								{#if elapsed.showHours}
-									<AnimatedDigits value={elapsed.hours} class="text-[10px]" />
-									<span class="opacity-60">:</span>
-								{/if}
-								<AnimatedDigits value={elapsed.minutes} class="text-[10px]" />
-								<span class="opacity-60">:</span>
-								<AnimatedDigits value={elapsed.seconds} class="text-[10px]" />
-							</span>
-							<span class="opacity-40">·</span>
-						{/if}
-						<span style="color: oklch(0.60 0.05 250);">{formatTokens(tokens)}</span>
-						<span class="opacity-40">·</span>
-						<span style="color: oklch(0.65 0.10 145);">${cost.toFixed(2)}</span>
-					</div>
-				</div>
-			</div>
-
-			<!-- Control Buttons -->
-			<div class="flex items-center gap-0.5 flex-shrink-0">
-				<!-- Auto-scroll toggle -->
-				<button
-					class="btn btn-xs"
-					class:btn-primary={autoScroll}
-					class:btn-ghost={!autoScroll}
-					onclick={toggleAutoScroll}
-					title={autoScroll ? 'Auto-scroll ON' : 'Auto-scroll OFF'}
-				>
-					<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 13.5L12 21m0 0l-7.5-7.5M12 21V3" />
-					</svg>
-				</button>
-				<!-- Attach Terminal -->
-				<button
-					class="btn btn-xs btn-ghost hover:btn-info"
-					onclick={onAttachTerminal}
-					disabled={!onAttachTerminal}
-					title="Open in terminal"
-				>
-					<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" />
-					</svg>
-				</button>
-				<!-- Kill Session -->
-				<button
-					class="btn btn-xs btn-ghost hover:btn-error"
-					onclick={handleKill}
-					disabled={killLoading || !onKillSession}
-					title="Kill session"
-				>
-					{#if killLoading}
-						<span class="loading loading-spinner loading-xs"></span>
-					{:else}
-						<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-						</svg>
-					{/if}
-				</button>
-			</div>
-		</div>
 	</div>
 
 	<!-- Output Section -->
@@ -1782,10 +1731,22 @@
 				</div>
 			{/if}
 
-			<!-- Text input: [esc][^c] LEFT | input MIDDLE | [action buttons] RIGHT -->
+			<!-- Text input: [autoscroll][esc][^c] LEFT | input MIDDLE | [action buttons] RIGHT -->
 			<div class="flex gap-1.5 items-end">
 				<!-- LEFT: Control buttons (always visible) -->
 				<div class="flex items-center gap-0.5 flex-shrink-0 pb-0.5">
+					<!-- Auto-scroll toggle -->
+					<button
+						class="btn btn-xs"
+						class:btn-primary={autoScroll}
+						class:btn-ghost={!autoScroll}
+						onclick={toggleAutoScroll}
+						title={autoScroll ? 'Auto-scroll ON' : 'Auto-scroll OFF'}
+					>
+						<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 13.5L12 21m0 0l-7.5-7.5M12 21V3" />
+						</svg>
+					</button>
 					<button
 						onclick={() => sendKey('escape')}
 						class="btn btn-xs font-mono text-[10px] tracking-wider uppercase"

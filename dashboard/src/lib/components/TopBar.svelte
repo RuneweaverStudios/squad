@@ -18,11 +18,61 @@
 	 * - sparklineData: DataPoint[] (24h sparkline data)
 	 */
 
+	import { page } from '$app/stores';
 	import AgentCountBadge from './AgentCountBadge.svelte';
 	import TokenUsageBadge from './TokenUsageBadge.svelte';
 	import UserProfile from './UserProfile.svelte';
 	import CommandPalette from './CommandPalette.svelte';
 	import { openTaskDrawer } from '$lib/stores/drawerStore';
+	import {
+		SORT_OPTIONS,
+		initSort,
+		handleSortClick,
+		getSortBy,
+		getSortDir,
+		type SortOption
+	} from '$lib/stores/workSort.svelte.js';
+	import { onMount } from 'svelte';
+
+	// Initialize sort store on mount
+	onMount(() => {
+		initSort();
+	});
+
+	// Check if we're on the /work page
+	const isWorkPage = $derived($page.url.pathname === '/work');
+
+	// Sort dropdown state
+	let showSortDropdown = $state(false);
+	let sortHovered = $state(false);
+	let sortDropdownTimeout: ReturnType<typeof setTimeout> | null = null;
+
+	// Get current sort state reactively
+	const currentSort = $derived(getSortBy());
+	const currentDir = $derived(getSortDir());
+	const currentSortLabel = $derived(SORT_OPTIONS.find(o => o.value === currentSort)?.label ?? 'Sort');
+	const currentSortIcon = $derived(SORT_OPTIONS.find(o => o.value === currentSort)?.icon ?? '🔔');
+
+	// Handle sort dropdown show/hide with delay
+	function showSortMenu() {
+		if (sortDropdownTimeout) clearTimeout(sortDropdownTimeout);
+		showSortDropdown = true;
+	}
+
+	function hideSortMenuDelayed() {
+		sortDropdownTimeout = setTimeout(() => {
+			showSortDropdown = false;
+		}, 150);
+	}
+
+	function keepSortMenuOpen() {
+		if (sortDropdownTimeout) clearTimeout(sortDropdownTimeout);
+	}
+
+	function onSortSelect(value: SortOption) {
+		handleSortClick(value);
+		showSortDropdown = false;
+	}
 
 	// Global action loading states
 	let newSessionLoading = $state(false);
@@ -523,6 +573,74 @@
 			</div>
 		{/if}
 	</div>
+
+	<!-- Sort Dropdown (only on /work page) -->
+	{#if isWorkPage}
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div
+			class="relative flex-none"
+			onmouseenter={showSortMenu}
+			onmouseleave={hideSortMenuDelayed}
+		>
+			<button
+				class="flex items-center gap-1 py-1 mr-3 rounded font-mono text-[10px] tracking-wider uppercase transition-all duration-200 ease-out overflow-hidden"
+				style="
+					background: {sortHovered || showSortDropdown ? 'oklch(0.35 0.03 250)' : 'oklch(0.30 0.02 250)'};
+					border: 1px solid {sortHovered || showSortDropdown ? 'oklch(0.50 0.03 250)' : 'oklch(0.40 0.02 250)'};
+					color: oklch(0.80 0.02 250);
+					padding-left: 8px;
+					padding-right: 8px;
+				"
+				title="Sort work sessions"
+				onmouseenter={() => sortHovered = true}
+				onmouseleave={() => sortHovered = false}
+			>
+				<span class="text-xs">{currentSortIcon}</span>
+				<span class="hidden sm:inline">{currentSortLabel}</span>
+				<span class="text-[9px] opacity-70">{currentDir === 'asc' ? '▲' : '▼'}</span>
+				<svg class="w-2.5 h-2.5 ml-0.5 transition-transform {showSortDropdown ? 'rotate-180' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+				</svg>
+			</button>
+
+			<!-- Sort Dropdown Menu -->
+			{#if showSortDropdown}
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div
+					class="absolute top-full left-0 mt-1 min-w-[160px] rounded-lg shadow-xl z-50 overflow-hidden"
+					style="
+						background: linear-gradient(180deg, oklch(0.22 0.02 250) 0%, oklch(0.18 0.02 250) 100%);
+						border: 1px solid oklch(0.40 0.03 250);
+					"
+					onmouseenter={keepSortMenuOpen}
+					onmouseleave={hideSortMenuDelayed}
+				>
+					<div class="px-3 py-2 border-b" style="border-color: oklch(0.30 0.02 250);">
+						<span class="text-[9px] font-mono uppercase tracking-wider" style="color: oklch(0.55 0.02 250);">
+							Sort Sessions
+						</span>
+					</div>
+					<div class="py-1">
+						{#each SORT_OPTIONS as opt (opt.value)}
+							<button
+								class="w-full px-3 py-2 text-left text-xs font-mono flex items-center gap-2 transition-colors"
+								style="color: {currentSort === opt.value ? 'oklch(0.90 0.15 250)' : 'oklch(0.75 0.02 250)'}; background: {currentSort === opt.value ? 'oklch(0.30 0.05 250)' : 'transparent'};"
+								onmouseenter={(e) => { if (currentSort !== opt.value) e.currentTarget.style.background = 'oklch(0.28 0.02 250)'; }}
+								onmouseleave={(e) => { if (currentSort !== opt.value) e.currentTarget.style.background = 'transparent'; }}
+								onclick={() => onSortSelect(opt.value)}
+							>
+								<span class="text-sm">{opt.icon}</span>
+								<span class="flex-1">{opt.label}</span>
+								{#if currentSort === opt.value}
+									<span class="text-[10px] opacity-70">{currentDir === 'asc' ? '▲' : '▼'}</span>
+								{/if}
+							</button>
+						{/each}
+					</div>
+				</div>
+			{/if}
+		</div>
+	{/if}
 
 	<!-- Middle: Command Palette -->
 	<div class="flex-none">

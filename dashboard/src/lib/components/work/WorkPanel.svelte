@@ -17,8 +17,9 @@
 	 * - onTaskClick: Callback when clicking a task ID
 	 */
 
-	import { browser } from '$app/environment';
 	import WorkCard from './WorkCard.svelte';
+	import { initSort, getSortBy, getSortDir } from '$lib/stores/workSort.svelte.js';
+	import { onMount } from 'svelte';
 
 	// Work session type - aligned with workSessions.svelte.ts
 	interface Task {
@@ -77,52 +78,14 @@
 		highlightedAgent = null
 	}: Props = $props();
 
-	// Sort options
-	type SortOption = 'state' | 'priority' | 'created' | 'cost';
-	type SortDirection = 'asc' | 'desc';
-	const SORT_OPTIONS: { value: SortOption; label: string; icon: string; defaultDir: SortDirection }[] = [
-		{ value: 'state', label: 'State', icon: '🔔', defaultDir: 'asc' },      // Attention-needed first
-		{ value: 'priority', label: 'Priority', icon: '⚡', defaultDir: 'asc' }, // P0 first
-		{ value: 'created', label: 'Time', icon: '⏱', defaultDir: 'desc' },     // Newest first
-		{ value: 'cost', label: 'Cost', icon: '💰', defaultDir: 'desc' }        // Highest first
-	];
-
-	// Persist sort preference
-	const SORT_STORAGE_KEY = 'work-panel-sort';
-	const SORT_DIR_STORAGE_KEY = 'work-panel-sort-dir';
-	let sortBy = $state<SortOption>('state');
-	let sortDir = $state<SortDirection>('asc');
-
-	// Load saved sort preference
-	$effect(() => {
-		if (browser) {
-			const savedSort = localStorage.getItem(SORT_STORAGE_KEY) as SortOption | null;
-			const savedDir = localStorage.getItem(SORT_DIR_STORAGE_KEY) as SortDirection | null;
-			if (savedSort && SORT_OPTIONS.some(o => o.value === savedSort)) {
-				sortBy = savedSort;
-			}
-			if (savedDir && (savedDir === 'asc' || savedDir === 'desc')) {
-				sortDir = savedDir;
-			}
-		}
+	// Initialize sort store on mount
+	onMount(() => {
+		initSort();
 	});
 
-	// Handle sort button click - toggle direction if same, or switch to new sort
-	function handleSortClick(value: SortOption) {
-		if (sortBy === value) {
-			// Same button - toggle direction
-			sortDir = sortDir === 'asc' ? 'desc' : 'asc';
-		} else {
-			// Different button - switch sort and use its default direction
-			sortBy = value;
-			const opt = SORT_OPTIONS.find(o => o.value === value);
-			sortDir = opt?.defaultDir ?? 'asc';
-		}
-		if (browser) {
-			localStorage.setItem(SORT_STORAGE_KEY, sortBy);
-			localStorage.setItem(SORT_DIR_STORAGE_KEY, sortDir);
-		}
-	}
+	// Get sort state from shared store
+	const sortBy = $derived(getSortBy());
+	const sortDir = $derived(getSortDir());
 
 	// Determine session state for sorting (mirrors WorkCard sessionState logic exactly)
 	// State priority for sorting (lower = more attention needed):
@@ -273,32 +236,14 @@
 			</div>
 		</div>
 	{:else}
-		<!-- Compact Header with Sort Controls -->
-		<div class="flex items-center justify-between px-3 py-1 flex-shrink-0" style="border-bottom: 1px solid oklch(0.5 0 0 / 0.1);">
-			<span class="text-xs text-base-content/50 font-mono">{sortedSessions.length} session{sortedSessions.length !== 1 ? 's' : ''}</span>
-			<!-- Sort Toggle Buttons -->
-			<div class="flex items-center gap-0.5">
-				{#each SORT_OPTIONS as opt (opt.value)}
-					<button
-						class="btn btn-xs px-2 {sortBy === opt.value ? 'btn-primary' : 'btn-ghost'}"
-						onclick={() => handleSortClick(opt.value)}
-						title="Sort by {opt.label} ({sortBy === opt.value ? (sortDir === 'asc' ? 'ascending' : 'descending') : opt.defaultDir})"
-					>
-						<span class="text-xs">{opt.icon}</span>
-						<span class="text-[10px] hidden sm:inline">{opt.label}</span>
-						{#if sortBy === opt.value}
-							<span class="text-[10px] opacity-70">{sortDir === 'asc' ? '▲' : '▼'}</span>
-						{/if}
-					</button>
-				{/each}
-			</div>
-		</div>
 		<!-- WorkCards -->
-		<div class="flex-1 overflow-hidden pt-2 px-2 pb-0">
-			<!-- Horizontal scrolling row (630px per card for full terminal output) -->
-			<div class="flex gap-4 overflow-x-auto h-full pb-2 scrollbar-thin scrollbar-thumb-base-300 scrollbar-track-transparent">
+		<div class="flex-1 min-h-0 px-2">
+			<!-- Horizontal scrolling row (640px per card for full terminal output) -->
+			<!-- pt-10 reserves space above cards for agent tabs that use negative margin -->
+			<!-- min-h-0 is critical for proper flex height calculation -->
+			<div class="flex gap-4 overflow-x-auto h-full pt-10 pb-2 scrollbar-thin scrollbar-thumb-base-300 scrollbar-track-transparent">
 				{#each sortedSessions as session (session.sessionName)}
-					<div class="flex-shrink-0 h-full" style="width: 640px;">
+					<div class="flex-shrink-0" style="width: 640px; height: calc(100% - 8px);">
 					<WorkCard
 						sessionName={session.sessionName}
 						agentName={session.agentName}

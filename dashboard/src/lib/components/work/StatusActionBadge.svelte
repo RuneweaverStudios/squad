@@ -24,6 +24,8 @@
 		disabled?: boolean;
 		dropUp?: boolean;
 		alignRight?: boolean;
+		/** 'badge' = standalone badge with bg/border, 'integrated' = minimal style for embedding in tabs */
+		variant?: 'badge' | 'integrated';
 		onAction?: (actionId: string) => Promise<void> | void;
 		class?: string;
 	}
@@ -34,6 +36,7 @@
 		disabled = false,
 		dropUp = false,
 		alignRight = false,
+		variant = 'badge',
 		onAction,
 		class: className = ''
 	}: Props = $props();
@@ -97,19 +100,18 @@
 	<button
 		type="button"
 		onclick={() => !disabled && (isOpen = !isOpen)}
-		class="font-mono text-[10px] tracking-wider px-1.5 pt-0.5 rounded flex-shrink-0 font-bold cursor-pointer transition-all hover:scale-105 hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-base-100"
-		class:animate-pulse={config.pulse}
+		class="font-mono tracking-wider flex-shrink-0 font-bold cursor-pointer transition-all focus:outline-none {variant === 'integrated' ? 'text-[11px] px-2 py-0.5 hover:bg-white/5 rounded' : 'text-[10px] px-1.5 pt-0.5 rounded hover:scale-105 hover:brightness-110 focus:ring-2 focus:ring-offset-1 focus:ring-offset-base-100'}"
+		class:animate-pulse={config.pulse && variant === 'badge'}
 		class:cursor-not-allowed={disabled}
 		class:opacity-50={disabled}
-		style="
-			background: {config.bgColor};
-			color: {config.textColor};
-			border: 1px solid {config.borderColor};
-		"
+		style={variant === 'integrated'
+			? `color: ${config.textColor};`
+			: `background: ${config.bgColor}; color: ${config.textColor}; border: 1px solid ${config.borderColor};`
+		}
 		disabled={disabled}
 		title="Click for actions"
 	>
-		{config.label}
+		{variant === 'integrated' ? config.shortLabel : config.label}
 		<!-- Dropdown indicator -->
 		<svg
 			class="inline-block w-2.5 h-2.5 ml-0.5 transition-transform"

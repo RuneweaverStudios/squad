@@ -108,7 +108,7 @@ export async function GET({ url }) {
 		}
 
 		// Step 2: Get all tasks from Beads (for lookup)
-		/** @type {Array<{id: string, title: string, status: string, priority: number, assignee: string, issue_type?: string, updated_at?: string}>} */
+		/** @type {Array<{id: string, title: string, description?: string, status: string, priority: number, assignee: string, issue_type?: string, updated_at?: string}>} */
 		let allTasks = [];
 		try {
 			allTasks = getTasks({});
@@ -126,6 +126,7 @@ export async function GET({ url }) {
 				agentTaskMap.set(t.assignee, {
 					id: t.id,
 					title: t.title,
+					description: t.description,
 					status: t.status,
 					priority: t.priority,
 					issue_type: t.issue_type
@@ -150,6 +151,7 @@ export async function GET({ url }) {
 					agentLastCompletedMap.set(t.assignee, {
 						id: t.id,
 						title: t.title,
+						description: t.description,
 						status: t.status,
 						priority: t.priority,
 						issue_type: t.issue_type,

@@ -322,9 +322,10 @@
 	class="h-full bg-base-200 flex flex-col overflow-hidden"
 >
 	<!-- Work Sessions (horizontal scroll) -->
+	<!-- min-h-0 allows proper flex shrinking; overflow-x-hidden clips horizontal overflow while scroll container handles horizontal scroll -->
 	<div
-		class="overflow-hidden bg-base-100 flex flex-col transition-all duration-150"
-		style="height: {splitPercent}%;"
+		class="min-h-0 bg-base-100 flex flex-col transition-all duration-150"
+		style="height: {splitPercent}%; overflow-x: hidden;"
 		class:hidden={collapsedDirection === 'top'}
 	>
 		{#if isInitialLoad}
