@@ -67,6 +67,8 @@ export function listSessions() {
 		return output
 			.split('\n')
 			.filter(line => line.startsWith(SESSION_PREFIX))
+			// Filter out pending sessions (still being set up, not yet renamed)
+			.filter(line => !line.startsWith('jat-pending-'))
 			.map(line => {
 				const [name, windows, created, attached] = line.split(':');
 				return {
@@ -105,6 +107,8 @@ export async function listSessionsAsync() {
 			.trim()
 			.split('\n')
 			.filter(line => line.startsWith(SESSION_PREFIX))
+			// Filter out pending sessions (still being set up, not yet renamed)
+			.filter(line => !line.startsWith('jat-pending-'))
 			.map(line => {
 				const [name, windows, created, attached] = line.split(':');
 				return {

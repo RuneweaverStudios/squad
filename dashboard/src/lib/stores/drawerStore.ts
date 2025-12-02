@@ -8,8 +8,19 @@ import { writable } from 'svelte/store';
 // Task drawer state
 export const isTaskDrawerOpen = writable(false);
 
+// Selected project context for task drawer (pre-fills project field)
+export const selectedDrawerProject = writable<string | null>(null);
+
+// Available projects for task drawer (dynamically populated from tasks)
+export const availableProjects = writable<string[]>([]);
+
 // Helper functions
-export function openTaskDrawer() {
+export function openTaskDrawer(project?: string) {
+	if (project && project !== 'All Projects') {
+		selectedDrawerProject.set(project);
+	} else {
+		selectedDrawerProject.set(null);
+	}
 	isTaskDrawerOpen.set(true);
 }
 

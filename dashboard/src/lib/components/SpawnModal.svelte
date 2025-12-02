@@ -172,10 +172,10 @@
 						class="text-lg font-bold font-mono uppercase tracking-wider"
 						style="color: oklch(0.85 0.02 250);"
 					>
-						Attack Backlog
+						Swarm
 					</h3>
 					<p class="text-sm mt-1" style="color: oklch(0.55 0.02 250);">
-						Spawn agents to work on ready tasks
+						Spawn one agent per ready task
 					</p>
 				</div>
 				<button
@@ -330,7 +330,7 @@
 						<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
 						</svg>
-						Attack with {agentCount} Agent{agentCount !== 1 ? 's' : ''}
+						Swarm {agentCount} Agent{agentCount !== 1 ? 's' : ''}
 					{/if}
 				</button>
 			</div>

@@ -13,7 +13,7 @@
 
 	import { goto } from '$app/navigation';
 	import { tick, onMount, onDestroy } from 'svelte';
-	import { isTaskDrawerOpen } from '$lib/stores/drawerStore';
+	import { isTaskDrawerOpen, selectedDrawerProject, availableProjects } from '$lib/stores/drawerStore';
 	import { broadcastTaskEvent } from '$lib/stores/taskEvents';
 	import VoiceInput from './VoiceInput.svelte';
 
@@ -32,6 +32,16 @@
 	$effect(() => {
 		const unsubscribe = isTaskDrawerOpen.subscribe(value => {
 			isOpen = value;
+		});
+		return unsubscribe;
+	});
+
+	// Subscribe to selected project and pre-fill when drawer opens
+	$effect(() => {
+		const unsubscribe = selectedDrawerProject.subscribe(project => {
+			if (project && isOpen) {
+				formData.project = project;
+			}
 		});
 		return unsubscribe;
 	});
@@ -189,8 +199,39 @@
 		{ value: 'chore', label: 'Chore', icon: '🔧' }
 	];
 
-	// Projects list (could be fetched from API in future)
-	const projectOptions = ['jat', 'chimaro', 'jomarchy'];
+	// Dynamic projects list from store (populated by layout from tasks)
+	let dynamicProjects = $state<string[]>([]);
+
+	// Track selected project from store for dynamic options
+	let selectedProjectFromStore = $state<string | null>(null);
+
+	// Subscribe to availableProjects store
+	$effect(() => {
+		const unsubscribe = availableProjects.subscribe(projects => {
+			dynamicProjects = projects;
+		});
+		return unsubscribe;
+	});
+
+	// Subscribe to selectedDrawerProject store
+	$effect(() => {
+		const unsubscribe = selectedDrawerProject.subscribe(project => {
+			selectedProjectFromStore = project;
+		});
+		return unsubscribe;
+	});
+
+	// Dynamic project options: use projects from store, ensure selected project is always in the list
+	const projectOptions = $derived.by(() => {
+		// Start with dynamic projects or fallback to empty
+		const baseOptions = dynamicProjects.length > 0 ? dynamicProjects : [];
+
+		// If selected project is not in the list, add it
+		if (selectedProjectFromStore && !baseOptions.includes(selectedProjectFromStore)) {
+			return [selectedProjectFromStore, ...baseOptions];
+		}
+		return baseOptions;
+	});
 
 	// Priority badge colors
 	const priorityColors: Record<number, string> = {
@@ -600,6 +641,7 @@
 				try {
 					// Spawn an agent for the newly created task via /api/work/spawn
 					// This endpoint properly registers the agent, assigns the task, and starts Claude
+					// Note: The spawn API will infer project from task ID prefix (e.g., jomarchy-abc → ~/code/jomarchy)
 					const spawnResponse = await fetch('/api/work/spawn', {
 						method: 'POST',
 						headers: { 'Content-Type': 'application/json' },

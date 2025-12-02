@@ -52,8 +52,6 @@
 		projectColors?: Record<string, string>;
 		/** Compact mode (no labels, smaller) */
 		compact?: boolean;
-		/** Show legend for multi-project mode */
-		showLegend?: boolean;
 	}
 
 	let {
@@ -62,8 +60,7 @@
 		sparklineData = [],
 		multiProjectData,
 		projectColors = {},
-		compact = false,
-		showLegend = true
+		compact = false
 	}: Props = $props();
 
 	// Transform multi-project API data to Sparkline's expected format
@@ -106,12 +103,6 @@
 		}
 
 		return meta.sort((a, b) => b.totalTokens - a.totalTokens);
-	});
-
-	// Get active projects (non-zero tokens) for legend
-	const activeProjects = $derived.by(() => {
-		if (!projectMeta) return [];
-		return projectMeta.filter((p) => p.totalTokens > 0).slice(0, 5); // Limit to top 5
 	});
 
 	// Check if we're in multi-project mode
@@ -171,9 +162,6 @@
 		<AnimatedDigits value={formatTokensCompact(tokensToday)} class="font-medium" />
 	</span>
 
-	<!-- Separator - Industrial -->
-	<span style="color: oklch(0.35 0.02 250);">|</span>
-
 	<!-- Cost Badge - Industrial -->
 	<span
 		class="px-2 py-0.5 rounded text-xs font-mono flex items-center gap-1"
@@ -194,8 +182,6 @@
 	<!-- Sparkline (multi-project or single-project) - Industrial -->
 	{#if isMultiProject}
 		<!-- Multi-project sparkline with stacked/overlay chart -->
-		<span style="color: oklch(0.35 0.02 250);">|</span>
-
 		<div class="hidden sm:block flex-shrink w-[120px] min-w-[60px] h-[20px]">
 			<Sparkline
 				{multiSeriesData}
@@ -206,31 +192,11 @@
 				showGrid={false}
 				showStyleToolbar={true}
 				showLegend={false}
+				showLegendInToolbar={true}
 			/>
 		</div>
-
-		<!-- Compact Legend (only show active projects with color dots) - Industrial -->
-		{#if showLegend && activeProjects.length > 0}
-			<span style="color: oklch(0.35 0.02 250);">|</span>
-			<div class="hidden lg:flex items-center gap-1.5 text-xs font-mono">
-				{#each activeProjects as project}
-					<div class="flex items-center gap-0.5" title="{project.name}: {formatTokensCompact(project.totalTokens)} tokens">
-						<div
-							class="w-2 h-2 rounded-full flex-shrink-0"
-							style="background-color: {project.color};"
-						></div>
-						<span style="color: oklch(0.55 0.02 250);" class="truncate max-w-[60px]">{project.name}</span>
-					</div>
-				{/each}
-				{#if projectMeta && projectMeta.filter(p => p.totalTokens > 0).length > 5}
-					<span style="color: oklch(0.45 0.02 250);">+{projectMeta.filter(p => p.totalTokens > 0).length - 5}</span>
-				{/if}
-			</div>
-		{/if}
 	{:else if sparklineData && sparklineData.length > 0}
 		<!-- Single-project sparkline (original behavior) - Industrial -->
-		<span style="color: oklch(0.35 0.02 250);">|</span>
-
 		<div class="hidden sm:block flex-shrink w-[120px] min-w-[60px] h-[20px]">
 			<Sparkline
 				data={sparklineData}

@@ -124,6 +124,12 @@ export const AGENT_STATUS_THRESHOLDS = {
 	IDLE_MS: 3600000, // 1 hour
 
 	/**
+	 * DISCONNECTED status: Session gone but activity within this time
+	 * Indicates unexpected session loss (vs intentional shutdown)
+	 */
+	DISCONNECTED_MS: 900000, // 15 minutes
+
+	/**
 	 * STALE status: Activity older than STALE_MINUTES considered stale
 	 * Used for highlighting stale activities
 	 */

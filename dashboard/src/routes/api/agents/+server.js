@@ -172,21 +172,27 @@ export async function GET({ url }) {
 		const tasks = getTasks({ projectName: projectFilter });  // Filter tasks only
 
 		// Fetch tmux session status to determine which agents have active sessions
-		/** @type {Set<string>} */
-		const agentsWithSessions = new Set();
+		// Also get session creation time for "connecting" state detection
+		/** @type {Map<string, number>} */
+		const agentSessionCreatedAt = new Map();
 		try {
 			const { stdout } = await execAsync(
-				'tmux list-sessions -F "#{session_name}" 2>/dev/null'
+				'tmux list-sessions -F "#{session_name}:#{session_created}" 2>/dev/null'
 			);
-			stdout.trim().split('\n').forEach(sessionName => {
+			stdout.trim().split('\n').forEach(line => {
+				const [sessionName, createdUnix] = line.split(':');
 				// Extract agent name from session name (jat-AgentName -> AgentName)
 				if (sessionName.startsWith('jat-')) {
-					agentsWithSessions.add(sessionName.replace('jat-', ''));
+					const agentName = sessionName.replace('jat-', '');
+					// Store creation timestamp (unix seconds)
+					agentSessionCreatedAt.set(agentName, parseInt(createdUnix, 10) * 1000);
 				}
 			});
 		} catch {
-			// No tmux server or no sessions - that's fine, set will be empty
+			// No tmux server or no sessions - that's fine, map will be empty
 		}
+		// For backward compat: create Set for hasSession check
+		const agentsWithSessions = new Set(agentSessionCreatedAt.keys());
 
 		// Optionally fetch token usage data
 		/** @type {Map<string, import('$lib/utils/tokenUsage.js').TokenUsage> | null} */
@@ -312,6 +318,8 @@ export async function GET({ url }) {
 				in_progress_tasks: inProgressTasks,
 				active: hasActiveReservations || inProgressTasks > 0,
 				hasSession: agentsWithSessions.has(agent.name),
+				// Session creation timestamp for "connecting" state detection
+				session_created_ts: agentSessionCreatedAt.get(agent.name) || null,
 				activities: filteredActivities
 			};
 

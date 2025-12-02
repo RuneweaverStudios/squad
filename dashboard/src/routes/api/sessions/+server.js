@@ -114,7 +114,9 @@ export async function POST({ request }) {
 		const projectPath = project || process.cwd().replace('/dashboard', '');
 
 		// Generate session name
-		const sessionName = agentName ? `jat-${agentName}` : `jat-agent-${Date.now()}`;
+		// If agentName provided, use it directly (caller is responsible for registration)
+		// Otherwise, use jat-pending-* naming so /jat:start can register and rename
+		const sessionName = agentName ? `jat-${agentName}` : `jat-pending-${Date.now()}`;
 
 		// Build the claude command with proper flags
 		let claudeCmd = `cd "${projectPath}"`;

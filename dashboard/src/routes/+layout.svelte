@@ -13,6 +13,7 @@
 	import { getProjectsFromTasks, getTaskCountByProject } from '$lib/utils/projectUtils';
 	import { initAudioOnInteraction, areSoundsEnabled, enableSounds, disableSounds } from '$lib/utils/soundEffects';
 	import { initSessionEvents, closeSessionEvents, lastSessionEvent } from '$lib/stores/sessionEvents';
+	import { availableProjects } from '$lib/stores/drawerStore';
 
 	let { children } = $props();
 
@@ -58,6 +59,13 @@
 		const params = new URLSearchParams($page.url.searchParams);
 		const projectParam = params.get('project');
 		selectedProject = projectParam || 'All Projects';
+	});
+
+	// Sync available projects to drawer store (for TaskCreationDrawer)
+	$effect(() => {
+		// Filter out "All Projects" and update the store
+		const actualProjects = projects.filter(p => p !== 'All Projects');
+		availableProjects.set(actualProjects);
 	});
 
 	// Track if audio has been initialized and permission prompt state

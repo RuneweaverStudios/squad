@@ -25,35 +25,42 @@
 </script>
 
 <div class="dropdown dropdown-end">
-	<!-- Avatar Button -->
+	<!-- Avatar Button - Industrial -->
 	<button
 		tabindex="0"
-		class="btn btn-ghost btn-circle avatar"
+		class="flex items-center justify-center w-7 h-7 rounded transition-all hover:scale-105"
+		style="
+			background: oklch(0.18 0.01 250);
+			border: 1px solid oklch(0.35 0.02 250);
+		"
 		aria-label="User profile menu"
 	>
-		<div class="w-8 rounded-full bg-base-300 flex items-center justify-center">
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				fill="none"
-				viewBox="0 0 24 24"
-				stroke-width="1.5"
-				stroke="currentColor"
-				class="w-5 h-5 text-base-content/70"
-			>
-				<path stroke-linecap="round" stroke-linejoin="round" d={userIcon} />
-			</svg>
-		</div>
+		<svg
+			xmlns="http://www.w3.org/2000/svg"
+			fill="none"
+			viewBox="0 0 24 24"
+			stroke-width="1.5"
+			stroke="currentColor"
+			class="w-4 h-4"
+			style="color: oklch(0.70 0.18 240);"
+		>
+			<path stroke-linecap="round" stroke-linejoin="round" d={userIcon} />
+		</svg>
 	</button>
 
-	<!-- Dropdown Menu -->
+	<!-- Dropdown Menu - Industrial -->
 	<ul
 		tabindex="0"
-		class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow-lg bg-base-100 rounded-box w-52 border border-base-300"
+		class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow-lg rounded w-52"
+		style="
+			background: oklch(0.20 0.01 250);
+			border: 1px solid oklch(0.35 0.02 250);
+		"
 	>
 		<!-- User Info -->
 		<li class="menu-title">
-			<span class="text-base-content font-semibold">{user.name}</span>
-			<span class="text-xs text-base-content/60">{user.email}</span>
+			<span class="font-semibold" style="color: oklch(0.85 0.02 250);">{user.name}</span>
+			<span class="text-xs" style="color: oklch(0.55 0.02 250);">{user.email}</span>
 		</li>
 
 		<!-- Theme Selector -->

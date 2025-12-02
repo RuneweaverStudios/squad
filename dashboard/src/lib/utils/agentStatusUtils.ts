@@ -13,9 +13,12 @@ import { getTimeSinceMs } from '$lib/utils/dateFormatters';
 
 /**
  * Agent status type.
- * Order reflects priority: live > working > active > idle > offline
+ * Order reflects priority: live > working > active > idle > connecting > disconnected > offline
+ * - connecting: session exists but very new and no activity yet (still initializing)
+ * - disconnected: no session but recent activity (unexpected termination)
+ * - offline: no session and no recent activity (expected state)
  */
-export type AgentStatus = 'live' | 'working' | 'active' | 'idle' | 'offline';
+export type AgentStatus = 'live' | 'working' | 'active' | 'idle' | 'connecting' | 'disconnected' | 'offline';
 
 /**
  * Minimal agent interface for status computation.
@@ -25,13 +28,19 @@ export interface AgentStatusInput {
 	last_active_ts?: string | null;
 	reservation_count?: number;
 	in_progress_tasks?: number;
+	hasSession?: boolean;
+	/** Session creation timestamp (ms since epoch) for "connecting" state detection */
+	session_created_ts?: number | null;
 }
 
 /**
- * Compute agent status based on activity and workload.
+ * Compute agent status based on session and activity.
  *
  * Priority order:
+ * 0a. DISCONNECTED - No session but recent activity <15min (unexpected termination)
+ * 0b. OFFLINE - No session and no recent activity (expected state)
  * 1. WORKING - Has active task or file locks (takes priority - agent is engaged)
+ * 1.5 CONNECTING - Session exists but very new (<10min) with no activity yet
  * 2. LIVE - Very recent activity (< 1 minute) without active work
  * 3. ACTIVE - Recent activity (< 10 minutes) or has locks within 1 hour
  * 4. IDLE - Within 1 hour but no activity indicators
@@ -49,14 +58,38 @@ export interface AgentStatusInput {
  * // → 'working' (has in-progress task)
  */
 export function computeAgentStatus(agent: AgentStatusInput): AgentStatus {
+	const timeSinceActive = getTimeSinceMs(agent.last_active_ts);
+
+	// Priority 0: No tmux session - determine if disconnected or offline
+	// hasSession is undefined for backwards compat; only treat explicit false
+	if (agent.hasSession === false) {
+		// Disconnected: session gone but was active within 15 min (unexpected)
+		if (timeSinceActive < AGENT_STATUS_THRESHOLDS.DISCONNECTED_MS) {
+			return 'disconnected';
+		}
+		// Offline: no session and not recently active (expected)
+		return 'offline';
+	}
+
 	const hasActiveLocks = (agent.reservation_count || 0) > 0;
 	const hasInProgressTask = (agent.in_progress_tasks || 0) > 0;
-	const timeSinceActive = getTimeSinceMs(agent.last_active_ts);
 
 	// Priority 1: WORKING - Has active task or file locks
 	// Agent has work in progress (takes priority over recency)
 	if (hasInProgressTask || hasActiveLocks) {
 		return 'working';
+	}
+
+	// Priority 1.5: CONNECTING - Session exists but still initializing
+	// Session was created recently (<10 min) but no meaningful activity yet
+	if (agent.session_created_ts && agent.hasSession !== false) {
+		const sessionAge = Date.now() - agent.session_created_ts;
+		const CONNECTING_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
+
+		// Session is new AND (no activity OR activity is not recent)
+		if (sessionAge < CONNECTING_THRESHOLD_MS && timeSinceActive >= AGENT_STATUS_THRESHOLDS.WORKING_MS) {
+			return 'connecting';
+		}
 	}
 
 	// Priority 2: LIVE - Very recent activity (< 1 minute) without active work
@@ -129,6 +162,10 @@ export function getAgentStatusDescription(status: AgentStatus): string {
 			return 'Agent was recently active (within 10 minutes)';
 		case 'idle':
 			return 'Agent is available but has been quiet (within 1 hour)';
+		case 'connecting':
+			return 'Agent session is starting up (created within 10 minutes)';
+		case 'disconnected':
+			return 'Agent session ended unexpectedly (was active within 15 minutes)';
 		case 'offline':
 			return 'Agent has not been active for over 1 hour';
 		default:

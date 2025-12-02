@@ -380,7 +380,7 @@
 				box-shadow: {taskHovered ? '0 0 20px oklch(0.75 0.22 145 / 0.4)' : 'none'};
 				transform: {taskHovered ? 'scale(1.05)' : 'scale(1)'};
 			"
-			onclick={openTaskDrawer}
+			onclick={() => openTaskDrawer(selectedProject)}
 			title="Create new task"
 			onmouseenter={() => taskHovered = true}
 			onmouseleave={() => taskHovered = false}

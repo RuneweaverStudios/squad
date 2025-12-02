@@ -6,6 +6,7 @@
 import agentMail from '../../../../lib/agent-mail.js';
 import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
+import { listSessions } from './sessions.js';
 
 /**
  * @typedef {import('../../../../lib/agent-mail.js').Message} Message
@@ -151,39 +152,20 @@ export function getReservations(agentName = undefined, projectPath = undefined) 
 }
 
 /**
- * Get active agents from session files (.claude/agent-*.txt)
- * These are agents currently running in Claude Code sessions
- * @param {string} projectPath - Project root path containing .claude directory
+ * Get active agents from running tmux sessions
+ * Uses actual jat-* tmux sessions instead of stale session files
+ * @param {string} projectPath - Project root path (unused, kept for API compat)
  * @returns {{ activeAgents: string[], activeCount: number }} - Active agent info
  */
 export function getActiveAgents(projectPath) {
 	try {
-		const claudeDir = join(projectPath, '.claude');
-		const files = readdirSync(claudeDir);
-
-		// Filter for agent-*.txt files (not agent-identity files)
-		const agentFiles = files.filter(f =>
-			f.startsWith('agent-') &&
-			f.endsWith('.txt') &&
-			!f.includes('identity')
-		);
-
-		// Read agent names from each file
-		const activeAgents = new Set();
-		for (const file of agentFiles) {
-			try {
-				const content = readFileSync(join(claudeDir, file), 'utf8').trim();
-				if (content) {
-					activeAgents.add(content);
-				}
-			} catch {
-				// Skip unreadable files
-			}
-		}
+		// Get actual running jat-* tmux sessions
+		const sessions = listSessions();
+		const activeAgents = sessions.map(s => s.agentName);
 
 		return {
-			activeAgents: Array.from(activeAgents),
-			activeCount: activeAgents.size
+			activeAgents,
+			activeCount: activeAgents.length
 		};
 	} catch {
 		return { activeAgents: [], activeCount: 0 };

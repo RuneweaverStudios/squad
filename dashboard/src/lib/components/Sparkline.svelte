@@ -121,6 +121,8 @@
 		defaultColorMode?: 'usage' | 'static';
 		/** Show compact legend for multi-series (default: false) */
 		showLegend?: boolean;
+		/** Show legend inside the hover toolbar (default: false) */
+		showLegendInToolbar?: boolean;
 		/** Enable draw animation (line draws left-to-right) */
 		animate?: boolean;
 	}
@@ -139,6 +141,7 @@
 		defaultTimeRange = '12h',
 		defaultColorMode = 'usage',
 		showLegend = false,
+		showLegendInToolbar = false,
 		animate = true
 	}: Props = $props();
 
@@ -893,6 +896,32 @@
 									{/each}
 								</div>
 							</div>
+							{/if}
+
+							<!-- Project Legend (multi-series only, shown in toolbar) -->
+							{#if showLegendInToolbar && isMultiSeries && activeProjects.length > 0}
+								<div class="border-t border-base-300 pt-1 mt-1">
+									<div class="text-[10px] font-semibold uppercase tracking-wider text-base-content/50 mb-1 px-1">Projects</div>
+									<div class="flex flex-col gap-0.5 max-h-32 overflow-y-auto">
+										{#each activeProjects as project}
+											{@const formattedTokens = project.totalTokens >= 1_000_000
+												? `${(project.totalTokens / 1_000_000).toFixed(1)}M`
+												: project.totalTokens >= 1_000
+													? `${(project.totalTokens / 1_000).toFixed(0)}K`
+													: project.totalTokens.toString()}
+											<div class="flex items-center justify-between gap-2 px-1 py-0.5 rounded hover:bg-base-300/50 transition-colors">
+												<div class="flex items-center gap-1.5">
+													<div
+														class="w-2.5 h-2.5 rounded-full flex-shrink-0"
+														style="background-color: {project.color};"
+													></div>
+													<span class="text-xs font-medium truncate max-w-[100px]">{project.name}</span>
+												</div>
+												<span class="text-xs font-mono text-base-content/60">{formattedTokens}</span>
+											</div>
+										{/each}
+									</div>
+								</div>
 							{/if}
 						</div>
 					</div>

@@ -22,6 +22,8 @@
 		sessionState: SessionState;
 		sessionName: string;
 		disabled?: boolean;
+		dropUp?: boolean;
+		alignRight?: boolean;
 		onAction?: (actionId: string) => Promise<void> | void;
 		class?: string;
 	}
@@ -30,6 +32,8 @@
 		sessionState,
 		sessionName,
 		disabled = false,
+		dropUp = false,
+		alignRight = false,
 		onAction,
 		class: className = ''
 	}: Props = $props();
@@ -109,7 +113,7 @@
 		<!-- Dropdown indicator -->
 		<svg
 			class="inline-block w-2.5 h-2.5 ml-0.5 transition-transform"
-			class:rotate-180={isOpen}
+			class:rotate-180={dropUp ? !isOpen : isOpen}
 			fill="none"
 			viewBox="0 0 24 24"
 			stroke="currentColor"
@@ -122,12 +126,12 @@
 	<!-- Dropdown Menu -->
 	{#if isOpen}
 		<div
-			class="absolute left-0 top-full mt-1 z-50 min-w-[180px] rounded-lg shadow-xl overflow-hidden"
+			class="absolute z-50 min-w-[180px] rounded-lg shadow-xl overflow-hidden {dropUp ? 'bottom-full mb-1' : 'top-full mt-1'} {alignRight ? 'right-0' : 'left-0'}"
 			style="
 				background: oklch(0.20 0.02 250);
 				border: 1px solid oklch(0.35 0.03 250);
 			"
-			transition:fly={{ y: -5, duration: 150 }}
+			transition:fly={{ y: dropUp ? 5 : -5, duration: 150 }}
 		>
 			<!-- Actions list -->
 			<ul class="py-1">

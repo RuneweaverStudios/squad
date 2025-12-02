@@ -13,7 +13,7 @@
 
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { isTaskDrawerOpen } from '$lib/stores/drawerStore';
+	import { openTaskDrawer } from '$lib/stores/drawerStore';
 	import TaskIdBadge from '$lib/components/TaskIdBadge.svelte';
 
 	// Modal state
@@ -104,7 +104,7 @@
 			keywords: ['create', 'new', 'task', 'add'],
 			execute: () => {
 				close();
-				isTaskDrawerOpen.set(true);
+				openTaskDrawer();
 			}
 		},
 		{
@@ -385,9 +385,14 @@
 	});
 </script>
 
-<!-- Quick Actions Button (visible in navbar) -->
+<!-- Quick Actions Button (visible in navbar) - Industrial -->
 <button
-	class="btn btn-sm btn-ghost gap-1"
+	class="px-2 py-1 rounded text-xs font-mono flex items-center gap-1.5 transition-all hover:scale-105"
+	style="
+		background: oklch(0.18 0.01 250);
+		border: 1px solid oklch(0.35 0.02 250);
+		color: oklch(0.60 0.02 250);
+	"
 	onclick={open}
 	aria-label="Quick actions (Cmd+K)"
 >
@@ -397,7 +402,8 @@
 		viewBox="0 0 24 24"
 		stroke-width="1.5"
 		stroke="currentColor"
-		class="w-4 h-4"
+		class="w-3 h-3"
+		style="color: oklch(0.55 0.02 250);"
 	>
 		<path
 			stroke-linecap="round"
@@ -405,7 +411,7 @@
 			d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
 		/>
 	</svg>
-	<kbd class="kbd kbd-xs hidden md:inline">⌘K</kbd>
+	<span class="hidden md:inline">⌘K</span>
 </button>
 
 <!-- Modal (stays in DOM, toggle modal-open class) - Industrial -->

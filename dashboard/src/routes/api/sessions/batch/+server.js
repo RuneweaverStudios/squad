@@ -67,12 +67,14 @@ export async function POST({ request }) {
 		}
 
 		// Spawn sessions with staggered timing
+		// Use jat-pending-* naming so /jat:start can register and rename sessions
+		// This ensures dashboard tracks sessions correctly after agent registration
 		const results = [];
 		const prompt = autoStart ? '/jat:start auto' : '';
 
 		for (let i = 0; i < agentCount; i++) {
-			const agentName = agentNames[i];
-			const sessionName = `jat-${agentName}`;
+			// Use pending naming - /jat:start will register agent and rename session
+			const sessionName = `jat-pending-${Date.now()}-${i}`;
 
 			try {
 				// Build the claude command
@@ -93,7 +95,7 @@ export async function POST({ request }) {
 				results.push({
 					success: true,
 					sessionName,
-					agentName,
+					agentName: null, // Will be assigned by /jat:start after registration
 					index: i + 1
 				});
 			} catch (err) {
@@ -101,7 +103,7 @@ export async function POST({ request }) {
 				results.push({
 					success: false,
 					sessionName,
-					agentName,
+					agentName: null,
 					index: i + 1,
 					error: errorMessage
 				});
