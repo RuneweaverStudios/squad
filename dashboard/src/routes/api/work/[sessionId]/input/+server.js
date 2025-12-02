@@ -10,6 +10,8 @@
  * - escape: Escape key
  * - ctrl-c: Sends Ctrl+C interrupt signal
  * - ctrl-d: Sends Ctrl+D (EOF)
+ * - ctrl-u: Sends Ctrl+U (clear line from cursor to beginning)
+ * - tab: Sends Tab key (for autocomplete)
  * - raw: Send exact keys without Enter
  *
  * Body:
@@ -71,6 +73,16 @@ export async function POST({ params, request }) {
 				command = `tmux send-keys -t "${sessionId}" C-d`;
 				break;
 
+			case 'ctrl-u':
+				// Send Ctrl+U (clear line from cursor to beginning - for live streaming)
+				command = `tmux send-keys -t "${sessionId}" C-u`;
+				break;
+
+			case 'tab':
+				// Send Tab key (for autocomplete in terminal)
+				command = `tmux send-keys -t "${sessionId}" Tab`;
+				break;
+
 			case 'raw':
 				// Send raw keys without Enter
 				// Escape special characters for shell
@@ -94,7 +106,7 @@ export async function POST({ params, request }) {
 				success: true,
 				sessionId,
 				type,
-				input: ['ctrl-c', 'ctrl-d', 'enter', 'down', 'up', 'escape'].includes(type) ? type : input,
+				input: ['ctrl-c', 'ctrl-d', 'ctrl-u', 'tab', 'enter', 'down', 'up', 'escape'].includes(type) ? type : input,
 				message: `Input sent to session ${sessionId}`,
 				timestamp: new Date().toISOString()
 			});

@@ -235,12 +235,17 @@
 		}
 	}
 
-	async function handleSendInput(sessionName: string, input: string, type: 'text' | 'key') {
+	async function handleSendInput(sessionName: string, input: string, type: 'text' | 'key' | 'raw') {
+		if (type === 'raw') {
+			// Send raw text without Enter (for live streaming)
+			await sendInput(sessionName, input, 'raw');
+			return;
+		}
 		if (type === 'key') {
 			// Special keys should be passed as the type, not the input
-			const specialKeys = ['ctrl-c', 'ctrl-d', 'enter', 'escape', 'up', 'down'];
+			const specialKeys = ['ctrl-c', 'ctrl-d', 'ctrl-u', 'enter', 'escape', 'up', 'down', 'tab'];
 			if (specialKeys.includes(input)) {
-				await sendInput(sessionName, '', input as 'ctrl-c' | 'ctrl-d' | 'enter' | 'escape' | 'up' | 'down');
+				await sendInput(sessionName, '', input as 'ctrl-c' | 'ctrl-d' | 'ctrl-u' | 'enter' | 'escape' | 'up' | 'down' | 'tab');
 				return;
 			}
 			// Fallback to raw for non-special keys

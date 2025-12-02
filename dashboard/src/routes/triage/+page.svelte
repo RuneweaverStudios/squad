@@ -186,13 +186,13 @@
 		}
 	}
 
-	async function handleSendInput(sessionName: string, input: string, type: 'text' | 'key') {
+	async function handleSendInput(sessionName: string, input: string, type: 'text' | 'key' | 'raw') {
 		try {
-			const endpoint = type === 'key' ? '/api/work/key' : '/api/work/input';
-			const response = await fetch(endpoint, {
+			// Use the unified session input endpoint
+			const response = await fetch(`/api/work/${encodeURIComponent(sessionName)}/input`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ sessionName, input, key: input })
+				body: JSON.stringify({ input, type })
 			});
 			if (!response.ok) throw new Error('Failed to send input');
 		} catch (e) {

@@ -73,7 +73,7 @@
 		onContinue?: () => void;
 		onAttachTerminal?: () => void; // Open tmux session in terminal
 		onTaskClick?: (taskId: string) => void;
-		onSendInput?: (input: string, type: 'text' | 'key') => Promise<void>;
+		onSendInput?: (input: string, type: 'text' | 'key' | 'raw') => Promise<void>;
 		onDismiss?: () => void; // Called when completion banner auto-dismisses
 		class?: string;
 		/** Whether this work card is currently highlighted (e.g., from clicking avatar elsewhere) */
@@ -187,6 +187,41 @@
 		previousIsComplete = isComplete;
 	});
 
+	// Track previous output length to detect submissions from attached terminal
+	let previousOutputLength = $state(0);
+
+	// Clear textarea when streamed text is submitted in terminal
+	$effect(() => {
+		if (!liveStreamEnabled || !lastStreamedText || !output) {
+			previousOutputLength = output?.length || 0;
+			return;
+		}
+
+		// Only check if output grew significantly (not just echo of typed chars)
+		const outputGrowth = output.length - previousOutputLength;
+		if (outputGrowth <= 0) {
+			previousOutputLength = output.length;
+			return;
+		}
+
+		const newContent = output.slice(previousOutputLength);
+
+		// Detect submission: new content contains the streamed text AND has a newline
+		// The newline indicates Enter was pressed (either echoed or from response)
+		const hasStreamedText = newContent.includes(lastStreamedText);
+		const hasNewline = newContent.includes('\n');
+		const significantGrowth = outputGrowth > lastStreamedText.length; // More output than just echo
+
+		if (hasStreamedText && hasNewline && significantGrowth && lastStreamedText.length >= 2) {
+			// Text was likely submitted in terminal - clear textarea
+			inputText = '';
+			lastStreamedText = '';
+			setTimeout(autoResizeTextarea, 0);
+		}
+
+		previousOutputLength = output.length;
+	});
+
 	// Cleanup timers on destroy
 	onDestroy(() => {
 		if (completionDismissTimer) {
@@ -200,6 +235,9 @@
 		}
 		if (hoverTimeout) {
 			clearTimeout(hoverTimeout);
+		}
+		if (streamDebounceTimer) {
+			clearTimeout(streamDebounceTimer);
 		}
 	});
 
@@ -279,6 +317,15 @@
 	// Input state
 	let inputText = $state('');
 	let inputRef: HTMLTextAreaElement | null = null;
+
+	// Live streaming input state
+	// When enabled, characters are streamed to terminal as user types
+	// This enables instant slash command filtering in Claude Code
+	let liveStreamEnabled = $state(true); // Default ON for better UX
+	let lastStreamedText = $state(''); // Track what we've already sent
+	let streamDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+	const STREAM_DEBOUNCE_MS = 50; // Short debounce for responsive feel
+	let isStreaming = $state(false); // Track if we're actively streaming
 
 	// Task description hover-expand state
 	let taskHovered = $state(false);
@@ -364,6 +411,76 @@
 		const maxHeight = 96;
 		const newHeight = Math.min(inputRef.scrollHeight, maxHeight);
 		inputRef.style.height = `${newHeight}px`;
+	}
+
+	// Stream text input to terminal as user types
+	// This enables real-time slash command filtering in Claude Code
+	async function streamInputToTerminal() {
+		if (!liveStreamEnabled || !onSendInput || isStreaming) return;
+
+		const currentText = inputText;
+		const previousText = lastStreamedText;
+
+		// Nothing changed
+		if (currentText === previousText) return;
+
+		// Don't stream if text is empty (user cleared input)
+		if (!currentText) {
+			// If we had text before, clear the terminal input
+			if (previousText) {
+				isStreaming = true;
+				try {
+					// Send Ctrl+U to clear the current line
+					await onSendInput('ctrl-u', 'key');
+					lastStreamedText = '';
+				} finally {
+					isStreaming = false;
+				}
+			}
+			return;
+		}
+
+		isStreaming = true;
+		try {
+			if (currentText.startsWith(previousText)) {
+				// Text was appended - send only the new characters (most common case)
+				const newChars = currentText.slice(previousText.length);
+				if (newChars) {
+					await onSendInput(newChars, 'raw');
+				}
+			} else {
+				// Text was modified (deletion, paste, or edit in middle)
+				// Clear line and resend entire text
+				await onSendInput('ctrl-u', 'key');
+				await new Promise(r => setTimeout(r, 20));
+				if (currentText) {
+					await onSendInput(currentText, 'raw');
+				}
+			}
+
+			lastStreamedText = currentText;
+		} catch (error) {
+			console.error('Error streaming input:', error);
+		} finally {
+			isStreaming = false;
+		}
+	}
+
+	// Debounced input handler for live streaming
+	function handleInputChange() {
+		autoResizeTextarea();
+
+		if (!liveStreamEnabled) return;
+
+		// Clear existing debounce timer
+		if (streamDebounceTimer) {
+			clearTimeout(streamDebounceTimer);
+		}
+
+		// Debounce the stream to avoid overwhelming tmux
+		streamDebounceTimer = setTimeout(() => {
+			streamInputToTerminal();
+		}, STREAM_DEBOUNCE_MS);
 	}
 
 	// Focus input when hovering over the card
@@ -1056,15 +1173,29 @@
 			}
 
 			if (message) {
-				// Send text first (API adds Enter), then send explicit Enter after delay
-				// Double Enter ensures Claude Code registers the submission
-				await onSendInput(message, 'text');
-				await new Promise((r) => setTimeout(r, 100));
-				await onSendInput('enter', 'key');
+				// If live streaming is enabled and we've already streamed the text,
+				// just send Enter to submit (text is already in terminal)
+				if (liveStreamEnabled && lastStreamedText === inputText.trim() && !hasImages) {
+					// Text already in terminal, just submit
+					await onSendInput('enter', 'key');
+				} else {
+					// Not streaming or text differs - send full text
+					// Clear any partial streamed text first if streaming was on
+					if (liveStreamEnabled && lastStreamedText) {
+						await onSendInput('ctrl-u', 'key');
+						await new Promise((r) => setTimeout(r, 20));
+					}
+					// Send text first (API adds Enter), then send explicit Enter after delay
+					// Double Enter ensures Claude Code registers the submission
+					await onSendInput(message, 'text');
+					await new Promise((r) => setTimeout(r, 100));
+					await onSendInput('enter', 'key');
+				}
 			}
 
 			// Clear input and attached images on success
 			inputText = '';
+			lastStreamedText = ''; // Reset streamed text tracking
 			// Reset textarea height after clearing
 			setTimeout(autoResizeTextarea, 0);
 			// Revoke object URLs to prevent memory leaks
@@ -1086,12 +1217,21 @@
 		} else if (e.key === 'Enter' && e.shiftKey) {
 			// Shift+Enter inserts newline (default textarea behavior)
 			// Let it happen naturally, then resize
-			setTimeout(autoResizeTextarea, 0);
+			setTimeout(handleInputChange, 0);
+		} else if (e.key === 'Tab' && liveStreamEnabled && onSendInput) {
+			// When streaming, send Tab to terminal for autocomplete
+			e.preventDefault();
+			onSendInput('tab', 'key');
 		} else if (e.key === 'Escape' || (e.key === 'c' && e.ctrlKey)) {
 			// Clear input text on Escape or Ctrl+C (terminal behavior)
 			e.preventDefault();
 			inputText = '';
-			// Reset textarea height after clearing
+			// If streaming was active and we had text, clear terminal input too
+			if (liveStreamEnabled && lastStreamedText && onSendInput) {
+				onSendInput('ctrl-u', 'key');
+			}
+			lastStreamedText = ''; // Reset streamed text tracking
+			// Reset textarea height
 			setTimeout(autoResizeTextarea, 0);
 		}
 		// Note: Ctrl+V is handled by onpaste event, not here
@@ -1731,7 +1871,7 @@
 				</div>
 			{/if}
 
-			<!-- Text input: [autoscroll][esc][^c] LEFT | input MIDDLE | [action buttons] RIGHT -->
+			<!-- Text input: [autoscroll][stream][esc][^c] LEFT | input MIDDLE | [action buttons] RIGHT -->
 			<div class="flex gap-1.5 items-end">
 				<!-- LEFT: Control buttons (always visible) -->
 				<div class="flex items-center gap-0.5 flex-shrink-0 pb-0.5">
@@ -1745,6 +1885,18 @@
 					>
 						<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 13.5L12 21m0 0l-7.5-7.5M12 21V3" />
+						</svg>
+					</button>
+					<!-- Live stream toggle -->
+					<button
+						class="btn btn-xs"
+						class:btn-info={liveStreamEnabled}
+						class:btn-ghost={!liveStreamEnabled}
+						onclick={() => { liveStreamEnabled = !liveStreamEnabled; if (!liveStreamEnabled && lastStreamedText) { lastStreamedText = ''; } }}
+						title={liveStreamEnabled ? 'Live streaming ON - Characters sent as you type' : 'Live streaming OFF - Send on Enter only'}
+					>
+						<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M9.348 14.652a3.75 3.75 0 010-5.304m5.304 0a3.75 3.75 0 010 5.304m-7.425 2.121a6.75 6.75 0 010-9.546m9.546 0a6.75 6.75 0 010 9.546M5.106 18.894c-3.808-3.807-3.808-9.98 0-13.788m13.788 0c3.808 3.807 3.808 9.98 0 13.788M12 12h.008v.008H12V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
 						</svg>
 					</button>
 					<button
@@ -1767,17 +1919,17 @@
 					</button>
 				</div>
 
-				<!-- MIDDLE: Text input (flexible width) with clear button -->
+				<!-- MIDDLE: Text input (flexible width) with clear button and streaming indicator -->
 				<div class="relative flex-1 min-w-0">
 					<textarea
 						bind:this={inputRef}
 						bind:value={inputText}
 						onkeydown={handleInputKeydown}
 						onpaste={handlePaste}
-						oninput={autoResizeTextarea}
-						placeholder="Type and press Enter... (Shift+Enter for newline)"
+						oninput={handleInputChange}
+						placeholder={liveStreamEnabled ? "Type to stream live... (Enter to submit)" : "Type and press Enter..."}
 						rows="1"
-						class="textarea textarea-xs w-full font-mono pr-6 resize-none overflow-hidden leading-tight"
+						class="textarea textarea-xs w-full font-mono pr-6 resize-none overflow-hidden leading-tight {liveStreamEnabled && inputText ? 'ring-1 ring-info/50' : ''}"
 						style="background: oklch(0.22 0.02 250); border: 1px solid oklch(0.30 0.02 250); color: oklch(0.80 0.02 250); min-height: 24px; max-height: 96px;"
 						disabled={sendingInput || !onSendInput}
 					></textarea>
@@ -1788,7 +1940,7 @@
 							style="color: oklch(0.55 0.02 250);"
 							onmouseenter={(e) => e.currentTarget.style.color = 'oklch(0.75 0.02 250)'}
 							onmouseleave={(e) => e.currentTarget.style.color = 'oklch(0.55 0.02 250)'}
-							onclick={() => { inputText = ''; setTimeout(autoResizeTextarea, 0); }}
+							onclick={() => { inputText = ''; lastStreamedText = ''; setTimeout(handleInputChange, 0); }}
 							aria-label="Clear input"
 							disabled={sendingInput || !onSendInput}
 						>
@@ -1803,6 +1955,10 @@
 								<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
 							</svg>
 						</button>
+					{/if}
+					<!-- Streaming indicator dot -->
+					{#if liveStreamEnabled && isStreaming}
+						<div class="absolute left-1.5 top-1.5 w-1.5 h-1.5 rounded-full bg-info animate-pulse" title="Streaming to terminal"></div>
 					{/if}
 				</div>
 

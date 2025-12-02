@@ -6,6 +6,8 @@
  * - text: Regular text input (sent with Enter)
  * - ctrl-c: Sends Ctrl+C interrupt signal
  * - ctrl-d: Sends Ctrl+D (EOF)
+ * - ctrl-u: Sends Ctrl+U (clear line)
+ * - tab: Sends Tab key (for autocomplete)
  * - raw: Send exact keys without Enter
  */
 
@@ -61,6 +63,16 @@ export async function POST({ params, request }) {
 			case 'ctrl-d':
 				// Send Ctrl+D (EOF)
 				command = `tmux send-keys -t "${sessionName}" C-d`;
+				break;
+
+			case 'ctrl-u':
+				// Send Ctrl+U (clear line - for live streaming input)
+				command = `tmux send-keys -t "${sessionName}" C-u`;
+				break;
+
+			case 'tab':
+				// Send Tab key (for autocomplete in terminal)
+				command = `tmux send-keys -t "${sessionName}" Tab`;
 				break;
 
 			case 'raw':

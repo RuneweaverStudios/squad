@@ -223,12 +223,12 @@ export async function kill(sessionName: string): Promise<boolean> {
 
 /**
  * Send input to a session (e.g., "continue", "yes", or arbitrary text)
- * @param type - Input type: 'text' (default), 'enter', 'up', 'down', 'escape', 'ctrl-c', 'ctrl-d', 'raw'
+ * @param type - Input type: 'text' (default), 'enter', 'up', 'down', 'escape', 'ctrl-c', 'ctrl-d', 'ctrl-u', 'tab', 'raw'
  */
 export async function sendInput(
 	sessionName: string,
 	input: string,
-	type: 'text' | 'enter' | 'up' | 'down' | 'escape' | 'ctrl-c' | 'ctrl-d' | 'raw' = 'text'
+	type: 'text' | 'enter' | 'up' | 'down' | 'escape' | 'ctrl-c' | 'ctrl-d' | 'ctrl-u' | 'tab' | 'raw' = 'text'
 ): Promise<boolean> {
 	try {
 		const response = await globalThis.fetch(`/api/sessions/${sessionName}/input`, {

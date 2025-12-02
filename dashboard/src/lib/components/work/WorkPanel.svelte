@@ -58,7 +58,7 @@
 		onInterrupt?: (sessionName: string) => Promise<void>;
 		onContinue?: (sessionName: string) => Promise<void>;
 		onAttachTerminal?: (sessionName: string) => Promise<void>;
-		onSendInput?: (sessionName: string, input: string, type: 'text' | 'key') => Promise<void>;
+		onSendInput?: (sessionName: string, input: string, type: 'text' | 'key' | 'raw') => Promise<void>;
 		onTaskClick?: (taskId: string) => void;
 		class?: string;
 		/** Currently highlighted agent name (for scroll-to-agent feature) */
@@ -219,7 +219,7 @@
 	}
 
 	function createSendInputHandler(sessionName: string) {
-		return async (input: string, type: 'text' | 'key') => {
+		return async (input: string, type: 'text' | 'key' | 'raw') => {
 			if (onSendInput) {
 				await onSendInput(sessionName, input, type);
 			}
