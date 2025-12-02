@@ -125,6 +125,8 @@
 	let selectedOptionIndices = $state<Set<number>>(new Set());
 	// Track current cursor position in the question UI
 	let currentOptionIndex = $state(0);
+	// Allow manual dismissal of terminal-parsed question UI
+	let dismissedTerminalQuestion = $state(false);
 
 	// Fetch question data from API
 	async function fetchQuestionData() {
@@ -160,6 +162,28 @@
 		}
 	}
 
+	// Dismiss terminal-parsed question UI
+	function dismissTerminalQuestion() {
+		dismissedTerminalQuestion = true;
+	}
+
+	// Track previous output length for detecting when question UI disappears
+	let lastQuestionUIPresent = $state(false);
+
+	// Reset dismissed state when question UI naturally disappears (user answered elsewhere)
+	$effect(() => {
+		if (!output) return;
+		const recentOutput = output.slice(-3000);
+		const hasQuestionUI = /Enter to select.*(?:Tab|Arrow).*(?:navigate|keys).*Esc to cancel/i.test(recentOutput);
+
+		// If question UI is no longer present and was dismissed, reset the dismissed state
+		// This allows a new question to show up later
+		if (!hasQuestionUI && lastQuestionUIPresent) {
+			dismissedTerminalQuestion = false;
+		}
+		lastQuestionUIPresent = hasQuestionUI;
+	});
+
 	onMount(() => {
 		// Update currentTime every second for real-time elapsed time display
 		elapsedTimeInterval = setInterval(() => {
@@ -169,6 +193,23 @@
 		// Poll for question data every 500ms when in needs-input state
 		fetchQuestionData();
 		questionPollInterval = setInterval(fetchQuestionData, 500);
+	});
+
+	// Set up ResizeObserver after DOM is ready
+	// Using $effect to ensure scrollContainerRef is bound
+	$effect(() => {
+		if (!scrollContainerRef || typeof ResizeObserver === 'undefined') return;
+		if (resizeObserver) return; // Already set up
+
+		resizeObserver = new ResizeObserver(handleContainerResize);
+		resizeObserver.observe(scrollContainerRef);
+
+		// Initial resize based on current container width
+		const initialWidth = scrollContainerRef.getBoundingClientRect().width;
+		const initialColumns = calculateColumns(initialWidth);
+		if (initialColumns > 0) {
+			resizeTmuxSession(initialColumns);
+		}
 	});
 
 	// Track when completion state changes to trigger banner
@@ -239,6 +280,12 @@
 		if (streamDebounceTimer) {
 			clearTimeout(streamDebounceTimer);
 		}
+		if (resizeDebounceTimer) {
+			clearTimeout(resizeDebounceTimer);
+		}
+		if (resizeObserver) {
+			resizeObserver.disconnect();
+		}
 	});
 
 	// Calculate elapsed time (uses currentTime to trigger reactive updates)
@@ -290,6 +337,77 @@
 	let autoScroll = $state(true);
 	let userScrolledUp = $state(false);
 	let scrollContainerRef: HTMLDivElement | null = null;
+
+	// Tmux session resize state
+	// Tracks the output container width and resizes tmux to match
+	let resizeObserver: ResizeObserver | null = null;
+	let lastResizedWidth = $state(0);
+	let resizeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+	const RESIZE_DEBOUNCE_MS = 300; // Wait for resize to stabilize
+	const MIN_COLUMN_CHANGE = 5; // Only resize if columns change by this much
+
+	// Monospace font character width estimation
+	// text-xs is typically 12px, monospace chars are ~0.6em wide = ~7.2px
+	const CHAR_WIDTH_PX = 7.2;
+	// Horizontal padding in the output container (p-3 = 12px on each side)
+	const CONTAINER_PADDING_PX = 24;
+
+	/**
+	 * Calculate the number of columns that fit in a given pixel width
+	 */
+	function calculateColumns(pixelWidth: number): number {
+		const availableWidth = pixelWidth - CONTAINER_PADDING_PX;
+		const columns = Math.floor(availableWidth / CHAR_WIDTH_PX);
+		// Clamp to reasonable range
+		return Math.max(40, Math.min(columns, 300));
+	}
+
+	/**
+	 * Resize tmux session to match container width
+	 */
+	async function resizeTmuxSession(columns: number) {
+		if (!sessionName) return;
+
+		try {
+			const response = await fetch(`/api/work/${encodeURIComponent(sessionName)}/resize`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ width: columns, height: 50 })
+			});
+
+			if (response.ok) {
+				lastResizedWidth = columns;
+			}
+		} catch (error) {
+			// Silently fail - resize is a UX enhancement, not critical
+			console.debug('Failed to resize tmux session:', error);
+		}
+	}
+
+	/**
+	 * Handle container resize - debounced to avoid excessive API calls
+	 */
+	function handleContainerResize(entries: ResizeObserverEntry[]) {
+		const entry = entries[0];
+		if (!entry) return;
+
+		const pixelWidth = entry.contentRect.width;
+		const columns = calculateColumns(pixelWidth);
+
+		// Only resize if the column count changed significantly
+		if (Math.abs(columns - lastResizedWidth) < MIN_COLUMN_CHANGE) {
+			return;
+		}
+
+		// Debounce the resize call
+		if (resizeDebounceTimer) {
+			clearTimeout(resizeDebounceTimer);
+		}
+
+		resizeDebounceTimer = setTimeout(() => {
+			resizeTmuxSession(columns);
+		}, RESIZE_DEBOUNCE_MS);
+	}
 
 	// Detect when user manually scrolls up to disable auto-scroll
 	function handleScroll(e: Event) {
@@ -582,6 +700,9 @@
 	// Detects both single-select (❯ cursor) and multi-select ([ ] checkbox) formats
 	const detectedQuestion = $derived.by((): DetectedQuestion | null => {
 		if (!output) return null;
+
+		// If manually dismissed, return null
+		if (dismissedTerminalQuestion) return null;
 
 		// Only look at recent output (last 3000 chars)
 		const recentOutput = output.slice(-3000);
@@ -1687,11 +1808,22 @@
 			{#if apiQuestionData?.active && apiQuestionData.questions?.length > 0}
 				{@const currentQuestion = apiQuestionData.questions[0]}
 				<div
-					class="mb-2 p-2 rounded-lg"
+					class="mb-2 p-2 rounded-lg relative"
 					style="background: oklch(0.22 0.04 250); border: 1px solid oklch(0.40 0.10 200);"
 				>
+					<!-- Close button -->
+					<button
+						onclick={() => clearQuestionData()}
+						class="absolute top-1 right-1 p-1 rounded-full opacity-50 hover:opacity-100 transition-opacity"
+						style="color: oklch(0.65 0.02 250);"
+						title="Dismiss (already answered)"
+					>
+						<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+						</svg>
+					</button>
 					<!-- Question header with API indicator -->
-					<div class="flex items-center gap-2 mb-2">
+					<div class="flex items-center gap-2 mb-2 pr-6">
 						<span class="text-[10px] px-1.5 py-0.5 rounded font-mono" style="background: oklch(0.35 0.10 200); color: oklch(0.90 0.05 200);">
 							❓
 						</span>
@@ -1807,12 +1939,23 @@
 			{:else if detectedQuestion}
 				<!-- Fallback to terminal-parsed question data -->
 				<div
-					class="mb-2 p-2 rounded-lg"
+					class="mb-2 p-2 rounded-lg relative"
 					style="background: oklch(0.22 0.04 250); border: 1px solid oklch(0.35 0.06 250);"
 				>
+					<!-- Close button -->
+					<button
+						onclick={() => dismissTerminalQuestion()}
+						class="absolute top-1 right-1 p-1 rounded-full opacity-50 hover:opacity-100 transition-opacity"
+						style="color: oklch(0.65 0.02 250);"
+						title="Dismiss (already answered)"
+					>
+						<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+						</svg>
+					</button>
 					<!-- Question header -->
 					{#if detectedQuestion.question}
-						<div class="text-xs font-semibold mb-2" style="color: oklch(0.85 0.10 200);">
+						<div class="text-xs font-semibold mb-2 pr-6" style="color: oklch(0.85 0.10 200);">
 							{detectedQuestion.question}
 						</div>
 					{/if}
