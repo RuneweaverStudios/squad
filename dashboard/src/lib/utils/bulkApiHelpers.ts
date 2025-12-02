@@ -34,14 +34,14 @@ export interface BulkOperationOptions {
  *
  * @param url - The URL to fetch
  * @param options - Fetch options
- * @param timeoutMs - Timeout in milliseconds (default: 30000)
+ * @param timeoutMs - Timeout in milliseconds (default: 60000)
  * @returns Promise resolving to the Response
  * @throws Error if request times out or fails
  */
 export async function fetchWithTimeout(
 	url: string,
 	options: RequestInit = {},
-	timeoutMs: number = 30000
+	timeoutMs: number = 60000
 ): Promise<Response> {
 	const controller = new AbortController();
 	const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
