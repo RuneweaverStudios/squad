@@ -13,6 +13,7 @@
 
 	import { goto } from '$app/navigation';
 	import { tick, onMount, onDestroy } from 'svelte';
+	import { get } from 'svelte/store';
 	import { isTaskDrawerOpen, selectedDrawerProject, availableProjects } from '$lib/stores/drawerStore';
 	import { broadcastTaskEvent } from '$lib/stores/taskEvents';
 	import { playSuccessChime, playErrorSound, playAttachmentSound } from '$lib/utils/soundEffects';
@@ -37,14 +38,15 @@
 		return unsubscribe;
 	});
 
-	// Subscribe to selected project and pre-fill when drawer opens
+	// Pre-fill project when drawer opens (read from store at open time)
 	$effect(() => {
-		const unsubscribe = selectedDrawerProject.subscribe(project => {
-			if (project && isOpen) {
+		if (isOpen) {
+			// Read current project from store when drawer opens
+			const project = get(selectedDrawerProject);
+			if (project) {
 				formData.project = project;
 			}
-		});
-		return unsubscribe;
+		}
 	});
 
 	// Auto-focus when drawer opens
@@ -247,17 +249,8 @@
 		return unsubscribe;
 	});
 
-	// Dynamic project options: use projects from store, ensure selected project is always in the list
-	const projectOptions = $derived.by(() => {
-		// Start with dynamic projects or fallback to empty
-		const baseOptions = dynamicProjects.length > 0 ? dynamicProjects : [];
-
-		// If selected project is not in the list, add it
-		if (selectedProjectFromStore && !baseOptions.includes(selectedProjectFromStore)) {
-			return [selectedProjectFromStore, ...baseOptions];
-		}
-		return baseOptions;
-	});
+	// Note: projectOptions was removed - project is now pre-selected from TopBar dropdown
+	// The project field in the form is read-only, showing the pre-selected project
 
 	// Priority badge colors
 	const priorityColors: Record<number, string> = {
@@ -321,11 +314,9 @@
 					formData.type = suggestions.type;
 				}
 
-				// Project
-				if (!userModifiedFields.has('project') && suggestions.project) {
-					formData.project = suggestions.project;
-					// This will trigger fetchAvailableTasks via $effect
-				}
+				// Project - NO LONGER APPLIED from AI suggestions
+				// Project is pre-selected from TopBar dropdown before opening drawer
+				// AI suggestions should not override the user's project choice
 
 				// Labels
 				if (!userModifiedFields.has('labels') && suggestions.labels?.length > 0) {
@@ -1129,44 +1120,34 @@
 						</div>
 					</div>
 
-					<!-- Project (Optional) - Industrial -->
+					<!-- Project (Pre-selected from TopBar dropdown) - Industrial -->
 					<div class="form-control">
-						<label class="label" for="task-project">
+						<label class="label">
 							<span class="label-text text-xs font-semibold font-mono uppercase tracking-wider" style="color: oklch(0.55 0.02 250);">
 								Project
-								{#if suggestionsApplied && !userModifiedFields.has('project') && formData.project}
-									<span class="badge badge-xs ml-1" style="background: oklch(0.35 0.15 240); color: oklch(0.90 0.02 250);">AI</span>
-								{/if}
 							</span>
 						</label>
-						<select
-							id="task-project"
-							class="select w-full font-mono"
-							style="background: oklch(0.18 0.01 250); border: 1px solid oklch(0.35 0.02 250); color: oklch(0.80 0.02 250);"
-							bind:value={formData.project}
-							onchange={() => markFieldModified('project')}
-							disabled={isSubmitting}
+						<div
+							class="flex items-center gap-2 px-4 py-3 rounded-lg"
+							style="background: oklch(0.22 0.02 250); border: 1px solid oklch(0.35 0.02 250);"
 						>
-							<option value="">Select project (optional)</option>
-							{#each projectOptions as project}
-								<option value={project}>{project}</option>
-							{/each}
-						</select>
-						<label class="label justify-between">
-							<span class="label-text-alt" style="color: oklch(0.50 0.02 250);">
-								Leave empty for auto-assignment
+							<span
+								class="w-2.5 h-2.5 rounded-full flex-shrink-0"
+								style="background: oklch(0.70 0.18 145);"
+							></span>
+							<span class="font-mono text-sm font-medium" style="color: oklch(0.85 0.02 250);">
+								{formData.project || 'No project selected'}
 							</span>
-							<a
-								href="/projects"
-								class="label-text-alt flex items-center gap-1 transition-colors hover:underline"
-								style="color: oklch(0.60 0.12 240);"
-							>
-								<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.204-.107-.397.165-.71.505-.78.929l-.15.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.272-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z" />
-									<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-								</svg>
-								Settings
-							</a>
+							{#if formData.project}
+								<span class="badge badge-xs ml-auto" style="background: oklch(0.30 0.10 145 / 0.3); color: oklch(0.75 0.15 145); border: 1px solid oklch(0.50 0.15 145 / 0.3);">
+									Selected
+								</span>
+							{/if}
+						</div>
+						<label class="label">
+							<span class="label-text-alt" style="color: oklch(0.45 0.02 250);">
+								Project selected from +Task dropdown
+							</span>
 						</label>
 					</div>
 

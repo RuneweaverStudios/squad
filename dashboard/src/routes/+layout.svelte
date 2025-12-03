@@ -10,7 +10,7 @@
 	import OutputDrawer from '$lib/components/OutputDrawer.svelte';
 	import TopBar from '$lib/components/TopBar.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
-	import { getProjectsFromTasks, getTaskCountByProject } from '$lib/utils/projectUtils';
+	import { getTaskCountByProject } from '$lib/utils/projectUtils';
 	import { initAudioOnInteraction, areSoundsEnabled, enableSounds, disableSounds } from '$lib/utils/soundEffects';
 	import { initSessionEvents, closeSessionEvents, lastSessionEvent } from '$lib/stores/sessionEvents';
 	import { availableProjects } from '$lib/stores/drawerStore';
@@ -20,6 +20,7 @@
 	// Shared project state for entire app
 	let selectedProject = $state('All Projects');
 	let allTasks = $state([]);
+	let configProjects = $state<string[]>([]); // Projects from JAT config (visible ones)
 
 	// Agent count state
 	let activeAgentCount = $state(0);
@@ -51,7 +52,8 @@
 	let projectColors = $state<Record<string, string>>({});
 
 	// Derived project data
-	const projects = $derived(getProjectsFromTasks(allTasks));
+	// Use config projects (from JAT config) with "All Projects" prepended
+	const projects = $derived(['All Projects', ...configProjects]);
 	const taskCounts = $derived(getTaskCountByProject(allTasks, 'open'));
 
 	// Sync selected project from URL parameter
@@ -63,9 +65,8 @@
 
 	// Sync available projects to drawer store (for TaskCreationDrawer)
 	$effect(() => {
-		// Filter out "All Projects" and update the store
-		const actualProjects = projects.filter(p => p !== 'All Projects');
-		availableProjects.set(actualProjects);
+		// Use config projects directly (already excludes "All Projects")
+		availableProjects.set(configProjects);
 	});
 
 	// Track if audio has been initialized and permission prompt state
@@ -115,7 +116,7 @@
 	onMount(() => {
 		themeChange(false);
 		initSessionEvents(); // Initialize cross-page session events
-		Promise.all([loadAllTasks(), loadSparklineData(), loadReadyTaskCount()]);
+		Promise.all([loadAllTasks(), loadSparklineData(), loadReadyTaskCount(), loadConfigProjects()]);
 
 		// Set up polling for token usage, sparkline, and ready tasks (every 30 seconds)
 		const interval = setInterval(() => {
@@ -220,6 +221,19 @@
 		} catch (error) {
 			console.error('Failed to fetch ready task count:', error);
 			readyTaskCount = 0;
+		}
+	}
+
+	// Fetch visible projects from JAT config (with stats for sorting by activity)
+	async function loadConfigProjects() {
+		try {
+			const response = await fetch('/api/projects?visible=true&stats=true');
+			const data = await response.json();
+			// Extract project names from the config (already sorted by last activity)
+			configProjects = (data.projects || []).map((p: { name: string }) => p.name);
+		} catch (error) {
+			console.error('Failed to fetch config projects:', error);
+			configProjects = [];
 		}
 	}
 

@@ -297,19 +297,13 @@
 	let showSessionDropdown = $state(false);
 	let sessionDropdownTimeout: ReturnType<typeof setTimeout> | null = null;
 
+	// Task dropdown state
+	let showTaskDropdown = $state(false);
+	let taskDropdownTimeout: ReturnType<typeof setTimeout> | null = null;
+
 	// Get actual project list (filter out "All Projects")
 	const actualProjects = $derived(projects.filter(p => p !== 'All Projects'));
 
-	// Auto-detect default project: use selected filter, or first available, or 'jat'
-	const defaultProject = $derived(() => {
-		if (selectedProject && selectedProject !== 'All Projects') {
-			return selectedProject;
-		}
-		if (actualProjects.length > 0) {
-			return actualProjects[0];
-		}
-		return 'jat';
-	});
 
 	// Handle dropdown show/hide with delay
 	function showDropdown() {
@@ -325,6 +319,28 @@
 
 	function keepDropdownOpen() {
 		if (sessionDropdownTimeout) clearTimeout(sessionDropdownTimeout);
+	}
+
+	// Handle task dropdown show/hide with delay
+	function showTaskDropdownMenu() {
+		if (taskDropdownTimeout) clearTimeout(taskDropdownTimeout);
+		showTaskDropdown = true;
+	}
+
+	function hideTaskDropdownDelayed() {
+		taskDropdownTimeout = setTimeout(() => {
+			showTaskDropdown = false;
+		}, 150);
+	}
+
+	function keepTaskDropdownOpen() {
+		if (taskDropdownTimeout) clearTimeout(taskDropdownTimeout);
+	}
+
+	// Handle task creation for selected project
+	function handleNewTask(projectName: string) {
+		showTaskDropdown = false;
+		openTaskDrawer(projectName);
 	}
 
 	// Button hover states
@@ -447,11 +463,6 @@
 										style="background: {projectColors[project] || 'oklch(0.60 0.15 250)'};"
 									></span>
 									<span class="flex-1">{project}</span>
-									{#if project === defaultProject()}
-										<span class="text-[8px] uppercase px-1 rounded" style="background: oklch(0.35 0.10 250); color: oklch(0.70 0.15 250);">
-											default
-										</span>
-									{/if}
 								</button>
 							{/each}
 						{/if}
@@ -476,33 +487,101 @@
 			{/if}
 		</div>
 
-		<!-- Add Task Button (Industrial) -->
-		<button
-			class="flex items-center gap-1 py-1 rounded font-mono text-[10px] tracking-wider uppercase transition-all duration-200 ease-out overflow-hidden"
-			style="
-				background: {taskHovered ? 'linear-gradient(135deg, oklch(0.75 0.22 145 / 0.35) 0%, oklch(0.75 0.22 145 / 0.2) 100%)' : 'linear-gradient(135deg, oklch(0.75 0.20 145 / 0.2) 0%, oklch(0.75 0.20 145 / 0.1) 100%)'};
-				border: 1px solid {taskHovered ? 'oklch(0.80 0.22 145 / 0.6)' : 'oklch(0.75 0.20 145 / 0.4)'};
-				color: {taskHovered ? 'oklch(0.90 0.20 145)' : 'oklch(0.80 0.18 145)'};
-				text-shadow: 0 0 10px oklch(0.75 0.20 145 / 0.5);
-				padding-left: {taskHovered ? '10px' : '8px'};
-				padding-right: {taskHovered ? '10px' : '8px'};
-				box-shadow: {taskHovered ? '0 0 20px oklch(0.75 0.22 145 / 0.4)' : 'none'};
-				transform: {taskHovered ? 'scale(1.05)' : 'scale(1)'};
-			"
-			onclick={() => openTaskDrawer(selectedProject)}
-			title="Create new task"
-			onmouseenter={() => taskHovered = true}
-			onmouseleave={() => taskHovered = false}
+		<!-- Add Task Dropdown (Industrial - pick project first) -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div
+			class="relative"
+			onmouseenter={showTaskDropdownMenu}
+			onmouseleave={hideTaskDropdownDelayed}
 		>
-			<svg class="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-			</svg>
-			{#if taskHovered}
-				<span class="whitespace-nowrap">Create New Task</span>
-			{:else}
-				<span class="hidden sm:inline">Task</span>
+			<button
+				class="flex items-center gap-1 py-1 rounded font-mono text-[10px] tracking-wider uppercase transition-all duration-200 ease-out overflow-hidden"
+				style="
+					background: {taskHovered || showTaskDropdown ? 'linear-gradient(135deg, oklch(0.75 0.22 145 / 0.35) 0%, oklch(0.75 0.22 145 / 0.2) 100%)' : 'linear-gradient(135deg, oklch(0.75 0.20 145 / 0.2) 0%, oklch(0.75 0.20 145 / 0.1) 100%)'};
+					border: 1px solid {taskHovered || showTaskDropdown ? 'oklch(0.80 0.22 145 / 0.6)' : 'oklch(0.75 0.20 145 / 0.4)'};
+					color: {taskHovered || showTaskDropdown ? 'oklch(0.90 0.20 145)' : 'oklch(0.80 0.18 145)'};
+					text-shadow: 0 0 10px oklch(0.75 0.20 145 / 0.5);
+					padding-left: {taskHovered || showTaskDropdown ? '10px' : '8px'};
+					padding-right: {taskHovered || showTaskDropdown ? '10px' : '8px'};
+					box-shadow: {taskHovered || showTaskDropdown ? '0 0 20px oklch(0.75 0.22 145 / 0.4)' : 'none'};
+					transform: {taskHovered || showTaskDropdown ? 'scale(1.05)' : 'scale(1)'};
+				"
+				title="Create new task - pick a project"
+				onmouseenter={() => taskHovered = true}
+				onmouseleave={() => taskHovered = false}
+			>
+				<svg class="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+				</svg>
+				{#if taskHovered || showTaskDropdown}
+					<span class="whitespace-nowrap">New Task</span>
+					<svg class="w-3 h-3 ml-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+					</svg>
+				{:else}
+					<span class="hidden sm:inline">Task</span>
+				{/if}
+			</button>
+
+			<!-- Project Dropdown for Task -->
+			{#if showTaskDropdown}
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div
+					class="absolute top-full left-0 mt-1 min-w-[180px] rounded-lg shadow-xl z-50 overflow-hidden"
+					style="
+						background: linear-gradient(180deg, oklch(0.22 0.02 250) 0%, oklch(0.18 0.02 250) 100%);
+						border: 1px solid oklch(0.40 0.03 250);
+					"
+					onmouseenter={keepTaskDropdownOpen}
+					onmouseleave={hideTaskDropdownDelayed}
+				>
+					<div class="px-3 py-2 border-b" style="border-color: oklch(0.30 0.02 250);">
+						<span class="text-[9px] font-mono uppercase tracking-wider" style="color: oklch(0.55 0.02 250);">
+							Select Project
+						</span>
+					</div>
+					<div class="py-1 max-h-[240px] overflow-y-auto">
+						{#if actualProjects.length === 0}
+							<div class="px-3 py-2 text-xs" style="color: oklch(0.50 0.02 250);">
+								No projects found
+							</div>
+						{:else}
+							{#each actualProjects as project}
+								<button
+									class="w-full px-3 py-2 text-left text-xs font-mono flex items-center gap-2 transition-colors"
+									style="color: oklch(0.80 0.02 250);"
+									onmouseenter={(e) => e.currentTarget.style.background = 'oklch(0.30 0.03 250)'}
+									onmouseleave={(e) => e.currentTarget.style.background = 'transparent'}
+									onclick={() => handleNewTask(project)}
+								>
+									<span
+										class="w-2 h-2 rounded-full flex-shrink-0"
+										style="background: {projectColors[project] || 'oklch(0.60 0.15 145)'};"
+									></span>
+									<span class="flex-1">{project}</span>
+								</button>
+							{/each}
+						{/if}
+					</div>
+					<!-- Project Settings Link -->
+					<div class="border-t" style="border-color: oklch(0.30 0.02 250);">
+						<a
+							href="/projects"
+							class="w-full px-3 py-2 text-left text-xs font-mono flex items-center gap-2 transition-colors"
+							style="color: oklch(0.60 0.02 250);"
+							onmouseenter={(e) => e.currentTarget.style.background = 'oklch(0.28 0.02 250)'}
+							onmouseleave={(e) => e.currentTarget.style.background = 'transparent'}
+						>
+							<svg class="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.204-.107-.397.165-.71.505-.78.929l-.15.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.272-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z" />
+								<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+							</svg>
+							<span>Project Settings</span>
+						</a>
+					</div>
+				</div>
 			{/if}
-		</button>
+		</div>
 
 		<!-- Global Action Buttons (Industrial) -->
 		<div class="hidden md:flex items-center gap-1">
