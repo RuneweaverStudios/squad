@@ -41,6 +41,7 @@
 	import VoiceInput from '$lib/components/VoiceInput.svelte';
 	import StatusActionBadge from './StatusActionBadge.svelte';
 	import ServerStatusBadge from './ServerStatusBadge.svelte';
+	import TerminalActivitySparkline from './TerminalActivitySparkline.svelte';
 	import {
 		SESSION_STATE_VISUALS,
 		SERVER_STATE_VISUALS,
@@ -73,8 +74,8 @@
 	}
 
 	interface Props {
-		/** Mode: 'agent' for work sessions, 'server' for dev server sessions */
-		mode?: 'agent' | 'server';
+		/** Mode: 'agent' for work sessions, 'server' for dev server sessions, 'compact' for kanban cards */
+		mode?: 'agent' | 'server' | 'compact';
 		sessionName: string;
 		agentName?: string; // Required for agent mode
 		task?: Task | null; // Agent mode only
@@ -94,6 +95,7 @@
 		tokens?: number; // Agent mode only
 		cost?: number; // Agent mode only
 		sparklineData?: SparklineDataPoint[]; // Agent mode: hourly token usage
+		activityData?: number[]; // Server mode: terminal activity sparkline
 		isComplete?: boolean; // Agent mode: task completion state
 		startTime?: Date | null; // When work started (for elapsed time)
 		created?: string; // Session creation timestamp
@@ -140,6 +142,7 @@
 		tokens = 0,
 		cost = 0,
 		sparklineData = [],
+		activityData = [],
 		isComplete = false,
 		startTime = null,
 		created = '',
@@ -164,8 +167,9 @@
 	}: Props = $props();
 
 	// Derived mode helpers
-	const isAgentMode = $derived(mode === 'agent');
+	const isAgentMode = $derived(mode === 'agent' || mode === 'compact');
 	const isServerMode = $derived(mode === 'server');
+	const isCompactMode = $derived(mode === 'compact');
 
 	// Completion state
 	let showCompletionBanner = $state(false);
@@ -420,6 +424,60 @@
 			seconds: String(seconds).padStart(2, '0'),
 			showHours: hours > 0
 		};
+	});
+
+	// Server elapsed time (uses `created` timestamp for server sessions)
+	const serverElapsedFormatted = $derived(() => {
+		if (!created) return null;
+		const startMs = new Date(created).getTime();
+		if (isNaN(startMs)) return null;
+		const elapsed = currentTime - startMs;
+		if (elapsed < 0) return null;
+
+		const totalSeconds = Math.floor(elapsed / 1000);
+		const hours = Math.floor(totalSeconds / 3600);
+		const minutes = Math.floor((totalSeconds % 3600) / 60);
+		const seconds = totalSeconds % 60;
+
+		return {
+			hours: String(hours).padStart(2, '0'),
+			minutes: String(minutes).padStart(2, '0'),
+			seconds: String(seconds).padStart(2, '0'),
+			showHours: hours > 0
+		};
+	});
+
+	// Server mode: Error detection in output
+	const serverErrors = $derived(() => {
+		if (!isServerMode || !output) return { count: 0, hasErrors: false };
+
+		// Error patterns to detect
+		const errorPatterns = [
+			/\bError\b:?/gi,
+			/\bERROR\b/g,
+			/\bFATAL\b/gi,
+			/\bException\b/gi,
+			/\bfailed\b/gi,
+			/\bECONNREFUSED\b/g,
+			/\bENOENT\b/g,
+			/\bEACCES\b/g,
+			/\bTypeError\b/g,
+			/\bSyntaxError\b/g,
+			/\bReferenceError\b/g,
+			/\bUnhandledPromiseRejection\b/gi,
+			/at\s+\S+\s+\([^)]+:\d+:\d+\)/g, // Stack trace lines
+		];
+
+		// Only check recent output (last 2000 chars) for performance
+		const recentOutput = output.slice(-2000);
+		let count = 0;
+
+		for (const pattern of errorPatterns) {
+			const matches = recentOutput.match(pattern);
+			if (matches) count += matches.length;
+		}
+
+		return { count, hasErrors: count > 0 };
 	});
 
 	// Format token count for display
@@ -1692,23 +1750,191 @@
 	const renderedOutput = $derived(ansiToHtml(output));
 </script>
 
-<div
-	class="card h-full flex flex-col relative rounded-none {className} {isHighlighted ? 'agent-highlight-flash ring-2 ring-info ring-offset-2 ring-offset-base-100' : ''}"
-	style="
-		background: linear-gradient(135deg, oklch(0.22 0.02 250) 0%, oklch(0.18 0.01 250) 50%, oklch(0.16 0.01 250) 100%);
-		border: 1px solid {showCompletionBanner ? 'oklch(0.65 0.20 145)' : 'oklch(0.35 0.02 250)'};
-		box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.05), 0 2px 8px oklch(0 0 0 / 0.1);
-		width: {effectiveWidth ?? 640}px;
-		flex-shrink: 0;
-	"
-	data-agent-name={agentName}
-	in:fly={{ x: 50, duration: 300, delay: 50 }}
-	out:fade={{ duration: 200 }}
-	onmouseenter={handleCardMouseEnter}
->
-	<!-- Horizontal resize handle on right edge -->
-	<HorizontalResizeHandle onResize={handleManualResize} onResizeEnd={handleResizeEnd} />
-	<!-- Status accent bar - left edge (color reflects session state) -->
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     REUSABLE SNIPPETS - Consistent UI elements across compact and full modes
+     ═══════════════════════════════════════════════════════════════════════════ -->
+
+<!-- Agent Stats Row: Timer + Tokens + Cost (sparkline optional via parameter) -->
+{#snippet agentStatsRow(showSparkline: boolean = false)}
+	<div class="flex items-center gap-1 font-mono text-[9px]" style="color: oklch(0.55 0.03 250);">
+		{#if startTime}
+			{@const elapsed = elapsedTimeFormatted()!}
+			<span class="flex items-center gap-0.5" title="Session duration">
+				{#if elapsed.showHours}
+					<AnimatedDigits value={elapsed.hours} class="text-[9px]" />
+					<span class="opacity-60">:</span>
+				{/if}
+				<AnimatedDigits value={elapsed.minutes} class="text-[9px]" />
+				<span class="opacity-60">:</span>
+				<AnimatedDigits value={elapsed.seconds} class="text-[9px]" />
+			</span>
+			<span class="opacity-40">·</span>
+		{/if}
+		<span style="color: oklch(0.60 0.05 250);">{formatTokens(tokens)}</span>
+		<span class="opacity-40">·</span>
+		<span style="color: oklch(0.65 0.10 145);">${cost.toFixed(2)}</span>
+		{#if showSparkline && sparklineData && sparklineData.length > 0}
+			<div class="flex-shrink-0 ml-1" style="width: 45px; height: 12px;">
+				<Sparkline
+					data={sparklineData}
+					height={12}
+					showTooltip={true}
+					showStyleToolbar={false}
+					defaultTimeRange="24h"
+					animate={false}
+				/>
+			</div>
+		{/if}
+	</div>
+{/snippet}
+
+{#if isCompactMode}
+	<!-- ═══════════════════════════════════════════════════════════════════════════
+	     COMPACT MODE - Simplified card for kanban views
+	     Shows: Agent name (styled), task ID badge, task title, sparkline+tokens inline
+	     Skips: Terminal output, input section, completion banner, resize handle
+	     ═══════════════════════════════════════════════════════════════════════════ -->
+	<article
+		class="unified-agent-card p-2 rounded-lg {className}"
+		class:ring-2={isHighlighted}
+		class:ring-primary={isHighlighted}
+		style="
+			background: linear-gradient(135deg, {stateVisual.bgTint} 0%, oklch(0.18 0.01 250) 100%);
+			border-left: 3px solid {stateVisual.accent};
+		"
+		data-agent-name={agentName}
+	>
+		<!-- Header: Agent identity + Stats + Status (single row) -->
+		<div class="flex items-center justify-between gap-2 mb-2">
+			<!-- Left: Avatar + Agent name -->
+			<div class="flex items-center gap-2 min-w-0">
+				<div
+					class="shrink-0 rounded-full leading-[0]"
+					style="box-shadow: 0 0 0 2px {stateVisual.accent};"
+				>
+					<AgentAvatar name={agentName} size={18} />
+				</div>
+				<span
+					class="font-mono text-[11px] font-semibold tracking-wider uppercase truncate"
+					style="color: {stateVisual.accent}; text-shadow: 0 0 12px {stateVisual.glow};"
+					title={agentName}
+				>
+					{agentName}
+				</span>
+			</div>
+
+			<!-- Right: Sparkline + Status dropdown -->
+			<div class="flex items-center gap-2 shrink-0">
+				{#if sparklineData && sparklineData.length > 0}
+					<div class="flex-shrink-0 -mt-2" style="width: 50px; height: 14px;">
+						<Sparkline
+							data={sparklineData}
+							height={14}
+							showTooltip={true}
+							showStyleToolbar={false}
+							defaultTimeRange="24h"
+							animate={false}
+						/>
+					</div>
+				{/if}
+				<!-- Status action dropdown -->
+				<StatusActionBadge
+					{sessionState}
+					{sessionName}
+					onAction={handleStatusAction}
+					variant="integrated"
+					alignRight={true}
+				/>
+			</div>
+		</div>
+
+		<!-- Task Section -->
+		{#if displayTask}
+			<div class="flex flex-col gap-1">
+				<!-- Task ID + Priority badges -->
+				<div class="flex items-center gap-2 flex-wrap">
+					<TaskIdBadge
+						task={{ id: displayTask.id, status: displayTask.status || 'in_progress', issue_type: displayTask.issue_type, title: displayTask.title || displayTask.id }}
+						size="xs"
+						showType={false}
+						showStatus={false}
+						onOpenTask={onTaskClick}
+					/>
+					{#if displayTask.priority !== undefined}
+						{@const priorityLabels = ['P0', 'P1', 'P2', 'P3']}
+						{@const priorityColors = ['badge-error', 'badge-warning', 'badge-info', 'badge-ghost']}
+						<span class="badge badge-xs {priorityColors[displayTask.priority] ?? 'badge-ghost'}">
+							{priorityLabels[displayTask.priority] ?? `P${displayTask.priority}`}
+						</span>
+					{/if}
+					{#if displayTask.issue_type}
+						{@const typeIcons: Record<string, string> = { task: '📋', bug: '🐛', feature: '✨', epic: '🎯', chore: '🔧' }}
+						<span class="badge badge-xs badge-ghost" title={displayTask.issue_type}>
+							{typeIcons[displayTask.issue_type] ?? '📋'}
+						</span>
+					{/if}
+				</div>
+				<!-- Task title -->
+				<button
+					type="button"
+					class="text-left font-mono font-bold text-sm tracking-wide truncate hover:border-b hover:border-dashed hover:border-base-content/30"
+					style="color: {sessionState === 'completed' ? 'oklch(0.75 0.02 250)' : 'oklch(0.90 0.02 250)'};"
+					onclick={() => onTaskClick?.(displayTask.id)}
+				>
+					{displayTask.title || displayTask.id}
+				</button>
+			</div>
+		{:else if lastCompletedTask}
+			<!-- Show last completed task -->
+			<div class="flex flex-col gap-1">
+				<div class="flex items-center gap-2">
+					<span class="badge badge-xs badge-success/20 text-success">
+						<svg class="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+						</svg>
+						Done
+					</span>
+					<span class="badge badge-xs badge-outline font-mono opacity-60">
+						{lastCompletedTask.id}
+					</span>
+				</div>
+				<button
+					type="button"
+					class="text-left font-mono font-bold text-sm tracking-wide truncate hover:border-b hover:border-dashed hover:border-base-content/30"
+					style="color: oklch(0.75 0.02 250);"
+					onclick={() => onTaskClick?.(lastCompletedTask.id)}
+				>
+					{lastCompletedTask.title || lastCompletedTask.id}
+				</button>
+			</div>
+		{:else}
+			<!-- No task state -->
+			<div class="text-sm text-base-content/50 italic">
+				No active task
+			</div>
+		{/if}
+	</article>
+{:else}
+	<!-- ═══════════════════════════════════════════════════════════════════════════
+	     FULL MODE (agent/server) - Complete card with terminal output
+	     ═══════════════════════════════════════════════════════════════════════════ -->
+	<div
+		class="card h-full flex flex-col relative rounded-none {className} {isHighlighted ? 'agent-highlight-flash ring-2 ring-info ring-offset-2 ring-offset-base-100' : ''}"
+		style="
+			background: linear-gradient(135deg, oklch(0.22 0.02 250) 0%, oklch(0.18 0.01 250) 50%, oklch(0.16 0.01 250) 100%);
+			border: 1px solid {showCompletionBanner ? 'oklch(0.65 0.20 145)' : 'oklch(0.35 0.02 250)'};
+			box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.05), 0 2px 8px oklch(0 0 0 / 0.1);
+			width: {effectiveWidth ?? 640}px;
+			flex-shrink: 0;
+		"
+		data-agent-name={agentName}
+		in:fly={{ x: 50, duration: 300, delay: 50 }}
+		out:fade={{ duration: 200 }}
+		onmouseenter={handleCardMouseEnter}
+	>
+		<!-- Horizontal resize handle on right edge -->
+		<HorizontalResizeHandle onResize={handleManualResize} onResizeEnd={handleResizeEnd} />
+		<!-- Status accent bar - left edge (color reflects session state) -->
 	<div
 		class="absolute left-0 top-0 bottom-0 w-1"
 		style="
@@ -1847,27 +2073,8 @@
 							</div>
 						{/if}
 					</div>
-					<div
-						class="flex items-center gap-1 font-mono text-[9px]"
-						style="color: oklch(0.55 0.03 250);"
-					>
-						{#if startTime}
-							{@const elapsed = elapsedTimeFormatted()!}
-							<span class="flex items-center gap-0.5" title="Session duration">
-								{#if elapsed.showHours}
-									<AnimatedDigits value={elapsed.hours} class="text-[9px]" />
-									<span class="opacity-60">:</span>
-								{/if}
-								<AnimatedDigits value={elapsed.minutes} class="text-[9px]" />
-								<span class="opacity-60">:</span>
-								<AnimatedDigits value={elapsed.seconds} class="text-[9px]" />
-							</span>
-							<span class="opacity-40">·</span>
-						{/if}
-						<span style="color: oklch(0.60 0.05 250);">{formatTokens(tokens)}</span>
-						<span class="opacity-40">·</span>
-						<span style="color: oklch(0.65 0.10 145);">${cost.toFixed(2)}</span>
-					</div>
+					<!-- Stats row (using shared snippet, no sparkline - it's above) -->
+					{@render agentStatsRow(false)}
 				</div>
 			</div>
 			<!-- Status Dropdown Section (divider + badge) -->
@@ -1921,10 +2128,58 @@
 							</span>
 							<span class="opacity-40">·</span>
 						{/if}
-						<span style="color: {serverVisual.textColor};">{serverVisual.shortLabel}</span>
+						{#if serverElapsedFormatted()}
+							{@const serverElapsed = serverElapsedFormatted()!}
+							<span class="flex items-center gap-0.5" title="Server uptime" style="color: {serverVisual.textColor};">
+								{#if serverElapsed.showHours}
+									<AnimatedDigits value={serverElapsed.hours} class="text-[9px]" />
+									<span class="opacity-60">:</span>
+								{/if}
+								<AnimatedDigits value={serverElapsed.minutes} class="text-[9px]" />
+								<span class="opacity-60">:</span>
+								<AnimatedDigits value={serverElapsed.seconds} class="text-[9px]" />
+							</span>
+						{:else}
+							<span style="color: {serverVisual.textColor};">{serverVisual.shortLabel}</span>
+						{/if}
 					</div>
 				</div>
 			</div>
+			<!-- Activity Sparkline Section -->
+			{#if activityData.length > 0}
+				{@const hasRecentActivity = activityData.slice(-3).some(v => v > 0)}
+				<div class="flex items-center">
+					<div class="w-px h-4 mx-1" style="background: oklch(0.40 0.01 250);"></div>
+					<div
+						class="px-1 {hasRecentActivity ? 'animate-pulse' : ''}"
+						title="Terminal activity"
+						style={hasRecentActivity ? 'animation-duration: 2s;' : ''}
+					>
+						<TerminalActivitySparkline
+							{activityData}
+							maxBars={12}
+							height={14}
+							width={44}
+						/>
+					</div>
+				</div>
+			{/if}
+			<!-- Error Badge (if errors detected) -->
+			{#if serverErrors().hasErrors}
+				<div class="flex items-center">
+					<div class="w-px h-4 mx-1" style="background: oklch(0.40 0.01 250);"></div>
+					<div
+						class="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono"
+						style="background: oklch(0.35 0.15 25 / 0.3); color: oklch(0.75 0.18 25);"
+						title="Errors detected in output"
+					>
+						<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+						</svg>
+						<span>{serverErrors().count}</span>
+					</div>
+				</div>
+			{/if}
 			<!-- Status Dropdown Section (divider + badge) -->
 			<div class="flex items-center">
 				<!-- Shorter, neutral divider -->
@@ -2502,8 +2757,18 @@
 		</div>
 	</div>
 </div>
+{/if}
 
 <style>
+	.unified-agent-card {
+		position: relative;
+		transition: all 0.2s ease;
+	}
+
+	.unified-agent-card:hover {
+		box-shadow: 0 4px 12px oklch(0 0 0 / 0.15);
+	}
+
 	@keyframes shimmer {
 		0% {
 			transform: translateX(-100%);

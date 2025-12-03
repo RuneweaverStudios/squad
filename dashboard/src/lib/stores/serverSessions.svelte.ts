@@ -67,6 +67,24 @@ let state = $state<ServerSessionsState>({
 	lastFetch: null
 });
 
+// Activity history tracking (output changes per poll interval)
+// Key: sessionName, Value: array of activity values (0 = no change, 1+ = lines changed)
+const MAX_ACTIVITY_HISTORY = 30; // Keep last 30 data points
+let activityHistory = $state<Map<string, number[]>>(new Map());
+let previousOutputHashes = new Map<string, string>();
+
+// Simple hash function for output comparison
+function hashOutput(output: string): string {
+	// Use last 2000 chars to detect recent changes
+	const sample = output.slice(-2000);
+	let hash = 0;
+	for (let i = 0; i < sample.length; i++) {
+		hash = ((hash << 5) - hash) + sample.charCodeAt(i);
+		hash = hash & hash; // Convert to 32-bit int
+	}
+	return hash.toString(36);
+}
+
 // Polling interval reference
 let pollingInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -86,7 +104,45 @@ export async function fetch(lines: number = 50): Promise<void> {
 			throw new Error(data.message || data.error || 'Failed to fetch server sessions');
 		}
 
-		state.sessions = data.sessions || [];
+		const sessions: ServerSession[] = data.sessions || [];
+
+		// Track activity by detecting output changes
+		for (const session of sessions) {
+			const currentHash = hashOutput(session.output || '');
+			const prevHash = previousOutputHashes.get(session.sessionName);
+
+			// Activity: 0 = no change, 1 = output changed (could enhance with diff size later)
+			const hasActivity = prevHash !== undefined && prevHash !== currentHash;
+			const activityValue = hasActivity ? 1 : 0;
+
+			// Debug logging
+			if (hasActivity) {
+				console.log(`[Activity] ${session.sessionName}: output changed`);
+			}
+
+			// Update previous hash
+			previousOutputHashes.set(session.sessionName, currentHash);
+
+			// Update activity history - create new array for reactivity
+			const oldHistory = activityHistory.get(session.sessionName) ?? [];
+			const newHistory = [...oldHistory, activityValue].slice(-MAX_ACTIVITY_HISTORY);
+
+			activityHistory.set(session.sessionName, newHistory);
+		}
+
+		// Clean up history for sessions that no longer exist
+		const activeSessionNames = new Set(sessions.map((s) => s.sessionName));
+		for (const sessionName of activityHistory.keys()) {
+			if (!activeSessionNames.has(sessionName)) {
+				activityHistory.delete(sessionName);
+				previousOutputHashes.delete(sessionName);
+			}
+		}
+
+		// Trigger reactivity by creating new Map
+		activityHistory = new Map(activityHistory);
+
+		state.sessions = sessions;
 		state.lastFetch = new Date();
 	} catch (err) {
 		state.error = err instanceof Error ? err.message : 'Failed to fetch server sessions';
@@ -280,5 +336,22 @@ export function getLastFetch(): Date | null {
 	return state.lastFetch;
 }
 
+/**
+ * Get activity history for a session
+ * @param sessionName - Name of the session
+ * @returns Array of activity values (line deltas per poll)
+ */
+export function getActivityHistory(sessionName: string): number[] {
+	return activityHistory.get(sessionName) ?? [];
+}
+
+/**
+ * Get activity history map (for reactive access)
+ */
+export function getActivityHistoryMap(): Map<string, number[]> {
+	return activityHistory;
+}
+
 // Export state for direct reactive access in components
+// Note: activityHistory is not exported directly since it's reassigned; use getActivityHistory() or getActivityHistoryMap() instead
 export { state as serverSessionsState };

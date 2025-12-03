@@ -50,16 +50,17 @@ function detectPort(output) {
 	// Strip ANSI codes before pattern matching
 	const cleanOutput = stripAnsi(output);
 
-	// Common patterns for port detection
+	// Common patterns for port detection (order matters - most specific first)
 	const patterns = [
 		/localhost:(\d+)/i,
 		/127\.0\.0\.1:(\d+)/i,
 		/0\.0\.0\.0:(\d+)/i,
-		/:(\d{4,5})\b/,
-		/port\s*[=:]\s*(\d+)/i,
-		/listening\s+(?:on\s+)?(?:port\s+)?(\d+)/i,
 		/http:\/\/[^:]+:(\d+)/i,
-		/https:\/\/[^:]+:(\d+)/i
+		/https:\/\/[^:]+:(\d+)/i,
+		/port\s*[=:]\s*(\d+)/i,
+		/--port\s+(\d+)/i,
+		/listening\s+(?:on\s+)?(?:port\s+)?(\d+)/i
+		// Removed generic /:(\d{4,5})\b/ - too greedy, matches line counts and timestamps
 	];
 
 	for (const pattern of patterns) {
@@ -250,22 +251,64 @@ export async function GET({ url }) {
 				// Extract project name from session name (server-projectName -> projectName)
 				const projectName = session.name.replace(/^server-/, '');
 
-				// Capture output
+				// Capture output - two captures:
+				// 1. Deep capture for port detection (startup line may have scrolled)
+				// 2. Recent capture for display
+				// 3. Get total history line count for activity tracking
 				let output = '';
+				let deepOutput = '';
 				let lineCount = 0;
 				try {
+					// Deep capture for port detection (2000 lines back - vite outputs many warnings)
+					const deepCaptureCommand = `tmux capture-pane -p -t "${session.name}" -S -2000`;
+					const { stdout: deepStdout } = await execAsync(deepCaptureCommand, { maxBuffer: 1024 * 1024 * 5 });
+					deepOutput = deepStdout;
+
+					// Recent capture for display (with ANSI codes for colors)
 					const captureCommand = `tmux capture-pane -p -e -t "${session.name}" -S -${lines}`;
 					const { stdout } = await execAsync(captureCommand, { maxBuffer: 1024 * 1024 * 5 });
 					output = stdout;
-					lineCount = stdout.split('\n').length;
+
+					// Get total history line count from tmux for activity tracking
+					// This counts all lines ever written, not just visible buffer
+					const historyCommand = `tmux display-message -p -t "${session.name}" '#{history_size}'`;
+					try {
+						const { stdout: historyStdout } = await execAsync(historyCommand);
+						lineCount = parseInt(historyStdout.trim(), 10) || 0;
+					} catch {
+						// Fallback to deep output line count
+						lineCount = deepOutput.split('\n').length;
+					}
 				} catch {
 					// Session might have closed, continue with empty output
 					output = '';
+					deepOutput = '';
 					lineCount = 0;
 				}
 
-				// Detect port from output
-				const port = detectPort(output);
+				// Detect port from deep output (better chance of finding startup line)
+				let port = detectPort(deepOutput || output);
+
+				// Try to get project config (path and port) from jat config
+				let projectPath = null;
+				let configPort = null;
+				try {
+					const configPath = `${process.env.HOME}/.config/jat/projects.json`;
+					const { stdout: configOutput } = await execAsync(
+						`jq -r '.projects["${projectName}"] | "\\(.path // empty)|\\(.port // empty)"' "${configPath}" 2>/dev/null`
+					);
+					const [pathPart, portPart] = configOutput.trim().split('|');
+					projectPath = pathPart ? pathPart.replace(/^~/, process.env.HOME || '') : null;
+					configPort = portPart ? parseInt(portPart, 10) : null;
+				} catch {
+					// Config not available, use default path
+					projectPath = `${process.env.HOME}/code/${projectName}`;
+				}
+
+				// Use config port if output detection failed
+				if (!port && configPort) {
+					port = configPort;
+				}
 
 				// Check if port is actually listening
 				const portRunning = port ? await isPortListening(port) : false;
@@ -278,19 +321,6 @@ export async function GET({ url }) {
 
 				// Generate display name
 				const displayName = generateDisplayName(projectName);
-
-				// Try to get project path from jat config
-				let projectPath = null;
-				try {
-					const configPath = `${process.env.HOME}/.config/jat/projects.json`;
-					const { stdout: configOutput } = await execAsync(
-						`jq -r '.projects["${projectName}"].path // empty' "${configPath}" 2>/dev/null`
-					);
-					projectPath = configOutput.trim().replace(/^~/, process.env.HOME || '');
-				} catch {
-					// Config not available, use default path
-					projectPath = `${process.env.HOME}/code/${projectName}`;
-				}
 
 				return {
 					mode: 'server',

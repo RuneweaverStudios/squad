@@ -23,6 +23,8 @@
 
 	import SessionCard from './SessionCard.svelte';
 	import { initSort, getSortBy, getSortDir } from '$lib/stores/workSort.svelte.js';
+	import { initServerSort, getServerSortBy, getServerSortDir } from '$lib/stores/serverSort.svelte.js';
+	import { getActivityHistory } from '$lib/stores/serverSessions.svelte';
 	import { onMount } from 'svelte';
 	import type { ServerState } from '$lib/config/statusColors';
 
@@ -83,6 +85,7 @@
 		highlightedAgent?: string | null;
 		// Server mode props
 		serverSessions?: ServerSession[];
+		highlightedSession?: string | null;
 		onStopServer?: (sessionName: string) => Promise<void>;
 		onRestartServer?: (sessionName: string) => Promise<void>;
 		onStartServer?: (projectName: string) => Promise<void>;
@@ -104,6 +107,7 @@
 		highlightedAgent = null,
 		// Server mode
 		serverSessions = [],
+		highlightedSession = null,
 		onStopServer,
 		onRestartServer,
 		onStartServer,
@@ -120,14 +124,17 @@
 	const isAgentMode = $derived(mode === 'agent');
 	const isServerMode = $derived(mode === 'server');
 
-	// Initialize sort store on mount
+	// Initialize sort stores on mount
 	onMount(() => {
 		initSort();
+		initServerSort();
 	});
 
-	// Get sort state from shared store
+	// Get sort state from shared stores
 	const sortBy = $derived(getSortBy());
 	const sortDir = $derived(getSortDir());
+	const serverSortBy = $derived(getServerSortBy());
+	const serverSortDir = $derived(getServerSortDir());
 
 	// Determine session state for sorting (mirrors SessionCard sessionState logic exactly)
 	// State priority for sorting (lower = more attention needed):
@@ -227,6 +234,54 @@
 		});
 	});
 
+	// Server status priority for sorting (lower = more attention needed)
+	// Status priority: running=1, starting=2, stopped=3
+	function getServerStatusPriority(status: ServerState): number {
+		const priorities: Record<ServerState, number> = {
+			running: 1,
+			starting: 2,
+			stopped: 3
+		};
+		return priorities[status] ?? 999;
+	}
+
+	// Sort server sessions based on selected sort option and direction
+	const sortedServerSessions = $derived.by(() => {
+		const dir = serverSortDir === 'asc' ? 1 : -1;
+		return [...serverSessions].sort((a, b) => {
+			switch (serverSortBy) {
+				case 'status': {
+					// Sort by status (asc = running first, desc = stopped first)
+					const priorityA = getServerStatusPriority(a.status);
+					const priorityB = getServerStatusPriority(b.status);
+					if (priorityA !== priorityB) return (priorityA - priorityB) * dir;
+					// Secondary: name
+					return a.displayName.localeCompare(b.displayName);
+				}
+				case 'name': {
+					// Sort by display name (asc = A-Z, desc = Z-A)
+					return a.displayName.localeCompare(b.displayName) * dir;
+				}
+				case 'port': {
+					// Sort by port number (asc = lowest first, desc = highest first)
+					const portA = a.port ?? 99999;
+					const portB = b.port ?? 99999;
+					if (portA !== portB) return (portA - portB) * dir;
+					// Secondary: name
+					return a.displayName.localeCompare(b.displayName);
+				}
+				case 'created': {
+					// Sort by created time / uptime (asc = oldest first, desc = newest first)
+					const createdA = a.created ? new Date(a.created).getTime() : 0;
+					const createdB = b.created ? new Date(b.created).getTime() : 0;
+					return (createdA - createdB) * dir;
+				}
+				default:
+					return 0;
+			}
+		});
+	});
+
 	// Create session-specific handlers
 	function createKillHandler(sessionName: string) {
 		return async () => {
@@ -293,8 +348,8 @@
 		};
 	}
 
-	// Get the sessions to display based on mode
-	const displaySessions = $derived(isAgentMode ? sortedSessions : serverSessions);
+	// Get the sessions to display based on mode (using sorted arrays)
+	const displaySessions = $derived(isAgentMode ? sortedSessions : sortedServerSessions);
 
 	// Empty state message based on mode
 	const emptyMessage = $derived(isAgentMode ? 'No active work sessions' : 'No active server sessions');
@@ -343,9 +398,9 @@
 						</div>
 					{/each}
 				{:else}
-					<!-- Server Mode: Server Sessions -->
-					{#each serverSessions as session (session.sessionName)}
-						<div class="h-[calc(100%-8px)]">
+					<!-- Server Mode: Server Sessions (sorted) -->
+					{#each sortedServerSessions as session (session.sessionName)}
+						<div class="h-[calc(100%-8px)]" data-session-name={session.sessionName}>
 							<SessionCard
 								mode="server"
 								sessionName={session.sessionName}
@@ -360,12 +415,14 @@
 								lineCount={session.lineCount}
 								created={session.created}
 								attached={session.attached}
+								activityData={getActivityHistory(session.sessionName)}
 								onKillSession={createKillHandler(session.sessionName)}
 								onAttachTerminal={createAttachTerminalHandler(session.sessionName)}
 								onSendInput={createSendInputHandler(session.sessionName)}
 								onStopServer={createStopServerHandler(session.sessionName)}
 								onRestartServer={createRestartServerHandler(session.sessionName)}
 								onStartServer={createStartServerHandler(session.projectName)}
+								isHighlighted={highlightedSession === session.sessionName}
 							/>
 						</div>
 					{/each}
