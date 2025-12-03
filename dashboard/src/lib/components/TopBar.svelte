@@ -32,26 +32,58 @@
 		getSortDir,
 		type SortOption
 	} from '$lib/stores/workSort.svelte.js';
+	import {
+		AGENT_SORT_OPTIONS,
+		initAgentSort,
+		handleAgentSortClick,
+		getAgentSortBy,
+		getAgentSortDir,
+		type AgentSortOption
+	} from '$lib/stores/agentSort.svelte.js';
+	import {
+		SERVER_SORT_OPTIONS,
+		initServerSort,
+		handleServerSortClick,
+		getServerSortBy,
+		getServerSortDir,
+		type ServerSortOption
+	} from '$lib/stores/serverSort.svelte.js';
 	import { onMount } from 'svelte';
 
-	// Initialize sort store on mount
+	// Initialize sort stores on mount
 	onMount(() => {
 		initSort();
+		initAgentSort();
+		initServerSort();
 	});
 
-	// Check if we're on the /work page
-	const isWorkPage = $derived($page.url.pathname === '/work');
+	// Check which page we're on for showing appropriate sort dropdown
+	const isWorkPage = $derived($page.url.pathname === '/work' || $page.url.pathname === '/tasks');
+	const isAgentsPage = $derived($page.url.pathname === '/agents');
+	const isServersPage = $derived($page.url.pathname === '/servers');
 
-	// Sort dropdown state
+	// Sort dropdown state (shared between work and agent pages)
 	let showSortDropdown = $state(false);
 	let sortHovered = $state(false);
 	let sortDropdownTimeout: ReturnType<typeof setTimeout> | null = null;
 
-	// Get current sort state reactively
+	// Get current sort state reactively (work/tasks page)
 	const currentSort = $derived(getSortBy());
 	const currentDir = $derived(getSortDir());
 	const currentSortLabel = $derived(SORT_OPTIONS.find(o => o.value === currentSort)?.label ?? 'Sort');
 	const currentSortIcon = $derived(SORT_OPTIONS.find(o => o.value === currentSort)?.icon ?? '🔔');
+
+	// Get current sort state reactively (agents page)
+	const currentAgentSort = $derived(getAgentSortBy());
+	const currentAgentDir = $derived(getAgentSortDir());
+	const currentAgentSortLabel = $derived(AGENT_SORT_OPTIONS.find(o => o.value === currentAgentSort)?.label ?? 'Sort');
+	const currentAgentSortIcon = $derived(AGENT_SORT_OPTIONS.find(o => o.value === currentAgentSort)?.icon ?? '🔔');
+
+	// Get current sort state reactively (servers page)
+	const currentServerSort = $derived(getServerSortBy());
+	const currentServerDir = $derived(getServerSortDir());
+	const currentServerSortLabel = $derived(SERVER_SORT_OPTIONS.find(o => o.value === currentServerSort)?.label ?? 'Sort');
+	const currentServerSortIcon = $derived(SERVER_SORT_OPTIONS.find(o => o.value === currentServerSort)?.icon ?? '🔔');
 
 	// Handle sort dropdown show/hide with delay
 	function showSortMenu() {
@@ -71,6 +103,16 @@
 
 	function onSortSelect(value: SortOption) {
 		handleSortClick(value);
+		showSortDropdown = false;
+	}
+
+	function onAgentSortSelect(value: AgentSortOption) {
+		handleAgentSortClick(value);
+		showSortDropdown = false;
+	}
+
+	function onServerSortSelect(value: ServerSortOption) {
+		handleServerSortClick(value);
 		showSortDropdown = false;
 	}
 
@@ -590,7 +632,7 @@
 		{/if}
 	</div>
 
-	<!-- Sort Dropdown (only on /work page) -->
+	<!-- Sort Dropdown (on /work or /tasks page) -->
 	{#if isWorkPage}
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
@@ -649,6 +691,142 @@
 								<span class="flex-1">{opt.label}</span>
 								{#if currentSort === opt.value}
 									<span class="text-[10px] opacity-70">{currentDir === 'asc' ? '▲' : '▼'}</span>
+								{/if}
+							</button>
+						{/each}
+					</div>
+				</div>
+			{/if}
+		</div>
+	{/if}
+
+	<!-- Agent Sort Dropdown (on /agents page) -->
+	{#if isAgentsPage}
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div
+			class="relative flex-none"
+			onmouseenter={showSortMenu}
+			onmouseleave={hideSortMenuDelayed}
+		>
+			<button
+				class="flex items-center gap-1 py-1 mr-3 rounded font-mono text-[10px] tracking-wider uppercase transition-all duration-200 ease-out overflow-hidden"
+				style="
+					background: {sortHovered || showSortDropdown ? 'oklch(0.35 0.03 250)' : 'oklch(0.30 0.02 250)'};
+					border: 1px solid {sortHovered || showSortDropdown ? 'oklch(0.50 0.03 250)' : 'oklch(0.40 0.02 250)'};
+					color: oklch(0.80 0.02 250);
+					padding-left: 8px;
+					padding-right: 8px;
+				"
+				title="Sort agents"
+				onmouseenter={() => sortHovered = true}
+				onmouseleave={() => sortHovered = false}
+			>
+				<span class="text-xs">{currentAgentSortIcon}</span>
+				<span class="hidden sm:inline">{currentAgentSortLabel}</span>
+				<span class="text-[9px] opacity-70">{currentAgentDir === 'asc' ? '▲' : '▼'}</span>
+				<svg class="w-2.5 h-2.5 ml-0.5 transition-transform {showSortDropdown ? 'rotate-180' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+				</svg>
+			</button>
+
+			<!-- Agent Sort Dropdown Menu -->
+			{#if showSortDropdown}
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div
+					class="absolute top-full left-0 mt-1 min-w-[160px] rounded-lg shadow-xl z-50 overflow-hidden"
+					style="
+						background: linear-gradient(180deg, oklch(0.22 0.02 250) 0%, oklch(0.18 0.02 250) 100%);
+						border: 1px solid oklch(0.40 0.03 250);
+					"
+					onmouseenter={keepSortMenuOpen}
+					onmouseleave={hideSortMenuDelayed}
+				>
+					<div class="px-3 py-2 border-b" style="border-color: oklch(0.30 0.02 250);">
+						<span class="text-[9px] font-mono uppercase tracking-wider" style="color: oklch(0.55 0.02 250);">
+							Sort Agents
+						</span>
+					</div>
+					<div class="py-1">
+						{#each AGENT_SORT_OPTIONS as opt (opt.value)}
+							<button
+								class="w-full px-3 py-2 text-left text-xs font-mono flex items-center gap-2 transition-colors"
+								style="color: {currentAgentSort === opt.value ? 'oklch(0.90 0.15 250)' : 'oklch(0.75 0.02 250)'}; background: {currentAgentSort === opt.value ? 'oklch(0.30 0.05 250)' : 'transparent'};"
+								onmouseenter={(e) => { if (currentAgentSort !== opt.value) e.currentTarget.style.background = 'oklch(0.28 0.02 250)'; }}
+								onmouseleave={(e) => { if (currentAgentSort !== opt.value) e.currentTarget.style.background = 'transparent'; }}
+								onclick={() => onAgentSortSelect(opt.value)}
+							>
+								<span class="text-sm">{opt.icon}</span>
+								<span class="flex-1">{opt.label}</span>
+								{#if currentAgentSort === opt.value}
+									<span class="text-[10px] opacity-70">{currentAgentDir === 'asc' ? '▲' : '▼'}</span>
+								{/if}
+							</button>
+						{/each}
+					</div>
+				</div>
+			{/if}
+		</div>
+	{/if}
+
+	<!-- Server Sort Dropdown (on /servers page) -->
+	{#if isServersPage}
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div
+			class="relative flex-none"
+			onmouseenter={showSortMenu}
+			onmouseleave={hideSortMenuDelayed}
+		>
+			<button
+				class="flex items-center gap-1 py-1 mr-3 rounded font-mono text-[10px] tracking-wider uppercase transition-all duration-200 ease-out overflow-hidden"
+				style="
+					background: {sortHovered || showSortDropdown ? 'oklch(0.35 0.03 250)' : 'oklch(0.30 0.02 250)'};
+					border: 1px solid {sortHovered || showSortDropdown ? 'oklch(0.50 0.03 250)' : 'oklch(0.40 0.02 250)'};
+					color: oklch(0.80 0.02 250);
+					padding-left: 8px;
+					padding-right: 8px;
+				"
+				title="Sort servers"
+				onmouseenter={() => sortHovered = true}
+				onmouseleave={() => sortHovered = false}
+			>
+				<span class="text-xs">{currentServerSortIcon}</span>
+				<span class="hidden sm:inline">{currentServerSortLabel}</span>
+				<span class="text-[9px] opacity-70">{currentServerDir === 'asc' ? '▲' : '▼'}</span>
+				<svg class="w-2.5 h-2.5 ml-0.5 transition-transform {showSortDropdown ? 'rotate-180' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+				</svg>
+			</button>
+
+			<!-- Server Sort Dropdown Menu -->
+			{#if showSortDropdown}
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div
+					class="absolute top-full left-0 mt-1 min-w-[160px] rounded-lg shadow-xl z-50 overflow-hidden"
+					style="
+						background: linear-gradient(180deg, oklch(0.22 0.02 250) 0%, oklch(0.18 0.02 250) 100%);
+						border: 1px solid oklch(0.40 0.03 250);
+					"
+					onmouseenter={keepSortMenuOpen}
+					onmouseleave={hideSortMenuDelayed}
+				>
+					<div class="px-3 py-2 border-b" style="border-color: oklch(0.30 0.02 250);">
+						<span class="text-[9px] font-mono uppercase tracking-wider" style="color: oklch(0.55 0.02 250);">
+							Sort Servers
+						</span>
+					</div>
+					<div class="py-1">
+						{#each SERVER_SORT_OPTIONS as opt (opt.value)}
+							<button
+								class="w-full px-3 py-2 text-left text-xs font-mono flex items-center gap-2 transition-colors"
+								style="color: {currentServerSort === opt.value ? 'oklch(0.90 0.15 250)' : 'oklch(0.75 0.02 250)'}; background: {currentServerSort === opt.value ? 'oklch(0.30 0.05 250)' : 'transparent'};"
+								onmouseenter={(e) => { if (currentServerSort !== opt.value) e.currentTarget.style.background = 'oklch(0.28 0.02 250)'; }}
+								onmouseleave={(e) => { if (currentServerSort !== opt.value) e.currentTarget.style.background = 'transparent'; }}
+								onclick={() => onServerSortSelect(opt.value)}
+							>
+								<span class="text-sm">{opt.icon}</span>
+								<span class="flex-1">{opt.label}</span>
+								{#if currentServerSort === opt.value}
+									<span class="text-[10px] opacity-70">{currentServerDir === 'asc' ? '▲' : '▼'}</span>
 								{/if}
 							</button>
 						{/each}

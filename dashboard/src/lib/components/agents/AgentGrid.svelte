@@ -1,38 +1,36 @@
 <script lang="ts">
-	import AgentCard from './AgentCard.svelte';
-	import AutoAssignModal from './AutoAssignModal.svelte';
-	import { generateAutoAssignments } from '$lib/utils/autoAssign';
+	import SessionCard from '$lib/components/work/SessionCard.svelte';
 	import { playAgentJoinSound } from '$lib/utils/soundEffects';
 	import { fly } from 'svelte/transition';
 	import { flip } from 'svelte/animate';
-	import type { Agent, Task, Reservation } from '$lib/stores/agents.svelte';
+	import { onMount } from 'svelte';
+	import type { Agent, Task } from '$lib/stores/agents.svelte';
+	import {
+		initAgentSort,
+		getAgentSortBy,
+		getAgentSortDir,
+		type AgentSortOption
+	} from '$lib/stores/agentSort.svelte.js';
 
-	// Assignment type from autoAssign utility
-	interface Assignment {
-		task: Task;
-		agent: Agent;
-		reason?: string;
-	}
-
-	// Props with types
+	// Props with types - simplified for one task : one agent model
 	interface Props {
 		agents?: Agent[];
 		tasks?: Task[];
-		allTasks?: Task[];
-		reservations?: Reservation[];
-		sparklineData?: unknown[];
-		onTaskAssign?: (taskId: string, agentName: string) => Promise<void>;
-		ontaskclick?: (taskId: string) => void;
+		onTaskClick?: (taskId: string) => void;
 		/** Currently highlighted agent name (for scroll-to-agent feature) */
 		highlightedAgent?: string | null;
 	}
 
-	let { agents = [], tasks = [], allTasks = [], reservations = [], sparklineData = [], onTaskAssign = async () => {}, ontaskclick = () => {}, highlightedAgent = null }: Props = $props();
+	let { agents = [], tasks = [], onTaskClick = () => {}, highlightedAgent = null }: Props = $props();
 
-	// Modal state
-	let showModal = $state(false);
-	let assignments = $state<Assignment[]>([]);
-	let isAssigning = $state(false);
+	// Initialize agent sort store on mount
+	onMount(() => {
+		initAgentSort();
+	});
+
+	// Get sort state from shared store
+	const sortBy = $derived(getAgentSortBy());
+	const sortDir = $derived(getAgentSortDir());
 
 	// Track previously seen agent names for entrance animation
 	// Using regular variables (not $state) to avoid effect loops
@@ -77,10 +75,10 @@
 		}
 	});
 
-	// Get unassigned tasks (status='open' and no assignee)
-	const unassignedTasks = $derived(
-		tasks.filter(t => t.status === 'open' && !t.assignee)
-	);
+	// Get agent's current task (if any)
+	function getAgentTask(agent: Agent): Task | null {
+		return tasks.find(t => t.assignee === agent.name && t.status === 'in_progress') || null;
+	}
 
 	// Agent status type
 	type AgentStatus = 'live' | 'working' | 'active' | 'idle' | 'offline';
@@ -145,106 +143,51 @@
 	// Count of hidden offline agents (for UI feedback)
 	const offlineCount = $derived.by(() => agents.length - activeAgents.length);
 
-	// Sort agents by status priority (live > working > active > idle)
+	// Sort agents based on selected sort option and direction
 	const sortedAgents = $derived.by(() => {
+		const dir = sortDir === 'asc' ? 1 : -1;
 		return [...activeAgents].sort((a, b) => {
-			const statusA = getAgentStatus(a);
-			const statusB = getAgentStatus(b);
-			const priorityA = getStatusPriority(statusA);
-			const priorityB = getStatusPriority(statusB);
-
-			// Sort by status priority first
-			if (priorityA !== priorityB) {
-				return priorityA - priorityB;
+			switch (sortBy) {
+				case 'status': {
+					// Sort by status priority (asc = live first, desc = idle first)
+					const statusA = getAgentStatus(a);
+					const statusB = getAgentStatus(b);
+					const priorityA = getStatusPriority(statusA);
+					const priorityB = getStatusPriority(statusB);
+					if (priorityA !== priorityB) return (priorityA - priorityB) * dir;
+					// Secondary: last activity (most recent first)
+					if (a.last_active_ts && b.last_active_ts) {
+						return new Date(b.last_active_ts).getTime() - new Date(a.last_active_ts).getTime();
+					}
+					return a.name.localeCompare(b.name);
+				}
+				case 'name': {
+					// Sort by name (asc = A-Z, desc = Z-A)
+					return a.name.localeCompare(b.name) * dir;
+				}
+				case 'tasks': {
+					// Sort by in-progress task count (asc = least first, desc = most first)
+					const tasksA = a.in_progress_tasks || 0;
+					const tasksB = b.in_progress_tasks || 0;
+					if (tasksA !== tasksB) return (tasksA - tasksB) * dir;
+					// Secondary: name
+					return a.name.localeCompare(b.name);
+				}
+				case 'cost': {
+					// Sort by token usage/cost (asc = least first, desc = most first)
+					// Note: usage may be present in API response but not in base Agent type
+					const costA = (a as { usage?: { today?: { cost?: number } } }).usage?.today?.cost || 0;
+					const costB = (b as { usage?: { today?: { cost?: number } } }).usage?.today?.cost || 0;
+					if (costA !== costB) return (costA - costB) * dir;
+					// Secondary: name
+					return a.name.localeCompare(b.name);
+				}
+				default:
+					return 0;
 			}
-
-			// Within same status, sort by last activity (most recent first)
-			if (a.last_active_ts && b.last_active_ts) {
-				return new Date(b.last_active_ts).getTime() - new Date(a.last_active_ts).getTime();
-			}
-
-			// If one has activity and other doesn't, prioritize the one with activity
-			if (a.last_active_ts && !b.last_active_ts) return -1;
-			if (!a.last_active_ts && b.last_active_ts) return 1;
-
-			// Finally sort by name alphabetically
-			return a.name.localeCompare(b.name);
 		});
 	});
 
-	// Auto-assign button action
-	function handleAutoAssign(): void {
-		// Generate assignments using the algorithm
-		const proposed = generateAutoAssignments(unassignedTasks, agents, reservations);
-
-		if (proposed.length === 0) {
-			alert('No suitable assignments found. All agents may be at capacity or tasks are blocked.');
-			return;
-		}
-
-		// Show preview modal
-		assignments = proposed;
-		showModal = true;
-	}
-
-	// Confirm and apply assignments
-	async function confirmAssignments(): Promise<void> {
-		isAssigning = true;
-
-		try {
-			// Batch assign all tasks via API
-			const promises = assignments.map(assignment =>
-				fetch('/api/tasks/assign', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						taskId: assignment.task.id,
-						agentName: assignment.agent.name
-					})
-				}).then(res => res.json())
-			);
-
-			const results = await Promise.all(promises);
-
-			// Check for errors
-			const errors = results.filter((r: { error?: unknown }) => r.error);
-			if (errors.length > 0) {
-				console.error('Some assignments failed:', errors);
-				alert(`${errors.length} assignment(s) failed. Check console for details.`);
-			} else {
-				console.log('All assignments successful!');
-			}
-
-			// Close modal
-			showModal = false;
-			assignments = [];
-
-			// Refresh data (parent component will handle via polling)
-		} catch (error: unknown) {
-			console.error('Error applying assignments:', error);
-			alert('Failed to apply assignments. See console for details.');
-		} finally {
-			isAssigning = false;
-		}
-	}
-
-	// Cancel assignment preview
-	function cancelAssignments(): void {
-		showModal = false;
-		assignments = [];
-	}
-
-	// Smart balance action (placeholder)
-	function handleSmartBalance(): void {
-		console.log('Smart balance logic will be implemented in P1 task');
-		// TODO: Implement in jomarchy-agent-tools-kpw
-	}
-
-	// Refresh data (placeholder)
-	function handleRefresh(): void {
-		console.log('Manual refresh triggered');
-		// Parent component will handle data fetching
-	}
 </script>
 
 <!-- Industrial Agent Grid -->
@@ -290,12 +233,31 @@
 			<!-- Horizontal Scrolling Row - Industrial -->
 			<div class="flex gap-4 overflow-x-auto pb-2 h-full scrollbar-thin scrollbar-thumb-base-300 scrollbar-track-transparent">
 				{#each sortedAgents as agent (agent.id || agent.name)}
+					{@const agentTask = getAgentTask(agent)}
 					<div
-						class="flex-shrink-0 w-80 h-full {newAgentNames.includes(agent.name) ? 'agent-new-entrance' : ''}"
+						class="flex-shrink-0 w-72 {newAgentNames.includes(agent.name) ? 'agent-new-entrance' : ''}"
 						animate:flip={{ duration: 300 }}
 						in:fly={{ x: -50, duration: 400, delay: 100 }}
 					>
-						<AgentCard {agent} {tasks} {allTasks} {reservations} {onTaskAssign} {ontaskclick} isHighlighted={highlightedAgent === agent.name} />
+						<SessionCard
+							mode="compact"
+							sessionName={`jat-${agent.name}`}
+							agentName={agent.name}
+							task={agentTask ? {
+								id: agentTask.id,
+								title: agentTask.title,
+								status: agentTask.status,
+								priority: agentTask.priority,
+								issue_type: agentTask.issue_type
+							} : null}
+							tokens={(agent as any).usage?.today?.total_tokens || 0}
+							cost={(agent as any).usage?.today?.cost || 0}
+							sparklineData={(agent as any).sparklineData}
+							created={agent.last_active_ts || ''}
+							attached={agent.hasSession || false}
+							{onTaskClick}
+							isHighlighted={highlightedAgent === agent.name}
+						/>
 					</div>
 				{/each}
 				<!-- Offline count indicator -->
@@ -311,13 +273,3 @@
 		{/if}
 	</div>
 </div>
-
-<!-- Auto-Assign Preview Modal -->
-{#if showModal}
-	<AutoAssignModal
-		{assignments}
-		{isAssigning}
-		onConfirm={confirmAssignments}
-		onCancel={cancelAssignments}
-	/>
-{/if}
