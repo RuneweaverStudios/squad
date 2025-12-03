@@ -36,6 +36,10 @@
 	});
 </script>
 
+<svelte:head>
+	<title>Sparkline Test | JAT Dashboard</title>
+</svelte:head>
+
 <div class="min-h-screen bg-base-200 p-8">
 	<div class="max-w-4xl mx-auto">
 		<h1 class="text-3xl font-bold mb-8">Sparkline Component Test</h1>

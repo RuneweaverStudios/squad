@@ -1,153 +1,165 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	/**
+	 * Agent Kanban Page
+	 *
+	 * Kanban board grouping active Claude Code sessions by their activity state.
+	 * Unlike the task kanban (/kanban) which groups tasks by status,
+	 * this view groups agents by what they're doing (working, needs-input, etc.)
+	 */
+
+	import { onMount, onDestroy } from 'svelte';
 	import { page } from '$app/stores';
-	import KanbanBoard from '$lib/components/graph/KanbanBoard.svelte';
+	import AgentKanbanBoard from '$lib/components/agent/kanban/AgentKanbanBoard.svelte';
 	import TaskDetailDrawer from '$lib/components/TaskDetailDrawer.svelte';
+	import {
+		fetch as fetchSessions,
+		fetchUsage as fetchSessionUsage,
+		kill as killSession,
+		sendInput,
+		interrupt as interruptSession,
+		startPolling,
+		stopPolling,
+		getSessions,
+		getIsLoading,
+		getError
+	} from '$lib/stores/workSessions.svelte.js';
 
-	// Task type
-	interface Task {
-		id: string;
-		title: string;
-		description?: string;
-		status: string;
-		priority: number;
-		assignee?: string;
-		depends_on?: string[];
-		labels?: string[];
-	}
-
-	// Task data
-	let tasks = $state<Task[]>([]);
-	let allTasks = $state<Task[]>([]);
-	let loading = $state(true);
-	let error = $state<string | null>(null);
-	let selectedTaskId = $state<string | null>(null);
+	// Drawer state
 	let drawerOpen = $state(false);
+	let selectedTaskId = $state<string | null>(null);
 
 	// Filters
-	let selectedPriorities = $state(new Set(['0', '1', '2', '3'])); // All priorities by default
+	let selectedProject = $state('All Projects');
+	let selectedPriorities = $state(new Set([0, 1, 2, 3]));
 	let searchQuery = $state('');
 
-	// Read project filter from URL (managed by root layout)
-	let selectedProject = $state('All Projects');
+	// Get sessions from store (reactive)
+	const sessions = $derived(getSessions());
+	const isLoading = $derived(getIsLoading());
+	const error = $derived(getError());
 
-	// Sync selectedProject from URL params
+	// Sync project filter from URL
 	$effect(() => {
 		const projectParam = $page.url.searchParams.get('project');
 		selectedProject = projectParam || 'All Projects';
 	});
 
 	// Toggle priority selection
-	function togglePriority(priority: string) {
+	function togglePriority(priority: number) {
 		if (selectedPriorities.has(priority)) {
 			selectedPriorities.delete(priority);
 		} else {
 			selectedPriorities.add(priority);
 		}
-		selectedPriorities = new Set(selectedPriorities); // Trigger reactivity
+		selectedPriorities = new Set(selectedPriorities);
 	}
 
-	// Filter tasks by project and priority
-	const filteredTasks = $derived(() => {
-		let result = allTasks;
+	// Event handlers
+	async function handleKillSession(sessionName: string) {
+		await killSession(sessionName);
+	}
 
-		// Filter by project prefix (e.g., "jat-abc" matches "jat")
-		if (selectedProject && selectedProject !== 'All Projects') {
-			result = result.filter((task) => task.id.startsWith(selectedProject + '-'));
-		}
+	async function handleInterrupt(sessionName: string) {
+		await interruptSession(sessionName);
+	}
 
-		// Filter by priority (OR logic: task priority must be in selected set)
-		if (selectedPriorities.size > 0 && selectedPriorities.size < 4) {
-			result = result.filter((task) => selectedPriorities.has(String(task.priority)));
-		}
+	async function handleContinue(sessionName: string) {
+		await sendInput(sessionName, 'continue', 'text');
+	}
 
-		// Filter by search
-		if (searchQuery.trim()) {
-			const query = searchQuery.toLowerCase();
-			result = result.filter(
-				(task) =>
-					task.title?.toLowerCase().includes(query) ||
-					task.description?.toLowerCase().includes(query)
-			);
-		}
-
-		return result;
-	});
-
-	// Fetch tasks
-	async function fetchTasks() {
-		try {
-			loading = true;
-			error = null;
-
-			const response = await fetch(`/api/tasks`);
-			if (!response.ok) throw new Error('Failed to fetch tasks');
-
-			const data = await response.json();
-			allTasks = data.tasks || [];
-		} catch (err: unknown) {
-			error = err instanceof Error ? err.message : 'Unknown error';
-			console.error('Failed to fetch tasks:', err);
-		} finally {
-			loading = false;
+	async function handleAttachTerminal(sessionName: string) {
+		// Open terminal in new window via API
+		const response = await fetch(`/api/sessions/${sessionName}/attach`, {
+			method: 'POST'
+		});
+		if (!response.ok) {
+			console.error('Failed to attach terminal');
 		}
 	}
 
-	// Handle card click in kanban board
+	async function handleSendInput(sessionName: string, input: string, type: 'text' | 'key' | 'raw') {
+		await sendInput(sessionName, input, type as 'text' | 'enter' | 'up' | 'down' | 'escape' | 'ctrl-c' | 'ctrl-d' | 'ctrl-u' | 'tab' | 'raw');
+	}
+
 	function handleTaskClick(taskId: string) {
 		selectedTaskId = taskId;
 		drawerOpen = true;
 	}
 
-	// Refetch tasks when filters change
-	$effect(() => {
-		fetchTasks();
+	// Start polling on mount
+	onMount(async () => {
+		// Phase 1: Fast initial fetch
+		await fetchSessions(100);
+
+		// Start polling for output updates (fast, no usage)
+		startPolling(1000);
+
+		// Phase 2: Lazy load usage data
+		setTimeout(() => fetchSessionUsage(100), 200);
 	});
 
-	// Update displayed tasks when project filter or allTasks change
+	// Usage data refresh (slower interval)
 	$effect(() => {
-		tasks = filteredTasks();
+		const interval = setInterval(() => fetchSessionUsage(100), 30000);
+		return () => clearInterval(interval);
 	});
 
-	onMount(() => {
-		fetchTasks();
+	onDestroy(() => {
+		stopPolling();
 	});
 </script>
 
+<svelte:head>
+	<title>Kanban | JAT Dashboard</title>
+</svelte:head>
+
 <div class="flex flex-col h-full bg-base-200">
 	<!-- Filters Bar -->
-	<div class="bg-base-100 border-b border-base-300 p-4 flex-none">
+	<div class="bg-base-100 border-b border-base-300 p-3 flex-none">
 		<div class="flex flex-wrap items-center gap-4">
-			<!-- Priority Filter (Toggle Badges) -->
-			<div class="form-control">
-				<label class="label py-1">
-					<span class="label-text text-sm">Priority ({selectedPriorities.size} selected)</span>
-				</label>
-				<div class="flex flex-wrap gap-1.5 p-2 bg-base-200 rounded-lg">
-					{#each ['0', '1', '2', '3'] as priority}
-						<button
-							class="badge badge-sm transition-all duration-200 cursor-pointer {selectedPriorities.has(priority) ? 'badge-primary shadow-md' : 'badge-ghost hover:badge-primary/20 hover:shadow-sm hover:scale-105'}"
-							onclick={() => togglePriority(priority)}
-						>
-							P{priority}
-							<span class="ml-1 opacity-70">
-								({allTasks.filter((task) => String(task.priority) === priority).length})
-							</span>
-						</button>
-					{/each}
-				</div>
+			<!-- Title -->
+			<div class="flex items-center gap-2">
+				<svg
+					class="w-5 h-5 text-primary"
+					fill="none"
+					stroke="currentColor"
+					viewBox="0 0 24 24"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"
+					/>
+				</svg>
+				<span class="font-semibold text-sm">Agent Kanban</span>
+				<span class="text-xs text-base-content/50">({sessions.length} sessions)</span>
+			</div>
+
+			<!-- Spacer -->
+			<div class="flex-1"></div>
+
+			<!-- Priority Filter -->
+			<div class="flex items-center gap-1.5">
+				<span class="text-xs text-base-content/50">Priority:</span>
+				{#each [0, 1, 2, 3] as priority}
+					<button
+						class="badge badge-sm cursor-pointer transition-all {selectedPriorities.has(priority)
+							? 'badge-primary shadow-sm'
+							: 'badge-ghost hover:badge-primary/20'}"
+						onclick={() => togglePriority(priority)}
+					>
+						P{priority}
+					</button>
+				{/each}
 			</div>
 
 			<!-- Search -->
 			<div class="form-control">
-				<label class="label py-1" for="search-filter">
-					<span class="label-text text-sm">Search</span>
-				</label>
 				<input
-					id="search-filter"
 					type="text"
-					placeholder="Search tasks..."
-					class="input input-bordered input-sm"
+					placeholder="Search agents/tasks..."
+					class="input input-bordered input-sm w-48"
 					bind:value={searchQuery}
 				/>
 			</div>
@@ -155,9 +167,12 @@
 	</div>
 
 	<!-- Loading State -->
-	{#if loading}
-		<div class="flex items-center justify-center h-96">
-			<div class="loading loading-spinner loading-lg text-primary"></div>
+	{#if isLoading && sessions.length === 0}
+		<div class="flex items-center justify-center flex-1">
+			<div class="text-center">
+				<span class="loading loading-bars loading-lg mb-4"></span>
+				<p class="text-sm text-base-content/60">Loading sessions...</p>
+			</div>
 		</div>
 
 	<!-- Error State -->
@@ -179,13 +194,49 @@
 			<span>Error: {error}</span>
 		</div>
 
+	<!-- Empty State -->
+	{:else if sessions.length === 0}
+		<div class="flex flex-col items-center justify-center flex-1 p-8">
+			<div class="text-center">
+				<svg
+					class="w-16 h-16 mx-auto mb-4 text-base-content/20"
+					fill="none"
+					stroke="currentColor"
+					viewBox="0 0 24 24"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="1.5"
+						d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+					/>
+				</svg>
+				<h3 class="text-lg font-medium mb-2 text-base-content/60">No Active Sessions</h3>
+				<p class="text-sm text-base-content/40 max-w-md">
+					Claude Code sessions will appear here when agents start working.
+					Use the <code class="text-xs px-1 py-0.5 bg-base-300 rounded">/jat:start</code> command to begin.
+				</p>
+			</div>
+		</div>
+
 	<!-- Main Content: Kanban Board -->
 	{:else}
-		<div class="flex-1 flex flex-col overflow-hidden">
-			<KanbanBoard tasks={filteredTasks()} onTaskClick={handleTaskClick} />
+		<div class="flex-1 overflow-hidden">
+			<AgentKanbanBoard
+				{sessions}
+				onKillSession={handleKillSession}
+				onInterrupt={handleInterrupt}
+				onContinue={handleContinue}
+				onAttachTerminal={handleAttachTerminal}
+				onSendInput={handleSendInput}
+				onTaskClick={handleTaskClick}
+				projectFilter={selectedProject}
+				priorityFilter={selectedPriorities}
+				{searchQuery}
+			/>
 		</div>
 	{/if}
 
-	<!-- Task Detail Modal -->
+	<!-- Task Detail Drawer -->
 	<TaskDetailDrawer bind:taskId={selectedTaskId} bind:isOpen={drawerOpen} />
 </div>

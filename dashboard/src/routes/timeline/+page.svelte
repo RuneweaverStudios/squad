@@ -92,6 +92,10 @@
 	});
 </script>
 
+<svelte:head>
+	<title>Timeline | JAT Dashboard</title>
+</svelte:head>
+
 <div class="min-h-screen bg-base-200">
 	<!-- Filters Bar -->
 	<div class="bg-base-100 border-b border-base-300 p-4">

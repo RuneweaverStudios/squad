@@ -47,6 +47,10 @@
 	];
 </script>
 
+<svelte:head>
+	<title>API Demo | JAT Dashboard</title>
+</svelte:head>
+
 <div class="min-h-screen bg-base-200">
 	<div class="container mx-auto p-4 space-y-6">
 		<!-- Status Banner -->

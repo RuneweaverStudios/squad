@@ -1,31 +1,37 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	/**
+	 * Work Page
+	 * Shows active Claude Code work sessions with TaskTable below.
+	 *
+	 * Layout: SessionPanel (horizontal scroll) + Resizable Divider + TaskTable
+	 * User can drag divider to adjust split between panels.
+	 */
+
+	import { onMount, onDestroy } from 'svelte';
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
 	import TaskTable from '$lib/components/agents/TaskTable.svelte';
-	import AgentGrid from '$lib/components/agents/AgentGrid.svelte';
+	import SessionPanel from '$lib/components/work/SessionPanel.svelte';
 	import TaskDetailDrawer from '$lib/components/TaskDetailDrawer.svelte';
 	import ResizableDivider from '$lib/components/ResizableDivider.svelte';
-	import { lastSessionEvent } from '$lib/stores/sessionEvents';
-
-	let tasks = $state<any[]>([]);
-	let allTasks = $state<any[]>([]);  // Unfiltered tasks for project list calculation
-	let agents = $state<any[]>([]);
-	let reservations = $state<any[]>([]);
-	let selectedProject = $state('All Projects');
-	let sparklineData = $state([]);
-	let isInitialLoad = $state(true);
-
-	// Drawer state for TaskDetailDrawer
-	let drawerOpen = $state(false);
-	let selectedTaskId = $state<string | null>(null);
-
-	// Highlighted agent for scroll-to-agent feature
-	let highlightedAgent = $state<string | null>(null);
+	import {
+		workSessionsState,
+		fetch as fetchSessions,
+		fetchUsage as fetchSessionUsage,
+		spawn,
+		kill,
+		sendInput,
+		interrupt,
+		sendEnter,
+		startPolling,
+		stopPolling
+	} from '$lib/stores/workSessions.svelte.js';
+	import { broadcastSessionEvent } from '$lib/stores/sessionEvents';
+	import { lastTaskEvent } from '$lib/stores/taskEvents';
 
 	// Resizable panel state
-	const STORAGE_KEY = 'dash-panel-split';
-	const DEFAULT_SPLIT = 40; // 40% for AgentGrid, 60% for TaskTable
+	const STORAGE_KEY = 'work-panel-split';
+	const DEFAULT_SPLIT = 60; // 60% for work panel, 40% for task table
 	const MIN_SPLIT = 20;
 	const MAX_SPLIT = 80;
 	const SNAP_RESTORE_SIZE = 40; // Restore to 40% when unsnapping
@@ -118,7 +124,22 @@
 		}
 	}
 
-	// Sync selectedProject from URL params (REACTIVE using $page store)
+	// Task state
+	let tasks = $state<any[]>([]);
+	let allTasks = $state<any[]>([]);
+	let agents = $state<any[]>([]);
+	let reservations = $state<any[]>([]);
+	let selectedProject = $state('All Projects');
+	let isInitialLoad = $state(true);
+
+	// Drawer state
+	let drawerOpen = $state(false);
+	let selectedTaskId = $state<string | null>(null);
+
+	// Highlighted agent for scroll-to-agent feature
+	let highlightedAgent = $state<string | null>(null);
+
+	// Sync selectedProject from URL params
 	$effect(() => {
 		const projectParam = $page.url.searchParams.get('project');
 		if (projectParam && projectParam !== 'All Projects') {
@@ -128,21 +149,27 @@
 		}
 	});
 
-	// Refetch data whenever selectedProject changes (triggered by URL or dropdown)
+	// Refetch data whenever selectedProject changes
 	$effect(() => {
-		// This effect depends on selectedProject, so it re-runs when it changes
-		selectedProject; // Read selectedProject to create dependency
-		fetchData();
+		selectedProject;
+		fetchTaskData();
 	});
 
-	// Fetch agent data from unified API
-	// Phase 1: Fast load without usage data (agents, tasks, reservations)
-	// Phase 2: Lazy load usage data separately for displayed agents
-	async function fetchData(includeUsage = false) {
+	// Listen for task events (created, released, etc.) and refresh immediately
+	$effect(() => {
+		const unsubscribe = lastTaskEvent.subscribe((event) => {
+			if (event) {
+				// Refresh task data when any task event occurs
+				fetchTaskData();
+			}
+		});
+		return unsubscribe;
+	});
+
+	// Fetch task data
+	async function fetchTaskData() {
 		try {
-			// Build URL with project filter and activities
-			// Only include usage=true if explicitly requested (for background refresh)
-			let url = `/api/agents?full=true&activities=true${includeUsage ? '&usage=true' : ''}`;
+			let url = '/api/agents?full=true';
 			if (selectedProject && selectedProject !== 'All Projects') {
 				url += `&project=${encodeURIComponent(selectedProject)}`;
 			}
@@ -155,99 +182,92 @@
 				return;
 			}
 
-			// Update state with real data
 			agents = data.agents || [];
 			reservations = data.reservations || [];
 			tasks = data.tasks || [];
 
-			// Update allTasks when viewing all projects (for dropdown options)
 			if (selectedProject === 'All Projects') {
 				allTasks = data.tasks || [];
 			}
 		} catch (error) {
-			console.error('Failed to fetch agent data:', error);
+			console.error('Failed to fetch task data:', error);
 		} finally {
-			// Only set to false after first load completes
 			isInitialLoad = false;
 		}
 	}
 
-	// Fetch usage data separately (runs after initial load completes)
-	async function fetchUsageData() {
-		try {
-			const response = await fetch('/api/agents?full=true&usage=true');
-			const data = await response.json();
+	// Event Handlers for WorkPanel
 
-			if (data.error || !data.agents) return;
-
-			// Merge usage data into existing agents
-			const usageMap = new Map(data.agents.map((a: { name: string; usage?: unknown }) => [a.name, a.usage]));
-			agents = agents.map(agent => ({
-				...agent,
-				usage: usageMap.get(agent.name) || agent.usage
-			}));
-		} catch (error) {
-			console.error('Failed to fetch usage data:', error);
+	async function handleSpawnForTask(taskId: string) {
+		const session = await spawn(taskId);
+		if (session) {
+			await fetchTaskData();
 		}
 	}
 
-	// Fetch sparkline data (system-wide, no agent filter)
-	async function fetchSparklineData() {
-		try {
-			const response = await fetch('/api/agents/sparkline?range=24h');
-			const result = await response.json();
+	async function handleKillSession(sessionName: string) {
+		const success = await kill(sessionName);
+		if (success) {
+			// Broadcast event so other pages (like /dash) know to refresh
+			broadcastSessionEvent('session-killed', sessionName);
+			await fetchTaskData();
+		}
+	}
 
-			if (result.error) {
-				console.error('Sparkline API error:', result.error);
+	async function handleInterrupt(sessionName: string) {
+		await interrupt(sessionName);
+	}
+
+	async function handleContinue(sessionName: string) {
+		await sendEnter(sessionName);
+	}
+
+	async function handleAttachTerminal(sessionName: string) {
+		try {
+			const response = await fetch(`/api/work/${sessionName}/attach`, {
+				method: 'POST'
+			});
+			if (!response.ok) {
+				console.error('Failed to attach terminal:', await response.text());
+			}
+		} catch (error) {
+			console.error('Failed to attach terminal:', error);
+		}
+	}
+
+	async function handleSendInput(sessionName: string, input: string, type: 'text' | 'key' | 'raw') {
+		if (type === 'raw') {
+			// Send raw text without Enter (for live streaming)
+			await sendInput(sessionName, input, 'raw');
+			return;
+		}
+		if (type === 'key') {
+			// Special keys should be passed as the type, not the input
+			const specialKeys = ['ctrl-c', 'ctrl-d', 'ctrl-u', 'enter', 'escape', 'up', 'down', 'tab'];
+			if (specialKeys.includes(input)) {
+				await sendInput(sessionName, '', input as 'ctrl-c' | 'ctrl-d' | 'ctrl-u' | 'enter' | 'escape' | 'up' | 'down' | 'tab');
 				return;
 			}
-
-			// Update sparkline data
-			sparklineData = result.data || [];
-		} catch (error) {
-			console.error('Failed to fetch sparkline data:', error);
+			// Fallback to raw for non-special keys
+			await sendInput(sessionName, input, 'raw');
+			return;
 		}
+		await sendInput(sessionName, input, 'text');
 	}
 
-	// Handle task assignment via drag-and-drop
-	async function handleTaskAssign(taskId: string, agentName: string) {
-		try {
-			const response = await fetch('/api/agents', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({ taskId, agentName })
-			});
-
-			const result = await response.json();
-
-			if (!response.ok || result.error) {
-				console.error('Failed to assign task:', result.error || result.message);
-				throw new Error(result.message || 'Failed to assign task');
-			}
-
-			// Immediately refresh data to show updated assignment
-			await fetchData();
-		} catch (error) {
-			console.error('Error assigning task:', error);
-			throw error;
-		}
-	}
-
-	// Handle task click from TaskQueue - open drawer
+	// Handle task click
 	function handleTaskClick(taskId: string) {
 		selectedTaskId = taskId;
 		drawerOpen = true;
 	}
 
-	// Handle agent click - scroll to agent card and highlight it
+	// Handle agent click - scroll to work card and highlight it
 	function handleAgentClick(agentName: string) {
-		// Find the agent card element using data-agent-name attribute
-		const agentCard = document.querySelector(`[data-agent-name="${agentName}"]`);
-		if (agentCard) {
-			// Scroll the agent card into view smoothly
-			agentCard.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+		// Find the work card element using data-agent-name attribute
+		const workCard = document.querySelector(`[data-agent-name="${agentName}"]`);
+		if (workCard) {
+			// Scroll the work card into view smoothly
+			workCard.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
 
 			// Set highlighted state to trigger animation
 			highlightedAgent = agentName;
@@ -259,53 +279,49 @@
 		}
 	}
 
-	// Auto-refresh data every 15 seconds (layout also polls at 30s)
-	// Include usage data on background refresh (user won't notice delay)
-	$effect(() => {
-		const interval = setInterval(() => fetchData(true), 15000);
-		return () => clearInterval(interval);
-	});
-
-	// React to session events from other pages (e.g., session killed on /work)
-	$effect(() => {
-		const event = $lastSessionEvent;
-		if (event) {
-			// Immediately refresh data when a session is killed or spawned
-			fetchData();
-		}
-	});
-
-	// Auto-refresh sparkline every 30 seconds
-	$effect(() => {
-		const interval = setInterval(fetchSparklineData, 30000);
-		return () => clearInterval(interval);
-	});
-
-	// Track previous drawer state to detect close transition
+	// Refetch on drawer close
 	let wasDrawerOpen = false;
-
-	// Refetch data when drawer closes (to update any changes made in drawer)
 	$effect(() => {
 		if (wasDrawerOpen && !drawerOpen) {
-			fetchData();
+			fetchTaskData();
+			fetchSessions();
 		}
 		wasDrawerOpen = drawerOpen;
 	});
 
-	onMount(async () => {
-		// Phase 1: Quick initial load (no usage data) - don't wait for sparkline
-		await fetchData();
-		updateContainerHeight();
+	// Auto-refresh task data every 15 seconds
+	$effect(() => {
+		const interval = setInterval(fetchTaskData, 15000);
+		return () => clearInterval(interval);
+	});
 
-		// Phase 2: Load sparkline and usage data in background (don't block UI)
-		// Sparkline takes ~1.5s on cache miss, so fetch it after UI renders
-		fetchSparklineData();
-		setTimeout(() => fetchUsageData(), 100);
+	// Auto-refresh session usage data every 30 seconds (slower than output polling)
+	$effect(() => {
+		const interval = setInterval(() => fetchSessionUsage(), 30000);
+		return () => clearInterval(interval);
+	});
+
+	onMount(() => {
+		// Phase 1: Fast initial load (no usage data)
+		fetchTaskData();
+		startPolling(500);
+		updateContainerHeight();
+		window.addEventListener('resize', updateContainerHeight);
+
+		// Phase 2: Lazy load usage data in background
+		setTimeout(() => fetchSessionUsage(), 200);
+	});
+
+	onDestroy(() => {
+		stopPolling();
+		if (browser) {
+			window.removeEventListener('resize', updateContainerHeight);
+		}
 	});
 </script>
 
 <svelte:head>
-	<title>Agents | JAT Dashboard</title>
+	<title>Tasks | JAT Dashboard</title>
 </svelte:head>
 
 <svelte:window onresize={updateContainerHeight} />
@@ -314,22 +330,33 @@
 	bind:this={containerRef}
 	class="h-full bg-base-200 flex flex-col overflow-hidden"
 >
-	<!-- Agent Grid -->
+	<!-- Work Sessions (horizontal scroll) -->
+	<!-- min-h-0 allows proper flex shrinking; overflow-x-hidden clips horizontal overflow while scroll container handles horizontal scroll -->
 	<div
-		class="overflow-hidden bg-base-100 flex flex-col transition-all duration-150"
-		style="height: {splitPercent}%;"
+		class="min-h-0 bg-base-100 flex flex-col transition-all duration-150"
+		style="height: {splitPercent}%; overflow-x: hidden;"
 		class:hidden={collapsedDirection === 'top'}
 	>
 		{#if isInitialLoad}
-			<!-- Loading State for Agent Grid -->
 			<div class="flex items-center justify-center flex-1">
 				<div class="text-center">
 					<span class="loading loading-bars loading-lg mb-4"></span>
-					<p class="text-sm text-base-content/60">Loading agents...</p>
+					<p class="text-sm text-base-content/60">Loading work sessions...</p>
 				</div>
 			</div>
 		{:else}
-			<AgentGrid {agents} {tasks} onTaskClick={handleTaskClick} {highlightedAgent} />
+			<SessionPanel
+				workSessions={workSessionsState.sessions}
+				onSpawnForTask={handleSpawnForTask}
+				onKillSession={handleKillSession}
+				onInterrupt={handleInterrupt}
+				onContinue={handleContinue}
+				onAttachTerminal={handleAttachTerminal}
+				onSendInput={handleSendInput}
+				onTaskClick={handleTaskClick}
+				{highlightedAgent}
+				class="flex-1"
+			/>
 		{/if}
 	</div>
 
@@ -342,14 +369,13 @@
 		class="h-2 bg-base-300 hover:bg-primary/20 border-y border-base-300 flex-shrink-0"
 	/>
 
-	<!-- Task Section -->
+	<!-- Task Table -->
 	<div
 		class="overflow-auto bg-base-100 flex-1 transition-all duration-150"
 		style="height: {100 - splitPercent}%;"
 		class:hidden={collapsedDirection === 'bottom'}
 	>
 		{#if isInitialLoad}
-			<!-- Loading State -->
 			<div class="flex items-center justify-center h-48">
 				<div class="text-center">
 					<span class="loading loading-bars loading-lg mb-4"></span>
