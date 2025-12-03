@@ -9,6 +9,8 @@
 	 * - Emits percentage changes via callback
 	 * - Visual feedback on hover/drag
 	 * - Snap-to-collapse support with click-to-restore
+	 * - Proximity detection: grows larger when mouse approaches
+	 * - Glow effect on hover for better visibility
 	 */
 
 	interface Props {
@@ -31,7 +33,13 @@
 	}: Props = $props();
 
 	let isDragging = $state(false);
+	let isNearby = $state(false);
+	let isHovering = $state(false);
 	let startY = $state(0);
+	let dividerElement: HTMLDivElement | undefined = $state();
+
+	// Proximity detection threshold in pixels
+	const PROXIMITY_THRESHOLD = 24;
 
 	function handleMouseDown(e: MouseEvent) {
 		// If collapsed and we have a restore handler, treat click as restore
@@ -83,15 +91,53 @@
 	function handleTouchEnd() {
 		isDragging = false;
 	}
+
+	function handleMouseEnter() {
+		isHovering = true;
+	}
+
+	function handleMouseLeave() {
+		isHovering = false;
+	}
+
+	// Proximity detection: track mouse movement near the divider
+	function handleProximityMove(e: MouseEvent) {
+		if (!dividerElement || isDragging) return;
+
+		const rect = dividerElement.getBoundingClientRect();
+		const dividerCenterY = rect.top + rect.height / 2;
+		const distance = Math.abs(e.clientY - dividerCenterY);
+
+		isNearby = distance <= PROXIMITY_THRESHOLD;
+	}
+
+	// Set up proximity tracking on mount
+	$effect(() => {
+		if (typeof window === 'undefined') return;
+
+		document.addEventListener('mousemove', handleProximityMove);
+
+		return () => {
+			document.removeEventListener('mousemove', handleProximityMove);
+		};
+	});
+
+	// Derived state for expanded appearance
+	const isExpanded = $derived(isDragging || isHovering || isNearby);
 </script>
 
 <div
-	class="flex items-center justify-center select-none transition-all duration-150 {className} {isDragging ? 'bg-primary/20' : ''} {isCollapsed ? 'cursor-pointer divider-collapsed' : 'cursor-row-resize'}"
+	bind:this={dividerElement}
+	class="divider-container flex items-center justify-center select-none {className} {isCollapsed ? 'cursor-pointer divider-collapsed' : 'cursor-row-resize'}"
+	class:expanded={isExpanded}
+	class:dragging={isDragging}
 	role="separator"
 	aria-orientation="horizontal"
 	aria-expanded={!isCollapsed}
 	tabindex="0"
 	onmousedown={handleMouseDown}
+	onmouseenter={handleMouseEnter}
+	onmouseleave={handleMouseLeave}
 	ontouchstart={handleTouchStart}
 	ontouchmove={handleTouchMove}
 	ontouchend={handleTouchEnd}
@@ -108,37 +154,102 @@
 			<div class="indicator-line"></div>
 		</div>
 	{:else}
-		<!-- Normal state: grippy handle -->
-		<div
-			class="flex flex-col gap-0.5 py-1 px-8 rounded transition-opacity"
-			class:opacity-100={isDragging}
-			class:opacity-50={!isDragging}
-		>
-			<div class="w-8 h-0.5 rounded-full bg-base-content/30"></div>
-			<div class="w-8 h-0.5 rounded-full bg-base-content/30"></div>
+		<!-- Normal state: grippy handle with proximity-aware sizing -->
+		<div class="grippy-handle">
+			<div class="grip-line"></div>
+			<div class="grip-line"></div>
 		</div>
 	{/if}
 </div>
 
 <style>
-	div[role="separator"]:hover {
-		background: oklch(0.5 0.1 250 / 0.1);
+	/* Main divider container with smooth transitions */
+	.divider-container {
+		height: 8px;
+		min-height: 8px;
+		transition:
+			height 200ms cubic-bezier(0.4, 0, 0.2, 1),
+			background 200ms ease,
+			box-shadow 200ms ease;
 	}
 
-	div[role="separator"]:not([aria-expanded="false"]):hover > div {
+	/* Expanded state: larger hit target + glow */
+	.divider-container.expanded {
+		height: 16px;
+		min-height: 16px;
+		background: oklch(0.55 0.12 250 / 0.15);
+		box-shadow:
+			0 0 12px oklch(0.65 0.18 250 / 0.4),
+			inset 0 0 8px oklch(0.65 0.18 250 / 0.2);
+	}
+
+	/* Dragging state: stronger glow */
+	.divider-container.dragging {
+		height: 16px;
+		min-height: 16px;
+		background: oklch(0.55 0.15 250 / 0.25);
+		box-shadow:
+			0 0 20px oklch(0.70 0.20 250 / 0.5),
+			inset 0 0 12px oklch(0.70 0.20 250 / 0.3);
+	}
+
+	/* Grippy handle styling */
+	.grippy-handle {
+		display: flex;
+		flex-direction: column;
+		gap: 3px;
+		padding: 4px 32px;
+		border-radius: 4px;
+		transition:
+			opacity 200ms ease,
+			transform 200ms ease;
+		opacity: 0.4;
+	}
+
+	.divider-container.expanded .grippy-handle {
 		opacity: 1;
+		transform: scaleY(1.2);
+	}
+
+	.divider-container.dragging .grippy-handle {
+		opacity: 1;
+		transform: scaleY(1.3);
+	}
+
+	.grip-line {
+		width: 32px;
+		height: 2px;
+		border-radius: 1px;
+		background: oklch(0.60 0.08 250);
+		transition: background 200ms ease, box-shadow 200ms ease;
+	}
+
+	.divider-container.expanded .grip-line {
+		background: oklch(0.75 0.15 250);
+		box-shadow: 0 0 6px oklch(0.75 0.15 250 / 0.5);
+	}
+
+	.divider-container.dragging .grip-line {
+		background: oklch(0.80 0.18 250);
+		box-shadow: 0 0 8px oklch(0.80 0.18 250 / 0.6);
 	}
 
 	/* Collapsed state styling */
 	.divider-collapsed {
-		height: 6px !important;
+		height: 6px;
 		min-height: 6px;
 		background: oklch(0.25 0.02 250);
 		border-color: oklch(0.30 0.03 250) !important;
 	}
 
-	.divider-collapsed:hover {
-		background: oklch(0.30 0.05 250) !important;
+	/* Collapsed + expanded (proximity/hover): grow larger for easy targeting */
+	.divider-collapsed.expanded {
+		height: 20px;
+		min-height: 20px;
+		background: oklch(0.35 0.08 250 / 0.6);
+		box-shadow:
+			0 0 16px oklch(0.60 0.20 250 / 0.5),
+			inset 0 0 10px oklch(0.60 0.20 250 / 0.3);
 	}
 
 	.collapsed-indicator {
@@ -147,6 +258,12 @@
 		gap: 8px;
 		width: 100%;
 		padding: 0 16px;
+		transition: transform 200ms ease;
+	}
+
+	/* Scale up the indicator when expanded */
+	.divider-collapsed.expanded .collapsed-indicator {
+		transform: scaleY(1.5);
 	}
 
 	.indicator-line {
@@ -159,13 +276,26 @@
 			oklch(0.50 0.08 250 / 0.3) 80%,
 			transparent 100%
 		);
+		transition: background 200ms ease, height 200ms ease;
+	}
+
+	/* Brighter lines when expanded */
+	.divider-collapsed.expanded .indicator-line {
+		height: 2px;
+		background: linear-gradient(
+			90deg,
+			transparent 0%,
+			oklch(0.70 0.15 250 / 0.7) 15%,
+			oklch(0.70 0.15 250 / 0.7) 85%,
+			transparent 100%
+		);
 	}
 
 	.indicator-dots {
 		display: flex;
 		gap: 3px;
 		opacity: 0.5;
-		transition: opacity 0.15s ease, transform 0.15s ease;
+		transition: opacity 200ms ease, transform 200ms ease, gap 200ms ease;
 	}
 
 	.indicator-dots span {
@@ -173,25 +303,19 @@
 		height: 3px;
 		border-radius: 50%;
 		background: oklch(0.60 0.12 250);
+		transition: width 200ms ease, height 200ms ease, background 200ms ease, box-shadow 200ms ease;
 	}
 
-	.divider-collapsed:hover .indicator-dots {
+	/* Expanded state: larger, brighter dots with glow */
+	.divider-collapsed.expanded .indicator-dots {
 		opacity: 1;
-		transform: scaleX(1.2);
+		gap: 5px;
 	}
 
-	.divider-collapsed:hover .indicator-dots span {
-		background: oklch(0.70 0.15 250);
-		box-shadow: 0 0 4px oklch(0.70 0.15 250 / 0.5);
-	}
-
-	.divider-collapsed:hover .indicator-line {
-		background: linear-gradient(
-			90deg,
-			transparent 0%,
-			oklch(0.60 0.12 250 / 0.5) 20%,
-			oklch(0.60 0.12 250 / 0.5) 80%,
-			transparent 100%
-		);
+	.divider-collapsed.expanded .indicator-dots span {
+		width: 5px;
+		height: 5px;
+		background: oklch(0.80 0.18 250);
+		box-shadow: 0 0 8px oklch(0.80 0.18 250 / 0.7);
 	}
 </style>
