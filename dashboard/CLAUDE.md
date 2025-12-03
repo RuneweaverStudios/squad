@@ -2852,14 +2852,126 @@ export const SESSION_STATE_ACTIONS: Record<string, SessionStateAction[]> = {
 ### Files
 
 - `src/lib/config/statusColors.ts` - Centralized visual config (SESSION_STATE_VISUALS, SESSION_STATE_ACTIONS)
-- `src/lib/components/work/WorkCard.svelte` - Main component with state detection (imports from statusColors.ts)
+- `src/lib/components/work/SessionCard.svelte` - Main component with state detection (imports from statusColors.ts)
 - `src/lib/components/work/StatusActionBadge.svelte` - Clickable status badge with dropdown actions
+
+## SessionCard Architecture
+
+### Overview
+
+The **SessionCard** component (`src/lib/components/work/SessionCard.svelte`) is the unified component for displaying agent sessions across the dashboard. It supports three display modes optimized for different contexts.
+
+**Design Philosophy:** One task : One agent : One session. The dashboard follows a simplified model where each agent works on a single task at a time, eliminating the need for task queues, drag-drop assignment, and multi-task conflict detection.
+
+### Display Modes
+
+| Mode | Use Case | Features |
+|------|----------|----------|
+| `agent` | Work sessions panel | Full terminal output, input field, resize, session controls |
+| `server` | Dev server sessions | Process output, start/stop controls |
+| `compact` | Kanban cards, Agent grid | Minimal card: agent name, task, tokens, state |
+
+### Usage Examples
+
+**Work Sessions Panel (agent mode):**
+```svelte
+<SessionCard
+  mode="agent"
+  sessionName={session.sessionName}
+  agentName={session.agentName}
+  task={session.task}
+  output={session.output}
+  tokens={session.tokens}
+  cost={session.cost}
+  onKillSession={handleKill}
+  onSendInput={handleSendInput}
+  onTaskClick={handleTaskClick}
+/>
+```
+
+**Agent Kanban Board (compact mode):**
+```svelte
+<SessionCard
+  mode="compact"
+  sessionName={session.sessionName}
+  agentName={session.agentName}
+  task={session.task}
+  tokens={session.tokens}
+  cost={session.cost}
+  onTaskClick={handleTaskClick}
+/>
+```
+
+**Agent Grid (compact mode):**
+```svelte
+<SessionCard
+  mode="compact"
+  sessionName={`jat-${agent.name}`}
+  agentName={agent.name}
+  task={agentTask}
+  tokens={agent.usage?.today?.total_tokens || 0}
+  cost={agent.usage?.today?.cost || 0}
+  onTaskClick={handleTaskClick}
+/>
+```
+
+### State Detection
+
+SessionCard detects agent activity state by parsing tmux output for markers:
+
+| State | Detection Pattern | Description |
+|-------|-------------------|-------------|
+| `starting` | No markers, has task | Agent initializing |
+| `working` | `[JAT:WORKING]` | Actively coding |
+| `needs-input` | `[JAT:NEEDS_INPUT]`, Claude Code question UI patterns | Waiting for user |
+| `ready-for-review` | `[JAT:READY]`, `[JAT:NEEDS_REVIEW]` | Asking to complete |
+| `completing` | `jat:complete is running` | Running completion |
+| `completed` | `[JAT:COMPLETED]`, `[JAT:IDLE]` | Task finished |
+| `idle` | No task assigned | No active work |
+
+### Files
+
+**Core Component:**
+- `src/lib/components/work/SessionCard.svelte` - Main component (~2700 lines)
+
+**Related Components:**
+- `src/lib/components/work/WorkPanel.svelte` - Container for agent mode cards
+- `src/lib/components/agent/kanban/AgentKanbanBoard.svelte` - Kanban board using compact mode
+- `src/lib/components/agent/kanban/AgentKanbanColumn.svelte` - Kanban column wrapper
+- `src/lib/components/agents/AgentGrid.svelte` - Agent grid using compact mode
+
+**Configuration:**
+- `src/lib/config/statusColors.ts` - Visual state definitions (SESSION_STATE_VISUALS)
+
+**Types:**
+- `src/lib/types/agent.ts` - Agent, Task, ActivityState types
+
+### Pages Using SessionCard
+
+| Page | Route | Mode | Component |
+|------|-------|------|-----------|
+| Work | `/work` | agent | WorkPanel.svelte |
+| Kanban | `/kanban` | compact | AgentKanbanBoard.svelte |
+| Agents | `/agents` | compact | AgentGrid.svelte |
+
+### Migration from UnifiedAgentCard
+
+The UnifiedAgentCard component tree was removed and consolidated into SessionCard:
+
+**Deleted components:**
+- `UnifiedAgentCard.svelte` and all sub-components (header/, task/, queue/, terminal/, metrics/, feed/, actions/, modals/)
+- `agentCardConfig.ts`, `unifiedAgentState.ts`, `sessionStateDetection.ts`, `conflictDetection.ts`
+
+**Migration mapping:**
+- `UnifiedAgentCard mode="expanded"` → `SessionCard mode="agent"`
+- `UnifiedAgentCard mode="compact"` → `SessionCard mode="compact"`
+- `UnifiedAgentCard mode="standard"` → `SessionCard mode="compact"` (simplified, no task queue)
 
 ## Smart Question UI
 
 ### Overview
 
-When an agent uses the `AskUserQuestion` tool, WorkCard displays the question options as clickable buttons instead of requiring manual text input.
+When an agent uses the `AskUserQuestion` tool, SessionCard displays the question options as clickable buttons instead of requiring manual text input.
 
 ### How It Works
 
@@ -2877,7 +2989,7 @@ When an agent uses the `AskUserQuestion` tool, WorkCard displays the question op
 │  3. Dashboard polls /api/work/{sessionId}/question                          │
 │     └─► Returns parsed question data                                        │
 │                                                                             │
-│  4. WorkCard renders options as buttons                                     │
+│  4. SessionCard renders options as buttons                                  │
 │     └─► Single-select: Click sends option number immediately               │
 │     └─► Multi-select: Click toggles selection, Done button submits         │
 │                                                                             │
@@ -3017,6 +3129,107 @@ Returns current question data if available:
 ### Task Reference
 
 - jat-nsrz: Smart Question UI - Parse and display Claude Code question options (completed)
+
+## Sound Effects System
+
+### Overview
+
+The dashboard includes a comprehensive sound effects system using the Web Audio API. All sounds are programmatically generated (no external audio files) and respect user preferences.
+
+**Key Features:**
+- 25+ sound effect functions for various UI interactions
+- User preference toggle in UserProfile dropdown
+- localStorage persistence for sound preference
+- Web Audio API with lazy AudioContext initialization (browser autoplay policy compliant)
+
+### User Preference
+
+Sound effects can be enabled/disabled via the UserProfile dropdown in the top navigation bar.
+
+**Implementation:**
+- Toggle stored in localStorage (`sounds-enabled` key)
+- Default: disabled
+- Test sound plays on enable to confirm working
+
+**Files:**
+- `src/lib/components/UserProfile.svelte` - Toggle UI
+- `src/lib/utils/soundEffects.ts` - `areSoundsEnabled()`, `enableSounds()`, `disableSounds()`
+
+### Sound Categories
+
+| Category | Functions | Trigger |
+|----------|-----------|---------|
+| **Task Lifecycle** | `playNewTaskChime`, `playTaskStartSound`, `playTaskCompleteSound`, `playTaskExitSound` | Task state changes |
+| **Session Actions** | `playCleanupSound`, `playKillSound`, `playAttachSound`, `playInterruptSound` | StatusActionBadge dropdown |
+| **Server Control** | `playServerStartSound`, `playServerStopSound` | Server start/stop buttons |
+| **State Transitions** | `playNeedsInputSound`, `playReadyForReviewSound` | SessionCard state changes |
+| **Feedback** | `playSuccessChime`, `playErrorSound` | Form submissions |
+| **Drag-Drop** | `playPickupSound`, `playDropSound` | WorkDropZone interactions |
+| **Voice Input** | `playRecordingStartSound`, `playRecordingStopSound` | VoiceInput component |
+| **Misc** | `playAgentJoinSound`, `playSwarmSound`, `playCopySound`, `playDeleteSound`, `playAttachmentSound`, `playCelebrationSound`, `playOpenSound` | Various UI interactions |
+
+### Integration Points
+
+| Component | Sounds Used |
+|-----------|-------------|
+| `StatusActionBadge.svelte` | complete, cleanup, kill, attach, interrupt, start |
+| `SessionCard.svelte` | needs-input, ready-for-review, task-complete |
+| `TaskCreationDrawer.svelte` | success, error, attachment |
+| `WorkDropZone.svelte` | pickup, drop |
+| `VoiceInput.svelte` | recording-start, recording-stop |
+| `servers/+page.svelte` | server-start, server-stop |
+
+### Adding New Sounds
+
+1. Add function to `src/lib/utils/soundEffects.ts`:
+```typescript
+export function playMyNewSound(): void {
+    if (!areSoundsEnabled()) return;
+
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.frequency.value = 440; // Hz
+    gain.gain.value = 0.15;    // Volume (0-1)
+
+    osc.start();
+    osc.stop(ctx.currentTime + 0.1); // Duration in seconds
+}
+```
+
+2. Import and call in component:
+```typescript
+import { playMyNewSound } from '$lib/utils/soundEffects';
+
+// In event handler
+playMyNewSound();
+```
+
+### Sound Design Guidelines
+
+| Action Type | Pattern | Example |
+|-------------|---------|---------|
+| Success/Positive | Ascending tones | Task complete: 523→659→784 Hz |
+| Error/Negative | Descending tones | Kill: 400→300→200 Hz |
+| Attention/Alert | Repeated short tones | Needs input: 800→600→800 Hz |
+| Neutral/Info | Single mid-range tone | Attach: 600 Hz pulse |
+| Start/Begin | Rising sweep | Recording start: 300→600 Hz |
+| End/Stop | Falling sweep | Recording stop: 600→300 Hz |
+
+### Files
+
+- `src/lib/utils/soundEffects.ts` - All sound functions (830+ lines)
+- `src/lib/components/UserProfile.svelte` - Sound toggle UI
+
+### Task Reference
+
+- jat-fr9v: Research and implement sound effects system (completed)
 
 ## Development Commands
 
