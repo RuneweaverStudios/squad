@@ -21,6 +21,7 @@
 	import { page } from '$app/stores';
 	import AgentCountBadge from './AgentCountBadge.svelte';
 	import TokenUsageBadge from './TokenUsageBadge.svelte';
+	import TasksCompletedBadge from './TasksCompletedBadge.svelte';
 	import UserProfile from './UserProfile.svelte';
 	import CommandPalette from './CommandPalette.svelte';
 	import { openTaskDrawer } from '$lib/stores/drawerStore';
@@ -866,6 +867,11 @@
 				{projectColors}
 				compact={true}
 			/>
+		</div>
+
+		<!-- Tasks Completed Today Badge -->
+		<div class="flex">
+			<TasksCompletedBadge compact={true} />
 		</div>
 
 		<!-- User Profile -->
