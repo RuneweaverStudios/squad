@@ -122,65 +122,155 @@ interface AnsiState {
 	dim: boolean;
 	italic: boolean;
 	underline: boolean;
+	reverse: boolean;
 	color: string | null;
 	bgColor: string | null;
 }
 
-function parseAnsiCode(code: string, state: AnsiState): void {
-	const num = parseInt(code, 10);
+/**
+ * Parse ANSI codes and update state
+ * Handles both single codes and extended color sequences (38;2;R;G;B and 48;2;R;G;B)
+ * @param codes - Array of code strings from the escape sequence
+ * @param state - Current ANSI state to update
+ */
+function parseAnsiCodes(codes: string[], state: AnsiState): void {
+	let i = 0;
+	while (i < codes.length) {
+		const num = parseInt(codes[i], 10);
 
-	if (num === 0) {
-		// Reset all
-		state.bold = false;
-		state.dim = false;
-		state.italic = false;
-		state.underline = false;
-		state.color = null;
-		state.bgColor = null;
-	} else if (num === 1) {
-		state.bold = true;
-	} else if (num === 2) {
-		state.dim = true;
-	} else if (num === 3) {
-		state.italic = true;
-	} else if (num === 4) {
-		state.underline = true;
-	} else if (num === 22) {
-		state.bold = false;
-		state.dim = false;
-	} else if (num === 23) {
-		state.italic = false;
-	} else if (num === 24) {
-		state.underline = false;
-	} else if (num >= 30 && num <= 37) {
-		state.color = ANSI_COLORS[num];
-	} else if (num === 39) {
-		state.color = null; // Default color
-	} else if (num >= 40 && num <= 47) {
-		state.bgColor = ANSI_BG_COLORS[num];
-	} else if (num === 49) {
-		state.bgColor = null; // Default background
-	} else if (num >= 90 && num <= 97) {
-		state.color = ANSI_COLORS[num];
-	} else if (num >= 100 && num <= 107) {
-		state.bgColor = ANSI_BG_COLORS[num];
+		// Check for 24-bit color codes: 38;2;R;G;B (foreground) or 48;2;R;G;B (background)
+		if ((num === 38 || num === 48) && codes[i + 1] === '2' && i + 4 < codes.length) {
+			const r = parseInt(codes[i + 2], 10);
+			const g = parseInt(codes[i + 3], 10);
+			const b = parseInt(codes[i + 4], 10);
+
+			if (!isNaN(r) && !isNaN(g) && !isNaN(b)) {
+				const color = `rgb(${r},${g},${b})`;
+				if (num === 38) {
+					state.color = color;
+				} else {
+					state.bgColor = color;
+				}
+				i += 5; // Skip 38/48, 2, R, G, B
+				continue;
+			}
+		}
+
+		// Check for 256-color codes: 38;5;N (foreground) or 48;5;N (background)
+		if ((num === 38 || num === 48) && codes[i + 1] === '5' && i + 2 < codes.length) {
+			const colorIndex = parseInt(codes[i + 2], 10);
+			if (!isNaN(colorIndex)) {
+				const color = get256Color(colorIndex);
+				if (num === 38) {
+					state.color = color;
+				} else {
+					state.bgColor = color;
+				}
+				i += 3; // Skip 38/48, 5, N
+				continue;
+			}
+		}
+
+		// Standard single-code handling
+		if (num === 0) {
+			// Reset all
+			state.bold = false;
+			state.dim = false;
+			state.italic = false;
+			state.underline = false;
+			state.reverse = false;
+			state.color = null;
+			state.bgColor = null;
+		} else if (num === 1) {
+			state.bold = true;
+		} else if (num === 2) {
+			state.dim = true;
+		} else if (num === 3) {
+			state.italic = true;
+		} else if (num === 4) {
+			state.underline = true;
+		} else if (num === 7) {
+			state.reverse = true;
+		} else if (num === 22) {
+			state.bold = false;
+			state.dim = false;
+		} else if (num === 23) {
+			state.italic = false;
+		} else if (num === 24) {
+			state.underline = false;
+		} else if (num === 27) {
+			state.reverse = false;
+		} else if (num >= 30 && num <= 37) {
+			state.color = ANSI_COLORS[num];
+		} else if (num === 39) {
+			state.color = null; // Default color
+		} else if (num >= 40 && num <= 47) {
+			state.bgColor = ANSI_BG_COLORS[num];
+		} else if (num === 49) {
+			state.bgColor = null; // Default background
+		} else if (num >= 90 && num <= 97) {
+			state.color = ANSI_COLORS[num];
+		} else if (num >= 100 && num <= 107) {
+			state.bgColor = ANSI_BG_COLORS[num];
+		}
+
+		i++;
+	}
+}
+
+/**
+ * Convert 256-color palette index to CSS color
+ * 0-7: Standard colors, 8-15: Bright colors
+ * 16-231: 6x6x6 color cube, 232-255: Grayscale
+ */
+function get256Color(index: number): string {
+	if (index < 8) {
+		// Standard colors
+		const colors = ['#000000', '#cd0000', '#00cd00', '#cdcd00', '#0000cd', '#cd00cd', '#00cdcd', '#e5e5e5'];
+		return colors[index];
+	} else if (index < 16) {
+		// Bright colors
+		const colors = ['#7f7f7f', '#ff0000', '#00ff00', '#ffff00', '#5c5cff', '#ff00ff', '#00ffff', '#ffffff'];
+		return colors[index - 8];
+	} else if (index < 232) {
+		// 6x6x6 color cube
+		const i = index - 16;
+		const r = Math.floor(i / 36);
+		const g = Math.floor((i % 36) / 6);
+		const b = i % 6;
+		const toHex = (n: number) => (n === 0 ? 0 : 55 + n * 40);
+		return `rgb(${toHex(r)},${toHex(g)},${toHex(b)})`;
+	} else {
+		// Grayscale (232-255 -> 24 shades)
+		const gray = (index - 232) * 10 + 8;
+		return `rgb(${gray},${gray},${gray})`;
 	}
 }
 
 function stateToStyle(state: AnsiState): string {
 	const styles: string[] = [];
 
+	// Handle reverse video by swapping foreground and background
+	let fgColor = state.color;
+	let bgColor = state.bgColor;
+	if (state.reverse) {
+		// Swap fg and bg colors
+		const temp = fgColor;
+		fgColor = bgColor || '#1a1a1a'; // Default bg if none set
+		bgColor = temp || '#ecf0f1'; // Default fg if none set
+	}
+
 	// When background color is set, ensure foreground has sufficient contrast
-	if (state.bgColor) {
-		styles.push(`background-color:${state.bgColor}`);
+	if (bgColor) {
+		styles.push(`background-color:${bgColor}`);
 		// Get a contrasting foreground color (either the current one if sufficient, or auto-selected)
-		const contrastingFg = getContrastingForeground(state.bgColor, state.color);
+		const contrastingFg = getContrastingForeground(bgColor, fgColor);
 		if (contrastingFg) {
 			styles.push(`color:${contrastingFg}`);
 		}
-	} else if (state.color) {
+	} else if (fgColor) {
 		// No background, just use the specified foreground color
-		styles.push(`color:${state.color}`);
+		styles.push(`color:${fgColor}`);
 	}
 
 	if (state.bold) {
@@ -212,6 +302,10 @@ function escapeHtml(text: string): string {
  * Convert a string containing ANSI escape codes to HTML
  */
 export function ansiToHtml(input: string): string {
+	// First, strip cursor show/hide sequences (ESC[?25l and ESC[?25h)
+	// These are output by chafa and other terminal tools but not needed in HTML
+	input = input.replace(/\x1b\[\?25[lh]/g, '');
+
 	// Match ANSI escape sequences: ESC[ followed by numbers and 'm'
 	const ansiRegex = /\x1b\[([0-9;]*)m/g;
 
@@ -220,6 +314,7 @@ export function ansiToHtml(input: string): string {
 		dim: false,
 		italic: false,
 		underline: false,
+		reverse: false,
 		color: null,
 		bgColor: null,
 	};
@@ -243,10 +338,9 @@ export function ansiToHtml(input: string): string {
 		}
 
 		// Parse the ANSI codes (can be multiple separated by ;)
+		// Uses parseAnsiCodes which handles extended color sequences (24-bit RGB, 256-color)
 		const codes = match[1].split(';').filter(c => c !== '');
-		for (const code of codes) {
-			parseAnsiCode(code, state);
-		}
+		parseAnsiCodes(codes, state);
 
 		// Open new span if we have styles
 		const style = stateToStyle(state);

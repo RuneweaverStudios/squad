@@ -6,8 +6,7 @@
 #
 # Multi-line status display for agent orchestration workflows
 #
-# Line 1: ██ Agent Name · [Priority] Task ID - Task Title ⏲ ActiveTime
-#         ^^ ANSI avatar (color based on name hash)
+# Line 1: Agent Name · [Priority] Task ID - Task Title ⏲ ActiveTime
 # Line 2: ▪▪▪▪▪▪▫▫▫▫ · ⎇ folder@branch · 🔒 N  📬 N  ⏱ Xm
 # Line 3: 💬 Xm Last user prompt...
 #
@@ -45,7 +44,7 @@
 #   Idle status:    Gray        (\033[0;37m)
 #
 # Example output:
-#   ██ GreatWind · [P1] 🔧 jat-4p0 - Demo: Frontend... ⏲ 1h23m
+#   GreatWind · [P1] 🔧 jat-4p0 - Demo: Frontend... ⏲ 1h23m
 #   ▪▪▪▪▪▪▫▫▫▫ · ⎇ jat@master* · 🔒 2  📬 1  ⏱ 45m
 #   💬 12m yes implement top 3
 #
@@ -64,78 +63,6 @@ RED='\033[0;31m'
 MAGENTA='\033[0;35m'
 RESET='\033[0m'
 BOLD='\033[1m'
-
-# ============================================================================
-# AGENT AVATAR (ANSI)
-# ============================================================================
-# Generates a 4-row tall colored avatar based on agent name.
-# Uses 256-color ANSI codes and half-block characters for smooth appearance.
-# Colors derived from name hash (same algorithm as dashboard fallback SVG).
-#
-# Format: 4 rows × 8 chars, circular shape using ▀▄█ characters
-# The avatar appears at the left of the statusline (multi-line).
-# ============================================================================
-
-# Generate ANSI avatar from agent name
-# Usage: avatar_lines=($(generate_avatar "AgentName"))
-# Returns 4 lines that should be printed separately
-generate_avatar() {
-    local name="$1"
-    [[ -z "$name" ]] && return
-
-    # Hash the name to get consistent colors
-    local hash=0
-    for (( i=0; i<${#name}; i++ )); do
-        char="${name:$i:1}"
-        ascii=$(printf '%d' "'$char")
-        hash=$(( (ascii + (hash * 31)) % 65536 ))
-    done
-
-    # Get primary hue (0-360)
-    local hue=$(( hash % 360 ))
-
-    # Map hue to 256-color palette - primary (bright) and secondary (dark) colors
-    local fg_code bg_code accent_code
-    if [[ $hue -lt 30 ]]; then
-        fg_code=196; bg_code=52; accent_code=209    # Red
-    elif [[ $hue -lt 60 ]]; then
-        fg_code=208; bg_code=94; accent_code=214    # Orange
-    elif [[ $hue -lt 90 ]]; then
-        fg_code=226; bg_code=100; accent_code=228   # Yellow
-    elif [[ $hue -lt 120 ]]; then
-        fg_code=118; bg_code=22; accent_code=154    # Lime
-    elif [[ $hue -lt 150 ]]; then
-        fg_code=48; bg_code=23; accent_code=85      # Green
-    elif [[ $hue -lt 180 ]]; then
-        fg_code=51; bg_code=30; accent_code=87      # Cyan
-    elif [[ $hue -lt 210 ]]; then
-        fg_code=45; bg_code=24; accent_code=81      # Sky blue
-    elif [[ $hue -lt 240 ]]; then
-        fg_code=33; bg_code=17; accent_code=69      # Blue
-    elif [[ $hue -lt 270 ]]; then
-        fg_code=129; bg_code=54; accent_code=171    # Purple
-    elif [[ $hue -lt 300 ]]; then
-        fg_code=201; bg_code=90; accent_code=213    # Magenta
-    elif [[ $hue -lt 330 ]]; then
-        fg_code=199; bg_code=89; accent_code=212    # Pink
-    else
-        fg_code=196; bg_code=52; accent_code=209    # Red
-    fi
-
-    # ANSI color codes
-    local FG="\033[38;5;${fg_code}m"
-    local BG="\033[38;5;${bg_code}m"
-    local AC="\033[38;5;${accent_code}m"
-    local RS="\033[0m"
-
-    # Generate 4-row circular avatar using half-blocks
-    # Uses ▀ (upper half), ▄ (lower half), █ (full block)
-    # Pattern creates a rounded square/circle effect
-    echo "${BG} ▄${FG}████${BG}▄ ${RS}"
-    echo "${FG}██${AC}████${FG}██${RS}"
-    echo "${FG}██${AC}████${FG}██${RS}"
-    echo "${BG} ▀${FG}████${BG}▀ ${RS}"
-}
 
 # ============================================================================
 # CACHING LAYER
@@ -454,7 +381,7 @@ if [[ -z "$task_id" ]] && command -v am-reservations &>/dev/null; then
         # Extract task ID from reason field (format: "task-id: description" or just "task-id")
         # Dynamic project prefix: extract from cwd (e.g., /home/jw/code/chimaro -> chimaro-xxx)
         project_prefix=$(basename "$cwd")
-        task_id=$(echo "$reservation_info" | grep "^Reason:" | sed 's/^Reason: //' | grep -oE -- "${project_prefix}-[a-z0-9]{3}\b" | head -1)
+        task_id=$(echo "$reservation_info" | grep "^Reason:" | sed 's/^Reason: //' | grep -oE "${project_prefix}-[a-z0-9]{3}\b" | head -1)
 
         # If we found a task ID from reservation, get its details from Beads
         if [[ -n "$task_id" ]] && command -v bd &>/dev/null; then
@@ -652,11 +579,21 @@ fi
 # Build status line with all indicators
 status_line=""
 
-# Generate avatar lines into array (4 rows)
-# We'll render these beside the status content later
-mapfile -t avatar_lines < <(generate_avatar "$agent_name")
+# Get ANSI avatar if available (cached .ansi file in avatars directory)
+# Multi-line avatar (6x3 chars) - each row prepended to corresponding status line
+AVATARS_DIR="/home/jw/code/jat/avatars"
+avatar_row1=""
+avatar_row2=""
+avatar_row3=""
+if [[ -n "$agent_name" ]] && [[ -f "${AVATARS_DIR}/${agent_name}.ansi" ]]; then
+    # Read multi-line avatar and split into rows
+    mapfile -t avatar_rows < "${AVATARS_DIR}/${agent_name}.ansi"
+    avatar_row1="${avatar_rows[0]:-}"
+    avatar_row2="${avatar_rows[1]:-}"
+    avatar_row3="${avatar_rows[2]:-}"
+fi
 
-# Start with agent name (avatar rendered separately)
+# Start with agent name (avatar will be prepended at output time)
 status_line="${BOLD}${BLUE}${agent_name}${RESET}"
 
 if [[ -n "$task_id" ]]; then
@@ -852,37 +789,18 @@ if [[ -n "$last_prompt" ]]; then
     third_line="${YELLOW}💬${RESET} ${activity_part}${last_prompt}"
 fi
 
-# Output status line(s) with avatar on the left
-# Avatar is 4 rows tall, status content is 3 rows
-# Layout:
-#   [avatar row 0] status_line
-#   [avatar row 1] second_line
-#   [avatar row 2] third_line
-#   [avatar row 3] (empty - just completes the avatar)
-
-avatar_width=9  # 8 chars + 1 space after avatar
-
-if [[ ${#avatar_lines[@]} -eq 4 ]]; then
-    # We have a valid avatar - render side by side
-    echo -e "${avatar_lines[0]} ${status_line}"
-    if [[ -n "$second_line" ]]; then
-        echo -e "${avatar_lines[1]} ${second_line}"
-    else
-        echo -e "${avatar_lines[1]}"
-    fi
-    if [[ -n "$third_line" ]]; then
-        echo -e "${avatar_lines[2]} ${third_line}"
-    else
-        echo -e "${avatar_lines[2]}"
-    fi
-    echo -e "${avatar_lines[3]}"
+# Output status line(s) with avatar rows prepended
+# Avatar is 6x3 chars - prepend each row to corresponding line
+if [[ -n "$avatar_row1" ]]; then
+    # Has multi-line avatar - prepend to each line
+    line1="${avatar_row1}${RESET} ${status_line}"
+    line2="${avatar_row2}${RESET} ${second_line}"
+    line3="${avatar_row3}${RESET} ${third_line}"
+    echo -e "${line1}\n${line2}\n${line3}"
+elif [[ -n "$third_line" ]]; then
+    echo -e "${status_line}\n${second_line}\n${third_line}"
+elif [[ -n "$second_line" ]]; then
+    echo -e "${status_line}\n${second_line}"
 else
-    # No avatar - just output status lines normally
-    if [[ -n "$third_line" ]]; then
-        echo -e "${status_line}\n${second_line}\n${third_line}"
-    elif [[ -n "$second_line" ]]; then
-        echo -e "${status_line}\n${second_line}"
-    else
-        echo -e "$status_line"
-    fi
+    echo -e "$status_line"
 fi

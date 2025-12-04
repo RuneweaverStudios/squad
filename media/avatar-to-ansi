@@ -1,0 +1,239 @@
+#!/bin/bash
+#
+# avatar-to-ansi - Convert SVG avatar to compact ANSI terminal representation
+#
+# Usage:
+#   avatar-to-ansi <agent-name>
+#   avatar-to-ansi --generate-all
+#
+# Output:
+#   Prints ANSI escape codes for a 2-character colorized avatar
+#   Stores .ansi files alongside SVGs for caching
+#
+# Example output: ██ (two colored block characters)
+#
+
+AVATARS_DIR="${AVATARS_DIR:-/home/jw/code/jat/avatars}"
+
+# Convert hex color to RGB values
+hex_to_rgb() {
+    local hex="${1#\#}"
+    printf "%d %d %d" "0x${hex:0:2}" "0x${hex:2:2}" "0x${hex:4:2}"
+}
+
+# Generate ANSI foreground color escape code for 24-bit color
+ansi_fg() {
+    local hex="$1"
+    local rgb=($(hex_to_rgb "$hex"))
+    printf "\033[38;2;%d;%d;%dm" "${rgb[0]}" "${rgb[1]}" "${rgb[2]}"
+}
+
+# Generate ANSI background color escape code for 24-bit color
+ansi_bg() {
+    local hex="$1"
+    local rgb=($(hex_to_rgb "$hex"))
+    printf "\033[48;2;%d;%d;%dm" "${rgb[0]}" "${rgb[1]}" "${rgb[2]}"
+}
+
+# Get contrasting foreground color (black or white) for a background
+contrast_fg() {
+    local hex="${1#\#}"
+    local r=$((16#${hex:0:2}))
+    local g=$((16#${hex:2:2}))
+    local b=$((16#${hex:4:2}))
+
+    # Calculate luminance (perceived brightness)
+    # Using the standard formula: 0.299*R + 0.587*G + 0.114*B
+    local luminance=$(( (299 * r + 587 * g + 114 * b) / 1000 ))
+
+    # Return black for light backgrounds, white for dark
+    if [[ $luminance -gt 140 ]]; then
+        printf "\033[38;2;0;0;0m"  # Black text
+    else
+        printf "\033[38;2;255;255;255m"  # White text
+    fi
+}
+
+# Interpolate between two hex colors
+# Usage: interpolate_color "#FF0000" "#0000FF" 0.5
+interpolate_color() {
+    local hex1="${1#\#}"
+    local hex2="${2#\#}"
+    local t="$3"  # 0.0 to 1.0
+
+    local r1=$((16#${hex1:0:2}))
+    local g1=$((16#${hex1:2:2}))
+    local b1=$((16#${hex1:4:2}))
+
+    local r2=$((16#${hex2:0:2}))
+    local g2=$((16#${hex2:2:2}))
+    local b2=$((16#${hex2:4:2}))
+
+    # Linear interpolation (using awk for floating point)
+    local r=$(awk "BEGIN {printf \"%.0f\", $r1 + ($r2 - $r1) * $t}")
+    local g=$(awk "BEGIN {printf \"%.0f\", $g1 + ($g2 - $g1) * $t}")
+    local b=$(awk "BEGIN {printf \"%.0f\", $b1 + ($b2 - $b1) * $t}")
+
+    printf "#%02X%02X%02X" "$r" "$g" "$b"
+}
+
+# Reset ANSI
+ansi_reset() {
+    printf "\033[0m"
+}
+
+# Extract unique fill colors from SVG, sorted by frequency
+extract_colors() {
+    local svg_file="$1"
+    # Extract hex colors from fill attributes, count occurrences, sort by frequency
+    cat "$svg_file" | \
+        tr '"' '\n' | \
+        grep -E '^#[A-Fa-f0-9]{6}$' | \
+        sort | uniq -c | sort -rn | \
+        awk '{print $2}'
+}
+
+# Avatar display mode: "svg" (render actual SVG) or "gradient" (gradient text)
+AVATAR_MODE="${AVATAR_MODE:-svg}"
+AVATAR_SIZE="${AVATAR_SIZE:-6x3}"  # Width x Height in characters (6 wide, 3 tall for statusline)
+
+# Generate ANSI avatar for a single agent
+generate_ansi() {
+    local agent_name="$1"
+    local svg_file="${AVATARS_DIR}/${agent_name}.svg"
+    local ansi_file="${AVATARS_DIR}/${agent_name}.ansi"
+
+    if [[ ! -f "$svg_file" ]]; then
+        echo "SVG not found: $svg_file" >&2
+        return 1
+    fi
+
+    local output=""
+
+    if [[ "$AVATAR_MODE" == "svg" ]] && command -v chafa &>/dev/null; then
+        # Render actual SVG using chafa (multi-line, symbols mode)
+        # Keep newlines for multi-row statusline display
+        # Remove cursor hide/show codes (ESC[?25l / ESC[?25h) - must include ESC char
+        output=$(chafa -f symbols -s "$AVATAR_SIZE" --relative=off "$svg_file" 2>/dev/null | sed $'s/\x1b\\[?25[lh]//g')
+    else
+        # Fallback: gradient text mode
+        output=$(generate_gradient_text "$agent_name" "$svg_file")
+    fi
+
+    # Save to cache file
+    printf "%s" "$output" > "$ansi_file"
+
+    # Output to stdout
+    printf "%s" "$output"
+}
+
+# Generate gradient text (fallback mode)
+generate_gradient_text() {
+    local agent_name="$1"
+    local svg_file="$2"
+
+    # Get colors from SVG (sorted by frequency, most common first)
+    local colors=($(extract_colors "$svg_file"))
+
+    if [[ ${#colors[@]} -eq 0 ]]; then
+        colors=("#808080" "#606060")
+    fi
+
+    if [[ ${#colors[@]} -eq 1 ]]; then
+        colors+=("${colors[0]}")
+    fi
+
+    local name_len=${#agent_name}
+    local num_colors=${#colors[@]}
+    local output=""
+
+    for ((i=0; i<name_len; i++)); do
+        local char="${agent_name:$i:1}"
+        local t=$(awk "BEGIN {printf \"%.4f\", $i / ($name_len - 1)}")
+        local segment=$(awk "BEGIN {printf \"%.0f\", $t * ($num_colors - 1)}")
+
+        if [[ $segment -ge $((num_colors - 1)) ]]; then
+            segment=$((num_colors - 2))
+        fi
+
+        local color1="${colors[$segment]}"
+        local color2="${colors[$((segment + 1))]}"
+        local segment_t=$(awk "BEGIN {
+            seg_start = $segment / ($num_colors - 1)
+            seg_end = ($segment + 1) / ($num_colors - 1)
+            if (seg_end == seg_start) { print 0 }
+            else { printf \"%.4f\", ($t - seg_start) / (seg_end - seg_start) }
+        }")
+
+        local bg_color=$(interpolate_color "$color1" "$color2" "$segment_t")
+        local fg=$(contrast_fg "$bg_color")
+        local bg=$(ansi_bg "$bg_color")
+
+        output+="${bg}${fg}${char}"
+    done
+    output+="$(ansi_reset)"
+
+    printf "%s" "$output"
+}
+
+# Get cached ANSI or generate
+get_ansi() {
+    local agent_name="$1"
+    local svg_file="${AVATARS_DIR}/${agent_name}.svg"
+    local ansi_file="${AVATARS_DIR}/${agent_name}.ansi"
+
+    # Check if cached ANSI exists and is newer than SVG
+    if [[ -f "$ansi_file" && "$ansi_file" -nt "$svg_file" ]]; then
+        cat "$ansi_file"
+        return 0
+    fi
+
+    # Generate new ANSI
+    if [[ -f "$svg_file" ]]; then
+        generate_ansi "$agent_name"
+        return 0
+    fi
+
+    # No SVG - return empty
+    return 1
+}
+
+# Generate all ANSI avatars
+generate_all() {
+    local count=0
+    for svg_file in "${AVATARS_DIR}"/*.svg; do
+        [[ -f "$svg_file" ]] || continue
+        local name=$(basename "$svg_file" .svg)
+        # Skip files that look like temporary/numeric IDs
+        [[ "$name" =~ ^[A-Z][a-zA-Z]+$ ]] || continue
+        echo -n "Generating $name... "
+        generate_ansi "$name" >/dev/null
+        echo "done"
+        ((count++))
+    done
+    echo "Generated $count ANSI avatars"
+}
+
+# Main
+case "${1:-}" in
+    --generate-all)
+        generate_all
+        ;;
+    --help|-h)
+        echo "Usage: avatar-to-ansi <agent-name> | --generate-all"
+        echo ""
+        echo "Converts SVG avatars to compact 2-character ANSI terminal art."
+        echo ""
+        echo "Options:"
+        echo "  <agent-name>    Generate/display ANSI for specific agent"
+        echo "  --generate-all  Generate ANSI for all existing SVG avatars"
+        echo "  --help          Show this help"
+        ;;
+    "")
+        echo "Usage: avatar-to-ansi <agent-name> | --generate-all" >&2
+        exit 1
+        ;;
+    *)
+        get_ansi "$1"
+        ;;
+esac

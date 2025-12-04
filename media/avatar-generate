@@ -209,3 +209,11 @@ fi
 echo "$SVG_ONLY" > "$OUTPUT"
 
 success "Avatar saved: $OUTPUT"
+
+# Generate ANSI version for statusline display
+ANSI_SCRIPT="$SCRIPT_DIR/avatar-to-ansi"
+if [[ -x "$ANSI_SCRIPT" ]]; then
+    echo "Generating ANSI avatar..."
+    "$ANSI_SCRIPT" "$AGENT_NAME" >/dev/null
+    success "ANSI avatar saved: ${AVATARS_DIR}/${AGENT_NAME}.ansi"
+fi
