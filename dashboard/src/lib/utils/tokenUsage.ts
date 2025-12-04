@@ -120,14 +120,46 @@ async function discoverProjectPaths(): Promise<string[]> {
 }
 
 /**
- * Build a map of session IDs to agent names by reading .claude/agent-*.txt files.
- * Now scans ALL projects in ~/code/* to find agent mappings, not just the specified project.
- * This handles the case where agents work on different projects (e.g., BoldCloud on steelbridge
- * while the dashboard runs from jat).
+ * Scan a directory for agent-*.txt files and add to map.
+ * Helper function for buildSessionAgentMap.
+ */
+async function scanDirectoryForAgentFiles(dir: string, map: Map<string, string>): Promise<void> {
+	try {
+		const files = await readdir(dir);
+		const agentFiles = files.filter(f => f.startsWith('agent-') && f.endsWith('.txt'));
+
+		for (const file of agentFiles) {
+			// Extract session ID from filename: agent-{session_id}.txt
+			const sessionId = file.slice(6, -4); // Remove 'agent-' prefix and '.txt' suffix
+
+			// Skip if we already have this session mapped (first location wins)
+			if (map.has(sessionId)) continue;
+
+			try {
+				const filePath = path.join(dir, file);
+				const content = await readFile(filePath, 'utf-8');
+				const agentName = content.trim();
+
+				if (agentName) {
+					map.set(sessionId, agentName);
+				}
+			} catch (error) {
+				// Skip files that can't be read
+			}
+		}
+	} catch (error) {
+		// Directory doesn't exist, skip
+	}
+}
+
+/**
+ * Build a map of session IDs to agent names by reading agent-*.txt files.
+ * Scans ALL projects in ~/code/* to find agent mappings.
+ * Checks .claude/sessions/ first (new location), then .claude/ (legacy location).
  *
- * Input: Project path (e.g., /home/user/code/project) - now used as primary, with fallback to all projects
+ * Input: Project path (e.g., /home/user/code/project) - used as primary, with fallback to all projects
  * Output: Map<sessionId, agentName>
- * State: Read-only, parses .claude/agent-*.txt files from all projects
+ * State: Read-only, parses agent-*.txt files from all projects
  */
 export async function buildSessionAgentMap(projectPath: string): Promise<Map<string, string>> {
 	const map = new Map<string, string>();
@@ -142,36 +174,13 @@ export async function buildSessionAgentMap(projectPath: string): Promise<Map<str
 	];
 
 	for (const scanPath of projectsToScan) {
+		// Check new location first: .claude/sessions/
+		const sessionsDir = path.join(scanPath, '.claude', 'sessions');
+		await scanDirectoryForAgentFiles(sessionsDir, map);
+
+		// Fall back to legacy location: .claude/
 		const claudeDir = path.join(scanPath, '.claude');
-
-		try {
-			const files = await readdir(claudeDir);
-
-			// Filter for agent-{session_id}.txt files
-			const agentFiles = files.filter(f => f.startsWith('agent-') && f.endsWith('.txt'));
-
-			for (const file of agentFiles) {
-				// Extract session ID from filename: agent-{session_id}.txt
-				const sessionId = file.slice(6, -4); // Remove 'agent-' prefix and '.txt' suffix
-
-				// Skip if we already have this session mapped (first project wins)
-				if (map.has(sessionId)) continue;
-
-				try {
-					const filePath = path.join(claudeDir, file);
-					const content = await readFile(filePath, 'utf-8');
-					const agentName = content.trim();
-
-					if (agentName) {
-						map.set(sessionId, agentName);
-					}
-				} catch (error) {
-					// Skip files that can't be read
-				}
-			}
-		} catch (error) {
-			// .claude directory might not exist, skip
-		}
+		await scanDirectoryForAgentFiles(claudeDir, map);
 	}
 
 	return map;

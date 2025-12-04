@@ -112,11 +112,24 @@ am-register --program claude-code --model sonnet-4.5
 
 #### 2C: Write Session File
 ```bash
+# Ensure sessions directory exists
+mkdir -p .claude/sessions
+
 # Use Write tool with session ID from 2A
-Write(.claude/agent-{session_id}.txt, "AgentName")
+Write(.claude/sessions/agent-{session_id}.txt, "AgentName")
 ```
 
-#### 2D: Rename tmux Session
+#### 2D: Clean Up Old Session Files (TTL)
+```bash
+# Remove session files older than 7 days to prevent clutter
+find .claude/sessions -name "agent-*.txt" -mtime +7 -delete 2>/dev/null
+find .claude/sessions -name "*-activity.jsonl" -mtime +7 -delete 2>/dev/null
+# Also clean legacy location
+find .claude -maxdepth 1 -name "agent-*.txt" -mtime +7 -delete 2>/dev/null
+find .claude -maxdepth 1 -name "*-activity.jsonl" -mtime +7 -delete 2>/dev/null
+```
+
+#### 2E: Rename tmux Session
 
 **🚨 CRITICAL - DO NOT SKIP**
 

@@ -154,7 +154,8 @@ fi
 #
 # File locations:
 #   - /tmp/claude-session-${PPID}.txt → session ID (process-specific, auto-deleted)
-#   - .claude/agent-${session_id}.txt → agent name (project-specific, persistent)
+#   - .claude/sessions/agent-${session_id}.txt → agent name (new location, TTL cleanup)
+#   - .claude/agent-${session_id}.txt → agent name (legacy location, backwards compat)
 #
 if [[ -n "$session_id" ]]; then
     echo "$session_id" > "/tmp/claude-session-${PPID}.txt" 2>/dev/null
@@ -168,16 +169,32 @@ fi
 
 # Get agent name from session-specific file
 # Each Claude Code session gets its own agent identity file
+# Check locations in priority order:
+#   1. .claude/sessions/ (new location - preferred)
+#   2. .claude/ (legacy location - for backwards compatibility)
 # Look in git root first (for subdirectory support), then current directory
 agent_name=""
 
 if [[ -n "$session_id" ]]; then
     # Try git root first (handles working in subdirectories like jat/dashboard)
-    if [[ -n "$git_root" ]] && [[ -f "$git_root/.claude/agent-${session_id}.txt" ]]; then
-        agent_name=$(cat "$git_root/.claude/agent-${session_id}.txt" 2>/dev/null | tr -d '\n')
-    # Fall back to current directory
-    elif [[ -f "$cwd/.claude/agent-${session_id}.txt" ]]; then
-        agent_name=$(cat "$cwd/.claude/agent-${session_id}.txt" 2>/dev/null | tr -d '\n')
+    if [[ -n "$git_root" ]]; then
+        # New location: .claude/sessions/
+        if [[ -f "$git_root/.claude/sessions/agent-${session_id}.txt" ]]; then
+            agent_name=$(cat "$git_root/.claude/sessions/agent-${session_id}.txt" 2>/dev/null | tr -d '\n')
+        # Legacy location: .claude/
+        elif [[ -f "$git_root/.claude/agent-${session_id}.txt" ]]; then
+            agent_name=$(cat "$git_root/.claude/agent-${session_id}.txt" 2>/dev/null | tr -d '\n')
+        fi
+    fi
+    # Fall back to current directory if not found in git root
+    if [[ -z "$agent_name" ]]; then
+        # New location: .claude/sessions/
+        if [[ -f "$cwd/.claude/sessions/agent-${session_id}.txt" ]]; then
+            agent_name=$(cat "$cwd/.claude/sessions/agent-${session_id}.txt" 2>/dev/null | tr -d '\n')
+        # Legacy location: .claude/
+        elif [[ -f "$cwd/.claude/agent-${session_id}.txt" ]]; then
+            agent_name=$(cat "$cwd/.claude/agent-${session_id}.txt" 2>/dev/null | tr -d '\n')
+        fi
     fi
 fi
 
