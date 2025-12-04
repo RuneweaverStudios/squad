@@ -52,16 +52,49 @@ export async function POST({ params }) {
 		// Get the project name from session name
 		const projectName = sessionName.replace(/^server-/, '');
 
-		// Get project path from jat config or use default
+		// Get project config (path and port) from jat config
 		let projectPath = null;
+		let configPort = null;
+		let detectedPort = null;
+
+		// First, try to detect port from current output (most accurate - shows what's actually running)
+		try {
+			const { stdout: outputStdout } = await execAsync(
+				`tmux capture-pane -p -t "${sessionName}" -S -500`
+			);
+			// Look for port patterns - prioritize localhost:port and --port patterns
+			const portPatterns = [
+				/localhost:(\d+)/,
+				/127\.0\.0\.1:(\d+)/,
+				/--port\s+(\d+)/,
+				/port\s+(\d+)/i
+			];
+			for (const pattern of portPatterns) {
+				const match = outputStdout.match(pattern);
+				if (match && match[1]) {
+					const port = parseInt(match[1], 10);
+					if (port >= 1024 && port <= 65535) {
+						detectedPort = port;
+						break;
+					}
+				}
+			}
+		} catch {
+			// Ignore detection errors
+		}
+
+		// Get project config as fallback
 		try {
 			const configPath = `${process.env.HOME}/.config/jat/projects.json`;
 			const { stdout: configOutput } = await execAsync(
-				`jq -r '.projects["${projectName}"].path // empty' "${configPath}" 2>/dev/null`
+				`jq -r '.projects["${projectName}"] | "\\(.path // empty)|\\(.port // empty)"' "${configPath}" 2>/dev/null`
 			);
-			const path = configOutput.trim();
-			if (path) {
-				projectPath = path.replace(/^~/, process.env.HOME || '');
+			const [pathPart, portPart] = configOutput.trim().split('|');
+			if (pathPart) {
+				projectPath = pathPart.replace(/^~/, process.env.HOME || '');
+			}
+			if (portPart) {
+				configPort = parseInt(portPart, 10);
 			}
 		} catch {
 			// Config not available
@@ -72,19 +105,25 @@ export async function POST({ params }) {
 			projectPath = `${process.env.HOME}/code/${projectName}`;
 		}
 
+		// Use detected port first, then config port as fallback
+		const port = detectedPort || configPort;
+
 		// Send Ctrl+C to stop the current server
 		await execAsync(`tmux send-keys -t "${sessionName}" C-c`);
 
 		// Wait for graceful shutdown
-		await new Promise((resolve) => setTimeout(resolve, 1000));
+		await new Promise((resolve) => setTimeout(resolve, 1500));
 
 		// Clear the terminal
 		await execAsync(`tmux send-keys -t "${sessionName}" "clear" Enter`);
 		await new Promise((resolve) => setTimeout(resolve, 100));
 
-		// Re-run npm run dev (the most common command)
-		// In future, we could track the original command and replay it
-		await execAsync(`tmux send-keys -t "${sessionName}" "npm run dev" Enter`);
+		// Build the restart command with port if available
+		const portArg = port ? ` -- --port ${port}` : '';
+		const restartCommand = `npm run dev${portArg}`;
+
+		// Re-run the server command
+		await execAsync(`tmux send-keys -t "${sessionName}" "${restartCommand}" Enter`);
 
 		// Wait a moment and get output
 		await new Promise((resolve) => setTimeout(resolve, 500));
@@ -105,10 +144,12 @@ export async function POST({ params }) {
 		return json({
 			success: true,
 			message: `Restarted server session: ${sessionName}`,
+			command: restartCommand,
 			session: {
 				mode: 'server',
 				sessionName,
 				projectName,
+				port,
 				status: 'starting',
 				output,
 				lineCount,
