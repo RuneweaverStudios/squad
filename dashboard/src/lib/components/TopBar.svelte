@@ -24,6 +24,7 @@
 	import TasksCompletedBadge from './TasksCompletedBadge.svelte';
 	import UserProfile from './UserProfile.svelte';
 	import CommandPalette from './CommandPalette.svelte';
+	import Sparkline from './Sparkline.svelte';
 	import { openTaskDrawer } from '$lib/stores/drawerStore';
 	import { startSpawning, stopSpawning, startBulkSpawn, endBulkSpawn } from '$lib/stores/spawningTasks';
 	import {
@@ -1167,8 +1168,63 @@
 	<!-- Vertical separator -->
 	<div class="w-px h-6 mx-3" style="background: linear-gradient(180deg, transparent, oklch(0.45 0.02 250), transparent);"></div>
 
-	<!-- Right side: Stats + User Profile (Industrial) -->
+	<!-- Right side: Sparkline + Stats + User Profile (Industrial) -->
 	<div class="flex-none flex items-center gap-2.5 pr-3">
+		<!-- Sparkline (positioned LEFT of all badges) -->
+		{#if multiProjectData && multiProjectData.length > 0}
+			<div class="hidden sm:block flex-shrink w-[120px] min-w-[60px] h-[20px]">
+				<Sparkline
+					multiSeriesData={multiProjectData.map((point) => {
+						const projects: Record<string, { tokens: number; cost: number }> = {};
+						for (const p of point.projects) {
+							projects[p.project] = { tokens: p.tokens, cost: p.cost };
+						}
+						return {
+							timestamp: point.timestamp,
+							projects,
+							total: { tokens: point.totalTokens, cost: point.totalCost }
+						};
+					})}
+					projectMeta={(() => {
+						const projectTotals = new Map<string, number>();
+						for (const point of multiProjectData) {
+							for (const p of point.projects) {
+								projectTotals.set(p.project, (projectTotals.get(p.project) || 0) + p.tokens);
+							}
+						}
+						const meta: Array<{ name: string; color: string; totalTokens: number }> = [];
+						for (const [name, totalTokens] of projectTotals.entries()) {
+							meta.push({
+								name,
+								color: projectColors[name] || '#888888',
+								totalTokens
+							});
+						}
+						return meta.sort((a, b) => b.totalTokens - a.totalTokens);
+					})()}
+					width="100%"
+					height={20}
+					showTooltip={true}
+					showGrid={false}
+					showStyleToolbar={true}
+					showLegend={false}
+					showLegendInToolbar={true}
+				/>
+			</div>
+		{:else if sparklineData && sparklineData.length > 0}
+			<div class="hidden sm:block flex-shrink w-[120px] min-w-[60px] h-[20px]">
+				<Sparkline
+					data={sparklineData}
+					width="100%"
+					height={20}
+					colorMode="usage"
+					showTooltip={true}
+					showGrid={false}
+					showStyleToolbar={true}
+				/>
+			</div>
+		{/if}
+
 		<!-- Agent Count Badge -->
 		<div class="hidden sm:flex">
 			<AgentCountBadge
@@ -1179,13 +1235,13 @@
 			/>
 		</div>
 
-		<!-- Token Usage Badge -->
+		<!-- Token Usage Badge (without sparkline - moved above) -->
 		<div class="hidden sm:flex">
 			<TokenUsageBadge
 				{tokensToday}
 				{costToday}
-				{sparklineData}
-				{multiProjectData}
+				sparklineData={[]}
+				multiProjectData={undefined}
 				{projectColors}
 				compact={true}
 			/>
