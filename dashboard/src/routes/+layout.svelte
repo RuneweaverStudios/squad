@@ -29,8 +29,9 @@
 	let totalAgentCount = $state(0);
 	let activeAgents = $state<string[]>([]);
 
-	// Ready task count for Swarm button
+	// Ready task count and list for Swarm button dropdown
 	let readyTaskCount = $state(0);
+	let readyTasks = $state<Array<{ id: string; title: string; priority: number; type: string; project: string }>>([]);
 
 	// Token usage state for TopBar
 	let tokensToday = $state(0);
@@ -214,15 +215,17 @@
 		}
 	}
 
-	// Fetch ready task count for Swarm button
+	// Fetch ready task count and list for Swarm button
 	async function loadReadyTaskCount() {
 		try {
 			const response = await fetch('/api/tasks/ready');
 			const data = await response.json();
 			readyTaskCount = data.count || 0;
+			readyTasks = data.tasks || [];
 		} catch (error) {
 			console.error('Failed to fetch ready task count:', error);
 			readyTaskCount = 0;
+			readyTasks = [];
 		}
 	}
 
@@ -276,6 +279,30 @@
 					}
 				} catch (err) {
 					console.error('Error attaching to session:', err);
+				}
+			}
+			return;
+		}
+
+		// Alt+C = Complete task for hovered session (sends /jat:complete command)
+		if (event.altKey && event.code === 'KeyC') {
+			event.preventDefault();
+			const sessionName = get(hoveredSessionName);
+			if (sessionName) {
+				try {
+					const response = await fetch(`/api/work/${encodeURIComponent(sessionName)}/input`, {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							type: 'text',
+							input: '/jat:complete'
+						})
+					});
+					if (!response.ok) {
+						console.error('Failed to send complete command:', await response.text());
+					}
+				} catch (err) {
+					console.error('Error sending complete command:', err);
 				}
 			}
 			return;
@@ -335,6 +362,7 @@
 			{multiProjectData}
 			{projectColors}
 			{readyTaskCount}
+			{readyTasks}
 			{projects}
 			{selectedProject}
 		/>
