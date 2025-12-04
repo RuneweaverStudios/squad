@@ -17,6 +17,8 @@ mcp_agent_mail/
 # Claude Code session-specific files (per-developer, don't commit)
 .claude/agent-*.txt
 .claude/agent-*-activity.jsonl
+.claude/sessions/agent-*.txt
+.claude/sessions/agent-*-activity.jsonl
 .claude/.agent-identity-*
 .mcp.json
 # Note: Session IDs now in /tmp/claude-session-${PPID}.txt (PPID-based, not in repo)

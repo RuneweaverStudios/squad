@@ -1,8 +1,0 @@
-{"ts":"2025-11-29T12:45:16Z","agent":"BoldRock","type":"tool","content":"Write file: /home/jw/code/jat/.claude/agent-7d5dc92d-6f74-4aa6-90ff-4b7148caa5eb.txt","preview":"Writing agent-7d5dc92d-6f74-4aa6-90ff-4b7148caa5eb.txt","tool":"Write","file":"/home/jw/code/jat/.claude/agent-7d5dc92d-6f74-4aa6-90ff-4b7148caa5eb.txt"}
-{"ts":"2025-11-29T12:45:17Z","agent":"BoldRock","type":"tool","content":"Bash: am-inbox BoldRock --unread 2>/dev/null || echo \"NO_MESSAGES\"","preview":"Running: am-inbox BoldRock --unread 2>/dev/null || echo \"NO...","tool":"Bash"}
-{"ts":"2025-11-29T12:45:17Z","agent":"BoldRock","type":"tool","content":"Bash: am-reservations --agent BoldRock --json 2>/dev/null || echo \"[]\"","preview":"Running: am-reservations --agent BoldRock --json 2>/dev/nul...","tool":"Bash"}
-{"ts":"2025-11-29T12:45:32Z","agent":"BoldRock","type":"tool","content":"Bash: bd update jat-kc1h --status in_progress --assignee BoldRock 2>/dev/null","preview":"Running: bd update jat-kc1h --status in_progress --assignee...","tool":"Bash"}
-{"ts":"2025-11-29T12:45:32Z","agent":"BoldRock","type":"tool","content":"Bash: am-send \"[jat-kc1h] Starting: Test agent fix 2 - another test\" \"Starting work on jat-kc1h"
-""
-"**Task:** Test agent fix 2 - another test"
-"**Agent:** BoldRock\" --from BoldRock --to @active --thread jat-kc1h 2>/dev/null || echo \"SEND_FAILED\"","preview":"Running: am-send \"[jat-kc1h] Starting: Test agent fix 2 - a...","tool":"Bash"}
