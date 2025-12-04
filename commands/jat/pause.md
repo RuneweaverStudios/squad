@@ -37,6 +37,27 @@ Pause current task quickly (without full completion) and show available tasks to
 
 ---
 
+## Pause vs Ready-for-Review
+
+These are different states with different purposes:
+
+| Situation | Use | Marker | Dashboard |
+|-----------|-----|--------|-----------|
+| Work done, waiting for user to approve | `[JAT:NEEDS_REVIEW]` | Ready for Review (yellow) | User can click "Complete" |
+| Incomplete, switching to different task | `/jat:pause` | `[JAT:IDLE]` | Shows paused, task stays in_progress |
+| Emergency exit, work incomplete | `/jat:pause` | `[JAT:IDLE]` | Quick save & release locks |
+
+**Key distinction:**
+- **Ready for Review** = "I finished my work, please look at it"
+- **Pause** = "I'm not done, but I need to switch to something else"
+
+**Don't confuse them:**
+- If you're done with the work → output `[JAT:NEEDS_REVIEW]` and wait
+- If you're NOT done but need to pivot → use `/jat:pause`
+- Pause does NOT require `[JAT:NEEDS_REVIEW]` first
+
+---
+
 ## Bash Syntax Patterns for Claude Code
 
 **CRITICAL:** Claude Code's Bash tool escapes command substitution syntax. You MUST use these patterns:

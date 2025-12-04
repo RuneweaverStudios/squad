@@ -346,3 +346,24 @@ After completing all steps above, format your final output using this template:
 - Does NOT start or resume work - just reports state
 - Use before `/start` or `/resume` to make informed decisions
 - Safe to run frequently without side effects
+
+---
+
+## Dashboard State Markers
+
+**This command does NOT output state markers.**
+
+Status is informational - it shows you state but doesn't change it. If you want to change dashboard state:
+
+| Desired State | Command/Marker |
+|---------------|----------------|
+| Working | `/jat:start` outputs `[JAT:WORKING task=xxx]` |
+| Needs Input | AskUserQuestion tool or `[JAT:NEEDS_INPUT]` |
+| Ready for Review | Output `[JAT:NEEDS_REVIEW]` when work is done |
+| Completed | `/jat:complete` outputs `[JAT:IDLE]` after `bd close` |
+| Paused | `/jat:pause` outputs `[JAT:IDLE]` |
+
+**If dashboard state seems stuck:**
+Running `/jat:status` won't fix it - the dashboard reads terminal output for markers. To fix stuck state:
+1. Re-output the appropriate marker for your current state
+2. Or run the appropriate command (`/jat:start`, `/jat:complete`, etc.)

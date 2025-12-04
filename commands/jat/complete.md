@@ -625,6 +625,23 @@ This preserves attribution and maintains the audit trail.
 
 ---
 
+## Dashboard State Markers
+
+The completion flow uses these markers (output automatically by the templates above):
+
+| Marker | When to Output | Dashboard Effect |
+|--------|----------------|------------------|
+| `[JAT:IDLE]` | ONLY after `bd close` succeeds | Shows "Completed" state (green) |
+
+**Critical timing:**
+- Do NOT output `[JAT:IDLE]` until AFTER all completion steps succeed
+- If you output it early, dashboard shows "complete" but task is still open in Beads
+- This causes confusion - other agents think task is done when it isn't
+
+**The marker is in the template** - just use the Step 8 template and the marker is included automatically.
+
+---
+
 ## Error Handling
 
 **No active session:**
