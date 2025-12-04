@@ -58,6 +58,7 @@
 	import HorizontalResizeHandle from "$lib/components/HorizontalResizeHandle.svelte";
 	import { setHoveredSession } from "$lib/stores/hoveredSession";
 	import { findHumanActionMarkers } from "$lib/utils/markerParser";
+	import { getTerminalHeight, getCtrlCIntercept, setCtrlCIntercept } from "$lib/stores/preferences.svelte";
 
 	// Props - aligned with workSessions.svelte.ts types
 	interface Task {
@@ -336,35 +337,6 @@
 			}
 		}
 
-		// Load global terminal height setting
-		const savedHeight = localStorage.getItem(TERMINAL_HEIGHT_KEY);
-		if (savedHeight) {
-			const parsed = parseInt(savedHeight, 10);
-			if (
-				!isNaN(parsed) &&
-				parsed >= MIN_TMUX_HEIGHT &&
-				parsed <= MAX_TMUX_HEIGHT
-			) {
-				tmuxHeight = parsed;
-			}
-		}
-
-		// Listen for height changes from UserProfile
-		const handleHeightEvent = (e: CustomEvent<number>) => {
-			tmuxHeight = e.detail;
-			// Trigger resize with new height
-			if (scrollContainerRef) {
-				const columns = calculateColumns(
-					scrollContainerRef.getBoundingClientRect().width,
-				);
-				resizeTmuxSession(columns);
-			}
-		};
-		window.addEventListener(
-			"terminal-height-changed",
-			handleHeightEvent as EventListener,
-		);
-
 		// Set up ResizeObserver after a short delay to ensure DOM is fully ready
 		// This auto-resizes tmux session to match the SessionCard width
 		setTimeout(() => {
@@ -599,12 +571,25 @@
 	const MAX_CARD_WIDTH = 1200; // Maximum card width in pixels
 	const STORAGE_KEY_PREFIX = "workcard-width-";
 
-	// Tmux height configuration (global user preference from UserProfile)
-	const TERMINAL_HEIGHT_KEY = "user-terminal-height";
-	const DEFAULT_TMUX_HEIGHT = 50;
+	// Tmux height configuration (from unified preferences store)
 	const MIN_TMUX_HEIGHT = 20;
 	const MAX_TMUX_HEIGHT = 150;
-	let tmuxHeight = $state(DEFAULT_TMUX_HEIGHT);
+	const tmuxHeight = $derived(getTerminalHeight());
+
+	// React to terminal height preference changes
+	let previousTmuxHeight = tmuxHeight;
+	$effect(() => {
+		if (tmuxHeight !== previousTmuxHeight) {
+			previousTmuxHeight = tmuxHeight;
+			// Trigger resize with new height
+			if (scrollContainerRef) {
+				const columns = calculateColumns(
+					scrollContainerRef.getBoundingClientRect().width,
+				);
+				resizeTmuxSession(columns);
+			}
+		}
+	});
 
 	// Load saved width from localStorage on init (done in onMount below)
 
@@ -781,6 +766,10 @@
 	let streamDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 	const STREAM_DEBOUNCE_MS = 50; // Short debounce for responsive feel
 	let isStreaming = $state(false); // Track if we're actively streaming
+
+	// Ctrl+C behavior toggle (reactive from preferences store)
+	// When true, Ctrl+C sends interrupt to tmux; when false, Ctrl+C copies as usual
+	const ctrlCInterceptEnabled = $derived(getCtrlCIntercept());
 
 	// Task description hover-expand state
 	let taskHovered = $state(false);
@@ -1928,8 +1917,9 @@
 			lastStreamedText = ""; // Reset streamed text tracking
 			// Reset textarea height
 			setTimeout(autoResizeTextarea, 0);
-		} else if (e.key === "c" && e.ctrlKey) {
+		} else if (e.key === "c" && e.ctrlKey && ctrlCInterceptEnabled) {
 			// Ctrl+C: Send interrupt signal to tmux AND clear local input
+			// (Only when intercept is enabled; otherwise let browser handle copy)
 			e.preventDefault();
 			inputText = "";
 			lastStreamedText = "";
@@ -3338,9 +3328,15 @@
 						</button>
 						<button
 							onclick={() => sendKey("ctrl-c")}
-							class="btn btn-xs font-mono text-[10px] tracking-wider uppercase"
-							style="background: oklch(0.30 0.12 25); border: none; color: oklch(0.95 0.02 250);"
-							title="Send Ctrl+C (interrupt)"
+							oncontextmenu={(e) => {
+								e.preventDefault();
+								setCtrlCIntercept(!ctrlCInterceptEnabled);
+							}}
+							class="btn btn-xs font-mono text-[10px] tracking-wider uppercase {!ctrlCInterceptEnabled ? 'opacity-50' : ''}"
+							style="background: {ctrlCInterceptEnabled ? 'oklch(0.30 0.12 25)' : 'oklch(0.25 0.05 250)'}; border: none; color: oklch(0.95 0.02 250); {!ctrlCInterceptEnabled ? 'text-decoration: line-through;' : ''}"
+							title={ctrlCInterceptEnabled
+								? "Send Ctrl+C (interrupt) — Right-click to allow Ctrl+C to copy"
+								: "Ctrl+C copies to clipboard — Right-click to re-enable interrupt"}
 							disabled={sendingInput || !onSendInput}
 						>
 							^C

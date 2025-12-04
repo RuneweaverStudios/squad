@@ -19,9 +19,13 @@
 		playSuccessChime
 	} from '$lib/utils/soundEffects';
 	import {
-		isSparklineVisible,
-		toggleSparkline
-	} from '$lib/utils/sparklinePreferences';
+		getSparklineVisible,
+		setSparklineVisible,
+		getTerminalHeight,
+		setTerminalHeight,
+		getCtrlCIntercept,
+		setCtrlCIntercept
+	} from '$lib/stores/preferences.svelte';
 
 	// Placeholder user data
 	const user = {
@@ -42,9 +46,13 @@
 	let soundsEnabled = $state(false);
 	let isSoundAnimating = $state(false);
 
-	// Sparkline visibility
-	let sparklineVisible = $state(true);
+	// Sparkline visibility (reactive from preferences store)
+	const sparklineVisible = $derived(getSparklineVisible());
 	let isSparklineAnimating = $state(false);
+
+	// Ctrl+C intercept (reactive from preferences store)
+	const ctrlCIntercept = $derived(getCtrlCIntercept());
+	let isCtrlCAnimating = $state(false);
 
 	// Help modal
 	let showHelpModal = $state(false);
@@ -57,27 +65,13 @@
 	const chartIcon = 'M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6';
 
 	// Terminal height settings (global user preference)
-	const TERMINAL_HEIGHT_KEY = 'user-terminal-height';
-	const DEFAULT_TERMINAL_HEIGHT = 50;
 	const MIN_TERMINAL_HEIGHT = 20;
 	const MAX_TERMINAL_HEIGHT = 150;
-	let terminalHeight = $state(DEFAULT_TERMINAL_HEIGHT);
+	const terminalHeight = $derived(getTerminalHeight());
 
 	onMount(() => {
 		// Load saved sound preference
 		soundsEnabled = areSoundsEnabled();
-
-		// Load saved sparkline visibility preference
-		sparklineVisible = isSparklineVisible();
-
-		// Load saved terminal height
-		const saved = localStorage.getItem(TERMINAL_HEIGHT_KEY);
-		if (saved) {
-			const parsed = parseInt(saved, 10);
-			if (!isNaN(parsed) && parsed >= MIN_TERMINAL_HEIGHT && parsed <= MAX_TERMINAL_HEIGHT) {
-				terminalHeight = parsed;
-			}
-		}
 	});
 
 	function handleSoundToggle() {
@@ -107,9 +101,9 @@
 		// Trigger animation
 		isSparklineAnimating = true;
 
-		// Toggle after brief delay
+		// Toggle after brief delay (store is reactive, UI updates automatically)
 		setTimeout(() => {
-			sparklineVisible = toggleSparkline();
+			setSparklineVisible(!sparklineVisible);
 		}, 100);
 
 		// Reset animation state
@@ -118,11 +112,24 @@
 		}, 400);
 	}
 
+	function handleCtrlCToggle() {
+		// Trigger animation
+		isCtrlCAnimating = true;
+
+		// Toggle after brief delay (store is reactive, UI updates automatically)
+		setTimeout(() => {
+			setCtrlCIntercept(!ctrlCIntercept);
+		}, 100);
+
+		// Reset animation state
+		setTimeout(() => {
+			isCtrlCAnimating = false;
+		}, 400);
+	}
+
 	function handleHeightChange(newHeight: number) {
-		terminalHeight = newHeight;
-		localStorage.setItem(TERMINAL_HEIGHT_KEY, newHeight.toString());
-		// Dispatch custom event so WorkCard/SessionCard can react
-		window.dispatchEvent(new CustomEvent('terminal-height-changed', { detail: newHeight }));
+		// Store handles persistence and reactivity automatically
+		setTerminalHeight(newHeight);
 	}
 </script>
 
@@ -269,6 +276,39 @@
 					"
 				>
 					{sparklineVisible ? 'ON' : 'OFF'}
+				</span>
+			</button>
+		</li>
+
+		<!-- Ctrl+C Behavior -->
+		<li>
+			<button
+				onclick={handleCtrlCToggle}
+				class="flex items-center gap-2 w-full px-2 py-1.5 rounded transition-colors"
+				style="background: {ctrlCIntercept ? 'oklch(0.30 0.08 25 / 0.3)' : 'transparent'};"
+				title={ctrlCIntercept
+					? 'Ctrl+C sends interrupt to tmux'
+					: 'Ctrl+C copies text (browser default)'}
+			>
+				<span
+					class="w-4 h-4 flex items-center justify-center font-mono text-[9px] font-bold transition-transform duration-300 {!ctrlCIntercept ? 'line-through opacity-50' : ''}"
+					class:toggle-icon-pulse={isCtrlCAnimating}
+					style="color: {ctrlCIntercept ? 'oklch(0.85 0.15 25)' : 'oklch(0.55 0.02 250)'};"
+				>
+					^C
+				</span>
+				<span class="text-xs flex-1 text-left" style="color: oklch(0.70 0.02 250);">
+					Ctrl+C Interrupt
+				</span>
+				<span
+					class="text-[10px] font-mono px-1.5 py-0.5 rounded transition-transform duration-300"
+					class:toggle-badge-bounce={isCtrlCAnimating}
+					style="
+						background: {ctrlCIntercept ? 'oklch(0.35 0.10 25)' : 'oklch(0.25 0.02 250)'};
+						color: {ctrlCIntercept ? 'oklch(0.85 0.10 25)' : 'oklch(0.55 0.02 250)'};
+					"
+				>
+					{ctrlCIntercept ? 'ON' : 'OFF'}
 				</span>
 			</button>
 		</li>
