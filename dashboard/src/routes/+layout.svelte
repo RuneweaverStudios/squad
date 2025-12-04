@@ -17,6 +17,7 @@
 	import { availableProjects, openTaskDrawer } from '$lib/stores/drawerStore';
 	import { hoveredSessionName } from '$lib/stores/hoveredSession';
 	import { get } from 'svelte/store';
+	import { initPreferences } from '$lib/stores/preferences.svelte';
 
 	let { children } = $props();
 
@@ -144,8 +145,9 @@
 		}
 	}
 
-	// Initialize theme-change, SSE, and load all tasks
+	// Initialize theme-change, SSE, preferences, and load all tasks
 	onMount(() => {
+		initPreferences(); // Initialize unified preferences store
 		themeChange(false);
 		initSessionEvents(); // Initialize cross-page session events
 		connectTaskEvents(); // Connect to real-time task events SSE

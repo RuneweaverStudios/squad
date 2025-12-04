@@ -78,10 +78,9 @@ function detectSessionState(output, task, lastCompletedTask) {
 	const recentOutput = output ? output.slice(-3000) : '';
 
 	// Find LAST position of each marker type (most recent wins)
-	const completedPos = Math.max(
-		recentOutput.lastIndexOf('[JAT:COMPLETED]'),
-		recentOutput.lastIndexOf('[JAT:IDLE]')
-	);
+	// Note: [JAT:COMPLETED] = recently finished, [JAT:IDLE] = idle/no work
+	const completedPos = recentOutput.lastIndexOf('[JAT:COMPLETED]');
+	const idlePos = recentOutput.lastIndexOf('[JAT:IDLE]');
 	const needsInputPos = Math.max(
 		recentOutput.lastIndexOf('[JAT:NEEDS_INPUT]'),
 		// Claude Code question prompt patterns
@@ -109,6 +108,7 @@ function detectSessionState(output, task, lastCompletedTask) {
 	// Build list of detected states with their positions
 	const positions = [
 		{ state: 'completed', pos: completedPos },
+		{ state: 'idle', pos: idlePos },
 		{ state: 'needs-input', pos: needsInputPos },
 		{ state: 'ready-for-review', pos: reviewPos },
 		{ state: 'completing', pos: completingPos },
@@ -128,13 +128,13 @@ function detectSessionState(output, task, lastCompletedTask) {
 		return 'working';
 	}
 
-	if (lastCompletedTask) {
-		return 'completed';
-	}
-
-	// Check if agent just started (no markers, no task yet)
-	if (!task && recentOutput.length < 500) {
-		return 'starting';
+	// No active task = idle (even if they completed something in the past)
+	if (!task) {
+		// Check if agent just started (no markers, very little output)
+		if (recentOutput.length < 500) {
+			return 'starting';
+		}
+		return 'idle';
 	}
 
 	return 'idle';

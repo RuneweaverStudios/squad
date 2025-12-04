@@ -3,11 +3,13 @@
 	 * AgentCountBadge Component
 	 * Displays count of active agent sessions by state
 	 *
-	 * Shows colored dots matching kanban states:
-	 * - Red: needs attention (needs-input)
+	 * Shows colored dots matching session states (in urgency order):
+	 * - Red (pulsing): needs attention (needs-input)
+	 * - Yellow (pulsing): waiting review (ready-for-review)
 	 * - Orange: being worked (working)
-	 * - Yellow: waiting review (ready-for-review)
+	 * - Blue/Cyan: starting up (starting)
 	 * - Green: complete/ready to close (completed)
+	 * - Grey: no active task (idle)
 	 */
 
 	import AnimatedDigits from './AnimatedDigits.svelte';
@@ -37,13 +39,15 @@
 		compact = false
 	}: Props = $props();
 
-	// Check if we have state data to display
+	// Check if we have any state data to display (including starting and idle)
 	const hasStateCounts = $derived(
 		stateCounts && (
 			stateCounts.needsInput > 0 ||
 			stateCounts.working > 0 ||
 			stateCounts.review > 0 ||
-			stateCounts.completed > 0
+			stateCounts.completed > 0 ||
+			(stateCounts.starting && stateCounts.starting > 0) ||
+			(stateCounts.idle && stateCounts.idle > 0)
 		)
 	);
 
@@ -57,21 +61,23 @@
 
 		const parts = [];
 		if (stateCounts.needsInput > 0) parts.push(`${stateCounts.needsInput} needs input`);
-		if (stateCounts.working > 0) parts.push(`${stateCounts.working} working`);
 		if (stateCounts.review > 0) parts.push(`${stateCounts.review} in review`);
-		if (stateCounts.completed > 0) parts.push(`${stateCounts.completed} completed`);
+		if (stateCounts.working > 0) parts.push(`${stateCounts.working} working`);
 		if (stateCounts.starting && stateCounts.starting > 0) parts.push(`${stateCounts.starting} starting`);
+		if (stateCounts.completed > 0) parts.push(`${stateCounts.completed} completed`);
 		if (stateCounts.idle && stateCounts.idle > 0) parts.push(`${stateCounts.idle} idle`);
 
 		return parts.length > 0 ? parts.join(', ') : 'No active sessions';
 	});
 
-	// Colors matching kanban/session states
+	// Colors matching session states
 	const STATE_COLORS = {
 		needsInput: 'oklch(0.65 0.25 25)',      // Red - needs attention
-		working: 'oklch(0.75 0.20 60)',          // Orange - being worked
 		review: 'oklch(0.78 0.18 85)',           // Yellow - waiting review
-		completed: 'oklch(0.70 0.20 145)'        // Green - complete
+		working: 'oklch(0.75 0.20 60)',          // Orange - being worked
+		starting: 'oklch(0.70 0.15 220)',        // Blue/Cyan - starting up
+		completed: 'oklch(0.70 0.20 145)',       // Green - complete
+		idle: 'oklch(0.55 0.02 250)'             // Grey - no active task
 	};
 </script>
 
@@ -86,9 +92,10 @@
 		"
 	>
 		{#if hasStateCounts && stateCounts}
-			<!-- State-colored dots with counts -->
+			<!-- State-colored dots with counts (ordered by urgency) -->
 			<div class="flex items-center gap-0.5">
 				{#if stateCounts.needsInput > 0}
+					<!-- Red pulsing - needs attention -->
 					<div class="flex items-center gap-0.5" title="{stateCounts.needsInput} needs input">
 						<span class="relative flex h-2 w-2">
 							<span class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style="background: {STATE_COLORS.needsInput};"></span>
@@ -97,13 +104,8 @@
 						<span class="text-[10px] font-bold" style="color: {STATE_COLORS.needsInput};">{stateCounts.needsInput}</span>
 					</div>
 				{/if}
-				{#if stateCounts.working > 0}
-					<div class="flex items-center gap-0.5" title="{stateCounts.working} working">
-						<span class="inline-flex rounded-full h-2 w-2" style="background: {STATE_COLORS.working};"></span>
-						<span class="text-[10px] font-bold" style="color: {STATE_COLORS.working};">{stateCounts.working}</span>
-					</div>
-				{/if}
 				{#if stateCounts.review > 0}
+					<!-- Yellow pulsing - in review -->
 					<div class="flex items-center gap-0.5" title="{stateCounts.review} in review">
 						<span class="relative flex h-2 w-2">
 							<span class="animate-pulse absolute inline-flex h-full w-full rounded-full opacity-75" style="background: {STATE_COLORS.review};"></span>
@@ -112,10 +114,32 @@
 						<span class="text-[10px] font-bold" style="color: {STATE_COLORS.review};">{stateCounts.review}</span>
 					</div>
 				{/if}
+				{#if stateCounts.working > 0}
+					<!-- Orange - working -->
+					<div class="flex items-center gap-0.5" title="{stateCounts.working} working">
+						<span class="inline-flex rounded-full h-2 w-2" style="background: {STATE_COLORS.working};"></span>
+						<span class="text-[10px] font-bold" style="color: {STATE_COLORS.working};">{stateCounts.working}</span>
+					</div>
+				{/if}
+				{#if stateCounts.starting && stateCounts.starting > 0}
+					<!-- Blue/Cyan - starting -->
+					<div class="flex items-center gap-0.5" title="{stateCounts.starting} starting">
+						<span class="inline-flex rounded-full h-2 w-2" style="background: {STATE_COLORS.starting};"></span>
+						<span class="text-[10px] font-bold" style="color: {STATE_COLORS.starting};">{stateCounts.starting}</span>
+					</div>
+				{/if}
 				{#if stateCounts.completed > 0}
+					<!-- Green - completed -->
 					<div class="flex items-center gap-0.5" title="{stateCounts.completed} completed">
 						<span class="inline-flex rounded-full h-2 w-2" style="background: {STATE_COLORS.completed};"></span>
 						<span class="text-[10px] font-bold" style="color: {STATE_COLORS.completed};">{stateCounts.completed}</span>
+					</div>
+				{/if}
+				{#if stateCounts.idle && stateCounts.idle > 0}
+					<!-- Grey - idle -->
+					<div class="flex items-center gap-0.5" title="{stateCounts.idle} idle">
+						<span class="inline-flex rounded-full h-2 w-2" style="background: {STATE_COLORS.idle};"></span>
+						<span class="text-[10px] font-bold" style="color: {STATE_COLORS.idle};">{stateCounts.idle}</span>
 					</div>
 				{/if}
 			</div>
