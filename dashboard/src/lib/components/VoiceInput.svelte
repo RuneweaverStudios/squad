@@ -41,6 +41,8 @@
 	let isSupported = $state(false);
 	let isWhisperAvailable = $state(false);
 	let statusText = $state('');
+	let isStartingAnimation = $state(false);
+	let isStoppingAnimation = $state(false);
 
 	// MediaRecorder state
 	let mediaRecorder: MediaRecorder | null = null;
@@ -129,7 +131,12 @@
 				onerror?.(new CustomEvent('error', { detail: 'Recording failed' }));
 			};
 
-			// Start recording
+			// Start recording with animation
+			isStartingAnimation = true;
+			setTimeout(() => {
+				isStartingAnimation = false;
+			}, 400);
+
 			mediaRecorder.start();
 			isRecording = true;
 			statusText = 'Recording...';
@@ -156,6 +163,11 @@
 			mediaRecorder.stop();
 		}
 		if (isRecording) {
+			// Trigger stop animation
+			isStoppingAnimation = true;
+			setTimeout(() => {
+				isStoppingAnimation = false;
+			}, 400);
 			playRecordingStopSound();
 		}
 		isRecording = false;
@@ -261,7 +273,7 @@
 </script>
 
 {#if isSupported && isWhisperAvailable}
-	<div class="relative inline-flex items-center gap-1 -mt-2">
+	<div class="relative inline-flex items-center gap-1 -mt-3">
 		<button
 			type="button"
 			class="btn btn-circle {sizeClasses[size]} {isRecording ? 'btn-error animate-pulse' : isProcessing ? 'btn-warning' : 'btn-ghost'} transition-all duration-200"
@@ -280,7 +292,8 @@
 					xmlns="http://www.w3.org/2000/svg"
 					fill="currentColor"
 					viewBox="0 0 24 24"
-					class="text-error-content"
+					class="text-error-content transition-transform duration-200"
+					class:mic-stop-animate={isStoppingAnimation}
 					style="width: {iconSizes[size]}px; height: {iconSizes[size]}px;"
 				>
 					<rect x="6" y="6" width="12" height="12" rx="1" />
@@ -293,6 +306,8 @@
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
 					stroke="currentColor"
+					class="transition-transform duration-200"
+					class:mic-start-animate={isStartingAnimation}
 					style="width: {iconSizes[size]}px; height: {iconSizes[size]}px;"
 				>
 					<path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
@@ -335,3 +350,39 @@
 {/if}
 <!-- Note: If whisper is not installed (isSupported && !isWhisperAvailable), nothing renders.
      This is intentional - users without whisper won't see a confusing disabled button. -->
+
+<style>
+	/* Recording start animation - mic icon grows and pulses when starting */
+	.mic-start-animate {
+		animation: mic-start-pulse 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+	}
+
+	@keyframes mic-start-pulse {
+		0% {
+			transform: scale(1);
+		}
+		40% {
+			transform: scale(1.4);
+		}
+		100% {
+			transform: scale(1);
+		}
+	}
+
+	/* Recording stop animation - stop icon shrinks when stopping */
+	.mic-stop-animate {
+		animation: mic-stop-shrink 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+	}
+
+	@keyframes mic-stop-shrink {
+		0% {
+			transform: scale(1);
+		}
+		40% {
+			transform: scale(0.7);
+		}
+		100% {
+			transform: scale(1);
+		}
+	}
+</style>

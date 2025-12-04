@@ -61,6 +61,7 @@
 
 	// Auto-scroll state
 	let autoScroll = $state(true);
+	let isAutoScrollAnimating = $state(false);
 	let scrollContainerRef: HTMLDivElement | null = null;
 
 	// History loading state
@@ -367,7 +368,18 @@
 
 	// Toggle auto-scroll
 	function toggleAutoScroll() {
-		autoScroll = !autoScroll;
+		// Trigger animation
+		isAutoScrollAnimating = true;
+
+		// Toggle after brief delay
+		setTimeout(() => {
+			autoScroll = !autoScroll;
+		}, 100);
+
+		// Reset animation state
+		setTimeout(() => {
+			isAutoScrollAnimating = false;
+		}, 400);
 	}
 
 	// Input state
@@ -579,7 +591,15 @@
 					class:btn-ghost={!autoScroll}
 					title={autoScroll ? 'Auto-scroll ON' : 'Auto-scroll OFF'}
 				>
-					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						class="w-4 h-4 transition-transform duration-300"
+						class:autoscroll-icon-animate={isAutoScrollAnimating}
+					>
 						<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 13.5L12 21m0 0l-7.5-7.5M12 21V3" />
 					</svg>
 				</button>
@@ -783,5 +803,22 @@
 <style>
 	.active-tab {
 		box-shadow: 0 0 8px oklch(0.50 0.15 240 / 0.3);
+	}
+
+	/* Auto-scroll toggle animation - bounce the arrow */
+	.autoscroll-icon-animate {
+		animation: autoscroll-bounce 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+	}
+
+	@keyframes autoscroll-bounce {
+		0% {
+			transform: translateY(0) scale(1);
+		}
+		50% {
+			transform: translateY(3px) scale(1.15);
+		}
+		100% {
+			transform: translateY(0) scale(1);
+		}
 	}
 </style>

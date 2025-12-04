@@ -44,6 +44,7 @@
 
 	// Sparkline visibility
 	let sparklineVisible = $state(true);
+	let isSparklineAnimating = $state(false);
 
 	// Help modal
 	let showHelpModal = $state(false);
@@ -103,7 +104,18 @@
 	}
 
 	function handleSparklineToggle() {
-		sparklineVisible = toggleSparkline();
+		// Trigger animation
+		isSparklineAnimating = true;
+
+		// Toggle after brief delay
+		setTimeout(() => {
+			sparklineVisible = toggleSparkline();
+		}, 100);
+
+		// Reset animation state
+		setTimeout(() => {
+			isSparklineAnimating = false;
+		}, 400);
 	}
 
 	function handleHeightChange(newHeight: number) {
@@ -239,7 +251,8 @@
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
 					stroke="currentColor"
-					class="w-4 h-4"
+					class="w-4 h-4 transition-transform duration-300"
+					class:toggle-icon-pulse={isSparklineAnimating}
 					style="color: {sparklineVisible ? 'oklch(0.75 0.15 240)' : 'oklch(0.55 0.02 250)'};"
 				>
 					<path stroke-linecap="round" stroke-linejoin="round" d={chartIcon} />
@@ -248,7 +261,8 @@
 					Sparkline
 				</span>
 				<span
-					class="text-[10px] font-mono px-1.5 py-0.5 rounded"
+					class="text-[10px] font-mono px-1.5 py-0.5 rounded transition-transform duration-300"
+					class:toggle-badge-bounce={isSparklineAnimating}
 					style="
 						background: {sparklineVisible ? 'oklch(0.35 0.10 240)' : 'oklch(0.25 0.02 250)'};
 						color: {sparklineVisible ? 'oklch(0.85 0.10 240)' : 'oklch(0.55 0.02 250)'};
@@ -429,12 +443,13 @@
 {/if}
 
 <style>
-	/* Sound toggle animation - pulse the speaker icon */
-	.sound-icon-pulse {
-		animation: sound-pulse 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+	/* Toggle icon animation - pulse and scale */
+	.sound-icon-pulse,
+	.toggle-icon-pulse {
+		animation: toggle-pulse 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 	}
 
-	@keyframes sound-pulse {
+	@keyframes toggle-pulse {
 		0% {
 			transform: scale(1);
 		}
@@ -446,12 +461,13 @@
 		}
 	}
 
-	/* Sound badge bounce animation */
-	.sound-badge-bounce {
-		animation: badge-bounce 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+	/* Toggle badge animation - bounce with rotation */
+	.sound-badge-bounce,
+	.toggle-badge-bounce {
+		animation: toggle-bounce 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 	}
 
-	@keyframes badge-bounce {
+	@keyframes toggle-bounce {
 		0% {
 			transform: scale(1) rotate(0deg);
 		}

@@ -73,6 +73,9 @@
 	// Hovered project for keyboard shortcuts
 	let hoveredProject = $state<string | null>(null);
 
+	// Animation state for visibility toggles
+	let animatingVisibility = $state<string | null>(null);
+
 	// Load saved split from localStorage
 	$effect(() => {
 		if (browser) {
@@ -203,6 +206,9 @@
 	}
 
 	async function toggleVisibility(project: Project) {
+		// Trigger animation
+		animatingVisibility = project.name;
+
 		saving = project.name;
 		try {
 			const response = await fetch('/api/projects', {
@@ -229,6 +235,10 @@
 			setTimeout(() => { error = null; }, 3000);
 		} finally {
 			saving = null;
+			// Reset animation after delay
+			setTimeout(() => {
+				animatingVisibility = null;
+			}, 300);
 		}
 	}
 
@@ -1003,6 +1013,7 @@
 										{:else}
 											<span
 												class="absolute top-0.5 w-2.5 h-2.5 rounded-full transition-all"
+												class:visibility-toggle-knob-animate={animatingVisibility === project.name}
 												style="
 													background: oklch(0.85 0.02 250);
 													left: {project.hidden ? '2px' : 'calc(100% - 12px)'};
@@ -1019,3 +1030,22 @@
 		{/if}
 	</div>
 </div>
+
+<style>
+	/* Visibility toggle knob animation - scale pulse */
+	.visibility-toggle-knob-animate {
+		animation: toggle-knob-pulse 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+	}
+
+	@keyframes toggle-knob-pulse {
+		0% {
+			transform: scale(1);
+		}
+		50% {
+			transform: scale(1.4);
+		}
+		100% {
+			transform: scale(1);
+		}
+	}
+</style>
