@@ -46,7 +46,99 @@ const execAsync = promisify(exec);
  * @property {SparklineDataPoint[]} sparklineData - Hourly token usage (last 24h)
  * @property {string} created - Session creation timestamp
  * @property {boolean} attached - Whether session is attached
+ * @property {string} sessionState - Detected session state (starting, working, needs-input, ready-for-review, completing, completed, idle)
  */
+
+/**
+ * @typedef {Object} StateCounts
+ * @property {number} needsInput - Agents waiting for user input
+ * @property {number} working - Agents actively working
+ * @property {number} review - Agents waiting for review
+ * @property {number} completed - Agents with completed tasks
+ * @property {number} starting - Agents that are starting up
+ * @property {number} idle - Agents with no active task
+ */
+
+/**
+ * @typedef {Object} Task
+ * @property {string} id - Task ID
+ * @property {string} [status] - Task status
+ * @property {string} [title] - Task title
+ */
+
+/**
+ * Detect session state from terminal output
+ * Uses the same logic as SessionCard.svelte for consistency
+ * @param {string} output - Terminal output
+ * @param {Task|null} task - Current task
+ * @param {Task|null} lastCompletedTask - Last completed task
+ * @returns {string} Session state
+ */
+function detectSessionState(output, task, lastCompletedTask) {
+	const recentOutput = output ? output.slice(-3000) : '';
+
+	// Find LAST position of each marker type (most recent wins)
+	const completedPos = Math.max(
+		recentOutput.lastIndexOf('[JAT:COMPLETED]'),
+		recentOutput.lastIndexOf('[JAT:IDLE]')
+	);
+	const needsInputPos = Math.max(
+		recentOutput.lastIndexOf('[JAT:NEEDS_INPUT]'),
+		// Claude Code question prompt patterns
+		recentOutput.lastIndexOf('⎿'),  // Question prompt character
+		recentOutput.lastIndexOf('  Yes  '),  // Yes/No question option
+		recentOutput.lastIndexOf('  No  ')
+	);
+	const reviewPos = Math.max(
+		recentOutput.lastIndexOf('[JAT:NEEDS_REVIEW]'),
+		recentOutput.lastIndexOf('[JAT:READY]'),
+		recentOutput.lastIndexOf('ready to mark complete'),
+		recentOutput.lastIndexOf('Ready to mark complete'),
+		recentOutput.lastIndexOf('shall I mark'),
+		recentOutput.lastIndexOf('Shall I mark'),
+		recentOutput.lastIndexOf('ready for review'),
+		recentOutput.lastIndexOf('Ready for Review')
+	);
+	const completingPos = Math.max(
+		recentOutput.lastIndexOf('jat:complete is running'),
+		recentOutput.lastIndexOf('Marking task complete')
+	);
+	const workingPos = recentOutput.lastIndexOf('[JAT:WORKING');
+	const compactingPos = recentOutput.lastIndexOf('[JAT:COMPACTING]');
+
+	// Build list of detected states with their positions
+	const positions = [
+		{ state: 'completed', pos: completedPos },
+		{ state: 'needs-input', pos: needsInputPos },
+		{ state: 'ready-for-review', pos: reviewPos },
+		{ state: 'completing', pos: completingPos },
+		{ state: 'compacting', pos: compactingPos },
+		{ state: 'working', pos: workingPos }
+	];
+
+	// Sort by position descending (most recent marker wins)
+	const sorted = positions.filter(p => p.pos >= 0).sort((a, b) => b.pos - a.pos);
+
+	if (sorted.length > 0) {
+		return sorted[0].state;
+	}
+
+	// No markers found - infer from task state
+	if (task && task.status === 'in_progress') {
+		return 'working';
+	}
+
+	if (lastCompletedTask) {
+		return 'completed';
+	}
+
+	// Check if agent just started (no markers, no task yet)
+	if (!task && recentOutput.length < 500) {
+		return 'starting';
+	}
+
+	return 'idle';
+}
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ url }) {
@@ -69,6 +161,7 @@ export async function GET({ url }) {
 				success: true,
 				sessions: [],
 				count: 0,
+				stateCounts: { needsInput: 0, working: 0, review: 0, completed: 0, starting: 0, idle: 0 },
 				timestamp: new Date().toISOString()
 			});
 		}
@@ -78,6 +171,7 @@ export async function GET({ url }) {
 				success: true,
 				sessions: [],
 				count: 0,
+				stateCounts: { needsInput: 0, working: 0, review: 0, completed: 0, starting: 0, idle: 0 },
 				timestamp: new Date().toISOString()
 			});
 		}
@@ -103,6 +197,7 @@ export async function GET({ url }) {
 				success: true,
 				sessions: [],
 				count: 0,
+				stateCounts: { needsInput: 0, working: 0, review: 0, completed: 0, starting: 0, idle: 0 },
 				timestamp: new Date().toISOString()
 			});
 		}
@@ -215,6 +310,9 @@ export async function GET({ url }) {
 					}
 				}
 
+				// Detect session state from output
+				const sessionState = detectSessionState(output, task, lastCompletedTask);
+
 				return {
 					sessionName: session.name,
 					agentName,
@@ -226,15 +324,54 @@ export async function GET({ url }) {
 					cost,
 					sparklineData,
 					created: session.created,
-					attached: session.attached
+					attached: session.attached,
+					sessionState
 				};
 			})
 		);
+
+		// Calculate state counts
+		/** @type {StateCounts} */
+		const stateCounts = {
+			needsInput: 0,
+			working: 0,
+			review: 0,
+			completed: 0,
+			starting: 0,
+			idle: 0
+		};
+
+		workSessions.forEach(session => {
+			switch (session.sessionState) {
+				case 'needs-input':
+					stateCounts.needsInput++;
+					break;
+				case 'working':
+				case 'compacting':
+					stateCounts.working++;
+					break;
+				case 'ready-for-review':
+					stateCounts.review++;
+					break;
+				case 'completed':
+				case 'completing':
+					stateCounts.completed++;
+					break;
+				case 'starting':
+					stateCounts.starting++;
+					break;
+				case 'idle':
+				default:
+					stateCounts.idle++;
+					break;
+			}
+		});
 
 		return json({
 			success: true,
 			sessions: workSessions,
 			count: workSessions.length,
+			stateCounts,
 			timestamp: new Date().toISOString()
 		});
 	} catch (error) {

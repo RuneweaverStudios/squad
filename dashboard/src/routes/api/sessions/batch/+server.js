@@ -6,9 +6,40 @@
 import { json } from '@sveltejs/kit';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { readFileSync, existsSync } from 'fs';
+import { homedir } from 'os';
+import { join } from 'path';
 import { listSessionsAsync } from '$lib/server/sessions.js';
 
 const execAsync = promisify(exec);
+
+/**
+ * Load JAT config defaults
+ * @returns {{ model: string, claude_flags: string, agent_stagger: number }}
+ */
+function loadJatDefaults() {
+	const configPath = join(homedir(), '.config/jat/projects.json');
+	const defaults = {
+		model: 'opus',
+		claude_flags: '--dangerously-skip-permissions',
+		agent_stagger: 30
+	};
+
+	if (existsSync(configPath)) {
+		try {
+			const config = JSON.parse(readFileSync(configPath, 'utf-8'));
+			if (config.defaults) {
+				if (config.defaults.model) defaults.model = config.defaults.model;
+				if (config.defaults.claude_flags) defaults.claude_flags = config.defaults.claude_flags;
+				if (config.defaults.agent_stagger) defaults.agent_stagger = config.defaults.agent_stagger;
+			}
+		} catch (err) {
+			console.error('Failed to load JAT config:', err);
+		}
+	}
+
+	return defaults;
+}
 
 /**
  * POST /api/sessions/batch
@@ -16,20 +47,22 @@ const execAsync = promisify(exec);
  * Body:
  * - count: Number of agents to spawn (required, 1-10)
  * - project: Project path (default: current project)
- * - model: Model to use (default: sonnet-4.5)
- * - stagger: Delay between spawns in ms (default: 15000)
+ * - model: Model to use (default: from JAT config, fallback opus-4.5)
+ * - stagger: Delay between spawns in ms (default: from JAT config agent_stagger * 1000)
  * - autoStart: Whether to run /jat:start auto (default: true)
  */
 /** @type {import('./$types').RequestHandler} */
 export async function POST({ request }) {
 	try {
+		const jatDefaults = loadJatDefaults();
 		const body = await request.json();
 		const {
 			count = 1,
 			project,
-			model = 'sonnet-4.5',
-			stagger = 15000,
-			autoStart = true
+			model = jatDefaults.model,
+			stagger = jatDefaults.agent_stagger * 1000,
+			autoStart = true,
+			claudeFlags = jatDefaults.claude_flags
 		} = body;
 
 		// Validate count
@@ -77,17 +110,18 @@ export async function POST({ request }) {
 			const sessionName = `jat-pending-${Date.now()}-${i}`;
 
 			try {
-				// Build the claude command
+				// Build the claude command with model and flags
 				let claudeCmd = `cd "${projectPath}" && claude`;
 				if (model) claudeCmd += ` --model ${model}`;
+				if (claudeFlags) claudeCmd += ` ${claudeFlags}`;
 
 				// Create tmux session
 				const command = `tmux new-session -d -s "${sessionName}" -c "${projectPath}" && tmux send-keys -t "${sessionName}" "${claudeCmd}" Enter`;
 				await execAsync(command);
 
-				// Wait for Claude to start, then send prompt
+				// Wait for Claude to fully start (5s minimum - Claude Code takes time to initialize)
 				if (prompt) {
-					await new Promise(resolve => setTimeout(resolve, 2000));
+					await new Promise(resolve => setTimeout(resolve, 5000));
 					const escapedPrompt = prompt.replace(/"/g, '\\"');
 					await execAsync(`tmux send-keys -t "${sessionName}" "${escapedPrompt}" Enter`);
 				}
@@ -126,6 +160,7 @@ export async function POST({ request }) {
 			results,
 			project: projectPath,
 			model,
+			claudeFlags,
 			stagger,
 			autoStart,
 			timestamp: new Date().toISOString()

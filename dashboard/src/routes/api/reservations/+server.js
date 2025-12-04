@@ -4,7 +4,7 @@ import { getReservations } from '$lib/server/agent-mail.js';
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ url }) {
 	try {
-		const agentName = url.searchParams.get('agent');
+		const agentName = url.searchParams.get('agent') ?? undefined;
 		const reservations = getReservations(agentName);
 
 		return json({ reservations });

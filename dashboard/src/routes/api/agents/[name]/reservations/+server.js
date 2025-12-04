@@ -69,12 +69,14 @@ export async function DELETE({ params, url }) {
 
 		try {
 			// First verify the reservation belongs to this agent
-			const reservation = db.prepare(`
-				SELECT r.id, r.path_pattern, a.name as agent_name
-				FROM file_reservations r
-				JOIN agents a ON r.agent_id = a.id
-				WHERE r.id = ?
-			`).get(reservationId);
+			const reservation = /** @type {{ id: number, path_pattern: string, agent_name: string } | undefined} */ (
+				db.prepare(`
+					SELECT r.id, r.path_pattern, a.name as agent_name
+					FROM file_reservations r
+					JOIN agents a ON r.agent_id = a.id
+					WHERE r.id = ?
+				`).get(reservationId)
+			);
 
 			if (!reservation) {
 				return json({
