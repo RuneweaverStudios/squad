@@ -138,28 +138,6 @@
 		}
 	});
 
-	// DEBUG: Global drag event logging
-	$effect(() => {
-		if (isOpen) {
-			const logDrag = (e: DragEvent) => {
-				console.log('[Window]', e.type, 'target:', (e.target as HTMLElement)?.tagName, (e.target as HTMLElement)?.className?.slice(0, 50));
-			};
-			const logDrop = (e: DragEvent) => {
-				console.log('[Window] DROP on', (e.target as HTMLElement)?.tagName, 'files:', e.dataTransfer?.files?.length);
-			};
-
-			window.addEventListener('dragenter', logDrag);
-			window.addEventListener('dragover', logDrag);
-			window.addEventListener('drop', logDrop);
-
-			return () => {
-				window.removeEventListener('dragenter', logDrag);
-				window.removeEventListener('dragover', logDrag);
-				window.removeEventListener('drop', logDrop);
-			};
-		}
-	});
-
 	// Voice input state
 	let voiceInputError = $state<string | null>(null);
 	let isTitleRecording = $state(false);
@@ -449,7 +427,6 @@
 	// Handle file selection (from input or drop)
 	function handleFiles(files: FileList | File[]) {
 		const fileArray = Array.from(files);
-		console.log('[Dropzone] handleFiles called with', fileArray.length, 'files:', fileArray.map(f => f.name));
 
 		for (const file of fileArray) {
 			// Generate unique ID
@@ -459,8 +436,6 @@
 			const isImage = file.type.startsWith('image/');
 			const preview = isImage ? URL.createObjectURL(file) : '';
 
-			console.log('[Dropzone] Adding file:', file.name, 'type:', file.type, 'isImage:', isImage);
-
 			pendingAttachments = [...pendingAttachments, {
 				id,
 				file,
@@ -468,38 +443,18 @@
 				type: isImage ? 'image' : 'file'
 			}];
 		}
-		console.log('[Dropzone] pendingAttachments now has', pendingAttachments.length, 'items');
 	}
 
 	// Handle drop event
 	function handleDrop(event: DragEvent) {
-		console.log('[Dropzone] DROP EVENT FIRED');
-		console.log('[Dropzone] event.dataTransfer:', event.dataTransfer);
-		console.log('[Dropzone] event.dataTransfer?.files:', event.dataTransfer?.files);
-		console.log('[Dropzone] event.dataTransfer?.files.length:', event.dataTransfer?.files?.length);
-		console.log('[Dropzone] event.dataTransfer?.types:', event.dataTransfer?.types);
-
 		event.preventDefault();
 		event.stopPropagation();
 		isDragOver = false;
 
 		const files = event.dataTransfer?.files;
 		if (files && files.length > 0) {
-			console.log('[Dropzone] Processing', files.length, 'dropped files');
-			try {
-				playAttachmentSound();
-				console.log('[Dropzone] Sound played, calling handleFiles...');
-			} catch (soundErr) {
-				console.error('[Dropzone] Sound error (non-fatal):', soundErr);
-			}
-			try {
-				handleFiles(files);
-				console.log('[Dropzone] handleFiles completed, pendingAttachments:', pendingAttachments.length);
-			} catch (filesErr) {
-				console.error('[Dropzone] handleFiles error:', filesErr);
-			}
-		} else {
-			console.log('[Dropzone] No files in drop event!');
+			playAttachmentSound();
+			handleFiles(files);
 		}
 	}
 
@@ -512,20 +467,11 @@
 		if (event.dataTransfer) {
 			event.dataTransfer.dropEffect = 'copy';
 		}
-
-		if (!isDragOver) {
-			console.log('[Dropzone] DRAGOVER - entering dropzone');
-			console.log('[Dropzone] dataTransfer.types:', event.dataTransfer?.types);
-			console.log('[Dropzone] dataTransfer.effectAllowed:', event.dataTransfer?.effectAllowed);
-		}
 		isDragOver = true;
 	}
 
-	// Handle drag enter (for logging)
+	// Handle drag enter
 	function handleDragEnter(event: DragEvent) {
-		console.log('[Dropzone] DRAGENTER event');
-		console.log('[Dropzone] target:', event.target);
-		console.log('[Dropzone] currentTarget:', event.currentTarget);
 		event.preventDefault();
 		event.stopPropagation();
 	}
@@ -541,7 +487,6 @@
 			const x = event.clientX;
 			const y = event.clientY;
 			if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
-				console.log('[Dropzone] DRAGLEAVE - left dropzone bounds');
 				isDragOver = false;
 			}
 		}
@@ -959,13 +904,7 @@
 			</div>
 
 			<!-- Content (scrollable area between sticky header and footer) - Industrial -->
-			<form
-				onsubmit={handleSubmit}
-				class="flex-1 overflow-y-auto p-6 flex flex-col min-h-0"
-				style="background: oklch(0.16 0.01 250);"
-				ondrop={(e) => { console.log('[Form] DROP on form - should NOT see this if dropzone catches it'); }}
-				ondragover={(e) => { console.log('[Form] DRAGOVER on form'); }}
-			>
+			<form onsubmit={handleSubmit} class="flex-1 overflow-y-auto p-6 flex flex-col min-h-0" style="background: oklch(0.16 0.01 250);">
 				<div class="space-y-6">
 					<!-- Title (Required) - Industrial -->
 					<div class="form-control">
