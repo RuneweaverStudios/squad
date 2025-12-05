@@ -101,6 +101,82 @@ export function isHierarchicalId(taskId: string): boolean {
 }
 
 /**
+ * Extract child number from a hierarchical task ID
+ *
+ * @param taskId - Task ID (e.g., "jat-abc.1", "jat-abc.10")
+ * @returns Child number or null if not hierarchical
+ *
+ * @example
+ * extractChildNumber("jat-abc.1") // 1
+ * extractChildNumber("jat-abc.10") // 10
+ * extractChildNumber("jat-abc") // null
+ */
+export function extractChildNumber(taskId: string): number | null {
+  if (!taskId || typeof taskId !== 'string') {
+    return null;
+  }
+
+  // Hierarchical IDs have format: parentId.childNumber (e.g., "jat-abc.1", "jat-qub2.7")
+  const match = taskId.match(/^.+\.(\d+)$/);
+
+  if (!match) {
+    return null;
+  }
+
+  return parseInt(match[1], 10);
+}
+
+/**
+ * Compare two task IDs for sorting, handling hierarchical IDs numerically
+ *
+ * For hierarchical IDs (jat-abc.1, jat-abc.2), sorts by:
+ * 1. Parent ID (alphabetically)
+ * 2. Child number (numerically)
+ *
+ * For non-hierarchical IDs, sorts alphabetically.
+ *
+ * @param idA - First task ID
+ * @param idB - Second task ID
+ * @returns Negative if idA < idB, positive if idA > idB, 0 if equal
+ *
+ * @example
+ * compareTaskIds("jat-abc.1", "jat-abc.2") // -1 (1 < 2)
+ * compareTaskIds("jat-abc.2", "jat-abc.10") // -1 (2 < 10, numeric)
+ * compareTaskIds("jat-abc.10", "jat-abc.2") // 1 (10 > 2)
+ * compareTaskIds("jat-abc", "jat-def") // alphabetical
+ */
+export function compareTaskIds(idA: string, idB: string): number {
+  const parentA = extractParentId(idA);
+  const parentB = extractParentId(idB);
+  const childA = extractChildNumber(idA);
+  const childB = extractChildNumber(idB);
+
+  // Both are hierarchical with same parent - sort by child number
+  if (parentA && parentB && parentA === parentB && childA !== null && childB !== null) {
+    return childA - childB;
+  }
+
+  // Both are hierarchical but different parents - sort by parent first
+  if (parentA && parentB) {
+    const parentCompare = parentA.localeCompare(parentB);
+    if (parentCompare !== 0) return parentCompare;
+    // Same parent, compare child numbers
+    if (childA !== null && childB !== null) {
+      return childA - childB;
+    }
+  }
+
+  // One is a child of the other's ID
+  // e.g., comparing "jat-abc" (parent) with "jat-abc.1" (child)
+  // Parent should come first
+  if (parentA === idB) return 1; // idA is child of idB, so idB comes first
+  if (parentB === idA) return -1; // idB is child of idA, so idA comes first
+
+  // Default alphabetical comparison
+  return idA.localeCompare(idB);
+}
+
+/**
  * Extract unique project names from a list of tasks
  *
  * @param tasks - Array of task objects with id property

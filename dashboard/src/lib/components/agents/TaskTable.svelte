@@ -7,7 +7,7 @@
 	import LabelBadges from '$lib/components/LabelBadges.svelte';
 	import TaskIdBadge from '$lib/components/TaskIdBadge.svelte';
 	import { analyzeDependencies } from '$lib/utils/dependencyUtils';
-	import { getProjectFromTaskId, extractParentId } from '$lib/utils/projectUtils';
+	import { getProjectFromTaskId, extractParentId, compareTaskIds } from '$lib/utils/projectUtils';
 	import { getProjectColor } from '$lib/utils/projectColors';
 	import { getPriorityBadge, getTaskStatusBadge, getTypeBadge } from '$lib/utils/badgeHelpers';
 	import { formatRelativeTime, formatFullDate, normalizeTimestamp, getAgeColorClass } from '$lib/utils/dateFormatters';
@@ -486,9 +486,9 @@
 
 			switch (sortColumn) {
 				case 'id':
-					aVal = a.id || '';
-					bVal = b.id || '';
-					break;
+					// Use hierarchical-aware comparison for IDs (handles jat-abc.1, jat-abc.10 correctly)
+					const idComparison = compareTaskIds(a.id || '', b.id || '');
+					return sortDirection === 'asc' ? idComparison : -idComparison;
 				case 'title':
 					aVal = a.title || '';
 					bVal = b.title || '';
@@ -1808,6 +1808,11 @@
 						{@const parentTask = groupingMode === 'parent' && groupKey ? [...(allTasks.length > 0 ? allTasks : tasks)].find(t => t.id === groupKey) : null}
 						{@const isCollapsed = collapsedGroups.has(groupKey)}
 						{@const workingAgents = [...new Set(typeTasks.filter(t => t.status === 'in_progress' && t.assignee).map(t => t.assignee))]}
+						<!-- In parent mode, only show collapsible header for groups with 2+ child tasks -->
+						<!-- Standalone tasks (single task where task.id === groupKey) get no header -->
+						{@const hasChildTasks = typeTasks.some(t => extractParentId(t.id) === groupKey)}
+						{@const showGroupHeader = groupingMode !== 'parent' || typeTasks.length >= 2 || hasChildTasks}
+						{#if showGroupHeader}
 						<thead>
 							<tr
 								class="cursor-pointer select-none hover:brightness-110 transition-all"
@@ -1898,7 +1903,9 @@
 								</th>
 							</tr>
 						</thead>
-						{#if !isCollapsed}
+						{/if}
+						<!-- Show tasks if: no header (standalone task), or header exists and not collapsed -->
+						{#if !showGroupHeader || !isCollapsed}
 						<tbody>
 							{#each typeTasks as task (task.id)}
 								{@const depStatus = analyzeDependencies(task)}
