@@ -68,10 +68,19 @@ export interface HumanActionMarker extends BaseMarker {
 	action: HumanAction;
 }
 
-/** Suggested task from SUGGESTED_TASKS marker */
+/** Suggested task from SUGGESTED_TASKS marker (agent-generated task recommendation) */
 export interface SuggestedTask {
-	id: string;
+	/** Optional ID if this references an existing task */
+	id?: string;
+	/** Task type: bug, feature, task, chore, epic */
+	type: string;
+	/** Task title */
 	title: string;
+	/** Task description */
+	description: string;
+	/** Priority level: 0-4 (P0=critical, P4=lowest) */
+	priority: number;
+	/** Optional reason why this task was suggested */
 	reason?: string;
 }
 
@@ -361,8 +370,84 @@ export function findHumanActionMarkers(output: string): HumanActionMarker[] {
 
 /**
  * Find the last SUGGESTED_TASKS marker and parse its JSON payload.
+ *
+ * Supports TWO formats:
+ *
+ * 1. Block format (primary, used by /jat:complete):
+ *    [JAT:SUGGESTED_TASKS]
+ *    {"tasks":[{"type":"feature","title":"...","description":"...","priority":1},...]}
+ *    [/JAT:SUGGESTED_TASKS]
+ *
+ * 2. Inline format (legacy):
+ *    [JAT:SUGGESTED_TASKS {"tasks":[...]}]
+ *
+ * The payload should be a JSON object with a "tasks" array. Each task should have:
+ * - type: string (bug, feature, task, chore, epic, agent, human)
+ * - title: string
+ * - description: string
+ * - priority: number (0-4)
+ * - id?: string (optional, if referencing existing task)
+ * - reason?: string (optional, why this task was suggested)
  */
 export function findSuggestedTasksMarker(output: string): SuggestedTasksMarker | null {
+	// Try block format first: [JAT:SUGGESTED_TASKS]...[/JAT:SUGGESTED_TASKS]
+	const blockResult = findSuggestedTasksBlockFormat(output);
+	if (blockResult) return blockResult;
+
+	// Fall back to inline format: [JAT:SUGGESTED_TASKS {...}]
+	return findSuggestedTasksInlineFormat(output);
+}
+
+/**
+ * Parse block format: [JAT:SUGGESTED_TASKS]\n{...}\n[/JAT:SUGGESTED_TASKS]
+ */
+function findSuggestedTasksBlockFormat(output: string): SuggestedTasksMarker | null {
+	const openTag = '[JAT:SUGGESTED_TASKS]';
+	const closeTag = '[/JAT:SUGGESTED_TASKS]';
+
+	// Find the last occurrence of the block
+	const closePos = output.lastIndexOf(closeTag);
+	if (closePos === -1) return null;
+
+	// Find the corresponding open tag before this close tag
+	const searchArea = output.slice(0, closePos);
+	const openPos = searchArea.lastIndexOf(openTag);
+	if (openPos === -1) return null;
+
+	// Extract content between tags
+	const contentStart = openPos + openTag.length;
+	const content = output.slice(contentStart, closePos).trim();
+
+	// Find the JSON object in the content using balanced brace extraction
+	const jsonStartIndex = content.indexOf('{');
+	if (jsonStartIndex === -1) return null;
+
+	const jsonStr = extractBalancedJson(content, jsonStartIndex);
+	if (!jsonStr) return null;
+
+	try {
+		const parsed = JSON.parse(jsonStr);
+		if (Array.isArray(parsed.tasks)) {
+			const raw = output.slice(openPos, closePos + closeTag.length);
+
+			return {
+				type: 'SUGGESTED_TASKS',
+				position: openPos,
+				raw,
+				tasks: parseSuggestedTasks(parsed.tasks)
+			};
+		}
+	} catch {
+		// Invalid JSON - silently fail
+	}
+
+	return null;
+}
+
+/**
+ * Parse inline format: [JAT:SUGGESTED_TASKS {...}]
+ */
+function findSuggestedTasksInlineFormat(output: string): SuggestedTasksMarker | null {
 	const prefix = '[JAT:SUGGESTED_TASKS ';
 	const position = output.lastIndexOf(prefix);
 
@@ -384,18 +469,35 @@ export function findSuggestedTasksMarker(output: string): SuggestedTasksMarker |
 				type: 'SUGGESTED_TASKS',
 				position,
 				raw,
-				tasks: parsed.tasks.map((t: { id?: string; title?: string; reason?: string }) => ({
-					id: t.id || '',
-					title: t.title || '',
-					reason: t.reason
-				}))
+				tasks: parseSuggestedTasks(parsed.tasks)
 			};
 		}
 	} catch {
-		// Invalid JSON
+		// Invalid JSON - silently fail
 	}
 
 	return null;
+}
+
+/**
+ * Parse and normalize task array from JSON payload
+ */
+function parseSuggestedTasks(tasks: Array<{
+	id?: string;
+	type?: string;
+	title?: string;
+	description?: string;
+	priority?: number;
+	reason?: string;
+}>): SuggestedTask[] {
+	return tasks.map((t) => ({
+		id: t.id,
+		type: t.type || 'task',
+		title: t.title || '',
+		description: t.description || '',
+		priority: typeof t.priority === 'number' ? t.priority : 2,
+		reason: t.reason
+	}));
 }
 
 // ============================================================================
