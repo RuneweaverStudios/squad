@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { getProjectColor as getProjectColorFromHash } from '$lib/utils/projectColors';
 	import { TASK_STATUS_VISUALS, STATUS_ICONS, getIssueTypeVisual } from '$lib/config/statusColors';
+	import { isHumanTask } from '$lib/utils/badgeHelpers';
 	import WorkingAgentBadge from '$lib/components/WorkingAgentBadge.svelte';
 
 	/** Dependency task info */
@@ -11,7 +12,7 @@
 	}
 
 	interface Props {
-		task: { id: string; status: string; issue_type?: string; assignee?: string; title?: string; updated_at?: string };
+		task: { id: string; status: string; issue_type?: string; assignee?: string; title?: string; updated_at?: string; labels?: string[] };
 		size?: 'xs' | 'sm' | 'md';
 		showStatus?: boolean;
 		showType?: boolean;
@@ -101,6 +102,9 @@
 	const activeBlocks = $derived(blocks.filter(d => d.status !== 'closed'));
 	const hasBlockers = $derived(showDependencies && unresolvedBlockers.length > 0);
 	const hasBlocks = $derived(showDependencies && activeBlocks.length > 0);
+
+	// Human task indicator - shown with warm orange styling
+	const isHuman = $derived(isHumanTask(task));
 </script>
 
 {#if minimal}
@@ -149,6 +153,14 @@
 		>
 			{#if showType && task.issue_type}
 				<span class={size === 'xs' ? 'text-xs' : size === 'sm' ? 'text-sm' : 'text-base'}>{typeVisual.icon}</span>
+			{/if}
+
+			{#if isHuman}
+				<span
+					class={size === 'xs' ? 'text-xs' : size === 'sm' ? 'text-sm' : 'text-base'}
+					title="Human action required"
+					style="color: oklch(0.70 0.18 45);"
+				>🧑</span>
 			{/if}
 
 			<span style="color: {projectColor}">{task.id}</span>
@@ -238,6 +250,14 @@
 			>
 				{#if showType && task.issue_type}
 					<span class={size === 'xs' ? 'text-xs' : size === 'sm' ? 'text-sm' : 'text-base'}>{typeVisual.icon}</span>
+				{/if}
+
+				{#if isHuman}
+					<span
+						class={size === 'xs' ? 'text-xs' : size === 'sm' ? 'text-sm' : 'text-base'}
+						title="Human action required"
+						style="color: oklch(0.70 0.18 45);"
+					>🧑</span>
 				{/if}
 
 				<span style="color: {projectColor}">{task.id}</span>

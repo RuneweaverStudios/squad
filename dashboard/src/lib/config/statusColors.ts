@@ -382,6 +382,12 @@ const ISSUE_TYPE_VISUALS: Record<string, IssueTypeVisual> = {
 		label: 'PERF',
 		accent: 'oklch(0.78 0.18 70)',      // Electric yellow
 		bgTint: 'oklch(0.78 0.18 70 / 0.08)'
+	},
+	human: {
+		icon: '🧑',
+		label: 'HUMAN',
+		accent: 'oklch(0.70 0.18 45)',      // Warm orange (human warmth)
+		bgTint: 'oklch(0.70 0.18 45 / 0.10)'
 	}
 };
 
