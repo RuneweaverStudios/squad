@@ -48,6 +48,7 @@
 	import TerminalActivitySparkline from "./TerminalActivitySparkline.svelte";
 	import StreakCelebration from "$lib/components/StreakCelebration.svelte";
 	import SuggestedTasksSection from "./SuggestedTasksSection.svelte";
+	import SuggestedTasksModal, { type SuggestedTaskWithState } from "./SuggestedTasksModal.svelte";
 	import {
 		SESSION_STATE_VISUALS,
 		SERVER_STATE_VISUALS,
@@ -63,6 +64,7 @@
 		findSuggestedTasksMarker,
 		type SuggestedTask,
 	} from "$lib/utils/markerParser";
+	import { getProjectFromTaskId } from "$lib/utils/projectUtils";
 	import { getTerminalHeight, getCtrlCIntercept, setCtrlCIntercept } from "$lib/stores/preferences.svelte";
 
 	// Props - aligned with workSessions.svelte.ts types
@@ -569,8 +571,9 @@
 	let userScrolledUp = $state(false);
 	let scrollContainerRef: HTMLDivElement | null = null;
 
-	// Suggested tasks panel expanded state
+	// Suggested tasks panel expanded state (inline) and modal state
 	let suggestedTasksExpanded = $state(false);
+	let suggestedTasksModalOpen = $state(false);
 
 	// Tmux session resize state
 	// Tracks the output container width and resizes tmux to match
@@ -1575,53 +1578,88 @@
 	/** Whether task creation is in progress */
 	let isCreatingSuggestedTasks = $state(false);
 
-	/** Create selected suggested tasks via bulk API */
+	/** Send selected suggested tasks back to agent via tmux for creation in Beads */
 	async function createSuggestedTasks(selectedTasks: typeof detectedSuggestedTasks) {
 		if (selectedTasks.length === 0) return;
+		if (!onSendInput) {
+			console.error('[SuggestedTasks] Cannot send tasks: onSendInput is not defined');
+			return;
+		}
 
 		isCreatingSuggestedTasks = true;
 
 		try {
-			// Map tasks to the format expected by the bulk API
+			// Map tasks to the payload format
 			const tasksToCreate = selectedTasks.map((t) => ({
 				type: t.edits?.type || t.type || 'task',
 				title: t.edits?.title || t.title,
 				description: t.edits?.description || t.description || '',
 				priority: t.edits?.priority ?? t.priority ?? 2,
-				labels: [],
 				reason: t.reason,
 			}));
 
-			const response = await fetch('/api/tasks/bulk', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ tasks: tasksToCreate }),
-			});
+			// Build the payload with parent_task_id for linking
+			const payload = {
+				parent_task_id: task?.id || displayTask?.id || null,
+				tasks: tasksToCreate,
+			};
 
-			const result = await response.json();
+			// Format: [JAT:CREATE_TASKS]{...json...}[/JAT:CREATE_TASKS]
+			const message = `[JAT:CREATE_TASKS]${JSON.stringify(payload)}[/JAT:CREATE_TASKS]`;
 
-			if (response.ok && result.success) {
-				// Clear selections and edits for created tasks
-				selectedTasks.forEach((t, i) => {
-					const key = getSuggestedTaskKey(t, i);
-					// Deselect the task
-					const newSelections = new Map(suggestedTaskSelections);
-					newSelections.delete(key);
-					suggestedTaskSelections = newSelections;
-					// Clear edits
-					clearSuggestedTaskEdits(key);
-				});
+			// Send to agent's terminal via tmux
+			console.log('[SuggestedTasks] Sending to agent:', message);
+			await onSendInput(message, 'text');
 
-				// Log success
-				console.log(`[SuggestedTasks] Created ${result.created} tasks:`, result.results);
-			} else {
-				console.error('[SuggestedTasks] Creation failed:', result.message || result.error);
-			}
+			// Clear all selections and edits after successful send
+			suggestedTaskSelections = new Map();
+			suggestedTaskEdits = new Map();
+
+			// Log success
+			console.log(`[SuggestedTasks] Sent ${selectedTasks.length} tasks to agent for creation`);
 		} catch (error) {
-			console.error('[SuggestedTasks] Error creating tasks:', error);
+			console.error('[SuggestedTasks] Error sending tasks to agent:', error);
 		} finally {
 			isCreatingSuggestedTasks = false;
 		}
+	}
+
+	/** Create suggested tasks directly via bulk API (used by modal) */
+	async function createSuggestedTasksViaBulkApi(selectedTasks: SuggestedTaskWithState[]): Promise<void> {
+		if (selectedTasks.length === 0) return;
+
+		// Map tasks to the bulk API format
+		const tasksToCreate = selectedTasks.map((t) => ({
+			type: t.edits?.type || t.type || 'task',
+			title: t.edits?.title || t.title,
+			description: t.edits?.description || t.description || '',
+			priority: t.edits?.priority ?? t.priority ?? 2,
+		}));
+
+		// Determine project from task ID if available
+		const currentTaskId = task?.id || displayTask?.id;
+		const project = currentTaskId ? getProjectFromTaskId(currentTaskId) : undefined;
+
+		const response = await fetch('/api/tasks/bulk', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				tasks: tasksToCreate,
+				project: project || undefined
+			})
+		});
+
+		if (!response.ok) {
+			const errorData = await response.json();
+			throw new Error(errorData.message || 'Failed to create tasks');
+		}
+
+		const result = await response.json();
+		if (result.failed > 0) {
+			throw new Error(`Created ${result.created} tasks, but ${result.failed} failed`);
+		}
+
+		console.log(`[SuggestedTasks] Created ${result.created} tasks via bulk API`);
 	}
 
 	// Task to display - either active task or last completed task
