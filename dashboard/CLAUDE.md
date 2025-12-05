@@ -3292,6 +3292,104 @@ playMyNewSound();
 
 - jat-fr9v: Research and implement sound effects system (completed)
 
+## UI Patterns: Table Row Gradients (hasRowGradient)
+
+### Overview
+
+TaskTable uses horizontal gradients on rows to indicate various states (working, completed, selected, etc.). Due to how CSS `background: inherit` works with gradients, each table cell would render its own copy of the gradient, creating visible column lines.
+
+### The Problem
+
+```css
+/* Row has horizontal gradient */
+<tr style="background: linear-gradient(90deg, green, transparent)">
+  /* Each cell with inherit renders its OWN gradient */
+  <td style="background: inherit">...</td>  /* Gradient starts here */
+  <td style="background: inherit">...</td>  /* Gradient starts again! */
+</tr>
+```
+
+**Result:** Gradient appears "chopped up" at column boundaries.
+
+### The Solution: hasRowGradient Pattern
+
+Use `background: transparent` instead of `inherit` when the row has a gradient, so the row's gradient shows through:
+
+```svelte
+{@const hasRowGradient = isCompletedByActiveSession || taskIsActive || selectedTasks.has(task.id) || isHuman}
+
+<tr style="background: {hasRowGradient ? 'linear-gradient(90deg, ...)' : ''}">
+  <td style="background: {hasRowGradient ? 'transparent' : 'inherit'}">...</td>
+  <td style="background: {hasRowGradient ? 'transparent' : 'inherit'}">...</td>
+</tr>
+```
+
+### When to Use
+
+Apply this pattern to ANY table row that uses:
+- Horizontal gradients (`linear-gradient(90deg, ...)`)
+- Solid background colors that should span the full row
+
+### Implementation in TaskTable
+
+**Project/Epic mode section (~line 2390):**
+```svelte
+{@const hasRowGradient = isCompletedByActiveSession || taskIsActive}
+```
+
+**Standard grouped mode section (~line 2705):**
+```svelte
+{@const hasRowGradient = isCompletedByActiveSession || dragOverTask === task.id || selectedTasks.has(task.id) || isHuman || taskIsActive}
+```
+
+**Exiting tasks section (~line 2881):**
+- Uses hardcoded `background: transparent` (always has row background)
+
+### Row States and Colors
+
+| State | Gradient/Color | Border |
+|-------|----------------|--------|
+| Completed (active session) | Green gradient `oklch(0.55 0.18 145 / 0.15)` | 3px solid green |
+| Working (taskIsActive) | Amber gradient `oklch(0.75 0.15 85 / 0.08)` | 2px solid amber |
+| Selected | Solid blue `oklch(0.70 0.18 240 / 0.1)` | 2px solid blue |
+| Human task | Solid orange `oklch(0.70 0.18 45 / 0.10)` | 2px solid orange |
+| Drag over | Solid blue `oklch(0.70 0.18 240 / 0.15)` | 2px solid blue |
+
+### Working→Completed Transition Animation
+
+When a task transitions directly from working (in_progress) to completed (closed), a smooth color transition animation plays:
+
+**CSS Animation:** `working-to-completed` (1.5s duration)
+
+**Timeline:**
+1. **0%** - Amber gradient (working state)
+2. **30%** - Brightens as transition begins (hue shifts 85→100)
+3. **60%** - Peak green glow with outer/inner shadows (hue 145)
+4. **100%** - Settles into final completed green gradient
+
+**Implementation:**
+- `workingCompletedTaskIds` state array tracks tasks that just transitioned
+- `isWorkingCompleted` const checks if task is in the array
+- `task-working-completed` class applies the animation
+- Animation clears after 3.5 seconds (matches other completion animations)
+
+**Class Application (in tr element):**
+```svelte
+{@const isWorkingCompleted = workingCompletedTaskIds.includes(task.id)}
+class="... {isWorkingCompleted ? 'task-working-completed' : isCompleted ? 'task-completed' : ''}"
+```
+
+**CSS Location:** `src/app.css` - `@keyframes working-to-completed`
+
+### Files
+
+- `src/lib/components/agents/TaskTable.svelte` - Main implementation
+- `src/lib/components/agents/TaskActionButton.svelte` - Action buttons for different states
+
+### Task Reference
+
+- jat-2mzr: Retain completed tasks visible in TaskTable (completed)
+
 ## Development Commands
 
 ```bash
