@@ -30,6 +30,7 @@
 	} from '$lib/stores/workSessions.svelte.js';
 	import { broadcastSessionEvent } from '$lib/stores/sessionEvents';
 	import { lastTaskEvent } from '$lib/stores/taskEvents';
+	import { initSort, getSortBy, getSortDir } from '$lib/stores/workSort.svelte.js';
 
 	// Resizable panel state
 	const STORAGE_KEY = 'work-panel-split';
@@ -140,6 +141,166 @@
 
 	// Highlighted agent for scroll-to-agent feature
 	let highlightedAgent = $state<string | null>(null);
+
+	// Focused session index for Alt+Left/Right keyboard navigation
+	let focusedSessionIndex = $state<number>(-1);
+
+	// Get sort state from shared stores (same as SessionPanel)
+	const sortBy = $derived(getSortBy());
+	const sortDir = $derived(getSortDir());
+
+	// Work session type for sorting
+	interface WorkSession {
+		sessionName: string;
+		agentName: string;
+		task: { id: string; priority?: number } | null;
+		lastCompletedTask: any;
+		output: string;
+		created: string;
+		cost: number;
+	}
+
+	// Determine session state for sorting (mirrors SessionPanel exactly)
+	// State priority: 0 = needs-input, 1 = review, 2 = working, 3 = starting, 4 = completed, 5 = idle
+	function getSessionState(session: WorkSession): number {
+		const output = session.output || '';
+		const recentOutput = output.slice(-3000);
+
+		const findLastPos = (patterns: RegExp[]): number => {
+			let maxPos = -1;
+			for (const pattern of patterns) {
+				const match = recentOutput.match(new RegExp(pattern.source, 'g'));
+				if (match) {
+					const lastMatch = match[match.length - 1];
+					const pos = recentOutput.lastIndexOf(lastMatch);
+					if (pos > maxPos) maxPos = pos;
+				}
+			}
+			return maxPos;
+		};
+
+		const needsInputPos = findLastPos([
+			/\[JAT:NEEDS_INPUT\]/,
+			/❓\s*NEED CLARIFICATION/,
+			/Enter to select.*Tab\/Arrow keys to navigate.*Esc to cancel/,
+			/\[ \].*\n.*\[ \]/,
+			/Type something\s*\n\s*Next/,
+		]);
+		const workingPos = findLastPos([/\[JAT:WORKING\s+task=/]);
+		const reviewPos = findLastPos([/\[JAT:NEEDS_REVIEW\]/, /\[JAT:READY\s+actions=/, /🔍\s*READY FOR REVIEW/]);
+
+		if (session.task) {
+			const positions = [
+				{ state: 0, pos: needsInputPos },
+				{ state: 1, pos: reviewPos },
+				{ state: 2, pos: workingPos },
+			].filter(p => p.pos >= 0);
+
+			if (positions.length > 0) {
+				positions.sort((a, b) => b.pos - a.pos);
+				return positions[0].state;
+			}
+			return 3; // starting
+		}
+
+		const hasCompletionMarker = /\[JAT:IDLE\]/.test(recentOutput) || /✅\s*TASK COMPLETE/.test(recentOutput);
+		if (session.lastCompletedTask || hasCompletionMarker) {
+			return 4; // completed
+		}
+		return 5; // idle
+	}
+
+	// Sort sessions based on selected sort option (mirrors SessionPanel exactly)
+	const sortedSessions = $derived.by(() => {
+		const dir = sortDir === 'asc' ? 1 : -1;
+		return [...workSessionsState.sessions].sort((a, b) => {
+			switch (sortBy) {
+				case 'state': {
+					const stateA = getSessionState(a);
+					const stateB = getSessionState(b);
+					if (stateA !== stateB) return (stateA - stateB) * dir;
+					const priorityA = a.task?.priority ?? 999;
+					const priorityB = b.task?.priority ?? 999;
+					return priorityA - priorityB;
+				}
+				case 'priority': {
+					const priorityA = a.task?.priority ?? 999;
+					const priorityB = b.task?.priority ?? 999;
+					if (priorityA !== priorityB) return (priorityA - priorityB) * dir;
+					return (a.task?.id ?? '').localeCompare(b.task?.id ?? '');
+				}
+				case 'created': {
+					const createdA = a.created ? new Date(a.created).getTime() : 0;
+					const createdB = b.created ? new Date(b.created).getTime() : 0;
+					return (createdA - createdB) * dir;
+				}
+				case 'cost': {
+					const costA = a.cost || 0;
+					const costB = b.cost || 0;
+					return (costA - costB) * dir;
+				}
+				default:
+					return 0;
+			}
+		});
+	});
+
+	// Keyboard handler for Alt+Left/Right to cycle through sessions
+	function handleKeydown(e: KeyboardEvent) {
+		// Ignore if typing in an input (unless Alt is held)
+		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+			// Allow Alt+Arrow even in input fields to switch cards
+			if (!e.altKey) return;
+		}
+
+		// Alt+Left or Alt+Right to cycle through session cards
+		if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+			e.preventDefault();
+
+			const sessions = sortedSessions;
+			if (sessions.length === 0) return;
+
+			// Calculate new index
+			let newIndex: number;
+			if (e.key === 'ArrowRight') {
+				// Move forward (or start at 0 if not focused)
+				newIndex = focusedSessionIndex < 0 ? 0 : (focusedSessionIndex + 1) % sessions.length;
+			} else {
+				// Move backward (or start at last if not focused)
+				newIndex = focusedSessionIndex < 0
+					? sessions.length - 1
+					: (focusedSessionIndex - 1 + sessions.length) % sessions.length;
+			}
+
+			focusedSessionIndex = newIndex;
+			const session = sessions[newIndex];
+			if (!session) return;
+
+			// Scroll to and highlight the session card
+			const agentName = session.agentName;
+			const workCard = document.querySelector(`[data-agent-name="${agentName}"]`);
+			if (workCard) {
+				// Scroll the work card into view smoothly
+				workCard.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+
+				// Set highlighted state to trigger animation
+				highlightedAgent = agentName;
+
+				// Focus the textarea within the card after a short delay for scroll
+				setTimeout(() => {
+					const textarea = workCard.querySelector('textarea');
+					if (textarea) {
+						textarea.focus();
+					}
+				}, 100);
+
+				// Clear highlight after animation completes (1.5s matches CSS animation duration)
+				setTimeout(() => {
+					highlightedAgent = null;
+				}, 1500);
+			}
+		}
+	}
 
 	// Sync selectedProject from URL params
 	$effect(() => {
@@ -304,11 +465,15 @@
 	});
 
 	onMount(() => {
+		// Initialize sort stores for keyboard navigation
+		initSort();
+
 		// Phase 1: Fast initial load (no usage data)
 		fetchTaskData();
 		startPolling(500);
 		updateContainerHeight();
 		window.addEventListener('resize', updateContainerHeight);
+		window.addEventListener('keydown', handleKeydown);
 
 		// Phase 2: Lazy load usage data in background
 		setTimeout(() => fetchSessionUsage(), 200);
@@ -318,6 +483,7 @@
 		stopPolling();
 		if (browser) {
 			window.removeEventListener('resize', updateContainerHeight);
+			window.removeEventListener('keydown', handleKeydown);
 		}
 	});
 </script>
