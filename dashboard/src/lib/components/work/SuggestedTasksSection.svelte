@@ -37,6 +37,14 @@
 		};
 	}
 
+	/** Result of a single task creation */
+	interface TaskCreationResult {
+		title: string;
+		taskId?: string;
+		success: boolean;
+		error?: string;
+	}
+
 	interface Props {
 		/** Detected suggested tasks with selection state */
 		tasks: SuggestedTaskWithState[];
@@ -54,6 +62,12 @@
 		onClearEdits?: (taskKey: string) => void;
 		/** Whether task creation is in progress */
 		isCreating?: boolean;
+		/** Creation results for feedback display */
+		createResults?: { success: TaskCreationResult[]; failed: TaskCreationResult[] };
+		/** Whether to show the feedback message */
+		showFeedback?: boolean;
+		/** Callback to dismiss feedback */
+		onDismissFeedback?: () => void;
 	}
 
 	let {
@@ -65,6 +79,9 @@
 		onEditTask,
 		onClearEdits,
 		isCreating = false,
+		createResults = { success: [], failed: [] },
+		showFeedback = false,
+		onDismissFeedback,
 	}: Props = $props();
 
 	// Collapsed state for the section
@@ -446,12 +463,34 @@
 									{:else}
 										<button
 											type="button"
-											onclick={(e) => startEditingTitle(taskKey, effectiveTitle, e)}
+											ondblclick={(e) => startEditingTitle(taskKey, effectiveTitle, e)}
 											class="flex-1 min-w-0 text-xs text-left font-medium truncate hover:underline"
 											style="color: oklch(0.92 0.03 280);"
-											title="Click to edit title"
+											title="Double-click to edit title"
 										>
 											{effectiveTitle}
+										</button>
+										<!-- Edit icon for title -->
+										<button
+											type="button"
+											onclick={(e) => startEditingTitle(taskKey, effectiveTitle, e)}
+											class="text-[10px] p-0.5 rounded opacity-40 hover:opacity-100 transition-opacity"
+											style="color: oklch(0.70 0.08 220);"
+											title="Edit title"
+										>
+											<svg
+												class="w-3 h-3"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke="currentColor"
+												stroke-width="2"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
+												/>
+											</svg>
 										</button>
 									{/if}
 
@@ -600,9 +639,78 @@
 				</div>
 			{/if}
 
+			<!-- Feedback message after task creation -->
+			{#if showFeedback && (createResults.success.length > 0 || createResults.failed.length > 0)}
+				<div
+					class="mt-2 p-2 rounded-lg text-xs"
+					style="
+						background: {createResults.failed.length > 0
+							? 'oklch(0.30 0.10 25 / 0.3)'
+							: 'oklch(0.30 0.12 145 / 0.3)'};
+						border: 1px solid {createResults.failed.length > 0
+							? 'oklch(0.50 0.15 25 / 0.5)'
+							: 'oklch(0.50 0.15 145 / 0.5)'};
+					"
+					transition:slide={{ duration: 200 }}
+				>
+					<!-- Success message -->
+					{#if createResults.success.length > 0}
+						<div class="flex items-center gap-2" style="color: oklch(0.75 0.15 145);">
+							<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+							</svg>
+							<span>
+								Created {createResults.success.length} task{createResults.success.length > 1 ? 's' : ''}
+								{#if createResults.success.some(r => r.taskId)}
+									<span class="opacity-70">
+										({createResults.success.filter(r => r.taskId).map(r => r.taskId).join(', ')})
+									</span>
+								{/if}
+							</span>
+						</div>
+					{/if}
+
+					<!-- Error message -->
+					{#if createResults.failed.length > 0}
+						<div class="flex items-start gap-2 mt-1" style="color: oklch(0.75 0.15 25);">
+							<svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+							</svg>
+							<div>
+								<span>Failed to create {createResults.failed.length} task{createResults.failed.length > 1 ? 's' : ''}:</span>
+								<ul class="list-disc list-inside mt-1 opacity-80 text-[10px]">
+									{#each createResults.failed as failure}
+										<li>
+											<span class="font-medium">{failure.title}</span>
+											{#if failure.error}
+												<span class="opacity-60">- {failure.error}</span>
+											{/if}
+										</li>
+									{/each}
+								</ul>
+							</div>
+						</div>
+					{/if}
+
+					<!-- Dismiss button -->
+					{#if onDismissFeedback}
+						<div class="flex justify-end mt-2">
+							<button
+								type="button"
+								onclick={onDismissFeedback}
+								class="text-[10px] px-2 py-0.5 rounded opacity-70 hover:opacity-100 transition-opacity"
+								style="background: oklch(0.35 0.02 250); color: oklch(0.85 0.02 250);"
+							>
+								Dismiss
+							</button>
+						</div>
+					{/if}
+				</div>
+			{/if}
+
 			<!-- Hint -->
 			<p class="text-[9px] mt-1 text-center opacity-40" style="color: oklch(0.60 0.02 280);">
-				Click titles to edit • Dropdowns to change priority/type • Expand for full description
+				Double-click or ✏️ to edit title • Dropdowns to change priority/type • Expand for description
 			</p>
 		</div>
 	{/if}
