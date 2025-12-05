@@ -1042,6 +1042,9 @@
 	}
 	let attachedImages = $state<AttachedImage[]>([]);
 
+	// Drag-and-drop state for file attachments
+	let isDragOver = $state(false);
+
 	// Detected Claude Code prompt options (numbered format: "1. Yes", "2. No")
 	interface PromptOption {
 		number: number;
@@ -2301,7 +2304,7 @@
 	}
 
 	// Handle native paste event - only intercept for images, let text paste normally
-	function handlePaste(e: ClipboardEvent) {
+	async function handlePaste(e: ClipboardEvent) {
 		if (!onSendInput || !e.clipboardData) return;
 
 		// Check if clipboard contains an image
@@ -2312,7 +2315,11 @@
 				e.preventDefault();
 				const blob = item.getAsFile();
 				if (blob) {
-					attachImage(blob);
+					await attachImage(blob);
+					// Also archive to task if there's an active task
+					if (task?.id) {
+						await saveImageToTask(blob, task.id);
+					}
 				}
 				return;
 			}
@@ -2338,6 +2345,98 @@
 			URL.revokeObjectURL(img.preview);
 		}
 		attachedImages = attachedImages.filter((i) => i.id !== id);
+	}
+
+	// Handle drag-and-drop for file attachments
+	function handleDragOver(e: DragEvent) {
+		e.preventDefault();
+		e.stopPropagation();
+		// Only show drag state if files are being dragged and we can send input
+		if (e.dataTransfer?.types.includes("Files") && onSendInput) {
+			isDragOver = true;
+			e.dataTransfer.dropEffect = "copy";
+		}
+	}
+
+	function handleDragLeave(e: DragEvent) {
+		e.preventDefault();
+		e.stopPropagation();
+		// Only reset if we're leaving the card entirely (not entering a child)
+		const relatedTarget = e.relatedTarget as HTMLElement | null;
+		if (!relatedTarget || !e.currentTarget || !(e.currentTarget as HTMLElement).contains(relatedTarget)) {
+			isDragOver = false;
+		}
+	}
+
+	function handleDragEnter(e: DragEvent) {
+		e.preventDefault();
+		e.stopPropagation();
+		if (e.dataTransfer?.types.includes("Files") && onSendInput) {
+			isDragOver = true;
+		}
+	}
+
+	async function handleDrop(e: DragEvent) {
+		e.preventDefault();
+		e.stopPropagation();
+		isDragOver = false;
+
+		if (!onSendInput || !e.dataTransfer?.files) return;
+
+		const files = Array.from(e.dataTransfer.files);
+
+		for (const file of files) {
+			// Handle images - attach them directly
+			if (file.type.startsWith("image/")) {
+				await attachImage(file);
+
+				// Also save to task for archival (if there's an active task)
+				if (task?.id) {
+					await saveImageToTask(file, task.id);
+				}
+			}
+			// For non-image files, we could potentially handle them differently in the future
+			// For now, only image attachments are supported (same as paste behavior)
+		}
+	}
+
+	/**
+	 * Save an image to a task for archival in TaskDetailDrawer.
+	 * Uploads the image and stores the reference with the task.
+	 */
+	async function saveImageToTask(blob: Blob, taskId: string) {
+		try {
+			// Upload to server
+			const formData = new FormData();
+			formData.append("image", blob, `task-${taskId}-${Date.now()}.png`);
+			formData.append("sessionName", `task-${taskId}`);
+
+			const response = await fetch("/api/work/upload-image", {
+				method: "POST",
+				body: formData,
+			});
+
+			if (!response.ok) {
+				console.error("Failed to upload image for task archival");
+				return;
+			}
+
+			const { filePath } = await response.json();
+
+			// Generate unique ID for this image
+			const imageId = `img-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+
+			// Save to task for persistence (shows in TaskDetailDrawer)
+			await fetch(`/api/tasks/${taskId}/image`, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ path: filePath, id: imageId, action: "add" }),
+			});
+
+			console.log(`Archived image to task ${taskId}: ${filePath}`);
+		} catch (err) {
+			console.error("Failed to archive image to task:", err);
+		}
 	}
 
 	// Handle voice transcription - append text to input
@@ -2374,6 +2473,10 @@
 				if (imageType) {
 					const blob = await item.getType(imageType);
 					await attachImage(blob);
+					// Also archive to task if there's an active task
+					if (task?.id) {
+						await saveImageToTask(blob, task.id);
+					}
 					return;
 				}
 
@@ -2724,7 +2827,30 @@
 		out:fade={{ duration: 200 }}
 		onmouseenter={handleCardMouseEnter}
 		onmouseleave={handleCardMouseLeave}
+		ondragover={handleDragOver}
+		ondragleave={handleDragLeave}
+		ondragenter={handleDragEnter}
+		ondrop={handleDrop}
 	>
+		<!-- File drop overlay -->
+		{#if isDragOver}
+			<div
+				class="absolute inset-0 z-50 flex items-center justify-center pointer-events-none"
+				style="
+					background: oklch(0.25 0.15 250 / 0.9);
+					border: 3px dashed oklch(0.65 0.20 250);
+					border-radius: inherit;
+				"
+				transition:fade={{ duration: 150 }}
+			>
+				<div class="flex flex-col items-center gap-2">
+					<svg class="w-12 h-12" style="color: oklch(0.75 0.15 250);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+					</svg>
+					<span class="text-sm font-semibold" style="color: oklch(0.85 0.10 250);">Drop image to attach</span>
+				</div>
+			</div>
+		{/if}
 		<!-- Horizontal resize handle on right edge -->
 		<HorizontalResizeHandle
 			onResize={handleManualResize}
@@ -2879,9 +3005,11 @@
 			<!-- Combines: Agent Info + Status Dropdown into unified tab -->
 			<!-- Background uses gradient that matches the main card's left-to-right gradient -->
 			<div
-				class="absolute right-[-1px] top-0 -mt-8.5 z-10 flex items-center gap-0 rounded-lg rounded-bl-none rounded-br-none"
+				class="absolute right-[-1px] top-0 -mt-8.5 z-10 flex flex-col rounded-lg rounded-bl-none rounded-br-none overflow-hidden"
 				style="background: linear-gradient(90deg, oklch(0.20 0.02 250) 0%, oklch(0.18 0.01 250) 100%); border-left: 0px solid oklch(0.35 0.02 250); border-right: 1px solid oklch(0.35 0.02 250); border-top: 1px solid oklch(0.35 0.02 250);"
 			>
+				<!-- Main row: Agent Info + Status -->
+				<div class="flex items-center gap-0">
 				<!-- Agent Info Section -->
 				<div class="flex items-center gap-1.5 pl-3 pt-2">
 					<AgentAvatar
@@ -2967,11 +3095,12 @@
 						variant="integrated"
 					/>
 				</div>
+				</div>
 				<!-- Context Progress Bar - bottom border showing context remaining -->
-				{#if contextPercent !== undefined}
+				{#if contextPercent != null && contextPercent >= 0}
 					{@const progressColor = contextPercent > 50 ? 'progress-success' : contextPercent > 25 ? 'progress-warning' : 'progress-error'}
 					<progress
-						class="progress {progressColor} h-0.5 w-full absolute bottom-0 left-0 rounded-none"
+						class="progress {progressColor} h-1 w-full rounded-none"
 						value={contextPercent}
 						max="100"
 						title="{contextPercent}% context remaining"
