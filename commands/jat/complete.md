@@ -821,6 +821,192 @@ The completion flow uses these markers (output automatically by the templates ab
 
 ---
 
+## Handling CREATE_TASKS Input from Dashboard
+
+**When the dashboard sends `[JAT:CREATE_TASKS]` input, handle it before the completion summary.**
+
+This happens when:
+1. Agent outputs `[JAT:SUGGESTED_TASKS]` with follow-up tasks
+2. Dashboard displays SuggestedTasksPanel UI
+3. User selects tasks and clicks "Create Selected Tasks"
+4. Dashboard sends `[JAT:CREATE_TASKS]{...json...}[/JAT:CREATE_TASKS]` to agent's terminal
+5. Agent parses this input and creates tasks in Beads
+
+### Input Format
+
+```
+[JAT:CREATE_TASKS]
+{
+  "tasks": [
+    {
+      "type": "agent",
+      "title": "Add caching to /api/agents endpoint",
+      "description": "Same Redis pattern as /api/tasks. Copy approach from cache.ts.",
+      "priority": 2
+    },
+    {
+      "type": "human",
+      "title": "Decide on cache TTL strategy",
+      "description": "Current TTL is 60s. Need product input on freshness vs performance tradeoff.",
+      "priority": 2
+    }
+  ],
+  "parent_task_id": "jat-xyz"
+}
+[/JAT:CREATE_TASKS]
+```
+
+### Field Reference
+
+| Field | Required | Type | Description |
+|-------|----------|------|-------------|
+| `tasks` | Yes | array | Array of tasks to create |
+| `tasks[].type` | Yes | `"agent"` or `"human"` | Who should do this work |
+| `tasks[].title` | Yes | string | Task title (3-10 words) |
+| `tasks[].priority` | Yes | number | 0-4 (P0=critical, P4=lowest) |
+| `tasks[].description` | No | string | Detailed description |
+| `tasks[].labels` | No | string[] | Labels for categorization |
+| `parent_task_id` | No | string | Parent task ID for linking |
+
+### Implementation Steps
+
+**When you detect CREATE_TASKS input in the terminal or receive it as user input:**
+
+#### Step 1: Parse the JSON Payload
+
+```bash
+# The input will look like:
+# [JAT:CREATE_TASKS]{"tasks":[...]}[/JAT:CREATE_TASKS]
+#
+# Parse between the markers to extract JSON
+```
+
+Extract the JSON payload and validate it has the required fields.
+
+#### Step 2: Create Each Task in Beads
+
+For each task in the `tasks` array:
+
+```bash
+# For agent tasks:
+bd create "Task title here" \
+  --description "Task description" \
+  --priority 2 \
+  --type task
+
+# For human tasks, add human-action label:
+bd create "Human task title here" \
+  --description "Task description" \
+  --priority 2 \
+  --type task \
+  --labels "human-action"
+
+# If labels were provided:
+bd create "Task title" \
+  --description "Description" \
+  --priority 2 \
+  --type task \
+  --labels "label1,label2"
+```
+
+**Capture the created task ID from the output** (format: `✓ Created issue: jat-xxx`).
+
+#### Step 3: Link to Parent Task (Optional)
+
+If `parent_task_id` was provided, link the new tasks:
+
+```bash
+# Add dependency relationship (syntax: bd dep add [new-id] [parent-id] --type discovered-from)
+bd dep add jat-newid jat-parentid --type discovered-from
+```
+
+#### Step 4: Output Confirmation
+
+```
+📋 Creating suggested tasks from dashboard...
+
+✓ Created 3 tasks:
+  • jat-abc - Add caching to /api/agents endpoint (agent)
+  • jat-def - Add cache metrics to dashboard (agent)
+  • jat-ghi - Decide on cache TTL strategy (human)
+
+  Linked to parent: jat-xyz
+```
+
+#### Step 5: Continue with Completion Flow
+
+After creating tasks, continue with the normal `/jat:complete` flow (verification, commit, close, announce).
+
+### Error Handling
+
+**JSON parse error:**
+```
+⚠️ CREATE_TASKS: Invalid JSON payload
+   Error: Unexpected token at position 45
+   Skipping task creation, continuing with completion...
+```
+
+**bd create fails for one task:**
+```
+📋 Creating suggested tasks from dashboard...
+
+✓ jat-abc - Add caching to /api/agents endpoint
+✗ Failed: Add cache metrics - bd create error: duplicate title
+✓ jat-ghi - Decide on cache TTL strategy
+
+2 of 3 tasks created successfully.
+```
+
+**Handle errors gracefully** - report which task failed but continue creating others.
+
+### Example Output
+
+```
+[User sends from dashboard:]
+[JAT:CREATE_TASKS]{"tasks":[{"type":"agent","title":"Add unit tests for cache layer","description":"Cover cache hit/miss scenarios","priority":2},{"type":"human","title":"Review cache invalidation strategy","description":"Ensure we invalidate on all write paths","priority":1}],"parent_task_id":"jat-xyz"}[/JAT:CREATE_TASKS]
+
+[Agent response:]
+📋 Creating suggested tasks from dashboard...
+
+Running: bd create "Add unit tests for cache layer" --description "Cover cache hit/miss scenarios" --priority 2 --type task
+✓ Created: jat-abc
+
+Running: bd create "Review cache invalidation strategy" --description "Ensure we invalidate on all write paths" --priority 1 --type task --labels "human-action"
+✓ Created: jat-def
+
+Linking to parent task jat-xyz...
+✓ Added dependency: jat-abc depends on jat-xyz (discovered-from)
+✓ Added dependency: jat-def depends on jat-xyz (discovered-from)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✓ Created 2 tasks from suggestions: jat-abc, jat-def
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[Continuing with completion flow...]
+```
+
+### Integration with Completion Flow
+
+The CREATE_TASKS handling should happen **after showing the completion summary** but **before outputting [JAT:IDLE]**:
+
+1. Steps 1-7 run normally (verify, commit, close, release, announce)
+2. Show completion summary box (Step 8)
+3. **Wait for potential CREATE_TASKS input from dashboard**
+   - If user sends CREATE_TASKS → parse and create tasks → confirm
+   - If user sends nothing / closes terminal → proceed to IDLE
+4. Output `[JAT:IDLE]` marker
+
+This allows the dashboard to:
+1. Parse the `[JAT:SUGGESTED_TASKS]` from completion summary
+2. Show the SuggestedTasksPanel UI to user
+3. User selects and clicks "Create Selected Tasks"
+4. Dashboard sends CREATE_TASKS to still-running agent
+5. Agent creates tasks and confirms
+
+**Note:** The agent session should remain open briefly after showing completion summary to allow this interaction. The `[JAT:IDLE]` marker signals the session can be closed.
+
+---
+
 ## Error Handling
 
 **No active session:**
@@ -868,6 +1054,7 @@ Or run /jat:verify to see detailed error report
 | 6 | Release Reservations | ALWAYS |
 | 7 | Announce Completion | ALWAYS |
 | 8 | Show Final Summary with Reflection | ALWAYS |
+| 9 | Handle CREATE_TASKS Input | If dashboard sends task creation request |
 
 ---
 
