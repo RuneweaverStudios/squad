@@ -34,6 +34,9 @@
 			title?: string;
 			description?: string;
 			priority?: number;
+			project?: string;
+			labels?: string;
+			depends_on?: string[];
 		};
 	}
 
@@ -68,6 +71,8 @@
 		showFeedback?: boolean;
 		/** Callback to dismiss feedback */
 		onDismissFeedback?: () => void;
+		/** Available projects for dropdown (from parent/store) */
+		availableProjects?: string[];
 	}
 
 	let {
@@ -82,6 +87,7 @@
 		createResults = { success: [], failed: [] },
 		showFeedback = false,
 		onDismissFeedback,
+		availableProjects = [],
 	}: Props = $props();
 
 	// Collapsed state for the section
@@ -213,6 +219,31 @@
 		}
 	}
 
+	// Update project
+	function updateProject(taskKey: string, project: string) {
+		if (onEditTask) {
+			onEditTask(taskKey, { project });
+		}
+	}
+
+	// Update labels
+	function updateLabels(taskKey: string, labels: string) {
+		if (onEditTask) {
+			onEditTask(taskKey, { labels });
+		}
+	}
+
+	// Update depends_on (from comma-separated string)
+	function updateDependsOn(taskKey: string, dependsOnStr: string) {
+		if (onEditTask) {
+			const depends_on = dependsOnStr
+				.split(',')
+				.map((s) => s.trim())
+				.filter((s) => s.length > 0);
+			onEditTask(taskKey, { depends_on });
+		}
+	}
+
 	// Clear edits for a task
 	function handleClearEdits(taskKey: string, event: MouseEvent) {
 		event.stopPropagation();
@@ -339,6 +370,9 @@
 					{@const effectiveTitle = getEffectiveValue(task, 'title') || ''}
 					{@const effectiveDescription = getEffectiveValue(task, 'description') || ''}
 					{@const effectivePriority = getEffectiveValue(task, 'priority') ?? 2}
+					{@const effectiveProject = getEffectiveValue(task, 'project') || ''}
+					{@const effectiveLabels = getEffectiveValue(task, 'labels') || ''}
+					{@const effectiveDependsOn = getEffectiveValue(task, 'depends_on') || []}
 					{@const priorityColors = getPriorityColor(effectivePriority)}
 					{@const typeVisual = getIssueTypeVisual(effectiveType)}
 
@@ -463,6 +497,7 @@
 									{:else}
 										<button
 											type="button"
+											onclick={(e) => e.stopPropagation()}
 											ondblclick={(e) => startEditingTitle(taskKey, effectiveTitle, e)}
 											class="flex-1 min-w-0 text-xs text-left font-medium truncate hover:underline"
 											style="color: oklch(0.92 0.03 280);"
@@ -539,15 +574,17 @@
 									</button>
 								</div>
 
-								<!-- Description preview (when collapsed) -->
+								<!-- Description preview (when collapsed) - click to expand and edit -->
 								{#if !isExpanded && effectiveDescription}
-									<p
-										class="text-xs mt-0.5 line-clamp-2"
+									<button
+										type="button"
+										onclick={(e) => toggleExpand(taskKey, e)}
+										class="text-xs mt-0.5 line-clamp-2 text-left hover:underline cursor-pointer w-full"
 										style="color: oklch(0.70 0.03 280);"
-										title={effectiveDescription}
+										title="Click to expand and edit description"
 									>
 										{truncateDescription(effectiveDescription)}
-									</p>
+									</button>
 								{/if}
 
 								<!-- Reason (if provided) -->
@@ -559,24 +596,90 @@
 							</div>
 						</div>
 
-						<!-- Expanded description editor -->
+						<!-- Expanded task editor (all fields) -->
 						{#if isExpanded}
 							<div
-								class="px-2 pb-2 pt-0 ml-7"
+								class="px-2 pb-2 pt-1 ml-7 space-y-2"
 								transition:slide={{ duration: 150 }}
 								onclick={(e) => e.stopPropagation()}
 							>
-								<textarea
-									value={effectiveDescription}
-									oninput={(e) => updateDescription(taskKey, e.currentTarget.value)}
-									class="w-full text-[11px] p-2 rounded resize-none"
-									style="background: oklch(0.25 0.02 250); color: oklch(0.90 0.02 250); border: 1px solid oklch(0.40 0.02 250); min-height: 60px;"
-									placeholder="Task description..."
-								></textarea>
+								<!-- Description -->
+								<div>
+									<label class="text-[9px] font-semibold opacity-60 block mb-0.5" style="color: oklch(0.70 0.02 250);">
+										Description
+									</label>
+									<textarea
+										value={effectiveDescription}
+										oninput={(e) => updateDescription(taskKey, e.currentTarget.value)}
+										class="w-full text-[11px] p-2 rounded resize-none"
+										style="background: oklch(0.25 0.02 250); color: oklch(0.90 0.02 250); border: 1px solid oklch(0.40 0.02 250); min-height: 50px;"
+										placeholder="Task description..."
+									></textarea>
+								</div>
+
+								<!-- Project and Labels row -->
+								<div class="grid grid-cols-2 gap-2">
+									<div>
+										<label class="text-[9px] font-semibold opacity-60 block mb-0.5" style="color: oklch(0.70 0.02 250);">
+											Project
+										</label>
+										{#if availableProjects.length > 0}
+											<select
+												value={effectiveProject}
+												onchange={(e) => updateProject(taskKey, e.currentTarget.value)}
+												class="w-full text-[11px] px-2 py-1 rounded cursor-pointer project-select"
+												style="background: oklch(0.25 0.02 250); color: oklch(0.90 0.02 250); border: 1px solid oklch(0.40 0.02 250);"
+											>
+												<option value="">Select project...</option>
+												{#each availableProjects as project}
+													<option value={project}>{project}</option>
+												{/each}
+											</select>
+										{:else}
+											<input
+												type="text"
+												value={effectiveProject}
+												oninput={(e) => updateProject(taskKey, e.currentTarget.value)}
+												class="w-full text-[11px] px-2 py-1 rounded"
+												style="background: oklch(0.25 0.02 250); color: oklch(0.90 0.02 250); border: 1px solid oklch(0.40 0.02 250);"
+												placeholder="e.g., jat, chimaro"
+											/>
+										{/if}
+									</div>
+									<div>
+										<label class="text-[9px] font-semibold opacity-60 block mb-0.5" style="color: oklch(0.70 0.02 250);">
+											Labels
+										</label>
+										<input
+											type="text"
+											value={effectiveLabels}
+											oninput={(e) => updateLabels(taskKey, e.currentTarget.value)}
+											class="w-full text-[11px] px-2 py-1 rounded"
+											style="background: oklch(0.25 0.02 250); color: oklch(0.90 0.02 250); border: 1px solid oklch(0.40 0.02 250);"
+											placeholder="label1, label2, ..."
+										/>
+									</div>
+								</div>
+
+								<!-- Dependencies -->
+								<div>
+									<label class="text-[9px] font-semibold opacity-60 block mb-0.5" style="color: oklch(0.70 0.02 250);">
+										Depends On (task IDs)
+									</label>
+									<input
+										type="text"
+										value={effectiveDependsOn.join(', ')}
+										oninput={(e) => updateDependsOn(taskKey, e.currentTarget.value)}
+										class="w-full text-[11px] px-2 py-1 rounded"
+										style="background: oklch(0.25 0.02 250); color: oklch(0.90 0.02 250); border: 1px solid oklch(0.40 0.02 250);"
+										placeholder="jat-abc, jat-xyz, ..."
+									/>
+								</div>
+
 								{#if task.reason}
 									<p
-										class="text-[9px] mt-1.5 opacity-60"
-										style="color: oklch(0.65 0.02 250);"
+										class="text-[9px] mt-1 opacity-60"
+										style="color: oklch(0.65 0.08 200);"
 									>
 										💡 Reason: {task.reason}
 									</p>
@@ -710,7 +813,7 @@
 
 			<!-- Hint -->
 			<p class="text-[9px] mt-1 text-center opacity-40" style="color: oklch(0.60 0.02 280);">
-				Double-click or ✏️ to edit title • Dropdowns to change priority/type • Expand for description
+				Double-click or ✏️ to edit title • Click description to edit • Dropdowns for priority/type
 			</p>
 		</div>
 	{/if}
@@ -732,15 +835,20 @@
 
 	/* Dropdown arrow styling */
 	.priority-select,
-	.type-select {
+	.type-select,
+	.project-select {
 		padding-right: 1rem;
 		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%23888' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
-		background-position: right 0.1rem center;
+		background-position: right 0.25rem center;
 		background-repeat: no-repeat;
 		background-size: 0.8rem;
 	}
 
 	.type-select {
 		min-width: 60px;
+	}
+
+	.project-select {
+		appearance: none;
 	}
 </style>

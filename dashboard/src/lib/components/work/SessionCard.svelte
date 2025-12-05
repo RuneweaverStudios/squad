@@ -41,6 +41,7 @@
 		playTaskCompleteSound,
 		playNeedsInputSound,
 		playReadyForReviewSound,
+		playNewTaskChime,
 	} from "$lib/utils/soundEffects";
 	import VoiceInput from "$lib/components/VoiceInput.svelte";
 	import StatusActionBadge from "./StatusActionBadge.svelte";
@@ -66,6 +67,8 @@
 	} from "$lib/utils/markerParser";
 	import { getProjectFromTaskId } from "$lib/utils/projectUtils";
 	import { getTerminalHeight, getCtrlCIntercept, setCtrlCIntercept } from "$lib/stores/preferences.svelte";
+	import { successToast } from "$lib/stores/toasts.svelte";
+	import { availableProjects as availableProjectsStore } from "$lib/stores/drawerStore";
 
 	// Props - aligned with workSessions.svelte.ts types
 	interface Task {
@@ -236,10 +239,17 @@
 	let currentOptionIndex = $state(0);
 	// Allow manual dismissal of terminal-parsed question UI
 	let dismissedTerminalQuestion = $state(false);
+	// "Other" option state - when user wants to type custom text
+	let isOtherInputMode = $state(false);
+	let otherInputValue = $state("");
+	// Suppress question fetching after answering (prevents race condition)
+	let suppressQuestionFetch = $state(false);
 
 	// Fetch question data from API
 	async function fetchQuestionData() {
 		if (!sessionName) return;
+		// Skip if we just answered a question (prevents race condition with DELETE)
+		if (suppressQuestionFetch) return;
 		try {
 			const response = await fetch(
 				`/api/work/${encodeURIComponent(sessionName)}/question`,
@@ -263,19 +273,73 @@
 	// Clear question data after answering
 	async function clearQuestionData() {
 		if (!sessionName) return;
+		// Suppress fetching to prevent race condition
+		suppressQuestionFetch = true;
+		apiQuestionData = null;
 		try {
 			await fetch(`/api/work/${encodeURIComponent(sessionName)}/question`, {
 				method: "DELETE",
 			});
-			apiQuestionData = null;
 		} catch (error) {
 			// Silently fail
 		}
+		// Re-enable fetching after a delay (allows polling to see the deleted state)
+		setTimeout(() => {
+			suppressQuestionFetch = false;
+		}, 2000);
 	}
 
 	// Dismiss terminal-parsed question UI
 	function dismissTerminalQuestion() {
 		dismissedTerminalQuestion = true;
+	}
+
+	// Activate "Other" input mode - navigates to "Type something" option and shows text input
+	async function activateOtherInputMode(numOptions: number) {
+		// "Type something" is at index = options.length (after all options, before Submit)
+		const typeIndex = numOptions;
+		const delta = typeIndex - currentOptionIndex;
+		const direction = delta > 0 ? "down" : "up";
+		const steps = Math.abs(delta);
+
+		// Navigate to "Type something" option
+		for (let i = 0; i < steps; i++) {
+			await onSendInput?.(direction, "key");
+			await new Promise((r) => setTimeout(r, 30));
+		}
+		currentOptionIndex = typeIndex;
+
+		// Press Enter to select "Type something" - this opens Claude Code's text input
+		await new Promise((r) => setTimeout(r, 50));
+		await onSendInput?.("enter", "key");
+
+		// Show our text input for the user to type their custom response
+		isOtherInputMode = true;
+		otherInputValue = "";
+	}
+
+	// Submit the "Other" text input
+	async function submitOtherInput() {
+		if (!otherInputValue.trim()) return;
+
+		// Send the text to Claude Code's "Type something" input
+		await onSendInput?.(otherInputValue.trim(), "text");
+
+		// Wait a moment then press Enter to submit
+		await new Promise((r) => setTimeout(r, 100));
+		await onSendInput?.("enter", "key");
+
+		// Clear the "Other" input state and dismiss question UI
+		isOtherInputMode = false;
+		otherInputValue = "";
+		await clearQuestionData();
+	}
+
+	// Cancel "Other" input mode - press Escape to go back
+	async function cancelOtherInputMode() {
+		await onSendInput?.("escape", "key");
+		isOtherInputMode = false;
+		otherInputValue = "";
 	}
 
 	// Fetch count of tasks completed today by this agent
@@ -574,6 +638,15 @@
 	// Suggested tasks panel expanded state (inline) and modal state
 	let suggestedTasksExpanded = $state(false);
 	let suggestedTasksModalOpen = $state(false);
+
+	// Available projects for suggested task editor dropdown
+	let availableProjects = $state<string[]>([]);
+	$effect(() => {
+		const unsubscribe = availableProjectsStore.subscribe((projects) => {
+			availableProjects = projects;
+		});
+		return unsubscribe;
+	});
 
 	// Tmux session resize state
 	// Tracks the output container width and resizes tmux to match
@@ -1049,6 +1122,12 @@
 		return options;
 	});
 
+	// Strip ANSI escape codes for text parsing
+	function stripAnsi(str: string): string {
+		// eslint-disable-next-line no-control-regex
+		return str.replace(/\x1b\[[0-9;]*m/g, '').replace(/\[[\d;]*m/g, '');
+	}
+
 	// Parse Claude Code AskUserQuestion format from output
 	// Detects both single-select (❯ cursor) and multi-select ([ ] checkbox) formats
 	const detectedQuestion = $derived.by((): DetectedQuestion | null => {
@@ -1057,8 +1136,8 @@
 		// If manually dismissed, return null
 		if (dismissedTerminalQuestion) return null;
 
-		// Only look at recent output (last 3000 chars)
-		const recentOutput = output.slice(-3000);
+		// Only look at recent output (last 3000 chars), strip ANSI codes for parsing
+		const recentOutput = stripAnsi(output.slice(-3000));
 
 		// Check for the navigation footer which indicates an active question prompt
 		const hasQuestionUI =
@@ -1126,11 +1205,12 @@
 				if (/Enter to select/i.test(line)) break;
 
 				// Check if this line is an option (with ❯ cursor or aligned unselected)
-				// The ❯ may have leading whitespace, so we check for it anywhere in the line start
-				const selectedMatch = line.match(/^\s*❯\s+(.+?)(?:\s{2,}(.+))?$/);
-				// Unselected options have spaces where ❯ would be (typically 2+ spaces before text)
+				// Options have format: "❯ 1. Label" or "  2. Label" (number prefix required)
+				// This distinguishes options from description lines which don't have numbers
+				const selectedMatch = line.match(/^\s*❯\s+(\d+\.\s+.+?)(?:\s{2,}(.+))?$/);
+				// Unselected options: spaces followed by "2. Label" pattern
 				const unselectedMatch = line.match(
-					/^\s{2,}([^\s❯].+?)(?:\s{2,}(.+))?$/,
+					/^\s{2,}(\d+\.\s+.+?)(?:\s{2,}(.+))?$/,
 				);
 
 				if (selectedMatch) {
@@ -1654,6 +1734,15 @@
 
 			// Show feedback
 			showCreateFeedback = true;
+
+			// Play success sound and show toast if any tasks were created
+			if (createResults.success.length > 0) {
+				playNewTaskChime();
+				successToast(
+					`Created ${createResults.success.length} task${createResults.success.length > 1 ? 's' : ''}`,
+					createResults.success.map((r) => r.taskId).filter(Boolean).join(', ')
+				);
+			}
 
 			// If all succeeded, clear selections after a short delay
 			if (createResults.failed.length === 0) {
@@ -3160,6 +3249,7 @@
 						{createResults}
 						showFeedback={showCreateFeedback}
 						onDismissFeedback={dismissCreateFeedback}
+						{availableProjects}
 					/>
 				</div>
 			{/if}
@@ -3260,90 +3350,123 @@
 							</span>
 						</div>
 
-						<!-- Options as clickable buttons (API data) -->
-						<div class="flex flex-wrap gap-1.5">
-							{#each currentQuestion.options as opt, index (index)}
-								<button
-									onclick={async () => {
-										// Navigate from current position to target index
-										const delta = index - currentOptionIndex;
-										const direction = delta > 0 ? "down" : "up";
-										const steps = Math.abs(delta);
-
-										for (let i = 0; i < steps; i++) {
-											await onSendInput?.(direction, "key");
-											await new Promise((r) => setTimeout(r, 30));
-										}
-										currentOptionIndex = index;
-
-										await new Promise((r) => setTimeout(r, 50));
-
-										if (currentQuestion.multiSelect) {
-											// Toggle selection with space
-											await onSendInput?.("space", "key");
-											// Update local selection state using array for better reactivity
-											const newSet = new Set(selectedOptionIndices);
-											if (newSet.has(index)) {
-												newSet.delete(index);
-											} else {
-												newSet.add(index);
+						{#if isOtherInputMode}
+							<!-- "Other" text input mode -->
+							<div class="flex flex-col gap-2">
+								<div class="flex items-center gap-2">
+									<input
+										type="text"
+										bind:value={otherInputValue}
+										placeholder="Type your custom response..."
+										class="input input-xs input-bordered flex-1 text-xs"
+										style="background: oklch(0.18 0.02 250); border-color: oklch(0.45 0.12 200); color: oklch(0.90 0.02 250);"
+										onkeydown={(e) => {
+											if (e.key === "Enter" && otherInputValue.trim()) {
+												submitOtherInput();
+											} else if (e.key === "Escape") {
+												cancelOtherInputMode();
 											}
-											selectedOptionIndices = newSet;
-										} else {
-											// Single select - just press enter
-											await onSendInput?.("enter", "key");
-											clearQuestionData();
-										}
-									}}
-									class="btn btn-xs gap-1 transition-all"
-									class:btn-primary={selectedOptionIndices.has(index)}
-									class:btn-outline={!selectedOptionIndices.has(index)}
-									style={selectedOptionIndices.has(index)
-										? "background: oklch(0.45 0.15 250); border-color: oklch(0.55 0.18 250); color: oklch(0.98 0.01 250);"
-										: "background: oklch(0.25 0.03 250); border-color: oklch(0.40 0.03 250); color: oklch(0.80 0.02 250);"}
-									title={opt.description}
-									disabled={sendingInput || !onSendInput}
+										}}
+										disabled={sendingInput || !onSendInput}
+									/>
+									<button
+										onclick={submitOtherInput}
+										class="btn btn-xs btn-success gap-1"
+										title="Send (Enter)"
+										disabled={sendingInput || !onSendInput || !otherInputValue.trim()}
+									>
+										<svg
+											class="w-3 h-3"
+											fill="none"
+											viewBox="0 0 24 24"
+											stroke="currentColor"
+											stroke-width="2.5"
+										>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"
+											/>
+										</svg>
+										Send
+									</button>
+									<button
+										onclick={cancelOtherInputMode}
+										class="btn btn-xs btn-ghost"
+										style="color: oklch(0.65 0.02 250);"
+										title="Cancel (Esc)"
+										disabled={sendingInput}
+									>
+										Cancel
+									</button>
+								</div>
+								<div
+									class="text-[10px] opacity-50"
+									style="color: oklch(0.65 0.02 250);"
 								>
-									{#if currentQuestion.multiSelect}
-										<span class="text-[10px]">
-											{selectedOptionIndices.has(index) ? "☑" : "☐"}
-										</span>
-									{/if}
-									{opt.label}
-								</button>
-							{/each}
+									Press Enter to send, Escape to cancel
+								</div>
+							</div>
+						{:else}
+							<!-- Options as clickable buttons (API data) -->
+							<div class="flex flex-wrap gap-1.5">
+								{#each currentQuestion.options as opt, index (index)}
+									<button
+										onclick={async () => {
+											// Navigate from current position to target index
+											const delta = index - currentOptionIndex;
+											const direction = delta > 0 ? "down" : "up";
+											const steps = Math.abs(delta);
 
-							<!-- Confirm button for multi-select (API) -->
-							{#if currentQuestion.multiSelect}
+											for (let i = 0; i < steps; i++) {
+												await onSendInput?.(direction, "key");
+												await new Promise((r) => setTimeout(r, 30));
+											}
+											currentOptionIndex = index;
+
+											await new Promise((r) => setTimeout(r, 50));
+
+											if (currentQuestion.multiSelect) {
+												// Toggle selection with space
+												await onSendInput?.("space", "key");
+												// Update local selection state using array for better reactivity
+												const newSet = new Set(selectedOptionIndices);
+												if (newSet.has(index)) {
+													newSet.delete(index);
+												} else {
+													newSet.add(index);
+												}
+												selectedOptionIndices = newSet;
+											} else {
+												// Single select - just press enter
+												await onSendInput?.("enter", "key");
+												clearQuestionData();
+											}
+										}}
+										class="btn btn-xs gap-1 transition-all"
+										class:btn-primary={selectedOptionIndices.has(index)}
+										class:btn-outline={!selectedOptionIndices.has(index)}
+										style={selectedOptionIndices.has(index)
+											? "background: oklch(0.45 0.15 250); border-color: oklch(0.55 0.18 250); color: oklch(0.98 0.01 250);"
+											: "background: oklch(0.25 0.03 250); border-color: oklch(0.40 0.03 250); color: oklch(0.80 0.02 250);"}
+										title={opt.description}
+										disabled={sendingInput || !onSendInput}
+									>
+										{#if currentQuestion.multiSelect}
+											<span class="text-[10px]">
+												{selectedOptionIndices.has(index) ? "☑" : "☐"}
+											</span>
+										{/if}
+										{opt.label}
+									</button>
+								{/each}
+
+								<!-- "Other" button - lets user type custom text -->
 								<button
-									onclick={async () => {
-										// Navigate to Submit option
-										// Claude Code UI has: [options...] + "Type something" + "Submit"
-										// So Submit is at index = options.length + 1
-										const submitIndex = currentQuestion.options.length + 1;
-										const delta = submitIndex - currentOptionIndex;
-										const direction = delta > 0 ? "down" : "up";
-										const steps = Math.abs(delta);
-
-										for (let i = 0; i < steps; i++) {
-											await onSendInput?.(direction, "key");
-											await new Promise((r) => setTimeout(r, 30));
-										}
-
-										await new Promise((r) => setTimeout(r, 50));
-										// First Enter: Select "Submit" in the options list
-										await onSendInput?.("enter", "key");
-
-										// Wait for confirmation screen to appear
-										await new Promise((r) => setTimeout(r, 150));
-
-										// Second Enter: Confirm "Submit answers" on the review screen
-										await onSendInput?.("enter", "key");
-
-										clearQuestionData();
-									}}
-									class="btn btn-xs btn-success gap-1"
-									title="Confirm selection (Enter)"
+									onclick={() => activateOtherInputMode(currentQuestion.options.length)}
+									class="btn btn-xs btn-outline gap-1"
+									style="background: oklch(0.20 0.04 45); border-color: oklch(0.45 0.10 45); color: oklch(0.80 0.08 45);"
+									title="Type a custom response"
 									disabled={sendingInput || !onSendInput}
 								>
 									<svg
@@ -3351,30 +3474,80 @@
 										fill="none"
 										viewBox="0 0 24 24"
 										stroke="currentColor"
-										stroke-width="2.5"
+										stroke-width="2"
 									>
 										<path
 											stroke-linecap="round"
 											stroke-linejoin="round"
-											d="M5 13l4 4L19 7"
+											d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
 										/>
 									</svg>
-									Done
+									Other
 								</button>
-							{/if}
-						</div>
 
-						<!-- Hint text -->
-						<div
-							class="text-[10px] mt-1.5 opacity-50"
-							style="color: oklch(0.65 0.02 250);"
-						>
-							{#if currentQuestion.multiSelect}
-								Click options to toggle, then Done to confirm
-							{:else}
-								Click an option to select
-							{/if}
-						</div>
+								<!-- Confirm button for multi-select (API) -->
+								{#if currentQuestion.multiSelect}
+									<button
+										onclick={async () => {
+											// Navigate to Submit option
+											// Claude Code UI has: [options...] + "Type something" + "Submit"
+											// So Submit is at index = options.length + 1
+											const submitIndex = currentQuestion.options.length + 1;
+											const delta = submitIndex - currentOptionIndex;
+											const direction = delta > 0 ? "down" : "up";
+											const steps = Math.abs(delta);
+
+											for (let i = 0; i < steps; i++) {
+												await onSendInput?.(direction, "key");
+												await new Promise((r) => setTimeout(r, 30));
+											}
+
+											await new Promise((r) => setTimeout(r, 50));
+											// First Enter: Select "Submit" in the options list
+											await onSendInput?.("enter", "key");
+
+											// Wait for confirmation screen to appear
+											await new Promise((r) => setTimeout(r, 150));
+
+											// Second Enter: Confirm "Submit answers" on the review screen
+											await onSendInput?.("enter", "key");
+
+											clearQuestionData();
+										}}
+										class="btn btn-xs btn-success gap-1"
+										title="Confirm selection (Enter)"
+										disabled={sendingInput || !onSendInput}
+									>
+										<svg
+											class="w-3 h-3"
+											fill="none"
+											viewBox="0 0 24 24"
+											stroke="currentColor"
+											stroke-width="2.5"
+										>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												d="M5 13l4 4L19 7"
+											/>
+										</svg>
+										Done
+									</button>
+								{/if}
+							</div>
+
+							<!-- Hint text -->
+							<div
+								class="text-[10px] mt-1.5 opacity-50"
+								style="color: oklch(0.65 0.02 250);"
+							>
+								{#if currentQuestion.multiSelect}
+									Click options to toggle, then Done to confirm
+								{:else}
+									Click an option to select, or "Other" to type a custom response
+								{/if}
+							</div>
+						{/if}
 					</div>
 				{:else if detectedQuestion}
 					<!-- Fallback to terminal-parsed question data -->
@@ -3413,41 +3586,99 @@
 							</div>
 						{/if}
 
-						<!-- Options as clickable buttons -->
-						<div class="flex flex-wrap gap-1.5">
-							{#each detectedQuestion.options as opt (opt.index)}
-								<button
-									onclick={() =>
-										selectQuestionOption(opt, detectedQuestion.isMultiSelect)}
-									class="btn btn-xs gap-1 transition-all"
-									class:btn-primary={opt.isSelected &&
-										!detectedQuestion.isMultiSelect}
-									class:btn-outline={!opt.isSelected ||
-										detectedQuestion.isMultiSelect}
-									style={opt.isSelected && detectedQuestion.isMultiSelect
-										? "background: oklch(0.35 0.12 250); border-color: oklch(0.50 0.15 250); color: oklch(0.95 0.02 250);"
-										: !opt.isSelected
-											? "background: oklch(0.25 0.03 250); border-color: oklch(0.40 0.03 250); color: oklch(0.80 0.02 250);"
-											: ""}
-									title={opt.description || opt.label}
-									disabled={sendingInput || !onSendInput}
+						{#if isOtherInputMode}
+							<!-- "Other" text input mode (fallback UI) -->
+							<div class="flex flex-col gap-2">
+								<div class="flex items-center gap-2">
+									<input
+										type="text"
+										bind:value={otherInputValue}
+										placeholder="Type your custom response..."
+										class="input input-xs input-bordered flex-1 text-xs"
+										style="background: oklch(0.18 0.02 250); border-color: oklch(0.45 0.12 200); color: oklch(0.90 0.02 250);"
+										onkeydown={(e) => {
+											if (e.key === "Enter" && otherInputValue.trim()) {
+												submitOtherInput();
+											} else if (e.key === "Escape") {
+												cancelOtherInputMode();
+											}
+										}}
+										disabled={sendingInput || !onSendInput}
+									/>
+									<button
+										onclick={submitOtherInput}
+										class="btn btn-xs btn-success gap-1"
+										title="Send (Enter)"
+										disabled={sendingInput || !onSendInput || !otherInputValue.trim()}
+									>
+										<svg
+											class="w-3 h-3"
+											fill="none"
+											viewBox="0 0 24 24"
+											stroke="currentColor"
+											stroke-width="2.5"
+										>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"
+											/>
+										</svg>
+										Send
+									</button>
+									<button
+										onclick={cancelOtherInputMode}
+										class="btn btn-xs btn-ghost"
+										style="color: oklch(0.65 0.02 250);"
+										title="Cancel (Esc)"
+										disabled={sendingInput}
+									>
+										Cancel
+									</button>
+								</div>
+								<div
+									class="text-[10px] opacity-50"
+									style="color: oklch(0.65 0.02 250);"
 								>
-									<!-- Checkbox/radio indicator for multi-select -->
-									{#if detectedQuestion.isMultiSelect}
-										<span class="text-[10px] opacity-70">
-											{opt.isSelected ? "☑" : "☐"}
-										</span>
-									{/if}
-									{opt.label}
-								</button>
-							{/each}
+									Press Enter to send, Escape to cancel
+								</div>
+							</div>
+						{:else}
+							<!-- Options as clickable buttons -->
+							<div class="flex flex-wrap gap-1.5">
+								{#each detectedQuestion.options as opt (opt.index)}
+									<button
+										onclick={() =>
+											selectQuestionOption(opt, detectedQuestion.isMultiSelect)}
+										class="btn btn-xs gap-1 transition-all"
+										class:btn-primary={opt.isSelected &&
+											!detectedQuestion.isMultiSelect}
+										class:btn-outline={!opt.isSelected ||
+											detectedQuestion.isMultiSelect}
+										style={opt.isSelected && detectedQuestion.isMultiSelect
+											? "background: oklch(0.35 0.12 250); border-color: oklch(0.50 0.15 250); color: oklch(0.95 0.02 250);"
+											: !opt.isSelected
+												? "background: oklch(0.25 0.03 250); border-color: oklch(0.40 0.03 250); color: oklch(0.80 0.02 250);"
+												: ""}
+										title={opt.description || opt.label}
+										disabled={sendingInput || !onSendInput}
+									>
+										<!-- Checkbox/radio indicator for multi-select -->
+										{#if detectedQuestion.isMultiSelect}
+											<span class="text-[10px] opacity-70">
+												{opt.isSelected ? "☑" : "☐"}
+											</span>
+										{/if}
+										{opt.label}
+									</button>
+								{/each}
 
-							<!-- Confirm button for multi-select -->
-							{#if detectedQuestion.isMultiSelect}
+								<!-- "Other" button - lets user type custom text -->
 								<button
-									onclick={confirmMultiSelect}
-									class="btn btn-xs btn-success gap-1"
-									title="Confirm selection (Enter)"
+									onclick={() => activateOtherInputMode(detectedQuestion.options.length)}
+									class="btn btn-xs btn-outline gap-1"
+									style="background: oklch(0.20 0.04 45); border-color: oklch(0.45 0.10 45); color: oklch(0.80 0.08 45);"
+									title="Type a custom response"
 									disabled={sendingInput || !onSendInput}
 								>
 									<svg
@@ -3455,30 +3686,55 @@
 										fill="none"
 										viewBox="0 0 24 24"
 										stroke="currentColor"
-										stroke-width="2.5"
+										stroke-width="2"
 									>
 										<path
 											stroke-linecap="round"
 											stroke-linejoin="round"
-											d="M5 13l4 4L19 7"
+											d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
 										/>
 									</svg>
-									Done
+									Other
 								</button>
-							{/if}
-						</div>
 
-						<!-- Hint text -->
-						<div
-							class="text-[10px] mt-1.5 opacity-50"
-							style="color: oklch(0.65 0.02 250);"
-						>
-							{#if detectedQuestion.isMultiSelect}
-								Click options to toggle, then Done to confirm
-							{:else}
-								Click an option to select
-							{/if}
-						</div>
+								<!-- Confirm button for multi-select -->
+								{#if detectedQuestion.isMultiSelect}
+									<button
+										onclick={confirmMultiSelect}
+										class="btn btn-xs btn-success gap-1"
+										title="Confirm selection (Enter)"
+										disabled={sendingInput || !onSendInput}
+									>
+										<svg
+											class="w-3 h-3"
+											fill="none"
+											viewBox="0 0 24 24"
+											stroke="currentColor"
+											stroke-width="2.5"
+										>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												d="M5 13l4 4L19 7"
+											/>
+										</svg>
+										Done
+									</button>
+								{/if}
+							</div>
+
+							<!-- Hint text -->
+							<div
+								class="text-[10px] mt-1.5 opacity-50"
+								style="color: oklch(0.65 0.02 250);"
+							>
+								{#if detectedQuestion.isMultiSelect}
+									Click options to toggle, then Done to confirm
+								{:else}
+									Click an option to select, or "Other" to type a custom response
+								{/if}
+							</div>
+						{/if}
 					</div>
 				{/if}
 
