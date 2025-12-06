@@ -146,7 +146,7 @@
 	// 'type' - group by issue_type (bug, task, feature, etc.)
 	// 'parent' - group by parent task ID (for epic/subtask hierarchies)
 	// 'label' - group by first label
-	let groupingMode = $state<GroupingMode>('parent');
+	let groupingMode = $state<GroupingMode>('project');
 
 	// Track collapsed groups (by group key)
 	let collapsedGroups = $state<Set<string | null>>(new Set());
@@ -1735,7 +1735,20 @@
 
 			<!-- Grouping Mode Toggle - Industrial btn-group -->
 			<div class="join rounded" style="border: 1px solid oklch(0.35 0.02 250);">
-				<!-- Parent grouping (folder icon) - DEFAULT -->
+				<!-- Project grouping (cube/package icon) - DEFAULT -->
+				<button
+					class="join-item btn btn-xs px-2"
+					style={groupingMode === 'project'
+						? 'background: oklch(0.50 0.18 240); color: oklch(0.95 0.02 250); border: none;'
+						: 'background: oklch(0.22 0.01 250); color: oklch(0.55 0.02 250); border: none;'}
+					onclick={() => setGroupingMode('project')}
+					title="Group by Project → Epic"
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+						<path stroke-linecap="round" stroke-linejoin="round" d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
+					</svg>
+				</button>
+				<!-- Parent grouping (folder icon) -->
 				<button
 					class="join-item btn btn-xs px-2"
 					style={groupingMode === 'parent'
@@ -1773,19 +1786,6 @@
 					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
 						<path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z" />
-					</svg>
-				</button>
-				<!-- Project grouping (cube/package icon) -->
-				<button
-					class="join-item btn btn-xs px-2"
-					style={groupingMode === 'project'
-						? 'background: oklch(0.50 0.18 240); color: oklch(0.95 0.02 250); border: none;'
-						: 'background: oklch(0.22 0.01 250); color: oklch(0.55 0.02 250); border: none;'}
-					onclick={() => setGroupingMode('project')}
-					title="Group by Project → Epic"
-				>
-					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-						<path stroke-linecap="round" stroke-linejoin="round" d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
 					</svg>
 				</button>
 			</div>
