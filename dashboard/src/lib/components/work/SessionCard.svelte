@@ -224,6 +224,11 @@
 	let currentTime = $state(Date.now());
 	let elapsedTimeInterval: ReturnType<typeof setInterval> | null = null;
 
+	// Activity tracking for dormancy detection
+	// Track when output last changed to detect stalled/inactive sessions
+	let lastOutputLength = $state(0);
+	let lastActivityTime = $state(Date.now());
+
 	// API-based question data (from PostToolUse hook)
 	interface APIQuestion {
 		question: string;
@@ -391,6 +396,16 @@
 			dismissedTerminalQuestion = false;
 		}
 		lastQuestionUIPresent = hasQuestionUI;
+	});
+
+	// Track activity for dormancy detection
+	// Update lastActivityTime when output changes
+	$effect(() => {
+		const currentLength = output?.length || 0;
+		if (currentLength !== lastOutputLength) {
+			lastOutputLength = currentLength;
+			lastActivityTime = Date.now();
+		}
 	});
 
 	onMount(() => {
@@ -1544,18 +1559,38 @@
 		return "idle";
 	});
 
-	// Detect dormant state (completed session that has been inactive for a while)
-	// Dormant shows 💤 icon instead of ✅ to indicate "sleeping, needs cleanup"
+	// Detect dormant state (session that has been inactive for a while)
+	// Dormant shows 💤 icon to indicate "sleeping/stalled/user away"
+	// Different thresholds for different states:
+	// - completed: 5 minutes since task closed (session needs cleanup)
+	// - working: 10 minutes of no output (agent may be stalled)
+	// - needs-input: 15 minutes of no activity (user is away)
+	// - ready-for-review: 15 minutes of no activity (user is away)
+	const DORMANT_THRESHOLDS = {
+		completed: 5,        // 5 minutes after task closed
+		working: 10,         // 10 minutes of no output
+		'needs-input': 15,   // 15 minutes waiting for user
+		'ready-for-review': 15, // 15 minutes waiting for user
+	} as const;
+
 	const isDormant = $derived.by((): boolean => {
-		if (sessionState !== 'completed') return false;
-		if (!lastCompletedTask?.closedAt) return false;
+		// Only certain states can become dormant
+		const threshold = DORMANT_THRESHOLDS[sessionState as keyof typeof DORMANT_THRESHOLDS];
+		if (!threshold) return false;
 
-		const closedDate = new Date(lastCompletedTask.closedAt);
-		const now = new Date();
-		const minutesSinceClosed = (now.getTime() - closedDate.getTime()) / (1000 * 60);
+		const now = currentTime; // Use reactive currentTime for live updates
 
-		// After 5 minutes, show dormant variant
-		return minutesSinceClosed >= 5;
+		// For completed state, use the task closed timestamp
+		if (sessionState === 'completed') {
+			if (!lastCompletedTask?.closedAt) return false;
+			const closedDate = new Date(lastCompletedTask.closedAt);
+			const minutesSinceClosed = (now - closedDate.getTime()) / (1000 * 60);
+			return minutesSinceClosed >= threshold;
+		}
+
+		// For other states, use activity-based detection (time since last output change)
+		const minutesSinceActivity = (now - lastActivityTime) / (1000 * 60);
+		return minutesSinceActivity >= threshold;
 	});
 
 	// Check if auto-proceed mode is active (for future autopilot feature)
@@ -1878,12 +1913,23 @@
 		SESSION_STATE_VISUALS[sessionState] || SESSION_STATE_VISUALS.idle,
 	);
 
-	// Get display labels (respects dormant state for completed sessions)
+	// Get display labels (respects dormant state)
 	const displayLabel = $derived(
 		isDormant && stateVisual.dormantLabel ? stateVisual.dormantLabel : stateVisual.label
 	);
 	const displayShortLabel = $derived(
 		isDormant && stateVisual.dormantShortLabel ? stateVisual.dormantShortLabel : stateVisual.shortLabel
+	);
+
+	// Get display colors (muted when dormant)
+	const displayAccent = $derived(
+		isDormant && stateVisual.dormantAccent ? stateVisual.dormantAccent : stateVisual.accent
+	);
+	const displayBgTint = $derived(
+		isDormant && stateVisual.dormantBgTint ? stateVisual.dormantBgTint : stateVisual.bgTint
+	);
+	const displayGlow = $derived(
+		isDormant && stateVisual.dormantGlow ? stateVisual.dormantGlow : stateVisual.glow
 	);
 
 	// Capture session log to .beads/logs/ on completion
@@ -2690,8 +2736,8 @@
 		class:ring-info={isJumpHighlighted}
 		class:animate-pulse-subtle={sessionState === "needs-input" && !isCompleteFlashing}
 		style="
-			background: linear-gradient(135deg, {stateVisual.bgTint} 0%, oklch(0.18 0.01 250) 100%);
-			border-left: 3px solid {isCompleteFlashing ? 'oklch(0.65 0.20 145)' : stateVisual.accent};
+			background: linear-gradient(135deg, {displayBgTint} 0%, oklch(0.18 0.01 250) 100%);
+			border-left: 3px solid {isCompleteFlashing ? 'oklch(0.65 0.20 145)' : displayAccent};
 			{isCompleteFlashing
 			? 'box-shadow: 0 0 20px oklch(0.65 0.20 145 / 0.6);'
 			: sessionState === 'needs-input'
@@ -2708,13 +2754,13 @@
 			<div class="flex items-center gap-2 min-w-0">
 				<div
 					class="shrink-0 rounded-full leading-[0]"
-					style="box-shadow: 0 0 0 2px {stateVisual.accent};"
+					style="box-shadow: 0 0 0 2px {displayAccent};"
 				>
 					<AgentAvatar name={agentName} size={18} />
 				</div>
 				<span
 					class="font-mono text-[11px] font-semibold tracking-wider uppercase truncate"
-					style="color: {stateVisual.accent}; text-shadow: 0 0 12px {stateVisual.glow};"
+					style="color: {displayAccent}; text-shadow: 0 0 12px {displayGlow};"
 					title={agentName}
 				>
 					{agentName}
@@ -3186,7 +3232,7 @@
 						<!-- Agent name -->
 						<span
 							class="font-mono text-sm font-bold tracking-wide"
-							style="color: {stateVisual.accent}; text-shadow: 0 0 12px {stateVisual.glow};"
+							style="color: {displayAccent}; text-shadow: 0 0 12px {displayGlow};"
 						>
 							{agentName}
 						</span>

@@ -421,6 +421,10 @@ export interface SessionStateVisual {
 	shortLabel: string;            // Short label without emoji (e.g., "Complete")
 	iconType: SessionStateIconType; // Icon identifier for SessionCard
 
+	// Dormant variants (for sessions that have been inactive)
+	dormantLabel?: string;         // Label when dormant (e.g., "💤 COMPLETE")
+	dormantShortLabel?: string;    // Short label when dormant
+
 	// StatusActionBadge colors (used for dropdown badges)
 	bgColor: string;               // Background color (oklch with alpha)
 	textColor: string;             // Text color (oklch)
@@ -432,6 +436,11 @@ export interface SessionStateVisual {
 	bgTint: string;                // Subtle background tint
 	glow: string;                  // Glow effect color (for active states)
 
+	// Dormant colors (muted/desaturated versions for inactive sessions)
+	dormantAccent?: string;        // Muted accent color when dormant
+	dormantBgTint?: string;        // Muted background tint when dormant
+	dormantGlow?: string;          // Muted glow when dormant
+
 	// SVG path for StatusActionBadge icon
 	icon: string;
 }
@@ -439,7 +448,7 @@ export interface SessionStateVisual {
 export const SESSION_STATE_VISUALS: Record<string, SessionStateVisual> = {
 	starting: {
 		label: '🚀 STARTING',
-		shortLabel: 'Starting',
+		shortLabel: '🚀 Starting',
 		iconType: 'rocket',
 		// StatusActionBadge colors
 		bgColor: 'oklch(0.60 0.15 200 / 0.3)',
@@ -452,9 +461,12 @@ export const SESSION_STATE_VISUALS: Record<string, SessionStateVisual> = {
 		icon: 'M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z'
 	},
 	working: {
-		label: '⚙️ WORKING',
-		shortLabel: 'Working',
+		label: '🔧 WORKING',
+		shortLabel: '🔧 Working',
 		iconType: 'gear',
+		// Dormant variant: agent was working but has gone quiet/stalled
+		dormantLabel: '💤 WORKING',
+		dormantShortLabel: '💤 Working',
 		// StatusActionBadge colors
 		bgColor: 'oklch(0.55 0.15 250 / 0.3)',
 		textColor: 'oklch(0.90 0.12 250)',
@@ -463,11 +475,15 @@ export const SESSION_STATE_VISUALS: Record<string, SessionStateVisual> = {
 		accent: 'oklch(0.70 0.18 250)',
 		bgTint: 'oklch(0.70 0.18 250 / 0.08)',
 		glow: 'oklch(0.70 0.18 250 / 0.4)',
+		// Dormant colors (muted/desaturated)
+		dormantAccent: 'oklch(0.50 0.05 250)',
+		dormantBgTint: 'oklch(0.50 0.05 250 / 0.05)',
+		dormantGlow: 'oklch(0.50 0.05 250 / 0.2)',
 		icon: 'M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z M15 12a3 3 0 11-6 0 3 3 0 016 0z'
 	},
 	compacting: {
 		label: '📦 COMPACTING',
-		shortLabel: 'Compacting',
+		shortLabel: '📦 Compacting',
 		iconType: 'gear',
 		// StatusActionBadge colors - muted purple to indicate system processing
 		bgColor: 'oklch(0.50 0.12 280 / 0.3)',
@@ -483,8 +499,11 @@ export const SESSION_STATE_VISUALS: Record<string, SessionStateVisual> = {
 	},
 	'needs-input': {
 		label: '❓ INPUT',
-		shortLabel: 'Needs Input',
+		shortLabel: '❓ Needs Input',
 		iconType: 'question',
+		// Dormant variant: waiting for user but user hasn't responded
+		dormantLabel: '💤 INPUT',
+		dormantShortLabel: '💤 Needs Input',
 		// StatusActionBadge colors
 		bgColor: 'oklch(0.60 0.20 45 / 0.3)',
 		textColor: 'oklch(0.90 0.15 45)',
@@ -494,12 +513,19 @@ export const SESSION_STATE_VISUALS: Record<string, SessionStateVisual> = {
 		accent: 'oklch(0.75 0.20 45)',
 		bgTint: 'oklch(0.75 0.20 45 / 0.10)',
 		glow: 'oklch(0.75 0.20 45 / 0.5)',
+		// Dormant colors (muted/desaturated)
+		dormantAccent: 'oklch(0.55 0.05 45)',
+		dormantBgTint: 'oklch(0.55 0.05 45 / 0.05)',
+		dormantGlow: 'oklch(0.55 0.05 45 / 0.2)',
 		icon: 'M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z'
 	},
 	'ready-for-review': {
 		label: '🔍 REVIEW',
-		shortLabel: 'Review',
+		shortLabel: '🔍 Review',
 		iconType: 'eye',
+		// Dormant variant: waiting for user review but user hasn't acted
+		dormantLabel: '💤 REVIEW',
+		dormantShortLabel: '💤 Review',
 		// StatusActionBadge colors
 		bgColor: 'oklch(0.55 0.18 85 / 0.3)',
 		textColor: 'oklch(0.85 0.15 85)',
@@ -509,11 +535,15 @@ export const SESSION_STATE_VISUALS: Record<string, SessionStateVisual> = {
 		accent: 'oklch(0.70 0.20 85)',
 		bgTint: 'oklch(0.70 0.20 85 / 0.08)',
 		glow: 'oklch(0.70 0.20 85 / 0.4)',
+		// Dormant colors (muted/desaturated)
+		dormantAccent: 'oklch(0.50 0.05 85)',
+		dormantBgTint: 'oklch(0.50 0.05 85 / 0.05)',
+		dormantGlow: 'oklch(0.50 0.05 85 / 0.2)',
 		icon: 'M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z M15 12a3 3 0 11-6 0 3 3 0 016 0z'
 	},
 	completing: {
 		label: '⏳ COMPLETING',
-		shortLabel: 'Completing',
+		shortLabel: '⏳ Completing',
 		iconType: 'gear',
 		// StatusActionBadge colors
 		bgColor: 'oklch(0.50 0.12 175 / 0.3)',
@@ -527,8 +557,11 @@ export const SESSION_STATE_VISUALS: Record<string, SessionStateVisual> = {
 	},
 	completed: {
 		label: '✅ DONE',
-		shortLabel: 'Complete',
+		shortLabel: '✅ Complete',
 		iconType: 'check',
+		// Dormant variant: session completed but now sleeping/inactive
+		dormantLabel: '💤 COMPLETE',
+		dormantShortLabel: '💤 Complete',
 		// StatusActionBadge colors
 		bgColor: 'oklch(0.45 0.18 145 / 0.3)',
 		textColor: 'oklch(0.80 0.15 145)',
@@ -537,11 +570,15 @@ export const SESSION_STATE_VISUALS: Record<string, SessionStateVisual> = {
 		accent: 'oklch(0.70 0.20 145)',
 		bgTint: 'oklch(0.70 0.20 145 / 0.08)',
 		glow: 'oklch(0.70 0.20 145 / 0.4)',
+		// Dormant colors (muted/desaturated)
+		dormantAccent: 'oklch(0.50 0.05 145)',
+		dormantBgTint: 'oklch(0.50 0.05 145 / 0.05)',
+		dormantGlow: 'oklch(0.50 0.05 145 / 0.2)',
 		icon: 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
 	},
 	idle: {
-		label: 'IDLE',
-		shortLabel: 'Idle',
+		label: '💤 IDLE',
+		shortLabel: '💤 Idle',
 		iconType: 'circle',
 		// StatusActionBadge colors
 		bgColor: 'oklch(0.5 0 0 / 0.1)',
@@ -718,7 +755,7 @@ export const SESSION_STATE_ACTIONS: Record<string, SessionStateAction[]> = {
 	idle: [
 		{
 			id: 'start',
-			label: 'Start Work',
+			label: 'Pick Task',
 			icon: 'M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z',
 			variant: 'success',
 			description: 'Run /jat:start to pick a task'
@@ -927,8 +964,9 @@ export function getServerStateActions(state: ServerState | string): ServerStateA
  * - type: Group by issue_type (bug, task, feature, etc.)
  * - parent: Group by parent task ID (for epic/subtask hierarchies)
  * - label: Group by first label
+ * - project: Group by project first, then by epic within each project
  */
-export type GroupingMode = 'type' | 'parent' | 'label';
+export type GroupingMode = 'type' | 'parent' | 'label' | 'project';
 
 export interface GroupHeaderInfo {
 	icon: string;         // Emoji or unicode icon for the group header
@@ -940,8 +978,8 @@ export interface GroupHeaderInfo {
 /**
  * Get group header visual info based on grouping mode
  *
- * @param mode - The grouping mode ('type', 'parent', or 'label')
- * @param groupKey - The key of the group (issue_type, parent ID, or label name)
+ * @param mode - The grouping mode ('type', 'parent', 'label', or 'project')
+ * @param groupKey - The key of the group (issue_type, parent ID, label name, or composite project::epic key)
  * @returns GroupHeaderInfo with icon, label, accent, and bgTint
  *
  * @example
@@ -956,6 +994,12 @@ export interface GroupHeaderInfo {
  * // Label mode - uses tag icon
  * getGroupHeaderInfo('label', 'dashboard')
  * // → { icon: '🏷️', label: 'DASHBOARD', accent: 'oklch(...)', bgTint: '...' }
+ *
+ * // Project mode - uses composite key (project::epic)
+ * getGroupHeaderInfo('project', 'jat::jat-abc')
+ * // → { icon: '📁', label: 'JAT-ABC', accent: 'oklch(...)', bgTint: '...' }
+ * getGroupHeaderInfo('project', 'jat::')
+ * // → { icon: '📦', label: 'JAT', accent: 'oklch(...)', bgTint: '...' } // Project header
  */
 export function getGroupHeaderInfo(mode: GroupingMode, groupKey: string | null): GroupHeaderInfo {
 	switch (mode) {
@@ -1003,6 +1047,35 @@ export function getGroupHeaderInfo(mode: GroupingMode, groupKey: string | null):
 				label: groupKey.toUpperCase(),
 				accent: 'oklch(0.68 0.16 185)',           // Teal for labels
 				bgTint: 'oklch(0.68 0.16 185 / 0.08)'
+			};
+		}
+
+		case 'project': {
+			// Project mode uses composite key: "project::epic" or "project::" for project-level
+			if (!groupKey) {
+				return {
+					icon: '📋',
+					label: 'NO PROJECT',
+					accent: 'oklch(0.60 0.05 250)',       // Muted slate for ungrouped
+					bgTint: 'oklch(0.60 0.05 250 / 0.06)'
+				};
+			}
+			const [project, epic] = groupKey.split('::');
+			if (!epic) {
+				// Project-level header
+				return {
+					icon: '📦',
+					label: project.toUpperCase(),
+					accent: 'oklch(0.70 0.15 140)',       // Green for projects
+					bgTint: 'oklch(0.70 0.15 140 / 0.08)'
+				};
+			}
+			// Epic-level header within project (nested)
+			return {
+				icon: '📁',
+				label: epic.toUpperCase(),
+				accent: 'oklch(0.70 0.18 270)',           // Purple for hierarchy (same as parent)
+				bgTint: 'oklch(0.70 0.18 270 / 0.08)'
 			};
 		}
 

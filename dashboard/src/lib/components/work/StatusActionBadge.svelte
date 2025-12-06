@@ -35,6 +35,8 @@
 		alignRight?: boolean;
 		/** 'badge' = standalone badge with bg/border, 'integrated' = minimal style for embedding in tabs */
 		variant?: 'badge' | 'integrated';
+		/** When true, shows dormant variant (💤) for states that support it (completed) */
+		isDormant?: boolean;
 		onAction?: (actionId: string) => Promise<void> | void;
 		class?: string;
 	}
@@ -46,6 +48,7 @@
 		dropUp = false,
 		alignRight = false,
 		variant = 'badge',
+		isDormant = false,
 		onAction,
 		class: className = ''
 	}: Props = $props();
@@ -58,6 +61,14 @@
 	// Get config from centralized statusColors.ts
 	const config = $derived(getSessionStateVisual(sessionState));
 	const actions = $derived(getSessionStateActions(sessionState));
+
+	// Get display label (use dormant variant if applicable)
+	const displayLabel = $derived(
+		isDormant && config.dormantLabel ? config.dormantLabel : config.label
+	);
+	const displayShortLabel = $derived(
+		isDormant && config.dormantShortLabel ? config.dormantShortLabel : config.shortLabel
+	);
 
 	// Handle click outside to close dropdown
 	function handleClickOutside(event: MouseEvent) {
@@ -148,7 +159,7 @@
 		disabled={disabled}
 		title="Click for actions"
 	>
-		{variant === 'integrated' ? config.shortLabel : config.label}
+		{variant === 'integrated' ? displayShortLabel : displayLabel}
 		<!-- Dropdown indicator -->
 		<svg
 			class="inline-block w-2.5 h-2.5 ml-0.5 transition-transform"
