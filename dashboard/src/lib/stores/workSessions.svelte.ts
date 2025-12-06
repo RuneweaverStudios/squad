@@ -6,14 +6,16 @@
  * - sessions: WorkSession[] - Array of active sessions
  * - isLoading: boolean - Loading state
  * - error: string | null - Error message
- * - fetch(lines, includeUsage) - Fetch all active sessions (usage data optional, defaults false for speed)
- * - fetchUsage(lines) - Lazy load usage data for all sessions (merges into existing sessions)
+ * - fetch(includeUsage) - Fetch all active sessions (uses scrollback preference for lines)
+ * - fetchUsage() - Lazy load usage data for all sessions (merges into existing sessions)
  * - spawn(taskId) - Spawn new agent for task
  * - kill(sessionName) - Kill a session
  * - sendInput(sessionName, input) - Send input to session
  * - startPolling(intervalMs) - Start auto-refresh
  * - stopPolling() - Stop auto-refresh
  */
+
+import { getTerminalScrollback } from '$lib/stores/preferences.svelte';
 
 /**
  * Sparkline data point for hourly token usage
@@ -53,6 +55,7 @@ export interface WorkSession {
 	tokens: number;
 	cost: number;
 	sparklineData?: SparklineDataPoint[];
+	contextPercent?: number | null;
 	created: string;
 	attached: boolean;
 }
@@ -77,14 +80,16 @@ let pollingInterval: ReturnType<typeof setInterval> | null = null;
 
 /**
  * Fetch all active work sessions from the API
- * @param lines - Number of output lines to capture (default: 50)
+ * Uses the terminal scrollback preference for line count
  * @param includeUsage - Whether to include token usage/sparkline data (slow, default: false)
  */
-export async function fetch(lines: number = 50, includeUsage: boolean = false): Promise<void> {
+export async function fetch(includeUsage: boolean = false): Promise<void> {
 	state.isLoading = true;
 	state.error = null;
 
 	try {
+		// Use scrollback preference for line count (defaults to 2000 if not initialized)
+		const lines = getTerminalScrollback() || 2000;
 		let url = `/api/work?lines=${lines}`;
 		if (includeUsage) {
 			url += '&usage=true';
@@ -98,25 +103,27 @@ export async function fetch(lines: number = 50, includeUsage: boolean = false): 
 
 		const newSessions: WorkSession[] = data.sessions || [];
 
-		// When not including usage data, preserve existing tokens/cost/sparklineData
+		// When not including usage data, preserve existing tokens/cost/sparklineData/contextPercent
 		// to avoid overwriting data from fetchUsage() with zeros
 		if (!includeUsage && state.sessions.length > 0) {
 			const existingUsageMap = new Map(
 				state.sessions.map(s => [s.sessionName, {
 					tokens: s.tokens,
 					cost: s.cost,
-					sparklineData: s.sparklineData
+					sparklineData: s.sparklineData,
+					contextPercent: s.contextPercent
 				}])
 			);
 
 			state.sessions = newSessions.map(session => {
 				const existingUsage = existingUsageMap.get(session.sessionName);
-				if (existingUsage && (existingUsage.tokens > 0 || existingUsage.sparklineData?.length)) {
+				if (existingUsage && (existingUsage.tokens > 0 || existingUsage.sparklineData?.length || existingUsage.contextPercent != null)) {
 					return {
 						...session,
 						tokens: existingUsage.tokens,
 						cost: existingUsage.cost,
-						sparklineData: existingUsage.sparklineData
+						sparklineData: existingUsage.sparklineData,
+						contextPercent: existingUsage.contextPercent
 					};
 				}
 				return session;
@@ -137,17 +144,18 @@ export async function fetch(lines: number = 50, includeUsage: boolean = false): 
 /**
  * Fetch usage data for all sessions (lazy load after initial fetch)
  */
-export async function fetchUsage(lines: number = 50): Promise<void> {
+export async function fetchUsage(): Promise<void> {
 	try {
+		const lines = getTerminalScrollback() || 2000;
 		const response = await globalThis.fetch(`/api/work?lines=${lines}&usage=true`);
 		const data = await response.json();
 
 		if (!response.ok || !data.sessions) return;
 
 		// Merge usage data into existing sessions
-		type UsageData = { tokens: number; cost: number; sparklineData: SparklineDataPoint[] };
+		type UsageData = { tokens: number; cost: number; sparklineData: SparklineDataPoint[]; contextPercent: number | null };
 		const usageMap = new Map<string, UsageData>(
-			data.sessions.map((s: WorkSession) => [s.sessionName, { tokens: s.tokens, cost: s.cost, sparklineData: s.sparklineData || [] }])
+			data.sessions.map((s: WorkSession) => [s.sessionName, { tokens: s.tokens, cost: s.cost, sparklineData: s.sparklineData || [], contextPercent: s.contextPercent ?? null }])
 		);
 
 		state.sessions = state.sessions.map(session => {
@@ -157,7 +165,8 @@ export async function fetchUsage(lines: number = 50): Promise<void> {
 					...session,
 					tokens: usage.tokens,
 					cost: usage.cost,
-					sparklineData: usage.sparklineData
+					sparklineData: usage.sparklineData,
+					contextPercent: usage.contextPercent
 				};
 			}
 			return session;
