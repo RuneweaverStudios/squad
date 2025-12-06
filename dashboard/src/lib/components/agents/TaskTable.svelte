@@ -24,8 +24,10 @@
 		createPutRequest,
 		createDeleteRequest
 	} from '$lib/utils/bulkApiHelpers';
-	import { playNewTaskChime, playTaskExitSound, playTaskStartSound, playTaskCompleteSound } from '$lib/utils/soundEffects';
+	import { playNewTaskChime, playTaskExitSound, playTaskStartSound, playTaskCompleteSound, playEpicCompleteSound } from '$lib/utils/soundEffects';
 	import { spawningTaskIds, isBulkSpawning } from '$lib/stores/spawningTasks';
+	import { successToast } from '$lib/stores/toasts.svelte';
+	import { getEpicCelebration, getEpicAutoClose } from '$lib/stores/preferences.svelte';
 	import { getFileTypeInfo, formatFileSize, type FileCategory } from '$lib/utils/fileUtils';
 
 	// Type definitions for task files (images, PDFs, text, etc.)
@@ -96,6 +98,7 @@
 	let startingTaskIds = $state<string[]>([]);
 	let completedTaskIds = $state<string[]>([]);
 	let workingCompletedTaskIds = $state<string[]>([]); // Tasks that transitioned from working → completed
+	let completedEpicIds = $state<string[]>([]); // Epics that just had all children complete
 
 	// Timer state for elapsed time display under rockets
 	let now = $state(Date.now());
@@ -441,6 +444,9 @@
 				exitingTasks = [...exitingTasks.filter(t => !closedIds.includes(t.id)), ...completedTasks];
 			}
 
+			// Check for epic completions (all children of an epic just became closed)
+			checkForEpicCompletions(closedIds);
+
 			// Clear completed highlight and exitingTasks after landing animation
 			// (0.8s landing + 0.6s delay + 0.4s checkmark + 1.7s linger)
 			setTimeout(() => {
@@ -450,6 +456,87 @@
 			}, 3500);
 		}
 	});
+
+	/**
+	 * Check if any epics just had all their children complete
+	 * Called when tasks transition to closed status
+	 */
+	function checkForEpicCompletions(justClosedIds: string[]) {
+		// Don't celebrate if the user has disabled it
+		if (!getEpicCelebration()) return;
+
+		// Build a map of parent -> children (using allTasks for complete picture)
+		const parentChildrenMap = new Map<string, Task[]>();
+		for (const task of allTasks) {
+			const parentId = extractParentId(task.id);
+			if (parentId && parentId !== task.id) {
+				// This is a child task
+				if (!parentChildrenMap.has(parentId)) {
+					parentChildrenMap.set(parentId, []);
+				}
+				parentChildrenMap.get(parentId)!.push(task);
+			}
+		}
+
+		// Find epics where the just-closed task was the last incomplete child
+		const newlyCompletedEpics: string[] = [];
+		for (const closedId of justClosedIds) {
+			const parentId = extractParentId(closedId);
+			if (!parentId || parentId === closedId) continue;
+
+			const children = parentChildrenMap.get(parentId);
+			if (!children || children.length === 0) continue;
+
+			// Check if ALL children are now closed (including the one that just closed)
+			const allClosed = children.every(child =>
+				child.status === 'closed' || justClosedIds.includes(child.id)
+			);
+
+			if (allClosed && !newlyCompletedEpics.includes(parentId)) {
+				newlyCompletedEpics.push(parentId);
+			}
+		}
+
+		if (newlyCompletedEpics.length > 0) {
+			// Trigger epic celebration
+			celebrateEpicCompletions(newlyCompletedEpics);
+		}
+	}
+
+	/**
+	 * Celebrate epic completions with toast, sound, and animation
+	 */
+	async function celebrateEpicCompletions(epicIds: string[]) {
+		// Set state for animation
+		completedEpicIds = epicIds;
+
+		// Play the epic completion sound (grander than regular task completion)
+		playEpicCompleteSound();
+
+		// Show toast for each completed epic
+		for (const epicId of epicIds) {
+			// Find the epic in allTasks to get its title
+			const epic = allTasks.find(t => t.id === epicId);
+			const title = epic?.title || epicId;
+			successToast(`Epic Complete: ${title}`, `All children of ${epicId} are now closed`);
+		}
+
+		// If auto-close is enabled, close the epics in Beads
+		if (getEpicAutoClose()) {
+			for (const epicId of epicIds) {
+				try {
+					await fetch(`/api/epics/${epicId}/close`, { method: 'POST' });
+				} catch (err) {
+					console.error(`Failed to auto-close epic ${epicId}:`, err);
+				}
+			}
+		}
+
+		// Clear epic animation state after animation completes
+		setTimeout(() => {
+			completedEpicIds = [];
+		}, 3000);
+	}
 
 	// Check if an agent is actively working (uses shared utility)
 	function isAgentWorking(agentName: string | undefined | null): boolean {
@@ -2312,12 +2399,13 @@
 								{@const epicAssignedAgents = [...new Set(epicTasks.filter(t => t.assignee).map(t => t.assignee))]}
 								{@const hasChildTasks = epicTasks.some(t => extractParentId(t.id) === epicKey)}
 								{@const showEpicHeader = epicTasks.length >= 2 || hasChildTasks}
+								{@const isEpicJustCompleted = completedEpicIds.includes(epicKey)}
 
 								<!-- Epic Header (nested under project) -->
 								{#if showEpicHeader}
 									<thead class="sticky z-10" style="top: 40px;">
 										<tr
-											class="cursor-pointer select-none hover:brightness-110 transition-all"
+											class="cursor-pointer select-none hover:brightness-110 transition-all {isEpicJustCompleted ? 'epic-completed-celebration' : ''}"
 											onclick={() => toggleGroupCollapse(`${projectKey}::${epicKey}`)}
 											title={isEpicCollapsed ? 'Click to expand epic' : 'Click to collapse epic'}
 										>
@@ -2577,9 +2665,23 @@
 
 												<!-- Priority -->
 												<td class="text-center" style="background: {hasRowGradient ? 'transparent' : 'inherit'};">
-													<span class="badge badge-sm {getPriorityBadge(task.priority)}">
-														P{task.priority}
-													</span>
+													<div class="flex items-center justify-center gap-1">
+														<span class="badge badge-sm {getPriorityBadge(task.priority)}">
+															P{task.priority}
+														</span>
+														{#if blockedTasks.length > 0}
+															<span
+																class="inline-flex items-center gap-0.5 text-xs font-mono px-1 py-0.5 rounded"
+																style="color: oklch(0.75 0.15 200); background: oklch(0.75 0.15 200 / 0.15);"
+																title="Completing this task unblocks {blockedTasks.length} other {blockedTasks.length === 1 ? 'task' : 'tasks'}: {blockedTasks.slice(0, 3).map(t => t.id).join(', ')}{blockedTasks.length > 3 ? '...' : ''}"
+															>
+																<svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+																	<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+																</svg>
+																{blockedTasks.length}
+															</span>
+														{/if}
+													</div>
 												</td>
 
 												<!-- Labels -->
@@ -2623,10 +2725,11 @@
 						})}
 						{@const showGroupHeader = groupingMode !== 'parent' || typeTasks.length >= 2 || hasChildTasks}
 						{@const groupIndex = visibleGroupKeys.indexOf(groupKey)}
+						{@const isEpicJustCompleted = groupingMode === 'parent' && groupKey && completedEpicIds.includes(groupKey)}
 						{#if showGroupHeader}
 						<thead>
 							<tr
-								class="cursor-pointer select-none hover:brightness-110 transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset"
+								class="cursor-pointer select-none hover:brightness-110 transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset {isEpicJustCompleted ? 'epic-completed-celebration' : ''}"
 								tabindex="0"
 								role="button"
 								aria-expanded={!isCollapsed}
@@ -2908,9 +3011,23 @@
 											</div>
 										</td>
 									<td class="text-center" style="background: {hasRowGradient ? 'transparent' : 'inherit'};">
-										<span class="badge badge-sm {getPriorityBadge(task.priority)}">
-											P{task.priority}
-										</span>
+										<div class="flex items-center justify-center gap-1">
+											<span class="badge badge-sm {getPriorityBadge(task.priority)}">
+												P{task.priority}
+											</span>
+											{#if blockedTasks.length > 0}
+												<span
+													class="inline-flex items-center gap-0.5 text-xs font-mono px-1 py-0.5 rounded"
+													style="color: oklch(0.75 0.15 200); background: oklch(0.75 0.15 200 / 0.15);"
+													title="Completing this task unblocks {blockedTasks.length} other {blockedTasks.length === 1 ? 'task' : 'tasks'}: {blockedTasks.slice(0, 3).map(t => t.id).join(', ')}{blockedTasks.length > 3 ? '...' : ''}"
+												>
+													<svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+														<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+													</svg>
+													{blockedTasks.length}
+												</span>
+											{/if}
+										</div>
 									</td>
 									<td style="background: {hasRowGradient ? 'transparent' : 'inherit'};">
 										{#if task.labels && task.labels.length > 0}
@@ -2945,6 +3062,8 @@
 					<tbody>
 						{#each exitingTasks as task (task.id)}
 							{@const isTaskCompleted = task.status === 'closed'}
+							{@const allTasksList = allTasks.length > 0 ? allTasks : tasks}
+							{@const blockedTasks = allTasksList.filter(t => t.depends_on?.some(d => d.id === task.id) && t.status !== 'closed')}
 							<tr
 								class="{isTaskCompleted ? 'task-completed-exit' : 'task-exit'}"
 								style="
@@ -2997,9 +3116,23 @@
 								</td>
 								<td class="w-28" style="background: transparent;"></td><!-- Image column -->
 								<td class="text-center" style="background: transparent;">
-									<span class="badge badge-sm {getPriorityBadge(task.priority)}">
-										P{task.priority}
-									</span>
+									<div class="flex items-center justify-center gap-1">
+										<span class="badge badge-sm {getPriorityBadge(task.priority)}">
+											P{task.priority}
+										</span>
+										{#if blockedTasks.length > 0}
+											<span
+												class="inline-flex items-center gap-0.5 text-xs font-mono px-1 py-0.5 rounded"
+												style="color: oklch(0.75 0.15 200); background: oklch(0.75 0.15 200 / 0.15);"
+												title="Completing this task unblocks {blockedTasks.length} other {blockedTasks.length === 1 ? 'task' : 'tasks'}: {blockedTasks.slice(0, 3).map(t => t.id).join(', ')}{blockedTasks.length > 3 ? '...' : ''}"
+											>
+												<svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+												</svg>
+												{blockedTasks.length}
+											</span>
+										{/if}
+									</div>
 								</td>
 								<td style="background: transparent;"></td>
 								<td style="background: transparent;"></td>
