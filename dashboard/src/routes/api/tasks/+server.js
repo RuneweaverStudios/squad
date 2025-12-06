@@ -16,6 +16,11 @@ export async function GET({ url }) {
 	const priority = url.searchParams.get('priority');
 	const search = url.searchParams.get('search');
 
+	// Pagination parameters
+	const limit = url.searchParams.get('limit');
+	const offset = url.searchParams.get('offset');
+	const cursor = url.searchParams.get('cursor'); // For cursor-based pagination (task ID)
+
 	const filters = {};
 	if (project) filters.project = project;
 	if (status) filters.status = status;
@@ -50,10 +55,46 @@ export async function GET({ url }) {
 		});
 	}
 
+	// Store total count before pagination
+	const totalCount = tasks.length;
+
+	// Apply cursor-based pagination (skip to after the cursor task ID)
+	if (cursor) {
+		const cursorIndex = tasks.findIndex(t => t.id === cursor);
+		if (cursorIndex !== -1) {
+			tasks = tasks.slice(cursorIndex + 1);
+		}
+	}
+
+	// Apply offset-based pagination
+	if (offset) {
+		const offsetNum = parseInt(offset);
+		if (!isNaN(offsetNum) && offsetNum > 0) {
+			tasks = tasks.slice(offsetNum);
+		}
+	}
+
+	// Apply limit
+	let hasMore = false;
+	let nextCursor = null;
+	if (limit) {
+		const limitNum = parseInt(limit);
+		if (!isNaN(limitNum) && limitNum > 0) {
+			hasMore = tasks.length > limitNum;
+			if (hasMore) {
+				nextCursor = tasks[limitNum - 1]?.id;
+			}
+			tasks = tasks.slice(0, limitNum);
+		}
+	}
+
 	return json({
 		tasks,
 		projects,
-		count: tasks.length
+		count: tasks.length,
+		totalCount,
+		hasMore,
+		nextCursor
 	});
 }
 
@@ -175,6 +216,19 @@ export async function POST({ request }) {
 		}
 
 		const taskId = match[1];
+
+		// Set review_override if provided (stored in notes field)
+		if (body.review_override && (body.review_override === 'always_review' || body.review_override === 'always_auto')) {
+			try {
+				const overrideCommand = project
+					? `cd ${process.env.HOME}/code/${project} && ${process.env.HOME}/code/jat/tools/bd-set-review-override ${taskId} ${body.review_override}`
+					: `${process.env.HOME}/code/jat/tools/bd-set-review-override ${taskId} ${body.review_override}`;
+				await execAsync(overrideCommand);
+			} catch (err) {
+				console.error('Failed to set review_override:', err);
+				// Continue without failing - task was created successfully
+			}
+		}
 
 		// Fetch the created task to return full object
 		const createdTask = getTaskById(taskId);

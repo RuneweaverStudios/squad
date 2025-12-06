@@ -313,6 +313,25 @@ export async function PATCH({ params, request }) {
 			}
 		}
 
+		// Handle review_override update (stored in notes field via bd-set-review-override)
+		if (updates.review_override !== undefined) {
+			try {
+				const projectPath = existingTask.project_path;
+				const value = updates.review_override;
+				if (value === 'always_review' || value === 'always_auto') {
+					const overrideCommand = `cd "${projectPath}" && ${process.env.HOME}/code/jat/tools/bd-set-review-override ${taskId} ${value}`;
+					await execAsync(overrideCommand);
+				} else if (value === null || value === '' || value === 'null') {
+					// Clear the override
+					const clearCommand = `cd "${projectPath}" && ${process.env.HOME}/code/jat/tools/bd-set-review-override ${taskId} --clear`;
+					await execAsync(clearCommand);
+				}
+			} catch (err) {
+				console.error('Failed to update review_override:', err.message);
+				// Continue without failing - main update succeeded
+			}
+		}
+
 		// Fetch and return updated task
 		const updatedTask = getTaskById(taskId);
 
