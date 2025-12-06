@@ -10,7 +10,8 @@
  * - state.settings: ExecutionSettings - Parallel/sequential, review threshold, etc.
  * - state.progress: { completed: number, total: number }
  * - state.runningAgents: string[] - Agent names currently working on epic children
- * - startEpic(epicId, settings) - Begin epic execution
+ * - launchEpic(epicId, settings) - Begin epic execution with API fetch and agent spawning
+ * - startEpic(epicId, epicTitle, children, settings) - Initialize epic state (internal)
  * - completeTask(taskId) - Mark a child task as completed
  * - getNextReadyTask() - Get next task ready for assignment
  * - isEpicComplete() - Check if all children are done
@@ -18,9 +19,11 @@
  * - updateTaskStatus(taskId, status) - Update a child's status
  * - addRunningAgent(agentName) - Track agent working on epic
  * - removeRunningAgent(agentName) - Remove agent from tracking
+ * - spawnNextAgent() - Spawn next agent for ready task (if under maxConcurrent)
  */
 
 import type { Task } from '$lib/types/api.types';
+import { SPAWN_STAGGER_MS, DEFAULT_MODEL } from '$lib/config/spawnConfig';
 
 // =============================================================================
 // TYPES
@@ -64,6 +67,17 @@ export interface ExecutionSettings {
 }
 
 /**
+ * Result of a spawn operation
+ */
+export interface SpawnResult {
+	success: boolean;
+	sessionName?: string;
+	agentName?: string;
+	taskId?: string;
+	error?: string;
+}
+
+/**
  * Epic queue state
  */
 interface EpicQueueState {
@@ -78,6 +92,11 @@ interface EpicQueueState {
 	runningAgents: string[];
 	isActive: boolean;
 	startedAt: Date | null;
+	// Spawning state
+	isSpawning: boolean;
+	spawnQueue: string[]; // Task IDs queued for spawning
+	spawnedSessions: Map<string, string>; // taskId -> sessionName
+	lastSpawnError: string | null;
 }
 
 // =============================================================================
@@ -99,7 +118,12 @@ const defaultState: EpicQueueState = {
 	progress: { completed: 0, total: 0 },
 	runningAgents: [],
 	isActive: false,
-	startedAt: null
+	startedAt: null,
+	// Spawning state
+	isSpawning: false,
+	spawnQueue: [],
+	spawnedSessions: new Map(),
+	lastSpawnError: null
 };
 
 // =============================================================================
@@ -110,7 +134,7 @@ const defaultState: EpicQueueState = {
 let state = $state<EpicQueueState>({ ...defaultState });
 
 /**
- * Start epic execution with the given settings
+ * Start epic execution with the given settings (internal - initializes state)
  * @param epicId - The epic task ID to execute
  * @param epicTitle - The epic title for display
  * @param children - Child tasks to execute
@@ -132,19 +156,269 @@ export function startEpic(
 		dependsOn: task.depends_on?.map((d) => d.id)
 	}));
 
-	state = {
-		epicId,
-		epicTitle,
-		children: epicChildren,
-		settings: { ...defaultSettings, ...settings },
-		progress: {
-			completed: epicChildren.filter((c) => c.status === 'completed').length,
-			total: epicChildren.length
-		},
-		runningAgents: [],
-		isActive: true,
-		startedAt: new Date()
+	// Mutate properties instead of reassigning (required for Svelte 5 exported state)
+	state.epicId = epicId;
+	state.epicTitle = epicTitle;
+	state.children = epicChildren;
+	state.settings = { ...defaultSettings, ...settings };
+	state.progress = {
+		completed: epicChildren.filter((c) => c.status === 'completed').length,
+		total: epicChildren.length
 	};
+	state.runningAgents = [];
+	state.isActive = true;
+	state.startedAt = new Date();
+	// Reset spawning state
+	state.isSpawning = false;
+	state.spawnQueue = [];
+	state.spawnedSessions = new Map();
+	state.lastSpawnError = null;
+}
+
+// =============================================================================
+// EPIC LAUNCH & SPAWNING
+// =============================================================================
+
+/**
+ * API response type for epic children
+ */
+interface EpicChildrenResponse {
+	epicId: string;
+	epicTitle: string;
+	children: Array<{
+		id: string;
+		title: string;
+		priority: number;
+		status: string;
+		issue_type: string;
+		assignee?: string;
+		isBlocked: boolean;
+		blockedBy: string[];
+	}>;
+	summary: {
+		total: number;
+		open: number;
+		inProgress: number;
+		closed: number;
+		blocked: number;
+		ready: number;
+	};
+}
+
+/**
+ * Launch epic execution with API fetch and agent spawning
+ * This is the main entry point for starting an epic swarm.
+ *
+ * @param epicId - The epic task ID to execute
+ * @param settings - Execution settings (reviewThreshold, maxConcurrent, autoSpawn, mode)
+ * @returns Promise with success status and any errors
+ */
+export async function launchEpic(
+	epicId: string,
+	settings: Partial<ExecutionSettings> = {}
+): Promise<{ success: boolean; error?: string; spawnResults?: SpawnResult[] }> {
+	try {
+		// Clear any previous error
+		state.lastSpawnError = null;
+
+		// 1. Fetch children from API
+		const response = await fetch(`/api/epics/${epicId}/children`);
+		if (!response.ok) {
+			const errorData = await response.json();
+			const errorMsg = errorData.error || 'Failed to fetch epic children';
+			state.lastSpawnError = errorMsg;
+			return { success: false, error: errorMsg };
+		}
+
+		const data: EpicChildrenResponse = await response.json();
+
+		// 2. Convert API children to Task format for startEpic
+		const childrenAsTasks: Task[] = data.children.map((child) => ({
+			id: child.id,
+			title: child.title,
+			description: '', // Not needed for epic queue
+			priority: child.priority,
+			status: child.status as Task['status'],
+			issue_type: child.issue_type as Task['issue_type'],
+			project: '', // Not needed for epic queue
+			assignee: child.assignee,
+			labels: [],
+			depends_on: child.blockedBy.map((id) => ({ id, status: 'open', title: '', priority: 0 }))
+		}));
+
+		// 3. Initialize epic state
+		const mergedSettings = { ...defaultSettings, ...settings };
+		startEpic(epicId, data.epicTitle, childrenAsTasks, mergedSettings);
+
+		// 4. If autoSpawn is enabled, spawn initial agents
+		if (mergedSettings.autoSpawn) {
+			const spawnResults = await spawnInitialAgents();
+			return { success: true, spawnResults };
+		}
+
+		return { success: true };
+	} catch (err) {
+		const errorMsg = err instanceof Error ? err.message : 'Unknown error launching epic';
+		state.lastSpawnError = errorMsg;
+		return { success: false, error: errorMsg };
+	}
+}
+
+/**
+ * Spawn initial agents for ready tasks up to maxConcurrent limit
+ * Called automatically by launchEpic when autoSpawn is enabled.
+ *
+ * @returns Array of spawn results
+ */
+export async function spawnInitialAgents(): Promise<SpawnResult[]> {
+	if (!state.isActive) {
+		return [{ success: false, error: 'No active epic' }];
+	}
+
+	const results: SpawnResult[] = [];
+	const readyTasks = getReadyTasks();
+	const maxToSpawn = Math.min(readyTasks.length, state.settings.maxConcurrent);
+
+	if (maxToSpawn === 0) {
+		return [{ success: false, error: 'No ready tasks to spawn' }];
+	}
+
+	state.isSpawning = true;
+
+	try {
+		for (let i = 0; i < maxToSpawn; i++) {
+			const task = readyTasks[i];
+
+			// Spawn agent for this task
+			const result = await spawnAgentForTask(task.id);
+			results.push(result);
+
+			if (result.success) {
+				// Mark task as in_progress
+				updateTaskStatus(task.id, 'in_progress', result.agentName);
+
+				// Track the spawned session
+				if (result.sessionName) {
+					state.spawnedSessions.set(task.id, result.sessionName);
+				}
+
+				// Add to running agents
+				if (result.agentName) {
+					addRunningAgent(result.agentName);
+				}
+			}
+
+			// Stagger spawns (except for the last one)
+			if (i < maxToSpawn - 1) {
+				await delay(SPAWN_STAGGER_MS);
+			}
+		}
+	} finally {
+		state.isSpawning = false;
+	}
+
+	return results;
+}
+
+/**
+ * Spawn the next available agent for a ready task
+ * Call this when an agent completes a task to spawn a replacement.
+ * Respects maxConcurrent limit.
+ *
+ * @returns Spawn result or null if no spawning needed/possible
+ */
+export async function spawnNextAgent(): Promise<SpawnResult | null> {
+	if (!state.isActive || state.isSpawning) {
+		return null;
+	}
+
+	// Check if we're at capacity
+	if (!canSpawnMore()) {
+		return null;
+	}
+
+	// Get next ready task
+	const nextTask = getNextReadyTask();
+	if (!nextTask) {
+		return null;
+	}
+
+	state.isSpawning = true;
+
+	try {
+		const result = await spawnAgentForTask(nextTask.id);
+
+		if (result.success) {
+			// Mark task as in_progress
+			updateTaskStatus(nextTask.id, 'in_progress', result.agentName);
+
+			// Track the spawned session
+			if (result.sessionName) {
+				state.spawnedSessions.set(nextTask.id, result.sessionName);
+			}
+
+			// Add to running agents
+			if (result.agentName) {
+				addRunningAgent(result.agentName);
+			}
+		} else {
+			state.lastSpawnError = result.error || 'Failed to spawn agent';
+		}
+
+		return result;
+	} finally {
+		state.isSpawning = false;
+	}
+}
+
+/**
+ * Spawn an agent for a specific task via POST /api/sessions
+ * @param taskId - The task ID to assign to the agent
+ * @returns Spawn result
+ */
+async function spawnAgentForTask(taskId: string): Promise<SpawnResult> {
+	try {
+		const response = await fetch('/api/sessions', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				model: DEFAULT_MODEL,
+				task: taskId
+				// agentName is auto-generated (jat-pending-*)
+				// project is auto-detected from cwd
+			})
+		});
+
+		const data = await response.json();
+
+		if (!response.ok) {
+			return {
+				success: false,
+				taskId,
+				error: data.message || data.error || 'Failed to spawn agent'
+			};
+		}
+
+		return {
+			success: true,
+			sessionName: data.sessionName,
+			agentName: data.agentName,
+			taskId
+		};
+	} catch (err) {
+		return {
+			success: false,
+			taskId,
+			error: err instanceof Error ? err.message : 'Network error'
+		};
+	}
+}
+
+/**
+ * Helper to delay execution
+ */
+function delay(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -303,7 +577,19 @@ export function isEpicComplete(): boolean {
  * Stop epic execution
  */
 export function stopEpic(): void {
-	state = { ...defaultState };
+	// Mutate properties instead of reassigning (required for Svelte 5 exported state)
+	state.epicId = null;
+	state.epicTitle = null;
+	state.children = [];
+	state.settings = { ...defaultSettings };
+	state.progress = { completed: 0, total: 0 };
+	state.runningAgents = [];
+	state.isActive = false;
+	state.startedAt = null;
+	state.isSpawning = false;
+	state.spawnQueue = [];
+	state.spawnedSessions = new Map();
+	state.lastSpawnError = null;
 }
 
 /**
@@ -433,6 +719,38 @@ export function getIsActive(): boolean {
 
 export function getStartedAt(): Date | null {
 	return state.startedAt;
+}
+
+export function getIsSpawning(): boolean {
+	return state.isSpawning;
+}
+
+export function getSpawnQueue(): string[] {
+	return state.spawnQueue;
+}
+
+export function getSpawnedSessions(): Map<string, string> {
+	return state.spawnedSessions;
+}
+
+export function getLastSpawnError(): string | null {
+	return state.lastSpawnError;
+}
+
+/**
+ * Get session name for a task (if spawned)
+ * @param taskId - The task ID to look up
+ * @returns Session name or undefined
+ */
+export function getSessionForTask(taskId: string): string | undefined {
+	return state.spawnedSessions.get(taskId);
+}
+
+/**
+ * Clear the last spawn error
+ */
+export function clearSpawnError(): void {
+	state.lastSpawnError = null;
 }
 
 // Export state for direct reactive access in components
