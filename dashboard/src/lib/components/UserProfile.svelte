@@ -24,7 +24,15 @@
 		getTerminalHeight,
 		setTerminalHeight,
 		getCtrlCIntercept,
-		setCtrlCIntercept
+		setCtrlCIntercept,
+		getTerminalFontFamily,
+		setTerminalFontFamily,
+		getTerminalFontSize,
+		setTerminalFontSize,
+		TERMINAL_FONT_OPTIONS,
+		TERMINAL_FONT_SIZE_OPTIONS,
+		type TerminalFontFamily,
+		type TerminalFontSize
 	} from '$lib/stores/preferences.svelte';
 
 	// Placeholder user data
@@ -68,6 +76,10 @@
 	const MIN_TERMINAL_HEIGHT = 20;
 	const MAX_TERMINAL_HEIGHT = 150;
 	const terminalHeight = $derived(getTerminalHeight());
+
+	// Terminal font settings (reactive from preferences store)
+	const terminalFontFamily = $derived(getTerminalFontFamily());
+	const terminalFontSize = $derived(getTerminalFontSize());
 
 	onMount(() => {
 		// Load saved sound preference
@@ -130,6 +142,14 @@
 	function handleHeightChange(newHeight: number) {
 		// Store handles persistence and reactivity automatically
 		setTerminalHeight(newHeight);
+	}
+
+	function handleFontFamilyChange(value: TerminalFontFamily) {
+		setTerminalFontFamily(value);
+	}
+
+	function handleFontSizeChange(value: TerminalFontSize) {
+		setTerminalFontSize(value);
 	}
 </script>
 
@@ -335,6 +355,50 @@
 				<div class="flex justify-between text-[9px]" style="color: oklch(0.50 0.02 250);">
 					<span>{MIN_TERMINAL_HEIGHT}</span>
 					<span>{MAX_TERMINAL_HEIGHT}</span>
+				</div>
+			</div>
+		</li>
+
+		<!-- Terminal Font Family -->
+		<li>
+			<div class="flex flex-col gap-1 px-2 py-1">
+				<span class="text-xs" style="color: oklch(0.70 0.02 250);">Font Family</span>
+				<div class="flex flex-wrap gap-1">
+					{#each TERMINAL_FONT_OPTIONS as option}
+						<button
+							onclick={() => handleFontFamilyChange(option.value)}
+							class="px-2 py-0.5 text-[10px] rounded transition-colors"
+							style="
+								background: {terminalFontFamily === option.value ? 'oklch(0.35 0.10 240)' : 'oklch(0.25 0.02 250)'};
+								color: {terminalFontFamily === option.value ? 'oklch(0.90 0.10 240)' : 'oklch(0.60 0.02 250)'};
+								border: 1px solid {terminalFontFamily === option.value ? 'oklch(0.45 0.12 240)' : 'oklch(0.30 0.02 250)'};
+							"
+						>
+							{option.label}
+						</button>
+					{/each}
+				</div>
+			</div>
+		</li>
+
+		<!-- Terminal Font Size -->
+		<li>
+			<div class="flex flex-col gap-1 px-2 py-1">
+				<span class="text-xs" style="color: oklch(0.70 0.02 250);">Font Size</span>
+				<div class="flex gap-1">
+					{#each TERMINAL_FONT_SIZE_OPTIONS as option}
+						<button
+							onclick={() => handleFontSizeChange(option.value)}
+							class="px-2.5 py-0.5 text-[10px] font-mono rounded transition-colors"
+							style="
+								background: {terminalFontSize === option.value ? 'oklch(0.35 0.10 240)' : 'oklch(0.25 0.02 250)'};
+								color: {terminalFontSize === option.value ? 'oklch(0.90 0.10 240)' : 'oklch(0.60 0.02 250)'};
+								border: 1px solid {terminalFontSize === option.value ? 'oklch(0.45 0.12 240)' : 'oklch(0.30 0.02 250)'};
+							"
+						>
+							{option.label}
+						</button>
+					{/each}
 				</div>
 			</div>
 		</li>
