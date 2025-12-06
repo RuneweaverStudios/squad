@@ -67,6 +67,22 @@ export async function POST({ params, request }) {
 		// Resize the window
 		await execAsync(`tmux resize-window -t "${sessionId}" -x ${Math.floor(width)} -y ${Math.floor(height)}`);
 
+		// Send SIGWINCH to the process in the pane so it can re-render at the new size
+		// This helps Claude Code redraw its current display (though scrollback history won't reflow)
+		try {
+			// Get the PID of the process in the pane
+			const { stdout: pidOut } = await execAsync(
+				`tmux list-panes -t "${sessionId}" -F '#{pane_pid}' | head -1`
+			);
+			const panePid = pidOut.trim();
+			if (panePid) {
+				// Send SIGWINCH to the process group
+				await execAsync(`kill -WINCH -${panePid} 2>/dev/null || true`);
+			}
+		} catch {
+			// Ignore errors - SIGWINCH is a best-effort optimization
+		}
+
 		// Get the new dimensions to confirm
 		const { stdout } = await execAsync(
 			`tmux display-message -p -t "${sessionId}" '#{window_width}x#{window_height}'`
