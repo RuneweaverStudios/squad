@@ -188,24 +188,20 @@ Combine conversation signals + git state to infer:
 **If work detected**, display proposal and ask for confirmation:
 
 ```
-╔══════════════════════════════════════════════════════════════════════════╗
-║               🔍 SPONTANEOUS WORK DETECTED                               ║
-╚══════════════════════════════════════════════════════════════════════════╝
+╔════════════════════════════════════════════════════════╗
+║         🔍 SPONTANEOUS WORK DETECTED                   ║
+╚════════════════════════════════════════════════════════╝
 
-No formal task was in progress, but I detected work in this session:
+No formal task was in progress, but work was detected:
 
 📋 Proposed Task:
    Title: [inferred title]
    Type: [task/bug/feature/chore]
    Description: [inferred description]
 
-📁 Files Changed:
-   [list from git status/diff]
+📁 Files Changed: [list from git status/diff]
 
-Would you like me to create a backfilled task record and complete it?
-This preserves attribution and maintains the audit trail.
-
-[Proceed? Y/n]
+Create a backfilled task record? [Proceed? Y/n]
 ```
 
 #### If User Confirms
@@ -409,47 +405,169 @@ Agent is now available for next task." \
 
 ---
 
-### STEP 8: Show Final Summary (Single Unified Box)
+### STEP 7.5: Determine Review Action (Configurable Rules)
 
-Output this SINGLE box containing everything - task info AND reflection together:
+**After announcing completion, determine which marker to emit based on configurable rules.**
+
+This step implements the review rules system that allows project-level configuration of which tasks require human review vs auto-proceed.
+
+#### Rule Evaluation Order
 
 ```
-┌──────────────────────────────────────────────────────────────────────────┐
-│  ✅ Task Completed: $task_id "$task_title"                               │
-│  👤 Agent: $agent_name                                                   │
-│  [JAT:IDLE]                                                              │
-│                                                                          │
-│  📋 What was accomplished:                                               │
-│     • [Brief summary of the work completed]                              │
-│     • [Key changes made]                                                 │
-│     • [Problems solved]                                                  │
-│                                                                          │
-│  🧑 Human actions required:  (ONLY if manual steps needed)               │
-│     [JAT:HUMAN_ACTION {"title":"...","description":"..."}]               │
-│     [JAT:HUMAN_ACTION {"title":"...","description":"..."}]               │
-│                                                                          │
-│  ⚡ Quality signals:                                                      │
-│     • Tests: [passing/failing/none added]                                │
-│     • Build: [clean/warnings]                                            │
-│     • Complexity: [straightforward | some challenges | obstacles]        │
-│                                                                          │
-│  🔗 Cross-agent intel:                                                   │
-│     • Files: [key files modified]                                        │
-│     • Patterns: [conventions other agents should follow]                 │
-│     • Gotchas: [surprises or tricky areas]                               │
-│                                                                          │
-│  🔍 Apply elsewhere:                                                     │
-│     • [Similar code that could benefit from same treatment]              │
-│                                                                          │
-│  ✨ Ideas to improve the app:                                            │
-│     • [UX improvements, features, or tech debt discovered]               │
-│                                                                          │
-│  📊 Backlog impact:                                                      │
-│     • Unblocked: [tasks that can now proceed]                            │
-│     • Discovered: [new work to add]                                      │
-│                                                                          │
-│  💡 Session complete. Close terminal when ready.                         │
-└──────────────────────────────────────────────────────────────────────────┘
+1. Check task.notes for [REVIEW_OVERRIDE:...] pattern
+   └─ If found → Use override action (always_review, auto_proceed, force_review)
+
+2. Load .beads/review-rules.json
+   └─ Find rule matching task.issue_type
+   └─ Compare task.priority to rule.maxAutoPriority
+
+3. If config missing → Use hardcoded defaults
+```
+
+#### Implementation
+
+```bash
+# Get task details
+task_json=$(bd show "$task_id" --json)
+task_notes=$(echo "$task_json" | jq -r '.[0].notes // ""')
+task_priority=$(echo "$task_json" | jq -r '.[0].priority')
+task_type=$(echo "$task_json" | jq -r '.[0].issue_type')
+
+# Step 1: Check for per-task override in notes
+COMPLETION_MARKER="[JAT:IDLE]"  # Default: requires review
+
+if echo "$task_notes" | grep -q '\[REVIEW_OVERRIDE:always_review\]'; then
+  echo "📋 Review override detected: always_review"
+  COMPLETION_MARKER="[JAT:IDLE]"
+elif echo "$task_notes" | grep -q '\[REVIEW_OVERRIDE:auto_proceed\]'; then
+  echo "📋 Review override detected: auto_proceed"
+  COMPLETION_MARKER="[JAT:AUTO_PROCEED]"
+elif echo "$task_notes" | grep -q '\[REVIEW_OVERRIDE:force_review\]'; then
+  echo "📋 Review override detected: force_review"
+  COMPLETION_MARKER="[JAT:IDLE]"
+else
+  # Step 2: Load review-rules.json and apply type-based rules
+  rules_file=".beads/review-rules.json"
+
+  if [[ -f "$rules_file" ]]; then
+    # Find maxAutoPriority for this task type
+    max_auto=$(jq -r --arg type "$task_type" \
+      '.rules[] | select(.type == $type) | .maxAutoPriority // -1' \
+      "$rules_file")
+
+    if [[ "$max_auto" != "-1" && "$max_auto" != "null" && -n "$max_auto" ]]; then
+      # Compare: task can auto-proceed if priority <= maxAutoPriority
+      # (lower number = higher priority, e.g., P0 < P3)
+      if (( task_priority <= max_auto )); then
+        echo "📋 Auto-proceed: P${task_priority} ${task_type} (max: P${max_auto})"
+        COMPLETION_MARKER="[JAT:AUTO_PROCEED]"
+      else
+        echo "📋 Review required: P${task_priority} ${task_type} (max auto: P${max_auto})"
+        COMPLETION_MARKER="[JAT:IDLE]"
+      fi
+    else
+      # No rule for this type, check defaultAction
+      default_action=$(jq -r '.defaultAction // "review"' "$rules_file")
+      if [[ "$default_action" == "auto" ]]; then
+        COMPLETION_MARKER="[JAT:AUTO_PROCEED]"
+      else
+        COMPLETION_MARKER="[JAT:IDLE]"
+      fi
+    fi
+  else
+    # Step 3: Fallback to hardcoded defaults
+    echo "📋 Using hardcoded defaults (no review-rules.json)"
+
+    # Default rules:
+    # - Epics: always review (maxAutoPriority: -1)
+    # - Chores: always auto-proceed (maxAutoPriority: 4)
+    # - Other (bug, feature, task): auto-proceed for P0-P3
+    case "$task_type" in
+      epic)
+        COMPLETION_MARKER="[JAT:IDLE]"  # Epics always require review
+        ;;
+      chore)
+        COMPLETION_MARKER="[JAT:AUTO_PROCEED]"  # Chores always auto-proceed
+        ;;
+      *)
+        # bug, feature, task: auto-proceed for P0-P3, review for P4
+        if (( task_priority <= 3 )); then
+          COMPLETION_MARKER="[JAT:AUTO_PROCEED]"
+        else
+          COMPLETION_MARKER="[JAT:IDLE]"
+        fi
+        ;;
+    esac
+  fi
+fi
+
+echo "🏷️  Completion marker: $COMPLETION_MARKER"
+```
+
+#### Review Override Values
+
+| Override Value | Effect | Use Case |
+|----------------|--------|----------|
+| `always_review` | Emit `[JAT:IDLE]` | Testing override behavior |
+| `auto_proceed` | Emit `[JAT:AUTO_PROCEED]` | Skip review for specific task |
+| `force_review` | Emit `[JAT:IDLE]` | Force review even if rules say auto |
+
+#### Example review-rules.json
+
+```json
+{
+  "version": 1,
+  "defaultAction": "review",
+  "priorityThreshold": 3,
+  "rules": [
+    { "type": "bug", "maxAutoPriority": 3, "note": "P0-P3 bugs auto-proceed" },
+    { "type": "feature", "maxAutoPriority": 3, "note": "P0-P3 features auto-proceed" },
+    { "type": "task", "maxAutoPriority": 3 },
+    { "type": "chore", "maxAutoPriority": 4, "note": "All chores auto-proceed" },
+    { "type": "epic", "maxAutoPriority": -1, "note": "Epics always require review" }
+  ],
+  "overrides": []
+}
+```
+
+**Understanding maxAutoPriority:**
+- Value represents highest priority number that can auto-proceed
+- Lower priority number = higher importance (P0 is most critical)
+- `maxAutoPriority: 3` means P0, P1, P2, P3 can auto-proceed; P4 requires review
+- `maxAutoPriority: -1` means no auto-proceed (always review)
+- `maxAutoPriority: 4` means all priorities auto-proceed
+
+---
+
+### STEP 8: Show Final Summary (Single Unified Box)
+
+Output this SINGLE box containing everything - task info AND reflection together.
+
+**Important:** Use the `$COMPLETION_MARKER` determined in Step 7.5. This will be either:
+- `[JAT:IDLE]` - Requires human review (session stays open, dashboard shows as waiting)
+- `[JAT:AUTO_PROCEED]` - Auto-proceed enabled (dashboard can auto-close session)
+
+```
+┌────────────────────────────────────────────────────────┐
+│  ✅ Task Completed: $task_id                           │
+│  👤 Agent: $agent_name                                 │
+│  [JAT:COMPLETED]                                       │
+└────────────────────────────────────────────────────────┘
+
+📋 What was accomplished:
+   • [Brief summary of work completed]
+   • [Key changes made]
+
+🧑 Human actions required: (ONLY if manual steps needed)
+   [JAT:HUMAN_ACTION {"title":"...","description":"..."}]
+
+⚡ Quality: Tests [pass/fail] | Build [clean/warn]
+
+🔗 Cross-agent intel:
+   • Files: [key files modified]
+   • Gotchas: [surprises or tricky areas]
+
+💡 Session complete. Close terminal when ready.
 ```
 
 **Guidelines:**
@@ -492,26 +610,23 @@ If your task requires ANY manual steps by the user that cannot be automated, you
 **Example with human actions:**
 
 ```
-┌──────────────────────────────────────────────────────────────────────────┐
-│  ✅ Task Completed: chimaro-xyz "Add anonymous auth support"             │
-│  👤 Agent: CalmMeadow                                                    │
-│  [JAT:IDLE]                                                              │
-│                                                                          │
-│  📋 What was accomplished:                                               │
-│     • Created migration to add auth_mode column to profiles table        │
-│     • Updated TypeScript types for anonymous auth flow                   │
-│     • Added server-side logic for anonymous session handling             │
-│                                                                          │
-│  🧑 Human actions required:                                              │
-│     [JAT:HUMAN_ACTION {"title":"Run migration in production","description":"Execute: supabase db push --db-url $PROD_DB_URL"}]
-│     [JAT:HUMAN_ACTION {"title":"Enable Anonymous Auth in Supabase","description":"Go to Supabase Dashboard > Authentication > Settings > Enable Anonymous sign-ins toggle"}]
-│                                                                          │
-│  ⚡ Quality signals:                                                      │
-│     • Tests: passing                                                     │
-│     • Build: clean                                                       │
-│                                                                          │
-│  💡 Session complete. Close terminal when ready.                         │
-└──────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────┐
+│  ✅ Task Completed: chimaro-xyz                        │
+│  👤 Agent: CalmMeadow                                  │
+│  [JAT:IDLE]                                            │
+└────────────────────────────────────────────────────────┘
+
+📋 What was accomplished:
+   • Created migration for auth_mode column
+   • Added anonymous session handling
+
+🧑 Human actions required:
+   [JAT:HUMAN_ACTION {"title":"Run migration","description":"..."}]
+   [JAT:HUMAN_ACTION {"title":"Enable Anon Auth","description":"..."}]
+
+⚡ Quality: Tests passing | Build clean
+
+💡 Session complete. Close terminal when ready.
 ```
 
 **What the dashboard does with these markers:**
@@ -573,30 +688,27 @@ If your task uncovered follow-up work (bugs, improvements, tech debt, new featur
 **Example with suggested tasks:**
 
 ```
-┌──────────────────────────────────────────────────────────────────────────┐
-│  ✅ Task Completed: jat-xyz "Add caching to API endpoints"               │
-│  👤 Agent: SwiftMeadow                                                   │
-│  [JAT:IDLE]                                                              │
-│                                                                          │
-│  📋 What was accomplished:                                               │
-│     • Added Redis caching layer to /api/tasks endpoint                   │
-│     • Implemented cache invalidation on task updates                     │
-│     • Reduced P99 latency from 450ms to 12ms                             │
-│                                                                          │
-│  📊 Backlog impact:                                                      │
-│     • Unblocked: Dashboard performance issues now resolved               │
-│     • Discovered: Other endpoints could benefit from same pattern        │
-│                                                                          │
-│     [JAT:SUGGESTED_TASKS]                                                │
-│     {"tasks":[                                                           │
-│       {"type":"agent","title":"Add caching to /api/agents endpoint","description":"Same Redis pattern as /api/tasks. Copy approach from cache.ts.","priority":2,"effort":"small"},
-│       {"type":"agent","title":"Add cache metrics to dashboard","description":"Display cache hit/miss rates. New component in monitoring section.","priority":3,"effort":"medium"},
-│       {"type":"human","title":"Decide on cache TTL strategy","description":"Current TTL is 60s. Need product input on freshness vs performance tradeoff.","priority":2}
-│     ]}                                                                   │
-│     [/JAT:SUGGESTED_TASKS]                                               │
-│                                                                          │
-│  💡 Session complete. Close terminal when ready.                         │
-└──────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────┐
+│  ✅ Task Completed: jat-xyz                            │
+│  👤 Agent: SwiftMeadow                                 │
+│  [JAT:IDLE]                                            │
+└────────────────────────────────────────────────────────┘
+
+📋 What was accomplished:
+   • Added Redis caching to /api/tasks endpoint
+   • Reduced P99 latency from 450ms to 12ms
+
+📊 Backlog impact:
+   • Discovered: Other endpoints need same pattern
+
+[JAT:SUGGESTED_TASKS]
+{"tasks":[
+  {"type":"agent","title":"Cache /api/agents","priority":2},
+  {"type":"human","title":"Decide cache TTL","priority":2}
+]}
+[/JAT:SUGGESTED_TASKS]
+
+💡 Session complete. Close terminal when ready.
 ```
 
 **What the dashboard does with suggested tasks:**
@@ -649,26 +761,20 @@ Full verification ensures quality before task closure.
 
 🔍 Analyzing session for spontaneous work...
 
-╔══════════════════════════════════════════════════════════════════════════╗
-║               🔍 SPONTANEOUS WORK DETECTED                               ║
-╚══════════════════════════════════════════════════════════════════════════╝
+╔════════════════════════════════════════════════════════╗
+║         🔍 SPONTANEOUS WORK DETECTED                   ║
+╚════════════════════════════════════════════════════════╝
 
-No formal task was in progress, but I detected work in this session:
+No formal task was in progress, but work was detected:
 
 📋 Proposed Task:
    Title: Fix jat CLI -p flag causing non-interactive sessions
    Type: bug
-   Description: The -p flag was causing Claude Code to run in print mode
-                (non-interactive), exiting immediately after processing.
-                Removed -p and pass prompt as positional argument instead.
+   Description: Fixed -p flag causing non-interactive mode
 
-📁 Files Changed:
-   M cli/jat
+📁 Files Changed: M cli/jat
 
-Would you like me to create a backfilled task record and complete it?
-This preserves attribution and maintains the audit trail.
-
-[Proceed? Y/n] Y
+Create a backfilled task record? [Proceed? Y/n] Y
 
 ✓ Created backfill task: jat-abc "Fix jat CLI -p flag causing non-interactive sessions"
 
@@ -688,40 +794,23 @@ This preserves attribution and maintains the audit trail.
 📢 Announcing task completion...
    ✅ Sent to @active
 
-┌──────────────────────────────────────────────────────────────────────────┐
-│  ✅ Task Completed: jat-abc "Fix jat CLI -p flag..."                     │
-│  👤 Agent: SwiftMoon                                                     │
-│  📝 Note: Backfilled from spontaneous work                               │
-│  [JAT:IDLE]                                                              │
-│                                                                          │
-│  📋 What was accomplished:                                               │
-│     • Fixed jat CLI -p flag that caused non-interactive sessions         │
-│     • Changed from -p flag to positional argument for prompt passing     │
-│     • Sessions now stay interactive as expected                          │
-│                                                                          │
-│  ⚡ Quality signals:                                                      │
-│     • Tests: passing (added 2 new CLI tests)                             │
-│     • Build: clean                                                       │
-│     • Complexity: straightforward once root cause identified             │
-│                                                                          │
-│  🔗 Cross-agent intel:                                                   │
-│     • Files: cli/jat, scripts/setup-bash-functions.sh                    │
-│     • Patterns: Claude's -p flag conflicts with interactive mode         │
-│     • Gotchas: Must use positional args for prompts, not flags           │
-│                                                                          │
-│  🔍 Apply elsewhere:                                                     │
-│     • Check other CLI scripts in ~/code/jat/cli/ for similar issues      │
-│                                                                          │
-│  ✨ Ideas to improve the app:                                            │
-│     • Add --verbose flag to jat CLI for debugging session issues         │
-│     • Consider adding a --dry-run mode to preview what would be launched │
-│                                                                          │
-│  📊 Backlog impact:                                                      │
-│     • Unblocked: None directly                                           │
-│     • Discovered: Should audit all CLI scripts for flag compatibility    │
-│                                                                          │
-│  💡 Session complete. Close terminal when ready.                         │
-└──────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────┐
+│  ✅ Task Completed: jat-abc                            │
+│  👤 Agent: SwiftMoon (Backfilled)                      │
+│  [JAT:IDLE]                                            │
+└────────────────────────────────────────────────────────┘
+
+📋 What was accomplished:
+   • Fixed jat CLI -p flag for non-interactive sessions
+   • Changed to positional argument for prompt passing
+
+⚡ Quality: Tests passing | Build clean
+
+🔗 Cross-agent intel:
+   • Files: cli/jat
+   • Gotchas: Use positional args, not flags for prompts
+
+💡 Session complete. Close terminal when ready.
 ```
 
 ---
@@ -754,46 +843,31 @@ This preserves attribution and maintains the audit trail.
 📢 Announcing task completion...
    ✅ Sent to @active
 
-┌──────────────────────────────────────────────────────────────────────────┐
-│  ✅ Task Completed: jat-abc "Add user settings page"                     │
-│  👤 Agent: JustGrove                                                     │
-│  [JAT:IDLE]                                                              │
-│                                                                          │
-│  📋 What was accomplished:                                               │
-│     • Added new user settings page at /account/settings                  │
-│     • Implemented form fields for profile, notifications, privacy        │
-│     • Connected to existing user API endpoints with proper validation    │
-│                                                                          │
-│  ⚡ Quality signals:                                                      │
-│     • Tests: passing (added 8 new component tests)                       │
-│     • Build: clean                                                       │
-│     • Complexity: some challenges (form state management was tricky)     │
-│                                                                          │
-│  🔗 Cross-agent intel:                                                   │
-│     • Files: routes/account/settings/+page.svelte, SettingsForm.svelte   │
-│     • Patterns: Using $state runes for form state, validation in server  │
-│     • Gotchas: User API returns nested objects - flatten for form binding│
-│                                                                          │
-│  🔍 Apply elsewhere:                                                     │
-│     • Form validation pattern could improve /account/profile             │
-│     • Notification prefs component could be reused in team settings      │
-│                                                                          │
-│  ✨ Ideas to improve the app:                                            │
-│     • Real-time preview for notification settings                        │
-│     • Keyboard shortcuts for power users (Cmd+S to save)                 │
-│     • Auto-save on change instead of explicit save button                │
-│                                                                          │
-│  📊 Backlog impact:                                                      │
-│     • Unblocked: Team settings can reuse notification component          │
-│     • Discovered: Profile page could use same form patterns              │
-│                                                                          │
-│  💡 Session complete. Close terminal when ready.                         │
-└──────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────┐
+│  ✅ Task Completed: jat-abc                            │
+│  👤 Agent: JustGrove                                   │
+│  [JAT:IDLE]                                            │
+└────────────────────────────────────────────────────────┘
+
+📋 What was accomplished:
+   • Added user settings page at /account/settings
+   • Implemented form fields for profile, notifications
+
+⚡ Quality: Tests passing | Build clean
+
+🔗 Cross-agent intel:
+   • Files: routes/account/settings/+page.svelte
+   • Gotchas: Flatten nested API response for form binding
+
+💡 Session complete. Close terminal when ready.
 ```
 
 **Markers explained:**
-- `[JAT:IDLE]` - Dashboard shows completion state, session can be closed
+- `[JAT:IDLE]` - Requires human review; dashboard shows completion state, session stays open
+- `[JAT:AUTO_PROCEED]` - Auto-proceed enabled; dashboard can auto-close session
 - `[JAT:SUGGESTED_TASKS]...[/JAT:SUGGESTED_TASKS]` - Follow-up tasks discovered during work
+
+The marker used depends on review rules (see Step 7.5).
 
 ---
 
@@ -803,9 +877,15 @@ The completion flow uses these markers (output automatically by the templates ab
 
 | Marker | When to Output | Dashboard Effect |
 |--------|----------------|------------------|
-| `[JAT:IDLE]` | ONLY after `bd close` succeeds | Shows "Completed" state (green) |
+| `[JAT:IDLE]` | After `bd close`, when review required | Shows "Completed" state (green), session stays open |
+| `[JAT:AUTO_PROCEED]` | After `bd close`, when auto-proceed enabled | Dashboard can auto-close session, optionally spawn next |
 | `[JAT:HUMAN_ACTION {...}]` | When manual steps are required | Shows prominent action checklist |
 | `[JAT:SUGGESTED_TASKS]...[/JAT:SUGGESTED_TASKS]` | When follow-up work discovered | Shows "N Suggested Tasks" badge, offers Beads creation |
+
+**Marker selection is automatic** - Step 7.5 determines which marker to use based on:
+1. Per-task override in notes (`[REVIEW_OVERRIDE:...]`)
+2. Project review rules (`.beads/review-rules.json`)
+3. Hardcoded defaults (epics require review, chores auto-proceed, others P0-P3 auto)
 
 **Critical timing:**
 - Do NOT output `[JAT:IDLE]` until AFTER all completion steps succeed
@@ -1053,6 +1133,7 @@ Or run /jat:verify to see detailed error report
 | 5 | Mark Task Complete | ALWAYS |
 | 6 | Release Reservations | ALWAYS |
 | 7 | Announce Completion | ALWAYS |
+| 7.5 | Determine Review Action | ALWAYS (sets COMPLETION_MARKER) |
 | 8 | Show Final Summary with Reflection | ALWAYS |
 | 9 | Handle CREATE_TASKS Input | If dashboard sends task creation request |
 
