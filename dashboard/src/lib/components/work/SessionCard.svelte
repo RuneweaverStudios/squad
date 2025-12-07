@@ -32,6 +32,7 @@
 	import { onMount, onDestroy } from "svelte";
 	import { fade, fly, slide } from "svelte/transition";
 	import { ansiToHtmlWithLinks, stripAnsi } from "$lib/utils/ansiToHtml";
+	import { throttledFetch } from "$lib/utils/requestThrottler";
 	import TokenUsageDisplay from "$lib/components/TokenUsageDisplay.svelte";
 	import TaskIdBadge from "$lib/components/TaskIdBadge.svelte";
 	import AgentAvatar from "$lib/components/AgentAvatar.svelte";
@@ -70,6 +71,7 @@
 	import { getTerminalHeight, getCtrlCIntercept, setCtrlCIntercept } from "$lib/stores/preferences.svelte";
 	import { successToast } from "$lib/stores/toasts.svelte";
 	import { availableProjects as availableProjectsStore } from "$lib/stores/drawerStore";
+	import { completeTask as epicCompleteTask, getIsActive as epicIsActive } from "$lib/stores/epicQueueStore.svelte";
 
 	// Props - aligned with workSessions.svelte.ts types
 	interface Task {
@@ -220,6 +222,12 @@
 	// Session log capture state (prevents duplicate captures)
 	let logCaptured = $state(false);
 
+	// Auto-close countdown state (for AUTO_PROCEED marker)
+	// When agent outputs [JAT:AUTO_PROCEED] and completes, start 3-second countdown
+	let autoCloseCountdown = $state<number | null>(null); // Seconds remaining (3, 2, 1, null)
+	let autoCloseTimer: ReturnType<typeof setInterval> | null = null;
+	let autoCloseHeld = $state(false); // User clicked "Hold for Review"
+
 	// Real-time elapsed time clock (ticks every second)
 	let currentTime = $state(Date.now());
 	let elapsedTimeInterval: ReturnType<typeof setInterval> | null = null;
@@ -253,13 +261,57 @@
 	// Suppress question fetching after answering (prevents race condition)
 	let suppressQuestionFetch = $state(false);
 
+	// Next task state (for "Start Next" action in completed state)
+	interface NextTaskInfo {
+		taskId: string;
+		taskTitle: string;
+		source: 'epic' | 'backlog';
+		epicId?: string;
+		epicTitle?: string;
+	}
+	let nextTaskInfo = $state<NextTaskInfo | null>(null);
+	let nextTaskLoading = $state(false);
+
+	// Fetch next task when session is in completed state
+	async function fetchNextTask() {
+		if (nextTaskLoading) return;
+		nextTaskLoading = true;
+		try {
+			const completedTaskId = displayTask?.id || lastCompletedTask?.id || null;
+			const params = completedTaskId ? `?completedTaskId=${encodeURIComponent(completedTaskId)}` : '';
+			const response = await fetch(`/api/tasks/next${params}`);
+			if (response.ok) {
+				const data = await response.json();
+				if (data.nextTask) {
+					nextTaskInfo = {
+						taskId: data.nextTask.taskId,
+						taskTitle: data.nextTask.taskTitle,
+						source: data.nextTask.source,
+						epicId: data.nextTask.epicId,
+						epicTitle: data.nextTask.epicTitle
+					};
+				} else {
+					nextTaskInfo = null;
+				}
+			} else {
+				nextTaskInfo = null;
+			}
+		} catch (error) {
+			console.error('[SessionCard] Failed to fetch next task:', error);
+			nextTaskInfo = null;
+		} finally {
+			nextTaskLoading = false;
+		}
+	}
+
 	// Fetch question data from API
+	// Uses throttledFetch to prevent connection exhaustion when many sessions poll simultaneously
 	async function fetchQuestionData() {
 		if (!sessionName) return;
 		// Skip if we just answered a question (prevents race condition with DELETE)
 		if (suppressQuestionFetch) return;
 		try {
-			const response = await fetch(
+			const response = await throttledFetch(
 				`/api/work/${encodeURIComponent(sessionName)}/question`,
 			);
 			if (response.ok) {
@@ -414,9 +466,8 @@
 			currentTime = Date.now();
 		}, 1000);
 
-		// Poll for question data every 500ms when in needs-input state
-		fetchQuestionData();
-		questionPollInterval = setInterval(fetchQuestionData, 500);
+		// Question polling is now managed by $effect based on sessionState
+		// This prevents N sessions from all polling simultaneously when not needed
 
 		// Load saved card width from localStorage
 		if (sessionName && !cardWidth) {
@@ -1559,6 +1610,34 @@
 		return "idle";
 	});
 
+	// Start/stop question polling based on sessionState
+	// Only poll when session is in needs-input state to reduce request load
+	// With 15 sessions, this prevents 15 * 2 req/sec = 30 req/sec when most sessions don't need it
+	$effect(() => {
+		const needsQuestionPolling = sessionState === "needs-input";
+
+		if (needsQuestionPolling && !questionPollInterval) {
+			// Start polling when entering needs-input state
+			fetchQuestionData(); // Immediate fetch
+			questionPollInterval = setInterval(fetchQuestionData, 1500); // 1.5s interval (was 500ms)
+		} else if (!needsQuestionPolling && questionPollInterval) {
+			// Stop polling when leaving needs-input state
+			clearInterval(questionPollInterval);
+			questionPollInterval = null;
+		}
+	});
+
+	// Fetch next task when session enters completed state
+	// This populates the "Start Next" action in the dropdown with actual task info
+	$effect(() => {
+		if (sessionState === 'completed' && !nextTaskInfo && !nextTaskLoading) {
+			fetchNextTask();
+		} else if (sessionState !== 'completed') {
+			// Clear next task info when leaving completed state
+			nextTaskInfo = null;
+		}
+	});
+
 	// Detect dormant state (session that has been inactive for a while)
 	// Dormant shows 💤 icon to indicate "sleeping/stalled/user away"
 	// Different thresholds for different states:
@@ -2043,6 +2122,77 @@
 		previousSessionState = sessionState;
 	});
 
+	// AUTO_PROCEED handling: Start countdown when session becomes completed with AUTO_PROCEED marker
+	$effect(() => {
+		// Only trigger on transition to completed state with AUTO_PROCEED
+		if (sessionState === "completed" && isAutoProceed && !autoCloseHeld && autoCloseCountdown === null) {
+			// Start 3-second countdown
+			autoCloseCountdown = 3;
+
+			// Clear any existing timer
+			if (autoCloseTimer) {
+				clearInterval(autoCloseTimer);
+			}
+
+			autoCloseTimer = setInterval(() => {
+				if (autoCloseCountdown !== null && autoCloseCountdown > 0) {
+					autoCloseCountdown = autoCloseCountdown - 1;
+				}
+			}, 1000);
+		}
+
+		// Clean up timer if we exit completed state or user holds
+		if ((sessionState !== "completed" || autoCloseHeld) && autoCloseTimer) {
+			clearInterval(autoCloseTimer);
+			autoCloseTimer = null;
+			if (autoCloseHeld) {
+				autoCloseCountdown = null;
+			}
+		}
+	});
+
+	// Execute auto-close when countdown reaches 0
+	$effect(() => {
+		if (autoCloseCountdown === 0 && !autoCloseHeld) {
+			// Clear the timer
+			if (autoCloseTimer) {
+				clearInterval(autoCloseTimer);
+				autoCloseTimer = null;
+			}
+
+			// Notify epicQueueStore if we're in an epic execution
+			const taskId = displayTask?.id || lastCompletedTask?.id;
+			if (taskId && epicIsActive()) {
+				epicCompleteTask(taskId);
+			}
+
+			// Call cleanup/kill session
+			if (onKillSession) {
+				onKillSession();
+			}
+
+			// Reset countdown state
+			autoCloseCountdown = null;
+		}
+	});
+
+	// Cancel auto-close countdown (Hold for Review button)
+	function holdForReview() {
+		autoCloseHeld = true;
+		autoCloseCountdown = null;
+		if (autoCloseTimer) {
+			clearInterval(autoCloseTimer);
+			autoCloseTimer = null;
+		}
+	}
+
+	// Cleanup auto-close timer on unmount
+	onDestroy(() => {
+		if (autoCloseTimer) {
+			clearInterval(autoCloseTimer);
+		}
+	});
+
 	// Send a workflow command (e.g., /jat:complete)
 	async function sendWorkflowCommand(command: string) {
 		if (!onSendInput) {
@@ -2130,6 +2280,33 @@
 	// Handle status badge actions
 	async function handleStatusAction(actionId: string) {
 		switch (actionId) {
+			case "start-next":
+				// Cleanup current session and spawn agent for next task
+				try {
+					const completedTaskId = displayTask?.id || lastCompletedTask?.id || null;
+					const response = await fetch('/api/tasks/next', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							completedTaskId,
+							cleanupSession: sessionName
+						})
+					});
+
+					if (response.ok) {
+						const data = await response.json();
+						console.log('[SessionCard] Start Next result:', data);
+						// Session will be cleaned up and new agent spawned
+						// The work panel will pick up the new session on next poll
+					} else {
+						const errorData = await response.json();
+						console.error('[SessionCard] Start Next failed:', errorData);
+					}
+				} catch (e) {
+					console.error('[SessionCard] Failed to start next task:', e);
+				}
+				break;
+
 			case "cleanup":
 				// Close tmux session and dismiss from UI
 				await onKillSession?.();
@@ -2838,16 +3015,38 @@
 						💡 {detectedSuggestedTasks.length}
 					</button>
 				{/if}
-				<!-- Status action dropdown -->
-				<StatusActionBadge
-					{sessionState}
-					{sessionName}
-					{isDormant}
-					{dormantTooltip}
-					onAction={handleStatusAction}
-					variant="integrated"
-					alignRight={true}
-				/>
+				<!-- Status action dropdown or auto-close countdown -->
+				{#if sessionState === "completed" && autoCloseCountdown !== null && !autoCloseHeld}
+					<!-- Auto-close countdown UI (compact) -->
+					<div class="flex items-center gap-1">
+						<span
+							class="badge badge-xs font-mono font-bold"
+							style="background: oklch(0.30 0.10 145 / 0.5); color: oklch(0.85 0.15 145); border: 1px solid oklch(0.50 0.15 145);"
+						>
+							{autoCloseCountdown}s
+						</span>
+						<button
+							onclick={holdForReview}
+							class="badge badge-xs cursor-pointer hover:opacity-80"
+							style="background: oklch(0.45 0.12 45); color: white; border: none;"
+							title="Cancel auto-close"
+						>
+							Hold
+						</button>
+					</div>
+				{:else}
+					<StatusActionBadge
+						{sessionState}
+						{sessionName}
+						{isDormant}
+						{dormantTooltip}
+						nextTask={nextTaskInfo}
+						{nextTaskLoading}
+						onAction={handleStatusAction}
+						variant="integrated"
+						alignRight={true}
+					/>
+				{/if}
 			</div>
 		</div>
 
@@ -3355,6 +3554,8 @@
 						{sessionName}
 						{isDormant}
 						{dormantTooltip}
+						nextTask={nextTaskInfo}
+						{nextTaskLoading}
 						onAction={handleStatusAction}
 						disabled={sendingInput}
 						alignRight={true}
@@ -4441,17 +4642,53 @@
 								{/if}
 							</button>
 						{:else if sessionState === "completed"}
-							<!-- Completed state: actionable badge with cleanup/attach options -->
-							<StatusActionBadge
-								{sessionState}
-								{sessionName}
-								{isDormant}
-								{dormantTooltip}
-								dropUp={true}
-								alignRight={true}
-								onAction={handleStatusAction}
-								disabled={sendingInput || !onSendInput}
-							/>
+							<!-- Completed state: show auto-close countdown if AUTO_PROCEED, otherwise actionable badge -->
+							{#if autoCloseCountdown !== null && !autoCloseHeld}
+								<!-- Auto-close countdown UI -->
+								<div class="flex items-center gap-2">
+									<span
+										class="text-xs font-mono font-bold px-2 py-1 rounded"
+										style="background: oklch(0.30 0.10 145 / 0.5); color: oklch(0.85 0.15 145); border: 1px solid oklch(0.50 0.15 145);"
+									>
+										Auto-closing in {autoCloseCountdown}...
+									</span>
+									<button
+										onclick={holdForReview}
+										class="btn btn-xs gap-1"
+										style="background: linear-gradient(135deg, oklch(0.50 0.15 45) 0%, oklch(0.42 0.12 55) 100%); border: none; color: white; font-weight: 600;"
+										title="Cancel auto-close and review"
+									>
+										<svg
+											class="w-3 h-3"
+											fill="none"
+											viewBox="0 0 24 24"
+											stroke="currentColor"
+											stroke-width="2"
+										>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
+											/>
+										</svg>
+										Hold
+									</button>
+								</div>
+							{:else}
+								<!-- Standard completed state: actionable badge with cleanup/attach options -->
+								<StatusActionBadge
+									{sessionState}
+									{sessionName}
+									{isDormant}
+									{dormantTooltip}
+									nextTask={nextTaskInfo}
+									{nextTaskLoading}
+									dropUp={true}
+									alignRight={true}
+									onAction={handleStatusAction}
+									disabled={sendingInput || !onSendInput}
+								/>
+							{/if}
 						{:else if sessionState === "ready-for-review"}
 							<!-- Ready for review: show Complete button -->
 							<button
@@ -4531,6 +4768,8 @@
 								{sessionName}
 								{isDormant}
 								{dormantTooltip}
+								nextTask={nextTaskInfo}
+								{nextTaskLoading}
 								dropUp={true}
 								alignRight={true}
 								onAction={handleStatusAction}

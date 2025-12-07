@@ -25,7 +25,15 @@
 		playTaskStartSound
 	} from '$lib/utils/soundEffects';
 
-	type SessionState = 'starting' | 'working' | 'needs-input' | 'ready-for-review' | 'completing' | 'completed' | 'idle';
+	type SessionState = 'starting' | 'working' | 'compacting' | 'needs-input' | 'ready-for-review' | 'completing' | 'completed' | 'idle';
+
+	interface NextTaskInfo {
+		taskId: string;
+		taskTitle: string;
+		source: 'epic' | 'backlog';
+		epicId?: string;
+		epicTitle?: string;
+	}
 
 	interface Props {
 		sessionState: SessionState;
@@ -39,6 +47,10 @@
 		isDormant?: boolean;
 		/** Tooltip text for dormant state (e.g., "Inactive for 15 minutes") */
 		dormantTooltip?: string | null;
+		/** Next task info to display in "Start Next" action (for completed state) */
+		nextTask?: NextTaskInfo | null;
+		/** Whether next task is being loaded */
+		nextTaskLoading?: boolean;
 		onAction?: (actionId: string) => Promise<void> | void;
 		class?: string;
 	}
@@ -52,6 +64,8 @@
 		variant = 'badge',
 		isDormant = false,
 		dormantTooltip = null,
+		nextTask = null,
+		nextTaskLoading = false,
 		onAction,
 		class: className = ''
 	}: Props = $props();
@@ -108,6 +122,7 @@
 				playInterruptSound();
 				break;
 			case 'start':
+			case 'start-next':
 				playTaskStartSound();
 				break;
 			// 'view-task' is silent - just viewing
@@ -143,6 +158,42 @@
 			default:
 				return 'hover:bg-base-300 text-base-content';
 		}
+	}
+
+	// Get dynamic label/description for actions that need runtime data
+	function getActionLabel(action: SessionStateAction): string {
+		if (action.id === 'start-next' && nextTask) {
+			return `Start ${nextTask.taskId}`;
+		}
+		return action.label;
+	}
+
+	function getActionDescription(action: SessionStateAction): string | undefined {
+		if (action.id === 'start-next') {
+			if (nextTaskLoading) {
+				return 'Finding next task...';
+			}
+			if (nextTask) {
+				// Truncate title if too long
+				const title = nextTask.taskTitle.length > 35
+					? nextTask.taskTitle.substring(0, 35) + '...'
+					: nextTask.taskTitle;
+				const source = nextTask.source === 'epic' && nextTask.epicId
+					? `from ${nextTask.epicId}`
+					: 'from backlog';
+				return `${title} (${source})`;
+			}
+			return 'No ready tasks available';
+		}
+		return action.description;
+	}
+
+	// Check if action should be disabled
+	function isActionDisabled(action: SessionStateAction): boolean {
+		if (action.id === 'start-next') {
+			return nextTaskLoading || !nextTask;
+		}
+		return false;
 	}
 </script>
 
@@ -189,14 +240,19 @@
 			<!-- Actions list -->
 			<ul class="py-1">
 				{#each actions as action (action.id)}
+					{@const actionDisabled = isActionDisabled(action)}
+					{@const actionLabel = getActionLabel(action)}
+					{@const actionDescription = getActionDescription(action)}
 					<li>
 						<button
 							type="button"
 							onclick={() => executeAction(action)}
 							class="w-full px-3 py-2 flex items-center gap-2 text-left text-xs transition-colors {getVariantClasses(action.variant)}"
-							disabled={isExecuting}
+							class:opacity-50={actionDisabled}
+							class:cursor-not-allowed={actionDisabled}
+							disabled={isExecuting || actionDisabled}
 						>
-							{#if isExecuting}
+							{#if isExecuting || (action.id === 'start-next' && nextTaskLoading)}
 								<span class="loading loading-spinner loading-xs"></span>
 							{:else}
 								<svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -204,9 +260,9 @@
 								</svg>
 							{/if}
 							<div class="flex flex-col min-w-0">
-								<span class="font-semibold">{action.label}</span>
-								{#if action.description}
-									<span class="text-[10px] opacity-60 truncate">{action.description}</span>
+								<span class="font-semibold">{actionLabel}</span>
+								{#if actionDescription}
+									<span class="text-[10px] opacity-60 truncate">{actionDescription}</span>
 								{/if}
 							</div>
 						</button>
