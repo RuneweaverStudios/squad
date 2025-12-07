@@ -63,7 +63,6 @@
 
 	import { formatTokens, formatCost, getUsageColor } from '$lib/utils/numberFormat.js';
 	import { slide } from 'svelte/transition';
-	import { untrack } from 'svelte';
 
 	// ============================================================================
 	// Props
@@ -157,28 +156,12 @@
 	let chartType = $state<ChartType>('line');
 	let timeRange = $state<TimeRange>(defaultTimeRange); // Initialize from prop
 
-	// Animation key - changes when data changes to re-trigger draw animation
-	let animationKey = $state(0);
-
-	// Track previous data length to detect actual data changes
-	let prevDataLength = 0;
-	let prevMultiSeriesLength = 0;
-
-	// Track data changes to trigger animation
-	$effect(() => {
-		// Read the reactive values (this creates the dependency)
-		const dataLen = data.length;
-		const multiLen = multiSeriesData?.length ?? 0;
-
-		// Check if lengths actually changed (simple heuristic to detect new data)
-		untrack(() => {
-			if ((dataLen > 0 && dataLen !== prevDataLength) ||
-				(multiLen > 0 && multiLen !== prevMultiSeriesLength)) {
-				prevDataLength = dataLen;
-				prevMultiSeriesLength = multiLen;
-				animationKey++;
-			}
-		});
+	// Animation key - only computed when animate is true
+	// Uses data length as a proxy for "new data arrived"
+	const animationKey = $derived.by(() => {
+		if (!animate) return 0;
+		// Use a combination of lengths to create a unique key when data changes
+		return (data?.length ?? 0) + ((multiSeriesData?.length ?? 0) * 1000);
 	});
 
 	// Multi-series mode (stacked vs overlay) - persisted globally via localStorage
@@ -440,28 +423,36 @@
 		return path;
 	});
 
+	// Memoize token range for color calculations - avoids recalculating min/max on every color lookup
+	const tokenRange = $derived.by(() => {
+		if (!filteredData || filteredData.length === 0) {
+			return { min: 0, max: 0, range: 0 };
+		}
+		const allTokens = filteredData.map((d) => d.tokens);
+		const min = Math.min(...allTokens);
+		const max = Math.max(...allTokens);
+		return { min, max, range: max - min };
+	});
+
+	// Color lookup - avoids repeated string allocations
+	const percentileColors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'] as const;
+
 	/** Calculate color for a specific data point based on relative position in range */
 	function getColorForValue(tokens: number): string {
 		if (internalColorMode === 'static') {
 			return selectedPaletteColor;
 		}
 
-		if (!filteredData || filteredData.length === 0) return '#10b981'; // Default green
+		if (tokenRange.range === 0) return percentileColors[0]; // Default green
 
-		// Use relative thresholds based on actual data range
-		const allTokens = filteredData.map((d) => d.tokens);
-		const min = Math.min(...allTokens);
-		const max = Math.max(...allTokens);
-		const range = max - min;
+		// Calculate percentile position (0-100) using memoized range
+		const percentile = ((tokens - tokenRange.min) / tokenRange.range) * 100;
 
-		// Calculate percentile position (0-100)
-		const percentile = range > 0 ? ((tokens - min) / range) * 100 : 50;
-
-		// Color gradient using direct hex values
-		if (percentile < 25) return '#10b981'; // Green - bottom 25%
-		if (percentile < 50) return '#3b82f6'; // Blue - 25-50%
-		if (percentile < 75) return '#f59e0b'; // Orange - 50-75%
-		return '#ef4444'; // Red - top 25%
+		// Color gradient using lookup
+		if (percentile < 25) return percentileColors[0]; // Green - bottom 25%
+		if (percentile < 50) return percentileColors[1]; // Blue - 25-50%
+		if (percentile < 75) return percentileColors[2]; // Orange - 50-75%
+		return percentileColors[3]; // Red - top 25%
 	}
 
 	/** Calculate line color based on average usage */
@@ -483,47 +474,36 @@
 		return filteredMultiSeriesData[hoveredIndex];
 	});
 
+	// Time range label lookup - avoids switch on every render
+	const timeRangeLabelMap: Record<TimeRange, string> = {
+		'12h': '12hr',
+		'24h': '24hr',
+		'7d': '7d',
+		'30d': '30d',
+		'all': 'All',
+		'custom': 'Custom'
+	};
+
 	/** Time range label for badge based on selected timeRange */
-	const timeRangeLabel = $derived(() => {
-		switch (timeRange) {
-			case '12h':
-				return '12hr';
-			case '24h':
-				return '24hr';
-			case '7d':
-				return '7d';
-			case '30d':
-				return '30d';
-			case 'all':
-				return 'All';
-			case 'custom':
-				// Show abbreviated custom range if both dates are set
-				if (customDateFrom && customDateTo) {
-					const from = new Date(customDateFrom);
-					const to = new Date(customDateTo);
-					return `${from.getMonth() + 1}/${from.getDate()} - ${to.getMonth() + 1}/${to.getDate()}`;
-				}
-				return 'Custom';
-			default:
-				return '24hr';
+	const timeRangeLabel = $derived.by(() => {
+		if (timeRange === 'custom' && customDateFrom && customDateTo) {
+			const from = new Date(customDateFrom);
+			const to = new Date(customDateTo);
+			return `${from.getMonth() + 1}/${from.getDate()} - ${to.getMonth() + 1}/${to.getDate()}`;
 		}
+		return timeRangeLabelMap[timeRange] ?? '24hr';
 	});
 
+	// Chart icon paths - static lookup avoids switch on every render
+	const chartIconPaths: Record<ChartType, string> = {
+		line: 'M2 12 L5 8 L8 10 L14 4',
+		bars: 'M2 14v-4h2v4zm4 0V8h2v6zm4 0V10h2v4zm4 0V6h2v8z',
+		area: 'M2 14 L2 12 L5 8 L8 10 L14 4 L14 14 Z',
+		dots: 'M2 12h.01M5 8h.01M8 10h.01M11 6h.01M14 4h.01'
+	};
+
 	/** Chart icon SVG path for badge */
-	const chartIconPath = $derived(() => {
-		switch (chartType) {
-			case 'line':
-				return 'M2 12 L5 8 L8 10 L14 4';
-			case 'bars':
-				return 'M2 14v-4h2v4zm4 0V8h2v6zm4 0V10h2v4zm4 0V6h2v8z';
-			case 'area':
-				return 'M2 14 L2 12 L5 8 L8 10 L14 4 L14 14 Z';
-			case 'dots':
-				return 'M2 12h.01M5 8h.01M8 10h.01M11 6h.01M14 4h.01';
-			default:
-				return 'M2 12 L5 8 L8 10 L14 4';
-		}
-	});
+	const chartIconPath = $derived(chartIconPaths[chartType] ?? chartIconPaths.line);
 
 	// ============================================================================
 	// Event Handlers
