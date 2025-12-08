@@ -35,12 +35,16 @@
 		setEpicCelebration,
 		getEpicAutoClose,
 		setEpicAutoClose,
+		getMaxSessions,
+		setMaxSessions,
 		TERMINAL_FONT_OPTIONS,
 		TERMINAL_FONT_SIZE_OPTIONS,
 		TERMINAL_SCROLLBACK_OPTIONS,
+		MAX_SESSIONS_OPTIONS,
 		type TerminalFontFamily,
 		type TerminalFontSize,
-		type TerminalScrollback
+		type TerminalScrollback,
+		type MaxSessions
 	} from '$lib/stores/preferences.svelte';
 
 	// Placeholder user data
@@ -95,6 +99,9 @@
 	const terminalFontFamily = $derived(getTerminalFontFamily());
 	const terminalFontSize = $derived(getTerminalFontSize());
 	const terminalScrollback = $derived(getTerminalScrollback());
+
+	// Swarm settings (reactive from preferences store)
+	const maxSessions = $derived(getMaxSessions());
 
 	onMount(() => {
 		// Load saved sound preference
@@ -199,6 +206,10 @@
 
 	function handleScrollbackChange(value: TerminalScrollback) {
 		setTerminalScrollback(value);
+	}
+
+	function handleMaxSessionsChange(value: MaxSessions) {
+		setMaxSessions(value);
 	}
 </script>
 
@@ -532,6 +543,28 @@
 								background: {terminalScrollback === option.value ? 'oklch(0.35 0.10 240)' : 'oklch(0.25 0.02 250)'};
 								color: {terminalScrollback === option.value ? 'oklch(0.90 0.10 240)' : 'oklch(0.60 0.02 250)'};
 								border: 1px solid {terminalScrollback === option.value ? 'oklch(0.45 0.12 240)' : 'oklch(0.30 0.02 250)'};
+							"
+						>
+							{option.label}
+						</button>
+					{/each}
+				</div>
+			</div>
+		</li>
+
+		<!-- Max Concurrent Sessions -->
+		<li>
+			<div class="flex flex-col gap-1 px-2 py-1">
+				<span class="text-xs" style="color: oklch(0.70 0.02 250);">Max Sessions</span>
+				<div class="flex gap-1">
+					{#each MAX_SESSIONS_OPTIONS as option}
+						<button
+							onclick={() => handleMaxSessionsChange(option.value)}
+							class="px-2 py-0.5 text-[10px] font-mono rounded transition-colors"
+							style="
+								background: {maxSessions === option.value ? 'oklch(0.35 0.10 145)' : 'oklch(0.25 0.02 250)'};
+								color: {maxSessions === option.value ? 'oklch(0.90 0.10 145)' : 'oklch(0.60 0.02 250)'};
+								border: 1px solid {maxSessions === option.value ? 'oklch(0.45 0.12 145)' : 'oklch(0.30 0.02 250)'};
 							"
 						>
 							{option.label}

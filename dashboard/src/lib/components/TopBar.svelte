@@ -55,6 +55,8 @@
 		type ServerSortOption
 	} from '$lib/stores/serverSort.svelte.js';
 	import { onMount, onDestroy } from 'svelte';
+	import { SPAWN_STAGGER_MS } from '$lib/config/spawnConfig';
+	import { getMaxSessions } from '$lib/stores/preferences.svelte';
 
 	// Sparkline visibility (reactive from preferences store)
 	const sparklineVisible = $derived(getSparklineVisible());
@@ -162,12 +164,23 @@
 		}
 	}
 
-	// Swarm - spawn one agent per ready task using the proper /api/work/spawn endpoint
+	// Swarm - spawn one agent per ready task up to MAX_SESSIONS limit
 	async function handleSwarm() {
 		swarmLoading = true;
 		startBulkSpawn(); // Signal bulk spawn started for TaskTable animations
 		try {
-			// Step 1: Get ready tasks
+			// Step 1: Get current active sessions to calculate available slots
+			const workResponse = await fetch('/api/work');
+			const workData = await workResponse.json();
+			const activeSessionCount = workData.count || 0;
+			const currentMaxSessions = getMaxSessions(); // Get current preference value
+			const availableSlots = Math.max(0, currentMaxSessions - activeSessionCount);
+
+			if (availableSlots === 0) {
+				throw new Error(`All ${currentMaxSessions} session slots are in use. Close some sessions first.`);
+			}
+
+			// Step 2: Get ready tasks
 			const readyResponse = await fetch('/api/tasks/ready');
 			const readyData = await readyResponse.json();
 
@@ -175,12 +188,12 @@
 				throw new Error('No ready tasks available');
 			}
 
-			// Spawn all ready tasks
-			const tasksToSpawn = readyData.tasks;
+			// Limit tasks to available slots
+			const tasksToSpawn = readyData.tasks.slice(0, availableSlots);
+			const skippedCount = readyData.tasks.length - tasksToSpawn.length;
 			const results = [];
-			const staggerMs = 6000; // Match SPAWN_STAGGER_MS from spawnConfig
 
-			// Step 2: Spawn an agent for each ready task
+			// Step 3: Spawn an agent for each ready task (up to limit)
 			for (let i = 0; i < tasksToSpawn.length; i++) {
 				const task = tasksToSpawn[i];
 				startSpawning(task.id); // Signal this task is spawning for animation
@@ -207,7 +220,7 @@
 
 				// Stagger between spawns (except last one)
 				if (i < tasksToSpawn.length - 1) {
-					await new Promise(resolve => setTimeout(resolve, staggerMs));
+					await new Promise(resolve => setTimeout(resolve, SPAWN_STAGGER_MS));
 				}
 			}
 
@@ -216,6 +229,11 @@
 
 			if (successCount === 0) {
 				throw new Error('Failed to spawn any agents');
+			}
+
+			// Show info if some tasks were skipped due to limit
+			if (skippedCount > 0) {
+				console.log(`Note: ${skippedCount} tasks skipped due to max sessions limit (${currentMaxSessions})`);
 			}
 		} catch (error) {
 			console.error('Swarm failed:', error);
@@ -411,6 +429,13 @@
 
 	// Get actual project list (filter out "All Projects")
 	const actualProjects = $derived(projects.filter(p => p !== 'All Projects'));
+
+	// Max sessions from user preferences (reactive)
+	const maxSessions = $derived(getMaxSessions());
+
+	// Calculate available slots and effective spawn count for Run All Ready
+	const availableSlots = $derived(Math.max(0, maxSessions - activeAgentCount));
+	const effectiveSpawnCount = $derived(Math.min(readyTaskCount, availableSlots));
 
 
 	// Handle dropdown show/hide with delay
@@ -1007,20 +1032,29 @@
 							<button
 								class="swarm-menu-item"
 								onclick={handleSwarm}
-								disabled={readyTaskCount === 0}
+								disabled={readyTaskCount === 0 || availableSlots === 0}
+								title={availableSlots === 0 ? `All ${maxSessions} session slots in use` : `Spawn ${effectiveSpawnCount} agent${effectiveSpawnCount !== 1 ? 's' : ''}`}
 							>
 								<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
 									<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
 								</svg>
 								<div class="flex-1">
 									<div class="font-semibold">Run All Ready</div>
-									<div class="text-[10px]" style="color: oklch(0.55 0.02 250);">Spawn agent per ready task</div>
+									<div class="text-[10px]" style="color: oklch(0.55 0.02 250);">
+										{#if availableSlots === 0}
+											No slots available (max {maxSessions})
+										{:else if readyTaskCount > availableSlots}
+											Spawn {availableSlots} of {readyTaskCount} tasks (max {maxSessions})
+										{:else}
+											Spawn agent per ready task
+										{/if}
+									</div>
 								</div>
 								{#if readyTaskCount > 0}
 									<span
 										class="px-1.5 py-0.5 rounded text-[9px] font-bold"
-										style="background: oklch(0.45 0.15 30); color: oklch(0.95 0.02 30);"
-									>{readyTaskCount}</span>
+										style="background: {availableSlots === 0 ? 'oklch(0.35 0.05 250)' : effectiveSpawnCount < readyTaskCount ? 'oklch(0.45 0.15 60)' : 'oklch(0.45 0.15 30)'}; color: oklch(0.95 0.02 30);"
+									>{effectiveSpawnCount}{#if effectiveSpawnCount < readyTaskCount}/{readyTaskCount}{/if}</span>
 								{/if}
 							</button>
 

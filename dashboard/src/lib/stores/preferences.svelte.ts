@@ -21,7 +21,8 @@ const STORAGE_KEYS = {
 	terminalFontSize: 'terminal-font-size',
 	terminalScrollback: 'terminal-scrollback-lines',
 	epicCelebration: 'epic-celebration-enabled',
-	epicAutoClose: 'epic-auto-close-enabled'
+	epicAutoClose: 'epic-auto-close-enabled',
+	maxSessions: 'max-concurrent-sessions'
 } as const;
 
 // Terminal font family options
@@ -49,6 +50,17 @@ export const TERMINAL_SCROLLBACK_OPTIONS = [
 	{ value: 10000, label: '10K' }
 ] as const;
 
+// Max concurrent sessions options
+export const MAX_SESSIONS_OPTIONS = [
+	{ value: 4, label: '4' },
+	{ value: 6, label: '6' },
+	{ value: 8, label: '8' },
+	{ value: 10, label: '10' },
+	{ value: 12, label: '12' },
+	{ value: 16, label: '16' },
+	{ value: 20, label: '20' }
+] as const;
+
 // Default values
 const DEFAULTS = {
 	sparklineVisible: true,
@@ -63,7 +75,8 @@ const DEFAULTS = {
 	terminalFontSize: 'sm' as TerminalFontSize,
 	terminalScrollback: 2000 as TerminalScrollback,
 	epicCelebration: true, // Show toast + sound when all epic children complete
-	epicAutoClose: false // Automatically close epic when all children complete
+	epicAutoClose: false, // Automatically close epic when all children complete
+	maxSessions: 12 as MaxSessions // Maximum concurrent agent sessions
 };
 
 // Types
@@ -73,6 +86,7 @@ export type SparklineMode = 'stacked' | 'overlaid';
 export type TerminalFontFamily = 'jetbrains' | 'fira' | 'cascadia' | 'system';
 export type TerminalFontSize = 'xs' | 'sm' | 'base' | 'lg';
 export type TerminalScrollback = 500 | 1000 | 2000 | 5000 | 10000;
+export type MaxSessions = 4 | 6 | 8 | 10 | 12 | 16 | 20;
 
 // Reactive state (module-level $state)
 let sparklineVisible = $state(DEFAULTS.sparklineVisible);
@@ -88,6 +102,7 @@ let terminalFontSize = $state<TerminalFontSize>(DEFAULTS.terminalFontSize);
 let terminalScrollback = $state<TerminalScrollback>(DEFAULTS.terminalScrollback);
 let epicCelebration = $state(DEFAULTS.epicCelebration);
 let epicAutoClose = $state(DEFAULTS.epicAutoClose);
+let maxSessions = $state<MaxSessions>(DEFAULTS.maxSessions);
 let initialized = $state(false);
 
 /**
@@ -144,6 +159,12 @@ export function initPreferences(): void {
 
 	const storedEpicAutoClose = localStorage.getItem(STORAGE_KEYS.epicAutoClose);
 	epicAutoClose = storedEpicAutoClose === null ? DEFAULTS.epicAutoClose : storedEpicAutoClose === 'true';
+
+	const storedMaxSessions = localStorage.getItem(STORAGE_KEYS.maxSessions);
+	const parsedMaxSessions = storedMaxSessions ? parseInt(storedMaxSessions, 10) : null;
+	maxSessions = (parsedMaxSessions === 4 || parsedMaxSessions === 6 || parsedMaxSessions === 8 || parsedMaxSessions === 10 || parsedMaxSessions === 12 || parsedMaxSessions === 16 || parsedMaxSessions === 20)
+		? parsedMaxSessions
+		: DEFAULTS.maxSessions;
 
 	// Apply terminal font CSS variables to document
 	updateTerminalFontCSSVars();
@@ -405,6 +426,21 @@ export function setEpicAutoClose(value: boolean): void {
 export function toggleEpicAutoClose(): boolean {
 	setEpicAutoClose(!epicAutoClose);
 	return epicAutoClose;
+}
+
+// ============================================================================
+// Max Concurrent Sessions (for Run All Ready swarm limit)
+// ============================================================================
+
+export function getMaxSessions(): MaxSessions {
+	return maxSessions;
+}
+
+export function setMaxSessions(value: MaxSessions): void {
+	maxSessions = value;
+	if (browser) {
+		localStorage.setItem(STORAGE_KEYS.maxSessions, String(value));
+	}
 }
 
 // ============================================================================
