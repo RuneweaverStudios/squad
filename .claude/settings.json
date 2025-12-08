@@ -48,8 +48,14 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/post-bash-agent-state-refresh.sh",
-            "statusMessage": "Checking agent state changes...",
+            "command": "./.claude/hooks/post-bash-jat-signal.sh",
+            "statusMessage": "",
+            "streamStdinJson": true
+          },
+          {
+            "type": "command",
+            "command": "./.claude/hooks/post-bash-agent-state-refresh.sh",
+            "statusMessage": "",
             "streamStdinJson": true
           }
         ]

@@ -18,7 +18,7 @@
 input_json=$(cat)
 
 # Extract the bash command that was executed
-command=$(echo "$input_json" | jq -r '.input.command // empty')
+command=$(echo "$input_json" | jq -r '.tool_input.command // empty')
 
 # Check if command is empty or null
 if [[ -z "$command" || "$command" == "null" ]]; then
