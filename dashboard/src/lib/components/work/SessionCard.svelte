@@ -150,6 +150,20 @@
 		sseState?: string;
 		/** Timestamp when SSE state was last updated */
 		sseStateTimestamp?: number;
+		/** Suggested tasks from jat-signal (via SSE session-signal event) */
+		signalSuggestedTasks?: Array<{
+			id?: string;
+			type: string;
+			title: string;
+			description: string;
+			priority: number;
+			reason?: string;
+			project?: string;
+			labels?: string;
+			depends_on?: string[];
+		}>;
+		/** Timestamp when signal suggested tasks were last updated */
+		signalSuggestedTasksTimestamp?: number;
 	}
 
 	let {
@@ -199,6 +213,9 @@
 		// SSE real-time state
 		sseState,
 		sseStateTimestamp,
+		// Signal data (from jat-signal via SSE)
+		signalSuggestedTasks,
+		signalSuggestedTasksTimestamp,
 	}: Props = $props();
 
 	// Derived mode helpers
@@ -267,6 +284,17 @@
 	let otherInputValue = $state("");
 	// Suppress question fetching after answering (prevents race condition)
 	let suppressQuestionFetch = $state(false);
+
+	// API-based signal data (from jat-signal action command)
+	// When agent runs jat-signal action '{"title":"...","items":[...]}', this data is
+	// written to /tmp/jat-signal-{session}.json and fetched here for display
+	interface SignalAction {
+		title: string;
+		items?: string[];
+		description?: string;
+	}
+	let signalActionData = $state<SignalAction | null>(null);
+	let signalPollInterval: ReturnType<typeof setInterval> | null = null;
 
 	// Next task state (for "Start Next" action in completed state)
 	interface NextTaskInfo {
@@ -359,6 +387,41 @@
 	// Dismiss terminal-parsed question UI
 	function dismissTerminalQuestion() {
 		dismissedTerminalQuestion = true;
+	}
+
+	// Fetch signal data from API (for human actions via jat-signal action)
+	// Uses throttledFetch to prevent connection exhaustion
+	async function fetchSignalData() {
+		if (!sessionName) return;
+		try {
+			const response = await throttledFetch(
+				`/api/sessions/${encodeURIComponent(sessionName)}/signal`,
+			);
+			if (response.ok) {
+				const data = await response.json();
+				// Only process action signals
+				if (data.hasSignal && data.signal?.type === 'action' && data.signal?.data) {
+					signalActionData = data.signal.data;
+				} else if (!data.hasSignal) {
+					signalActionData = null;
+				}
+			}
+		} catch (error) {
+			// Silently fail - signal data is optional enhancement
+		}
+	}
+
+	// Clear signal data after user dismisses it
+	async function clearSignalData() {
+		if (!sessionName) return;
+		signalActionData = null;
+		try {
+			await fetch(`/api/sessions/${encodeURIComponent(sessionName)}/signal`, {
+				method: "DELETE",
+			});
+		} catch (error) {
+			// Silently fail
+		}
 	}
 
 	// Activate "Other" input mode - navigates to "Type something" option and shows text input
@@ -1673,6 +1736,28 @@
 		}
 	});
 
+	// Poll for signal data (human actions) in agent mode only
+	// Signal data comes from jat-signal action command via PostToolUse hook
+	// Poll every 3 seconds - signals are written once and persist until cleared
+	$effect(() => {
+		// Only poll in agent/compact mode (not server mode)
+		if (!isAgentMode) return;
+
+		// Start polling on mount
+		if (!signalPollInterval) {
+			fetchSignalData(); // Immediate fetch
+			signalPollInterval = setInterval(fetchSignalData, 3000);
+		}
+
+		// Cleanup on unmount (effect cleanup function)
+		return () => {
+			if (signalPollInterval) {
+				clearInterval(signalPollInterval);
+				signalPollInterval = null;
+			}
+		};
+	});
+
 	// Detect dormant state (session that has been inactive for a while)
 	// Dormant shows 💤 icon to indicate "sleeping/stalled/user away"
 	// Different thresholds for different states:
@@ -1712,8 +1797,10 @@
 		output ? /\[JAT:AUTO_PROCEED\]/.test(output.slice(-3000)) : false,
 	);
 
-	// Detect human action markers in output
-	// Format: [JAT:HUMAN_ACTION {"title":"...","description":"..."}]
+	// Detect human action markers in output and from signal API
+	// Sources:
+	// 1. Terminal markers: [JAT:HUMAN_ACTION {"title":"...","description":"..."}]
+	// 2. Signal API: jat-signal action '{"title":"...","items":[...]}'
 	// Uses unified marker parser with balanced-brace JSON extraction
 	interface HumanAction {
 		title: string;
@@ -1724,19 +1811,50 @@
 	let humanActionCompletedState = $state<Map<string, boolean>>(new Map());
 
 	const detectedHumanActions = $derived.by((): HumanAction[] => {
-		if (!output) return [];
+		const actions: HumanAction[] = [];
 
-		// Look at a larger window for human actions (they appear in completion summary)
-		const recentOutput = output.slice(-6000);
+		// Source 1: Signal API actions (jat-signal action command)
+		// These take priority as they're the newer, hook-based approach
+		if (signalActionData) {
+			// If signal has items array, each item is a separate action
+			if (signalActionData.items && signalActionData.items.length > 0) {
+				for (const item of signalActionData.items) {
+					actions.push({
+						title: item,
+						description: '',
+						completed: humanActionCompletedState.get(item) || false,
+					});
+				}
+			}
+			// If signal has title only (no items), use title as single action
+			else if (signalActionData.title && !signalActionData.items) {
+				actions.push({
+					title: signalActionData.title,
+					description: signalActionData.description || '',
+					completed: humanActionCompletedState.get(signalActionData.title) || false,
+				});
+			}
+		}
 
-		// Use unified marker parser for safe JSON extraction
-		const markers = findHumanActionMarkers(recentOutput);
+		// Source 2: Terminal markers (legacy [JAT:HUMAN_ACTION ...] markers)
+		// Only process if we have output
+		if (output) {
+			const recentOutput = output.slice(-6000);
+			const markers = findHumanActionMarkers(recentOutput);
 
-		return markers.map((marker) => ({
-			title: marker.action.title,
-			description: marker.action.description,
-			completed: humanActionCompletedState.get(marker.action.title) || false,
-		}));
+			for (const marker of markers) {
+				// Avoid duplicates: skip if title already exists from signal
+				if (!actions.some(a => a.title === marker.action.title)) {
+					actions.push({
+						title: marker.action.title,
+						description: marker.action.description,
+						completed: humanActionCompletedState.get(marker.action.title) || false,
+					});
+				}
+			}
+		}
+
+		return actions;
 	});
 
 	// Toggle completion state of a human action
@@ -1778,10 +1896,46 @@
 	let suggestedTaskEdits = $state<Map<string, Partial<SuggestedTask>>>(new Map());
 
 	/**
-	 * Detect and parse SUGGESTED_TASKS markers from terminal output.
-	 * Uses a larger output window (~8000 chars) since payload may be substantial.
+	 * Detect and parse SUGGESTED_TASKS from signal data or terminal output.
+	 * Priority: jat-signal data (SSE) > terminal marker parsing (fallback)
+	 *
+	 * Signal data is more reliable as it comes directly from the jat-signal hook
+	 * without needing to parse terminal output which can be corrupted by ANSI codes.
 	 */
 	const detectedSuggestedTasks = $derived.by((): SuggestedTaskWithState[] => {
+		// TTL for signal data (1 minute - matches SSE server SIGNAL_TTL_MS)
+		const SIGNAL_TTL_MS = 60 * 1000;
+
+		// Prefer signal-based suggested tasks if recent
+		if (signalSuggestedTasks && signalSuggestedTasks.length > 0 && signalSuggestedTasksTimestamp) {
+			const ageMs = Date.now() - signalSuggestedTasksTimestamp;
+			if (ageMs < SIGNAL_TTL_MS) {
+				// Map signal tasks to tasks with local UI state
+				return signalSuggestedTasks.map((task, index) => {
+					const key = task.title || `task-${index}`;
+					const isSelected = suggestedTaskSelections.get(key) ?? false;
+					const edits = suggestedTaskEdits.get(key);
+					const hasEdits = edits && Object.keys(edits).length > 0;
+
+					return {
+						...task,
+						// Apply edits if present
+						...(hasEdits
+							? {
+									type: edits.type ?? task.type,
+									title: edits.title ?? task.title,
+									description: edits.description ?? task.description,
+									priority: edits.priority ?? task.priority,
+								}
+							: {}),
+						selected: isSelected,
+						edited: hasEdits ?? false,
+					};
+				});
+			}
+		}
+
+		// Fall back to terminal marker parsing for legacy support
 		if (!output) return [];
 
 		// Look at a larger window for suggested tasks (JSON payload can be substantial)
@@ -4295,43 +4449,54 @@
 					</div>
 				{/if}
 
-				<!-- Human Actions Required: Display when agent outputs [JAT:HUMAN_ACTION] markers -->
+				<!-- Human Actions Required: Display when agent outputs [JAT:HUMAN_ACTION] markers or jat-signal action -->
 				{#if detectedHumanActions.length > 0}
 					<div
 						class="mb-2 p-2.5 rounded-lg"
 						style="background: linear-gradient(135deg, oklch(0.25 0.08 50) 0%, oklch(0.22 0.05 45) 100%); border: 1px solid oklch(0.45 0.15 50);"
 					>
 						<!-- Header -->
-						<div class="flex items-center gap-2 mb-2">
-							<span
-								class="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold"
-								style="background: oklch(0.40 0.18 50); color: oklch(0.98 0.02 250);"
-							>
-								🧑 HUMAN
-							</span>
-							<span
-								class="text-xs font-semibold"
-								style="color: oklch(0.95 0.08 50);"
-							>
-								{pendingHumanActionsCount > 0
-									? `${pendingHumanActionsCount} action${pendingHumanActionsCount > 1 ? "s" : ""} required`
-									: "All actions completed"}
-							</span>
-							{#if pendingHumanActionsCount === 0}
-								<svg
-									class="w-4 h-4"
-									style="color: oklch(0.70 0.20 145);"
-									fill="none"
-									viewBox="0 0 24 24"
-									stroke="currentColor"
-									stroke-width="2"
+						<div class="flex flex-col gap-1 mb-2">
+							<div class="flex items-center gap-2">
+								<span
+									class="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold"
+									style="background: oklch(0.40 0.18 50); color: oklch(0.98 0.02 250);"
 								>
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										d="M5 13l4 4L19 7"
-									/>
-								</svg>
+									🧑 HUMAN
+								</span>
+								<span
+									class="text-xs font-semibold"
+									style="color: oklch(0.95 0.08 50);"
+								>
+									{pendingHumanActionsCount > 0
+										? `${pendingHumanActionsCount} action${pendingHumanActionsCount > 1 ? "s" : ""} required`
+										: "All actions completed"}
+								</span>
+								{#if pendingHumanActionsCount === 0}
+									<svg
+										class="w-4 h-4"
+										style="color: oklch(0.70 0.20 145);"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											d="M5 13l4 4L19 7"
+										/>
+									</svg>
+								{/if}
+							</div>
+							<!-- Signal action title as subtitle if available -->
+							{#if signalActionData?.title && signalActionData.items?.length}
+								<span
+									class="text-[11px] font-medium pl-0.5"
+									style="color: oklch(0.75 0.05 50);"
+								>
+									{signalActionData.title}
+								</span>
 							{/if}
 						</div>
 
