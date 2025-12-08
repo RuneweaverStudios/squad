@@ -91,28 +91,75 @@ let state = $state<WorkSessionsState>({
 // Polling interval reference
 let pollingInterval: ReturnType<typeof setInterval> | null = null;
 
+// Track consecutive fetch failures for exponential backoff
+let fetchFailureCount = 0;
+let fetchBackoffUntil = 0;
+const FETCH_MAX_BACKOFF_MS = 60000; // Max 1 minute backoff
+const FETCH_BASE_BACKOFF_MS = 2000;  // Start with 2 second backoff
+
+// Abort controller to cancel pending fetch requests
+let fetchAbortController: AbortController | null = null;
+// Track if a fetch is currently in progress to prevent concurrent calls
+let fetchInProgress = false;
+
 /**
  * Fetch all active work sessions from the API
  * Uses the terminal scrollback preference for line count
+ * Implements exponential backoff when requests fail to prevent browser overload
  * @param includeUsage - Whether to include token usage/sparkline data (slow, default: false)
  */
 export async function fetch(includeUsage: boolean = false): Promise<void> {
-	state.isLoading = true;
-	state.error = null;
-
+	// Wrap entire function in try-catch to ensure no unhandled rejections escape
 	try {
+		// Check if we're in backoff period
+		const now = Date.now();
+		if (now < fetchBackoffUntil) {
+			// Skip this request - server is overloaded
+			return;
+		}
+
+		// Skip if a fetch is already in progress - this prevents the abort-rejection
+		// issue where aborting a pending request causes an "Uncaught (in promise)" error
+		if (fetchInProgress) {
+			return;
+		}
+		fetchInProgress = true;
+
+		const controller = new AbortController();
+		fetchAbortController = controller;
+
+		state.isLoading = true;
+		state.error = null;
 		// Use scrollback preference for line count (defaults to 2000 if not initialized)
 		const lines = getTerminalScrollback() || 2000;
-		let url = `/api/work?lines=${lines}`;
+		// Add cache-busting parameter to prevent request deduplication in throttler
+		// This ensures each poll gets its own request that can be safely aborted
+		let url = `/api/work?lines=${lines}&_t=${Date.now()}`;
 		if (includeUsage) {
 			url += '&usage=true';
 		}
-		const response = await throttledFetch(url);
+
+		// Use a shorter timeout for polling requests (10s instead of 30s default)
+		// Capture controller in closure so we only abort our own request
+		const timeoutMs = 10000;
+		const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+		// Create the fetch promise and attach a no-op catch handler synchronously
+		// This prevents "Uncaught (in promise) DOMException" during HMR/navigation
+		// when the abort fires but the promise chain has been garbage collected
+		const fetchPromise = throttledFetch(url, { signal: controller.signal });
+		fetchPromise.catch(() => {}); // Prevent unhandled rejection
+
+		const response = await fetchPromise;
+		clearTimeout(timeoutId);
 		const data = await response.json();
 
 		if (!response.ok) {
 			throw new Error(data.message || data.error || 'Failed to fetch sessions');
 		}
+
+		// Success - reset failure count
+		fetchFailureCount = 0;
 
 		const newSessions: WorkSession[] = data.sessions || [];
 
@@ -146,11 +193,35 @@ export async function fetch(includeUsage: boolean = false): Promise<void> {
 		}
 
 		state.lastFetch = new Date();
-	} catch (err) {
+	} catch (err: unknown) {
+		// Silently ignore aborted requests (they're intentional when a new poll starts)
+		// Check all possible abort error types
+		if (err instanceof Error) {
+			if (err.name === 'AbortError' || err.message?.includes('aborted') || err.message?.includes('abort')) {
+				return;
+			}
+		}
+		// DOMException is a separate class from Error
+		if (err instanceof DOMException) {
+			if (err.name === 'AbortError' || err.message?.includes('aborted') || err.message?.includes('abort')) {
+				return;
+			}
+		}
+		// Catch-all for any other abort-like errors (duck typing)
+		if (typeof err === 'object' && err !== null && 'name' in err && (err as { name: string }).name === 'AbortError') {
+			return;
+		}
+
+		// Increment failure count and calculate backoff
+		fetchFailureCount++;
+		const backoffMs = Math.min(FETCH_BASE_BACKOFF_MS * Math.pow(2, fetchFailureCount - 1), FETCH_MAX_BACKOFF_MS);
+		fetchBackoffUntil = Date.now() + backoffMs;
+
 		state.error = err instanceof Error ? err.message : 'Failed to fetch sessions';
-		console.error('workSessions.fetch error:', err);
+		console.error(`workSessions.fetch error (backing off ${backoffMs / 1000}s):`, err);
 	} finally {
 		state.isLoading = false;
+		fetchInProgress = false;
 	}
 }
 
@@ -243,6 +314,13 @@ export function subscribeToOutputUpdates(): () => void {
 			// Session not in state yet - might be a new session
 			// The next HTTP poll will pick it up with full metadata
 			return;
+		}
+
+		// PERFORMANCE: Check if output actually changed before triggering re-render
+		// Creating a new array causes all SessionCard $derived computations to re-run
+		const currentSession = state.sessions[sessionIndex];
+		if (currentSession.output === output && currentSession.lineCount === lineCount) {
+			return; // No change, skip expensive array update
 		}
 
 		// Update the session output in place for reactivity
@@ -416,7 +494,7 @@ export function startPolling(intervalMs: number = 5000, useWebSocket: boolean = 
 	stopPolling(); // Clear any existing interval
 
 	// Initial fetch to populate sessions
-	fetch();
+	fetch().catch(() => {}); // Errors handled by backoff, suppress unhandled rejections
 
 	// Subscribe to WebSocket for real-time output streaming
 	if (useWebSocket) {
@@ -428,7 +506,8 @@ export function startPolling(intervalMs: number = 5000, useWebSocket: boolean = 
 	// Without WebSocket, this is the only update mechanism
 	const safeInterval = Math.max(intervalMs, useWebSocket ? 2000 : 1000);
 	pollingInterval = setInterval(() => {
-		fetch();
+		// Catch errors silently - backoff handles retries, we don't need unhandled rejections
+		fetch().catch(() => {});
 	}, safeInterval);
 }
 

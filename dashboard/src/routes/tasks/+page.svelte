@@ -25,9 +25,7 @@
 		kill,
 		sendInput,
 		interrupt,
-		sendEnter,
-		startPolling,
-		stopPolling
+		sendEnter
 	} from '$lib/stores/workSessions.svelte.js';
 	import { broadcastSessionEvent } from '$lib/stores/sessionEvents';
 	import { lastTaskEvent } from '$lib/stores/taskEvents';
@@ -139,14 +137,23 @@
 	// Derive completed task IDs from active sessions
 	// These are tasks that were completed by agents who still have active sessions
 	// They should remain visible in TaskTable until the session is closed
+	// IMPORTANT: Memoize to avoid triggering TaskTable re-renders on every session update
+	let lastCompletedIdsKey = '';
+	let lastCompletedIdsSet = new Set<string>();
 	const completedTasksFromActiveSessions = $derived.by(() => {
-		const completedIds = new Set<string>();
+		const completedIds: string[] = [];
 		for (const session of workSessionsState.sessions) {
 			if (session.lastCompletedTask?.id) {
-				completedIds.add(session.lastCompletedTask.id);
+				completedIds.push(session.lastCompletedTask.id);
 			}
 		}
-		return completedIds;
+		// Only create new Set if content changed (prevents TaskTable re-render cascade)
+		const key = completedIds.sort().join(',');
+		if (key !== lastCompletedIdsKey) {
+			lastCompletedIdsKey = key;
+			lastCompletedIdsSet = new Set(completedIds);
+		}
+		return lastCompletedIdsSet;
 	});
 
 	// Drawer state
@@ -224,14 +231,26 @@
 		return 5; // idle
 	}
 
+	// Pre-compute session states ONCE before sorting (avoids expensive regex in every comparison)
+	// This is critical for performance - getSessionState runs regex on 3000 chars of output
+	const sessionStates = $derived.by(() => {
+		const states = new Map<string, number>();
+		for (const session of workSessionsState.sessions) {
+			states.set(session.sessionName, getSessionState(session));
+		}
+		return states;
+	});
+
 	// Sort sessions based on selected sort option (mirrors SessionPanel exactly)
 	const sortedSessions = $derived.by(() => {
 		const dir = sortDir === 'asc' ? 1 : -1;
+		const states = sessionStates; // Use pre-computed states
 		return [...workSessionsState.sessions].sort((a, b) => {
 			switch (sortBy) {
 				case 'state': {
-					const stateA = getSessionState(a);
-					const stateB = getSessionState(b);
+					// Use cached states instead of recomputing for every comparison
+					const stateA = states.get(a.sessionName) ?? 5;
+					const stateB = states.get(b.sessionName) ?? 5;
 					if (stateA !== stateB) return (stateA - stateB) * dir;
 					const priorityA = a.task?.priority ?? 999;
 					const priorityB = b.task?.priority ?? 999;
@@ -466,11 +485,12 @@
 		wasDrawerOpen = drawerOpen;
 	});
 
-	// Auto-refresh task data every 15 seconds
-	$effect(() => {
-		const interval = setInterval(fetchTaskData, 15000);
-		return () => clearInterval(interval);
-	});
+	// DISABLED: SSE via lastTaskEvent already triggers fetchTaskData() on any task change
+	// Polling was causing redundant fetches and UI lag
+	// $effect(() => {
+	// 	const interval = setInterval(fetchTaskData, 15000);
+	// 	return () => clearInterval(interval);
+	// });
 
 	// DISABLED: Auto-refresh session usage data was overwhelming the server
 	// The JSONL parsing is too expensive with many active sessions
@@ -480,13 +500,13 @@
 	// 	return () => clearInterval(interval);
 	// });
 
-	onMount(() => {
+	onMount(async () => {
 		// Initialize sort stores for keyboard navigation
 		initSort();
 
 		// Phase 1: Fast initial load (no usage data)
 		fetchTaskData();
-		startPolling(2000); // 2s polling (was 500ms - too aggressive)
+		await fetchSessions(100); // Initial session fetch - SSE handles subsequent updates
 		updateContainerHeight();
 		window.addEventListener('resize', updateContainerHeight);
 		window.addEventListener('keydown', handleKeydown);
@@ -497,7 +517,6 @@
 	});
 
 	onDestroy(() => {
-		stopPolling();
 		if (browser) {
 			window.removeEventListener('resize', updateContainerHeight);
 			window.removeEventListener('keydown', handleKeydown);

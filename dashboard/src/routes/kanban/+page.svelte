@@ -7,7 +7,7 @@
 	 * this view groups agents by what they're doing (working, needs-input, etc.)
 	 */
 
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import AgentKanbanBoard from '$lib/components/agent/kanban/AgentKanbanBoard.svelte';
 	import TaskDetailDrawer from '$lib/components/TaskDetailDrawer.svelte';
@@ -17,8 +17,6 @@
 		kill as killSession,
 		sendInput,
 		interrupt as interruptSession,
-		startPolling,
-		stopPolling,
 		getSessions,
 		getIsLoading,
 		getError
@@ -87,27 +85,16 @@
 		drawerOpen = true;
 	}
 
-	// Start polling on mount
+	// Initial fetch on mount - SSE handles all real-time updates
 	onMount(async () => {
 		// Phase 1: Fast initial fetch
 		await fetchSessions(100);
 
-		// Start polling for output updates (fast, no usage)
-		startPolling(1000);
-
-		// Phase 2: Lazy load usage data
-		setTimeout(() => fetchSessionUsage(100), 200);
+		// Phase 2: Lazy load usage data once (after 5s delay)
+		setTimeout(() => fetchSessionUsage(100), 5000);
 	});
 
-	// Usage data refresh (slower interval)
-	$effect(() => {
-		const interval = setInterval(() => fetchSessionUsage(100), 30000);
-		return () => clearInterval(interval);
-	});
-
-	onDestroy(() => {
-		stopPolling();
-	});
+	// No polling needed - SSE via sessionEvents provides real-time updates
 </script>
 
 <svelte:head>

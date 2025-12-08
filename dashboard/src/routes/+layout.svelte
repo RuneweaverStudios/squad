@@ -100,8 +100,8 @@
 				playNewTaskChime();
 			}
 
-			// Refresh task data immediately
-			loadAllTasks();
+			// Refresh task data immediately (fast version without usage data)
+			loadAllTasksFast();
 			loadReadyTaskCount();
 			loadEpicsWithReady();
 		}
@@ -175,24 +175,15 @@
 		initSessionEvents(); // Initialize cross-page session events (BroadcastChannel)
 		connectSessionEvents(); // Connect to real-time session events SSE
 		connectTaskEvents(); // Connect to real-time task events SSE
-		// Load sparkline data (worker thread prevents event loop blocking)
-		Promise.all([loadAllTasks(), loadReadyTaskCount(), loadConfigProjects(), loadStateCounts(), loadEpicsWithReady(), loadReviewRules(), loadSparklineData()]);
+		// Load critical data first (tasks, projects, state counts)
+		// Sparkline is deferred to avoid blocking the initial page render
+		Promise.all([loadAllTasks(), loadReadyTaskCount(), loadConfigProjects(), loadStateCounts(), loadEpicsWithReady(), loadReviewRules()]);
 
-		// Sparkline polling - 5 minute refresh (matches cache TTL)
-		// Multi-project sparkline takes 5+ seconds to generate, so polling more frequently
-		// would cause periodic UI freezes as the server blocks during generation
-		const sparklineInterval = setInterval(() => {
-			loadSparklineData();
-		}, 5 * 60 * 1000);
-
-		// Poll for session state counts more frequently (every 5 seconds) for responsive badge updates
-		const stateCountsInterval = setInterval(() => {
-			loadStateCounts();
-		}, 5_000);
+		// DISABLED: All polling removed - SSE handles real-time updates
+		// - Sparkline disabled (too slow, 5+ seconds)
+		// - stateCountsInterval disabled (SSE triggers loadStateCounts on session events)
 
 		return () => {
-			clearInterval(sparklineInterval);
-			clearInterval(stateCountsInterval);
 			closeSessionEvents(); // Close cross-page BroadcastChannel
 			disconnectSessionEvents(); // Disconnect from session events SSE
 			disconnectTaskEvents(); // Disconnect from task events SSE
@@ -200,11 +191,15 @@
 	});
 
 	// React to session events from other pages/tabs (e.g., session killed on /work)
+	// ONLY refresh on session-created/session-destroyed, NOT on frequent events like session-output
 	$effect(() => {
 		const event = $lastSessionEvent;
-		if (event) {
-			// Refresh data when a session is killed or spawned
-			loadAllTasks();
+		if (!event) return;
+
+		// Only refresh data on significant session lifecycle events
+		// session-output and session-state fire every 1-2 seconds and would cause constant lag
+		if (event.type === 'session-created' || event.type === 'session-destroyed') {
+			loadAllTasksFast(); // Use fast version without usage data
 			loadReadyTaskCount();
 			loadStateCounts();
 			loadEpicsWithReady();
@@ -212,6 +207,26 @@
 	});
 
 	// Fetch all tasks to populate project dropdown and agent counts
+	// Fast task loader - no usage data, ~100ms (for reactive updates)
+	async function loadAllTasksFast() {
+		try {
+			const response = await fetch('/api/agents?full=true');
+			const data = await response.json();
+			allTasks = data.tasks || [];
+
+			// Update agent counts
+			if (data.agent_counts) {
+				activeAgentCount = data.agent_counts.activeCount || 0;
+				totalAgentCount = data.agent_counts.totalCount || 0;
+				activeAgents = data.agent_counts.activeAgents || [];
+			}
+		} catch (error) {
+			console.error('Failed to load tasks (fast):', error);
+			allTasks = [];
+		}
+	}
+
+	// Full task loader - includes usage data, ~2-4s (for initial load + background refresh)
 	async function loadAllTasks() {
 		try {
 			const response = await fetch('/api/agents?full=true&usage=true');
@@ -260,9 +275,26 @@
 	}
 
 	// Fetch sparkline data for TopBar (multi-project mode)
+	// Uses AbortController with timeout to prevent indefinite blocking
+	let sparklineAbortController: AbortController | null = null;
+
 	async function loadSparklineData() {
+		// Abort any in-flight sparkline request
+		if (sparklineAbortController) {
+			sparklineAbortController.abort();
+		}
+		sparklineAbortController = new AbortController();
+
 		try {
-			const response = await fetch('/api/agents/sparkline?range=24h&multiProject=true');
+			// 15-second timeout - sparkline can take 5+ seconds but shouldn't hang forever
+			const timeoutId = setTimeout(() => sparklineAbortController?.abort(), 15000);
+
+			const response = await fetch('/api/agents/sparkline?range=24h&multiProject=true', {
+				signal: sparklineAbortController.signal
+			});
+
+			clearTimeout(timeoutId);
+
 			const result = await response.json();
 
 			if (result.error) {
@@ -289,6 +321,10 @@
 				cost: point.totalCost
 			}));
 		} catch (error) {
+			// Ignore abort errors (expected when navigating away or refreshing)
+			if (error instanceof Error && error.name === 'AbortError') {
+				return;
+			}
 			console.error('Failed to fetch sparkline data:', error);
 			sparklineData = [];
 			multiProjectData = [];
@@ -629,9 +665,9 @@
 			{stateCounts}
 			{tokensToday}
 			{costToday}
-			{sparklineData}
-			{multiProjectData}
-			{projectColors}
+			sparklineData={[]}
+			multiProjectData={[]}
+			projectColors={{}}
 			{readyTaskCount}
 			{readyTasks}
 			{projects}
