@@ -234,17 +234,29 @@
 				}
 			}
 
+			// Filter out epics with nothing to launch (0 ready tasks)
+			// These are either completed or have no actionable children
+			const actionableEpics = epicsWithInfo.filter(e => e.ready > 0);
+
 			// Sort by ready tasks (most ready first), then by total
-			epicsWithInfo.sort((a, b) => {
+			actionableEpics.sort((a, b) => {
 				if (b.ready !== a.ready) return b.ready - a.ready;
 				return b.total - a.total;
 			});
 
-			availableEpics = epicsWithInfo;
+			availableEpics = actionableEpics;
+
+			// Auto-close any epics that have all children complete
+			// This cleans up completed epics so they don't clutter the system
+			try {
+				await fetch('/api/epics/close-eligible', { method: 'POST' });
+			} catch {
+				// Ignore errors - this is just cleanup
+			}
 
 			// Auto-select first epic if none selected
-			if (!selectedEpicId && epicsWithInfo.length > 0) {
-				selectedEpicId = epicsWithInfo[0].id;
+			if (!selectedEpicId && actionableEpics.length > 0) {
+				selectedEpicId = actionableEpics[0].id;
 			}
 		} catch (err) {
 			epicLoadError = err instanceof Error ? err.message : 'Failed to load epics';

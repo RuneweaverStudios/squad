@@ -376,6 +376,30 @@ bd close "$task_id" --reason "Completed by $agent_name"
 
 ---
 
+### STEP 5.5: Auto-Close Eligible Epics
+
+**After closing a task, check if any parent epics are now fully complete.**
+
+This ensures epics don't linger in "open" status when all children are done.
+
+```bash
+# Auto-close epics where all children are complete
+bd epic close-eligible
+
+# This command:
+# - Finds all epics with issue_type=epic and status=open
+# - Checks if all child tasks (by ID pattern) are closed
+# - Automatically closes eligible epics
+# - Reports what was closed
+```
+
+**Why this matters:**
+- Without this, epics stay open forever even when all work is done
+- The Epic Swarm dropdown filters out closed epics
+- This keeps the task list clean and accurate
+
+---
+
 ### STEP 6: Release File Reservations
 
 ```bash
@@ -407,7 +431,7 @@ Agent is now available for next task." \
 
 ### STEP 7.5: Determine Review Action (Configurable Rules)
 
-**After announcing completion, determine which marker to emit based on configurable rules.**
+**After announcing completion, determine which completion signal to emit based on configurable rules.**
 
 This step implements the review rules system that allows project-level configuration of which tasks require human review vs auto-proceed.
 
@@ -417,8 +441,8 @@ This step implements the review rules system that allows project-level configura
 0. Check session epic context (.claude/sessions/context-{session_id}.json)
    └─ If epic context exists with reviewThreshold:
       └─ Compare task.priority to threshold
-      └─ If priority > threshold: emit [JAT:IDLE] (require review)
-      └─ If priority <= threshold: emit [JAT:AUTO_PROCEED]
+      └─ If priority > threshold: run `jat-signal idle` (require review)
+      └─ If priority <= threshold: run `jat-signal auto_proceed`
    └─ Epic context takes precedence over all other rules
 
 1. Check task.notes for [REVIEW_OVERRIDE:...] pattern
@@ -445,7 +469,7 @@ task_notes=$(echo "$task_json" | jq -r '.[0].notes // ""')
 task_priority=$(echo "$task_json" | jq -r '.[0].priority')
 task_type=$(echo "$task_json" | jq -r '.[0].issue_type')
 
-COMPLETION_MARKER=""  # Will be set by first matching rule
+COMPLETION_SIGNAL=""  # Will be set by first matching rule (idle, auto_proceed, completed)
 
 # Step 0: Check session epic context (highest priority)
 # Session context is set by dashboard when spawning agents for epic execution
@@ -465,40 +489,40 @@ if [[ -f "$context_file" ]]; then
     case "$epic_threshold" in
       "all")
         echo "📋 Epic context: reviewThreshold='all' → All tasks require review"
-        COMPLETION_MARKER="[JAT:IDLE]"
+        COMPLETION_SIGNAL="idle"
         ;;
       "none")
         echo "📋 Epic context: reviewThreshold='none' → All tasks auto-proceed"
-        COMPLETION_MARKER="[JAT:AUTO_PROCEED]"
+        COMPLETION_SIGNAL="auto_proceed"
         ;;
       "p0")
         # Only P0 requires review; P1+ auto-proceed
         if (( task_priority == 0 )); then
           echo "📋 Epic context: P0 task requires review (threshold: p0)"
-          COMPLETION_MARKER="[JAT:IDLE]"
+          COMPLETION_SIGNAL="idle"
         else
           echo "📋 Epic context: P${task_priority} task auto-proceeds (threshold: p0)"
-          COMPLETION_MARKER="[JAT:AUTO_PROCEED]"
+          COMPLETION_SIGNAL="auto_proceed"
         fi
         ;;
       "p0-p1")
         # P0-P1 require review; P2+ auto-proceed
         if (( task_priority <= 1 )); then
           echo "📋 Epic context: P${task_priority} task requires review (threshold: p0-p1)"
-          COMPLETION_MARKER="[JAT:IDLE]"
+          COMPLETION_SIGNAL="idle"
         else
           echo "📋 Epic context: P${task_priority} task auto-proceeds (threshold: p0-p1)"
-          COMPLETION_MARKER="[JAT:AUTO_PROCEED]"
+          COMPLETION_SIGNAL="auto_proceed"
         fi
         ;;
       "p0-p2")
         # P0-P2 require review; P3+ auto-proceed
         if (( task_priority <= 2 )); then
           echo "📋 Epic context: P${task_priority} task requires review (threshold: p0-p2)"
-          COMPLETION_MARKER="[JAT:IDLE]"
+          COMPLETION_SIGNAL="idle"
         else
           echo "📋 Epic context: P${task_priority} task auto-proceeds (threshold: p0-p2)"
-          COMPLETION_MARKER="[JAT:AUTO_PROCEED]"
+          COMPLETION_SIGNAL="auto_proceed"
         fi
         ;;
       *)
@@ -508,20 +532,20 @@ if [[ -f "$context_file" ]]; then
   fi
 fi
 
-# If epic context didn't set marker, continue with other rules
-if [[ -z "$COMPLETION_MARKER" ]]; then
-  COMPLETION_MARKER="[JAT:IDLE]"  # Default: requires review
+# If epic context didn't set signal, continue with other rules
+if [[ -z "$COMPLETION_SIGNAL" ]]; then
+  COMPLETION_SIGNAL="idle"  # Default: requires review
 
   # Step 1: Check for per-task override in notes
   if echo "$task_notes" | grep -q '\[REVIEW_OVERRIDE:always_review\]'; then
     echo "📋 Review override detected: always_review"
-    COMPLETION_MARKER="[JAT:IDLE]"
+    COMPLETION_SIGNAL="idle"
   elif echo "$task_notes" | grep -q '\[REVIEW_OVERRIDE:auto_proceed\]'; then
     echo "📋 Review override detected: auto_proceed"
-    COMPLETION_MARKER="[JAT:AUTO_PROCEED]"
+    COMPLETION_SIGNAL="auto_proceed"
   elif echo "$task_notes" | grep -q '\[REVIEW_OVERRIDE:force_review\]'; then
     echo "📋 Review override detected: force_review"
-    COMPLETION_MARKER="[JAT:IDLE]"
+    COMPLETION_SIGNAL="idle"
   else
   # Step 2: Load review-rules.json and apply type-based rules
   rules_file=".beads/review-rules.json"
@@ -537,18 +561,18 @@ if [[ -z "$COMPLETION_MARKER" ]]; then
       # (lower number = higher priority, e.g., P0 < P3)
       if (( task_priority <= max_auto )); then
         echo "📋 Auto-proceed: P${task_priority} ${task_type} (max: P${max_auto})"
-        COMPLETION_MARKER="[JAT:AUTO_PROCEED]"
+        COMPLETION_SIGNAL="auto_proceed"
       else
         echo "📋 Review required: P${task_priority} ${task_type} (max auto: P${max_auto})"
-        COMPLETION_MARKER="[JAT:IDLE]"
+        COMPLETION_SIGNAL="idle"
       fi
     else
       # No rule for this type, check defaultAction
       default_action=$(jq -r '.defaultAction // "review"' "$rules_file")
       if [[ "$default_action" == "auto" ]]; then
-        COMPLETION_MARKER="[JAT:AUTO_PROCEED]"
+        COMPLETION_SIGNAL="auto_proceed"
       else
-        COMPLETION_MARKER="[JAT:IDLE]"
+        COMPLETION_SIGNAL="idle"
       fi
     fi
   else
@@ -561,34 +585,35 @@ if [[ -z "$COMPLETION_MARKER" ]]; then
     # - Other (bug, feature, task): auto-proceed for P0-P3
     case "$task_type" in
       epic)
-        COMPLETION_MARKER="[JAT:IDLE]"  # Epics always require review
+        COMPLETION_SIGNAL="idle"  # Epics always require review
         ;;
       chore)
-        COMPLETION_MARKER="[JAT:AUTO_PROCEED]"  # Chores always auto-proceed
+        COMPLETION_SIGNAL="auto_proceed"  # Chores always auto-proceed
         ;;
       *)
         # bug, feature, task: auto-proceed for P0-P3, review for P4
         if (( task_priority <= 3 )); then
-          COMPLETION_MARKER="[JAT:AUTO_PROCEED]"
+          COMPLETION_SIGNAL="auto_proceed"
         else
-          COMPLETION_MARKER="[JAT:IDLE]"
+          COMPLETION_SIGNAL="idle"
         fi
         ;;
     esac
   fi
-  fi  # End of: if [[ -z "$COMPLETION_MARKER" ]]
+  fi  # End of: if [[ -z "$COMPLETION_SIGNAL" ]]
 fi  # End of: else (no REVIEW_OVERRIDE found)
 
-echo "🏷️  Completion marker: $COMPLETION_MARKER"
+# Emit the completion signal
+jat-signal "$COMPLETION_SIGNAL"
 ```
 
 #### Review Override Values
 
 | Override Value | Effect | Use Case |
 |----------------|--------|----------|
-| `always_review` | Emit `[JAT:IDLE]` | Testing override behavior |
-| `auto_proceed` | Emit `[JAT:AUTO_PROCEED]` | Skip review for specific task |
-| `force_review` | Emit `[JAT:IDLE]` | Force review even if rules say auto |
+| `always_review` | Run `jat-signal idle` | Testing override behavior |
+| `auto_proceed` | Run `jat-signal auto_proceed` | Skip review for specific task |
+| `force_review` | Run `jat-signal idle` | Force review even if rules say auto |
 
 #### Example review-rules.json
 
@@ -670,15 +695,19 @@ await writeFile(contextPath, JSON.stringify(context, null, 2));
 
 Output this SINGLE box containing everything - task info AND reflection together.
 
-**Important:** Use the `$COMPLETION_MARKER` determined in Step 7.5. This will be either:
-- `[JAT:IDLE]` - Requires human review (session stays open, dashboard shows as waiting)
-- `[JAT:AUTO_PROCEED]` - Auto-proceed enabled (dashboard can auto-close session)
+**Important:** Run `jat-signal completed` to signal task completion. Step 7.5 already emitted the review action signal (`idle` or `auto_proceed`).
+
+```bash
+# Signal task completion (captured by PostToolUse hook)
+jat-signal completed
+```
+
+Then output the summary:
 
 ```
 ┌────────────────────────────────────────────────────────┐
 │  ✅ Task Completed: $task_id                           │
 │  👤 Agent: $agent_name                                 │
-│  [JAT:COMPLETED]                                       │
 └────────────────────────────────────────────────────────┘
 
 📋 What was accomplished:
@@ -686,7 +715,7 @@ Output this SINGLE box containing everything - task info AND reflection together
    • [Key changes made]
 
 🧑 Human actions required: (ONLY if manual steps needed)
-   [JAT:HUMAN_ACTION {"title":"...","description":"..."}]
+   → Run: jat-signal action '{"title":"...","description":"..."}'
 
 ⚡ Quality: Tests [pass/fail] | Build [clean/warn]
 
@@ -710,7 +739,7 @@ Output this SINGLE box containing everything - task info AND reflection together
 
 **When to include human actions:**
 
-If your task requires ANY manual steps by the user that cannot be automated, you MUST output `[JAT:HUMAN_ACTION]` markers. This ensures the dashboard displays them prominently.
+If your task requires ANY manual steps by the user that cannot be automated, you MUST run `jat-signal action` commands. This ensures the dashboard displays them prominently.
 
 **Common examples of human actions:**
 - Run migration in production database
@@ -721,26 +750,36 @@ If your task requires ANY manual steps by the user that cannot be automated, you
 - Review and merge PR
 - Manual testing in staging environment
 
-**Marker format:**
+**Signal format:**
 
-```
-[JAT:HUMAN_ACTION {"title":"Short action title","description":"Detailed steps to complete this action"}]
+```bash
+jat-signal action '{"title":"Short action title","description":"Detailed steps to complete this action"}'
 ```
 
 **Rules:**
-1. Each action gets its own marker on a separate line
+1. Each action gets its own `jat-signal action` command
 2. Title should be 3-8 words (shows as header in dashboard)
 3. Description can be multi-line but keep it concise
 4. JSON must be valid (escape quotes if needed)
-5. Place markers INSIDE the completion box, under "🧑 Human actions required:"
+5. Run signals BEFORE outputting the completion box summary
 
 **Example with human actions:**
+
+```bash
+# Signal human actions required
+jat-signal action '{"title":"Run migration","description":"Run npx prisma migrate deploy"}'
+jat-signal action '{"title":"Enable Anon Auth","description":"Enable anonymous auth in Supabase dashboard"}'
+
+# Then signal completion
+jat-signal completed
+```
+
+Then output the summary:
 
 ```
 ┌────────────────────────────────────────────────────────┐
 │  ✅ Task Completed: chimaro-xyz                        │
 │  👤 Agent: CalmMeadow                                  │
-│  [JAT:IDLE]                                            │
 └────────────────────────────────────────────────────────┘
 
 📋 What was accomplished:
@@ -748,15 +787,15 @@ If your task requires ANY manual steps by the user that cannot be automated, you
    • Added anonymous session handling
 
 🧑 Human actions required:
-   [JAT:HUMAN_ACTION {"title":"Run migration","description":"..."}]
-   [JAT:HUMAN_ACTION {"title":"Enable Anon Auth","description":"..."}]
+   → Run migration (npx prisma migrate deploy)
+   → Enable Anon Auth in Supabase dashboard
 
 ⚡ Quality: Tests passing | Build clean
 
 💡 Session complete. Close terminal when ready.
 ```
 
-**What the dashboard does with these markers:**
+**What the dashboard does with these signals:**
 - Displays a prominent "Human Actions Required" badge on the session card
 - Shows each action as a checklist item the user can mark as done
 - Persists action completion state until session is closed
@@ -768,17 +807,12 @@ If your task requires ANY manual steps by the user that cannot be automated, you
 
 **When to include suggested tasks:**
 
-If your task uncovered follow-up work (bugs, improvements, tech debt, new features), you SHOULD output `[JAT:SUGGESTED_TASKS]` markers. This helps the commander make informed decisions about what to tackle next.
+If your task uncovered follow-up work (bugs, improvements, tech debt, new features), you SHOULD run `jat-signal tasks`. This helps the commander make informed decisions about what to tackle next.
 
-**Marker format:**
+**Signal format:**
 
-```
-[JAT:SUGGESTED_TASKS]
-{"tasks":[
-  {"type":"agent","title":"...","description":"...","priority":1},
-  {"type":"human","title":"...","description":"...","priority":2}
-]}
-[/JAT:SUGGESTED_TASKS]
+```bash
+jat-signal tasks '[{"type":"agent","title":"...","description":"...","priority":1},{"type":"human","title":"...","description":"...","priority":2}]'
 ```
 
 **Field Reference:**
@@ -807,18 +841,27 @@ If your task uncovered follow-up work (bugs, improvements, tech debt, new featur
 **Rules:**
 
 1. JSON must be valid (escape quotes, no trailing commas)
-2. One `[JAT:SUGGESTED_TASKS]...[/JAT:SUGGESTED_TASKS]` block per completion
-3. Multiple tasks go in the `tasks` array
-4. Place marker INSIDE the completion box, under "📊 Backlog impact:"
-5. Dashboard parses on session end and offers to create tasks in Beads
+2. One `jat-signal tasks` call per completion
+3. Multiple tasks go in the array
+4. Run signal BEFORE the completion box summary
+5. Dashboard reads from signal file and offers to create tasks in Beads
 
 **Example with suggested tasks:**
+
+```bash
+# Signal suggested tasks discovered during work
+jat-signal tasks '[{"type":"agent","title":"Cache /api/agents","priority":2},{"type":"human","title":"Decide cache TTL","priority":2}]'
+
+# Then signal completion
+jat-signal completed
+```
+
+Then output the summary:
 
 ```
 ┌────────────────────────────────────────────────────────┐
 │  ✅ Task Completed: jat-xyz                            │
 │  👤 Agent: SwiftMeadow                                 │
-│  [JAT:IDLE]                                            │
 └────────────────────────────────────────────────────────┘
 
 📋 What was accomplished:
@@ -827,30 +870,24 @@ If your task uncovered follow-up work (bugs, improvements, tech debt, new featur
 
 📊 Backlog impact:
    • Discovered: Other endpoints need same pattern
-
-[JAT:SUGGESTED_TASKS]
-{"tasks":[
-  {"type":"agent","title":"Cache /api/agents","priority":2},
-  {"type":"human","title":"Decide cache TTL","priority":2}
-]}
-[/JAT:SUGGESTED_TASKS]
+   • Suggested: Cache /api/agents, Decide cache TTL
 
 💡 Session complete. Close terminal when ready.
 ```
 
 **What the dashboard does with suggested tasks:**
 
-- Parses the JSON payload when session completes
+- Reads tasks from signal file when session completes
 - Displays "N Suggested Tasks" badge on session card
 - Shows task list in a modal when clicked
 - Offers one-click creation in Beads (with confirmation)
 - Agent tasks can be auto-spawned if user enables swarm mode
 - Human tasks are highlighted differently (won't auto-assign)
 
-**Comparison with JAT:HUMAN_ACTION:**
+**Comparison with jat-signal action vs jat-signal tasks:**
 
-| Aspect | JAT:HUMAN_ACTION | JAT:SUGGESTED_TASKS |
-|--------|------------------|---------------------|
+| Aspect | `jat-signal action` | `jat-signal tasks` |
+|--------|---------------------|-------------------|
 | **Purpose** | Manual steps for THIS task | Follow-up work from THIS task |
 | **Timing** | Must be done before task is truly complete | Can be done later, separate work |
 | **Urgency** | Blocking - task isn't done without these | Non-blocking - backlog items |
@@ -859,10 +896,10 @@ If your task uncovered follow-up work (bugs, improvements, tech debt, new featur
 
 **When to use each:**
 
-- Use `JAT:HUMAN_ACTION` when: "The user needs to do X for this task to be complete"
+- Use `jat-signal action` when: "The user needs to do X for this task to be complete"
   - Example: "Run migration in production" - task isn't done until migration runs
 
-- Use `JAT:SUGGESTED_TASKS` when: "I discovered Y that should be done separately"
+- Use `jat-signal tasks` when: "I discovered Y that should be done separately"
   - Example: "Found similar code that needs same fix" - different task, do later
 
 ---
@@ -921,10 +958,15 @@ Create a backfilled task record? [Proceed? Y/n] Y
 📢 Announcing task completion...
    ✅ Sent to @active
 
+✓ Signal: idle
+[JAT-SIGNAL:STATE] idle
+
+✓ Signal: completed
+[JAT-SIGNAL:STATE] completed
+
 ┌────────────────────────────────────────────────────────┐
 │  ✅ Task Completed: jat-abc                            │
 │  👤 Agent: SwiftMoon (Backfilled)                      │
-│  [JAT:IDLE]                                            │
 └────────────────────────────────────────────────────────┘
 
 📋 What was accomplished:
@@ -970,10 +1012,15 @@ Create a backfilled task record? [Proceed? Y/n] Y
 📢 Announcing task completion...
    ✅ Sent to @active
 
+✓ Signal: idle
+[JAT-SIGNAL:STATE] idle
+
+✓ Signal: completed
+[JAT-SIGNAL:STATE] completed
+
 ┌────────────────────────────────────────────────────────┐
 │  ✅ Task Completed: jat-abc                            │
 │  👤 Agent: JustGrove                                   │
-│  [JAT:IDLE]                                            │
 └────────────────────────────────────────────────────────┘
 
 📋 What was accomplished:
@@ -989,42 +1036,43 @@ Create a backfilled task record? [Proceed? Y/n] Y
 💡 Session complete. Close terminal when ready.
 ```
 
-**Markers explained:**
-- `[JAT:IDLE]` - Requires human review; dashboard shows completion state, session stays open
-- `[JAT:AUTO_PROCEED]` - Auto-proceed enabled; dashboard can auto-close session
-- `[JAT:SUGGESTED_TASKS]...[/JAT:SUGGESTED_TASKS]` - Follow-up tasks discovered during work
+**Signals explained:**
+- `jat-signal idle` - Requires human review; dashboard shows completion state, session stays open
+- `jat-signal auto_proceed` - Auto-proceed enabled; dashboard can auto-close session
+- `jat-signal tasks '[...]'` - Follow-up tasks discovered during work
 
-The marker used depends on review rules (see Step 7.5).
+The signal used depends on review rules (see Step 7.5).
 
 ---
 
-## Dashboard State Markers
+## Dashboard State Signals
 
-The completion flow uses these markers (output automatically by the templates above):
+The completion flow uses these signals (captured by PostToolUse hook):
 
-| Marker | When to Output | Dashboard Effect |
-|--------|----------------|------------------|
-| `[JAT:IDLE]` | After `bd close`, when review required | Shows "Completed" state (green), session stays open |
-| `[JAT:AUTO_PROCEED]` | After `bd close`, when auto-proceed enabled | Dashboard can auto-close session, optionally spawn next |
-| `[JAT:HUMAN_ACTION {...}]` | When manual steps are required | Shows prominent action checklist |
-| `[JAT:SUGGESTED_TASKS]...[/JAT:SUGGESTED_TASKS]` | When follow-up work discovered | Shows "N Suggested Tasks" badge, offers Beads creation |
+| Signal Command | When to Run | Dashboard Effect |
+|----------------|-------------|------------------|
+| `jat-signal idle` | After `bd close`, when review required | Shows "Completed" state (green), session stays open |
+| `jat-signal auto_proceed` | After `bd close`, when auto-proceed enabled | Dashboard can auto-close session, optionally spawn next |
+| `jat-signal action '{...}'` | When manual steps are required | Shows prominent action checklist |
+| `jat-signal tasks '[...]'` | When follow-up work discovered | Shows "N Suggested Tasks" badge, offers Beads creation |
+| `jat-signal completed` | After all completion steps | Final completion signal |
 
-**Marker selection is automatic** - Step 7.5 determines which marker to use based on:
+**Signal selection is automatic** - Step 7.5 determines which signal to run based on:
 1. Per-task override in notes (`[REVIEW_OVERRIDE:...]`)
 2. Project review rules (`.beads/review-rules.json`)
 3. Hardcoded defaults (epics require review, chores auto-proceed, others P0-P3 auto)
 
 **Critical timing:**
-- Do NOT output `[JAT:IDLE]` until AFTER all completion steps succeed
-- If you output it early, dashboard shows "complete" but task is still open in Beads
+- Do NOT run `jat-signal idle` or `jat-signal completed` until AFTER all completion steps succeed
+- If you signal early, dashboard shows "complete" but task is still open in Beads
 - This causes confusion - other agents think task is done when it isn't
 
-**Human action markers:**
-- Output BEFORE `[JAT:IDLE]` in the completion box
-- Each action gets its own line with valid JSON payload
-- Dashboard parses these to show a checklist of manual steps
+**Human action signals:**
+- Run BEFORE `jat-signal completed`
+- Each action gets its own `jat-signal action` call with valid JSON payload
+- Dashboard reads these from signal file to show a checklist of manual steps
 
-**The markers are in the template** - just use the Step 8 template and markers are included automatically.
+**The signals are called in Step 7.5 and Step 8** - follow the implementation and signals are emitted correctly.
 
 ---
 
@@ -1033,7 +1081,7 @@ The completion flow uses these markers (output automatically by the templates ab
 **When the dashboard sends `[JAT:CREATE_TASKS]` input, handle it before the completion summary.**
 
 This happens when:
-1. Agent outputs `[JAT:SUGGESTED_TASKS]` with follow-up tasks
+1. Agent runs `jat-signal tasks` with follow-up tasks
 2. Dashboard displays SuggestedTasksPanel UI
 3. User selects tasks and clicks "Create Selected Tasks"
 4. Dashboard sends `[JAT:CREATE_TASKS]{...json...}[/JAT:CREATE_TASKS]` to agent's terminal
@@ -1194,23 +1242,23 @@ Linking to parent task jat-xyz...
 
 ### Integration with Completion Flow
 
-The CREATE_TASKS handling should happen **after showing the completion summary** but **before outputting [JAT:IDLE]**:
+The CREATE_TASKS handling should happen **after showing the completion summary** but **before running `jat-signal idle`**:
 
 1. Steps 1-7 run normally (verify, commit, close, release, announce)
 2. Show completion summary box (Step 8)
 3. **Wait for potential CREATE_TASKS input from dashboard**
    - If user sends CREATE_TASKS → parse and create tasks → confirm
    - If user sends nothing / closes terminal → proceed to IDLE
-4. Output `[JAT:IDLE]` marker
+4. Run `jat-signal idle`
 
 This allows the dashboard to:
-1. Parse the `[JAT:SUGGESTED_TASKS]` from completion summary
+1. Read suggested tasks from signal file (`jat-signal tasks`)
 2. Show the SuggestedTasksPanel UI to user
 3. User selects and clicks "Create Selected Tasks"
 4. Dashboard sends CREATE_TASKS to still-running agent
 5. Agent creates tasks and confirms
 
-**Note:** The agent session should remain open briefly after showing completion summary to allow this interaction. The `[JAT:IDLE]` marker signals the session can be closed.
+**Note:** The agent session should remain open briefly after showing completion summary to allow this interaction. The `jat-signal idle` call signals the session can be closed.
 
 ---
 
@@ -1258,6 +1306,7 @@ Or run /jat:verify to see detailed error report
 | 3 | Verify Task | ALWAYS |
 | 4 | Commit Changes | ALWAYS |
 | 5 | Mark Task Complete | ALWAYS |
+| 5.5 | Auto-Close Eligible Epics | ALWAYS |
 | 6 | Release Reservations | ALWAYS |
 | 7 | Announce Completion | ALWAYS |
 | 7.5 | Determine Review Action | ALWAYS (sets COMPLETION_MARKER) |
@@ -1421,7 +1470,6 @@ When completing an epic, use this modified summary:
 ┌──────────────────────────────────────────────────────────────────────────┐
 │  ✅ Epic Verified: jat-abc "Improve Dashboard Performance"               │
 │  👤 Agent: $agent_name                                                   │
-│  [JAT:IDLE]                                                              │
 │                                                                          │
 │  📦 Child Tasks Completed:                                               │
 │     ✓ jat-abc.1: Add caching layer (by CalmMeadow)                      │
@@ -1470,7 +1518,6 @@ fi
 ┌──────────────────────────────────────────────────────────────────────────┐
 │  ✅ Task Completed: jat-abc.3 "Add performance tests"                    │
 │  👤 Agent: JustGrove                                                     │
-│  [JAT:IDLE]                                                              │
 │                                                                          │
 │  📦 Epic Status:                                                         │
 │     Parent: jat-abc "Improve Dashboard Performance"                      │
