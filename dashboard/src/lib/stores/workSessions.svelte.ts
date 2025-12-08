@@ -71,6 +71,28 @@ export interface WorkSession {
 	_sseState?: string;
 	/** Timestamp when SSE state was last updated */
 	_sseStateTimestamp?: number;
+	/** Suggested tasks from jat-signal (via SSE session-signal event) */
+	_signalSuggestedTasks?: Array<{
+		id?: string;
+		type: string;
+		title: string;
+		description: string;
+		priority: number;
+		reason?: string;
+		project?: string;
+		labels?: string;
+		depends_on?: string[];
+	}>;
+	/** Timestamp when signal suggested tasks were last updated */
+	_signalSuggestedTasksTimestamp?: number;
+	/** Human action from jat-signal (via SSE session-signal event) */
+	_signalAction?: {
+		action: string;
+		message?: string;
+		timestamp?: string;
+	};
+	/** Timestamp when signal action was last updated */
+	_signalActionTimestamp?: number;
 }
 
 interface WorkSessionsState {

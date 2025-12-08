@@ -48,6 +48,13 @@ export interface SuggestedTask {
 	depends_on?: string[];
 }
 
+// Human action interface (from jat-signal action type)
+export interface HumanAction {
+	action: string;
+	message?: string;
+	timestamp?: string;
+}
+
 export interface SessionEvent {
 	type: SessionEventType;
 	sessionName?: string;
@@ -67,6 +74,7 @@ export interface SessionEvent {
 	// Signal event fields (from jat-signal)
 	signalType?: string;
 	suggestedTasks?: SuggestedTask[];
+	action?: HumanAction;
 }
 
 // Store for reactive updates - components can subscribe to this
@@ -155,23 +163,37 @@ function handleSessionQuestion(_data: SessionEvent): void {
 }
 
 /**
- * Handle session-signal event: update suggested tasks from jat-signal
- * These are real-time task suggestions from agents via the signal system
+ * Handle session-signal event: update suggested tasks or actions from jat-signal
+ * These are real-time signals from agents via the signal system
+ *
+ * Signal types:
+ * - 'tasks': Suggested task list from agent
+ * - 'action': Human action message from agent
  *
  * PERFORMANCE: Uses in-place mutation for fine-grained reactivity.
  */
 function handleSessionSignal(data: SessionEvent): void {
-	const { sessionName, signalType, suggestedTasks } = data;
-	if (!sessionName || signalType !== 'tasks') return;
+	const { sessionName, signalType, suggestedTasks, action } = data;
+	if (!sessionName) return;
 
 	const sessionIndex = workSessionsState.sessions.findIndex(s => s.sessionName === sessionName);
 	if (sessionIndex === -1) {
 		return;
 	}
 
-	// PERFORMANCE: Mutate in-place for fine-grained reactivity (Svelte 5 $state)
-	workSessionsState.sessions[sessionIndex]._signalSuggestedTasks = suggestedTasks || [];
-	workSessionsState.sessions[sessionIndex]._signalSuggestedTasksTimestamp = data.timestamp;
+	// Handle tasks signal type
+	if (signalType === 'tasks') {
+		// PERFORMANCE: Mutate in-place for fine-grained reactivity (Svelte 5 $state)
+		workSessionsState.sessions[sessionIndex]._signalSuggestedTasks = suggestedTasks || [];
+		workSessionsState.sessions[sessionIndex]._signalSuggestedTasksTimestamp = data.timestamp;
+	}
+
+	// Handle action signal type
+	if (signalType === 'action' && action) {
+		// Store the action for display in SessionCard
+		workSessionsState.sessions[sessionIndex]._signalAction = action;
+		workSessionsState.sessions[sessionIndex]._signalActionTimestamp = data.timestamp;
+	}
 }
 
 /**

@@ -2,14 +2,22 @@
  * SSE endpoint for real-time session events
  *
  * Watches tmux sessions and pushes events to connected clients.
+ * Also watches signal files in /tmp for instant signal updates.
  *
  * Events emitted:
  * - connected: Initial connection acknowledgment
  * - session-output: { sessionName, output, lineCount, timestamp }
- * - session-state: { sessionName, state, timestamp }
+ * - session-state: { sessionName, state, timestamp } - from polling OR signal file changes
  * - session-question: { sessionName, question, timestamp }
+ * - session-signal: { sessionName, signalType, suggestedTasks?, action?, timestamp }
  * - session-created: { sessionName, agentName, task, timestamp }
  * - session-destroyed: { sessionName, timestamp }
+ *
+ * Signal file watching:
+ * - Monitors /tmp/jat-signal-tmux-*.json files for changes
+ * - Broadcasts session-state events instantly when state signals change
+ * - Broadcasts session-signal events for tasks and action signals
+ * - No polling delay - updates are pushed within ~50ms of file write
  *
  * The watcher only runs when at least one client is connected.
  * Output changes are debounced (configurable via query param, default 250ms).
@@ -17,7 +25,7 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { readFileSync, existsSync, statSync, readdirSync } from 'fs';
+import { readFileSync, existsSync, statSync, readdirSync, watch, type FSWatcher } from 'fs';
 import { join } from 'path';
 import { getTasks } from '$lib/server/beads.js';
 
@@ -50,6 +58,24 @@ interface SessionInfo {
 	attached: boolean;
 }
 
+interface SuggestedTask {
+	id?: string;
+	type: string;
+	title: string;
+	description: string;
+	priority: number;
+	reason?: string;
+	project?: string;
+	labels?: string;
+	depends_on?: string[];
+}
+
+interface HumanAction {
+	action: string;
+	message?: string;
+	timestamp?: string;
+}
+
 interface SessionState {
 	output: string;
 	outputHash: string;
@@ -63,6 +89,8 @@ interface SessionState {
 		status?: string;
 	} | null;
 	agentName: string;
+	suggestedTasks?: SuggestedTask[];
+	suggestedTasksHash?: string;
 }
 
 interface Task {
@@ -90,6 +118,16 @@ let pollInterval: ReturnType<typeof setInterval> | null = null;
 
 // Debounce timers for output changes
 const debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+// Signal file watcher
+let signalWatcher: FSWatcher | null = null;
+
+// Track signal file states for change detection (keyed by sessionName)
+const signalFileStates = new Map<string, { state: string | null; tasksHash: string | null; actionHash: string | null }>();
+
+// Debounce timers for signal file changes (prevents multiple events for same write)
+const signalDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const SIGNAL_DEBOUNCE_MS = 50; // Quick debounce for file write completion
 
 // ============================================================================
 // Helper Functions
@@ -161,6 +199,244 @@ function readSignalState(sessionName: string): string | null {
 	} catch {
 		return null;
 	}
+}
+
+/**
+ * Read suggested tasks from signal file
+ * Returns array of SuggestedTask or null if not available
+ */
+function readSignalSuggestedTasks(sessionName: string): SuggestedTask[] | null {
+	const signalFile = `/tmp/jat-signal-tmux-${sessionName}.json`;
+
+	try {
+		if (!existsSync(signalFile)) {
+			return null;
+		}
+
+		// Check file age - signals older than TTL are stale
+		const stats = statSync(signalFile);
+		const ageMs = Date.now() - stats.mtimeMs;
+		if (ageMs > SIGNAL_TTL_MS) {
+			return null;
+		}
+
+		const content = readFileSync(signalFile, 'utf-8');
+		const signal = JSON.parse(content);
+
+		// Handle tasks signal (type: "tasks", data: [...])
+		if (signal.type === 'tasks' && Array.isArray(signal.data)) {
+			return signal.data.map((t: Partial<SuggestedTask>) => ({
+				id: t.id,
+				type: t.type || 'task',
+				title: t.title || '',
+				description: t.description || '',
+				priority: typeof t.priority === 'number' ? t.priority : 2,
+				reason: t.reason,
+				project: t.project,
+				labels: t.labels,
+				depends_on: t.depends_on
+			}));
+		}
+
+		// Handle complete signal with embedded suggestedTasks
+		if (signal.type === 'complete' && signal.data?.suggestedTasks) {
+			return signal.data.suggestedTasks.map((t: Partial<SuggestedTask>) => ({
+				id: t.id,
+				type: t.type || 'task',
+				title: t.title || '',
+				description: t.description || '',
+				priority: typeof t.priority === 'number' ? t.priority : 2,
+				reason: t.reason,
+				project: t.project,
+				labels: t.labels,
+				depends_on: t.depends_on
+			}));
+		}
+
+		return null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Read human action from signal file
+ * Returns action data if type is "action", null otherwise
+ */
+function readSignalAction(sessionName: string): HumanAction | null {
+	const signalFile = `/tmp/jat-signal-tmux-${sessionName}.json`;
+
+	try {
+		if (!existsSync(signalFile)) {
+			return null;
+		}
+
+		// Check file age - signals older than TTL are stale
+		const stats = statSync(signalFile);
+		const ageMs = Date.now() - stats.mtimeMs;
+		if (ageMs > SIGNAL_TTL_MS) {
+			return null;
+		}
+
+		const content = readFileSync(signalFile, 'utf-8');
+		const signal = JSON.parse(content);
+
+		// Handle action signals
+		if (signal.type === 'action' && signal.data?.action) {
+			return {
+				action: signal.data.action,
+				message: signal.data.message,
+				timestamp: signal.timestamp
+			};
+		}
+
+		return null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Read full signal file content for processing
+ * Returns parsed signal or null
+ */
+function readSignalFile(sessionName: string): { type: string; state?: string; data?: unknown; timestamp?: string } | null {
+	const signalFile = `/tmp/jat-signal-tmux-${sessionName}.json`;
+
+	try {
+		if (!existsSync(signalFile)) {
+			return null;
+		}
+
+		// Check file age - signals older than TTL are stale
+		const stats = statSync(signalFile);
+		const ageMs = Date.now() - stats.mtimeMs;
+		if (ageMs > SIGNAL_TTL_MS) {
+			return null;
+		}
+
+		const content = readFileSync(signalFile, 'utf-8');
+		return JSON.parse(content);
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Process a signal file change and broadcast appropriate events
+ */
+function processSignalFileChange(sessionName: string): void {
+	if (clients.size === 0) return;
+
+	const signal = readSignalFile(sessionName);
+	if (!signal) return;
+
+	const prevFileState = signalFileStates.get(sessionName) || { state: null, tasksHash: null, actionHash: null };
+	const currentFileState = { state: prevFileState.state, tasksHash: prevFileState.tasksHash, actionHash: prevFileState.actionHash };
+
+	// Handle state signals
+	if (signal.type === 'state' && signal.state) {
+		const mappedState = SIGNAL_STATE_MAP[signal.state] || signal.state;
+		if (mappedState !== prevFileState.state) {
+			currentFileState.state = mappedState;
+			broadcast('session-state', {
+				sessionName,
+				state: mappedState,
+				previousState: prevFileState.state
+			});
+			console.log(`[SSE Signal] State change for ${sessionName}: ${prevFileState.state} -> ${mappedState}`);
+		}
+	}
+
+	// Handle tasks signals
+	if (signal.type === 'tasks' || (signal.type === 'complete' && (signal.data as { suggestedTasks?: unknown })?.suggestedTasks)) {
+		const tasks = readSignalSuggestedTasks(sessionName);
+		const tasksHash = tasks ? simpleHash(JSON.stringify(tasks)) : null;
+		if (tasksHash !== prevFileState.tasksHash) {
+			currentFileState.tasksHash = tasksHash;
+			broadcast('session-signal', {
+				sessionName,
+				signalType: 'tasks',
+				suggestedTasks: tasks || []
+			});
+			console.log(`[SSE Signal] Tasks update for ${sessionName}: ${tasks?.length || 0} tasks`);
+		}
+	}
+
+	// Handle action signals
+	if (signal.type === 'action') {
+		const action = readSignalAction(sessionName);
+		const actionHash = action ? simpleHash(JSON.stringify(action)) : null;
+		if (actionHash !== prevFileState.actionHash) {
+			currentFileState.actionHash = actionHash;
+			broadcast('session-signal', {
+				sessionName,
+				signalType: 'action',
+				action: action
+			});
+			console.log(`[SSE Signal] Action for ${sessionName}: ${action?.action}`);
+		}
+	}
+
+	signalFileStates.set(sessionName, currentFileState);
+}
+
+/**
+ * Start watching signal files in /tmp for real-time updates
+ */
+function startSignalWatcher(): void {
+	if (signalWatcher) return;
+
+	console.log('[SSE Signal] Starting signal file watcher on /tmp');
+
+	try {
+		signalWatcher = watch('/tmp', (eventType, filename) => {
+			// Only process jat-signal files for tmux sessions
+			if (!filename || !filename.startsWith('jat-signal-tmux-') || !filename.endsWith('.json')) {
+				return;
+			}
+
+			// Extract session name from filename: jat-signal-tmux-{sessionName}.json
+			const sessionName = filename.replace('jat-signal-tmux-', '').replace('.json', '');
+			if (!sessionName) return;
+
+			// Debounce to handle rapid file writes (file systems may emit multiple events)
+			const existingTimer = signalDebounceTimers.get(sessionName);
+			if (existingTimer) {
+				clearTimeout(existingTimer);
+			}
+
+			signalDebounceTimers.set(sessionName, setTimeout(() => {
+				signalDebounceTimers.delete(sessionName);
+				processSignalFileChange(sessionName);
+			}, SIGNAL_DEBOUNCE_MS));
+		});
+
+		signalWatcher.on('error', (err) => {
+			console.error('[SSE Signal] Watcher error:', err);
+		});
+	} catch (err) {
+		console.error('[SSE Signal] Failed to start watcher:', err);
+	}
+}
+
+/**
+ * Stop the signal file watcher
+ */
+function stopSignalWatcher(): void {
+	if (!signalWatcher) return;
+
+	signalWatcher.close();
+	signalWatcher = null;
+
+	// Clear debounce timers
+	signalDebounceTimers.forEach(timer => clearTimeout(timer));
+	signalDebounceTimers.clear();
+
+	// Clear tracked state
+	signalFileStates.clear();
+
+	console.log('[SSE Signal] Stopped signal file watcher');
 }
 
 /**
@@ -426,6 +702,10 @@ async function pollSessions(outputLines: number, debounceMs: number): Promise<vo
 		// Read question data
 		const { hasQuestion, questionData } = readQuestionData(session.name);
 
+		// Read suggested tasks from signal file
+		const suggestedTasks = readSignalSuggestedTasks(session.name);
+		const suggestedTasksHash = suggestedTasks ? simpleHash(JSON.stringify(suggestedTasks)) : undefined;
+
 		// Get previous state
 		const prevState = sessionStates.get(session.name);
 
@@ -438,7 +718,9 @@ async function pollSessions(outputLines: number, debounceMs: number): Promise<vo
 			hasQuestion,
 			questionData,
 			task,
-			agentName
+			agentName,
+			suggestedTasks: suggestedTasks || undefined,
+			suggestedTasksHash
 		});
 
 		// Check for output changes (debounced)
@@ -474,6 +756,16 @@ async function pollSessions(outputLines: number, debounceMs: number): Promise<vo
 				question: questionData
 			});
 		}
+
+		// Check for suggested tasks changes (immediate)
+		// Broadcast when tasks appear, change, or disappear
+		if (suggestedTasksHash !== prevState?.suggestedTasksHash) {
+			broadcast('session-signal', {
+				sessionName: session.name,
+				signalType: 'tasks',
+				suggestedTasks: suggestedTasks || []
+			});
+		}
 	}
 }
 
@@ -491,6 +783,9 @@ function startPolling(outputLines: number, debounceMs: number): void {
 		console.log(`[SSE Sessions] Initialized with ${sessions.length} sessions`);
 	});
 
+	// Start signal file watcher for real-time signal updates
+	startSignalWatcher();
+
 	pollInterval = setInterval(() => {
 		pollSessions(outputLines, debounceMs).catch(err => {
 			console.error('[SSE Sessions] Poll error:', err);
@@ -506,6 +801,9 @@ function stopPolling(): void {
 
 	clearInterval(pollInterval);
 	pollInterval = null;
+
+	// Stop signal file watcher
+	stopSignalWatcher();
 
 	// Clear all debounce timers
 	debounceTimers.forEach(timer => clearTimeout(timer));
