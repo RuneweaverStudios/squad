@@ -277,7 +277,10 @@ export async function spawnInitialAgents(): Promise<SpawnResult[]> {
 
 	const results: SpawnResult[] = [];
 	const readyTasks = getReadyTasks();
-	const maxToSpawn = Math.min(readyTasks.length, state.settings.maxConcurrent);
+	// In sequential mode, only spawn 1 agent at a time
+	const maxToSpawn = state.settings.mode === 'sequential'
+		? 1
+		: Math.min(readyTasks.length, state.settings.maxConcurrent);
 
 	if (maxToSpawn === 0) {
 		return [{ success: false, error: 'No ready tasks to spawn' }];
@@ -676,10 +679,14 @@ export function removeRunningAgent(agentName: string): void {
 
 /**
  * Check if we can spawn more agents
- * @returns true if under maxConcurrent limit
+ * @returns true if under maxConcurrent limit (or 0 running in sequential mode)
  */
 export function canSpawnMore(): boolean {
 	if (!state.isActive) return false;
+	// In sequential mode, only spawn when no agents are running
+	if (state.settings.mode === 'sequential') {
+		return state.runningAgents.length === 0;
+	}
 	return state.runningAgents.length < state.settings.maxConcurrent;
 }
 

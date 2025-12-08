@@ -7,7 +7,7 @@
 	import FilterDropdown from '$lib/components/FilterDropdown.svelte';
 	import LabelBadges from '$lib/components/LabelBadges.svelte';
 	import TaskIdBadge from '$lib/components/TaskIdBadge.svelte';
-	import { analyzeDependencies } from '$lib/utils/dependencyUtils';
+	import { analyzeDependencies, calculateAllCriticalPaths, type CriticalPathResult } from '$lib/utils/dependencyUtils';
 	import { getProjectFromTaskId, extractParentId, compareTaskIds } from '$lib/utils/projectUtils';
 	import { getProjectColor } from '$lib/utils/projectColors';
 	import { getPriorityBadge, getTaskStatusBadge, getTypeBadge, isHumanTask } from '$lib/utils/badgeHelpers';
@@ -32,6 +32,7 @@
 	import { calculateRecommendationScore, type RecommendationScore } from '$lib/utils/recommendationUtils';
 	import RecommendedBadge from '$lib/components/RecommendedBadge.svelte';
 	import { getEpicId, getProgress, getRunningAgents, getIsActive } from '$lib/stores/epicQueueStore.svelte';
+	import EpicSwarmModal from '$lib/components/EpicSwarmModal.svelte';
 
 	// Type definitions for task files (images, PDFs, text, etc.)
 	interface TaskFile {
@@ -102,6 +103,10 @@
 	let completedTaskIds = $state<string[]>([]);
 	let workingCompletedTaskIds = $state<string[]>([]); // Tasks that transitioned from working → completed
 	let completedEpicIds = $state<string[]>([]); // Epics that just had all children complete
+
+	// Epic Swarm Modal state
+	let epicSwarmModalOpen = $state(false);
+	let epicSwarmModalId = $state<string | null>(null);
 
 	// Timer state for elapsed time display under rockets
 	let now = $state(Date.now());
@@ -741,6 +746,13 @@
 			.slice(0, 3);
 
 		return new Map(sorted);
+	});
+
+	// Calculate critical paths for all incomplete epics
+	// Task: jat-puza.5 - Critical path highlighting in TaskTable
+	const criticalPaths = $derived.by(() => {
+		const allTasksList = allTasks.length > 0 ? allTasks : tasks;
+		return calculateAllCriticalPaths(allTasksList);
 	});
 
 	// Type order for grouping (BUG first, then features, tasks, chores, epics, no type last)
@@ -2432,6 +2444,8 @@
 								{@const closedChildrenCount = epicTasks.filter(t => t.status === 'closed').length}
 								{@const totalChildrenCount = epicTasks.length}
 								{@const isEpicFullyComplete = closedChildrenCount === totalChildrenCount && totalChildrenCount > 0}
+								{@const hasReadyChildren = epicTasks.some(t => t.status === 'open' && !t.depends_on?.some(d => d.status !== 'closed'))}
+								{@const canRunEpic = !isRunningEpic && !isEpicFullyComplete && hasReadyChildren}
 
 								<!-- Epic Header (nested under project) -->
 								{#if showEpicHeader}
@@ -2546,6 +2560,27 @@
 														</div>
 													{/if}
 
+													<!-- Run Epic button -->
+													{#if !isEpicFullyComplete}
+														<button
+															class="btn btn-xs btn-ghost gap-1 ml-2 {canRunEpic ? 'hover:btn-primary' : 'opacity-40 cursor-not-allowed'}"
+															onclick={(e) => {
+																e.stopPropagation();
+																if (canRunEpic) {
+																	epicSwarmModalId = epicKey;
+																	epicSwarmModalOpen = true;
+																}
+															}}
+															disabled={!canRunEpic}
+															title={isRunningEpic ? 'Epic is already running' : !hasReadyChildren ? 'No ready tasks to run' : 'Launch Epic Swarm'}
+														>
+															<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+																<path stroke-linecap="round" stroke-linejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+															</svg>
+															<span class="hidden sm:inline text-xs">Run</span>
+														</button>
+													{/if}
+
 													<!-- Decorative line -->
 													<div
 														class="flex-1 h-px mx-3 opacity-20"
@@ -2578,13 +2613,16 @@
 											{@const isSpawning = spawningSingle === task.id || ($spawningTaskIds.has(task.id))}
 											{@const hasRowGradient = isCompletedByActiveSession || taskIsActive}
 											{@const recommendation = recommendedTasks.get(task.id)}
+											{@const criticalPathResult = epicKey ? criticalPaths.get(epicKey) : undefined}
+											{@const isOnCriticalPath = criticalPathResult?.criticalPathIds.has(task.id) && task.status !== 'closed'}
+											{@const criticalPathLength = criticalPathResult?.pathLengths.get(task.id) || 0}
 											<tr
 												class="hover:bg-base-200/50 cursor-pointer transition-colors {isNewTask ? 'task-new' : ''} {isStarting ? 'task-starting' : ''} {isWorkingCompleted ? 'task-working-completed' : isCompleted ? 'task-completed' : ''} {isChildTask ? 'pl-6' : ''}"
 												onclick={() => handleRowClick(task.id)}
 												style="
 												background: {isCompletedByActiveSession ? 'linear-gradient(90deg, oklch(0.55 0.18 145 / 0.15), transparent)' : taskIsActive ? 'linear-gradient(90deg, oklch(0.75 0.15 85 / 0.08), transparent)' : ''};
 												border-bottom: 1px solid oklch(0.25 0.01 250);
-												border-left: {isCompletedByActiveSession ? '3px solid oklch(0.65 0.20 145)' : taskIsActive ? '2px solid oklch(0.75 0.18 85)' : isChildTask ? '1px dashed oklch(0.40 0.02 250)' : '2px solid transparent'};
+												border-left: {isCompletedByActiveSession ? '3px solid oklch(0.65 0.20 145)' : taskIsActive ? '2px solid oklch(0.75 0.18 85)' : isOnCriticalPath ? '2px solid oklch(0.65 0.18 30)' : isChildTask ? '1px dashed oklch(0.40 0.02 250)' : '2px solid transparent'};
 											"
 											>
 												<!-- Checkbox -->
@@ -2739,6 +2777,17 @@
 																{blockedTasks.length}
 															</span>
 														{/if}
+														{#if isOnCriticalPath}
+															<span
+																class="inline-flex items-center gap-0.5 text-xs font-mono px-1 py-0.5 rounded"
+																style="color: oklch(0.75 0.18 30); background: oklch(0.75 0.18 30 / 0.15);"
+																title="Critical path: {criticalPathLength} {criticalPathLength === 1 ? 'task' : 'tasks'} to epic completion. Completing this task shortens the critical path."
+															>
+																<svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+																	<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+																</svg>
+															</span>
+														{/if}
 														{#if recommendation}
 															<RecommendedBadge reasons={recommendation.reasons} size="xs" iconOnly />
 														{/if}
@@ -2791,6 +2840,8 @@
 						{@const parentEpicQueueAgents = isParentRunningEpic ? getRunningAgents() : []}
 						{@const parentClosedCount = typeTasks.filter(t => t.status === 'closed').length}
 						{@const parentIsFullyComplete = parentClosedCount === typeTasks.length && typeTasks.length > 0}
+						{@const hasParentReadyChildren = typeTasks.some(t => t.status === 'open' && !t.depends_on?.some(d => d.status !== 'closed'))}
+						{@const canRunParentEpic = groupingMode === 'parent' && !isParentRunningEpic && !parentIsFullyComplete && hasParentReadyChildren}
 						{#if showGroupHeader}
 						<thead>
 							<tr
@@ -2914,6 +2965,27 @@
 											</div>
 										{/if}
 
+										<!-- Run Epic button (only in parent mode) -->
+										{#if groupingMode === 'parent' && !parentIsFullyComplete}
+											<button
+												class="btn btn-xs btn-ghost gap-1 ml-2 {canRunParentEpic ? 'hover:btn-primary' : 'opacity-40 cursor-not-allowed'}"
+												onclick={(e) => {
+													e.stopPropagation();
+													if (canRunParentEpic && groupKey) {
+														epicSwarmModalId = groupKey;
+														epicSwarmModalOpen = true;
+													}
+												}}
+												disabled={!canRunParentEpic}
+												title={isParentRunningEpic ? 'Epic is already running' : !hasParentReadyChildren ? 'No ready tasks to run' : 'Launch Epic Swarm'}
+											>
+												<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+												</svg>
+												<span class="hidden sm:inline text-xs">Run</span>
+											</button>
+										{/if}
+
 										<!-- Decorative line -->
 										<div
 											class="flex-1 h-px mx-3 opacity-30"
@@ -2953,19 +3025,23 @@
 									{@const fireScale = elapsed ? getFireScale(elapsed.minutes) : 1}
 									{@const hasRowGradient = isCompletedByActiveSession || dragOverTask === task.id || selectedTasks.has(task.id) || isHuman || taskIsActive}
 									{@const recommendation = recommendedTasks.get(task.id)}
+									{@const parentEpicId = groupingMode === 'parent' ? groupKey : extractParentId(task.id)}
+									{@const criticalPathResult = parentEpicId ? criticalPaths.get(parentEpicId) : undefined}
+									{@const isOnCriticalPath = criticalPathResult?.criticalPathIds.has(task.id) && task.status !== 'closed'}
+									{@const criticalPathLength = criticalPathResult?.pathLengths.get(task.id) || 0}
 									<!-- Main task row -->
 									<tr
 										class="cursor-pointer group overflow-visible industrial-row {depStatus.hasBlockers ? 'opacity-70' : ''} {isNewTask ? 'task-new-entrance' : ''} {isStarting ? 'task-starting' : ''} {isWorkingCompleted ? 'task-working-completed' : isCompleted ? 'task-completed' : ''}"
 										style="
 											background: {isCompletedByActiveSession ? 'linear-gradient(90deg, oklch(0.55 0.18 145 / 0.15), transparent)' : dragOverTask === task.id ? 'oklch(0.70 0.18 240 / 0.15)' : selectedTasks.has(task.id) ? 'oklch(0.70 0.18 240 / 0.1)' : isHuman ? 'oklch(0.70 0.18 45 / 0.10)' : taskIsActive ? 'oklch(0.70 0.18 240 / 0.05)' : ''};
 											border-bottom: 1px solid oklch(0.25 0.01 250);
-											border-left: {isCompletedByActiveSession ? '3px solid oklch(0.65 0.20 145)' : dragOverTask === task.id ? '2px solid oklch(0.70 0.18 240)' : selectedTasks.has(task.id) ? '2px solid oklch(0.70 0.18 240)' : isHuman ? '2px solid oklch(0.70 0.18 45)' : unresolvedBlockers.length > 0 ? '2px solid oklch(0.55 0.18 30 / 0.4)' : taskIsActive ? '2px solid oklch(0.70 0.18 240 / 0.5)' : '2px solid transparent'};
+											border-left: {isCompletedByActiveSession ? '3px solid oklch(0.65 0.20 145)' : dragOverTask === task.id ? '2px solid oklch(0.70 0.18 240)' : selectedTasks.has(task.id) ? '2px solid oklch(0.70 0.18 240)' : isHuman ? '2px solid oklch(0.70 0.18 45)' : unresolvedBlockers.length > 0 ? '2px solid oklch(0.55 0.18 30 / 0.4)' : taskIsActive ? '2px solid oklch(0.70 0.18 240 / 0.5)' : isOnCriticalPath ? '2px solid oklch(0.65 0.18 30)' : '2px solid transparent'};
 										"
 										onclick={() => handleRowClick(task.id)}
 										ondrop={(e) => handleImageDrop(e, task.id)}
 										ondragover={(e) => handleFileDragOver(e, task.id)}
 										ondragleave={handleFileDragLeave}
-										title={isCompletedByActiveSession ? 'Completed - session still active' : depStatus.hasBlockers ? `Blocked: ${depStatus.blockingReason}` : ''}
+										title={isCompletedByActiveSession ? 'Completed - session still active' : depStatus.hasBlockers ? `Blocked: ${depStatus.blockingReason}` : isOnCriticalPath ? 'Critical path task - bottleneck for epic completion' : ''}
 									>
 										<th
 											style="background: {hasRowGradient ? 'transparent' : 'inherit'};"
@@ -3118,6 +3194,17 @@
 													{blockedTasks.length}
 												</span>
 											{/if}
+											{#if isOnCriticalPath}
+												<span
+													class="inline-flex items-center gap-0.5 text-xs font-mono px-1 py-0.5 rounded"
+													style="color: oklch(0.75 0.18 30); background: oklch(0.75 0.18 30 / 0.15);"
+													title="Critical path: {criticalPathLength} {criticalPathLength === 1 ? 'task' : 'tasks'} to epic completion. Completing this task shortens the critical path."
+												>
+													<svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+														<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+													</svg>
+												</span>
+											{/if}
 											{#if recommendation}
 												<RecommendedBadge reasons={recommendation.reasons} size="xs" iconOnly />
 											{/if}
@@ -3239,3 +3326,15 @@
 		</table>
 	</div>
 </div>
+
+<!-- Epic Swarm Modal -->
+{#if epicSwarmModalId}
+	<EpicSwarmModal
+		epicId={epicSwarmModalId}
+		bind:isOpen={epicSwarmModalOpen}
+		onClose={() => {
+			epicSwarmModalOpen = false;
+			epicSwarmModalId = null;
+		}}
+	/>
+{/if}
