@@ -32,13 +32,23 @@
 	// Using globalThis to ensure cache survives HMR in development
 	const avatarCache: Map<string, string> = (globalThis as any).__avatarCache ??= new Map();
 
+	// Cache for "no avatar" results to avoid repeated API calls for agents without custom avatars
+	const noAvatarCache: Set<string> = (globalThis as any).__noAvatarCache ??= new Set();
+
+	// Expose caches for debugging in browser console: window.__avatarCache, window.__noAvatarCache
+	if (typeof window !== 'undefined') {
+		(window as any).__avatarCache = avatarCache;
+		(window as any).__noAvatarCache = noAvatarCache;
+	}
+
 	// Pending fetches to deduplicate in-flight requests
 	const pendingFetches: Map<string, Promise<string | null>> = (globalThis as any).__pendingAvatarFetches ??= new Map();
 
 	// Cache version - increment to bust all avatar caches
 	// Bump this when avatars are regenerated or cache logic changes
 	// v5: Added key to TaskTable #each loop for proper component keying
-	const CACHE_VERSION = 5;
+	// v6: Added negative cache (noAvatarCache) for fallback avatars
+	const CACHE_VERSION = 6;
 
 	// Actual fetch implementation
 	async function doFetch(agentName: string, cacheKey: string): Promise<string | null> {
@@ -52,14 +62,17 @@
 				// Only use real generated avatars, not fallbacks with initials
 				const isFallback = svg.includes('<text');
 				if (isFallback) {
+					// Cache the "no avatar" result to avoid repeated API calls
+					noAvatarCache.add(cacheKey);
 					return null; // Return null so generic avatar icon is shown
 				}
 				avatarCache.set(cacheKey, svg);
 				return svg;
 			}
+			// API error - don't cache, might be transient
 			return null;
 		} catch (err) {
-			// Silently fail - will show fallback icon
+			// Network error - don't cache, might be transient
 			return null;
 		}
 	}
@@ -74,11 +87,19 @@
 
 		const cacheKey = `${agentName}:v${CACHE_VERSION}`;
 
-		// Check cache first
+		// Check cache first - positive cache (has avatar)
 		const cached = avatarCache.get(cacheKey);
 		if (cached) {
 			svgContent = cached;
 			loadState = 'success';
+			currentFetchedName = agentName;
+			return;
+		}
+
+		// Check negative cache (no avatar - shows fallback icon)
+		if (noAvatarCache.has(cacheKey)) {
+			svgContent = null;
+			loadState = 'error';
 			currentFetchedName = agentName;
 			return;
 		}
