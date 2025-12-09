@@ -74,7 +74,16 @@
 	});
 
 	// Form state
-	let formData = $state({
+	interface FormData {
+		title: string;
+		description: string;
+		priority: number;
+		type: string;
+		project: string;
+		labels: string;
+	}
+
+	let formData = $state<FormData>({
 		title: '',
 		description: '',
 		priority: 1,
@@ -111,9 +120,9 @@
 
 	// UI state
 	let isSubmitting = $state(false);
-	let validationErrors = $state({});
-	let submitError = $state(null);
-	let successMessage = $state(null);
+	let validationErrors = $state<Record<string, string>>({});
+	let submitError = $state<string | null>(null);
+	let successMessage = $state<string | null>(null);
 	let titleInput: HTMLInputElement;
 
 	// AI suggestion state
@@ -639,7 +648,7 @@
 
 	// Validate form
 	function validateForm() {
-		const errors = {};
+		const errors: Record<string, string> = {};
 
 		if (!formData.title.trim()) {
 			errors.title = 'Title is required';
@@ -798,9 +807,9 @@
 					successMessage = null;
 				}, 1500);
 			}
-		} catch (error) {
+		} catch (error: unknown) {
 			console.error('Error creating task:', error);
-			submitError = error.message || 'Failed to create task. Please try again.';
+			submitError = error instanceof Error ? error.message : 'Failed to create task. Please try again.';
 			playErrorSound();
 		} finally {
 			isSubmitting = false;

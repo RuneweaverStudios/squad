@@ -22,10 +22,28 @@
 	import AgentAvatar from '$lib/components/AgentAvatar.svelte';
 	import { computeAgentStatus, type AgentStatusInput, type AgentStatus } from '$lib/utils/agentStatusUtils';
 	import { analyzeDependencies } from '$lib/utils/dependencyUtils';
-	import { broadcastTaskEvent } from '$lib/stores/taskEvents';
+	import { broadcastTaskEvent, lastTaskEvent } from '$lib/stores/taskEvents';
 	import { getElapsedTimeColor, getFireScale, formatElapsedTime } from '$lib/config/rocketConfig';
 	import { TaskDetailSkeleton } from '$lib/components/skeleton';
 	import SlideOpenButton from '$lib/components/SlideOpenButton.svelte';
+
+	// Task interface for drawer (extends API Task with additional optional fields)
+	interface DrawerTask {
+		id: string;
+		title: string;
+		description?: string;
+		status: 'open' | 'in_progress' | 'blocked' | 'closed';
+		priority: number;
+		type?: string;
+		project?: string;
+		project_path?: string;
+		assignee?: string;
+		labels?: string[];
+		depends_on?: Array<{ id: string; title: string; status: string; priority: number }>;
+		blocked_by?: Array<{ id: string; title: string; status: string; priority: number }>;
+		created_at?: string;
+		updated_at?: string;
+	}
 
 	// Agent interface for action state
 	interface Agent extends AgentStatusInput {
@@ -52,10 +70,10 @@
 	} = $props();
 
 	// Task data state
-	let task = $state(null);
-	let originalTask = $state(null); // Track original task to prevent infinite save loops
+	let task = $state<DrawerTask | null>(null);
+	let originalTask = $state<DrawerTask | null>(null); // Track original task to prevent infinite save loops
 	let loading = $state(false);
-	let error = $state(null);
+	let error = $state<string | null>(null);
 
 	// Task history state
 	interface TimelineEvent {
@@ -96,7 +114,7 @@
 
 	// Auto-save state
 	let isSaving = $state(false);
-	let saveError = $state(null);
+	let saveError = $state<string | null>(null);
 	let lastSaved = $state<Date | null>(null);
 	let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 	let isUpdatingFromServer = $state(false); // Flag to prevent effect loops during server updates
@@ -105,7 +123,7 @@
 	let fetchController: AbortController | null = null;
 
 	// UI state
-	let toastMessage = $state<{ type: 'success' | 'error'; text: string } | null>(null);
+	let toastMessage = $state<{ type: 'success' | 'error' | 'warning'; text: string } | null>(null);
 	let showHelp = $state(false);
 	let copiedTaskId = $state(false);
 	let editingLabels = $state(false);
@@ -128,7 +146,7 @@
 
 	// Derived: Find agent for this task
 	const taskAgent = $derived(
-		task?.assignee ? agents.find(a => a.name === task.assignee) : null
+		task?.assignee ? agents.find(a => a.name === task!.assignee) : null
 	);
 
 	// Derived: Compute agent status
@@ -147,8 +165,9 @@
 	);
 
 	// Derived: Dependency analysis for blocking check
+	// Cast to Task type for analyzeDependencies (DrawerTask is compatible at runtime)
 	const depStatus = $derived(
-		task ? analyzeDependencies(task) : { hasBlockers: false, blockingReason: '' }
+		task ? analyzeDependencies(task as unknown as import('$lib/types/api.types').Task) : { hasBlockers: false, blockingReason: '' }
 	);
 
 	// Derived: Calculate elapsed time from task updated_at
@@ -167,13 +186,13 @@
 
 	// Derived: Action mode based on task status
 	type ActionMode = 'spawn' | 'in_progress' | 'blocked' | 'closed';
-	const actionMode = $derived<ActionMode>(() => {
+	const actionMode = $derived<ActionMode>((() => {
 		if (!task) return 'spawn';
 		if (task.status === 'closed') return 'closed';
 		if (task.status === 'in_progress') return 'in_progress';
 		if (task.status === 'blocked' || depStatus.hasBlockers) return 'blocked';
 		return 'spawn';
-	});
+	})());
 
 	// Task attachments state
 	interface TaskAttachment {
@@ -225,7 +244,7 @@
 	});
 
 	// Status badge colors
-	const statusColors = {
+	const statusColors: Record<string, string> = {
 		open: 'badge-info',
 		in_progress: 'badge-warning',
 		closed: 'badge-success',
@@ -233,7 +252,7 @@
 	};
 
 	// Priority badge colors
-	const priorityColors = {
+	const priorityColors: Record<number, string> = {
 		0: 'badge-error', // P0 - Critical
 		1: 'badge-warning', // P1 - High
 		2: 'badge-info', // P2 - Medium
@@ -574,7 +593,7 @@
 
 
 	// Show toast notification
-	function showToast(type: 'success' | 'error', text: string) {
+	function showToast(type: 'success' | 'error' | 'warning', text: string) {
 		toastMessage = { type, text };
 		setTimeout(() => {
 			toastMessage = null;
@@ -636,10 +655,10 @@
 				const data = await response.json();
 
 				// Update task with server response
-				task = data.task;
+				task = data.task as DrawerTask;
 
 				// Update originalTask to match saved state
-				originalTask = { ...task };
+				originalTask = task ? { ...task } : null;
 
 				lastSaved = new Date();
 
@@ -735,12 +754,8 @@
 			}
 
 			// Broadcast event for other components BEFORE closing
-			broadcastTaskEvent({
-				type: 'migrated',
-				taskId: data.oldTaskId,
-				newTaskId: data.newTaskId,
-				project: targetProject
-			});
+			// Using 'task-updated' to signal the migration (task changed)
+			broadcastTaskEvent('task-updated', data.newTaskId);
 
 			// Notify parent to refresh their data
 			onrefresh();
@@ -787,8 +802,8 @@
 			const data = await response.json();
 
 			// Update task with server response
-			task = data.task;
-			originalTask = { ...task };
+			task = data.task as DrawerTask;
+			originalTask = task ? { ...task } : null;
 
 			// Refresh available tasks (to remove the one we just added)
 			fetchAvailableTasks(taskId);
@@ -832,8 +847,8 @@
 			const data = await response.json();
 
 			// Update task with server response
-			task = data.task;
-			originalTask = { ...task };
+			task = data.task as DrawerTask;
+			originalTask = task ? { ...task } : null;
 
 			// Refresh available tasks (to add the one we just removed)
 			fetchAvailableTasks(taskId);
@@ -927,14 +942,14 @@
 			showToast('success', `🚀 Agent ${data.session?.agentName || ''} spawned`);
 
 			// Broadcast event so pages refresh immediately
-			broadcastTaskEvent('task-spawned', taskId);
+			broadcastTaskEvent('task-start-requested', taskId!);
 
 			// Refetch task to get updated status
-			setTimeout(() => fetchTask(taskId), 500);
+			setTimeout(() => fetchTask(taskId!), 500);
 
 			// Also call the onspawn callback if provided (for additional parent handling)
 			if (onspawn) {
-				onspawn(taskId);
+				onspawn(taskId!);
 			}
 		} catch (error: any) {
 			console.error('Spawn error:', error);
@@ -1363,10 +1378,10 @@
 
 							<!-- Project (migrate to different project) -->
 							<InlineSelect
-								value={task.project || ''}
-								options={projectOptions.filter(p => p !== task.project).map(p => ({ value: p, label: p }))}
+								value={task?.project || ''}
+								options={projectOptions.filter(p => p !== task?.project).map(p => ({ value: p, label: p }))}
 								onSave={async (newValue) => {
-									if (newValue && newValue !== task.project) {
+									if (newValue && newValue !== task?.project) {
 										await migrateToProject(newValue);
 									}
 								}}
@@ -1397,7 +1412,7 @@
 
 							<!-- Assignee / Actions -->
 							<span class="flex items-center gap-1.5">
-								{#if actionMode() === 'spawn'}
+								{#if actionMode === 'spawn'}
 									<!-- Unassigned: Show Launch button -->
 									<button
 										class="btn btn-xs btn-primary gap-1"
@@ -1417,12 +1432,12 @@
 									{#if depStatus.hasBlockers}
 										<span class="text-xs text-warning" title={depStatus.blockingReason}>⚠</span>
 									{/if}
-								{:else if actionMode() === 'in_progress' || actionMode() === 'blocked'}
+								{:else if actionMode === 'in_progress' || actionMode === 'blocked'}
 									<!-- Assigned: Show agent + actions -->
 									<div class="flex items-center gap-1">
 										<div class="avatar">
 											<div class="w-5 h-5 rounded-full ring-1 {isAgentOnline ? 'ring-success' : 'ring-warning'}">
-												<AgentAvatar name={task.assignee} size={20} />
+												<AgentAvatar name={task?.assignee ?? ''} size={20} />
 											</div>
 										</div>
 										<span class="text-xs">{task.assignee}</span>
@@ -1461,7 +1476,7 @@
 											{/if}
 										</button>
 									</div>
-								{:else if actionMode() === 'closed'}
+								{:else if actionMode === 'closed'}
 									<!-- Closed: Show reopen option -->
 									<button
 										class="btn btn-xs btn-ghost gap-1"
@@ -1530,7 +1545,7 @@
 						<span>{error}</span>
 					</div>
 					<div class="mt-4">
-						<button class="btn btn-primary" onclick={() => fetchTask(taskId)}>
+						<button class="btn btn-primary" onclick={() => taskId && fetchTask(taskId)}>
 							Retry
 						</button>
 					</div>
