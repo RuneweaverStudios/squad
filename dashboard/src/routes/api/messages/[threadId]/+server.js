@@ -9,7 +9,8 @@ export async function GET({ params }) {
 		const messages = getThreadMessages(threadId);
 		return json({ messages });
 	} catch (error) {
-		console.error('Error fetching thread messages:', error);
-		return json({ error: error.message, messages: [] }, { status: 500 });
+		const err = /** @type {Error} */ (error);
+		console.error('Error fetching thread messages:', err);
+		return json({ error: err.message, messages: [] }, { status: 500 });
 	}
 }

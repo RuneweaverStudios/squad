@@ -29,6 +29,8 @@
 	interface SuggestedTaskWithState extends SuggestedTask {
 		selected: boolean;
 		edited: boolean;
+		/** Whether this task already exists in Beads (matched by title) */
+		alreadyCreated?: boolean;
 		edits?: {
 			type?: string;
 			title?: string;
@@ -299,7 +301,7 @@
 			</span>
 			<!-- Count badge -->
 			<span
-				class="badge badge-sm font-mono"
+				class="badge badge-sm font-mono pt-1"
 				style="background: oklch(0.35 0.12 280); color: oklch(0.95 0.05 280); border: none;"
 			>
 				{tasks.length}
@@ -379,46 +381,57 @@
 					<div
 						class="rounded-md transition-all"
 						style="
-							background: {task.selected
-							? isHuman
-								? 'oklch(0.28 0.08 50 / 0.4)'
-								: 'oklch(0.30 0.08 220 / 0.35)'
-							: 'oklch(0.20 0.02 280 / 0.5)'};
-							border: 1px solid {task.selected
-							? isHuman
-								? 'oklch(0.55 0.15 50 / 0.6)'
-								: 'oklch(0.50 0.15 220 / 0.5)'
-							: 'oklch(0.35 0.03 280 / 0.3)'};
+							background: {task.alreadyCreated
+							? 'oklch(0.22 0.05 145 / 0.3)'
+							: task.selected
+								? isHuman
+									? 'oklch(0.28 0.08 50 / 0.4)'
+									: 'oklch(0.30 0.08 220 / 0.35)'
+								: 'oklch(0.20 0.02 280 / 0.5)'};
+							border: 1px solid {task.alreadyCreated
+							? 'oklch(0.45 0.12 145 / 0.5)'
+							: task.selected
+								? isHuman
+									? 'oklch(0.55 0.15 50 / 0.6)'
+									: 'oklch(0.50 0.15 220 / 0.5)'
+								: 'oklch(0.35 0.03 280 / 0.3)'};
+							opacity: {task.alreadyCreated ? '0.75' : '1'};
 						"
 					>
 						<!-- Main task row -->
 						<div
-							class="flex items-start gap-2 p-2 cursor-pointer group"
-							onclick={() => onToggleSelection(taskKey)}
-							onkeydown={(e) => e.key === 'Enter' && onToggleSelection(taskKey)}
+							class="flex items-start gap-2 p-2 {task.alreadyCreated ? '' : 'cursor-pointer'} group"
+							onclick={() => !task.alreadyCreated && onToggleSelection(taskKey)}
+							onkeydown={(e) => e.key === 'Enter' && !task.alreadyCreated && onToggleSelection(taskKey)}
 							role="checkbox"
-							aria-checked={task.selected}
+							aria-checked={task.alreadyCreated ? true : task.selected}
 							tabindex="0"
 						>
-							<!-- Checkbox -->
+							<!-- Checkbox (or Created indicator) -->
 							<div
 								class="flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center mt-0.5 transition-colors"
 								style="
-									background: {task.selected
-									? isHuman
-										? 'oklch(0.55 0.18 50)'
-										: 'oklch(0.55 0.18 220)'
-									: 'transparent'};
-									border-color: {task.selected
-									? isHuman
-										? 'oklch(0.55 0.18 50)'
-										: 'oklch(0.55 0.18 220)'
-									: 'oklch(0.50 0.05 280)'};
+									background: {task.alreadyCreated
+									? 'oklch(0.35 0.10 145)'
+									: task.selected
+										? isHuman
+											? 'oklch(0.55 0.18 50)'
+											: 'oklch(0.55 0.18 220)'
+										: 'transparent'};
+									border-color: {task.alreadyCreated
+									? 'oklch(0.45 0.12 145)'
+									: task.selected
+										? isHuman
+											? 'oklch(0.55 0.18 50)'
+											: 'oklch(0.55 0.18 220)'
+										: 'oklch(0.50 0.05 280)'};
 								"
+								title={task.alreadyCreated ? 'Already created in Beads' : ''}
 							>
-								{#if task.selected}
+								{#if task.alreadyCreated || task.selected}
 									<svg
-										class="w-3 h-3 text-white"
+										class="w-3 h-3"
+										style="color: {task.alreadyCreated ? 'oklch(0.75 0.15 145)' : 'white'};"
 										fill="none"
 										viewBox="0 0 24 24"
 										stroke="currentColor"
@@ -529,8 +542,22 @@
 										</button>
 									{/if}
 
+									<!-- Already Created indicator -->
+									{#if task.alreadyCreated}
+										<span
+											class="badge badge-xs font-mono gap-1"
+											style="background: oklch(0.35 0.10 145); color: oklch(0.75 0.15 145); border: none;"
+											title="This task already exists in Beads"
+										>
+											<svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+											</svg>
+											Created
+										</span>
+									{/if}
+
 									<!-- Edited indicator with revert button -->
-									{#if task.edited}
+									{#if task.edited && !task.alreadyCreated}
 										<span
 											class="badge badge-xs font-mono"
 											style="background: oklch(0.50 0.15 45); color: oklch(0.95 0.05 45); border: none;"

@@ -313,6 +313,8 @@
 							sseStateTimestamp={session._sseStateTimestamp}
 							signalSuggestedTasks={session._signalSuggestedTasks}
 							signalSuggestedTasksTimestamp={session._signalSuggestedTasksTimestamp}
+							completionBundle={session._completionBundle}
+							completionBundleTimestamp={session._completionBundleTimestamp}
 							onKillSession={createKillHandler(session.sessionName)}
 							onInterrupt={createInterruptHandler(session.sessionName)}
 							onContinue={createContinueHandler(session.sessionName)}

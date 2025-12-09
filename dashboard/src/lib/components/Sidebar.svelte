@@ -230,42 +230,44 @@
 			></div>
 
 			<!-- Settings link (Industrial) -->
-			{@const settingsActive = isActive('/settings')}
-			<a
-				href="/settings"
-				aria-label="Settings"
-				class="w-full flex items-center gap-3 px-3 py-2.5 rounded transition-all duration-200 group
-					is-drawer-close:justify-center is-drawer-close:tooltip is-drawer-close:tooltip-right
-					{settingsActive ? '' : 'industrial-hover'}"
-				style="
-					background: {settingsActive ? 'linear-gradient(90deg, oklch(0.70 0.18 240 / 0.2) 0%, transparent 100%)' : 'transparent'};
-					border-left: 2px solid {settingsActive ? 'oklch(0.70 0.18 240)' : 'transparent'};
-					color: {settingsActive ? 'oklch(0.80 0.15 240)' : 'oklch(0.60 0.02 250)'};
-					text-decoration: none;
-				"
-				data-tip="Settings"
-			>
-				<div class="flex items-center justify-center w-6 h-6">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke-width={settingsActive ? 2 : 1.5}
-						stroke="currentColor"
-						class="w-4.5 h-4.5 group-hover:scale-110 transition-transform"
-						style="color: {settingsActive ? 'oklch(0.75 0.16 240)' : 'oklch(0.55 0.02 250)'};"
-					>
-						<path stroke-linecap="round" stroke-linejoin="round" d={icons.settings} />
-					</svg>
-				</div>
-				<span
-					class="font-mono text-xs tracking-wider uppercase is-drawer-close:hidden transition-colors
-						{settingsActive ? '' : 'group-hover:text-base-content/70'}"
-					style="text-shadow: {settingsActive ? '0 0 10px oklch(0.70 0.18 240 / 0.4)' : 'none'};"
+			{#if true}
+				{@const settingsActive = isActive('/settings')}
+				<a
+					href="/settings"
+					aria-label="Settings"
+					class="w-full flex items-center gap-3 px-3 py-2.5 rounded transition-all duration-200 group
+						is-drawer-close:justify-center is-drawer-close:tooltip is-drawer-close:tooltip-right
+						{settingsActive ? '' : 'industrial-hover'}"
+					style="
+						background: {settingsActive ? 'linear-gradient(90deg, oklch(0.70 0.18 240 / 0.2) 0%, transparent 100%)' : 'transparent'};
+						border-left: 2px solid {settingsActive ? 'oklch(0.70 0.18 240)' : 'transparent'};
+						color: {settingsActive ? 'oklch(0.80 0.15 240)' : 'oklch(0.60 0.02 250)'};
+						text-decoration: none;
+					"
+					data-tip="Settings"
 				>
-					Settings
-				</span>
-			</a>
+					<div class="flex items-center justify-center w-6 h-6">
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke-width={settingsActive ? 2 : 1.5}
+							stroke="currentColor"
+							class="w-4.5 h-4.5 group-hover:scale-110 transition-transform"
+							style="color: {settingsActive ? 'oklch(0.75 0.16 240)' : 'oklch(0.55 0.02 250)'};"
+						>
+							<path stroke-linecap="round" stroke-linejoin="round" d={icons.settings} />
+						</svg>
+					</div>
+					<span
+						class="font-mono text-xs tracking-wider uppercase is-drawer-close:hidden transition-colors
+							{settingsActive ? '' : 'group-hover:text-base-content/70'}"
+						style="text-shadow: {settingsActive ? '0 0 10px oklch(0.70 0.18 240 / 0.4)' : 'none'};"
+					>
+						Settings
+					</span>
+				</a>
+			{/if}
 
 			<!-- Help button (Industrial) -->
 			<button

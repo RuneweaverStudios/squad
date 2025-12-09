@@ -31,7 +31,8 @@ const execAsync = promisify(exec);
 // ============================================================================
 // Signal File Support - Read state from jat-signal hook output
 // ============================================================================
-const SIGNAL_TTL_MS = 60 * 1000; // 1 minute
+const SIGNAL_TTL_MS = 60 * 1000; // 1 minute for state signals
+const COMPLETION_TTL_MS = 30 * 60 * 1000; // 30 minutes for completion bundles
 
 /**
  * Map jat-signal states to SessionCard states
@@ -51,6 +52,7 @@ const SIGNAL_STATE_MAP = {
 
 /**
  * Read signal state from /tmp/jat-signal-tmux-{sessionName}.json
+ * Handles both state signals (type: "state") and completion bundles (type: "complete")
  * @param {string} sessionName - tmux session name
  * @returns {string|null} Session state or null if no valid signal
  */
@@ -62,19 +64,28 @@ function readSignalState(sessionName) {
 			return null;
 		}
 
-		// Check file age - signals older than TTL are stale
+		const content = readFileSync(signalFile, 'utf-8');
+		/** @type {{ type?: string, state?: string }} */
+		const signal = JSON.parse(content);
+
+		// Check file age - use different TTL based on signal type
+		// State signals expire quickly (1 min), completion bundles persist (30 min)
 		const stats = statSync(signalFile);
 		const ageMs = Date.now() - stats.mtimeMs;
-		if (ageMs > SIGNAL_TTL_MS) {
+		const ttl = signal.type === 'complete' ? COMPLETION_TTL_MS : SIGNAL_TTL_MS;
+		if (ageMs > ttl) {
 			return null;
 		}
 
-		const content = readFileSync(signalFile, 'utf-8');
-		const signal = JSON.parse(content);
-
-		// Only use state signals
+		// Handle state signals (working, review, needs_input, etc.)
 		if (signal.type === 'state' && signal.state) {
-			return SIGNAL_STATE_MAP[signal.state] || signal.state;
+			const state = signal.state;
+			return SIGNAL_STATE_MAP[/** @type {keyof typeof SIGNAL_STATE_MAP} */ (state)] || state;
+		}
+
+		// Handle completion bundles - these should show as "completed" state
+		if (signal.type === 'complete') {
+			return 'completed';
 		}
 
 		return null;
@@ -87,6 +98,7 @@ function readSignalState(sessionName) {
 // Task Cache - getTasks() is expensive (parses 800+ line JSONL on each call)
 // Cache for 5 seconds to prevent constant re-parsing during frequent polling
 // ============================================================================
+/** @type {Task[]} */
 let cachedTasks = [];
 let taskCacheTimestamp = 0;
 const TASK_CACHE_TTL_MS = 5000;
@@ -144,6 +156,12 @@ function getCachedTasks() {
  * @property {string} id - Task ID
  * @property {string} [status] - Task status
  * @property {string} [title] - Task title
+ * @property {string} [description] - Task description
+ * @property {number} [priority] - Task priority (0-4)
+ * @property {string} [assignee] - Task assignee
+ * @property {string} [issue_type] - Task type
+ * @property {string} [closedAt] - When task was closed
+ * @property {string} [updated_at] - Last update timestamp
  */
 
 /**
@@ -230,6 +248,7 @@ function detectSessionState(output, task, lastCompletedTask, sessionName) {
  */
 function detectSessionStateFromOutput(output, task, lastCompletedTask) {
 	// Strip ANSI escape codes before pattern matching (they can appear mid-marker)
+	/** @param {string} str */
 	const stripAnsi = (str) => str.replace(/\x1b\[[0-9;]*m/g, '');
 	const recentOutput = output ? stripAnsi(output.slice(-3000)) : '';
 
@@ -392,23 +411,24 @@ export async function GET({ url }) {
 		}
 
 		// Step 2: Get all tasks from Beads (for lookup) - uses cache to avoid expensive JSONL parsing
-		/** @type {Array<{id: string, title: string, description?: string, status: string, priority: number, assignee: string, issue_type?: string, updated_at?: string}>} */
 		const allTasks = getCachedTasks();
 
 		// Create a map of agent -> in_progress task
-		/** @type {Map<string, Object>} */
+		/** @type {Map<string, Task>} */
 		const agentTaskMap = new Map();
 		allTasks
-			.filter(t => t.status === 'in_progress' && t.assignee)
-			.forEach(t => {
-				agentTaskMap.set(t.assignee, {
-					id: t.id,
-					title: t.title,
-					description: t.description,
-					status: t.status,
-					priority: t.priority,
-					issue_type: t.issue_type
-				});
+			.filter((/** @type {Task} */ t) => t.status === 'in_progress' && t.assignee)
+			.forEach((/** @type {Task} */ t) => {
+				if (t.assignee) {
+					agentTaskMap.set(t.assignee, {
+						id: t.id,
+						title: t.title,
+						description: t.description,
+						status: t.status,
+						priority: t.priority,
+						issue_type: t.issue_type
+					});
+				}
 			});
 
 		// Create a map of agent -> most recently closed task
@@ -416,16 +436,16 @@ export async function GET({ url }) {
 		/** @type {Map<string, Object>} */
 		const agentLastCompletedMap = new Map();
 		allTasks
-			.filter(t => t.status === 'closed' && t.assignee)
+			.filter((/** @type {Task} */ t) => t.status === 'closed' && t.assignee)
 			// Sort by updated_at descending to get most recent first
-			.sort((a, b) => {
+			.sort((/** @type {Task} */ a, /** @type {Task} */ b) => {
 				const dateA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
 				const dateB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
 				return dateB - dateA;
 			})
-			.forEach(t => {
+			.forEach((/** @type {Task} */ t) => {
 				// Only keep the first (most recent) closed task per agent
-				if (!agentLastCompletedMap.has(t.assignee)) {
+				if (t.assignee && !agentLastCompletedMap.has(t.assignee)) {
 					agentLastCompletedMap.set(t.assignee, {
 						id: t.id,
 						title: t.title,
@@ -451,10 +471,12 @@ export async function GET({ url }) {
 				const agentName = session.name.replace(/^jat-/, '');
 
 				// Get task for this agent
-				const task = agentTaskMap.get(agentName) || null;
+				/** @type {Task|null} */
+				const task = /** @type {Task|undefined} */ (agentTaskMap.get(agentName)) || null;
 
 				// Get last completed task for this agent (for completion state display)
-				const lastCompletedTask = agentLastCompletedMap.get(agentName) || null;
+				/** @type {Task|null} */
+				const lastCompletedTask = /** @type {Task|undefined} */ (agentLastCompletedMap.get(agentName)) || null;
 
 				// Capture output
 				let output = '';

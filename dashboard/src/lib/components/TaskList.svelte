@@ -7,6 +7,16 @@
 	import TaskDetailDrawer from './TaskDetailDrawer.svelte';
 	import TaskIdBadge from './TaskIdBadge.svelte';
 
+	/**
+	 * @typedef {Object} Task
+	 * @property {string} id
+	 * @property {string} title
+	 * @property {string} [description]
+	 * @property {string} project
+	 * @property {number} priority
+	 * @property {string} status
+	 */
+
 	// Props
 	let {
 		selectedProject = $bindable('all'),
@@ -16,10 +26,14 @@
 	} = $props();
 
 	// State
+	/** @type {Task[]} */
 	let tasks = $state([]);
+	/** @type {string[]} */
 	let projects = $state([]);
 	let loading = $state(true);
+	/** @type {string|null} */
 	let error = $state(null);
+	/** @type {Date|null} */
 	let lastUpdated = $state(null);
 
 	// Drawer state (replacing modal)
@@ -74,19 +88,24 @@
 			projects = data.projects;
 			lastUpdated = new Date();
 		} catch (err) {
-			error = err.message;
+			error = err instanceof Error ? err.message : String(err);
 		} finally {
 			if (!silent) loading = false;
 		}
 	}
 
 	// Handle task click - open drawer (drawer fetches data itself)
+	/** @param {string} taskId */
 	function handleTaskClick(taskId) {
 		selectedTaskId = taskId;
 		drawerOpen = true;
 	}
 
 	// Handle keyboard events for accessibility
+	/**
+	 * @param {KeyboardEvent} event
+	 * @param {string} taskId
+	 */
 	function handleKeyDown(event, taskId) {
 		if (event.key === 'Enter' || event.key === ' ') {
 			event.preventDefault();

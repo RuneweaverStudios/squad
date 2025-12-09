@@ -101,12 +101,66 @@ export type SignalState =
  * Full signal data as returned by the signals API.
  */
 export interface SignalData {
-	/** Signal type: 'state', 'tasks', 'action' */
-	type: 'state' | 'tasks' | 'action';
+	/** Signal type: 'state', 'tasks', 'action', 'complete' */
+	type: 'state' | 'tasks' | 'action' | 'complete';
 	/** Signal data (varies by type) */
-	data: SignalState | SuggestedTask[] | HumanAction;
+	data: SignalState | SuggestedTask[] | HumanAction | CompletionBundle;
 	/** Timestamp when signal was received */
 	timestamp: number;
 	/** Task ID associated with the signal (for 'working' state) */
 	taskId?: string;
+}
+
+// =============================================================================
+// COMPLETION BUNDLE TYPES
+// =============================================================================
+
+/**
+ * Quality signals from completed task.
+ */
+export interface QualitySignals {
+	/** Test status */
+	tests: 'passing' | 'failing' | 'none' | 'skipped';
+	/** Build status */
+	build: 'clean' | 'warnings' | 'errors';
+	/** Note about pre-existing issues */
+	preExisting?: string;
+}
+
+/**
+ * Cross-agent intelligence shared after task completion.
+ */
+export interface CrossAgentIntel {
+	/** Key files modified */
+	files?: string[];
+	/** Coding patterns/conventions to follow */
+	patterns?: string[];
+	/** Non-obvious issues or gotchas */
+	gotchas?: string[];
+}
+
+/**
+ * Full completion bundle from jat-signal complete command.
+ *
+ * This is the structured data agents emit when completing a task,
+ * enabling the dashboard to render an interactive completion UI.
+ *
+ * Agents emit via:
+ *   jat-signal complete '{"taskId":"...","agentName":"...","summary":[...],...}'
+ */
+export interface CompletionBundle {
+	/** Task ID that was completed */
+	taskId: string;
+	/** Agent name that completed the task */
+	agentName: string;
+	/** Array of accomplishment bullet points */
+	summary: string[];
+	/** Quality signals (tests, build status) */
+	quality: QualitySignals;
+	/** Human actions required (manual steps for user) */
+	humanActions?: HumanAction[];
+	/** Follow-up tasks discovered during work */
+	suggestedTasks?: SuggestedTask[];
+	/** Intel for other agents working in the codebase */
+	crossAgentIntel?: CrossAgentIntel;
 }

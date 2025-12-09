@@ -22,6 +22,7 @@ const getImageStorePath = () => {
 /**
  * Clean up attachments for a task
  * Removes image files and clears entry from task-images.json
+ * @param {string} taskId
  */
 async function cleanupTaskAttachments(taskId) {
 	try {
@@ -41,7 +42,8 @@ async function cleanupTaskAttachments(taskId) {
 					await unlink(img.path);
 					console.log(`Deleted attachment: ${img.path}`);
 				} catch (err) {
-					console.error(`Failed to delete attachment ${img.path}:`, err.message);
+					const error = /** @type {Error} */ (err);
+					console.error(`Failed to delete attachment ${img.path}:`, error.message);
 				}
 			}
 		}
@@ -135,8 +137,9 @@ export async function PUT({ params, request }) {
 
 		return json({ task: updatedTask });
 	} catch (error) {
-		console.error('Error updating task:', error);
-		return json({ error: 'Failed to update task', details: error.message }, { status: 500 });
+		const err = /** @type {Error} */ (error);
+		console.error('Error updating task:', err);
+		return json({ error: 'Failed to update task', details: err.message }, { status: 500 });
 	}
 }
 
@@ -283,15 +286,19 @@ export async function PATCH({ params, request }) {
 		// Handle dependencies separately using bd dep add/remove
 		// Note: bd CLI doesn't support --deps flag for updates, need to use bd dep add
 		if (updates.dependencies !== undefined && Array.isArray(updates.dependencies)) {
-			// Get current dependencies
-			const currentDeps = existingTask.dependencies || [];
+			// Get current dependencies - cast task to include dependencies property
+			/** @type {{ dependencies?: string[] }} */
+			const taskWithDeps = /** @type {{ dependencies?: string[] }} */ (existingTask);
+			/** @type {string[]} */
+			const currentDeps = taskWithDeps.dependencies || [];
+			/** @type {string[]} */
 			const newDeps = updates.dependencies;
 
 			// Find deps to add (in new but not in current)
-			const depsToAdd = newDeps.filter(d => !currentDeps.includes(d));
+			const depsToAdd = newDeps.filter((/** @type {string} */ d) => !currentDeps.includes(d));
 
 			// Find deps to remove (in current but not in new)
-			const depsToRemove = currentDeps.filter(d => !newDeps.includes(d));
+			const depsToRemove = currentDeps.filter((/** @type {string} */ d) => !newDeps.includes(d));
 
 			// Add new dependencies
 			for (const depId of depsToAdd) {
@@ -300,7 +307,8 @@ export async function PATCH({ params, request }) {
 					const addDepCommand = `cd "${projectPath}" && bd dep add ${taskId} ${depId}`;
 					await execAsync(addDepCommand);
 				} catch (err) {
-					console.error(`Failed to add dependency ${depId}:`, err.message);
+					const error = /** @type {Error} */ (err);
+					console.error(`Failed to add dependency ${depId}:`, error.message);
 					// Continue with other deps even if one fails
 				}
 			}
@@ -312,7 +320,8 @@ export async function PATCH({ params, request }) {
 					const removeDepCommand = `cd "${projectPath}" && bd dep remove ${taskId} ${depId}`;
 					await execAsync(removeDepCommand);
 				} catch (err) {
-					console.error(`Failed to remove dependency ${depId}:`, err.message);
+					const error = /** @type {Error} */ (err);
+					console.error(`Failed to remove dependency ${depId}:`, error.message);
 					// Continue with other deps even if one fails
 				}
 			}
@@ -332,7 +341,8 @@ export async function PATCH({ params, request }) {
 					await execAsync(clearCommand);
 				}
 			} catch (err) {
-				console.error('Failed to update review_override:', err.message);
+				const error = /** @type {Error} */ (err);
+				console.error('Failed to update review_override:', error.message);
 				// Continue without failing - main update succeeded
 			}
 		}
@@ -364,11 +374,12 @@ export async function PATCH({ params, request }) {
 		console.error('Error updating task:', err);
 
 		// Check if it's a validation error from bd CLI
-		if (err.stderr && err.stderr.includes('Error:')) {
+		const execErr = /** @type {{ stderr?: string, message?: string }} */ (err);
+		if (execErr.stderr && execErr.stderr.includes('Error:')) {
 			return json(
 				{
 					error: true,
-					message: err.stderr.trim(),
+					message: execErr.stderr.trim(),
 					type: 'validation_error'
 				},
 				{ status: 400 }
@@ -378,7 +389,7 @@ export async function PATCH({ params, request }) {
 		return json(
 			{
 				error: true,
-				message: err.message || 'Internal server error updating task',
+				message: execErr.message || 'Internal server error updating task',
 				type: 'server_error'
 			},
 			{ status: 500 }
@@ -438,11 +449,12 @@ export async function DELETE({ params }) {
 		console.error('Error deleting task:', err);
 
 		// Check if it's a validation error from bd CLI
-		if (err.stderr && err.stderr.includes('Error:')) {
+		const execErr = /** @type {{ stderr?: string, message?: string }} */ (err);
+		if (execErr.stderr && execErr.stderr.includes('Error:')) {
 			return json(
 				{
 					error: true,
-					message: err.stderr.trim(),
+					message: execErr.stderr.trim(),
 					type: 'validation_error'
 				},
 				{ status: 400 }
@@ -452,7 +464,7 @@ export async function DELETE({ params }) {
 		return json(
 			{
 				error: true,
-				message: err.message || 'Internal server error deleting task',
+				message: execErr.message || 'Internal server error deleting task',
 				type: 'server_error'
 			},
 			{ status: 500 }

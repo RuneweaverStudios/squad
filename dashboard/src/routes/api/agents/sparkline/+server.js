@@ -209,19 +209,25 @@ export async function GET({ url }) {
 
 		let result;
 
+		// Cast range and bucketSize to expected types since we validated them above
+		/** @type {'24h' | '7d' | 'all'} */
+		const validatedRange = /** @type {'24h' | '7d' | 'all'} */ (range);
+		/** @type {'30min' | 'hour' | 'session'} */
+		const validatedBucketSize = /** @type {'30min' | 'hour' | 'session'} */ (bucketSize);
+
 		if (multiProject && agentName) {
 			// Per-agent multi-project mode: filter multi-project data by agent's sessions
 			result = await getAgentMultiProjectTimeSeries({
 				agentName,
-				range,
-				bucketSize
+				range: validatedRange,
+				bucketSize: validatedBucketSize
 			});
 		} else if (multiProject) {
 			// System-wide multi-project mode: aggregate across all projects from jat config
 			// Using async worker thread version to avoid blocking the event loop
 			result = await getMultiProjectTimeSeriesAsync({
-				range,
-				bucketSize
+				range: validatedRange,
+				bucketSize: validatedBucketSize
 			});
 		} else {
 			// Single-project mode: use existing logic
@@ -229,10 +235,10 @@ export async function GET({ url }) {
 			const projectPath = process.cwd().replace(/\/dashboard$/, '');
 
 			result = await getTokenTimeSeries({
-				range,
+				range: validatedRange,
 				agentName,
 				sessionId,
-				bucketSize,
+				bucketSize: validatedBucketSize,
 				projectPath
 			});
 		}
@@ -254,13 +260,14 @@ export async function GET({ url }) {
 		});
 	} catch (error) {
 		console.error('[Sparkline API] Error:', error);
-		console.error('[Sparkline API] Error stack:', error.stack);
+		const err = /** @type {Error} */ (error);
+		console.error('[Sparkline API] Error stack:', err.stack);
 
 		return json(
 			{
 				error: 'Failed to fetch sparkline data',
-				message: error.message || 'Unknown error',
-				stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+				message: err.message || 'Unknown error',
+				stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
 			},
 			{ status: 500 }
 		);

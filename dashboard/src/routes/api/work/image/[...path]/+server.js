@@ -18,6 +18,7 @@ import { tmpdir } from 'os';
  * @returns {string} - MIME type
  */
 function getContentType(ext) {
+	/** @type {Record<string, string>} */
 	const contentTypes = {
 		// Images
 		png: 'image/png',

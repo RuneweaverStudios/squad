@@ -21,7 +21,11 @@ function getApiKey() {
 	return env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
 }
 
-// Format open tasks for the prompt
+/**
+ * Format open tasks for the prompt
+ * @param {Array<{ id?: string, title?: string, priority?: number, issue_type?: string }>} tasks
+ * @returns {Array<{ id?: string, title?: string, priority?: number, issue_type?: string }>}
+ */
 function formatOpenTasks(tasks) {
 	if (!Array.isArray(tasks) || tasks.length === 0) {
 		return [];
@@ -32,10 +36,17 @@ function formatOpenTasks(tasks) {
 // Default projects (fallback if no descriptions provided)
 const DEFAULT_PROJECTS = ['jat', 'chimaro', 'jomarchy'];
 
-// Build the prompt for Claude
+/**
+ * Build the prompt for Claude
+ * @param {string} title
+ * @param {string} description
+ * @param {Array<{ id?: string, title?: string, priority?: number, issue_type?: string }>} openTasks
+ * @param {Record<string, string>} projectDescriptions
+ * @returns {string}
+ */
 function buildPrompt(title, description, openTasks, projectDescriptions = {}) {
 	const taskList = openTasks
-		.map((t) => `- ${t.id}: ${t.title} (P${t.priority}, ${t.issue_type})`)
+		.map((/** @type {{ id?: string, title?: string, priority?: number, issue_type?: string }} */ t) => `- ${t.id}: ${t.title} (P${t.priority}, ${t.issue_type})`)
 		.join('\n');
 
 	// Build project list with descriptions if available
@@ -52,7 +63,7 @@ function buildPrompt(title, description, openTasks, projectDescriptions = {}) {
 		projectSection = `AVAILABLE PROJECTS (with descriptions):
 ${projectList}
 
-Projects without descriptions: ${projectNames.filter(p => !projectDescriptions[p]).join(', ') || 'none'}`;
+Projects without descriptions: ${projectNames.filter((/** @type {string} */ p) => !projectDescriptions[p]).join(', ') || 'none'}`;
 	} else {
 		projectSection = `AVAILABLE PROJECTS: ${projectNames.join(', ')}`;
 	}
@@ -157,7 +168,7 @@ export async function POST({ request }) {
 		const result = await response.json();
 
 		// Extract the text response
-		const textContent = result.content?.find((c) => c.type === 'text');
+		const textContent = result.content?.find((/** @type {{ type?: string, text?: string }} */ c) => c.type === 'text');
 		if (!textContent?.text) {
 			return json(
 				{
@@ -202,11 +213,11 @@ export async function POST({ request }) {
 				: 'task',
 			project: validProjects.includes(suggestions.project) ? suggestions.project : null,
 			labels: Array.isArray(suggestions.labels)
-				? suggestions.labels.filter((l) => typeof l === 'string').slice(0, 5)
+				? suggestions.labels.filter((/** @type {unknown} */ l) => typeof l === 'string').slice(0, 5)
 				: [],
 			dependencies: Array.isArray(suggestions.dependencies)
 				? suggestions.dependencies
-						.filter((d) => typeof d === 'string' && openTasks.some((t) => t.id === d))
+						.filter((/** @type {unknown} */ d) => typeof d === 'string' && openTasks.some((/** @type {{ id?: string }} */ t) => t.id === d))
 						.slice(0, 3)
 				: [],
 			reasoning: suggestions.reasoning || ''
@@ -218,11 +229,12 @@ export async function POST({ request }) {
 			usage: result.usage
 		});
 	} catch (err) {
-		console.error('Error in task suggest API:', err);
+		const error = /** @type {Error} */ (err);
+		console.error('Error in task suggest API:', error);
 		return json(
 			{
 				error: true,
-				message: err.message || 'Internal server error'
+				message: error.message || 'Internal server error'
 			},
 			{ status: 500 }
 		);

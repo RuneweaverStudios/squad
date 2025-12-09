@@ -31,6 +31,7 @@ export async function GET({ params }) {
 		}
 
 		// Fetch Agent Mail messages for this task thread
+		/** @type {Array<{ created_ts?: string, subject?: string, from_agent?: string, to_agents?: string, body_md?: string, body_text?: string, importance?: string | number, ack_required?: boolean, id?: number }>} */
 		let mailMessages = [];
 		try {
 			mailMessages = getThreadMessages(id);
@@ -45,40 +46,42 @@ export async function GET({ params }) {
 		// 1. Add Beads events
 
 		// Task created event
-		if (task.created_at) {
+		/** @type {{ type?: string, closed_at?: string, created_at?: string, updated_at?: string, priority?: number, status?: string, assignee?: string, title?: string }} */
+		const taskData = task;
+		if (taskData.created_at) {
 			timeline.push({
 				type: 'beads_event',
 				event: 'task_created',
-				timestamp: task.created_at,
+				timestamp: taskData.created_at,
 				description: 'Task created',
 				metadata: {
 					status: 'open',
-					priority: task.priority,
-					type: task.type
+					priority: taskData.priority,
+					type: taskData.type
 				}
 			});
 		}
 
 		// Task updated event (if different from created)
-		if (task.updated_at && task.updated_at !== task.created_at) {
+		if (taskData.updated_at && taskData.updated_at !== taskData.created_at) {
 			timeline.push({
 				type: 'beads_event',
 				event: 'task_updated',
-				timestamp: task.updated_at,
+				timestamp: taskData.updated_at,
 				description: 'Task updated',
 				metadata: {
-					status: task.status,
-					assignee: task.assignee
+					status: taskData.status,
+					assignee: taskData.assignee
 				}
 			});
 		}
 
 		// Task closed event (if applicable)
-		if (task.closed_at) {
+		if (taskData.closed_at) {
 			timeline.push({
 				type: 'beads_event',
 				event: 'task_closed',
-				timestamp: task.closed_at,
+				timestamp: taskData.closed_at,
 				description: 'Task closed',
 				metadata: {
 					status: 'closed'
@@ -113,7 +116,7 @@ export async function GET({ params }) {
 
 		return json({
 			task_id: id,
-			task_title: task.title,
+			task_title: taskData.title,
 			timeline: timeline,
 			count: {
 				total: timeline.length,
@@ -124,13 +127,14 @@ export async function GET({ params }) {
 		});
 
 	} catch (error) {
-		console.error('Error fetching task history:', error);
-		console.error('Error stack:', error.stack);
+		const err = /** @type {Error} */ (error);
+		console.error('Error fetching task history:', err);
+		console.error('Error stack:', err.stack);
 
 		return json({
 			error: 'Failed to fetch task history',
-			message: error.message,
-			stack: error.stack
+			message: err.message,
+			stack: err.stack
 		}, { status: 500 });
 	}
 }

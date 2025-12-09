@@ -3,7 +3,7 @@
  * Prevents regression of global agent reservation query bugs (jat-n3a)
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import { GET, DELETE } from './+server.js';
 import Database from 'better-sqlite3';
 import { join } from 'path';
@@ -13,10 +13,22 @@ import { getReservations } from '$lib/server/agent-mail.js';
 const TEST_DB_PATH = join(homedir(), '.agent-mail.db');
 
 describe('Agent Reservations API', () => {
+	/** @type {import('better-sqlite3').Database} */
 	let db;
-	let testProjectId1, testProjectId2;
-	let testAgentId1, testAgentId2;
-	let testReservation1, testReservation2, testReservation3;
+	/** @type {number | bigint} */
+	let testProjectId1;
+	/** @type {number | bigint} */
+	let testProjectId2;
+	/** @type {number | bigint} */
+	let testAgentId1;
+	/** @type {number | bigint} */
+	let testAgentId2;
+	/** @type {number | bigint} */
+	let testReservation1;
+	/** @type {number | bigint} */
+	let testReservation2;
+	/** @type {number | bigint} */
+	let testReservation3;
 
 	beforeAll(() => {
 		// Open the actual Agent Mail database
@@ -104,17 +116,17 @@ describe('Agent Reservations API', () => {
 	});
 
 	describe('getReservations() JS function', () => {
-		it('should return all reservations across projects when projectPath is null', () => {
-			// Test case 1: Global query (projectPath = null)
-			const reservations = getReservations('TestAgent1', null);
+		it('should return all reservations across projects when projectPath is undefined', () => {
+			// Test case 1: Global query (projectPath = undefined)
+			const reservations = getReservations('TestAgent1', undefined);
 
 			// Should return reservations from BOTH projects
 			expect(reservations).toHaveLength(2);
-			expect(reservations.map(r => r.id)).toContain(testReservation1);
-			expect(reservations.map(r => r.id)).toContain(testReservation2);
+			expect(reservations.map((/** @type {{ id: number | bigint }} */ r) => r.id)).toContain(testReservation1);
+			expect(reservations.map((/** @type {{ id: number | bigint }} */ r) => r.id)).toContain(testReservation2);
 
 			// Verify they're from different projects
-			const projects = reservations.map(r => r.project_path);
+			const projects = reservations.map((/** @type {{ project_path: string }} */ r) => r.project_path);
 			expect(projects).toContain('test-project-alpha');
 			expect(projects).toContain('test-project-beta');
 		});
@@ -138,8 +150,8 @@ describe('Agent Reservations API', () => {
 
 		it('should return reservations for correct agent only', () => {
 			// Verify agent filtering works correctly
-			const agent1Reservations = getReservations('TestAgent1', null);
-			const agent2Reservations = getReservations('TestAgent2', null);
+			const agent1Reservations = getReservations('TestAgent1', undefined);
+			const agent2Reservations = getReservations('TestAgent2', undefined);
 
 			expect(agent1Reservations).toHaveLength(2);
 			expect(agent2Reservations).toHaveLength(1);
@@ -149,13 +161,13 @@ describe('Agent Reservations API', () => {
 		it('should handle multi-project agents correctly', () => {
 			// Test the specific bug scenario from jat-n3a:
 			// Agent with locks in different projects should see all locks when queried globally
-			const allReservations = getReservations('TestAgent1', null);
+			const allReservations = getReservations('TestAgent1', undefined);
 
 			// Verify we get both reservations
 			expect(allReservations).toHaveLength(2);
 
 			// Verify they have different project paths
-			const uniqueProjects = [...new Set(allReservations.map(r => r.project_path))];
+			const uniqueProjects = [...new Set(allReservations.map((/** @type {{ project_path: string }} */ r) => r.project_path))];
 			expect(uniqueProjects).toHaveLength(2);
 			expect(uniqueProjects).toContain('test-project-alpha');
 			expect(uniqueProjects).toContain('test-project-beta');
@@ -165,9 +177,9 @@ describe('Agent Reservations API', () => {
 	describe('GET /api/agents/[name]/reservations endpoint', () => {
 		it('should return global results for agent (projectPath = null)', async () => {
 			// Test case 3: API endpoint returns global results
-			const mockRequest = {
+			const mockRequest = /** @type {any} */ ({
 				params: { name: 'TestAgent1' }
-			};
+			});
 
 			const response = await GET(mockRequest);
 			const data = await response.json();
@@ -178,15 +190,15 @@ describe('Agent Reservations API', () => {
 			expect(data.count).toBe(2);
 
 			// Verify reservations are from both projects
-			const projects = data.reservations.map(r => r.project_path);
+			const projects = data.reservations.map((/** @type {{ project_path: string }} */ r) => r.project_path);
 			expect(projects).toContain('test-project-alpha');
 			expect(projects).toContain('test-project-beta');
 		});
 
 		it('should return 400 if agent name is missing', async () => {
-			const mockRequest = {
+			const mockRequest = /** @type {any} */ ({
 				params: {}
-			};
+			});
 
 			const response = await GET(mockRequest);
 			const data = await response.json();
@@ -196,9 +208,9 @@ describe('Agent Reservations API', () => {
 		});
 
 		it('should handle non-existent agents gracefully', async () => {
-			const mockRequest = {
+			const mockRequest = /** @type {any} */ ({
 				params: { name: 'NonExistentAgent' }
-			};
+			});
 
 			const response = await GET(mockRequest);
 			const data = await response.json();
@@ -211,10 +223,10 @@ describe('Agent Reservations API', () => {
 
 	describe('DELETE /api/agents/[name]/reservations endpoint', () => {
 		it('should release a valid reservation', async () => {
-			const mockRequest = {
+			const mockRequest = /** @type {any} */ ({
 				params: { name: 'TestAgent1' },
 				url: new URL(`http://localhost/api/agents/TestAgent1/reservations?id=${testReservation1}`)
-			};
+			});
 
 			const response = await DELETE(mockRequest);
 			const data = await response.json();
@@ -224,15 +236,15 @@ describe('Agent Reservations API', () => {
 			expect(data.pattern).toBe('test/pattern/alpha/**');
 
 			// Verify reservation was actually released
-			const reservation = db.prepare('SELECT released_ts FROM file_reservations WHERE id = ?').get(testReservation1);
+			const reservation = /** @type {{ released_ts: string | null }} */ (db.prepare('SELECT released_ts FROM file_reservations WHERE id = ?').get(testReservation1));
 			expect(reservation.released_ts).not.toBeNull();
 		});
 
 		it('should return 404 for non-existent reservation', async () => {
-			const mockRequest = {
+			const mockRequest = /** @type {any} */ ({
 				params: { name: 'TestAgent1' },
 				url: new URL('http://localhost/api/agents/TestAgent1/reservations?id=999999')
-			};
+			});
 
 			const response = await DELETE(mockRequest);
 			const data = await response.json();
@@ -242,10 +254,10 @@ describe('Agent Reservations API', () => {
 		});
 
 		it('should return 403 when trying to release another agents reservation', async () => {
-			const mockRequest = {
+			const mockRequest = /** @type {any} */ ({
 				params: { name: 'TestAgent1' },
 				url: new URL(`http://localhost/api/agents/TestAgent1/reservations?id=${testReservation3}`)
-			};
+			});
 
 			const response = await DELETE(mockRequest);
 			const data = await response.json();
@@ -255,10 +267,10 @@ describe('Agent Reservations API', () => {
 		});
 
 		it('should return 400 if reservation ID is missing', async () => {
-			const mockRequest = {
+			const mockRequest = /** @type {any} */ ({
 				params: { name: 'TestAgent1' },
 				url: new URL('http://localhost/api/agents/TestAgent1/reservations')
-			};
+			});
 
 			const response = await DELETE(mockRequest);
 			const data = await response.json();
@@ -278,18 +290,22 @@ describe('Agent Reservations API', () => {
 			// 1. Agent has locks in multiple projects
 			// 2. API endpoint must return ALL locks (not filtered by project)
 
-			const reservations = getReservations('TestAgent1', null);
+			const reservations = getReservations('TestAgent1', undefined);
 
 			// Critical assertion: MUST return locks from all projects
 			expect(reservations.length).toBeGreaterThan(1);
 
 			// Verify locks are from different projects
-			const projectPaths = reservations.map(r => r.project_path);
+			/** @param {{ project_path: string }} r */
+			const getProjectPath = (r) => r.project_path;
+			const projectPaths = reservations.map(getProjectPath);
 			const uniqueProjects = [...new Set(projectPaths)];
 			expect(uniqueProjects.length).toBeGreaterThan(1);
 
-			// This ensures the fix (passing null for projectPath) is maintained
-			expect(reservations.every(r => r.agent_name === 'TestAgent1')).toBe(true);
+			// This ensures the fix (passing undefined for projectPath) is maintained
+			/** @param {{ agent_name: string }} r */
+			const isTestAgent = (r) => r.agent_name === 'TestAgent1';
+			expect(reservations.every(isTestAgent)).toBe(true);
 		});
 	});
 });

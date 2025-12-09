@@ -87,12 +87,49 @@ export interface WorkSession {
 	_signalSuggestedTasksTimestamp?: number;
 	/** Human action from jat-signal (via SSE session-signal event) */
 	_signalAction?: {
-		action: string;
+		action?: string;
+		title?: string;
+		description?: string;
 		message?: string;
 		timestamp?: string;
+		items?: string[];
 	};
 	/** Timestamp when signal action was last updated */
 	_signalActionTimestamp?: number;
+	/** Completion bundle from jat-signal complete (via SSE session-complete event) */
+	_completionBundle?: {
+		taskId: string;
+		agentName: string;
+		summary: string[];
+		quality: {
+			tests: 'passing' | 'failing' | 'none' | 'skipped';
+			build: 'clean' | 'warnings' | 'errors';
+			preExisting?: string;
+		};
+		humanActions?: Array<{
+			title: string;
+			description?: string;
+			items?: string[];
+		}>;
+		suggestedTasks?: Array<{
+			id?: string;
+			type: string;
+			title: string;
+			description: string;
+			priority: number;
+			reason?: string;
+			project?: string;
+			labels?: string;
+			depends_on?: string[];
+		}>;
+		crossAgentIntel?: {
+			files?: string[];
+			patterns?: string[];
+			gotchas?: string[];
+		};
+	};
+	/** Timestamp when completion bundle was received */
+	_completionBundleTimestamp?: number;
 }
 
 interface WorkSessionsState {
@@ -183,7 +220,13 @@ export async function fetch(includeUsage: boolean = false): Promise<void> {
 		// Success - reset failure count
 		fetchFailureCount = 0;
 
-		const newSessions: WorkSession[] = data.sessions || [];
+		const newSessions: WorkSession[] = (data.sessions || []).map((session: WorkSession & { sessionState?: string }) => ({
+			...session,
+			// Map sessionState from HTTP API to _sseState for SessionCard consumption
+			// This ensures completion state from signal files is displayed even without SSE events
+			_sseState: session.sessionState || session._sseState,
+			_sseStateTimestamp: session.sessionState ? Date.now() : session._sseStateTimestamp
+		}));
 
 		// When not including usage data, preserve existing tokens/cost/sparklineData/contextPercent
 		// to avoid overwriting data from fetchUsage() with zeros

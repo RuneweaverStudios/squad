@@ -34,15 +34,18 @@ export async function GET() {
 		const data = JSON.parse(content);
 
 		// Migrate old format (single object) to new format (array)
+		/** @type {Record<string, Array<{ path: string, id: string, uploadedAt?: string }>>} */
 		const migratedImages = {};
 		for (const [taskId, value] of Object.entries(data)) {
 			if (Array.isArray(value)) {
 				migratedImages[taskId] = value;
-			} else if (value && typeof value === 'object' && value.path) {
+			} else if (value && typeof value === 'object' && /** @type {{ path?: string }} */ (value).path) {
 				// Old format: single object - convert to array
+				const oldValue = /** @type {{ path: string, id?: string, uploadedAt?: string }} */ (value);
 				migratedImages[taskId] = [{
-					...value,
-					id: value.id || `img-migrated-${Date.now()}`
+					path: oldValue.path,
+					uploadedAt: oldValue.uploadedAt,
+					id: oldValue.id || `img-migrated-${Date.now()}`
 				}];
 			}
 		}

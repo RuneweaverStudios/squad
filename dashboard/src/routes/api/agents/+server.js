@@ -39,7 +39,9 @@ const execAsync = promisify(exec);
 // Task Cache - getTasks() is expensive (parses 800+ line JSONL on each call)
 // Cache for 5 seconds to prevent constant re-parsing during frequent polling
 // ============================================================================
+/** @type {Task[]} */
 let cachedTasks = [];
+/** @type {string | null} */
 let cachedTasksProject = null;
 let taskCacheTimestamp = 0;
 const TASK_CACHE_TTL_MS = 5000;
@@ -47,14 +49,14 @@ const TASK_CACHE_TTL_MS = 5000;
 /**
  * Get tasks with caching (5s TTL)
  * @param {string|null} projectName - Optional project filter
- * @returns {Array} Cached or fresh tasks
+ * @returns {Task[]} Cached or fresh tasks
  */
 function getCachedTasks(projectName = null) {
 	const now = Date.now();
 	// Cache miss if: expired, empty, or different project filter
 	if (now - taskCacheTimestamp > TASK_CACHE_TTL_MS || cachedTasks.length === 0 || cachedTasksProject !== projectName) {
 		try {
-			cachedTasks = getTasks({ projectName });
+			cachedTasks = getTasks({ projectName: projectName ?? undefined });
 			cachedTasksProject = projectName;
 			taskCacheTimestamp = now;
 		} catch (err) {

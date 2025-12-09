@@ -271,10 +271,14 @@ export async function GET({ url }) {
 			for (const [key, config] of Object.entries(jatConfig.projects)) {
 				const projectPath = config.path?.replace(/^~/, homedir()) || join(homedir(), 'code', key);
 
+				// serverPath is where 'npm run dev' should be executed (optional, defaults to path)
+				const serverPath = config.server_path?.replace(/^~/, homedir()) || null;
+
 				projects.push({
 					name: key,
 					displayName: config.name || key.toUpperCase(),
 					path: projectPath,
+					serverPath,
 					port: config.port || null,
 					activeColor: config.active_color || null,
 					inactiveColor: config.inactive_color || null,

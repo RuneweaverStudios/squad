@@ -38,6 +38,7 @@ export async function POST({ params, request }) {
 		}
 
 		// Parse optional body
+		/** @type {{ taskId?: string }} */
 		let body = {};
 		try {
 			body = await request.json();

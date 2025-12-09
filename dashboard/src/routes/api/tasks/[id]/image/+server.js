@@ -41,15 +41,18 @@ async function loadTaskImages() {
 		const data = JSON.parse(content);
 
 		// Migrate old format (single object) to new format (array)
+		/** @type {Record<string, ImageData[]>} */
 		const migrated = {};
 		for (const [taskId, value] of Object.entries(data)) {
 			if (Array.isArray(value)) {
 				migrated[taskId] = value;
-			} else if (value && typeof value === 'object' && value.path) {
+			} else if (value && typeof value === 'object' && /** @type {{ path?: string }} */ (value).path) {
 				// Old format: single object
+				const oldValue = /** @type {{ path: string; uploadedAt?: string; id?: string }} */ (value);
 				migrated[taskId] = [{
-					...value,
-					id: value.id || `img-migrated-${Date.now()}`
+					path: oldValue.path,
+					uploadedAt: oldValue.uploadedAt || new Date().toISOString(),
+					id: oldValue.id || `img-migrated-${Date.now()}`
 				}];
 			}
 		}

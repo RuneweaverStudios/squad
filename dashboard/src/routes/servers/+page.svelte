@@ -40,6 +40,7 @@
 		name: string;
 		displayName: string;
 		path: string;
+		serverPath: string | null; // Where 'npm run dev' should be executed (optional, defaults to path)
 		port: number | null;
 		activeColor: string | null;
 		description: string | null;
@@ -156,6 +157,7 @@
 	let saving = $state<string | null>(null); // Project name being saved
 	let editingDescription = $state<string | null>(null); // Project name being edited
 	let descriptionDraft = $state<string>('');
+	let copiedTmuxCmd = $state<string | null>(null); // Project name whose tmux cmd was copied
 	let editingPort = $state<string | null>(null); // Project name being edited (port)
 	let portDraft = $state<string>('');
 
@@ -834,22 +836,79 @@
 														<path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
 													</svg>
 												</button>
-											{:else if project.port}
-												<!-- Not running: click to edit -->
-												<button
-													class="group flex items-center gap-1 font-mono text-xs"
-													onclick={(e) => { e.stopPropagation(); startEditingPort(project); }}
-													title="Click to edit port"
-												>
-													<span style="color: oklch(0.70 0.02 250);">{project.port}</span>
-													<svg
-														class="w-2.5 h-2.5 opacity-0 group-hover:opacity-60 transition-opacity"
-														style="color: oklch(0.50 0.02 250);"
-														fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+												<!-- Copy tmux command button (only shows when running but not in tmux) -->
+												{#if !runningSessionName}
+													<button
+														class="p-0.5 rounded opacity-60 hover:opacity-100 transition-opacity"
+														style="color: {copiedTmuxCmd === project.name ? 'oklch(0.70 0.18 145)' : 'oklch(0.70 0.12 200)'};"
+														onclick={(e) => {
+															e.stopPropagation();
+															const execPath = (project.serverPath || project.path).replace(/^\/home\/[^/]+/, '~');
+															const cmd = `tmux new-session -s server-${project.name} -c "${execPath}" 'npm run dev -- --port ${project.port}'`;
+															navigator.clipboard.writeText(cmd);
+															copiedTmuxCmd = project.name;
+															setTimeout(() => copiedTmuxCmd = null, 1500);
+														}}
+														title="Copy tmux command (server is running but not tracked - run this to add to dashboard)"
 													>
-														<path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-													</svg>
-												</button>
+														{#if copiedTmuxCmd === project.name}
+															<svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+																<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+															</svg>
+														{:else}
+															<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+																<path stroke-linecap="round" stroke-linejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+															</svg>
+														{/if}
+													</button>
+												{/if}
+											{:else if project.port}
+												<!-- Not running: port + edit + copy tmux command -->
+												<div class="flex items-center gap-1">
+													<button
+														class="font-mono text-xs"
+														style="color: oklch(0.70 0.02 250);"
+														onclick={(e) => { e.stopPropagation(); startEditingPort(project); }}
+														title="Click to edit port"
+													>
+														:{project.port}
+													</button>
+													<!-- Edit port button -->
+													<button
+														class="p-0.5 rounded opacity-40 hover:opacity-100 transition-opacity"
+														style="color: oklch(0.50 0.02 250);"
+														onclick={(e) => { e.stopPropagation(); startEditingPort(project); }}
+														title="Edit port"
+													>
+														<svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+															<path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+														</svg>
+													</button>
+													<!-- Copy tmux command button -->
+													<button
+														class="p-0.5 rounded opacity-40 hover:opacity-100 transition-opacity"
+														style="color: {copiedTmuxCmd === project.name ? 'oklch(0.70 0.18 145)' : 'oklch(0.70 0.12 200)'};"
+														onclick={(e) => {
+															e.stopPropagation();
+															const execPath = (project.serverPath || project.path).replace(/^\/home\/[^/]+/, '~');
+															const cmd = `tmux new-session -s server-${project.name} -c "${execPath}" 'npm run dev -- --port ${project.port}'`;
+															navigator.clipboard.writeText(cmd);
+															copiedTmuxCmd = project.name;
+															setTimeout(() => copiedTmuxCmd = null, 1500);
+														}}
+														title="Copy tmux command to start server"
+													>
+														{#if copiedTmuxCmd === project.name}
+															<svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+																<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+															</svg>
+														{:else}
+															<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+																<path stroke-linecap="round" stroke-linejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+															</svg>
+														{/if}
+													</button>
+												</div>
 											{:else}
 												<!-- No port: click to add -->
 												<button

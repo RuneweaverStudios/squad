@@ -291,6 +291,8 @@
 					sseStateTimestamp={session._sseStateTimestamp}
 					signalSuggestedTasks={session._signalSuggestedTasks}
 					signalSuggestedTasksTimestamp={session._signalSuggestedTasksTimestamp}
+					completionBundle={session._completionBundle}
+					completionBundleTimestamp={session._completionBundleTimestamp}
 					onKillSession={createKillHandler(session.sessionName)}
 					onSendInput={createSendInputHandler(session.sessionName)}
 					{onTaskClick}

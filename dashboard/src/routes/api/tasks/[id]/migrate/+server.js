@@ -151,11 +151,12 @@ export async function POST({ params, request }) {
 			}
 		} catch (createError) {
 			console.error('Create error:', createError);
+			const execErr = /** @type {{ stderr?: string, message?: string }} */ (createError);
 			return json(
 				{
 					error: true,
 					message: 'Failed to create task in target project',
-					details: createError.stderr || createError.message
+					details: execErr.stderr || execErr.message
 				},
 				{ status: 500 }
 			);
@@ -183,7 +184,8 @@ export async function POST({ params, request }) {
 					await execAsync(depCommand, { timeout: 10000 });
 					console.log(`Added dependency: ${newTaskId} -> ${depId}`);
 				} catch (depError) {
-					console.error(`Failed to add dependency ${depId}:`, depError.message);
+					const err = /** @type {Error} */ (depError);
+					console.error(`Failed to add dependency ${depId}:`, err.message);
 					// Non-fatal - continue with other dependencies
 				}
 			}
@@ -227,11 +229,12 @@ export async function POST({ params, request }) {
 		});
 	} catch (error) {
 		console.error('Migration error:', error);
+		const execErr = /** @type {{ stderr?: string, stdout?: string, message?: string }} */ (error);
 		return json(
 			{
 				error: true,
-				message: error.message || 'Unknown error during migration',
-				details: error.stderr || error.stdout || ''
+				message: execErr.message || 'Unknown error during migration',
+				details: execErr.stderr || execErr.stdout || ''
 			},
 			{ status: 500 }
 		);
@@ -264,6 +267,7 @@ async function migrateTaskAttachments(oldTaskId, newTaskId, sourcePath, targetPa
 		}
 
 		// Load or create target images store
+		/** @type {Record<string, object | object[]>} */
 		let targetImages = {};
 		if (existsSync(targetImagesPath)) {
 			const targetContent = await readFileAsync(targetImagesPath, 'utf-8');
@@ -308,7 +312,8 @@ async function migrateTaskAttachments(oldTaskId, newTaskId, sourcePath, targetPa
 				// Delete the old file
 				await execAsync(`rm "${oldPath}"`);
 			} catch (copyErr) {
-				console.error(`Failed to copy attachment ${oldPath}:`, copyErr.message);
+				const err = /** @type {Error} */ (copyErr);
+				console.error(`Failed to copy attachment ${oldPath}:`, err.message);
 				// Keep the old path as fallback
 				migratedAttachments.push(attachment);
 			}
@@ -316,10 +321,12 @@ async function migrateTaskAttachments(oldTaskId, newTaskId, sourcePath, targetPa
 
 		// Save migrated attachments to target
 		if (migratedAttachments.length > 0) {
-			targetImages[newTaskId] = migratedAttachments.length === 1
+			/** @type {Record<string, object | object[]>} */
+			const typedTargetImages = targetImages;
+			typedTargetImages[newTaskId] = migratedAttachments.length === 1
 				? migratedAttachments[0]
 				: migratedAttachments;
-			await writeFileAsync(targetImagesPath, JSON.stringify(targetImages, null, 2), 'utf-8');
+			await writeFileAsync(targetImagesPath, JSON.stringify(typedTargetImages, null, 2), 'utf-8');
 		}
 
 		// Remove from source images
@@ -338,7 +345,8 @@ async function migrateTaskAttachments(oldTaskId, newTaskId, sourcePath, targetPa
 
 		console.log(`Migrated ${migratedAttachments.length} attachment(s) for ${oldTaskId} -> ${newTaskId}`);
 	} catch (err) {
-		console.error('Failed to migrate attachments:', err.message);
+		const error = /** @type {Error} */ (err);
+		console.error('Failed to migrate attachments:', error.message);
 		// Don't fail the migration if attachments fail
 	}
 }

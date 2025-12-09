@@ -33,7 +33,8 @@ export async function GET({ params }) {
 		try {
 			logFiles = await readdir(logsDir);
 		} catch (err) {
-			if (err.code === 'ENOENT') {
+			const error = /** @type {{ code?: string }} */ (err);
+			if (error.code === 'ENOENT') {
 				// Logs directory doesn't exist yet
 				return json({
 					task_id: id,
@@ -146,10 +147,11 @@ export async function GET({ params }) {
 		});
 
 	} catch (error) {
-		console.error('Error fetching task logs:', error);
+		const err = /** @type {Error} */ (error);
+		console.error('Error fetching task logs:', err);
 		return json({
 			error: 'Failed to fetch task logs',
-			message: error.message
+			message: err.message
 		}, { status: 500 });
 	}
 }
@@ -157,6 +159,8 @@ export async function GET({ params }) {
 /**
  * Extract agent name from log filename
  * Format: session-jat-{AgentName}-{timestamp}.log
+ * @param {string} filename
+ * @returns {string|null}
  */
 function extractAgentFromFilename(filename) {
 	// Pattern: session-jat-AgentName-20251129-123456.log
@@ -170,6 +174,8 @@ function extractAgentFromFilename(filename) {
 /**
  * Extract agent name from log content
  * Look for agent registration or statusline patterns
+ * @param {string} content
+ * @returns {string|null}
  */
 function extractAgentFromContent(content) {
 	// Look for agent name patterns in content
@@ -192,6 +198,8 @@ function extractAgentFromContent(content) {
 /**
  * Extract session start time from filename
  * Format: session-...-YYYYMMDD-HHMMSS.log
+ * @param {string} filename
+ * @returns {string|null}
  */
 function extractTimeFromFilename(filename) {
 	const match = filename.match(/(\d{8})-(\d{6})\.log$/);
@@ -212,6 +220,9 @@ function extractTimeFromFilename(filename) {
 
 /**
  * Count occurrences of a string in content
+ * @param {string} content
+ * @param {string} searchStr
+ * @returns {number}
  */
 function countOccurrences(content, searchStr) {
 	let count = 0;
@@ -225,6 +236,9 @@ function countOccurrences(content, searchStr) {
 
 /**
  * Extract a preview snippet around the first occurrence of task ID
+ * @param {string} content
+ * @param {string} taskId
+ * @returns {string|null}
  */
 function extractPreview(content, taskId) {
 	const index = content.indexOf(taskId);
@@ -248,6 +262,8 @@ function extractPreview(content, taskId) {
 
 /**
  * Format bytes to human-readable string
+ * @param {number} bytes
+ * @returns {string}
  */
 function formatBytes(bytes) {
 	if (bytes === 0) return '0 B';

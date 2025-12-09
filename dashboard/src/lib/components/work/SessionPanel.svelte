@@ -44,6 +44,53 @@
 		cost: number;
 	}
 
+	// Suggested task interface (from jat-signal)
+	interface SuggestedTask {
+		id?: string;
+		type: string;
+		title: string;
+		description: string;
+		priority: number;
+		reason?: string;
+		project?: string;
+		labels?: string;
+		depends_on?: string[];
+	}
+
+	// Human action interface (from jat-signal action type)
+	interface HumanAction {
+		action?: string;
+		title?: string;
+		description?: string;
+		message?: string;
+		timestamp?: string;
+	}
+
+	// Quality signals from completed task
+	interface QualitySignals {
+		tests: 'passing' | 'failing' | 'none' | 'skipped';
+		build: 'clean' | 'warnings' | 'errors';
+		preExisting?: string;
+	}
+
+	// Cross-agent intelligence from completed task
+	interface CrossAgentIntel {
+		files?: string[];
+		patterns?: string[];
+		gotchas?: string[];
+	}
+
+	// Full completion bundle from jat-signal complete
+	interface CompletionBundle {
+		taskId: string;
+		agentName: string;
+		summary: string[];
+		quality: QualitySignals;
+		humanActions?: HumanAction[];
+		suggestedTasks?: SuggestedTask[];
+		crossAgentIntel?: CrossAgentIntel;
+	}
+
 	interface WorkSession {
 		sessionName: string;
 		agentName: string;
@@ -57,6 +104,22 @@
 		contextPercent?: number | null;
 		created: string;
 		attached: boolean;
+		/** Real-time state from SSE (working, needs-input, ready-for-review, etc.) */
+		_sseState?: string;
+		/** Timestamp when SSE state was last updated */
+		_sseStateTimestamp?: number;
+		/** Suggested tasks from jat-signal (via SSE session-signal event) */
+		_signalSuggestedTasks?: SuggestedTask[];
+		/** Timestamp when signal suggested tasks were last updated */
+		_signalSuggestedTasksTimestamp?: number;
+		/** Human action from jat-signal (via SSE session-signal event) */
+		_signalAction?: HumanAction;
+		/** Timestamp when signal action was last updated */
+		_signalActionTimestamp?: number;
+		/** Completion bundle from jat-signal complete (via SSE session-complete event) */
+		_completionBundle?: CompletionBundle;
+		/** Timestamp when completion bundle was received */
+		_completionBundleTimestamp?: number;
 	}
 
 	// Server session type - aligned with serverSessions.svelte.ts
@@ -401,6 +464,14 @@
 								sparklineData={session.sparklineData}
 								contextPercent={session.contextPercent}
 								startTime={session.created ? new Date(session.created) : null}
+								sseState={session._sseState}
+								sseStateTimestamp={session._sseStateTimestamp}
+								signalSuggestedTasks={session._signalSuggestedTasks}
+								signalSuggestedTasksTimestamp={session._signalSuggestedTasksTimestamp}
+								signalAction={session._signalAction}
+								signalActionTimestamp={session._signalActionTimestamp}
+								completionBundle={session._completionBundle}
+								completionBundleTimestamp={session._completionBundleTimestamp}
 								onKillSession={createKillHandler(session.sessionName)}
 								onInterrupt={createInterruptHandler(session.sessionName)}
 								onContinue={createContinueHandler(session.sessionName)}

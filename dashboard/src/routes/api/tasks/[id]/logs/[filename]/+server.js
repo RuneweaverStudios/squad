@@ -31,7 +31,8 @@ export async function GET({ params, url }) {
 		try {
 			await stat(logPath);
 		} catch (err) {
-			if (err.code === 'ENOENT') {
+			const error = /** @type {{ code?: string }} */ (err);
+			if (error.code === 'ENOENT') {
 				return json({ error: 'Log file not found' }, { status: 404 });
 			}
 			throw err;
@@ -63,10 +64,11 @@ export async function GET({ params, url }) {
 		}
 
 	} catch (error) {
-		console.error('Error reading log file:', error);
+		const err = /** @type {Error} */ (error);
+		console.error('Error reading log file:', err);
 		return json({
 			error: 'Failed to read log file',
-			message: error.message
+			message: err.message
 		}, { status: 500 });
 	}
 }

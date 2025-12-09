@@ -72,7 +72,8 @@ export async function POST({ params }) {
 			terminal: terminalPath
 		});
 	} catch (error) {
-		console.error('Failed to attach terminal:', error);
-		return json({ error: error.message }, { status: 500 });
+		const err = /** @type {Error} */ (error);
+		console.error('Failed to attach terminal:', err);
+		return json({ error: err.message }, { status: 500 });
 	}
 }

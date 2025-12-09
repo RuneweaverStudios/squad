@@ -38,7 +38,8 @@ export async function GET() {
 		const name = generateName();
 		return json({ name });
 	} catch (error) {
-		console.error('Failed to generate name:', error);
-		return json({ error: error.message }, { status: 500 });
+		const err = /** @type {Error} */ (error);
+		console.error('Failed to generate name:', err);
+		return json({ error: err.message }, { status: 500 });
 	}
 }

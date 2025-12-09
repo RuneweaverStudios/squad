@@ -25,8 +25,16 @@
 	let isKeyboardNavigation = $state(false); // Track if user is using keyboard
 
 	// Task search state
+	interface Task {
+		id: string;
+		title: string;
+		status?: string;
+		priority?: number;
+		issue_type?: string;
+		project?: string;
+	}
 	let searchMode = $state<'actions' | 'tasks'>('actions'); // 'actions' = command palette, 'tasks' = task search
-	let tasks = $state([]);
+	let tasks = $state<Task[]>([]);
 	let isLoadingTasks = $state(false);
 	let searchDebounceTimer: number;
 
@@ -541,7 +549,7 @@
 						</div>
 					{:else}
 						<!-- Group tasks by project -->
-						{@const groupedTasks = tasks.reduce((acc, task) => {
+						{@const groupedTasks = tasks.reduce<Record<string, Task[]>>((acc, task) => {
 							const project = task.project || 'unknown';
 							if (!acc[project]) acc[project] = [];
 							acc[project].push(task);
@@ -549,7 +557,7 @@
 						}, {})}
 
 						<div class="p-2">
-							{#each Object.entries(groupedTasks) as [project, projectTasks]}
+							{#each Object.entries(groupedTasks) as [project, projectTasks] (project)}
 								<!-- Project header - Industrial -->
 								<div
 									class="px-3 py-1.5 text-xs font-semibold font-mono uppercase tracking-wider sticky top-0 backdrop-blur-sm"

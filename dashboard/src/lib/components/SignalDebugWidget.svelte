@@ -92,9 +92,20 @@
 		border: 'oklch(0.35 0.02 250 / 0.5)'
 	};
 
-	function getStateColors(state: string | undefined) {
+	function getStateColors(state: string | undefined, type?: string) {
+		// If no explicit state, check if type implies completed
+		if (!state && type === 'complete') {
+			return stateColors['completed'];
+		}
 		if (!state) return defaultColors;
 		return stateColors[state] || defaultColors;
+	}
+
+	function getDisplayState(signal: Signal): string | undefined {
+		// Show state if present, or derive from type
+		if (signal.state) return signal.state;
+		if (signal.type === 'complete') return 'COMPLETE';
+		return undefined;
 	}
 
 	async function fetchSignals() {
@@ -303,7 +314,8 @@
 		{:else}
 			<div class="space-y-2">
 				{#each signals as signal (signal._file)}
-					{@const colors = getStateColors(signal.state)}
+					{@const colors = getStateColors(signal.state, signal.type)}
+					{@const displayState = getDisplayState(signal)}
 					{@const isExpanded = expandedSignals.has(signal.sessionName)}
 					<div
 						class="rounded-lg overflow-hidden transition-all"
@@ -319,12 +331,12 @@
 						>
 							<div class="flex items-center gap-3">
 								<!-- State badge -->
-								{#if signal.state}
+								{#if displayState}
 									<span
 										class="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-semibold"
 										style="background: {colors.border}; color: {colors.text};"
 									>
-										{signal.state}
+										{displayState}
 									</span>
 								{/if}
 

@@ -22,6 +22,8 @@
 	export interface SuggestedTaskWithState extends SuggestedTask {
 		selected: boolean;
 		edited: boolean;
+		/** Whether this task already exists in Beads (matched by title) */
+		alreadyCreated?: boolean;
 		edits?: {
 			type?: string;
 			title?: string;
@@ -110,11 +112,13 @@
 		selections = newSelections;
 	}
 
-	// Select all tasks
+	// Select all tasks (skip already-created ones)
 	function selectAll() {
 		const newSelections = new Map(selections);
 		tasks.forEach((task, index) => {
-			newSelections.set(getTaskKey(task, index), true);
+			if (!task.alreadyCreated) {
+				newSelections.set(getTaskKey(task, index), true);
+			}
 		});
 		selections = newSelections;
 	}
@@ -144,16 +148,26 @@
 		return { bg: p.color, text: p.textColor };
 	}
 
-	// Count selected tasks
+	// Count selected tasks (excluding already-created)
 	const selectedCount = $derived(
-		tasks.filter((task, index) => isSelected(task, index)).length
+		tasks.filter((task, index) => isSelected(task, index) && !task.alreadyCreated).length
 	);
 
-	// Get selected tasks with edits applied
+	// Count tasks that can still be created (not already created)
+	const creatableCount = $derived(
+		tasks.filter((task) => !task.alreadyCreated).length
+	);
+
+	// Count already created tasks
+	const alreadyCreatedCount = $derived(
+		tasks.filter((task) => task.alreadyCreated).length
+	);
+
+	// Get selected tasks with edits applied (excluding already-created)
 	function getSelectedTasksWithEdits(): SuggestedTaskWithState[] {
 		return tasks
 			.map((task, index) => {
-				if (!isSelected(task, index)) return null;
+				if (!isSelected(task, index) || task.alreadyCreated) return null;
 				const key = getTaskKey(task, index);
 				const taskEdits = edits.get(key);
 				return {
@@ -347,9 +361,14 @@
 						Clear
 					</button>
 				</div>
+				{#if alreadyCreatedCount > 0}
+					<span class="text-xs font-mono" style="color: oklch(0.65 0.12 145);">
+						{alreadyCreatedCount} already created
+					</span>
+				{/if}
 				{#if selectedCount > 0}
 					<span class="text-xs font-mono" style="color: oklch(0.75 0.15 145);">
-						{selectedCount} of {tasks.length} selected
+						{selectedCount} of {creatableCount} selected
 					</span>
 				{/if}
 			</div>
@@ -370,43 +389,35 @@
 					<div
 						class="rounded-lg transition-all"
 						style="
-							background: {selected
-							? isHuman
-								? 'oklch(0.25 0.08 50 / 0.4)'
-								: 'oklch(0.26 0.08 220 / 0.35)'
-							: 'oklch(0.20 0.02 250 / 0.6)'};
-							border: 1px solid {selected
-							? isHuman
-								? 'oklch(0.55 0.15 50 / 0.6)'
-								: 'oklch(0.50 0.15 220 / 0.5)'
-							: 'oklch(0.32 0.03 250 / 0.5)'};
+							background: {task.alreadyCreated
+							? 'oklch(0.22 0.05 145 / 0.3)'
+							: selected
+								? isHuman
+									? 'oklch(0.25 0.08 50 / 0.4)'
+									: 'oklch(0.26 0.08 220 / 0.35)'
+								: 'oklch(0.20 0.02 250 / 0.6)'};
+							border: 1px solid {task.alreadyCreated
+							? 'oklch(0.45 0.12 145 / 0.5)'
+							: selected
+								? isHuman
+									? 'oklch(0.55 0.15 50 / 0.6)'
+									: 'oklch(0.50 0.15 220 / 0.5)'
+								: 'oklch(0.32 0.03 250 / 0.5)'};
+							opacity: {task.alreadyCreated ? '0.75' : '1'};
 						"
 					>
 						<!-- Main task row -->
 						<div class="flex items-start gap-3 p-3">
-							<!-- Checkbox -->
-							<button
-								type="button"
-								class="flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center mt-0.5 transition-colors cursor-pointer"
-								style="
-									background: {selected
-									? isHuman
-										? 'oklch(0.55 0.18 50)'
-										: 'oklch(0.55 0.18 220)'
-									: 'transparent'};
-									border-color: {selected
-									? isHuman
-										? 'oklch(0.55 0.18 50)'
-										: 'oklch(0.55 0.18 220)'
-									: 'oklch(0.50 0.05 250)'};
-								"
-								onclick={() => toggleSelection(task, index)}
-								disabled={isCreating}
-								aria-label={selected ? 'Deselect task' : 'Select task'}
-							>
-								{#if selected}
+							<!-- Checkbox (disabled for already-created tasks) -->
+							{#if task.alreadyCreated}
+								<div
+									class="flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center mt-0.5"
+									style="background: oklch(0.35 0.10 145); border-color: oklch(0.45 0.12 145);"
+									title="Already created in Beads"
+								>
 									<svg
-										class="w-3 h-3 text-white"
+										class="w-3 h-3"
+										style="color: oklch(0.75 0.15 145);"
 										fill="none"
 										viewBox="0 0 24 24"
 										stroke="currentColor"
@@ -418,8 +429,44 @@
 											d="M5 13l4 4L19 7"
 										/>
 									</svg>
-								{/if}
-							</button>
+								</div>
+							{:else}
+								<button
+									type="button"
+									class="flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center mt-0.5 transition-colors cursor-pointer"
+									style="
+										background: {selected
+										? isHuman
+											? 'oklch(0.55 0.18 50)'
+											: 'oklch(0.55 0.18 220)'
+										: 'transparent'};
+										border-color: {selected
+										? isHuman
+											? 'oklch(0.55 0.18 50)'
+											: 'oklch(0.55 0.18 220)'
+										: 'oklch(0.50 0.05 250)'};
+									"
+									onclick={() => toggleSelection(task, index)}
+									disabled={isCreating}
+									aria-label={selected ? 'Deselect task' : 'Select task'}
+								>
+									{#if selected}
+										<svg
+											class="w-3 h-3 text-white"
+											fill="none"
+											viewBox="0 0 24 24"
+											stroke="currentColor"
+											stroke-width="3"
+										>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												d="M5 13l4 4L19 7"
+											/>
+										</svg>
+									{/if}
+								</button>
+							{/if}
 
 							<!-- Task content -->
 							<div class="flex-1 min-w-0">
@@ -502,30 +549,53 @@
 										</svg>
 									</button>
 
-									<!-- Create single button -->
-									<button
-										type="button"
-										class="flex-shrink-0 btn btn-xs gap-1"
-										style="background: oklch(0.45 0.15 145); color: oklch(0.98 0 0); border: none;"
-										onclick={() => handleCreateSingle(task, index)}
-										disabled={isCreating}
-										title="Create this task in Beads"
-									>
-										<svg
-											class="w-3 h-3"
-											fill="none"
-											viewBox="0 0 24 24"
-											stroke="currentColor"
-											stroke-width="2"
+									<!-- Create single button OR Created badge -->
+									{#if task.alreadyCreated}
+										<span
+											class="flex-shrink-0 badge badge-sm gap-1"
+											style="background: oklch(0.35 0.10 145); color: oklch(0.85 0.15 145); border: none;"
+											title="This task already exists in Beads"
 										>
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												d="M12 4.5v15m7.5-7.5h-15"
-											/>
-										</svg>
-										Create
-									</button>
+											<svg
+												class="w-3 h-3"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke="currentColor"
+												stroke-width="2"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													d="M5 13l4 4L19 7"
+												/>
+											</svg>
+											Created
+										</span>
+									{:else}
+										<button
+											type="button"
+											class="flex-shrink-0 btn btn-xs gap-1"
+											style="background: oklch(0.45 0.15 145); color: oklch(0.98 0 0); border: none;"
+											onclick={() => handleCreateSingle(task, index)}
+											disabled={isCreating}
+											title="Create this task in Beads"
+										>
+											<svg
+												class="w-3 h-3"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke="currentColor"
+												stroke-width="2"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													d="M12 4.5v15m7.5-7.5h-15"
+												/>
+											</svg>
+											Create
+										</button>
+									{/if}
 								</div>
 
 								<!-- Description preview (when collapsed) -->

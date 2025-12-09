@@ -172,8 +172,8 @@ export async function POST({ request }) {
 		// Add labels if provided
 		if (body.labels && Array.isArray(body.labels) && body.labels.length > 0) {
 			const sanitizedLabels = body.labels
-				.filter(l => typeof l === 'string' && l.trim())
-				.map(l => l.trim())
+				.filter((/** @type {unknown} */ l) => typeof l === 'string' && /** @type {string} */ (l).trim())
+				.map((/** @type {string} */ l) => l.trim())
 				.join(',');
 			if (sanitizedLabels) {
 				command += ` --labels ${sanitizedLabels}`;
@@ -183,8 +183,8 @@ export async function POST({ request }) {
 		// Add dependencies if provided
 		if (body.deps && Array.isArray(body.deps) && body.deps.length > 0) {
 			const sanitizedDeps = body.deps
-				.filter(d => typeof d === 'string' && d.trim())
-				.map(d => d.trim())
+				.filter((/** @type {unknown} */ d) => typeof d === 'string' && /** @type {string} */ (d).trim())
+				.map((/** @type {string} */ d) => d.trim())
 				.join(',');
 			if (sanitizedDeps) {
 				command += ` --deps ${sanitizedDeps}`;
@@ -254,11 +254,12 @@ export async function POST({ request }) {
 		console.error('Error creating task:', err);
 
 		// Check if it's a validation error from bd create
-		if (err.stderr && err.stderr.includes('Error:')) {
+		const execErr = /** @type {{ stderr?: string, message?: string }} */ (err);
+		if (execErr.stderr && execErr.stderr.includes('Error:')) {
 			return json(
 				{
 					error: true,
-					message: err.stderr.trim(),
+					message: execErr.stderr.trim(),
 					type: 'validation_error'
 				},
 				{ status: 400 }
@@ -268,7 +269,7 @@ export async function POST({ request }) {
 		return json(
 			{
 				error: true,
-				message: err.message || 'Internal server error creating task',
+				message: execErr.message || 'Internal server error creating task',
 				type: 'server_error'
 			},
 			{ status: 500 }

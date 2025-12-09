@@ -27,7 +27,8 @@ export async function GET({ request }) {
 
 		return json(metrics);
 	} catch (error) {
-		console.error('Error fetching Claude usage metrics:', error);
+		const err = /** @type {Error} */ (error);
+		console.error('Error fetching Claude usage metrics:', err);
 
 		// Return error response with fallback data
 		return json({
@@ -43,7 +44,7 @@ export async function GET({ request }) {
 			burnRate: null,
 			lastUpdated: new Date(),
 			cacheHit: false,
-			errors: [error.message || 'Failed to fetch metrics']
+			errors: [err.message || 'Failed to fetch metrics']
 		}, { status: 500 });
 	}
 }

@@ -28,6 +28,7 @@ function getExtension(mimeType, filename) {
 	}
 
 	// Fall back to MIME type mapping
+	/** @type {Record<string, string>} */
 	const mimeToExt = {
 		// Images
 		'image/png': 'png',

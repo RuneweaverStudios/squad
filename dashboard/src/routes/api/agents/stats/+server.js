@@ -50,7 +50,7 @@ export async function GET({ url }) {
 
 		// Find agents with in_progress tasks
 		const workingAgents = new Set();
-		tasks.forEach((task) => {
+		tasks.forEach((/** @type {{ status?: string, assignee?: string }} */ task) => {
 			if (task.status === 'in_progress' && task.assignee) {
 				workingAgents.add(task.assignee);
 			}

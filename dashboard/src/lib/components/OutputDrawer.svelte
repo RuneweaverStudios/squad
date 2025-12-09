@@ -7,7 +7,7 @@
 	 * - Tab bar for session selection (horizontal scrollable)
 	 * - Single session view (no collapsing, cleaner UI)
 	 * - Auto-scroll with pause toggle
-	 * - Polls all sessions every 500ms when open
+	 * - Uses SSE events for real-time updates (no polling!)
 	 * - Syncs selected session with store for targeting
 	 * - Persists open/closed state in localStorage
 	 */
@@ -21,6 +21,7 @@
 		selectedOutputSession,
 		clearOutputSessionSelection
 	} from '$lib/stores/drawerStore';
+	import { lastSessionEvent, type SessionEvent } from '$lib/stores/sessionEvents';
 	import { ansiToHtml } from '$lib/utils/ansiToHtml';
 
 	// Drawer open state - synced with store
@@ -67,8 +68,8 @@
 	// History loading state
 	let loadingHistory = $state(false);
 
-	// Polling interval reference
-	let pollInterval: ReturnType<typeof setInterval> | null = null;
+	// SSE event unsubscribe function
+	let unsubscribeSSE: (() => void) | null = null;
 
 	/**
 	 * Extract agent name from session output by parsing the statusline
@@ -186,18 +187,81 @@
 		}
 	});
 
-	// Start/stop polling based on open state
+	// Handle SSE events for real-time updates
+	function handleSSEEvent(event: SessionEvent | null) {
+		if (!event || !isOpen) return;
+
+		const sessionName = event.sessionName;
+		if (!sessionName) return;
+
+		// Handle different event types
+		switch (event.type) {
+			case 'session-output':
+				// Update output for the specific session
+				if (event.output !== undefined) {
+					const idx = sessions.findIndex(s => s.name === sessionName);
+					if (idx !== -1) {
+						// Update in-place for fine-grained reactivity
+						sessions[idx].output = event.output;
+						sessions[idx].lineCount = event.lineCount ?? sessions[idx].lineCount;
+						sessions[idx].lastUpdated = new Date().toISOString();
+
+						// Auto-scroll if enabled and this is the selected session
+						if (autoScroll && scrollContainerRef && sessionName === selectedSession) {
+							requestAnimationFrame(() => {
+								if (scrollContainerRef) {
+									scrollContainerRef.scrollTop = scrollContainerRef.scrollHeight;
+								}
+							});
+						}
+					}
+				}
+				break;
+
+			case 'session-created':
+				// Add new session if not already present
+				if (!sessions.some(s => s.name === sessionName)) {
+					const agentName = event.agentName || sessionName.replace('jat-', '');
+					sessions = [...sessions, {
+						name: sessionName,
+						agentName,
+						output: '',
+						lineCount: 0,
+						lastUpdated: new Date().toISOString(),
+						hasFullHistory: false
+					}];
+					// Auto-select if this is the first session
+					if (!selectedSession) {
+						selectedSession = sessionName;
+						selectedOutputSession.set(selectedSession);
+					}
+				}
+				break;
+
+			case 'session-destroyed':
+				// Remove destroyed session
+				sessions = sessions.filter(s => s.name !== sessionName);
+				// Auto-select another session if the selected one was destroyed
+				if (selectedSession === sessionName) {
+					selectedSession = sessions[0]?.name || null;
+					selectedOutputSession.set(selectedSession);
+				}
+				break;
+		}
+	}
+
+	// Subscribe to SSE events when drawer is open
 	$effect(() => {
 		if (isOpen) {
-			// Initial fetch
+			// Initial fetch to populate session list
 			fetchAllSessions();
-			// Start polling
-			pollInterval = setInterval(fetchAllSessions, 500);
+			// Subscribe to SSE events for real-time updates
+			unsubscribeSSE = lastSessionEvent.subscribe(handleSSEEvent);
 		} else {
-			// Stop polling
-			if (pollInterval) {
-				clearInterval(pollInterval);
-				pollInterval = null;
+			// Unsubscribe when closed
+			if (unsubscribeSSE) {
+				unsubscribeSSE();
+				unsubscribeSSE = null;
 			}
 		}
 	});
@@ -216,8 +280,9 @@
 
 	// Cleanup on unmount
 	onDestroy(() => {
-		if (pollInterval) {
-			clearInterval(pollInterval);
+		if (unsubscribeSSE) {
+			unsubscribeSSE();
+			unsubscribeSSE = null;
 		}
 	});
 

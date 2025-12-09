@@ -95,6 +95,7 @@ export async function POST({ request }) {
 
 		// Ensure we have enough names
 		while (agentNames.length < agentCount) {
+			/** @type {string} */
 			const fallbackName = `Agent${Date.now()}${agentNames.length}`;
 			agentNames.push(fallbackName);
 		}
