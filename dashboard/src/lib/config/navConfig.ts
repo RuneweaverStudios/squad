@@ -5,19 +5,19 @@
  * NAVIGATION STRUCTURE:
  *
  * PRIMARY (main nav - always visible):
- *   /work     - Tasks (default route, tmux sessions + agent work)
- *   /dash     - Agents (agent dashboard, status, activity)
- *   /projects - Servers (project server sessions)
+ *   /tasks    - Tasks (default route, tmux sessions + agent work)
+ *   /agents   - Agents (agent dashboard, status, activity)
+ *   /servers  - Servers (project server sessions)
  *
  * SECONDARY (collapsible or less prominent):
+ *   /projects - Projects (multi-project sessions view)
  *   /triage   - Task triage (needs work, not ready for primetime)
  *   /timeline - Historical view (link from /projects)
  *   /kanban   - Agent kanban (sessions grouped by activity state)
  *   /graph    - Dependency visualization
  *
  * DROPPED (removed):
- *   /         - Replaced by /work as default
- *   /agents   - Merged into /dash
+ *   /         - Replaced by /tasks as default
  */
 
 export interface NavItem {
@@ -68,6 +68,13 @@ export const unifiedNavConfig: UnifiedNavConfig = {
 			primary: true
 		},
 		// SECONDARY: Less prominent routes
+		{
+			id: 'projects',
+			label: 'Projects',
+			href: '/projects',
+			icon: 'folders',
+			primary: false
+		},
 		{
 			id: 'triage',
 			label: 'Triage',
