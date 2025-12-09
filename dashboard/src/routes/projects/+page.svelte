@@ -1,26 +1,26 @@
 <script lang="ts">
 	/**
-	 * Projects Page
-	 * Shows all projects with active sessions, each in a collapsible container.
+	 * Projects Page - Flat Hierarchy Layout
 	 *
-	 * Layout per project:
-	 * [PROJECT COLLAPSABLE CONTAINER]
-	 *   [SESSION CARDS row - horizontal scroll]
-	 *   [RESIZABLE DIVIDER]
-	 *   [TASK TABLE COLLAPSABLE]
+	 * Each project has independent collapsible sections:
+	 * [> PROJECT HEADER] - collapses entire project
+	 *   [≡ SESSIONS] - independently collapsible/resizable section
+	 *   [≡ TASKS] - independently collapsible/resizable section
 	 *
-	 * Projects scroll vertically.
+	 * Each section can be:
+	 * - Collapsed (just header visible)
+	 * - Resized (drag bottom edge)
+	 * - Expanded to viewport height (drag past max)
 	 */
 
-	import { onMount, onDestroy } from 'svelte';
-	import { page } from '$app/stores';
+	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import SessionCard from '$lib/components/work/SessionCard.svelte';
 	import TaskTable from '$lib/components/agents/TaskTable.svelte';
+	import WorkingAgentBadge from '$lib/components/WorkingAgentBadge.svelte';
 	import TaskDetailDrawer from '$lib/components/TaskDetailDrawer.svelte';
 	import ResizableDivider from '$lib/components/ResizableDivider.svelte';
 	import SessionPanelSkeleton from '$lib/components/skeleton/SessionPanelSkeleton.svelte';
-	import TaskTableSkeleton from '$lib/components/skeleton/TaskTableSkeleton.svelte';
 	import {
 		workSessionsState,
 		fetch as fetchSessions,
@@ -63,13 +63,21 @@
 		expires_ts: string;
 	}
 
-	// Collapse state storage key prefix
-	const COLLAPSE_KEY_PREFIX = 'projects-collapse-';
-	const SPLIT_KEY_PREFIX = 'projects-split-';
+	// Section state type
+	interface SectionState {
+		collapsed: boolean;
+		height: number; // pixels
+	}
+
+	// Storage keys
+	const PROJECT_COLLAPSE_KEY = 'projects-collapse-';
+	const SECTION_STATE_KEY = 'projects-section-';
 	const PROJECT_ORDER_KEY = 'projects-order';
-	const DEFAULT_SPLIT = 50; // 50% each
-	const MIN_SPLIT = 10;
-	const MAX_SPLIT = 90;
+
+	// Section defaults
+	const DEFAULT_SESSION_HEIGHT = 300;
+	const DEFAULT_TASK_HEIGHT = 400;
+	const MIN_SECTION_HEIGHT = 100;
 
 	// State
 	let tasks = $state<Task[]>([]);
@@ -85,22 +93,27 @@
 	// Highlighted agent for scroll-to-agent feature
 	let highlightedAgent = $state<string | null>(null);
 
-	// Per-project collapse state
+	// Per-project collapse state (entire project)
 	let projectCollapseState = $state<Map<string, boolean>>(new Map());
-	let taskTableCollapseState = $state<Map<string, boolean>>(new Map());
-	let projectSplitState = $state<Map<string, number>>(new Map());
-	let projectContainerRefs = $state<Map<string, HTMLDivElement | null>>(new Map());
 
-	// Drag and drop state
+	// Per-section state: Map<"project-sessions" | "project-tasks", SectionState>
+	let sectionStates = $state<Map<string, SectionState>>(new Map());
+
+	// Track heights before full-height snap for restore
+	let heightBeforeSnap = $state<Map<string, number>>(new Map());
+
+	// Drag and drop state for project reordering
 	let draggedProject = $state<string | null>(null);
 	let dragOverProject = $state<string | null>(null);
 	let customProjectOrder = $state<string[]>([]);
 
+	// Keyboard navigation state
+	let focusedProjectIndex = $state<number>(-1);
+	const focusedProject = $derived(focusedProjectIndex >= 0 ? sortedProjects[focusedProjectIndex] : null);
+
 	// Derive all projects (from sessions OR tasks)
 	const allProjects = $derived.by(() => {
 		const projects = new Set<string>();
-
-		// Add projects from sessions
 		for (const session of workSessionsState.sessions) {
 			if (session.task?.id) {
 				const project = getProjectFromTaskId(session.task.id);
@@ -109,65 +122,26 @@
 				const project = getProjectFromTaskId(session.lastCompletedTask.id);
 				if (project) projects.add(project);
 			} else {
-				// Fallback: try to get project from session name (jat-AgentName)
 				const match = session.sessionName.match(/^([a-zA-Z0-9_-]+?)-/);
-				if (match && match[1]) {
-					projects.add(match[1]);
-				}
+				if (match && match[1]) projects.add(match[1]);
 			}
 		}
-
-		// Add projects from tasks
 		for (const task of tasks) {
 			const project = getProjectFromTaskId(task.id);
 			if (project) projects.add(project);
 		}
-
 		return Array.from(projects).sort();
 	});
 
-	// Projects with active sessions (shown first, with session grid)
-	const projectsWithSessions = $derived.by(() => {
-		const projects = new Set<string>();
-		for (const session of workSessionsState.sessions) {
-			if (session.task?.id) {
-				const project = getProjectFromTaskId(session.task.id);
-				if (project) projects.add(project);
-			} else if (session.lastCompletedTask?.id) {
-				const project = getProjectFromTaskId(session.lastCompletedTask.id);
-				if (project) projects.add(project);
-			} else {
-				const match = session.sessionName.match(/^([a-zA-Z0-9_-]+?)-/);
-				if (match && match[1]) {
-					projects.add(match[1]);
-				}
-			}
-		}
-		return projects;
-	});
-
-	// Projects with only tasks (no sessions) - shown after projects with sessions
-	const projectsWithOnlyTasks = $derived.by(() => {
-		return allProjects.filter(p => !projectsWithSessions.has(p));
-	});
-
-	// Sorted projects list - respects custom order, with new projects appended alphabetically
+	// Sorted projects list
 	const sortedProjects = $derived.by(() => {
-		if (customProjectOrder.length === 0) {
-			return allProjects;
-		}
-		// Start with projects in custom order (that still exist)
+		if (customProjectOrder.length === 0) return allProjects;
 		const ordered: string[] = [];
 		for (const p of customProjectOrder) {
-			if (allProjects.includes(p)) {
-				ordered.push(p);
-			}
+			if (allProjects.includes(p)) ordered.push(p);
 		}
-		// Add any new projects not in custom order (alphabetically)
 		for (const p of allProjects) {
-			if (!ordered.includes(p)) {
-				ordered.push(p);
-			}
+			if (!ordered.includes(p)) ordered.push(p);
 		}
 		return ordered;
 	});
@@ -194,56 +168,55 @@
 		return groups;
 	});
 
-	// Load/save collapse state from localStorage
-	function loadCollapseState(project: string): boolean {
-		if (!browser) return false;
-		const saved = localStorage.getItem(COLLAPSE_KEY_PREFIX + project);
-		return saved === 'true';
+	// Helper to get section key
+	function getSectionKey(project: string, section: 'sessions' | 'tasks'): string {
+		return `${project}-${section}`;
 	}
 
-	function saveCollapseState(project: string, collapsed: boolean) {
-		if (!browser) return;
-		localStorage.setItem(COLLAPSE_KEY_PREFIX + project, collapsed.toString());
-	}
+	// Load/save section state from localStorage
+	function loadSectionState(project: string, section: 'sessions' | 'tasks'): SectionState {
+		const defaultHeight = section === 'sessions' ? DEFAULT_SESSION_HEIGHT : DEFAULT_TASK_HEIGHT;
+		if (!browser) return { collapsed: false, height: defaultHeight };
 
-	function loadTaskTableCollapseState(project: string): boolean {
-		if (!browser) return false;
-		const saved = localStorage.getItem(COLLAPSE_KEY_PREFIX + project + '-tasks');
-		return saved === 'true';
-	}
-
-	function saveTaskTableCollapseState(project: string, collapsed: boolean) {
-		if (!browser) return;
-		localStorage.setItem(COLLAPSE_KEY_PREFIX + project + '-tasks', collapsed.toString());
-	}
-
-	function loadSplitState(project: string): number {
-		if (!browser) return DEFAULT_SPLIT;
-		const saved = localStorage.getItem(SPLIT_KEY_PREFIX + project);
+		const key = SECTION_STATE_KEY + getSectionKey(project, section);
+		const saved = localStorage.getItem(key);
 		if (saved) {
-			const parsed = parseFloat(saved);
-			if (!isNaN(parsed) && parsed >= MIN_SPLIT && parsed <= MAX_SPLIT) {
-				return parsed;
+			try {
+				const parsed = JSON.parse(saved);
+				return {
+					collapsed: parsed.collapsed ?? false,
+					height: parsed.height ?? defaultHeight
+				};
+			} catch {
+				return { collapsed: false, height: defaultHeight };
 			}
 		}
-		return DEFAULT_SPLIT;
+		return { collapsed: false, height: defaultHeight };
 	}
 
-	function saveSplitState(project: string, split: number) {
+	function saveSectionState(project: string, section: 'sessions' | 'tasks', state: SectionState) {
 		if (!browser) return;
-		localStorage.setItem(SPLIT_KEY_PREFIX + project, split.toString());
+		const key = SECTION_STATE_KEY + getSectionKey(project, section);
+		localStorage.setItem(key, JSON.stringify(state));
 	}
 
-	// Load/save custom project order
+	// Load/save project collapse state
+	function loadProjectCollapse(project: string): boolean {
+		if (!browser) return false;
+		return localStorage.getItem(PROJECT_COLLAPSE_KEY + project) === 'true';
+	}
+
+	function saveProjectCollapse(project: string, collapsed: boolean) {
+		if (!browser) return;
+		localStorage.setItem(PROJECT_COLLAPSE_KEY + project, collapsed.toString());
+	}
+
+	// Load/save project order
 	function loadProjectOrder(): string[] {
 		if (!browser) return [];
 		const saved = localStorage.getItem(PROJECT_ORDER_KEY);
 		if (saved) {
-			try {
-				return JSON.parse(saved);
-			} catch {
-				return [];
-			}
+			try { return JSON.parse(saved); } catch { return []; }
 		}
 		return [];
 	}
@@ -253,7 +226,127 @@
 		localStorage.setItem(PROJECT_ORDER_KEY, JSON.stringify(order));
 	}
 
-	// Drag and drop handlers
+	// Get section state (pure read - returns default if not initialized)
+	function getSectionState(project: string, section: 'sessions' | 'tasks'): SectionState {
+		const key = getSectionKey(project, section);
+		const defaultHeight = section === 'sessions' ? DEFAULT_SESSION_HEIGHT : DEFAULT_TASK_HEIGHT;
+		return sectionStates.get(key) ?? { collapsed: false, height: defaultHeight };
+	}
+
+	// Initialize section states for all projects (call this when projects change)
+	function initializeSectionStates(projects: string[]) {
+		let needsUpdate = false;
+		const newStates = new Map(sectionStates);
+
+		for (const project of projects) {
+			for (const section of ['sessions', 'tasks'] as const) {
+				const key = getSectionKey(project, section);
+				if (!newStates.has(key)) {
+					const loaded = loadSectionState(project, section);
+					newStates.set(key, loaded);
+					needsUpdate = true;
+				}
+			}
+		}
+
+		if (needsUpdate) {
+			sectionStates = newStates;
+		}
+	}
+
+	// Update section state
+	function updateSectionState(project: string, section: 'sessions' | 'tasks', updates: Partial<SectionState>) {
+		const key = getSectionKey(project, section);
+		const current = getSectionState(project, section);
+		const newState = { ...current, ...updates };
+
+		const newStates = new Map(sectionStates);
+		newStates.set(key, newState);
+		sectionStates = newStates;
+
+		saveSectionState(project, section, newState);
+	}
+
+	// Toggle section collapse
+	function toggleSectionCollapse(project: string, section: 'sessions' | 'tasks') {
+		const current = getSectionState(project, section);
+		updateSectionState(project, section, {
+			collapsed: !current.collapsed
+		});
+	}
+
+	// Toggle project collapse
+	function toggleProjectCollapse(project: string) {
+		const current = projectCollapseState.get(project) ?? false;
+		const newState = new Map(projectCollapseState);
+		newState.set(project, !current);
+		projectCollapseState = newState;
+		saveProjectCollapse(project, !current);
+	}
+
+	// Handle section resize
+	function handleSectionResize(project: string, section: 'sessions' | 'tasks', deltaY: number) {
+		const current = getSectionState(project, section);
+		if (current.collapsed) return;
+
+		let newHeight = current.height + deltaY;
+
+		// Snap to collapsed if dragging below minimum
+		if (newHeight < MIN_SECTION_HEIGHT) {
+			// Save current height for restore
+			const key = getSectionKey(project, section);
+			const newHeightBefore = new Map(heightBeforeSnap);
+			newHeightBefore.set(key, current.height);
+			heightBeforeSnap = newHeightBefore;
+
+			updateSectionState(project, section, { collapsed: true });
+			return;
+		}
+
+		// No upper limit - allow free resizing to any height
+		// User can scroll the page if content is taller than viewport
+		updateSectionState(project, section, { height: newHeight });
+	}
+
+	// Restore section from collapsed state
+	function restoreSection(project: string, section: 'sessions' | 'tasks') {
+		const key = getSectionKey(project, section);
+		const savedHeight = heightBeforeSnap.get(key);
+		const defaultHeight = section === 'sessions' ? DEFAULT_SESSION_HEIGHT : DEFAULT_TASK_HEIGHT;
+		const restoreHeight = savedHeight ?? defaultHeight;
+
+		updateSectionState(project, section, {
+			collapsed: false,
+			height: restoreHeight
+		});
+	}
+
+	// Auto-size section to fit content (double-click handler)
+	function autoSizeSection(project: string, section: 'sessions' | 'tasks') {
+		const current = getSectionState(project, section);
+		if (current.collapsed) {
+			// If collapsed, expand to default height
+			updateSectionState(project, section, { collapsed: false });
+			return;
+		}
+
+		// Calculate content height based on section type
+		let contentHeight: number;
+		if (section === 'sessions') {
+			const sessions = sessionsByProject.get(project) || [];
+			// SessionCard in agent mode is roughly 400px tall, plus padding
+			contentHeight = Math.max(300, Math.min(sessions.length > 0 ? 420 : 300, window.innerHeight * 0.6));
+		} else {
+			const projectTasks = getTasksForProject(project);
+			// Estimate ~36px per task row, plus header (~50px), min 200px
+			const openTasks = projectTasks.filter(t => t.status !== 'closed').length;
+			contentHeight = Math.max(200, Math.min(50 + openTasks * 36, window.innerHeight * 0.6));
+		}
+
+		updateSectionState(project, section, { height: contentHeight });
+	}
+
+	// Drag and drop handlers for project reordering
 	function handleDragStart(e: DragEvent, project: string) {
 		draggedProject = project;
 		if (e.dataTransfer) {
@@ -266,9 +359,7 @@
 		e.preventDefault();
 		if (draggedProject && draggedProject !== project) {
 			dragOverProject = project;
-			if (e.dataTransfer) {
-				e.dataTransfer.dropEffect = 'move';
-			}
+			if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
 		}
 	}
 
@@ -284,24 +375,16 @@
 			return;
 		}
 
-		// Get current order (use sortedProjects as base)
 		const currentOrder = [...sortedProjects];
 		const draggedIndex = currentOrder.indexOf(draggedProject);
 		const targetIndex = currentOrder.indexOf(targetProject);
 
-		if (draggedIndex === -1 || targetIndex === -1) {
-			draggedProject = null;
-			dragOverProject = null;
-			return;
+		if (draggedIndex !== -1 && targetIndex !== -1) {
+			currentOrder.splice(draggedIndex, 1);
+			currentOrder.splice(targetIndex, 0, draggedProject);
+			customProjectOrder = currentOrder;
+			saveProjectOrder(currentOrder);
 		}
-
-		// Remove from old position and insert at new position
-		currentOrder.splice(draggedIndex, 1);
-		currentOrder.splice(targetIndex, 0, draggedProject);
-
-		// Save and update state
-		customProjectOrder = currentOrder;
-		saveProjectOrder(currentOrder);
 
 		draggedProject = null;
 		dragOverProject = null;
@@ -312,86 +395,30 @@
 		dragOverProject = null;
 	}
 
-	// Initialize collapse states on mount
+	// Initialize project collapse states
 	$effect(() => {
 		if (browser && allProjects.length > 0) {
-			let collapseChanged = false;
-			let taskTableChanged = false;
-			let splitChanged = false;
-
-			const newCollapseState = new Map(projectCollapseState);
-			const newTaskTableState = new Map(taskTableCollapseState);
-			const newSplitState = new Map(projectSplitState);
+			const currentState = $state.snapshot(projectCollapseState);
+			let changed = false;
+			const newState = new Map(currentState);
 
 			for (const project of allProjects) {
-				if (!newCollapseState.has(project)) {
-					newCollapseState.set(project, loadCollapseState(project));
-					collapseChanged = true;
-				}
-				if (!newTaskTableState.has(project)) {
-					newTaskTableState.set(project, loadTaskTableCollapseState(project));
-					taskTableChanged = true;
-				}
-				if (!newSplitState.has(project)) {
-					newSplitState.set(project, loadSplitState(project));
-					splitChanged = true;
+				if (!newState.has(project)) {
+					newState.set(project, loadProjectCollapse(project));
+					changed = true;
 				}
 			}
 
-			// Only reassign if something changed to avoid infinite loops
-			if (collapseChanged) projectCollapseState = newCollapseState;
-			if (taskTableChanged) taskTableCollapseState = newTaskTableState;
-			if (splitChanged) projectSplitState = newSplitState;
+			if (changed) projectCollapseState = newState;
 		}
 	});
 
-	// Toggle project collapse
-	function toggleProjectCollapse(project: string) {
-		const current = projectCollapseState.get(project) || false;
-		// Create new Map to trigger Svelte reactivity
-		const newState = new Map(projectCollapseState);
-		newState.set(project, !current);
-		projectCollapseState = newState;
-		saveCollapseState(project, !current);
-	}
-
-	// Toggle task table collapse
-	function toggleTaskTableCollapse(project: string) {
-		const current = taskTableCollapseState.get(project) || false;
-		// Create new Map to trigger Svelte reactivity
-		const newState = new Map(taskTableCollapseState);
-		newState.set(project, !current);
-		taskTableCollapseState = newState;
-		saveTaskTableCollapseState(project, !current);
-	}
-
-	// Handle resize for a project
-	// splitPercent * 4 = session height in pixels (50 = 200px, 75 = 300px, 100 = 400px)
-	function handleResize(project: string, deltaY: number) {
-		const currentSplit = projectSplitState.get(project) || DEFAULT_SPLIT;
-		// Convert pixel delta to split units (4px per unit)
-		const deltaSplit = deltaY / 4;
-		let newSplit = currentSplit + deltaSplit;
-
-		// Clamp to min/max (10 = 40px min, 125 = 500px max for sessions)
-		newSplit = Math.max(MIN_SPLIT, Math.min(125, newSplit));
-
-		// Create new Map to trigger Svelte reactivity
-		const newState = new Map(projectSplitState);
-		newState.set(project, newSplit);
-		projectSplitState = newState;
-		saveSplitState(project, newSplit);
-	}
-
-	// Svelte action to set ref for a project
-	function setProjectRef(el: HTMLDivElement, project: string) {
-		projectContainerRefs.set(project, el);
-		return {
-			destroy() {
-				projectContainerRefs.delete(project);
-			}
-		};
-	}
+	// Initialize section states when projects change
+	$effect(() => {
+		if (sortedProjects.length > 0) {
+			initializeSectionStates(sortedProjects);
+		}
+	});
 
 	// Listen for task events
 	$effect(() => {
@@ -431,9 +458,7 @@
 	// Event handlers
 	async function handleSpawnForTask(taskId: string) {
 		const session = await spawn(taskId);
-		if (session) {
-			await fetchTaskData();
-		}
+		if (session) await fetchTaskData();
 	}
 
 	async function handleKillSession(sessionName: string) {
@@ -454,12 +479,8 @@
 
 	async function handleAttachTerminal(sessionName: string) {
 		try {
-			const response = await fetch(`/api/work/${sessionName}/attach`, {
-				method: 'POST'
-			});
-			if (!response.ok) {
-				console.error('Failed to attach terminal:', await response.text());
-			}
+			const response = await fetch(`/api/work/${sessionName}/attach`, { method: 'POST' });
+			if (!response.ok) console.error('Failed to attach terminal:', await response.text());
 		} catch (error) {
 			console.error('Failed to attach terminal:', error);
 		}
@@ -492,9 +513,7 @@
 		if (workCard) {
 			workCard.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
 			highlightedAgent = agentName;
-			setTimeout(() => {
-				highlightedAgent = null;
-			}, 1500);
+			setTimeout(() => { highlightedAgent = null; }, 1500);
 		}
 	}
 
@@ -525,10 +544,69 @@
 		return completedIds;
 	}
 
-	onMount(async () => {
-		// Load custom project order from localStorage
-		customProjectOrder = loadProjectOrder();
+	// Keyboard navigation handler
+	function handleKeydown(e: KeyboardEvent) {
+		// Don't handle if user is typing in an input
+		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+		// Don't handle if drawer is open
+		if (drawerOpen) return;
 
+		switch (e.key) {
+			case 'j': // Next project
+				e.preventDefault();
+				if (sortedProjects.length > 0) {
+					focusedProjectIndex = Math.min(focusedProjectIndex + 1, sortedProjects.length - 1);
+					scrollToFocusedProject();
+				}
+				break;
+			case 'k': // Previous project
+				e.preventDefault();
+				if (sortedProjects.length > 0) {
+					focusedProjectIndex = Math.max(focusedProjectIndex - 1, 0);
+					scrollToFocusedProject();
+				}
+				break;
+			case 'Enter': // Toggle expand/collapse focused project
+				e.preventDefault();
+				if (focusedProject) {
+					toggleProjectCollapse(focusedProject);
+				}
+				break;
+			case '1': // Toggle sessions section
+				e.preventDefault();
+				if (focusedProject && !projectCollapseState.get(focusedProject)) {
+					toggleSectionCollapse(focusedProject, 'sessions');
+				}
+				break;
+			case '2': // Toggle tasks section
+				e.preventDefault();
+				if (focusedProject && !projectCollapseState.get(focusedProject)) {
+					toggleSectionCollapse(focusedProject, 'tasks');
+				}
+				break;
+			case 'Escape': // Collapse all projects
+				e.preventDefault();
+				const newState = new Map(projectCollapseState);
+				for (const project of sortedProjects) {
+					newState.set(project, true);
+					saveProjectCollapse(project, true);
+				}
+				projectCollapseState = newState;
+				break;
+		}
+	}
+
+	function scrollToFocusedProject() {
+		if (focusedProject) {
+			const el = document.querySelector(`[data-project="${focusedProject}"]`);
+			if (el) {
+				el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+			}
+		}
+	}
+
+	onMount(async () => {
+		customProjectOrder = loadProjectOrder();
 		fetchTaskData();
 		await fetchSessions();
 		setTimeout(() => fetchSessionUsage(), 5000);
@@ -538,6 +616,8 @@
 <svelte:head>
 	<title>Projects | JAT Dashboard</title>
 </svelte:head>
+
+<svelte:window onkeydown={handleKeydown} />
 
 <div class="h-full bg-base-200 flex flex-col overflow-auto">
 	{#if isInitialLoad}
@@ -556,25 +636,28 @@
 			</div>
 		</div>
 	{:else}
-		<!-- Project containers -->
-		<div class="flex flex-col gap-0">
+		<!-- Project list -->
+		<div class="flex flex-col">
 			{#each sortedProjects as project (project)}
-				{@const isCollapsed = projectCollapseState.get(project) || false}
-				{@const isTaskTableCollapsed = taskTableCollapseState.get(project) || false}
-				{@const splitPercent = projectSplitState.get(project) || DEFAULT_SPLIT}
+				{@const isProjectCollapsed = projectCollapseState.get(project) ?? false}
 				{@const sessions = sessionsByProject.get(project) || []}
 				{@const projectTasks = getTasksForProject(project)}
 				{@const projectColor = getProjectColor(project)}
+				{@const hasSessions = sessions.length > 0}
 				{@const isDragging = draggedProject === project}
 				{@const isDragOver = dragOverProject === project}
+				{@const isFocused = focusedProject === project}
 
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<div
+					data-project={project}
 					class="border-b border-base-300 bg-base-100 transition-all duration-150"
-					class:pb-0={isCollapsed}
 					class:opacity-50={isDragging}
 					class:border-t-2={isDragOver}
 					class:border-t-primary={isDragOver}
+					class:ring-2={isFocused}
+					class:ring-primary={isFocused}
+					class:ring-inset={isFocused}
 					draggable="true"
 					ondragstart={(e) => handleDragStart(e, project)}
 					ondragover={(e) => handleDragOver(e, project)}
@@ -582,18 +665,12 @@
 					ondrop={(e) => handleDrop(e, project)}
 					ondragend={handleDragEnd}
 				>
-					<!-- Project header (collapsible + drag handle) -->
+					<!-- Project header -->
 					<div
-						class="w-full flex items-center gap-3 px-4 py-3 hover:bg-base-200/50 transition-colors cursor-grab active:cursor-grabbing {isDragOver ? 'bg-primary/10' : ''}"
+						class="w-full flex items-center gap-3 px-4 py-2 hover:bg-base-200/50 transition-colors cursor-grab active:cursor-grabbing bg-base-100 z-20 sticky top-0 shadow-sm {isDragOver ? 'bg-primary/10' : ''}"
 					>
-						<!-- Drag handle icon -->
-						<svg
-							class="w-4 h-4 text-base-content/30 hover:text-base-content/60 flex-shrink-0"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-							stroke-width="2"
-						>
+						<!-- Drag handle -->
+						<svg class="w-4 h-4 text-base-content/30 hover:text-base-content/60 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M4 8h16M4 16h16" />
 						</svg>
 
@@ -602,105 +679,141 @@
 							class="flex items-center gap-3 flex-1 min-w-0"
 							onclick={() => toggleProjectCollapse(project)}
 						>
-							<!-- Collapse indicator -->
 							<svg
 								class="w-4 h-4 transition-transform duration-200 flex-shrink-0"
-								class:rotate-90={!isCollapsed}
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
+								class:rotate-90={!isProjectCollapsed}
+								fill="none" viewBox="0 0 24 24" stroke="currentColor"
 							>
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
 							</svg>
 
-							<!-- Project color indicator -->
-							<div
-								class="w-3 h-3 rounded-full flex-shrink-0"
-								style="background-color: {projectColor}"
-							></div>
+							<div class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: {projectColor}"></div>
 
-							<!-- Project name -->
 							<span class="font-semibold text-base-content uppercase tracking-wide">{project}</span>
 
-							<!-- Session count badge -->
 							<span class="badge badge-ghost badge-sm">{sessions.length} session{sessions.length !== 1 ? 's' : ''}</span>
 
-							<!-- Task count badge -->
 							{#if projectTasks.length > 0}
 								<span class="badge badge-outline badge-sm">{projectTasks.filter(t => t.status !== 'closed').length} tasks</span>
+							{/if}
+
+							<!-- Mini session avatars (shown when collapsed) -->
+							{#if isProjectCollapsed && hasSessions}
+								<div class="flex items-center -space-x-1 ml-2 pl-2 border-l border-base-300">
+									{#each sessions.slice(0, 5) as session (session.sessionName)}
+										{@const isWorking = session._sseState === 'working' || session._sseState === 'needs_input' || session._sseState === 'review'}
+										<WorkingAgentBadge
+											name={session.agentName || ''}
+											size={22}
+											{isWorking}
+											variant="avatar"
+											onClick={() => {
+												// Expand project and scroll to session
+												if (isProjectCollapsed) toggleProjectCollapse(project);
+												setTimeout(() => handleAgentClick(session.agentName), 100);
+											}}
+										/>
+									{/each}
+									{#if sessions.length > 5}
+										<span class="text-xs text-base-content/50 ml-2">+{sessions.length - 5}</span>
+									{/if}
+								</div>
 							{/if}
 						</button>
 					</div>
 
-					<!-- Collapsible content -->
-					{#if !isCollapsed}
-						{@const sessionHeight = Math.round(splitPercent * 4)}
-						{@const hasSessions = sessions.length > 0}
-						<div
-							class="flex flex-col"
-							use:setProjectRef={project}
-						>
-							<!-- Sessions row - only shown if project has active sessions -->
+					<!-- Project content (collapsible) -->
+					{#if !isProjectCollapsed}
+						<div class="flex flex-col">
+							<!-- Sessions Section -->
 							{#if hasSessions}
-								<div
-									class="min-h-0 bg-base-100 overflow-hidden flex-shrink-0"
-									style="height: {sessionHeight}px;"
-								>
-									<div class="flex gap-3 overflow-x-auto h-full p-2 scrollbar-thin scrollbar-thumb-base-300 scrollbar-track-transparent">
-										{#each sessions as session (session.sessionName)}
-											<div class="h-[calc(100%-8px)]">
-												<SessionCard
-													mode="agent"
-													sessionName={session.sessionName}
-													agentName={session.agentName}
-													task={session.task}
-													lastCompletedTask={session.lastCompletedTask}
-													output={session.output}
-													lineCount={session.lineCount}
-													tokens={session.tokens}
-													cost={session.cost}
-													sparklineData={session.sparklineData}
-													contextPercent={session.contextPercent ?? undefined}
-													startTime={session.created ? new Date(session.created) : null}
-													sseState={session._sseState}
-													sseStateTimestamp={session._sseStateTimestamp}
-													signalSuggestedTasks={session._signalSuggestedTasks}
-													signalSuggestedTasksTimestamp={session._signalSuggestedTasksTimestamp}
-													completionBundle={session._completionBundle}
-													completionBundleTimestamp={session._completionBundleTimestamp}
-													onKillSession={() => handleKillSession(session.sessionName)}
-													onInterrupt={() => handleInterrupt(session.sessionName)}
-													onContinue={() => handleContinue(session.sessionName)}
-													onAttachTerminal={() => handleAttachTerminal(session.sessionName)}
-													onSendInput={(input, type) => handleSendInput(session.sessionName, input, type)}
-													onTaskClick={handleTaskClick}
-													isHighlighted={highlightedAgent === session.agentName}
-												/>
-											</div>
-										{/each}
-									</div>
-								</div>
+								{@const sessionState = getSectionState(project, 'sessions')}
+								<div class="border-b border-base-300">
+									<!-- Sessions header (double-click to auto-size) -->
+									<button
+										class="w-full flex items-center gap-2 px-6 py-1.5 bg-base-200/30 hover:bg-base-200/60 transition-colors"
+										onclick={() => toggleSectionCollapse(project, 'sessions')}
+										ondblclick={() => autoSizeSection(project, 'sessions')}
+										title="Click to collapse/expand, double-click to auto-size"
+									>
+										<svg
+											class="w-3 h-3 transition-transform duration-200"
+											class:rotate-90={!sessionState.collapsed}
+											fill="none" viewBox="0 0 24 24" stroke="currentColor"
+										>
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+										</svg>
+										<span class="text-xs font-medium text-base-content/70 uppercase tracking-wide">
+											Sessions ({sessions.length})
+										</span>
+									</button>
 
-								<!-- Resizable divider - only shown if project has sessions -->
-								<ResizableDivider
-									onResize={(deltaY) => handleResize(project, deltaY)}
-									class="flex-shrink-0 bg-base-300 border-y border-base-300"
-								/>
+									<!-- Sessions content -->
+									<div
+										class="overflow-hidden transition-all duration-200"
+										class:hidden={sessionState.collapsed}
+										style="height: {sessionState.height}px;"
+									>
+										<div class="flex gap-3 overflow-x-auto h-full p-2 scrollbar-thin scrollbar-thumb-base-300 scrollbar-track-transparent">
+											{#each sessions as session (session.sessionName)}
+												<div class="h-[calc(100%-8px)]">
+													<SessionCard
+														mode="agent"
+														sessionName={session.sessionName}
+														agentName={session.agentName}
+														task={session.task}
+														lastCompletedTask={session.lastCompletedTask}
+														output={session.output}
+														lineCount={session.lineCount}
+														tokens={session.tokens}
+														cost={session.cost}
+														sparklineData={session.sparklineData}
+														contextPercent={session.contextPercent ?? undefined}
+														startTime={session.created ? new Date(session.created) : null}
+														sseState={session._sseState}
+														sseStateTimestamp={session._sseStateTimestamp}
+														signalSuggestedTasks={session._signalSuggestedTasks}
+														signalSuggestedTasksTimestamp={session._signalSuggestedTasksTimestamp}
+														completionBundle={session._completionBundle}
+														completionBundleTimestamp={session._completionBundleTimestamp}
+														onKillSession={() => handleKillSession(session.sessionName)}
+														onInterrupt={() => handleInterrupt(session.sessionName)}
+														onContinue={() => handleContinue(session.sessionName)}
+														onAttachTerminal={() => handleAttachTerminal(session.sessionName)}
+														onSendInput={(input, type) => handleSendInput(session.sessionName, input, type)}
+														onTaskClick={handleTaskClick}
+														isHighlighted={highlightedAgent === session.agentName}
+													/>
+												</div>
+											{/each}
+										</div>
+									</div>
+
+									<!-- Sessions resize handle -->
+									{#if !sessionState.collapsed}
+										<ResizableDivider
+											onResize={(deltaY) => handleSectionResize(project, 'sessions', deltaY)}
+											class="bg-base-300/50 hover:bg-base-300"
+										/>
+									{/if}
+								</div>
 							{/if}
 
-							<!-- Task table section with collapse header - grows naturally -->
-							<div class="flex flex-col">
-								<!-- Task table header (collapsible) -->
+							<!-- Tasks Section -->
+							{#if true}
+							{@const taskState = getSectionState(project, 'tasks')}
+							<div>
+								<!-- Tasks header (double-click to auto-size) -->
 								<button
-									class="w-full flex items-center gap-2 px-4 py-1.5 bg-base-200/50 hover:bg-base-200 transition-colors border-b border-base-300"
-									onclick={() => toggleTaskTableCollapse(project)}
+									class="w-full flex items-center gap-2 px-6 py-1.5 bg-base-200/30 hover:bg-base-200/60 transition-colors"
+									onclick={() => toggleSectionCollapse(project, 'tasks')}
+									ondblclick={() => autoSizeSection(project, 'tasks')}
+									title="Click to collapse/expand, double-click to auto-size"
 								>
 									<svg
 										class="w-3 h-3 transition-transform duration-200"
-										class:rotate-90={!isTaskTableCollapsed}
-										fill="none"
-										viewBox="0 0 24 24"
-										stroke="currentColor"
+										class:rotate-90={!taskState.collapsed}
+										fill="none" viewBox="0 0 24 24" stroke="currentColor"
 									>
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
 									</svg>
@@ -709,9 +822,13 @@
 									</span>
 								</button>
 
-								<!-- Task table content -->
-								{#if !isTaskTableCollapsed}
-									<div class="flex-1 overflow-auto">
+								<!-- Tasks content -->
+								<div
+									class="overflow-hidden transition-all duration-200"
+									class:hidden={taskState.collapsed}
+									style="height: {taskState.height}px;"
+								>
+									<div class="h-full overflow-auto">
 										<TaskTable
 											tasks={projectTasks}
 											allTasks={allTasks}
@@ -722,8 +839,17 @@
 											onagentclick={handleAgentClick}
 										/>
 									</div>
+								</div>
+
+								<!-- Tasks resize handle -->
+								{#if !taskState.collapsed}
+									<ResizableDivider
+										onResize={(deltaY) => handleSectionResize(project, 'tasks', deltaY)}
+										class="bg-base-300/50 hover:bg-base-300"
+									/>
 								{/if}
 							</div>
+						{/if}
 						</div>
 					{/if}
 				</div>
