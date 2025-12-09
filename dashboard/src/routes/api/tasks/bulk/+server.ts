@@ -59,6 +59,36 @@ interface BulkCreateResponse {
 const VALID_TYPES = ['task', 'bug', 'feature', 'epic', 'chore'];
 
 /**
+ * Type aliases to normalize common alternative names to valid types
+ */
+const TYPE_ALIASES: Record<string, string> = {
+	docs: 'chore',
+	documentation: 'chore',
+	doc: 'chore',
+	test: 'chore',
+	tests: 'chore',
+	testing: 'chore',
+	refactor: 'chore',
+	refactoring: 'chore',
+	cleanup: 'chore',
+	improvement: 'feature',
+	enhancement: 'feature',
+	fix: 'bug',
+	hotfix: 'bug',
+	story: 'feature',
+	spike: 'task',
+	research: 'task'
+};
+
+/**
+ * Normalize task type, mapping aliases to valid types
+ */
+function normalizeType(type: string): string {
+	const lower = type.toLowerCase();
+	return TYPE_ALIASES[lower] || lower;
+}
+
+/**
  * Validate a single task object
  */
 function validateTask(task: unknown, index: number): { valid: boolean; error?: string } {
@@ -78,10 +108,11 @@ function validateTask(task: unknown, index: number): { valid: boolean; error?: s
 		return { valid: false, error: `Task at index ${index} is missing required type` };
 	}
 
-	if (!VALID_TYPES.includes(t.type.toLowerCase())) {
+	const normalizedType = normalizeType(t.type as string);
+	if (!VALID_TYPES.includes(normalizedType)) {
 		return {
 			valid: false,
-			error: `Task at index ${index} has invalid type "${t.type}". Must be one of: ${VALID_TYPES.join(', ')}`
+			error: `Task at index ${index} has invalid type "${t.type}". Must be one of: ${VALID_TYPES.join(', ')} (or aliases like docs, test, refactor, fix, etc.)`
 		};
 	}
 
@@ -114,7 +145,7 @@ async function createTask(task: SuggestedTask, defaultProject?: string): Promise
 	try {
 		const title = task.title.trim();
 		const description = task.description?.trim() || '';
-		const type = task.type.toLowerCase();
+		const type = normalizeType(task.type);
 		const priority = task.priority ?? 2;
 		// Use task-level project if provided, otherwise use default
 		const project = task.project || defaultProject;
