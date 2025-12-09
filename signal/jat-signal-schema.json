@@ -1,0 +1,196 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "jat-signal-schema.json",
+  "description": "JSON Schema for jat-signal payloads",
+  "definitions": {
+    "signalState": {
+      "type": "string",
+      "enum": ["working", "review", "idle", "auto_proceed", "needs_input", "completed"],
+      "description": "Valid state signal values"
+    },
+    "suggestedTask": {
+      "type": "object",
+      "description": "A task suggested by an agent for follow-up work",
+      "required": ["title"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Optional existing task ID this references"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["bug", "feature", "task", "chore", "epic"],
+          "description": "Task type"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Task title"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "Task description"
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4,
+          "description": "Priority level: 0=critical, 4=lowest"
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Why this task was suggested"
+        },
+        "project": {
+          "type": "string",
+          "pattern": "^[a-z0-9_-]+$",
+          "description": "Project identifier"
+        },
+        "labels": {
+          "type": "string",
+          "description": "Comma-separated labels"
+        },
+        "depends_on": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Task IDs this task depends on"
+        }
+      }
+    },
+    "humanAction": {
+      "type": "object",
+      "description": "An action requiring human intervention",
+      "required": ["title"],
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Action title"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "Action description"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Checklist items for multi-step actions"
+        }
+      }
+    },
+    "qualitySignals": {
+      "type": "object",
+      "description": "Quality signals from completed task",
+      "additionalProperties": false,
+      "properties": {
+        "tests": {
+          "type": "string",
+          "enum": ["passing", "failing", "none", "skipped"],
+          "description": "Test status"
+        },
+        "build": {
+          "type": "string",
+          "enum": ["clean", "warnings", "errors"],
+          "description": "Build status"
+        },
+        "preExisting": {
+          "type": "string",
+          "description": "Note about pre-existing issues"
+        }
+      }
+    },
+    "crossAgentIntel": {
+      "type": "object",
+      "description": "Intelligence for other agents",
+      "additionalProperties": false,
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Key files modified"
+        },
+        "patterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Coding patterns/conventions to follow"
+        },
+        "gotchas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Non-obvious issues or gotchas"
+        }
+      }
+    },
+    "tasksSignal": {
+      "type": "array",
+      "description": "Array of suggested tasks",
+      "items": {
+        "$ref": "#/definitions/suggestedTask"
+      },
+      "minItems": 1,
+      "maxItems": 10
+    },
+    "actionSignal": {
+      "$ref": "#/definitions/humanAction"
+    },
+    "completeSignal": {
+      "type": "object",
+      "description": "Full completion bundle from agent",
+      "additionalProperties": false,
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "description": "Task ID that was completed"
+        },
+        "agentName": {
+          "type": "string",
+          "description": "Agent name that completed the task"
+        },
+        "summary": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Array of accomplishment bullet points"
+        },
+        "quality": {
+          "$ref": "#/definitions/qualitySignals"
+        },
+        "humanActions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/humanAction"
+          },
+          "description": "Human actions required"
+        },
+        "suggestedTasks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/suggestedTask"
+          },
+          "description": "Follow-up tasks discovered during work"
+        },
+        "crossAgentIntel": {
+          "$ref": "#/definitions/crossAgentIntel"
+        }
+      }
+    }
+  }
+}

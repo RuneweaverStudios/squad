@@ -1,0 +1,289 @@
+#!/usr/bin/env bash
+#
+# jat-signal - Emit structured signals for dashboard consumption
+#
+# Usage:
+#   jat-signal working <task-id>                    # Started working on task
+#   jat-signal review                               # Ready for review
+#   jat-signal idle                                 # Session idle
+#   jat-signal auto_proceed                         # OK to auto-close
+#   jat-signal completed                            # Task done
+#   jat-signal needs_input                          # Waiting for user
+#   jat-signal tasks '[{...}]'                      # Suggest follow-up tasks
+#   jat-signal action '{"title":"...","desc":"..."}' # Request human action
+#   jat-signal complete '{"suggestedTasks":[...]}'  # Full completion bundle
+#
+# Options:
+#   --no-validate    Skip JSON schema validation for data signals
+#   --strict         Fail on validation warnings (default: just warn)
+#
+# The PostToolUse hook captures this command and writes to temp file.
+# Dashboard reads /tmp/jat-signal-{session}.json instead of parsing terminal.
+#
+# Replaces terminal markers:
+#   [JAT:WORKING task=xxx]     → jat-signal working xxx
+#   [JAT:NEEDS_REVIEW]         → jat-signal review
+#   [JAT:IDLE]                 → jat-signal idle
+#   [JAT:AUTO_PROCEED]         → jat-signal auto_proceed
+#   [JAT:COMPLETED]            → jat-signal completed
+#   [JAT:NEEDS_INPUT]          → jat-signal needs_input
+#   [JAT:SUGGESTED_TASKS {...}] → jat-signal tasks '[...]'
+#   [JAT:HUMAN_ACTION {...}]   → jat-signal action '{...}'
+
+set -euo pipefail
+
+# Script directory for finding validation tool
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")")" && pwd)"
+
+# Try to find validation script in multiple locations
+find_validator() {
+    local locations=(
+        "/home/jw/code/jat/signal/jat-signal-validate"
+        "${SCRIPT_DIR}/jat-signal-validate"
+    )
+    for loc in "${locations[@]}"; do
+        if [[ -x "$loc" ]]; then
+            echo "$loc"
+            return 0
+        fi
+    done
+    return 1
+}
+
+show_usage() {
+    echo "Usage: jat-signal <signal> [data] [--no-validate] [--strict]"
+    echo ""
+    echo "State Signals:"
+    echo "  working <task-id>     - Started working on task"
+    echo "  review                - Ready for human review"
+    echo "  idle                  - Session idle, no active task"
+    echo "  auto_proceed          - OK for dashboard to auto-close"
+    echo "  completed             - Task completed"
+    echo "  needs_input           - Waiting for user input"
+    echo ""
+    echo "Data Signals:"
+    echo "  tasks '[{...}]'       - Suggest follow-up tasks (JSON array)"
+    echo "  action '{...}'        - Request human action (JSON object)"
+    echo "  complete '{...}'      - Full completion bundle (JSON object)"
+    echo ""
+    echo "Options:"
+    echo "  --no-validate         Skip schema validation for data signals"
+    echo "  --strict              Fail on validation errors (default: warn and continue)"
+    echo ""
+    echo "Examples:"
+    echo "  jat-signal working jat-abc"
+    echo "  jat-signal review"
+    echo "  jat-signal tasks '[{\"title\":\"Add tests\",\"priority\":2}]'"
+    echo "  jat-signal action '{\"title\":\"Run migration\",\"description\":\"...\"}'"
+    echo ""
+    echo "Schema Requirements:"
+    echo ""
+    echo "  tasks array items must have:"
+    echo "    - title (required, 1-200 chars)"
+    echo "    - type (optional: bug, feature, task, chore, epic)"
+    echo "    - priority (optional: 0-4)"
+    echo "    - description (optional, max 2000 chars)"
+    echo "    - project (optional: lowercase alphanumeric with - and _)"
+    echo "    - depends_on (optional: array of task IDs)"
+    echo ""
+    echo "  action object must have:"
+    echo "    - title (required, 1-200 chars)"
+    echo "    - description (optional, max 2000 chars)"
+    echo "    - items (optional: array of strings)"
+    echo ""
+    echo "  complete object may have:"
+    echo "    - taskId, agentName (strings)"
+    echo "    - summary (array of strings)"
+    echo "    - quality.tests (passing|failing|none|skipped)"
+    echo "    - quality.build (clean|warnings|errors)"
+    echo "    - humanActions (array of action objects)"
+    echo "    - suggestedTasks (array of task objects)"
+    echo "    - crossAgentIntel.files, .patterns, .gotchas (arrays of strings)"
+}
+
+# Parse options
+VALIDATE=true
+STRICT=false
+POSITIONAL_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --no-validate)
+            VALIDATE=false
+            shift
+            ;;
+        --strict)
+            STRICT=true
+            shift
+            ;;
+        -h|--help|help)
+            show_usage
+            exit 0
+            ;;
+        *)
+            POSITIONAL_ARGS+=("$1")
+            shift
+            ;;
+    esac
+done
+
+set -- "${POSITIONAL_ARGS[@]:-}"
+
+SIGNAL_TYPE="${1:-}"
+SIGNAL_DATA="${2:-}"
+
+# Validate data signal payload
+validate_payload() {
+    local signal_type="$1"
+    local payload="$2"
+
+    if [[ "$VALIDATE" != "true" ]]; then
+        return 0
+    fi
+
+    local validator
+    if ! validator=$(find_validator); then
+        # Validator not found, skip validation with warning
+        echo "⚠ Warning: jat-signal-validate not found, skipping schema validation" >&2
+        return 0
+    fi
+
+    local validation_output
+    local validation_exit=0
+
+    validation_output=$("$validator" "$signal_type" "$payload" 2>&1) || validation_exit=$?
+
+    if [[ $validation_exit -ne 0 ]]; then
+        if [[ "$STRICT" == "true" ]]; then
+            echo "✗ Validation failed: $validation_output" >&2
+            exit 1
+        else
+            echo "⚠ Validation warning: $validation_output" >&2
+            echo "  (Use --strict to fail on validation errors)" >&2
+        fi
+    fi
+
+    return 0
+}
+
+if [[ -z "$SIGNAL_TYPE" ]]; then
+    show_usage
+    exit 1
+fi
+
+case "$SIGNAL_TYPE" in
+    # State signals (shortcuts for common states)
+    working)
+        TASK_ID="${SIGNAL_DATA:-}"
+        if [[ -n "$TASK_ID" ]]; then
+            echo "✓ Signal: working (task: ${TASK_ID})"
+            echo "[JAT-SIGNAL:STATE] working:${TASK_ID}"
+        else
+            echo "✓ Signal: working"
+            echo "[JAT-SIGNAL:STATE] working"
+        fi
+        ;;
+    review|needs_review)
+        echo "✓ Signal: review (ready for human review)"
+        echo "[JAT-SIGNAL:STATE] review"
+        ;;
+    idle)
+        echo "✓ Signal: idle (session idle)"
+        echo "[JAT-SIGNAL:STATE] idle"
+        ;;
+    auto_proceed|auto-proceed)
+        echo "✓ Signal: auto_proceed (OK to auto-close)"
+        echo "[JAT-SIGNAL:STATE] auto_proceed"
+        ;;
+    completed|done)
+        echo "✓ Signal: completed (task done)"
+        echo "[JAT-SIGNAL:STATE] completed"
+        ;;
+    needs_input|input)
+        echo "✓ Signal: needs_input (waiting for user)"
+        echo "[JAT-SIGNAL:STATE] needs_input"
+        ;;
+
+    # Legacy 'state' subcommand for compatibility
+    state)
+        STATE="${SIGNAL_DATA:-idle}"
+        case "$STATE" in
+            working|review|idle|auto_proceed|needs_input|completed)
+                echo "✓ Signal: $STATE"
+                echo "[JAT-SIGNAL:STATE] $STATE"
+                ;;
+            *)
+                echo "Error: Unknown state '$STATE'"
+                echo "Use: working, review, idle, auto_proceed, needs_input, completed"
+                exit 1
+                ;;
+        esac
+        ;;
+
+    # Data signals
+    tasks)
+        if [[ -z "$SIGNAL_DATA" ]]; then
+            echo "Error: tasks signal requires JSON array"
+            exit 1
+        fi
+        if ! echo "$SIGNAL_DATA" | jq . >/dev/null 2>&1; then
+            echo "Error: Invalid JSON for tasks signal"
+            exit 1
+        fi
+
+        # Validate against schema
+        validate_payload "tasks" "$SIGNAL_DATA"
+
+        TASK_COUNT=$(echo "$SIGNAL_DATA" | jq 'length')
+        echo "✓ Signal: tasks (${TASK_COUNT} suggested)"
+        echo "[JAT-SIGNAL:TASKS] $SIGNAL_DATA"
+        ;;
+    action)
+        if [[ -z "$SIGNAL_DATA" ]]; then
+            echo "Error: action signal requires JSON object"
+            exit 1
+        fi
+        if ! echo "$SIGNAL_DATA" | jq . >/dev/null 2>&1; then
+            echo "Error: Invalid JSON for action signal"
+            exit 1
+        fi
+
+        # Validate against schema
+        validate_payload "action" "$SIGNAL_DATA"
+
+        ACTION_TITLE=$(echo "$SIGNAL_DATA" | jq -r '.title // "untitled"')
+        echo "✓ Signal: action (${ACTION_TITLE})"
+        echo "[JAT-SIGNAL:ACTION] $SIGNAL_DATA"
+        ;;
+    complete)
+        # Full completion bundle with optional suggested tasks and human actions
+        if [[ -n "$SIGNAL_DATA" ]]; then
+            if ! echo "$SIGNAL_DATA" | jq . >/dev/null 2>&1; then
+                echo "Error: Invalid JSON for complete signal"
+                exit 1
+            fi
+
+            # Validate against schema
+            validate_payload "complete" "$SIGNAL_DATA"
+
+            TASK_COUNT=$(echo "$SIGNAL_DATA" | jq '.suggestedTasks // [] | length')
+            ACTION_COUNT=$(echo "$SIGNAL_DATA" | jq '.humanActions // [] | length')
+            echo "✓ Signal: complete (${TASK_COUNT} tasks, ${ACTION_COUNT} actions)"
+        else
+            echo "✓ Signal: complete"
+        fi
+        echo "[JAT-SIGNAL:COMPLETE] ${SIGNAL_DATA:-"{}"}"
+        ;;
+
+    -h|--help|help)
+        show_usage
+        exit 0
+        ;;
+    *)
+        echo "Error: Unknown signal type '$SIGNAL_TYPE'"
+        show_usage
+        exit 1
+        ;;
+esac
+
+exit 0
