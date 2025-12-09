@@ -1006,15 +1006,16 @@
 		return count;
 	}
 
-	// Get agents who have worked on a project (for project header avatars)
-	// Shows all agents with assigned tasks, not just currently working ones
+	// Get agents currently working on a project (for project header avatars)
+	// Only shows agents with in_progress tasks to match the TopBar active agent count
 	function getProjectAssignedAgents(project: string): string[] {
 		const epicMap = nestedGroupedTasks.get(project);
 		if (!epicMap) return [];
 		const agents = new Set<string>();
 		for (const tasks of epicMap.values()) {
 			for (const task of tasks) {
-				if (task.assignee) {
+				// Only include agents with in_progress tasks (actively working)
+				if (task.assignee && task.status === 'in_progress') {
 					agents.add(task.assignee);
 				}
 			}
