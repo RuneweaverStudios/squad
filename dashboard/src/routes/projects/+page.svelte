@@ -158,6 +158,9 @@
 	const focusedProject = $derived(focusedProjectIndex >= 0 ? sortedProjects[focusedProjectIndex] : null);
 
 	// Group sessions by project
+	// Project is determined from task ID prefix (e.g., flush-12p -> flush)
+	// Do NOT fall back to tmux session name - all sessions are named jat-{AgentName}
+	// regardless of which project they're working on
 	const sessionsByProject = $derived.by(() => {
 		const groups = new Map<string, typeof workSessionsState.sessions>();
 		for (const session of workSessionsState.sessions) {
@@ -166,10 +169,10 @@
 				project = getProjectFromTaskId(session.task.id);
 			} else if (session.lastCompletedTask?.id) {
 				project = getProjectFromTaskId(session.lastCompletedTask.id);
-			} else {
-				const match = session.sessionName.match(/^([a-zA-Z0-9_-]+?)-/);
-				if (match && match[1]) project = match[1];
 			}
+			// Note: We intentionally don't fall back to sessionName because
+			// tmux sessions are named jat-{AgentName} not {project}-{AgentName}
+			// Sessions without task info won't be grouped (shown when task loads)
 			if (project) {
 				const existing = groups.get(project) || [];
 				existing.push(session);
@@ -435,7 +438,8 @@
 	$effect(() => {
 		const unsubscribe = lastTaskEvent.subscribe((event) => {
 			if (event) {
-				fetchTaskData();
+				// Use fresh=true to bypass cache after task creation/update
+				fetchTaskData(true);
 				if (event.updatedTasks && event.updatedTasks.length > 0) {
 					fetchSessions();
 				}
@@ -445,9 +449,10 @@
 	});
 
 	// Fetch task data
-	async function fetchTaskData() {
+	async function fetchTaskData(fresh = false) {
 		try {
-			const response = await fetch('/api/agents?full=true');
+			const url = fresh ? '/api/agents?full=true&fresh=true' : '/api/agents?full=true';
+			const response = await fetch(url);
 			const data = await response.json();
 
 			if (data.error) {
@@ -732,10 +737,46 @@
 
 							<span class="font-semibold text-base-content uppercase tracking-wide">{project}</span>
 
-							<span class="badge badge-ghost badge-sm">{sessions.length} session{sessions.length !== 1 ? 's' : ''}</span>
+							<!-- Sessions badge - clickable to toggle sessions section -->
+							<span
+								role="button"
+								tabindex="0"
+								class="badge badge-ghost badge-sm hover:badge-primary transition-colors cursor-pointer"
+								onclick={(e) => {
+									e.stopPropagation();
+									// If project is collapsed, expand it first
+									if (isProjectCollapsed) toggleProjectCollapse(project);
+									// Toggle sessions section (with slight delay if expanding project)
+									if (isProjectCollapsed) {
+										setTimeout(() => toggleSectionCollapse(project, 'sessions'), 50);
+									} else {
+										toggleSectionCollapse(project, 'sessions');
+									}
+								}}
+								onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); toggleSectionCollapse(project, 'sessions'); } }}
+								title="Click to expand/collapse sessions"
+							>{sessions.length} session{sessions.length !== 1 ? 's' : ''}</span>
 
+							<!-- Tasks badge - clickable to toggle tasks section -->
 							{#if projectTasks.length > 0}
-								<span class="badge badge-outline badge-sm">{projectTasks.filter(t => t.status !== 'closed').length} tasks</span>
+								<span
+									role="button"
+									tabindex="0"
+									class="badge badge-outline badge-sm hover:badge-primary transition-colors cursor-pointer"
+									onclick={(e) => {
+										e.stopPropagation();
+										// If project is collapsed, expand it first
+										if (isProjectCollapsed) toggleProjectCollapse(project);
+										// Toggle tasks section (with slight delay if expanding project)
+										if (isProjectCollapsed) {
+											setTimeout(() => toggleSectionCollapse(project, 'tasks'), 50);
+										} else {
+											toggleSectionCollapse(project, 'tasks');
+										}
+									}}
+									onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); toggleSectionCollapse(project, 'tasks'); } }}
+									title="Click to expand/collapse tasks"
+								>{projectTasks.filter(t => t.status !== 'closed').length} tasks</span>
 							{/if}
 
 							<!-- Mini session avatars (shown when collapsed) -->
