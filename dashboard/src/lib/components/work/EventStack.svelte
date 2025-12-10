@@ -54,7 +54,8 @@
 		onRollback,
 		onCreateTasks,
 		availableProjects = [],
-		class: className = ''
+		class: className = '',
+		autoExpand = false
 	}: {
 		sessionName: string;
 		maxEvents?: number;
@@ -63,12 +64,24 @@
 		onCreateTasks?: (tasks: SuggestedTaskWithState[]) => Promise<{ success: any[]; failed: any[] }>;
 		availableProjects?: string[];
 		class?: string;
+		/** Auto-expand when completion or tasks event is latest */
+		autoExpand?: boolean;
 	} = $props();
 
 	let events = $state<TimelineEvent[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let isExpanded = $state(false);
+
+	// Auto-expand when latest event is completion or tasks and autoExpand is enabled
+	$effect(() => {
+		if (autoExpand && events.length > 0) {
+			const latestEvent = events[0];
+			if (latestEvent?.type === 'complete' || latestEvent?.type === 'tasks' || latestEvent?.state === 'completed') {
+				isExpanded = true;
+			}
+		}
+	});
 	let expandedEventIdx = $state<number | null>(null);
 	let pollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -211,12 +224,25 @@
 	}
 
 	// State styling - solid backgrounds to avoid see-through stacking
+	// Maps signal states to visual styles (matches SessionCard SessionState)
 	const stateStyles: Record<string, { icon: string; bg: string; text: string; border: string }> = {
+		starting: {
+			icon: '🚀',
+			bg: 'oklch(0.22 0.08 200)',
+			text: 'oklch(0.80 0.12 200)',
+			border: 'oklch(0.35 0.10 200)'
+		},
 		working: {
 			icon: '⚡',
 			bg: 'oklch(0.25 0.08 85)',
 			text: 'oklch(0.85 0.15 85)',
 			border: 'oklch(0.40 0.10 85)'
+		},
+		compacting: {
+			icon: '📦',
+			bg: 'oklch(0.22 0.06 50)',
+			text: 'oklch(0.80 0.10 50)',
+			border: 'oklch(0.35 0.08 50)'
 		},
 		review: {
 			icon: '👁',
@@ -230,8 +256,20 @@
 			text: 'oklch(0.80 0.15 310)',
 			border: 'oklch(0.35 0.10 310)'
 		},
+		completing: {
+			icon: '⏳',
+			bg: 'oklch(0.22 0.08 145)',
+			text: 'oklch(0.75 0.12 145)',
+			border: 'oklch(0.35 0.10 145)'
+		},
 		completed: {
 			icon: '✅',
+			bg: 'oklch(0.22 0.10 145)',
+			text: 'oklch(0.80 0.18 145)',
+			border: 'oklch(0.35 0.12 145)'
+		},
+		auto_proceed: {
+			icon: '🚀',
 			bg: 'oklch(0.22 0.10 145)',
 			text: 'oklch(0.80 0.18 145)',
 			border: 'oklch(0.35 0.12 145)'
@@ -679,6 +717,60 @@
 											</div>
 											<div class="text-[10px]" style="color: oklch(0.50 0.02 250);">
 												Agent has finished work and is waiting. You can assign a new task or close the session.
+											</div>
+										</div>
+									{:else if event.state === 'starting'}
+										<!-- Starting state -->
+										<div class="space-y-2">
+											<div class="flex items-center gap-2 text-xs" style="color: oklch(0.80 0.12 200);">
+												<span>🚀</span>
+												<span class="font-medium">Session Starting</span>
+											</div>
+											<div class="text-[10px]" style="color: oklch(0.60 0.02 250);">
+												Agent is initializing and preparing to work.
+											</div>
+										</div>
+									{:else if event.state === 'compacting'}
+										<!-- Compacting state -->
+										<div class="space-y-2">
+											<div class="flex items-center gap-2 text-xs" style="color: oklch(0.80 0.10 50);">
+												<span>📦</span>
+												<span class="font-medium">Compacting Context</span>
+											</div>
+											<div class="text-[10px]" style="color: oklch(0.60 0.02 250);">
+												Agent is summarizing conversation to free up context space.
+											</div>
+										</div>
+									{:else if event.state === 'completing'}
+										<!-- Completing state -->
+										<div class="space-y-2">
+											<div class="flex items-center gap-2 text-xs" style="color: oklch(0.75 0.12 145);">
+												<span>⏳</span>
+												<span class="font-medium">Completing Task</span>
+											</div>
+											{#if event.task_id}
+												<div class="text-[10px]" style="color: oklch(0.60 0.02 250);">
+													Task: <span class="font-mono" style="color: oklch(0.75 0.02 250);">{event.task_id}</span>
+												</div>
+											{/if}
+											<div class="text-[10px]" style="color: oklch(0.55 0.02 250);">
+												Agent is running completion steps (commit, close, release, announce).
+											</div>
+										</div>
+									{:else if event.state === 'auto_proceed'}
+										<!-- Auto-proceed state -->
+										<div class="space-y-2">
+											<div class="flex items-center gap-2 text-xs" style="color: oklch(0.80 0.18 145);">
+												<span>🚀</span>
+												<span class="font-medium">Auto-Proceeding</span>
+											</div>
+											{#if event.task_id}
+												<div class="text-[10px]" style="color: oklch(0.60 0.02 250);">
+													Task: <span class="font-mono" style="color: oklch(0.75 0.02 250);">{event.task_id}</span>
+												</div>
+											{/if}
+											<div class="text-[10px]" style="color: oklch(0.55 0.02 250);">
+												Task completed. Session will auto-close and proceed to next task.
 											</div>
 										</div>
 									{:else if event.type === 'action' && event.data}

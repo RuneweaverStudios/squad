@@ -72,6 +72,13 @@
 	import { completeTask as epicCompleteTask, getIsActive as epicIsActive } from "$lib/stores/epicQueueStore.svelte";
 
 	// Props - aligned with workSessions.svelte.ts types
+	interface TaskDep {
+		id: string;
+		status?: string;
+		title?: string;
+		priority?: number;
+		issue_type?: string;
+	}
 	interface Task {
 		id: string;
 		title?: string;
@@ -79,6 +86,7 @@
 		status?: string;
 		priority?: number;
 		issue_type?: string;
+		depends_on?: TaskDep[];
 	}
 
 	/** Extended task info for completed tasks - includes closedAt timestamp */
@@ -3804,6 +3812,32 @@
 							</p>
 						</div>
 					</button>
+					<!-- Row 3: Dependencies (if any) -->
+					{#if displayTask.depends_on && displayTask.depends_on.length > 0}
+						{@const unresolvedDeps = displayTask.depends_on.filter(d => d.status !== 'closed')}
+						{@const resolvedDeps = displayTask.depends_on.filter(d => d.status === 'closed')}
+						<div class="flex items-center gap-1.5 mt-1.5 flex-wrap">
+							<span class="text-[10px] font-mono" style="color: oklch(0.55 0.02 250);">deps:</span>
+							{#each unresolvedDeps as dep (dep.id)}
+								<span
+									class="px-1.5 py-0.5 rounded text-[10px] font-mono"
+									style="background: oklch(0.25 0.08 30); color: oklch(0.75 0.12 30); border: 1px solid oklch(0.35 0.10 30);"
+									title="{dep.title || dep.id} ({dep.status || 'open'})"
+								>
+									⏳ {dep.id}
+								</span>
+							{/each}
+							{#each resolvedDeps as dep (dep.id)}
+								<span
+									class="px-1.5 py-0.5 rounded text-[10px] font-mono"
+									style="background: oklch(0.22 0.06 145); color: oklch(0.65 0.10 145); border: 1px solid oklch(0.32 0.08 145);"
+									title="{dep.title || dep.id} (closed)"
+								>
+									✓ {dep.id}
+								</span>
+							{/each}
+						</div>
+					{/if}
 				{:else}
 					<!-- Idle state -->
 					<div class="flex items-center gap-2 mb-1">
@@ -4272,6 +4306,7 @@
 						{sessionName}
 						maxEvents={20}
 						pollInterval={5000}
+						autoExpand={sessionState === 'completed'}
 						onRollback={(event) => {
 							// Open confirmation modal before rolling back
 							if (event.git_sha) {

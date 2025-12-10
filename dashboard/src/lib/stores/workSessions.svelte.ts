@@ -160,6 +160,8 @@ const FETCH_BASE_BACKOFF_MS = 2000;  // Start with 2 second backoff
 let fetchAbortController: AbortController | null = null;
 // Track if a fetch is currently in progress to prevent concurrent calls
 let fetchInProgress = false;
+// Flag to bust server-side cache on next fetch (set after spawn to ensure fresh task data)
+let bustCacheOnNextFetch = false;
 
 /**
  * Fetch all active work sessions from the API
@@ -196,6 +198,11 @@ export async function fetch(includeUsage: boolean = false): Promise<void> {
 		let url = `/api/work?lines=${lines}&_t=${Date.now()}`;
 		if (includeUsage) {
 			url += '&usage=true';
+		}
+		// Add bust param to invalidate server-side task cache (used after spawn)
+		if (bustCacheOnNextFetch) {
+			url += '&bust=true';
+			bustCacheOnNextFetch = false; // Only bust once
 		}
 
 		// Use a shorter timeout for polling requests (10s instead of 30s default)
@@ -425,6 +432,8 @@ export function isOutputStreamingActive(): boolean {
 
 /**
  * Spawn a new agent for a specific task
+ * After spawn, the next fetch() will bust the server-side task cache to ensure
+ * the new task assignment is visible immediately.
  */
 export async function spawn(taskId: string): Promise<WorkSession | null> {
 	try {
@@ -440,9 +449,13 @@ export async function spawn(taskId: string): Promise<WorkSession | null> {
 			throw new Error(data.message || data.error || 'Failed to spawn agent');
 		}
 
-		// Add the new session to state
+		// Add the new session to state with full task data from spawn response
 		if (data.session) {
 			state.sessions = [...state.sessions, data.session];
+			// Flag to bust cache on next fetch so subsequent polls get fresh task data
+			// This handles the race condition where the task was just assigned but
+			// the server-side 5-second cache still has stale data
+			bustCacheOnNextFetch = true;
 		}
 
 		return data.session || null;

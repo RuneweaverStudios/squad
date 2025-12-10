@@ -24,6 +24,7 @@ import {
 	DANGEROUSLY_SKIP_PERMISSIONS,
 	AGENT_MAIL_URL
 } from '$lib/config/spawnConfig.js';
+import { getTaskById } from '$lib/server/beads.js';
 
 const execAsync = promisify(exec);
 
@@ -263,13 +264,37 @@ export async function POST({ request }) {
 			}
 		}
 
-		// Step 5: Return WorkSession
+		// Step 5: Get full task data from Beads (if taskId provided)
+		// This ensures the response has complete task info (title, description, etc.)
+		// which allows the SessionCard to display immediately without waiting for cache refresh
+		let fullTask = null;
+		if (taskId) {
+			try {
+				const foundTask = getTaskById(taskId);
+				if (foundTask) {
+					fullTask = {
+						id: foundTask.id,
+						title: foundTask.title,
+						description: foundTask.description,
+						status: foundTask.status,
+						priority: foundTask.priority,
+						issue_type: foundTask.issue_type
+					};
+				}
+			} catch (err) {
+				// Non-fatal - fall back to minimal task data
+				console.warn('[spawn] Could not fetch full task data:', err);
+				fullTask = { id: taskId };
+			}
+		}
+
+		// Step 6: Return WorkSession
 		return json({
 			success: true,
 			session: {
 				sessionName,
 				agentName,
-				task: taskId ? { id: taskId } : null,
+				task: fullTask,
 				imagePath: imagePath || null,
 				output: '',
 				lineCount: 0,

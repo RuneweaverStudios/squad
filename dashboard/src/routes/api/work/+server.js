@@ -31,7 +31,8 @@ const execAsync = promisify(exec);
 // ============================================================================
 // Signal File Support - Read state from jat-signal hook output
 // ============================================================================
-const SIGNAL_TTL_MS = 60 * 1000; // 1 minute for state signals
+const SIGNAL_TTL_MS = 60 * 1000; // 1 minute for most state signals
+const COMPLETED_STATE_TTL_MS = 30 * 60 * 1000; // 30 minutes for completed state (matches completion bundles)
 const COMPLETION_TTL_MS = 30 * 60 * 1000; // 30 minutes for completion bundles
 
 /**
@@ -69,10 +70,12 @@ function readSignalState(sessionName) {
 		const signal = JSON.parse(content);
 
 		// Check file age - use different TTL based on signal type
-		// State signals expire quickly (1 min), completion bundles persist (30 min)
+		// Most state signals expire quickly (1 min), but completed state and completion bundles persist (30 min)
+		// This ensures completed sessions stay visible in dashboard until user takes action
 		const stats = statSync(signalFile);
 		const ageMs = Date.now() - stats.mtimeMs;
-		const ttl = signal.type === 'complete' ? COMPLETION_TTL_MS : SIGNAL_TTL_MS;
+		const isCompletedState = signal.type === 'state' && (signal.state === 'completed' || signal.state === 'auto_proceed');
+		const ttl = signal.type === 'complete' || isCompletedState ? COMPLETED_STATE_TTL_MS : SIGNAL_TTL_MS;
 		if (ageMs > ttl) {
 			return null;
 		}
@@ -152,6 +155,15 @@ function getCachedTasks() {
  */
 
 /**
+ * @typedef {Object} TaskDep
+ * @property {string} id - Dependency task ID
+ * @property {string} [status] - Dependency status
+ * @property {string} [title] - Dependency title
+ * @property {number} [priority] - Dependency priority
+ * @property {string} [issue_type] - Dependency type
+ */
+
+/**
  * @typedef {Object} Task
  * @property {string} id - Task ID
  * @property {string} [status] - Task status
@@ -162,6 +174,7 @@ function getCachedTasks() {
  * @property {string} [issue_type] - Task type
  * @property {string} [closedAt] - When task was closed
  * @property {string} [updated_at] - Last update timestamp
+ * @property {TaskDep[]} [depends_on] - Task dependencies
  */
 
 /**
@@ -355,6 +368,13 @@ export async function GET({ url }) {
 		const lines = Math.min(Math.max(parseInt(linesParam || '50', 10) || 50, 1), 500);
 		// Only fetch token usage/sparkline if requested (slow operation)
 		const includeUsage = url.searchParams.get('usage') === 'true';
+		// Force task cache refresh (used after spawn to ensure new task assignments are visible)
+		const bustCache = url.searchParams.get('bust') === 'true';
+
+		if (bustCache) {
+			// Reset cache timestamp to force refresh
+			taskCacheTimestamp = 0;
+		}
 
 		// Step 1: List jat-* tmux sessions
 		const sessionsCommand = `tmux list-sessions -F "#{session_name}:#{session_created}:#{session_attached}" 2>/dev/null || echo ""`;
@@ -426,7 +446,8 @@ export async function GET({ url }) {
 						description: t.description,
 						status: t.status,
 						priority: t.priority,
-						issue_type: t.issue_type
+						issue_type: t.issue_type,
+						depends_on: t.depends_on || []
 					});
 				}
 			});
