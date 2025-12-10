@@ -112,10 +112,9 @@ export async function POST({ params }) {
 		await new Promise(resolve => setTimeout(resolve, 5000));
 
 		try {
-			const escapedPrompt = initialPrompt.replace(/"/g, '\\"');
-			await execAsync(`tmux send-keys -t "${sessionId}" -- "${escapedPrompt}"`);
-			await new Promise(resolve => setTimeout(resolve, 100));
-			await execAsync(`tmux send-keys -t "${sessionId}" Enter`);
+			// Escape special characters and send text+Enter as ONE command to avoid race conditions
+			const escapedPrompt = initialPrompt.replace(/"/g, '\\"').replace(/\$/g, '\\$');
+			await execAsync(`tmux send-keys -t "${sessionId}" -- "${escapedPrompt}" Enter`);
 		} catch (err) {
 			// Non-fatal - session is created, prompt just failed
 			console.error('Failed to send initial prompt:', err);

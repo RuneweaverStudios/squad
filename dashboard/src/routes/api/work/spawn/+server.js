@@ -190,10 +190,11 @@ export async function POST({ request }) {
 		await new Promise(resolve => setTimeout(resolve, 5000));
 
 		try {
-			const escapedPrompt = initialPrompt.replace(/"/g, '\\"');
-			await execAsync(`tmux send-keys -t "${sessionName}" -- "${escapedPrompt}"`);
-			await new Promise(resolve => setTimeout(resolve, 100));
-			await execAsync(`tmux send-keys -t "${sessionName}" Enter`);
+			// Escape special characters for shell - match the pattern from /api/work/[sessionId]/input
+			const escapedPrompt = initialPrompt.replace(/"/g, '\\"').replace(/\$/g, '\\$');
+			// Send text and Enter as ONE command to avoid race conditions
+			// (Previously sent as two separate commands which caused Enter to be lost sometimes)
+			await execAsync(`tmux send-keys -t "${sessionName}" -- "${escapedPrompt}" Enter`);
 		} catch (err) {
 			// Non-fatal - session is created, prompt just failed
 			console.error('Failed to send initial prompt:', err);
@@ -207,10 +208,9 @@ export async function POST({ request }) {
 
 			try {
 				// Send the image path as input - the agent can then view it with Read tool
-				const escapedPath = imagePath.replace(/"/g, '\\"');
-				await execAsync(`tmux send-keys -t "${sessionName}" -- "${escapedPath}"`);
-				await new Promise(resolve => setTimeout(resolve, 100));
-				await execAsync(`tmux send-keys -t "${sessionName}" Enter`);
+				// Escape special characters and send text+Enter as ONE command
+				const escapedPath = imagePath.replace(/"/g, '\\"').replace(/\$/g, '\\$');
+				await execAsync(`tmux send-keys -t "${sessionName}" -- "${escapedPath}" Enter`);
 				console.log(`[spawn] Sent image path to session ${sessionName}: ${imagePath}`);
 			} catch (err) {
 				// Non-fatal - image send failed but session is still running

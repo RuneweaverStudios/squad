@@ -153,11 +153,9 @@ export async function POST({ request }) {
 			// Claude Code needs ~5 seconds to initialize and show prompt
 			if (initialPrompt) {
 				await new Promise(resolve => setTimeout(resolve, 5000));
-				const escapedPrompt = initialPrompt.replace(/"/g, '\\"');
-				// Send prompt text first, then Enter separately for reliability
-				await execAsync(`tmux send-keys -t "${sessionName}" -- "${escapedPrompt}"`);
-				await new Promise(resolve => setTimeout(resolve, 100));
-				await execAsync(`tmux send-keys -t "${sessionName}" Enter`);
+				// Escape special characters and send text+Enter as ONE command to avoid race conditions
+				const escapedPrompt = initialPrompt.replace(/"/g, '\\"').replace(/\$/g, '\\$');
+				await execAsync(`tmux send-keys -t "${sessionName}" -- "${escapedPrompt}" Enter`);
 			}
 
 			return json({
