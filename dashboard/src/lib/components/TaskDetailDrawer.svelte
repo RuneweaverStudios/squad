@@ -203,6 +203,10 @@
 	let attachments = $state<TaskAttachment[]>([]);
 	let attachmentsLoading = $state(false);
 
+	// Attachment drag-drop state
+	let isDraggingOver = $state(false);
+	let isUploading = $state(false);
+
 	// Session logs state
 	interface SessionLog {
 		filename: string;
@@ -383,6 +387,107 @@
 			attachments = [];
 		} finally {
 			attachmentsLoading = false;
+		}
+	}
+
+	// Drag-drop handlers for attachments
+	function handleDragOver(event: DragEvent) {
+		event.preventDefault();
+		event.stopPropagation();
+		if (event.dataTransfer) {
+			event.dataTransfer.dropEffect = 'copy';
+		}
+		isDraggingOver = true;
+	}
+
+	function handleDragLeave(event: DragEvent) {
+		event.preventDefault();
+		event.stopPropagation();
+		isDraggingOver = false;
+	}
+
+	async function handleFileDrop(event: DragEvent) {
+		event.preventDefault();
+		event.stopPropagation();
+		isDraggingOver = false;
+
+		if (!event.dataTransfer || !taskId) return;
+
+		const files = Array.from(event.dataTransfer.files);
+		if (files.length === 0) return;
+
+		isUploading = true;
+
+		try {
+			for (const file of files) {
+				await uploadAttachment(file);
+			}
+			// Refresh attachments after upload
+			await fetchAttachments(taskId);
+			showToast('success', `✓ Uploaded ${files.length} file${files.length > 1 ? 's' : ''}`);
+		} catch (err) {
+			console.error('Failed to upload attachment:', err);
+			showToast('error', 'Failed to upload file');
+		} finally {
+			isUploading = false;
+		}
+	}
+
+	async function uploadAttachment(file: File) {
+		if (!taskId) return;
+
+		const formData = new FormData();
+		formData.append('file', file, file.name);
+		formData.append('sessionName', `task-${taskId}`);
+		formData.append('filename', file.name);
+
+		const response = await fetch('/api/work/upload-image', {
+			method: 'POST',
+			body: formData
+		});
+
+		if (!response.ok) {
+			throw new Error(`Upload failed: ${response.statusText}`);
+		}
+
+		const { filePath } = await response.json();
+
+		// Save to task's images in the server
+		const fileId = `file-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+		await fetch(`/api/tasks/${taskId}/image`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ path: filePath, id: fileId })
+		});
+
+		// Update task notes with attachment info
+		await updateTaskNotesWithAttachment(filePath, file.name);
+	}
+
+	async function updateTaskNotesWithAttachment(filePath: string, fileName: string) {
+		if (!taskId) return;
+
+		try {
+			// Get current attachments to build the notes
+			const response = await fetch(`/api/tasks/${taskId}/image`);
+			if (!response.ok) return;
+			const data = await response.json();
+			const images = data.images || [];
+
+			if (images.length === 0) return;
+
+			const filePaths = images.map((img: TaskAttachment, i: number) =>
+				`  ${i + 1}. ${img.path}`
+			).join('\n');
+			const noteText = `📷 Attached screenshots:\n${filePaths}\n(Use Read tool to view these images)`;
+
+			await fetch(`/api/tasks/${taskId}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ notes: noteText })
+			});
+		} catch (err) {
+			console.error('Failed to update task notes with attachment:', err);
 		}
 	}
 
@@ -1616,18 +1721,40 @@
 							/>
 						</div>
 
-						<!-- Attachments - Industrial -->
-						<div>
+						<!-- Attachments - Industrial with Drag-Drop -->
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
+						<div
+							ondragover={handleDragOver}
+							ondragleave={handleDragLeave}
+							ondrop={handleFileDrop}
+							class="relative rounded transition-all duration-200"
+							style="
+								{isDraggingOver ? 'background: oklch(0.25 0.10 145 / 0.15); border: 2px dashed oklch(0.55 0.18 145);' : ''}
+							"
+						>
 							<h4 class="text-xs font-semibold mb-2 font-mono uppercase tracking-wider" style="color: oklch(0.55 0.02 250);">
 								Attachments
 								{#if attachments.length > 0}
 									<span class="ml-1 badge badge-xs" style="background: oklch(0.30 0.02 250); color: oklch(0.70 0.02 250);">{attachments.length}</span>
 								{/if}
 							</h4>
-							{#if attachmentsLoading}
+
+							{#if isUploading}
+								<div class="flex items-center gap-2 p-3 rounded" style="background: oklch(0.18 0.01 250);">
+									<span class="loading loading-spinner loading-sm"></span>
+									<span class="text-sm" style="color: oklch(0.55 0.02 250);">Uploading...</span>
+								</div>
+							{:else if attachmentsLoading}
 								<div class="flex items-center gap-2 p-3 rounded" style="background: oklch(0.18 0.01 250);">
 									<span class="loading loading-spinner loading-sm"></span>
 									<span class="text-sm" style="color: oklch(0.55 0.02 250);">Loading attachments...</span>
+								</div>
+							{:else if isDraggingOver}
+								<div class="p-6 rounded text-center" style="background: oklch(0.20 0.08 145 / 0.2);">
+									<svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mx-auto mb-2" style="color: oklch(0.70 0.18 145);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+									</svg>
+									<span class="text-sm font-medium" style="color: oklch(0.70 0.18 145);">Drop files to attach</span>
 								</div>
 							{:else if attachments.length > 0}
 								<div class="grid grid-cols-3 gap-2 p-2 rounded" style="background: oklch(0.18 0.01 250);">
@@ -1655,11 +1782,18 @@
 											</div>
 										</div>
 									{/each}
+									<!-- Add more hint when attachments exist -->
+									<div class="flex items-center justify-center h-20 rounded border-2 border-dashed opacity-50 hover:opacity-80 transition-opacity cursor-default" style="border-color: oklch(0.35 0.02 250);">
+										<span class="text-[10px] text-center px-1" style="color: oklch(0.45 0.02 250);">Drop to add more</span>
+									</div>
 								</div>
 							{:else}
-								<div class="p-3 rounded text-center" style="background: oklch(0.18 0.01 250);">
-									<span class="text-sm" style="color: oklch(0.45 0.02 250);">No attachments</span>
-									<p class="text-xs mt-1" style="color: oklch(0.40 0.02 250);">Drop images on the task row in the table to attach</p>
+								<div class="p-4 rounded text-center border-2 border-dashed transition-colors" style="background: oklch(0.18 0.01 250); border-color: oklch(0.30 0.02 250);">
+									<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mx-auto mb-2" style="color: oklch(0.45 0.02 250);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+									</svg>
+									<span class="text-sm block" style="color: oklch(0.45 0.02 250);">No attachments</span>
+									<p class="text-xs mt-1" style="color: oklch(0.40 0.02 250);">Drag and drop files here to attach</p>
 								</div>
 							{/if}
 						</div>
