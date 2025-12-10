@@ -179,6 +179,9 @@ export async function fetch(lines: number = 50): Promise<void> {
 					if (state.sessions[idx].output !== newSession.output) {
 						state.sessions[idx].output = newSession.output;
 					}
+					if (state.sessions[idx].created !== newSession.created) {
+						state.sessions[idx].created = newSession.created;
+					}
 				}
 			}
 		}
