@@ -179,12 +179,11 @@
 		connectSessionEvents(); // Connect to real-time session events SSE
 		connectTaskEvents(); // Connect to real-time task events SSE
 		// Load critical data first (tasks, projects, state counts)
-		// Sparkline is deferred to avoid blocking the initial page render
+		// Sparkline is deferred (setTimeout) to avoid blocking the initial page render
 		Promise.all([loadAllTasks(), loadReadyTaskCount(), loadConfigProjects(), loadStateCounts(), loadEpicsWithReady(), loadReviewRules()]);
 
-		// DISABLED: All polling removed - SSE handles real-time updates
-		// - Sparkline disabled (too slow, 5+ seconds)
-		// - stateCountsInterval disabled (SSE triggers loadStateCounts on session events)
+		// Load sparkline data after initial render (fast with SQLite, ~5ms)
+		setTimeout(() => loadSparklineData(), 200);
 
 		return () => {
 			closeSessionEvents(); // Close cross-page BroadcastChannel
@@ -302,7 +301,8 @@
 			// 15-second timeout - sparkline can take 5+ seconds but shouldn't hang forever
 			const timeoutId = setTimeout(() => sparklineAbortController?.abort(), 15000);
 
-			const response = await fetch('/api/agents/sparkline?range=24h&multiProject=true', {
+			// Use SQLite source for fast queries (~5ms vs 5+ seconds for JSONL)
+			const response = await fetch('/api/agents/sparkline?range=24h&multiProject=true&source=sqlite', {
 				signal: sparklineAbortController.signal
 			});
 
@@ -701,9 +701,9 @@
 			{stateCounts}
 			{tokensToday}
 			{costToday}
-			sparklineData={[]}
-			multiProjectData={[]}
-			projectColors={{}}
+			{sparklineData}
+			{multiProjectData}
+			{projectColors}
 			{readyTaskCount}
 			{readyTasks}
 			{projects}
