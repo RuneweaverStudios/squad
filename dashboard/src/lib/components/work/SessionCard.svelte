@@ -70,6 +70,19 @@
 	import { successToast } from "$lib/stores/toasts.svelte";
 	import { availableProjects as availableProjectsStore } from "$lib/stores/drawerStore";
 	import { completeTask as epicCompleteTask, getIsActive as epicIsActive } from "$lib/stores/epicQueueStore.svelte";
+	// Rich signal card components
+	import WorkingSignalCard from "$lib/components/signals/WorkingSignalCard.svelte";
+	import ReviewSignalCard from "$lib/components/signals/ReviewSignalCard.svelte";
+	import NeedsInputSignalCard from "$lib/components/signals/NeedsInputSignalCard.svelte";
+	import CompletingSignalCard from "$lib/components/signals/CompletingSignalCard.svelte";
+	import IdleSignalCard from "$lib/components/signals/IdleSignalCard.svelte";
+	import type {
+		WorkingSignal,
+		ReviewSignal,
+		NeedsInputSignal,
+		CompletingSignal as CompletingSignalType,
+		IdleSignal,
+	} from "$lib/types/richSignals";
 
 	// Props - aligned with workSessions.svelte.ts types
 	interface TaskDep {
@@ -204,6 +217,13 @@
 		};
 		/** Timestamp when completion bundle was received */
 		completionBundleTimestamp?: number;
+		/** Rich signal payload from SSE (for working, review, needs_input, completing states) */
+		richSignalPayload?: {
+			type: string;
+			[key: string]: unknown;
+		};
+		/** Timestamp when rich signal payload was last updated */
+		richSignalPayloadTimestamp?: number;
 	}
 
 	let {
@@ -259,12 +279,61 @@
 		// Completion bundle (from jat-signal complete via SSE)
 		completionBundle,
 		completionBundleTimestamp,
+		// Rich signal payload (from SSE session-state events)
+		richSignalPayload,
+		richSignalPayloadTimestamp,
 	}: Props = $props();
 
 	// Derived mode helpers
 	const isAgentMode = $derived(mode === "agent" || mode === "compact");
 	const isServerMode = $derived(mode === "server");
 	const isCompactMode = $derived(mode === "compact");
+
+	// Rich signal type detection - determine which signal card to render
+	// These derive typed signals from the generic richSignalPayload prop
+	const workingSignal = $derived.by(() => {
+		if (richSignalPayload?.type === 'working') {
+			return richSignalPayload as unknown as WorkingSignal;
+		}
+		return null;
+	});
+
+	const reviewSignal = $derived.by(() => {
+		if (richSignalPayload?.type === 'review') {
+			return richSignalPayload as unknown as ReviewSignal;
+		}
+		return null;
+	});
+
+	const needsInputSignal = $derived.by(() => {
+		if (richSignalPayload?.type === 'needs_input') {
+			return richSignalPayload as unknown as NeedsInputSignal;
+		}
+		return null;
+	});
+
+	const completingSignal = $derived.by(() => {
+		if (richSignalPayload?.type === 'completing') {
+			return richSignalPayload as unknown as CompletingSignalType;
+		}
+		return null;
+	});
+
+	const idleSignal = $derived.by(() => {
+		if (richSignalPayload?.type === 'idle') {
+			return richSignalPayload as unknown as IdleSignal;
+		}
+		return null;
+	});
+
+	// Whether we have any rich signal to display
+	const hasRichSignal = $derived(
+		workingSignal !== null ||
+		reviewSignal !== null ||
+		needsInputSignal !== null ||
+		completingSignal !== null ||
+		idleSignal !== null
+	);
 
 	// Flash effect when Alt+C complete command is triggered
 	const isCompleteFlashing = $derived($completingSessionFlash === sessionName);
@@ -4135,6 +4204,85 @@
 			class="flex-1 flex flex-col min-h-0"
 			style="border-top: 10px solid oklch(0.5 0 0 / 0.08);"
 		>
+			<!-- Rich Signal Cards - display context-aware signal information above terminal -->
+			{#if hasRichSignal && isAgentMode}
+				<div class="px-3 py-2 flex-shrink-0" style="border-bottom: 1px solid oklch(0.5 0 0 / 0.12);">
+					{#if workingSignal}
+						<WorkingSignalCard
+							signal={workingSignal}
+							onTaskClick={(taskId) => onTaskClick?.(taskId)}
+							onInterrupt={onInterrupt ? async () => { await onInterrupt?.(); } : undefined}
+							onPause={onSendInput ? async () => {
+								// Send /jat:pause to pause work on this task
+								await onSendInput('/jat:pause', 'text');
+							} : undefined}
+							compact={false}
+						/>
+					{:else if reviewSignal}
+						<ReviewSignalCard
+							signal={reviewSignal}
+							onTaskClick={(taskId) => onTaskClick?.(taskId)}
+							onApprove={async () => {
+								// When user approves from review card, trigger completion flow
+								if (onSendInput) {
+									await onSendInput('/jat:complete', 'text');
+								}
+							}}
+							onRequestChanges={onSendInput ? async (feedback) => {
+								// Send feedback to agent for requested changes
+								await onSendInput(feedback, 'text');
+							} : undefined}
+							onAskQuestion={onSendInput ? async (question) => {
+								// Send question to agent
+								await onSendInput(question, 'text');
+							} : undefined}
+							compact={false}
+						/>
+					{:else if needsInputSignal}
+						<NeedsInputSignalCard
+							signal={needsInputSignal}
+							onTaskClick={(taskId) => onTaskClick?.(taskId)}
+							onSelectOption={async (optionId) => {
+								// Send the option selection to the terminal
+								if (onSendInput) {
+									await onSendInput(optionId, 'text');
+								}
+							}}
+							onSubmitText={async (text) => {
+								// Send custom text input to the terminal
+								if (onSendInput) {
+									await onSendInput(text, 'text');
+								}
+							}}
+							compact={false}
+						/>
+					{:else if completingSignal}
+						<CompletingSignalCard
+							signal={completingSignal}
+							compact={false}
+						/>
+					{:else if idleSignal}
+						<IdleSignalCard
+							signal={idleSignal}
+							onTaskClick={(taskId) => onTaskClick?.(taskId)}
+							onStartIdle={onSendInput ? async () => {
+								// Send /jat:start to start working
+								await onSendInput('/jat:start', 'text');
+							} : undefined}
+							onStartSuggested={onSendInput && idleSignal.suggestedNextTask ? async () => {
+								// Start working on the suggested task
+								await onSendInput(`/jat:start ${idleSignal.suggestedNextTask!.taskId}`, 'text');
+							} : undefined}
+							onAssignTask={onSendInput ? async (taskId) => {
+								// Start working on a specific task
+								await onSendInput(`/jat:start ${taskId}`, 'text');
+							} : undefined}
+							compact={false}
+						/>
+					{/if}
+				</div>
+			{/if}
+
 			<!-- Output Content - Click to center card, add glow effect, and focus input -->
 			<!-- svelte-ignore a11y_click_events_have_key_events -->
 			<!-- svelte-ignore a11y_no_static_element_interactions -->

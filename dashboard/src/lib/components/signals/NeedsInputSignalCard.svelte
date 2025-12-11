@@ -26,6 +26,8 @@
 		onTaskClick?: (taskId: string) => void;
 		/** Whether input is being submitted */
 		submitting?: boolean;
+		/** Whether to show in compact mode (for inline/timeline display) */
+		compact?: boolean;
 		/** Additional CSS class */
 		class?: string;
 	}
@@ -37,6 +39,7 @@
 		onFileClick,
 		onTaskClick,
 		submitting = false,
+		compact = false,
 		class: className = ''
 	}: Props = $props();
 
