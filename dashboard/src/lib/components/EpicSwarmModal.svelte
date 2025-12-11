@@ -249,13 +249,11 @@
 
 			availableEpics = actionableEpics;
 
-			// Auto-close any epics that have all children complete
-			// This cleans up completed epics so they don't clutter the system
-			try {
-				await fetch('/api/epics/close-eligible', { method: 'POST' });
-			} catch {
+			// Auto-close any epics that have all children complete (non-blocking)
+			// This cleans up completed epics in the background - doesn't need to block UI
+			fetch('/api/epics/close-eligible', { method: 'POST' }).catch(() => {
 				// Ignore errors - this is just cleanup
-			}
+			});
 
 			// Auto-select first epic if none selected
 			if (!selectedEpicId && actionableEpics.length > 0) {
