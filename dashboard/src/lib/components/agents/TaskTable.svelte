@@ -2751,7 +2751,7 @@
 													<div>
 														<div class="font-medium text-sm" style="color: oklch(0.85 0.02 250);">{task.title}</div>
 														{#if task.description}
-															<div class="text-xs" style="color: oklch(0.55 0.02 250);">
+															<div class="text-xs line-clamp-5" style="color: oklch(0.55 0.02 250);">
 																{task.description}
 															</div>
 														{/if}
@@ -3200,7 +3200,7 @@
 											<div>
 												<div class="font-medium text-sm" style="color: oklch(0.85 0.02 250);">{task.title}</div>
 												{#if task.description}
-													<div class="text-xs" style="color: oklch(0.55 0.02 250);">
+													<div class="text-xs line-clamp-5" style="color: oklch(0.55 0.02 250);">
 														{task.description}
 													</div>
 												{/if}
