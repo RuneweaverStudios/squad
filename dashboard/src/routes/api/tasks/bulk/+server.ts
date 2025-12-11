@@ -10,6 +10,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import type { RequestHandler } from './$types';
 import { invalidateCache } from '$lib/server/cache.js';
+import { _resetTaskCache } from '../../../api/agents/+server.js';
 
 const execAsync = promisify(exec);
 
@@ -350,9 +351,11 @@ export const POST: RequestHandler = async ({ request }) => {
 			: `Created ${created} task${created !== 1 ? 's' : ''}, ${failed} failed`;
 
 		// Invalidate task-related caches since we created tasks
+		// Also reset module-level task cache in agents endpoint
 		if (created > 0) {
 			invalidateCache.tasks();
 			invalidateCache.agents(); // Agent data includes task counts
+			_resetTaskCache();
 		}
 
 		return json(

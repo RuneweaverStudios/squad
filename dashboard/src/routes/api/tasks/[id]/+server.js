@@ -10,6 +10,7 @@ import { readFile, writeFile, unlink } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { invalidateCache } from '$lib/server/cache.js';
+import { _resetTaskCache } from '../../../api/agents/+server.js';
 
 const execAsync = promisify(exec);
 
@@ -124,9 +125,10 @@ export async function PUT({ params, request }) {
 			}
 		}
 
-		// Invalidate related caches
+		// Invalidate related caches (both apiCache and module-level task cache in agents endpoint)
 		invalidateCache.tasks();
 		invalidateCache.agents();
+		_resetTaskCache();
 
 		// Get updated task
 		const updatedTask = getTaskById(taskId);
@@ -347,9 +349,10 @@ export async function PATCH({ params, request }) {
 			}
 		}
 
-		// Invalidate related caches
+		// Invalidate related caches (both apiCache and module-level task cache in agents endpoint)
 		invalidateCache.tasks();
 		invalidateCache.agents();
+		_resetTaskCache();
 
 		// Fetch and return updated task
 		const updatedTask = getTaskById(taskId);
@@ -436,9 +439,10 @@ export async function DELETE({ params }) {
 		// Permanently delete attachments since this is a DELETE (not just close)
 		await cleanupTaskAttachments(taskId);
 
-		// Invalidate related caches
+		// Invalidate related caches (both apiCache and module-level task cache in agents endpoint)
 		invalidateCache.tasks();
 		invalidateCache.agents();
+		_resetTaskCache();
 
 		return json({
 			success: true,

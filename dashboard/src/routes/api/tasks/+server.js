@@ -4,6 +4,8 @@
  */
 import { json } from '@sveltejs/kit';
 import { getTasks, getProjects, getTaskById } from '../../../../../lib/beads.js';
+import { invalidateCache } from '$lib/server/cache.js';
+import { _resetTaskCache } from '../../api/agents/+server.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -229,6 +231,13 @@ export async function POST({ request }) {
 				// Continue without failing - task was created successfully
 			}
 		}
+
+		// Invalidate caches so subsequent fetches get fresh data
+		// This is critical for reactive updates on /projects page
+		// Also reset module-level task cache in agents endpoint
+		invalidateCache.tasks();
+		invalidateCache.agents();
+		_resetTaskCache();
 
 		// Fetch the created task to return full object
 		const createdTask = getTaskById(taskId);
