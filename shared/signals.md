@@ -66,8 +66,21 @@ jat-signal completing '{"taskId":"jat-abc","currentStep":"committing"}'
 # Waiting for user input
 jat-signal needs_input '{"taskId":"jat-abc","question":"Which auth library?","questionType":"choice"}'
 
-# Ready for review
-jat-signal review '{"taskId":"jat-abc","summary":["Added login page","Implemented OAuth"]}'
+# Ready for review (rich payload with file stats, quality status, review guidance)
+jat-signal review '{
+  "taskId":"jat-abc",
+  "taskTitle":"Add user auth",
+  "summary":["Added login page","Implemented OAuth"],
+  "filesModified":[
+    {"path":"src/lib/auth.ts","changeType":"added","linesAdded":150,"linesRemoved":0},
+    {"path":"src/routes/login/+page.svelte","changeType":"added","linesAdded":80,"linesRemoved":0}
+  ],
+  "totalLinesAdded":230,
+  "totalLinesRemoved":0,
+  "testsStatus":"passing",
+  "buildStatus":"clean",
+  "reviewFocus":["Check token refresh logic","Verify error handling"]
+}'
 
 # Task completed
 jat-signal completed '{"taskId":"jat-abc","outcome":"success"}'
@@ -367,8 +380,20 @@ jat-signal needs_input '{"taskId":"jat-abc","question":"OAuth or JWT?","question
 # User provides answer, agent resumes
 jat-signal working '{"taskId":"jat-abc","taskTitle":"Add auth flow"}'
 
-# Agent finishes coding
-jat-signal review '{"taskId":"jat-abc","summary":["Added OAuth login","Created user session"]}'
+# Agent finishes coding - emit rich review signal
+jat-signal review '{
+  "taskId":"jat-abc",
+  "taskTitle":"Add auth flow",
+  "summary":["Added OAuth login","Created user session"],
+  "filesModified":[
+    {"path":"src/lib/auth.ts","changeType":"added","linesAdded":120,"linesRemoved":0}
+  ],
+  "totalLinesAdded":120,
+  "totalLinesRemoved":0,
+  "testsStatus":"passing",
+  "buildStatus":"clean",
+  "reviewFocus":["Verify OAuth token handling"]
+}'
 
 # Agent suggests follow-up tasks
 jat-signal tasks '[{"title":"Add tests","priority":2}]'

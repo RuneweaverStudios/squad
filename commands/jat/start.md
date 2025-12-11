@@ -360,42 +360,158 @@ Read the full task details and start coding.
 
 ## When You Finish Working
 
-**🚨 CRITICAL: You MUST run `jat-signal review` when done.**
+**🚨 CRITICAL: You MUST emit a rich `review` signal when done.**
 
 The dashboard tracks your state via signals. Without signaling, you'll show "Working" even when you're done. This confuses users who don't know you're waiting for them.
 
-**Always run the signal command and output summary:**
+### Gather Review Data
+
+Before emitting the review signal, gather the following data:
 
 ```bash
-# Signal that you're ready for review (include summary of work)
-jat-signal review '{"taskId":"{TASK_ID}","summary":["Change 1","Change 2"]}'
+# Get file changes with stats
+git diff --stat HEAD~1
+
+# Get total lines changed
+git diff --numstat HEAD~1 | awk '{added+=$1; removed+=$2} END {print "Added:", added, "Removed:", removed}'
+
+# Get recent commits for this task
+git log --oneline -5
 ```
 
-Then output the summary:
+### Build Rich Review Signal
+
+The review signal should include:
+- **summary**: Array of accomplishment bullet points
+- **filesModified**: Array of file changes with stats
+- **keyDecisions**: Architectural choices made (if any)
+- **testsStatus**: "passing", "failing", "none", or "skipped"
+- **buildStatus**: "clean", "warnings", or "errors"
+- **reviewFocus**: Areas the reviewer should pay attention to
+
+```bash
+jat-signal review '{
+  "taskId": "{TASK_ID}",
+  "taskTitle": "{TASK_TITLE}",
+  "summary": [
+    "Added rich review signal validation",
+    "Updated jat-signal-validate with new fields",
+    "Documented rich review signal in start.md"
+  ],
+  "approach": "Extended existing validation to support full ReviewSignal interface",
+  "filesModified": [
+    {
+      "path": "signal/jat-signal-validate",
+      "changeType": "modified",
+      "linesAdded": 130,
+      "linesRemoved": 15,
+      "description": "Added validation for review signal fields"
+    },
+    {
+      "path": "commands/jat/start.md",
+      "changeType": "modified",
+      "linesAdded": 85,
+      "linesRemoved": 20,
+      "description": "Documented rich review signal"
+    }
+  ],
+  "totalLinesAdded": 215,
+  "totalLinesRemoved": 35,
+  "keyDecisions": [
+    {
+      "decision": "Made all new fields optional for backward compatibility",
+      "rationale": "Existing workflows should continue to work"
+    }
+  ],
+  "testsStatus": "none",
+  "buildStatus": "clean",
+  "reviewFocus": [
+    "Check validation logic for filesModified array",
+    "Verify documentation matches TypeScript interface"
+  ],
+  "commits": [
+    {
+      "sha": "abc1234",
+      "message": "task: Add rich review signal validation"
+    }
+  ]
+}'
+```
+
+### Review Signal Fields Reference
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `taskId` | string | **Yes** | Task ID (e.g., "jat-abc") |
+| `taskTitle` | string | No | Task title |
+| `summary` | string[] | **Recommended** | Bullet points of accomplishments |
+| `approach` | string | No | How the implementation was done |
+| `filesModified` | object[] | **Recommended** | Files changed with stats |
+| `totalLinesAdded` | number | No | Total lines added |
+| `totalLinesRemoved` | number | No | Total lines removed |
+| `keyDecisions` | object[] | No | Architectural decisions made |
+| `testsStatus` | enum | **Recommended** | "passing", "failing", "none", "skipped" |
+| `testsRun` | number | No | Number of tests executed |
+| `testsPassed` | number | No | Number of tests passing |
+| `buildStatus` | enum | **Recommended** | "clean", "warnings", "errors" |
+| `buildWarnings` | string[] | No | Warning messages if any |
+| `reviewFocus` | string[] | **Recommended** | Areas to focus review on |
+| `knownLimitations` | string[] | No | Edge cases not handled |
+| `commits` | object[] | No | Commits made (sha + message) |
+
+### filesModified Object
+
+```json
+{
+  "path": "src/lib/auth.ts",
+  "changeType": "modified",  // "added" | "modified" | "deleted"
+  "linesAdded": 50,
+  "linesRemoved": 10,
+  "description": "Added OAuth token refresh"
+}
+```
+
+### Output Summary
+
+After emitting the signal, output a summary:
 
 ```
 ┌────────────────────────────────────────────────────────┐
 │  🔍 READY FOR REVIEW: {TASK_ID}                        │
 └────────────────────────────────────────────────────────┘
 
-Changes made:
-  - [summary of changes]
-  - [files modified]
+📋 Summary:
+  • [accomplishment 1]
+  • [accomplishment 2]
+
+📁 Files Modified: {N} files (+{added}/-{removed} lines)
+  • path/to/file.ts (modified, +50/-10)
+  • path/to/new.ts (added, +100)
+
+🧪 Tests: {status}
+🏗️ Build: {status}
+
+🎯 Review Focus:
+  • [focus area 1]
+  • [focus area 2]
 
 Run /jat:complete when ready to close this task.
 ```
 
-**When to signal review:**
+### When to Signal Review
+
 - After completing any substantial code changes
 - After writing documentation or analysis
 - After fixing a bug (even if more testing is recommended)
 - Before asking "should I mark this complete?"
 - Whenever you're done and waiting for user input
 
-**Do NOT:**
+### Do NOT
+
 - Say "I'm done" without running `jat-signal review`
 - Just stop outputting and wait
 - Use vague phrases like "let me know if you have questions"
+- Emit a thin signal without the rich payload
 
 **Do NOT say "Task Complete" until the user runs `/jat:complete`.**
 
@@ -508,7 +624,19 @@ Options:
 # Emit rich working signal (after reading task)
 jat-signal working '{"taskId":"jat-abc","taskTitle":"...","approach":"...","expectedFiles":["..."],"baselineCommit":"..."}'
 
-# When done coding - ALWAYS run this:
-jat-signal review '{"taskId":"jat-abc","summary":["Change 1","Change 2"]}'
+# When done coding - emit rich review signal:
+jat-signal review '{
+  "taskId":"jat-abc",
+  "taskTitle":"Add feature X",
+  "summary":["Implemented X","Added tests for X"],
+  "filesModified":[
+    {"path":"src/x.ts","changeType":"added","linesAdded":100,"linesRemoved":0}
+  ],
+  "totalLinesAdded":100,
+  "totalLinesRemoved":0,
+  "testsStatus":"passing",
+  "buildStatus":"clean",
+  "reviewFocus":["Check error handling in x.ts"]
+}'
 # Then output summary and wait for user to run /jat:complete
 ```

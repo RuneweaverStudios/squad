@@ -2795,20 +2795,20 @@ The **WorkCard** component (`src/lib/components/work/WorkCard.svelte`) tracks ag
 
 ### State Detection via Signals API
 
-Session state is detected via SSE (Server-Sent Events) from the signals API. Agents emit state changes using `jat-signal`:
+Session state is detected via SSE (Server-Sent Events) from the signals API. Agents emit state changes using `jat-signal` with JSON payloads:
 
 ```bash
-# Agent signals working state
-jat-signal working task-id
+# Agent signals working state (requires JSON)
+jat-signal working '{"taskId":"jat-abc","taskTitle":"Add auth"}'
 
-# Agent signals needs input
-jat-signal needs_input
+# Agent signals needs input (requires JSON)
+jat-signal needs_input '{"taskId":"jat-abc","question":"Which lib?","questionType":"choice"}'
 
-# Agent signals ready for review
-jat-signal review
+# Agent signals ready for review (requires JSON)
+jat-signal review '{"taskId":"jat-abc","summary":["Added login"]}'
 
-# Agent signals completion
-jat-signal completed
+# Agent signals completion (requires JSON)
+jat-signal completed '{"taskId":"jat-abc","outcome":"success"}'
 ```
 
 The PostToolUse hook captures these signals and writes them to `/tmp/jat-signal-{session}.json`. The SSE server reads these files and broadcasts state changes to connected dashboard clients via `session-signal` events.
@@ -2818,7 +2818,7 @@ The PostToolUse hook captures these signals and writes them to `/tmp/jat-signal-
 ### State Transitions
 
 **STARTING → WORKING:**
-- Agent runs `jat-signal working task-id`
+- Agent runs `jat-signal working '{"taskId":"...","taskTitle":"..."}'`
 - Or inferred from `task.status === 'in_progress'` in Beads
 
 **WORKING → NEEDS INPUT:**

@@ -1403,19 +1403,19 @@ GreatWind | [P1] jat-4p0 - Demo: Frontend... [🔒2 📬1 ⏱45m]
 
 The jat-signal system replaces fragile terminal marker parsing with hook-based signals. Agents emit signals via commands, PostToolUse hooks capture them, and the dashboard receives real-time updates via SSE.
 
-**Quick Usage:**
+**Quick Usage (all signals require JSON):**
 ```bash
 # Signal that you're working on a task
-jat-signal working jat-abc
+jat-signal working '{"taskId":"jat-abc","taskTitle":"Add auth"}'
 
 # Signal that you need user input
-jat-signal needs_input
+jat-signal needs_input '{"taskId":"jat-abc","question":"Which lib?","questionType":"choice"}'
 
 # Signal that you're ready for review
-jat-signal review
+jat-signal review '{"taskId":"jat-abc","summary":["Added login page"]}'
 
 # Signal task completion
-jat-signal completed
+jat-signal completed '{"taskId":"jat-abc","outcome":"success"}'
 
 # Suggest follow-up tasks
 jat-signal tasks '[{"title": "Add tests", "priority": 2}]'
@@ -1425,18 +1425,18 @@ jat-signal tasks '[{"title": "Add tests", "priority": 2}]'
 
 | Signal | Command | Dashboard Effect |
 |--------|---------|-----------------|
-| `working` | `jat-signal working <task-id>` | Amber "Working" state |
-| `needs_input` | `jat-signal needs_input` | Purple "Needs Input" state |
-| `review` | `jat-signal review` | Cyan "Ready for Review" state |
-| `completed` | `jat-signal completed` | Green "Completed" state |
-| `idle` | `jat-signal idle` | Gray "Idle" state |
+| `working` | `jat-signal working '{...}'` | Amber "Working" state |
+| `needs_input` | `jat-signal needs_input '{...}'` | Purple "Needs Input" state |
+| `review` | `jat-signal review '{...}'` | Cyan "Ready for Review" state |
+| `completed` | `jat-signal completed '{...}'` | Green "Completed" state |
+| `idle` | `jat-signal idle '{...}'` | Gray "Idle" state |
 | `tasks` | `jat-signal tasks '[...]'` | Shows suggested tasks in UI |
 | `action` | `jat-signal action '{...}'` | Shows human action request |
 
 **How It Works:**
 
-1. **Agent runs** `jat-signal working jat-abc`
-2. **Command outputs** marker: `[JAT-SIGNAL:STATE] working:jat-abc`
+1. **Agent runs** `jat-signal working '{"taskId":"jat-abc","taskTitle":"..."}'`
+2. **Command outputs** marker: `[JAT-SIGNAL:working] {"taskId":"jat-abc",...}`
 3. **PostToolUse hook** (`post-bash-jat-signal.sh`) captures output
 4. **Hook writes** JSON to `/tmp/jat-signal-{session}.json`
 5. **Dashboard SSE** broadcasts state change to all clients
