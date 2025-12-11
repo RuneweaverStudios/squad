@@ -3,7 +3,8 @@
  *
  * GET /api/agents/sparkline?range=24h&agent=AgentName&session=sessionId
  * GET /api/agents/sparkline?range=24h&multiProject=true
- * GET /api/agents/sparkline?range=24h&multiProject=true&agent=AgentName  (NEW!)
+ * GET /api/agents/sparkline?range=24h&multiProject=true&agent=AgentName
+ * GET /api/agents/sparkline?source=sqlite&range=24h  (SQLite data source)
  *
  * Returns time-series token usage data for sparkline visualization.
  *
@@ -13,6 +14,10 @@
  * - session: Session ID filter (optional)
  * - bucketSize: Time bucket size (30min | hour | session) - defaults to 30min
  * - multiProject: Return multi-project data with per-project breakdown (optional, boolean)
+ * - source: Data source (sqlite | jsonl) - defaults to jsonl
+ *   - sqlite: Uses pre-aggregated SQLite data (~1-5ms query time)
+ *   - jsonl: Parses JSONL files directly (~100-5000ms depending on data volume)
+ *   - Falls back to JSONL if SQLite has no data
  *
  * Mode combinations:
  * - agent only: Single-project sparkline for that agent
@@ -29,7 +34,8 @@
  *   startTime: string,
  *   endTime: string,
  *   cached: boolean,
- *   cacheAge: number
+ *   cacheAge: number,
+ *   source: string
  * }
  *
  * Response Format (multiProject=true):
@@ -44,18 +50,20 @@
  *   projectKeys: string[],
  *   projectColors: Record<string, string>,
  *   cached: boolean,
- *   cacheAge: number
+ *   cacheAge: number,
+ *   source: string
  * }
  *
  * Caching:
- * - 30-second TTL per unique query combination
+ * - 5-minute TTL per unique query combination
  * - In-memory Map-based cache
- * - Cache key: `${range}-${agent}-${session}-${bucketSize}-${multiProject}`
- * - Performance: <5ms (cache hit), <100ms (cache miss)
+ * - Cache key: `${range}-${agent}-${session}-${bucketSize}-${multiProject}-${source}`
+ * - Performance: <5ms (cache hit), <100ms (SQLite cache miss), <5000ms (JSONL cache miss)
  */
 
 import { json } from '@sveltejs/kit';
 import { getTokenTimeSeries, getMultiProjectTimeSeries, getMultiProjectTimeSeriesAsync, getAgentMultiProjectTimeSeries } from '$lib/utils/tokenUsageTimeSeries.js';
+import { getHourlyBreakdown, getUsageByProject, runAggregation, getDatabaseStats } from '$lib/server/tokenUsageDb.js';
 
 // ============================================================================
 // In-Memory Cache
@@ -143,11 +151,197 @@ function setCache(key, data) {
  * @param {string} [params.session] - Session ID
  * @param {string} [params.bucketSize] - Bucket size
  * @param {boolean} [params.multiProject] - Multi-project mode
+ * @param {string} [params.source] - Data source (sqlite or jsonl)
  * @returns {string} Cache key
  */
 function getCacheKey(params) {
-	const { range = '24h', agent = '', session = '', bucketSize = '30min', multiProject = false } = params;
-	return `${range}-${agent}-${session}-${bucketSize}-${multiProject}`;
+	const { range = '24h', agent = '', session = '', bucketSize = '30min', multiProject = false, source = 'jsonl' } = params;
+	return `${range}-${agent}-${session}-${bucketSize}-${multiProject}-${source}`;
+}
+
+// ============================================================================
+// SQLite Query Functions
+// ============================================================================
+
+/**
+ * Project colors for multi-project sparklines (same as tokenUsageTimeSeries.js)
+ * @type {Record<string, string>}
+ */
+const PROJECT_COLORS = {
+	jat: '#22c55e',      // green
+	chimaro: '#3b82f6',  // blue
+	jomarchy: '#f59e0b', // amber
+	other: '#8b5cf6'     // purple
+};
+
+/**
+ * Get time range boundaries based on range parameter
+ * @param {'24h' | '7d' | 'all'} range
+ * @returns {{ startTime: Date, endTime: Date }}
+ */
+function getTimeRange(range) {
+	const now = new Date();
+	let startTime;
+
+	switch (range) {
+		case '24h':
+			startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+			break;
+		case '7d':
+			startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+			break;
+		case 'all':
+			// Start from 30 days ago for 'all' range
+			startTime = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+			break;
+		default:
+			startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+	}
+
+	return { startTime, endTime: now };
+}
+
+/**
+ * @typedef {Object} SparklineResult
+ * @property {any[]} data - Time series data
+ * @property {number} totalTokens - Total tokens
+ * @property {number} totalCost - Total cost
+ * @property {number} bucketCount - Number of buckets
+ * @property {string} bucketSize - Bucket size
+ * @property {string} startTime - Start time ISO string
+ * @property {string} endTime - End time ISO string
+ * @property {string[]} [projectKeys] - Project keys (multiProject only)
+ * @property {Record<string, string>} [projectColors] - Project colors (multiProject only)
+ */
+
+/**
+ * Fetch sparkline data from SQLite database
+ *
+ * @param {Object} options
+ * @param {'24h' | '7d' | 'all'} options.range - Time range
+ * @param {'30min' | 'hour' | 'session'} options.bucketSize - Bucket size
+ * @param {string} [options.agentName] - Agent name filter
+ * @param {boolean} [options.multiProject] - Multi-project mode
+ * @returns {Promise<SparklineResult|null>} Sparkline result or null if no data
+ */
+async function fetchFromSQLite({ range, bucketSize, agentName, multiProject }) {
+	const { startTime, endTime } = getTimeRange(range);
+
+	// Convert bucketSize to minutes for getHourlyBreakdown
+	const bucketMinutes = bucketSize === '30min' ? 30 : 60;
+
+	if (multiProject) {
+		// Multi-project mode: get usage by project
+		const projectData = getUsageByProject(startTime, endTime);
+
+		if (!projectData || projectData.length === 0) {
+			return null;
+		}
+
+		// Group by timestamp and aggregate per-project data
+		/** @type {Map<string, { totalTokens: number, totalCost: number, projects: Array<{ project: string, tokens: number, cost: number, color: string }> }>} */
+		const bucketMap = new Map();
+		/** @type {Set<string>} */
+		const projectSet = new Set();
+
+		for (const row of projectData) {
+			projectSet.add(row.project);
+
+			let bucket = bucketMap.get(row.timestamp);
+			if (!bucket) {
+				bucket = { totalTokens: 0, totalCost: 0, projects: [] };
+				bucketMap.set(row.timestamp, bucket);
+			}
+
+			bucket.totalTokens += row.total_tokens;
+			bucket.totalCost += row.cost_usd;
+			bucket.projects.push({
+				project: row.project,
+				tokens: row.total_tokens,
+				cost: row.cost_usd,
+				color: PROJECT_COLORS[row.project] || PROJECT_COLORS.other
+			});
+		}
+
+		// Convert to array sorted by timestamp
+		const data = Array.from(bucketMap.entries())
+			.sort((a, b) => a[0].localeCompare(b[0]))
+			.map(([timestamp, bucket]) => ({
+				timestamp,
+				totalTokens: bucket.totalTokens,
+				totalCost: bucket.totalCost,
+				projects: bucket.projects
+			}));
+
+		// Calculate totals
+		let totalTokens = 0;
+		let totalCost = 0;
+		for (const bucket of data) {
+			totalTokens += bucket.totalTokens;
+			totalCost += bucket.totalCost;
+		}
+
+		// Build project keys and colors
+		const projectKeys = Array.from(projectSet).sort();
+		/** @type {Record<string, string>} */
+		const projectColors = {};
+		for (const project of projectKeys) {
+			projectColors[project] = PROJECT_COLORS[project] || PROJECT_COLORS.other;
+		}
+
+		return {
+			data,
+			totalTokens,
+			totalCost,
+			bucketCount: data.length,
+			bucketSize,
+			startTime: startTime.toISOString(),
+			endTime: endTime.toISOString(),
+			projectKeys,
+			projectColors
+		};
+	} else {
+		// Single-project or agent-filtered mode
+		const hourlyData = getHourlyBreakdown(startTime, endTime, {
+			agent: agentName,
+			bucketMinutes
+		});
+
+		if (!hourlyData || hourlyData.length === 0) {
+			return null;
+		}
+
+		// Calculate totals
+		let totalTokens = 0;
+		let totalCost = 0;
+
+		const data = hourlyData.map(row => {
+			totalTokens += row.total_tokens;
+			totalCost += row.cost_usd;
+
+			return {
+				timestamp: row.timestamp,
+				tokens: row.total_tokens,
+				cost: row.cost_usd,
+				breakdown: {
+					input: 0,
+					cacheCreation: 0,
+					cacheRead: 0,
+					output: 0
+				}
+			};
+		});
+
+		return {
+			data,
+			totalTokens,
+			totalCost,
+			bucketCount: data.length,
+			bucketSize,
+			startTime: startTime.toISOString(),
+			endTime: endTime.toISOString()
+		};
+	}
 }
 
 // ============================================================================
@@ -163,6 +357,7 @@ export async function GET({ url }) {
 		const sessionId = url.searchParams.get('session') || undefined;
 		const bucketSize = url.searchParams.get('bucketSize') || '30min';
 		const multiProject = url.searchParams.get('multiProject') === 'true';
+		const source = url.searchParams.get('source') || 'jsonl'; // 'sqlite' or 'jsonl'
 
 		// Validate parameters
 		if (!['24h', '7d', 'all'].includes(range)) {
@@ -187,8 +382,19 @@ export async function GET({ url }) {
 			);
 		}
 
-		// Generate cache key
-		const cacheKey = getCacheKey({ range, agent: agentName, session: sessionId, bucketSize, multiProject });
+		if (!['sqlite', 'jsonl'].includes(source)) {
+			return json(
+				{
+					error: 'Invalid source parameter',
+					message: 'Source must be: sqlite or jsonl',
+					validValues: ['sqlite', 'jsonl']
+				},
+				{ status: 400 }
+			);
+		}
+
+		// Generate cache key (includes source)
+		const cacheKey = getCacheKey({ range, agent: agentName, session: sessionId, bucketSize, multiProject, source });
 
 		// Check cache
 		const cached = getCached(cacheKey);
@@ -207,7 +413,8 @@ export async function GET({ url }) {
 		// Fetch data (cache miss)
 		const startTime = Date.now();
 
-		let result;
+		/** @type {SparklineResult | null} */
+		let result = null;
 
 		// Cast range and bucketSize to expected types since we validated them above
 		/** @type {'24h' | '7d' | 'all'} */
@@ -215,37 +422,67 @@ export async function GET({ url }) {
 		/** @type {'30min' | 'hour' | 'session'} */
 		const validatedBucketSize = /** @type {'30min' | 'hour' | 'session'} */ (bucketSize);
 
-		if (multiProject && agentName) {
-			// Per-agent multi-project mode: filter multi-project data by agent's sessions
-			result = await getAgentMultiProjectTimeSeries({
-				agentName,
+		// SQLite source: use pre-aggregated data from tokenUsageDb
+		if (source === 'sqlite') {
+			const sqliteResult = await fetchFromSQLite({
 				range: validatedRange,
-				bucketSize: validatedBucketSize
-			});
-		} else if (multiProject) {
-			// System-wide multi-project mode: aggregate across all projects from jat config
-			// Using async worker thread version to avoid blocking the event loop
-			result = await getMultiProjectTimeSeriesAsync({
-				range: validatedRange,
-				bucketSize: validatedBucketSize
-			});
-		} else {
-			// Single-project mode: use existing logic
-			// Get project path (dashboard runs from /dashboard subdirectory)
-			const projectPath = process.cwd().replace(/\/dashboard$/, '');
-
-			result = await getTokenTimeSeries({
-				range: validatedRange,
-				agentName,
-				sessionId,
 				bucketSize: validatedBucketSize,
-				projectPath
+				agentName,
+				multiProject
 			});
+
+			// Check if SQLite has data, fall back to JSONL if empty
+			if (sqliteResult && sqliteResult.bucketCount > 0) {
+				result = sqliteResult;
+				const queryDuration = Date.now() - startTime;
+				console.log(
+					`[Sparkline API] SQLite query: ${sqliteResult.bucketCount} buckets in ${queryDuration}ms (${sqliteResult.totalTokens.toLocaleString()} tokens)${multiProject ? ' [multi-project]' : ''}`
+				);
+			} else {
+				console.log(`[Sparkline API] SQLite returned no data, falling back to JSONL...`);
+				// Fall through to JSONL path below
+			}
+		}
+
+		// JSONL source (default or fallback from SQLite)
+		if (!result) {
+			if (multiProject && agentName) {
+				// Per-agent multi-project mode: filter multi-project data by agent's sessions
+				result = await getAgentMultiProjectTimeSeries({
+					agentName,
+					range: validatedRange,
+					bucketSize: validatedBucketSize
+				});
+			} else if (multiProject) {
+				// System-wide multi-project mode: aggregate across all projects from jat config
+				// Using async worker thread version to avoid blocking the event loop
+				result = await getMultiProjectTimeSeriesAsync({
+					range: validatedRange,
+					bucketSize: validatedBucketSize
+				});
+			} else {
+				// Single-project mode: use existing logic
+				// Get project path (dashboard runs from /dashboard subdirectory)
+				const projectPath = process.cwd().replace(/\/dashboard$/, '');
+
+				result = await getTokenTimeSeries({
+					range: validatedRange,
+					agentName,
+					sessionId,
+					bucketSize: validatedBucketSize,
+					projectPath
+				});
+			}
+		}
+
+		// At this point result is guaranteed to be non-null (either from SQLite or JSONL fallback)
+		if (!result) {
+			throw new Error('No sparkline data available from any source');
 		}
 
 		const fetchDuration = Date.now() - startTime;
 		console.log(
-			`[Sparkline API] Fetched ${result.bucketCount} buckets in ${fetchDuration}ms (${result.totalTokens.toLocaleString()} tokens)${multiProject ? ' [multi-project]' : ''}`
+			`[Sparkline API] Fetched ${result.bucketCount} buckets in ${fetchDuration}ms (${result.totalTokens.toLocaleString()} tokens)${multiProject ? ' [multi-project]' : ''} [source: ${source}]`
 		);
 
 		// Cache the result
@@ -256,7 +493,8 @@ export async function GET({ url }) {
 			...result,
 			cached: false,
 			cacheAge: 0,
-			fetchDuration
+			fetchDuration,
+			source
 		});
 	} catch (error) {
 		console.error('[Sparkline API] Error:', error);
