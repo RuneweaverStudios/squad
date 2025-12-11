@@ -32,7 +32,7 @@
 		interrupt,
 		sendEnter
 	} from '$lib/stores/workSessions.svelte.js';
-	import { broadcastSessionEvent } from '$lib/stores/sessionEvents';
+	import { broadcastSessionEvent, lastSessionEvent } from '$lib/stores/sessionEvents';
 	import { lastTaskEvent } from '$lib/stores/taskEvents';
 	import { getProjectFromTaskId, filterTasksByProject } from '$lib/utils/projectUtils';
 	import { getProjectColor } from '$lib/utils/projectColors';
@@ -487,6 +487,21 @@
 				// Use fresh=true to bypass cache after task creation/update
 				fetchTaskData(true);
 				if (event.updatedTasks && event.updatedTasks.length > 0) {
+					fetchSessions();
+				}
+			}
+		});
+		return unsubscribe;
+	});
+
+	// Listen for session events (spawn, kill, etc.)
+	// This ensures the session list refreshes when an agent is spawned from the drawer
+	$effect(() => {
+		const unsubscribe = lastSessionEvent.subscribe((event) => {
+			if (event) {
+				const structuralEvents = ['session-spawned', 'session-created', 'session-destroyed', 'session-killed'];
+				if (structuralEvents.includes(event.type)) {
+					// Refresh sessions to pick up the new/removed session
 					fetchSessions();
 				}
 			}

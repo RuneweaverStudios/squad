@@ -15,6 +15,7 @@
 	import { get } from 'svelte/store';
 	import { isTaskDrawerOpen, selectedDrawerProject, availableProjects } from '$lib/stores/drawerStore';
 	import { broadcastTaskEvent } from '$lib/stores/taskEvents';
+	import { broadcastSessionEvent } from '$lib/stores/sessionEvents';
 	import { playSuccessChime, playErrorSound, playAttachmentSound } from '$lib/utils/soundEffects';
 	import { getFileTypeInfo, formatFileSize, getAcceptAttribute, type FileCategory } from '$lib/utils/fileUtils';
 	import VoiceInput from './VoiceInput.svelte';
@@ -271,6 +272,64 @@
 
 	// Human action toggle - adds 'human-action' label when checked
 	let isHumanAction = $state(false);
+
+	// Review override state: null = use project rules, 'always_review' = always require review, 'always_auto' = always auto-proceed
+	let reviewOverride = $state<'always_review' | 'always_auto' | null>(null);
+
+	// Computed default review action based on type/priority
+	let computedReviewAction = $state<'auto' | 'review' | null>(null);
+	let computedReviewReason = $state<string | null>(null);
+	let isLoadingReviewPreview = $state(false);
+
+	// Fetch the computed review action when type or priority changes
+	async function fetchReviewPreview() {
+		if (!formData.type) {
+			computedReviewAction = null;
+			computedReviewReason = null;
+			return;
+		}
+
+		isLoadingReviewPreview = true;
+		try {
+			const response = await fetch('/api/review-rules/preview', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					type: formData.type,
+					priority: formData.priority
+				})
+			});
+
+			if (response.ok) {
+				const data = await response.json();
+				computedReviewAction = data.action;
+				computedReviewReason = data.reason;
+			} else {
+				computedReviewAction = null;
+				computedReviewReason = null;
+			}
+		} catch (err) {
+			console.error('Error fetching review preview:', err);
+			computedReviewAction = null;
+			computedReviewReason = null;
+		} finally {
+			isLoadingReviewPreview = false;
+		}
+	}
+
+	// Trigger review preview when type or priority changes
+	$effect(() => {
+		// Track dependencies
+		const _type = formData.type;
+		const _priority = formData.priority;
+
+		// Debounce the fetch to avoid excessive API calls
+		const timeout = setTimeout(() => {
+			fetchReviewPreview();
+		}, 300);
+
+		return () => clearTimeout(timeout);
+	});
 
 	// Dynamic projects list from store (populated by layout from tasks)
 	let dynamicProjects = $state<string[]>([]);
@@ -700,7 +759,8 @@
 				type: formData.type,
 				project: formData.project.trim() || undefined,
 				labels: labels.length > 0 ? labels : undefined,
-				deps: dependencies.length > 0 ? dependencies : undefined
+				deps: dependencies.length > 0 ? dependencies : undefined,
+				review_override: reviewOverride || undefined
 			};
 
 			// POST to API endpoint
@@ -783,6 +843,11 @@
 					// Broadcast task created event
 					broadcastTaskEvent('task-created', taskId);
 
+					// Broadcast session spawned event so other pages refresh their session lists
+					const sessionName = spawnData.session?.sessionName || `jat-${spawnData.session?.agentName}`;
+					const agentName = spawnData.session?.agentName || '';
+					broadcastSessionEvent('session-spawned', sessionName, agentName);
+
 					setTimeout(() => {
 						resetForm();
 						isTaskDrawerOpen.set(false);
@@ -837,6 +902,11 @@
 
 		// Reset human action toggle
 		isHumanAction = false;
+
+		// Reset review override
+		reviewOverride = null;
+		computedReviewAction = null;
+		computedReviewReason = null;
 
 		// Reset AI suggestion state
 		isLoadingSuggestions = false;
@@ -1279,6 +1349,147 @@
 						<label class="label">
 							<span class="label-text-alt" style="color: oklch(0.50 0.02 250);">
 								Comma-separated list of labels
+							</span>
+						</label>
+					</div>
+
+					<!-- Review Override - Industrial -->
+					<div class="form-control">
+						<label class="label">
+							<span class="label-text text-xs font-semibold font-mono uppercase tracking-wider" style="color: oklch(0.55 0.02 250);">
+								Review Override
+							</span>
+							{#if isLoadingReviewPreview}
+								<span class="loading loading-spinner loading-xs" style="color: oklch(0.55 0.02 250);"></span>
+							{/if}
+						</label>
+
+						<!-- Computed default display -->
+						{#if computedReviewAction && !isLoadingReviewPreview}
+							<div
+								class="rounded-lg p-3 mb-3"
+								style="background: oklch(0.20 0.01 250); border: 1px solid oklch(0.30 0.02 250);"
+							>
+								<div class="flex items-center gap-2 mb-1">
+									{#if computedReviewAction === 'review'}
+										<span class="flex items-center gap-1.5 text-sm font-medium" style="color: oklch(0.75 0.15 200);">
+											<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+												<path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+											</svg>
+											Requires Review
+										</span>
+									{:else}
+										<span class="flex items-center gap-1.5 text-sm font-medium" style="color: oklch(0.75 0.15 145);">
+											<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+											</svg>
+											Auto-Proceed
+										</span>
+									{/if}
+									<span class="text-xs" style="color: oklch(0.50 0.02 250);">
+										(project default for P{formData.priority} {formData.type})
+									</span>
+								</div>
+								{#if computedReviewReason}
+									<p class="text-xs" style="color: oklch(0.55 0.02 250);">
+										{computedReviewReason}
+									</p>
+								{/if}
+							</div>
+						{/if}
+
+						<!-- Radio buttons for override -->
+						<div class="space-y-2">
+							<!-- Use project rules (default) -->
+							<label
+								class="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all"
+								style="
+									background: {reviewOverride === null ? 'oklch(0.25 0.08 240 / 0.15)' : 'oklch(0.18 0.01 250)'};
+									border: 1px solid {reviewOverride === null ? 'oklch(0.50 0.15 240 / 0.5)' : 'oklch(0.30 0.02 250)'};
+								"
+							>
+								<input
+									type="radio"
+									name="review-override"
+									class="radio radio-sm"
+									checked={reviewOverride === null}
+									onchange={() => reviewOverride = null}
+									disabled={isSubmitting}
+								/>
+								<div class="flex-1">
+									<span class="text-sm font-medium" style="color: oklch(0.80 0.02 250);">
+										Use project rules
+									</span>
+									<p class="text-xs mt-0.5" style="color: oklch(0.50 0.02 250);">
+										Apply the configured review rules for this type and priority
+									</p>
+								</div>
+							</label>
+
+							<!-- Always require review -->
+							<label
+								class="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all"
+								style="
+									background: {reviewOverride === 'always_review' ? 'oklch(0.25 0.10 200 / 0.15)' : 'oklch(0.18 0.01 250)'};
+									border: 1px solid {reviewOverride === 'always_review' ? 'oklch(0.50 0.15 200 / 0.5)' : 'oklch(0.30 0.02 250)'};
+								"
+							>
+								<input
+									type="radio"
+									name="review-override"
+									class="radio radio-sm"
+									checked={reviewOverride === 'always_review'}
+									onchange={() => reviewOverride = 'always_review'}
+									disabled={isSubmitting}
+								/>
+								<div class="flex-1">
+									<span class="flex items-center gap-1.5 text-sm font-medium" style="color: oklch(0.80 0.02 250);">
+										<svg class="w-4 h-4" style="color: oklch(0.75 0.15 200);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+											<path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+										</svg>
+										Always require review
+									</span>
+									<p class="text-xs mt-0.5" style="color: oklch(0.50 0.02 250);">
+										Override project rules - this task always needs human review
+									</p>
+								</div>
+							</label>
+
+							<!-- Always auto-proceed -->
+							<label
+								class="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all"
+								style="
+									background: {reviewOverride === 'always_auto' ? 'oklch(0.25 0.10 145 / 0.15)' : 'oklch(0.18 0.01 250)'};
+									border: 1px solid {reviewOverride === 'always_auto' ? 'oklch(0.50 0.15 145 / 0.5)' : 'oklch(0.30 0.02 250)'};
+								"
+							>
+								<input
+									type="radio"
+									name="review-override"
+									class="radio radio-sm"
+									checked={reviewOverride === 'always_auto'}
+									onchange={() => reviewOverride = 'always_auto'}
+									disabled={isSubmitting}
+								/>
+								<div class="flex-1">
+									<span class="flex items-center gap-1.5 text-sm font-medium" style="color: oklch(0.80 0.02 250);">
+										<svg class="w-4 h-4" style="color: oklch(0.75 0.15 145);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+										</svg>
+										Always auto-proceed
+									</span>
+									<p class="text-xs mt-0.5" style="color: oklch(0.50 0.02 250);">
+										Override project rules - this task can auto-proceed without review
+									</p>
+								</div>
+							</label>
+						</div>
+
+						<label class="label">
+							<span class="label-text-alt" style="color: oklch(0.45 0.02 250);">
+								Override the project's review rules for this specific task
 							</span>
 						</label>
 					</div>

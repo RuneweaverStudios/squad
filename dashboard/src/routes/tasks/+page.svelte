@@ -27,7 +27,7 @@
 		interrupt,
 		sendEnter
 	} from '$lib/stores/workSessions.svelte.js';
-	import { broadcastSessionEvent } from '$lib/stores/sessionEvents';
+	import { broadcastSessionEvent, lastSessionEvent } from '$lib/stores/sessionEvents';
 	import { lastTaskEvent } from '$lib/stores/taskEvents';
 	import { initSort, getSortBy, getSortDir } from '$lib/stores/workSort.svelte.js';
 
@@ -360,6 +360,21 @@
 				// Also refresh work sessions when tasks are updated (status/assignee changes)
 				// This ensures SessionCards show the correct task immediately
 				if (event.updatedTasks && event.updatedTasks.length > 0) {
+					fetchSessions();
+				}
+			}
+		});
+		return unsubscribe;
+	});
+
+	// Listen for session events (spawn, kill, etc.) and refresh immediately
+	// This ensures the session panel updates when an agent is spawned from the drawer
+	$effect(() => {
+		const unsubscribe = lastSessionEvent.subscribe((event) => {
+			if (event) {
+				const structuralEvents = ['session-spawned', 'session-created', 'session-destroyed', 'session-killed'];
+				if (structuralEvents.includes(event.type)) {
+					// Refresh sessions to pick up the new/removed session
 					fetchSessions();
 				}
 			}
