@@ -22,7 +22,8 @@ const STORAGE_KEYS = {
 	terminalScrollback: 'terminal-scrollback-lines',
 	epicCelebration: 'epic-celebration-enabled',
 	epicAutoClose: 'epic-auto-close-enabled',
-	maxSessions: 'max-concurrent-sessions'
+	maxSessions: 'max-concurrent-sessions',
+	collapsedEpics: 'tasktable-collapsed-epics'
 } as const;
 
 // Terminal font family options
@@ -76,7 +77,8 @@ const DEFAULTS = {
 	terminalScrollback: 2000 as TerminalScrollback,
 	epicCelebration: true, // Show toast + sound when all epic children complete
 	epicAutoClose: false, // Automatically close epic when all children complete
-	maxSessions: 12 as MaxSessions // Maximum concurrent agent sessions
+	maxSessions: 12 as MaxSessions, // Maximum concurrent agent sessions
+	collapsedEpics: [] as string[] // Task IDs of collapsed epics/groups in TaskTable
 };
 
 // Types
@@ -103,6 +105,7 @@ let terminalScrollback = $state<TerminalScrollback>(DEFAULTS.terminalScrollback)
 let epicCelebration = $state(DEFAULTS.epicCelebration);
 let epicAutoClose = $state(DEFAULTS.epicAutoClose);
 let maxSessions = $state<MaxSessions>(DEFAULTS.maxSessions);
+let collapsedEpics = $state<string[]>(DEFAULTS.collapsedEpics);
 let initialized = $state(false);
 
 /**
@@ -165,6 +168,18 @@ export function initPreferences(): void {
 	maxSessions = (parsedMaxSessions === 4 || parsedMaxSessions === 6 || parsedMaxSessions === 8 || parsedMaxSessions === 10 || parsedMaxSessions === 12 || parsedMaxSessions === 16 || parsedMaxSessions === 20)
 		? parsedMaxSessions
 		: DEFAULTS.maxSessions;
+
+	const storedCollapsedEpics = localStorage.getItem(STORAGE_KEYS.collapsedEpics);
+	if (storedCollapsedEpics) {
+		try {
+			const parsed = JSON.parse(storedCollapsedEpics);
+			collapsedEpics = Array.isArray(parsed) ? parsed : DEFAULTS.collapsedEpics;
+		} catch {
+			collapsedEpics = DEFAULTS.collapsedEpics;
+		}
+	} else {
+		collapsedEpics = DEFAULTS.collapsedEpics;
+	}
 
 	// Apply terminal font CSS variables to document
 	updateTerminalFontCSSVars();
@@ -441,6 +456,36 @@ export function setMaxSessions(value: MaxSessions): void {
 	if (browser) {
 		localStorage.setItem(STORAGE_KEYS.maxSessions, String(value));
 	}
+}
+
+// ============================================================================
+// Collapsed Epics (TaskTable group collapse state persistence)
+// ============================================================================
+
+export function getCollapsedEpics(): string[] {
+	return collapsedEpics;
+}
+
+export function setCollapsedEpics(value: string[]): void {
+	collapsedEpics = value;
+	if (browser) {
+		localStorage.setItem(STORAGE_KEYS.collapsedEpics, JSON.stringify(value));
+	}
+}
+
+export function toggleCollapsedEpic(epicId: string): void {
+	const newValue = collapsedEpics.includes(epicId)
+		? collapsedEpics.filter(id => id !== epicId)
+		: [...collapsedEpics, epicId];
+	setCollapsedEpics(newValue);
+}
+
+export function isEpicCollapsed(epicId: string): boolean {
+	return collapsedEpics.includes(epicId);
+}
+
+export function clearCollapsedEpics(): void {
+	setCollapsedEpics([]);
 }
 
 // ============================================================================
