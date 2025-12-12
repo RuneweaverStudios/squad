@@ -102,6 +102,13 @@ export const unifiedNavConfig: UnifiedNavConfig = {
 			href: '/graph',
 			icon: 'graph',
 			primary: false
+		},
+		{
+			id: 'automation',
+			label: 'Automation',
+			href: '/automation',
+			icon: 'automation',
+			primary: false
 		}
 	],
 	showProjectFilter: true,
