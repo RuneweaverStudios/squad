@@ -223,6 +223,7 @@ $effect(() => {
 
 | State | Signal Type | Icon | Color | Description |
 |-------|-------------|------|-------|-------------|
+| User Input | `user_input` | 💬 | Purple | User sent a message |
 | Starting | `starting` | 🚀 | Cyan | Agent initializing |
 | Working | `working` | ⚡ | Amber | Actively working on task |
 | Compacting | `compacting` | 📦 | Orange | Summarizing context |
@@ -244,12 +245,31 @@ All signals are also written to a timeline JSONL file (`/tmp/jat-timeline-jat-{A
 - Rollback button for events with git_sha
 - Auto-refresh polling
 
+**Collapsed Card Labels:**
+
+Collapsed cards show context-specific summaries from signal payloads:
+
+| Event Type | Collapsed Label Shows | Fallback |
+|------------|----------------------|----------|
+| `user_input` | Truncated prompt (first 60 chars) | - |
+| `working` | `data.approach` (what agent plans to do) | `data.taskTitle` |
+| `review` | First `data.summary` item or `data.reviewFocus` | `data.taskTitle` |
+| `completing` | `data.currentStep` (e.g., "Committing...") | `data.taskTitle` |
+| `completed` | `data.outcome` (e.g., "Task completed successfully") | `data.taskTitle` |
+| `needs_input` | `data.question` (what agent is asking) | `data.taskTitle` |
+| Others | Uppercase type + task ID (e.g., "STARTING jat-abc") | - |
+
+**Click-to-Copy:**
+
+In the expanded view, `user_input` message text is click-to-copy. Click the purple message box to copy the full prompt to clipboard. A brief "Copied!" badge confirms the action.
+
 **Rich Event Views:**
 
 Each event type has a custom UI in the expanded timeline:
 
 | Event Type | Rich View |
 |------------|-----------|
+| `user_input` | User message in purple card, click-to-copy |
 | `tasks` | Full SuggestedTasksSection with checkboxes, priority dropdowns, editable titles, "Create Tasks" button |
 | `complete` | Summary bullets, quality badges (tests/build), human actions, suggested tasks, cross-agent intel |
 | `action` | Title and description card |

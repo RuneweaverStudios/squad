@@ -26,6 +26,7 @@
 		CompletingSignalCard
 	} from '$lib/components/signals';
 	import type { SuggestedTask } from '$lib/types/signals';
+	import { workSessionsState } from '$lib/stores/workSessions.svelte';
 	import type {
 		WorkingSignal,
 		ReviewSignal,
@@ -125,6 +126,14 @@
 	let error = $state<string | null>(null);
 	let isExpanded = $state(false);
 	let actionSubmitting = $state(false);
+	let copiedEventKey = $state<string | null>(null);
+
+	// Activity state for shimmer effect on latest event
+	// Derived from the central workSessionsState store
+	const isGenerating = $derived.by(() => {
+		const session = workSessionsState.sessions.find(s => s.sessionName === sessionName);
+		return session?._activityState === 'generating';
+	});
 
 	// Filtered events based on filter props
 	const filteredEvents = $derived.by(() => {
@@ -153,7 +162,36 @@
 			result = result.filter((e) => new Date(e.timestamp).getTime() <= endTs);
 		}
 
-		return result;
+		// Merge consecutive events of the same type for the same task
+		// This prevents multiple COMPLETING entries from cluttering the timeline
+		// Events are stored newest-first (index 0 = most recent)
+		// Keep only the most recent event when consecutive events have same type+task
+		const merged: TimelineEvent[] = [];
+		for (let i = 0; i < result.length; i++) {
+			const current = result[i];
+			const prev = merged[merged.length - 1];
+
+			// Get event type (could be in type or state field)
+			const currentType = current.type === 'state' ? current.state : current.type;
+			const prevType = prev ? (prev.type === 'state' ? prev.state : prev.type) : null;
+
+			// Check if this is a duplicate/update of a previous event
+			// Merge if: same type AND same task_id AND type is one that updates frequently
+			const mergableTypes = ['completing', 'compacting'];
+			const shouldMerge = prev &&
+				currentType === prevType &&
+				current.task_id === prev.task_id &&
+				mergableTypes.includes(currentType || '');
+
+			if (shouldMerge) {
+				// Skip this older event - we already have the newest one of this type
+				// (events are newest-first, so 'prev' is newer than 'current')
+			} else {
+				merged.push(current);
+			}
+		}
+
+		return merged;
 	});
 
 	// Helper to check if event has rich signal data
@@ -319,6 +357,12 @@
 	// State styling - solid backgrounds to avoid see-through stacking
 	// Maps signal states to visual styles (matches SessionCard SessionState)
 	const stateStyles: Record<string, { icon: string; bg: string; text: string; border: string }> = {
+		user_input: {
+			icon: '💬',
+			bg: 'oklch(0.22 0.08 260)',
+			text: 'oklch(0.85 0.12 260)',
+			border: 'oklch(0.40 0.10 260)'
+		},
 		starting: {
 			icon: '🚀',
 			bg: 'oklch(0.22 0.08 200)',
@@ -449,8 +493,72 @@
 	function getEventLabel(event: TimelineEvent): string {
 		// Determine the signal type - in new format, type IS the signal type
 		const signalType = event.state || event.type;
-		const label = signalType.toUpperCase().replace('_', ' ');
+		const maxLen = 60;
+		const truncate = (s: string) => s.length > maxLen ? s.slice(0, maxLen) + '…' : s;
 
+		// For user_input events, show truncated prompt preview
+		if (event.type === 'user_input' && event.data?.prompt) {
+			return truncate(event.data.prompt as string);
+		}
+
+		// For working events, show approach (what agent plans to do)
+		if (signalType === 'working' && event.data) {
+			if (event.data.approach) {
+				return truncate(event.data.approach as string);
+			}
+			if (event.data.taskTitle) {
+				return truncate(event.data.taskTitle as string);
+			}
+		}
+
+		// For review events, show first summary item or reviewFocus
+		if (signalType === 'review' && event.data) {
+			if (event.data.summary && Array.isArray(event.data.summary) && event.data.summary.length > 0) {
+				return truncate(event.data.summary[0] as string);
+			}
+			if (event.data.reviewFocus && Array.isArray(event.data.reviewFocus) && event.data.reviewFocus.length > 0) {
+				return truncate(event.data.reviewFocus[0] as string);
+			}
+			if (event.data.taskTitle) {
+				return truncate(event.data.taskTitle as string);
+			}
+		}
+
+		// For completing events, show current step
+		if (signalType === 'completing' && event.data) {
+			if (event.data.currentStep) {
+				// Capitalize and format step name (e.g., "committing" -> "Committing...")
+				const step = (event.data.currentStep as string).charAt(0).toUpperCase() + (event.data.currentStep as string).slice(1);
+				return `${step}...`;
+			}
+			if (event.data.taskTitle) {
+				return truncate(event.data.taskTitle as string);
+			}
+		}
+
+		// For needs_input events, show the question
+		if (signalType === 'needs_input' && event.data) {
+			if (event.data.question) {
+				return truncate(event.data.question as string);
+			}
+			if (event.data.taskTitle) {
+				return truncate(event.data.taskTitle as string);
+			}
+		}
+
+		// For completed events, show outcome
+		if ((signalType === 'completed' || event.type === 'complete') && event.data) {
+			if (event.data.outcome) {
+				const outcome = event.data.outcome as string;
+				return outcome === 'success' ? 'Task completed successfully' : `Completed: ${outcome}`;
+			}
+			if (event.data.taskTitle) {
+				return truncate(event.data.taskTitle as string);
+			}
+		}
+
+		// Fallback to uppercase label with task ID
+		const label = signalType.toUpperCase().replace('_', ' ');
 		if (event.task_id) {
 			return `${label} ${event.task_id}`;
 		}
@@ -547,7 +655,7 @@
 				transition:slide={{ duration: 200, easing: cubicOut }}
 			>
 				<div class="p-2 flex flex-col-reverse gap-1">
-					{#each events as event, idx (event.timestamp + idx)}
+					{#each filteredEvents as event, idx (event.timestamp + idx)}
 						{@const style = getEventStyle(event)}
 						<div
 							class="rounded-md cursor-pointer transition-all hover:scale-[1.01]"
@@ -561,7 +669,10 @@
 							>
 								<div class="flex items-center gap-2">
 									<span class="text-sm">{style.icon}</span>
-									<span class="font-mono text-xs font-medium" style="color: {style.text};">
+									<span
+										class="font-mono text-xs font-medium {idx === 0 && isGenerating ? 'shimmer-text-fast' : ''}"
+										style="color: {style.text};"
+									>
 										{getEventLabel(event)}
 									</span>
 									{#if event.git_sha}
@@ -978,6 +1089,31 @@
 												</div>
 											{/if}
 										</div>
+									{:else if event.type === 'user_input' && event.data}
+										<!-- User Input event - show user's message (click to copy) -->
+										<div class="space-y-2">
+											{#if event.data.prompt}
+												<!-- svelte-ignore a11y_click_events_have_key_events -->
+												<!-- svelte-ignore a11y_no_static_element_interactions -->
+												<div
+													class="text-xs p-2 rounded-lg whitespace-pre-wrap cursor-pointer transition-all hover:brightness-110 active:scale-[0.99] relative"
+													style="background: oklch(0.18 0.04 260); border-left: 3px solid oklch(0.55 0.15 260); color: oklch(0.80 0.05 260);"
+													onclick={async () => {
+														await navigator.clipboard.writeText(event.data.prompt);
+														copiedEventKey = getEventKey(event);
+														setTimeout(() => copiedEventKey = null, 1500);
+													}}
+													title="Click to copy"
+												>
+													{event.data.prompt}
+													{#if copiedEventKey === getEventKey(event)}
+														<span class="absolute top-1 right-1 text-[9px] px-1.5 py-0.5 rounded" style="background: oklch(0.35 0.15 145); color: oklch(0.90 0.15 145);">
+															Copied!
+														</span>
+													{/if}
+												</div>
+											{/if}
+										</div>
 									{:else}
 										<!-- Default JSON view for other event types -->
 										<pre
@@ -998,7 +1134,7 @@
 			<!-- Collapsed view - stacked cards peeking above input -->
 			<!-- stack-top: older events peek out above the newest (bottom) card -->
 			<div class="stack stack-top h-10 w-full">
-				{#each events.slice(0, 3) as event, idx (getEventKey(event))}
+				{#each filteredEvents.slice(0, 3) as event, idx (getEventKey(event))}
 					{@const style = getEventStyle(event)}
 					{@const isNewest = idx === 0}
 					{@const isNew = newEventIds.has(getEventKey(event))}
@@ -1028,12 +1164,12 @@
 									<span class="font-mono text-[10px]" style="color: oklch(0.50 0.02 250);">
 										{formatRelativeTime(event.timestamp)}
 									</span>
-									{#if events.length > 1}
+									{#if filteredEvents.length > 1}
 										<span
 											class="font-mono text-[9px]"
 											style="color: oklch(0.55 0.02 250);"
 										>
-											+{events.length - 1}
+											+{filteredEvents.length - 1}
 										</span>
 									{/if}
 								</div>
