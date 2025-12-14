@@ -182,12 +182,20 @@
 
 			if (data.error || !data.agents) return;
 
-			// Merge usage data into existing agents
-			const usageMap = new Map(data.agents.map((a: { name: string; usage?: unknown }) => [a.name, a.usage]));
-			agents = agents.map(agent => ({
-				...agent,
-				usage: usageMap.get(agent.name) || agent.usage
-			}));
+			// Merge usage data (including sparklineData and contextPercent) into existing agents
+			const usageMap = new Map(data.agents.map((a: { name: string; usage?: unknown; sparklineData?: unknown; contextPercent?: number }) => [a.name, { usage: a.usage, sparklineData: a.sparklineData, contextPercent: a.contextPercent }]));
+			agents = agents.map(agent => {
+				const usageData = usageMap.get(agent.name);
+				if (usageData) {
+					return {
+						...agent,
+						usage: usageData.usage || agent.usage,
+						sparklineData: usageData.sparklineData || agent.sparklineData,
+						contextPercent: usageData.contextPercent ?? agent.contextPercent
+					};
+				}
+				return agent;
+			});
 		} catch (error) {
 			console.error('Failed to fetch usage data:', error);
 		}

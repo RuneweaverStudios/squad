@@ -28,7 +28,7 @@
 import { json } from '@sveltejs/kit';
 import { getAgents, getReservations, getBeadsActivities, getAgentCounts } from '$lib/server/agent-mail.js';
 import { getTasks } from '$lib/server/beads.js';
-import { getAllAgentUsageAsync, getHourlyUsageAsync } from '$lib/utils/tokenUsage.js';
+import { getAllAgentUsageAsync, getHourlyUsageAsync, getAgentHourlyUsageAsync, getAgentContextPercent } from '$lib/utils/tokenUsage.js';
 import { apiCache, cacheKey, CACHE_TTL, invalidateCache } from '$lib/server/cache.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -47,14 +47,26 @@ let taskCacheTimestamp = 0;
 const TASK_CACHE_TTL_MS = 5000;
 
 /**
+ * Reset the module-level task cache
+ * Called when tasks are created/updated to force fresh data on next request
+ * Note: Named with '_' prefix to comply with SvelteKit export rules for +server.js
+ */
+export function _resetTaskCache() {
+	taskCacheTimestamp = 0;
+	cachedTasks = [];
+	cachedTasksProject = null;
+}
+
+/**
  * Get tasks with caching (5s TTL)
  * @param {string|null} projectName - Optional project filter
+ * @param {boolean} [forceFresh=false] - Skip cache and fetch fresh data
  * @returns {Task[]} Cached or fresh tasks
  */
-function getCachedTasks(projectName = null) {
+function getCachedTasks(projectName = null, forceFresh = false) {
 	const now = Date.now();
-	// Cache miss if: expired, empty, or different project filter
-	if (now - taskCacheTimestamp > TASK_CACHE_TTL_MS || cachedTasks.length === 0 || cachedTasksProject !== projectName) {
+	// Cache miss if: forced fresh, expired, empty, or different project filter
+	if (forceFresh || now - taskCacheTimestamp > TASK_CACHE_TTL_MS || cachedTasks.length === 0 || cachedTasksProject !== projectName) {
 		try {
 			cachedTasks = getTasks({ projectName: projectName ?? undefined });
 			cachedTasksProject = projectName;
@@ -190,6 +202,7 @@ export async function GET({ url }) {
 	const includeHourly = url.searchParams.get('hourly') === 'true';
 	const includeActivities = url.searchParams.get('activities') === 'true';
 	const rangeParam = url.searchParams.get('range') ?? undefined;
+	const forceFresh = url.searchParams.get('fresh') === 'true';
 
 	// Build cache key from relevant parameters
 	const key = cacheKey('agents', {
@@ -205,10 +218,12 @@ export async function GET({ url }) {
 	// Determine TTL based on whether usage is included (expensive operation)
 	const ttl = includeUsage ? CACHE_TTL.LONG : CACHE_TTL.SHORT;
 
-	// Check cache
-	const cached = apiCache.get(key);
-	if (cached) {
-		return json(cached);
+	// Check cache (skip if forceFresh requested)
+	if (!forceFresh) {
+		const cached = apiCache.get(key);
+		if (cached) {
+			return json(cached);
+		}
 	}
 
 	try {
@@ -223,7 +238,7 @@ export async function GET({ url }) {
 		/** @type {Reservation[]} */
 		const reservations = getReservations(agentFilter, undefined);  // Show all reservations
 		/** @type {Task[]} */
-		const tasks = getCachedTasks(projectFilter);  // Filter tasks only (cached to avoid expensive JSONL parsing)
+		const tasks = getCachedTasks(projectFilter, forceFresh);  // Filter tasks only (cached to avoid expensive JSONL parsing)
 
 		// Fetch tmux session status to determine which agents have active sessions
 		// Also get session creation time for "connecting" state detection
@@ -253,11 +268,35 @@ export async function GET({ url }) {
 		let usageToday = null;
 		/** @type {Map<string, import('$lib/utils/tokenUsage.js').TokenUsage> | null} */
 		let usageWeek = null;
+		/** @type {Map<string, import('$lib/utils/tokenUsage.js').HourlyUsage[]>} */
+		const agentSparklineData = new Map();
+		/** @type {Map<string, number | null>} */
+		const agentContextPercent = new Map();
+
 		if (includeUsage) {
+			// Fetch aggregated usage data
 			[usageToday, usageWeek] = await Promise.all([
 				getAllAgentUsageAsync('today', projectPath),
 				getAllAgentUsageAsync('week', projectPath)
 			]);
+
+			// Fetch per-agent sparklineData and contextPercent for agents with active sessions
+			// (only for agents that have tmux sessions - others don't need sparklines)
+			const agentsWithActiveSessions = agents.filter(a => agentsWithSessions.has(a.name));
+			await Promise.all(
+				agentsWithActiveSessions.map(async (agent) => {
+					try {
+						const [sparkline, contextPct] = await Promise.all([
+							getAgentHourlyUsageAsync(agent.name, projectPath),
+							getAgentContextPercent(agent.name, projectPath)
+						]);
+						agentSparklineData.set(agent.name, sparkline);
+						agentContextPercent.set(agent.name, contextPct);
+					} catch (err) {
+						// Silently ignore errors for individual agents
+					}
+				})
+			);
 		}
 
 		// Optionally fetch hourly token usage data (raw data for sparklines, using worker threads)
@@ -400,6 +439,16 @@ export async function GET({ url }) {
 						sessionCount: weekUsage.sessionCount
 					} : { total_tokens: 0, cost: 0, sessionCount: 0 }
 				};
+
+				// Include per-agent sparklineData and contextPercent
+				const sparkline = agentSparklineData.get(agent.name);
+				if (sparkline && sparkline.length > 0) {
+					baseStats.sparklineData = sparkline;
+				}
+				const contextPct = agentContextPercent.get(agent.name);
+				if (contextPct !== undefined) {
+					baseStats.contextPercent = contextPct;
+				}
 			}
 
 			return baseStats;

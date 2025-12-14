@@ -1074,6 +1074,46 @@ validate_starting() {
         return 1
     fi
 
+    # Validate sessionId if present (should be string, UUID format)
+    if echo "$payload" | jq -e 'has("sessionId")' >/dev/null 2>&1; then
+        local session_id
+        session_id=$(echo "$payload" | jq -r '.sessionId // ""')
+        if [[ -z "$session_id" ]]; then
+            echo "Error: starting.sessionId cannot be empty when provided" >&2
+            return 1
+        fi
+    fi
+
+    # Validate taskId if present (should be non-empty string)
+    if echo "$payload" | jq -e 'has("taskId")' >/dev/null 2>&1; then
+        local task_id
+        task_id=$(echo "$payload" | jq -r '.taskId // ""')
+        if [[ -z "$task_id" ]]; then
+            echo "Error: starting.taskId cannot be empty when provided" >&2
+            return 1
+        fi
+    fi
+
+    # Validate taskTitle if present (should be non-empty string)
+    if echo "$payload" | jq -e 'has("taskTitle")' >/dev/null 2>&1; then
+        local task_title
+        task_title=$(echo "$payload" | jq -r '.taskTitle // ""')
+        if [[ -z "$task_title" ]]; then
+            echo "Error: starting.taskTitle cannot be empty when provided" >&2
+            return 1
+        fi
+    fi
+
+    # Validate project if present (should be non-empty string)
+    if echo "$payload" | jq -e 'has("project")' >/dev/null 2>&1; then
+        local project
+        project=$(echo "$payload" | jq -r '.project // ""')
+        if [[ -z "$project" ]]; then
+            echo "Error: starting.project cannot be empty when provided" >&2
+            return 1
+        fi
+    fi
+
     # Validate gitStatus if present
     local git_status
     git_status=$(echo "$payload" | jq -r '.gitStatus // ""')

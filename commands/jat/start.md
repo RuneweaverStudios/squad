@@ -228,6 +228,41 @@ am-send "[$TASK_ID] Starting: $TASK_TITLE" \
 
 ---
 
+### STEP 6.5: Emit Starting Signal
+
+**Emit a rich `starting` signal with session and task info for dashboard tracking.**
+
+The starting signal includes:
+- **sessionId** - Claude Code session ID (from Step 2A)
+- **agentName** - Agent name
+- **taskId** - Task being started
+- **taskTitle** - Human-readable task title
+- **project** - Project name (e.g., "jat", "chimaro")
+
+```bash
+# Emit starting signal with full session and task context
+jat-signal starting '{
+  "agentName": "{AGENT_NAME}",
+  "sessionId": "{SESSION_ID}",
+  "taskId": "{TASK_ID}",
+  "taskTitle": "{TASK_TITLE}",
+  "project": "{PROJECT_NAME}"
+}'
+```
+
+**Example:**
+```bash
+jat-signal starting '{"agentName":"CrystalBay","sessionId":"4a5001aa-04eb-47f6-a4da-75048baf4c79","taskId":"jat-fbz2","taskTitle":"Create session start signal event","project":"jat"}'
+```
+
+This signal appears in the dashboard EventStack and shows:
+- Agent name
+- Full session ID (selectable for copying)
+- Task ID and title
+- Project name
+
+---
+
 ### STEP 7: Plan Approach & Emit Rich Signal
 
 **You MUST emit a rich `working` signal for dashboard state tracking.**

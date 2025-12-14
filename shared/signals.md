@@ -29,7 +29,7 @@ Output format: `[JAT-SIGNAL:<type>] <json-payload>`
 
 | Signal | Command | Required Fields |
 |--------|---------|-----------------|
-| `starting` | `jat-signal starting '{...}'` | agentName |
+| `starting` | `jat-signal starting '{...}'` | agentName (optional: sessionId, taskId, taskTitle, project) |
 | `working` | `jat-signal working '{...}'` | taskId, taskTitle |
 | `compacting` | `jat-signal compacting '{...}'` | reason, contextSizeBefore |
 | `completing` | `jat-signal completing '{...}'` | taskId, currentStep |
@@ -51,8 +51,11 @@ Output format: `[JAT-SIGNAL:<type>] <json-payload>`
 
 **State Signals:**
 ```bash
-# Session starting up
+# Session starting up (basic)
 jat-signal starting '{"agentName":"FairBay","project":"chimaro","model":"sonnet-4"}'
+
+# Session starting up (with task and session ID)
+jat-signal starting '{"agentName":"FairBay","project":"chimaro","sessionId":"4a5001aa-04eb-47f6-a4da-75048baf4c79","taskId":"jat-abc","taskTitle":"Add auth flow"}'
 
 # Starting work on a task
 jat-signal working '{"taskId":"jat-abc","taskTitle":"Add auth flow"}'
@@ -278,7 +281,7 @@ Each event type has a custom UI in the expanded timeline:
 | `needs_input` | Question, question type, options if provided |
 | `completing` | Current step (hidden once task completes) |
 | `completed` | Green outcome badge, summary checklist, task ID |
-| `starting` | Agent name, project, model |
+| `starting` | Agent name, session ID (full UUID), task ID and title, project |
 | `compacting` | Reason, context size before |
 | `idle` | Ready for work status, session summary |
 | `auto_proceed` | Current task ID, next task ID |
@@ -398,8 +401,8 @@ jat-signal --help
 ### Example Workflow
 
 ```bash
-# Agent starts session
-jat-signal starting '{"agentName":"FairBay","project":"chimaro","model":"sonnet-4"}'
+# Agent starts session (with session ID and task if known)
+jat-signal starting '{"agentName":"FairBay","project":"chimaro","sessionId":"4a5001aa-04eb-47f6-a4da-75048baf4c79","taskId":"jat-abc","taskTitle":"Add auth flow"}'
 
 # Agent picks up task via /jat:start
 jat-signal working '{"taskId":"jat-abc","taskTitle":"Add auth flow"}'

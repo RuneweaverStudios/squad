@@ -253,6 +253,7 @@
 							tokens={(agent as any).usage?.today?.total_tokens || 0}
 							cost={(agent as any).usage?.today?.cost || 0}
 							sparklineData={(agent as any).sparklineData}
+							contextPercent={(agent as any).contextPercent}
 							created={agent.last_active_ts || ''}
 							attached={agent.hasSession || false}
 							{onTaskClick}

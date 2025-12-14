@@ -140,6 +140,14 @@ validate_payload() {
     validation_output=$("$validator" "$signal_type" "$payload" 2>&1) || validation_exit=$?
 
     if [[ $validation_exit -ne 0 ]]; then
+        # Always fail on missing required fields (even in non-strict mode)
+        # This prevents incomplete signals from being emitted
+        if echo "$validation_output" | grep -q "missing required field"; then
+            echo "Error: $validation_output" >&2
+            echo "Hint: Include all required fields in your signal payload" >&2
+            exit 1
+        fi
+
         if [[ "$STRICT" == "true" ]]; then
             echo "Error: Validation failed: $validation_output" >&2
             exit 1
@@ -176,6 +184,8 @@ fi
 case "$SIGNAL_TYPE" in
     working)
         require_json "working" "$SIGNAL_DATA"
+        # Compact JSON to single line for hook parsing
+        SIGNAL_DATA=$(echo "$SIGNAL_DATA" | jq -c .)
         validate_payload "working" "$SIGNAL_DATA"
         TASK_ID=$(echo "$SIGNAL_DATA" | jq -r '.taskId // ""')
         TASK_TITLE=$(echo "$SIGNAL_DATA" | jq -r '.taskTitle // ""')
@@ -185,6 +195,8 @@ case "$SIGNAL_TYPE" in
 
     review|needs_review)
         require_json "review" "$SIGNAL_DATA"
+        # Compact JSON to single line for hook parsing
+        SIGNAL_DATA=$(echo "$SIGNAL_DATA" | jq -c .)
         validate_payload "review" "$SIGNAL_DATA"
         TASK_ID=$(echo "$SIGNAL_DATA" | jq -r '.taskId // ""')
         SUMMARY_COUNT=$(echo "$SIGNAL_DATA" | jq '.summary // [] | length')
@@ -194,6 +206,8 @@ case "$SIGNAL_TYPE" in
 
     needs_input|input)
         require_json "needs_input" "$SIGNAL_DATA"
+        # Compact JSON to single line for hook parsing
+        SIGNAL_DATA=$(echo "$SIGNAL_DATA" | jq -c .)
         validate_payload "needs_input" "$SIGNAL_DATA"
         TASK_ID=$(echo "$SIGNAL_DATA" | jq -r '.taskId // ""')
         QUESTION_TYPE=$(echo "$SIGNAL_DATA" | jq -r '.questionType // "text"')
@@ -203,6 +217,8 @@ case "$SIGNAL_TYPE" in
 
     idle)
         require_json "idle" "$SIGNAL_DATA"
+        # Compact JSON to single line for hook parsing
+        SIGNAL_DATA=$(echo "$SIGNAL_DATA" | jq -c .)
         validate_payload "idle" "$SIGNAL_DATA"
         READY=$(echo "$SIGNAL_DATA" | jq -r '.readyForWork // true')
         TASKS_COMPLETED=$(echo "$SIGNAL_DATA" | jq -r '.sessionSummary.tasksCompleted // [] | length')
@@ -224,6 +240,8 @@ case "$SIGNAL_TYPE" in
 
     completing)
         require_json "completing" "$SIGNAL_DATA"
+        # Compact JSON to single line for hook parsing
+        SIGNAL_DATA=$(echo "$SIGNAL_DATA" | jq -c .)
         validate_payload "completing" "$SIGNAL_DATA"
         TASK_ID=$(echo "$SIGNAL_DATA" | jq -r '.taskId // ""')
         STEP=$(echo "$SIGNAL_DATA" | jq -r '.currentStep // ""')
@@ -233,6 +251,8 @@ case "$SIGNAL_TYPE" in
 
     completed|done)
         require_json "completed" "$SIGNAL_DATA"
+        # Compact JSON to single line for hook parsing
+        SIGNAL_DATA=$(echo "$SIGNAL_DATA" | jq -c .)
         validate_payload "completed" "$SIGNAL_DATA"
         TASK_ID=$(echo "$SIGNAL_DATA" | jq -r '.taskId // ""')
         OUTCOME=$(echo "$SIGNAL_DATA" | jq -r '.outcome // ""')
@@ -242,15 +262,27 @@ case "$SIGNAL_TYPE" in
 
     starting)
         require_json "starting" "$SIGNAL_DATA"
+        # Compact JSON to single line for hook parsing
+        SIGNAL_DATA=$(echo "$SIGNAL_DATA" | jq -c .)
         validate_payload "starting" "$SIGNAL_DATA"
         AGENT_NAME=$(echo "$SIGNAL_DATA" | jq -r '.agentName // ""')
         PROJECT=$(echo "$SIGNAL_DATA" | jq -r '.project // ""')
-        echo "Signal: starting (agent: ${AGENT_NAME}, project: ${PROJECT})"
+        TASK_ID=$(echo "$SIGNAL_DATA" | jq -r '.taskId // ""')
+        SESSION_ID=$(echo "$SIGNAL_DATA" | jq -r '.sessionId // ""')
+        # Build output message with available info
+        OUTPUT="Signal: starting (agent: ${AGENT_NAME}"
+        [[ -n "$PROJECT" ]] && OUTPUT="$OUTPUT, project: ${PROJECT}"
+        [[ -n "$TASK_ID" ]] && OUTPUT="$OUTPUT, task: ${TASK_ID}"
+        [[ -n "$SESSION_ID" ]] && OUTPUT="$OUTPUT, session: ${SESSION_ID:0:8}...)"
+        [[ -z "$SESSION_ID" ]] && OUTPUT="$OUTPUT)"
+        echo "$OUTPUT"
         echo "[JAT-SIGNAL:starting] $SIGNAL_DATA"
         ;;
 
     compacting)
         require_json "compacting" "$SIGNAL_DATA"
+        # Compact JSON to single line for hook parsing
+        SIGNAL_DATA=$(echo "$SIGNAL_DATA" | jq -c .)
         validate_payload "compacting" "$SIGNAL_DATA"
         REASON=$(echo "$SIGNAL_DATA" | jq -r '.reason // ""')
         CONTEXT_BEFORE=$(echo "$SIGNAL_DATA" | jq -r '.contextSizeBefore // 0')
@@ -260,6 +292,8 @@ case "$SIGNAL_TYPE" in
 
     auto_proceed|auto-proceed)
         require_json "auto_proceed" "$SIGNAL_DATA"
+        # Compact JSON to single line for hook parsing
+        SIGNAL_DATA=$(echo "$SIGNAL_DATA" | jq -c .)
         validate_payload "auto_proceed" "$SIGNAL_DATA"
         TASK_ID=$(echo "$SIGNAL_DATA" | jq -r '.taskId // ""')
         NEXT_TASK=$(echo "$SIGNAL_DATA" | jq -r '.nextTaskId // ""')
@@ -274,6 +308,8 @@ case "$SIGNAL_TYPE" in
     # Data signals
     tasks)
         require_json "tasks" "$SIGNAL_DATA"
+        # Compact JSON to single line for hook parsing
+        SIGNAL_DATA=$(echo "$SIGNAL_DATA" | jq -c .)
         validate_payload "tasks" "$SIGNAL_DATA"
         TASK_COUNT=$(echo "$SIGNAL_DATA" | jq 'length')
         echo "Signal: tasks (${TASK_COUNT} suggested)"
@@ -282,6 +318,8 @@ case "$SIGNAL_TYPE" in
 
     action)
         require_json "action" "$SIGNAL_DATA"
+        # Compact JSON to single line for hook parsing
+        SIGNAL_DATA=$(echo "$SIGNAL_DATA" | jq -c .)
         validate_payload "action" "$SIGNAL_DATA"
         ACTION_TITLE=$(echo "$SIGNAL_DATA" | jq -r '.title // "untitled"')
         echo "Signal: action (${ACTION_TITLE})"
@@ -294,6 +332,8 @@ case "$SIGNAL_TYPE" in
                 echo "Error: Invalid JSON for complete signal"
                 exit 1
             fi
+            # Compact JSON to single line for hook parsing
+            SIGNAL_DATA=$(echo "$SIGNAL_DATA" | jq -c .)
             validate_payload "complete" "$SIGNAL_DATA"
             TASK_COUNT=$(echo "$SIGNAL_DATA" | jq '.suggestedTasks // [] | length')
             ACTION_COUNT=$(echo "$SIGNAL_DATA" | jq '.humanActions // [] | length')
