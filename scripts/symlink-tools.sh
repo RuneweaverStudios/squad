@@ -23,6 +23,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # JAT tool directories
 TOOLS_DIR="$SCRIPT_DIR/tools"
 BROWSER_TOOLS_DIR="$SCRIPT_DIR/browser-tools"
+SIGNAL_DIR="$SCRIPT_DIR/signal"
 MEDIA_DIR="$SCRIPT_DIR/media"
 
 # Verify directories exist
@@ -34,15 +35,22 @@ if [ ! -d "$TOOLS_DIR" ] || [ ! -d "$BROWSER_TOOLS_DIR" ]; then
     exit 1
 fi
 
-# Count all tools (media/ is optional)
+# Count all tools (signal/ and media/ are optional)
+SIGNAL_COUNT=0
+if [ -d "$SIGNAL_DIR" ]; then
+    SIGNAL_COUNT=$(find "$SIGNAL_DIR" -maxdepth 1 -type f -executable | wc -l)
+fi
 MEDIA_COUNT=0
 if [ -d "$MEDIA_DIR" ]; then
     MEDIA_COUNT=$(find "$MEDIA_DIR" -maxdepth 1 -type f -executable | wc -l)
 fi
-TOOL_COUNT=$(( $(find "$TOOLS_DIR" "$BROWSER_TOOLS_DIR" -maxdepth 1 -type f -executable | wc -l) + MEDIA_COUNT ))
+TOOL_COUNT=$(( $(find "$TOOLS_DIR" "$BROWSER_TOOLS_DIR" -maxdepth 1 -type f -executable | wc -l) + SIGNAL_COUNT + MEDIA_COUNT ))
 echo "  Found $TOOL_COUNT tools"
 echo "    - $(find "$TOOLS_DIR" -maxdepth 1 -type f -executable | wc -l) in tools/"
 echo "    - $(find "$BROWSER_TOOLS_DIR" -maxdepth 1 -type f -executable | wc -l) in browser-tools/"
+if [ -d "$SIGNAL_DIR" ] && [ "$SIGNAL_COUNT" -gt 0 ]; then
+    echo "    - $SIGNAL_COUNT in signal/"
+fi
 if [ -d "$MEDIA_DIR" ] && [ "$MEDIA_COUNT" -gt 0 ]; then
     echo "    - $MEDIA_COUNT in media/"
 fi
@@ -93,6 +101,9 @@ symlink_tools() {
 # Symlink tools from all directories
 symlink_tools "$TOOLS_DIR"
 symlink_tools "$BROWSER_TOOLS_DIR"
+if [ -d "$SIGNAL_DIR" ]; then
+    symlink_tools "$SIGNAL_DIR"
+fi
 if [ -d "$MEDIA_DIR" ]; then
     symlink_tools "$MEDIA_DIR"
 fi
@@ -179,8 +190,9 @@ echo ""
 
 echo "  Tool categories:"
 echo "    • Agent Mail (12): am-register, am-inbox, am-send, am-reply, am-ack, ..."
-echo "    • Browser (7): browser-start.js, browser-nav.js, browser-eval.js, ..."
+echo "    • Browser (11): browser-start.js, browser-nav.js, browser-eval.js, ..."
+echo "    • Signal (2): jat-signal, jat-signal-validate"
 echo "    • Media (4+): gemini-image, gemini-edit, gemini-compose, avatar-generate"
-echo "    • Additional (21): db-*, monitoring, deployment helpers"
+echo "    • Additional (15): db-*, bd-*, monitoring tools"
 echo "    • JAT CLI: jat <project> - Launch full dev environment"
 echo ""
