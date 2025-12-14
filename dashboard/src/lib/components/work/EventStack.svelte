@@ -1250,7 +1250,7 @@
 							<div class="px-3 h-full flex items-center justify-between">
 								<div class="flex items-center gap-2">
 									<span class="text-xs">{style.icon}</span>
-									<span class="font-mono text-[11px] font-medium" style="color: {style.text};">
+									<span class="font-mono text-[11px] font-medium {isNewest && isGenerating ? 'shimmer-text-fast' : ''}" style="color: {style.text};">
 										{getEventLabel(event)}
 									</span>
 									{#if event.git_sha}
