@@ -48,6 +48,7 @@
 	import StatusActionBadge from "./StatusActionBadge.svelte";
 	import ServerStatusBadge from "./ServerStatusBadge.svelte";
 	import TerminalActivitySparkline from "./TerminalActivitySparkline.svelte";
+	import { workSessionsState } from "$lib/stores/workSessions.svelte";
 	import EventStack from "./EventStack.svelte";
 	import StreakCelebration from "$lib/components/StreakCelebration.svelte";
 	import SuggestedTasksSection from "./SuggestedTasksSection.svelte";
@@ -75,12 +76,14 @@
 	import ReviewSignalCard from "$lib/components/signals/ReviewSignalCard.svelte";
 	import NeedsInputSignalCard from "$lib/components/signals/NeedsInputSignalCard.svelte";
 	import CompletingSignalCard from "$lib/components/signals/CompletingSignalCard.svelte";
+	import CompletedSignalCard from "$lib/components/signals/CompletedSignalCard.svelte";
 	import IdleSignalCard from "$lib/components/signals/IdleSignalCard.svelte";
 	import type {
 		WorkingSignal,
 		ReviewSignal,
 		NeedsInputSignal,
 		CompletingSignal as CompletingSignalType,
+		CompletedSignal as CompletedSignalType,
 		IdleSignal,
 	} from "$lib/types/richSignals";
 
@@ -214,6 +217,15 @@
 				patterns?: string[];
 				gotchas?: string[];
 			};
+			sessionStats?: {
+				duration?: number;
+				tokensUsed?: number;
+				filesModified?: number;
+				linesChanged?: number;
+				commitsCreated?: number;
+			};
+			finalCommit?: string;
+			prLink?: string;
 		};
 		/** Timestamp when completion bundle was received */
 		completionBundleTimestamp?: number;
@@ -330,12 +342,41 @@
 		return null;
 	});
 
+	const completedSignal = $derived.by(() => {
+		// First check if we have a completed state signal from SSE
+		if (richSignalPayload?.type === 'completed') {
+			return richSignalPayload as unknown as CompletedSignalType;
+		}
+		// Also check if we have a completion bundle (from complete data signal)
+		// and SSE state is completed - construct a CompletedSignal from it
+		const BUNDLE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+		const bundleIsValid = completionBundle && completionBundleTimestamp &&
+			(Date.now() - completionBundleTimestamp) < BUNDLE_TTL_MS;
+		if (bundleIsValid && sseState === 'completed') {
+			return {
+				type: 'completed' as const,
+				taskId: completionBundle.taskId,
+				agentName: completionBundle.agentName,
+				summary: completionBundle.summary || [],
+				quality: completionBundle.quality || { tests: 'none', build: 'unknown' },
+				humanActions: completionBundle.humanActions,
+				suggestedTasks: completionBundle.suggestedTasks || [],
+				crossAgentIntel: completionBundle.crossAgentIntel,
+				sessionStats: completionBundle.sessionStats || { duration: 0, tokensUsed: 0, filesModified: 0, linesChanged: 0, commitsCreated: 0 },
+				finalCommit: completionBundle.finalCommit || '',
+				prLink: completionBundle.prLink,
+			} as CompletedSignalType;
+		}
+		return null;
+	});
+
 	// Whether we have any rich signal to display
 	const hasRichSignal = $derived(
 		workingSignal !== null ||
 		reviewSignal !== null ||
 		needsInputSignal !== null ||
 		completingSignal !== null ||
+		completedSignal !== null ||
 		idleSignal !== null
 	);
 
@@ -376,6 +417,13 @@
 	// Track when output last changed to detect stalled/inactive sessions
 	let lastOutputLength = $state(0);
 	let lastActivityTime = $state(Date.now());
+
+	// Real-time output activity state (for shimmer effect)
+	// Derived from the central workSessionsState store (polling handled centrally)
+	const outputActivityState = $derived.by(() => {
+		const session = workSessionsState.sessions.find(s => s.sessionName === sessionName);
+		return session?._activityState || 'idle';
+	});
 
 	// API-based question data (from PostToolUse hook)
 	interface APIQuestion {
@@ -422,15 +470,22 @@
 	}
 	let nextTaskInfo = $state<NextTaskInfo | null>(null);
 	let nextTaskLoading = $state(false);
+	let nextTaskFetchFailed = $state(false); // Track if fetch failed (404, network error) to prevent infinite retry loop
 
 	// Fetch next task when session is in completed state
+	// Only recommends tasks from the same project as the completed task
 	async function fetchNextTask() {
 		if (nextTaskLoading) return;
 		nextTaskLoading = true;
 		try {
 			const completedTaskId = displayTask?.id || lastCompletedTask?.id || null;
-			const params = completedTaskId ? `?completedTaskId=${encodeURIComponent(completedTaskId)}` : '';
-			const response = await fetch(`/api/tasks/next${params}`);
+			// Extract project from task ID (e.g., "steelbridge-abc" → "steelbridge")
+			const project = completedTaskId?.split('-')[0] || null;
+			const params = new URLSearchParams();
+			if (completedTaskId) params.set('completedTaskId', completedTaskId);
+			if (project) params.set('project', project);
+			const queryString = params.toString();
+			const response = await fetch(`/api/tasks/next${queryString ? '?' + queryString : ''}`);
 			if (response.ok) {
 				const data = await response.json();
 				if (data.nextTask) {
@@ -444,12 +499,17 @@
 				} else {
 					nextTaskInfo = null;
 				}
+				nextTaskFetchFailed = false;
 			} else {
+				// 404 means endpoint doesn't exist (project dashboard without /api/tasks/next)
+				// Don't log error for 404 - this is expected for projects without the endpoint
 				nextTaskInfo = null;
+				nextTaskFetchFailed = true;
 			}
 		} catch (error) {
-			console.error('[SessionCard] Failed to fetch next task:', error);
+			// Network errors - silently fail, this is optional functionality
 			nextTaskInfo = null;
+			nextTaskFetchFailed = true;
 		} finally {
 			nextTaskLoading = false;
 		}
@@ -777,6 +837,10 @@
 		previousOutputLength = output.length;
 	});
 
+	// Note: Activity state polling is now centralized in workSessionsState store
+	// The store polls all active sessions every 200ms and updates _activityState
+	// SessionCard derives outputActivityState from the store reactively
+
 	// Cleanup timers on destroy
 	onDestroy(() => {
 		if (completionDismissTimer) {
@@ -791,6 +855,7 @@
 		if (questionPollInterval) {
 			clearInterval(questionPollInterval);
 		}
+		// Note: activityPollInterval removed - polling is now centralized in workSessionsState
 		if (hoverTimeout) {
 			clearTimeout(hoverTimeout);
 		}
@@ -1923,11 +1988,12 @@
 	// Fetch next task when session enters completed state
 	// This populates the "Start Next" action in the dropdown with actual task info
 	$effect(() => {
-		if (sessionState === 'completed' && !nextTaskInfo && !nextTaskLoading) {
+		if (sessionState === 'completed' && !nextTaskInfo && !nextTaskLoading && !nextTaskFetchFailed) {
 			fetchNextTask();
 		} else if (sessionState !== 'completed') {
-			// Clear next task info when leaving completed state
+			// Clear next task info and reset failed flag when leaving completed state
 			nextTaskInfo = null;
+			nextTaskFetchFailed = false;
 		}
 	});
 
@@ -2425,18 +2491,23 @@
 				};
 			}
 
-			// Parse results - bulk API returns { created, failed, tasks, errors }
-			const successTasks = (result.tasks || []).map((t: any) => ({
-				title: t.title,
-				taskId: t.id,
-				success: true
-			}));
+			// Parse results - bulk API returns { success, results, created, failed, message }
+			// results is an array of { title, taskId?, success, error? }
+			const successTasks = (result.results || [])
+				.filter((t: any) => t.success)
+				.map((t: any) => ({
+					title: t.title,
+					taskId: t.taskId,
+					success: true
+				}));
 
-			const failedTasks = (result.errors || []).map((err: any) => ({
-				title: err.title || 'Unknown',
-				success: false,
-				error: err.error || err.message
-			}));
+			const failedTasks = (result.results || [])
+				.filter((t: any) => !t.success)
+				.map((t: any) => ({
+					title: t.title || 'Unknown',
+					success: false,
+					error: t.error || 'Unknown error'
+				}));
 
 			console.log(`[EventStack] Created ${successTasks.length} tasks, ${failedTasks.length} failed`);
 
@@ -3439,8 +3510,7 @@
 					<AgentAvatar name={agentName} size={18} />
 				</div>
 				<span
-					class="font-mono text-[11px] font-semibold tracking-wider uppercase truncate"
-					style="color: {displayAccent}; text-shadow: 0 0 12px {displayGlow};"
+					class="font-mono text-[11px] font-semibold tracking-wider uppercase truncate bg-red-500 text-white px-2 py-1 rounded"
 					title={agentName}
 				>
 					{agentName}
@@ -3960,7 +4030,7 @@
 					<div class="flex flex-col min-w-0">
 						<!-- Agent name -->
 						<span
-							class="font-mono text-sm font-bold tracking-wide"
+							class="font-mono text-sm font-bold tracking-wide {outputActivityState === 'generating' || outputActivityState === 'thinking' ? 'shimmer-text-fast' : ''}"
 							style="color: {displayAccent}; text-shadow: 0 0 12px {displayGlow};"
 						>
 							{agentName}
@@ -4216,8 +4286,9 @@
 			style="border-top: 10px solid oklch(0.5 0 0 / 0.08);"
 		>
 			<!-- Rich Signal Cards - display context-aware signal information above terminal -->
+			<!-- Container has max-height and overflow-y-auto to prevent content from spilling outside card -->
 			{#if hasRichSignal && isAgentMode}
-				<div class="px-3 py-2 flex-shrink-0" style="border-bottom: 1px solid oklch(0.5 0 0 / 0.12);">
+				<div class="px-3 py-2 overflow-y-auto overflow-x-hidden" style="border-bottom: 1px solid oklch(0.5 0 0 / 0.12); max-height: 50%;">
 					{#if workingSignal}
 						<WorkingSignalCard
 							signal={workingSignal}
@@ -4272,6 +4343,16 @@
 							signal={completingSignal}
 							compact={false}
 						/>
+					{:else if completedSignal}
+						<CompletedSignalCard
+							signal={completedSignal}
+							onTaskClick={(taskId) => onTaskClick?.(taskId)}
+							onCleanup={onKillSession ? async () => {
+								// Cleanup/close the completed session
+								await onKillSession?.();
+							} : undefined}
+							compact={false}
+						/>
 					{:else if idleSignal}
 						<IdleSignalCard
 							signal={idleSignal}
@@ -4313,9 +4394,10 @@
 				{/if}
 			</div>
 
-			<!-- Completion Bundle Section (when agent completes task with structured data) -->
-			{#if hasCompletionBundle && completionBundle && isAgentMode}
-				<div class="px-3 py-2 flex-shrink-0" style="border-top: 1px solid oklch(0.5 0 0 / 0.08); background: linear-gradient(135deg, oklch(0.20 0.05 145 / 0.3) 0%, oklch(0.18 0.03 145 / 0.2) 100%);">
+			<!-- Completion Bundle Section (legacy - only show if no completedSignal card is rendering) -->
+			<!-- Container has max-height and overflow-y-auto to prevent content from spilling outside card -->
+			{#if hasCompletionBundle && completionBundle && isAgentMode && !completedSignal}
+				<div class="px-3 py-2 overflow-y-auto overflow-x-hidden" style="border-top: 1px solid oklch(0.5 0 0 / 0.08); background: linear-gradient(135deg, oklch(0.20 0.05 145 / 0.3) 0%, oklch(0.18 0.03 145 / 0.2) 100%); max-height: 40%;">
 					<!-- Header -->
 					<div class="flex items-center gap-2 mb-2">
 						<span class="font-semibold text-sm" style="color: oklch(0.85 0.12 145);">
@@ -4442,8 +4524,10 @@
 			{/if}
 
 			<!-- Suggested Tasks Section (when detected in output) -->
-			{#if hasSuggestedTasks && isAgentMode}
-				<div class="px-3 py-2 flex-shrink-0" style="border-top: 1px solid oklch(0.5 0 0 / 0.08);">
+			<!-- Container has max-height and overflow-y-auto to prevent content from spilling outside card -->
+			<!-- Hide when completedSignal exists - CompletedSignalCard in EventStack handles showing suggested tasks -->
+			{#if hasSuggestedTasks && isAgentMode && !completedSignal}
+				<div class="px-3 py-2 overflow-y-auto overflow-x-hidden" style="border-top: 1px solid oklch(0.5 0 0 / 0.08); max-height: 40%;">
 					<SuggestedTasksSection
 						tasks={detectedSuggestedTasks}
 						selectedCount={selectedSuggestedTasksCount}
