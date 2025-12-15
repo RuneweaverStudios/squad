@@ -485,7 +485,13 @@
 			if (completedTaskId) params.set('completedTaskId', completedTaskId);
 			if (project) params.set('project', project);
 			const queryString = params.toString();
-			const response = await fetch(`/api/tasks/next${queryString ? '?' + queryString : ''}`);
+			// Add timeout to prevent hanging forever
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+			const response = await fetch(`/api/tasks/next${queryString ? '?' + queryString : ''}`, {
+				signal: controller.signal
+			});
+			clearTimeout(timeoutId);
 			if (response.ok) {
 				const data = await response.json();
 				if (data.nextTask) {
@@ -1575,10 +1581,13 @@
 		const recentOutput = stripAnsi(output.slice(-3000));
 
 		// Check for the navigation footer which indicates an active question prompt
+		// Pattern 1: Normal question UI with navigation (Enter to select, Tab/Arrow to navigate, Esc to cancel)
+		// Pattern 2: Confirmation/review screen (Enter to confirm/submit, may not have full navigation)
+		// Pattern 3: Review your answers screen (shows answers with ❯ Submit answers option)
 		const hasQuestionUI =
-			/Enter to select.*(?:Tab|Arrow).*(?:navigate|keys).*Esc to cancel/i.test(
-				recentOutput,
-			);
+			/Enter to select.*(?:Tab|Arrow).*(?:navigate|keys).*Esc to cancel/i.test(recentOutput) ||
+			/(?:review your answers|Do these.*look correct|Submit answers)/i.test(recentOutput) ||
+			/Enter to (?:confirm|submit|proceed)/i.test(recentOutput);
 		if (!hasQuestionUI) return null;
 
 		// Find the question text (line starting with "?")
@@ -1634,19 +1643,26 @@
 			let currentSelectedIndex = 0;
 			let index = 0;
 
+			// Check if this is a confirmation/review screen (no numbered options)
+			const isConfirmationScreen = /(?:review your answers|Do these.*look correct|Submit answers)/i.test(recentOutput);
+
 			for (const line of lines) {
 				// Skip empty lines and the navigation footer
 				if (!line.trim()) continue;
-				if (/Enter to select/i.test(line)) break;
+				if (/Enter to (?:select|confirm|submit|proceed)/i.test(line)) break;
 
 				// Check if this line is an option (with ❯ cursor or aligned unselected)
-				// Options have format: "❯ 1. Label" or "  2. Label" (number prefix required)
-				// This distinguishes options from description lines which don't have numbers
-				const selectedMatch = line.match(/^\s*❯\s+(\d+\.\s+.+?)(?:\s{2,}(.+))?$/);
-				// Unselected options: spaces followed by "2. Label" pattern
-				const unselectedMatch = line.match(
-					/^\s{2,}(\d+\.\s+.+?)(?:\s{2,}(.+))?$/,
-				);
+				// Normal format: "❯ 1. Label" or "  2. Label" (number prefix required)
+				// Confirmation format: "❯ Submit answers" or "  Edit answers" (no numbers)
+				let selectedMatch = line.match(/^\s*❯\s+(\d+\.\s+.+?)(?:\s{2,}(.+))?$/);
+				let unselectedMatch = line.match(/^\s{2,}(\d+\.\s+.+?)(?:\s{2,}(.+))?$/);
+
+				// For confirmation screens, also match options WITHOUT number prefixes
+				if (!selectedMatch && !unselectedMatch && isConfirmationScreen) {
+					// Confirmation screen options: "❯ Submit answers" or "  Edit answers"
+					selectedMatch = line.match(/^\s*❯\s+([A-Z][a-z]+(?:\s+[a-z]+)*)\s*$/);
+					unselectedMatch = line.match(/^\s{2,}([A-Z][a-z]+(?:\s+[a-z]+)*)\s*$/);
+				}
 
 				if (selectedMatch) {
 					inOptionSection = true;
