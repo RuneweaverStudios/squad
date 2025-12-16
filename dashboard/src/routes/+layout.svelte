@@ -16,7 +16,7 @@
 	import { getTaskCountByProject } from '$lib/utils/projectUtils';
 	import { setProjectsCache, type ProjectConfig } from '$lib/utils/fileLinks';
 	import { initAudioOnInteraction, areSoundsEnabled, enableSounds, disableSounds, playNewTaskChime, playCopySound } from '$lib/utils/soundEffects';
-	import { successToast, errorToast, warningToast } from '$lib/stores/toasts.svelte';
+	import { successToast } from '$lib/stores/toasts.svelte';
 	import { initSessionEvents, closeSessionEvents, connectSessionEvents, disconnectSessionEvents, lastSessionEvent } from '$lib/stores/sessionEvents';
 	import { connectTaskEvents, disconnectTaskEvents, lastTaskEvent } from '$lib/stores/taskEvents';
 	import { availableProjects, openTaskDrawer, isTaskDetailDrawerOpen, taskDetailDrawerTaskId, closeTaskDetailDrawer, isEpicSwarmModalOpen, epicSwarmModalEpicId } from '$lib/stores/drawerStore';
@@ -510,7 +510,8 @@
 		}
 
 		// Alt+C = Complete task for hovered session (sends /jat:complete command)
-		if (event.altKey && event.code === 'KeyC') {
+		// Note: Check !shiftKey to avoid conflict with Alt+Shift+C (copy session)
+		if (event.altKey && !event.shiftKey && event.code === 'KeyC') {
 			event.preventDefault();
 			const sessionName = get(hoveredSessionName);
 			if (sessionName) {
@@ -681,29 +682,22 @@
 		if (event.altKey && event.shiftKey && event.code === 'KeyC') {
 			event.preventDefault();
 			const sessionName = get(hoveredSessionName);
-			if (!sessionName) {
-				warningToast('Hover over a session first', 'Alt+Shift+C copies the hovered session');
-				return;
-			}
-			try {
-				const response = await fetch(`/api/work/${encodeURIComponent(sessionName)}/copy`);
-				if (response.ok) {
-					const data = await response.json();
-					if (data.content) {
-						await navigator.clipboard.writeText(data.content);
-						playCopySound();
-						successToast('Session contents copied to clipboard');
+			if (sessionName) {
+				try {
+					const response = await fetch(`/api/work/${encodeURIComponent(sessionName)}/copy`);
+					if (response.ok) {
+						const data = await response.json();
+						if (data.content) {
+							await navigator.clipboard.writeText(data.content);
+							playCopySound();
+							successToast('Session contents copied to clipboard');
+						}
 					} else {
-						errorToast('No content to copy', 'Session output may be empty');
+						console.error('Failed to get session contents:', await response.text());
 					}
-				} else {
-					const errorText = await response.text();
-					console.error('Failed to get session contents:', errorText);
-					errorToast('Failed to copy session', errorText);
+				} catch (err) {
+					console.error('Error copying session contents:', err);
 				}
-			} catch (err) {
-				console.error('Error copying session contents:', err);
-				errorToast('Failed to copy session', err instanceof Error ? err.message : 'Unknown error');
 			}
 			return;
 		}
