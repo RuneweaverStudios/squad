@@ -14,6 +14,28 @@
 	import RuleEditor from '$lib/components/automation/RuleEditor.svelte';
 	import type { AutomationRule } from '$lib/types/automation';
 	import type { ActivityLogEntry } from '$lib/components/automation/ActivityLog.svelte';
+	import { addRule, updateRule, getRules } from '$lib/stores/automationRules.svelte';
+	import { onAutomationTrigger } from '$lib/utils/automationEngine';
+
+	// Convert store rules to PatternTester format
+	// PatternTester uses simplified types, so we flatten patterns array
+	const testerRules = $derived.by(() => {
+		const storeRules = getRules();
+		return storeRules.flatMap(rule => {
+			// Create one entry per pattern in the rule
+			return rule.patterns.map((pattern, idx) => ({
+				id: `${rule.id}-p${idx}`,
+				name: rule.name,
+				enabled: rule.enabled,
+				pattern: pattern.pattern,
+				isRegex: pattern.mode === 'regex',
+				caseSensitive: pattern.caseSensitive,
+				action: rule.actions[0] || { type: 'notify_only' as const, value: '' },
+				cooldownMs: rule.cooldownSeconds * 1000,
+				priority: rule.priority
+			}));
+		});
+	});
 
 	// Page state
 	let isLoading = $state(true);
@@ -41,6 +63,26 @@
 		setTimeout(() => {
 			isLoading = false;
 		}, 300);
+
+		// Subscribe to automation triggers for activity log
+		const unsubscribe = onAutomationTrigger((sessionName, rule, match, results) => {
+			// Convert trigger event to ActivityLogEntry
+			const entry: ActivityLogEntry = {
+				id: `activity-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+				timestamp: new Date(),
+				sessionName,
+				ruleName: rule.name,
+				matchedPattern: match.pattern.pattern,
+				actionTaken: results.map(r => r.action.type).join(', ') || 'none',
+				result: results.every(r => r.success) ? 'success' : results.some(r => r.success) ? 'pending' : 'failure',
+				details: results.map(r => r.error).filter(Boolean).join('; ') || undefined
+			};
+			activityEntries = [entry, ...activityEntries].slice(0, 100); // Keep latest 100
+		});
+
+		return () => {
+			unsubscribe();
+		};
 	});
 
 	// Handle edit rule
@@ -59,6 +101,18 @@
 	function handleCloseEditor() {
 		showRuleEditor = false;
 		editingRule = null;
+	}
+
+	// Handle save rule
+	function handleSaveRule(rule: AutomationRule) {
+		if (editingRule) {
+			// Update existing rule
+			updateRule(rule.id, rule);
+		} else {
+			// Create new rule
+			addRule(rule);
+		}
+		handleCloseEditor();
 	}
 
 	// Handle clear activity log
@@ -108,7 +162,7 @@
 				<!-- Bottom Row -->
 				<!-- Pattern Tester (left) -->
 				<div class="min-h-[250px] overflow-hidden">
-					<PatternTester />
+					<PatternTester rules={testerRules} />
 				</div>
 
 				<!-- Activity Log (right) -->
@@ -128,5 +182,6 @@
 <RuleEditor
 	bind:isOpen={showRuleEditor}
 	rule={editingRule}
+	onSave={handleSaveRule}
 	onCancel={handleCloseEditor}
 />

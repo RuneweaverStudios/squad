@@ -23,7 +23,9 @@
 		deleteRule,
 		reorderRules,
 		toggleAutomation,
-		cloneRule
+		cloneRule,
+		exportRules,
+		importRules
 	} from '$lib/stores/automationRules.svelte';
 	import { RULE_CATEGORY_META } from '$lib/config/automationConfig';
 
@@ -52,6 +54,15 @@
 	// Drag state
 	let draggedRuleId = $state<string | null>(null);
 	let dragOverRuleId = $state<string | null>(null);
+
+	// Import modal state
+	let showImportModal = $state(false);
+	let importFileInput: HTMLInputElement;
+	let importData = $state<string | null>(null);
+	let importFileName = $state<string>('');
+	let importError = $state<string | null>(null);
+	let importSuccess = $state(false);
+	let parsedRuleCount = $state(0);
 
 	// Group rules by category
 	const rulesByCategory = $derived.by(() => {
@@ -177,6 +188,90 @@
 			default: return type;
 		}
 	}
+
+	// Handle export rules
+	function handleExport() {
+		const jsonString = exportRules();
+		const blob = new Blob([jsonString], { type: 'application/json' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = `automation-rules-${new Date().toISOString().slice(0, 10)}.json`;
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		URL.revokeObjectURL(url);
+	}
+
+	// Handle import file selection
+	function handleImportFileChange(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+
+		importFileName = file.name;
+		importError = null;
+		importSuccess = false;
+
+		const reader = new FileReader();
+		reader.onload = (e) => {
+			const content = e.target?.result as string;
+			try {
+				const data = JSON.parse(content);
+				if (!data.rules || !Array.isArray(data.rules)) {
+					importError = 'Invalid file format: "rules" array not found';
+					importData = null;
+					parsedRuleCount = 0;
+				} else {
+					importData = content;
+					parsedRuleCount = data.rules.length;
+					showImportModal = true;
+				}
+			} catch (err) {
+				importError = 'Invalid JSON file';
+				importData = null;
+				parsedRuleCount = 0;
+			}
+		};
+		reader.onerror = () => {
+			importError = 'Failed to read file';
+			importData = null;
+		};
+		reader.readAsText(file);
+
+		// Reset input so same file can be selected again
+		input.value = '';
+	}
+
+	// Handle import with merge option
+	function handleImport(merge: boolean) {
+		if (!importData) return;
+
+		const success = importRules(importData, merge);
+		if (success) {
+			importSuccess = true;
+			importError = null;
+			showImportModal = false;
+			// Reset state after a delay to allow success message to show
+			setTimeout(() => {
+				importSuccess = false;
+				importData = null;
+				importFileName = '';
+				parsedRuleCount = 0;
+			}, 3000);
+		} else {
+			importError = 'Failed to import rules. Check file format.';
+		}
+	}
+
+	// Cancel import
+	function handleCancelImport() {
+		showImportModal = false;
+		importData = null;
+		importFileName = '';
+		importError = null;
+		parsedRuleCount = 0;
+	}
 </script>
 
 <div class="rules-list {className}">
@@ -205,6 +300,41 @@
 					<span class="toggle-track">
 						<span class="toggle-thumb"></span>
 					</span>
+				</button>
+			</div>
+
+			<!-- Import/Export buttons -->
+			<div class="import-export-btns">
+				<!-- Hidden file input for import -->
+				<input
+					type="file"
+					accept=".json,application/json"
+					class="hidden"
+					bind:this={importFileInput}
+					onchange={handleImportFileChange}
+				/>
+				<!-- Import button -->
+				<button
+					class="io-btn import-btn"
+					onclick={() => importFileInput?.click()}
+					aria-label="Import rules"
+					title="Import rules from JSON file"
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+					</svg>
+				</button>
+				<!-- Export button -->
+				<button
+					class="io-btn export-btn"
+					onclick={handleExport}
+					aria-label="Export rules"
+					title="Export rules to JSON file"
+					disabled={rules.length === 0}
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+					</svg>
 				</button>
 			</div>
 
@@ -361,7 +491,91 @@
 			{/each}
 		{/if}
 	</div>
+
+	<!-- Import success/error messages -->
+	{#if importSuccess}
+		<div class="import-message success" transition:fade={{ duration: 150 }}>
+			<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="message-icon">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+			</svg>
+			<span>Successfully imported {parsedRuleCount} rule{parsedRuleCount !== 1 ? 's' : ''}</span>
+		</div>
+	{/if}
+	{#if importError && !showImportModal}
+		<div class="import-message error" transition:fade={{ duration: 150 }}>
+			<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="message-icon">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+			</svg>
+			<span>{importError}</span>
+			<button class="dismiss-btn" onclick={() => importError = null}>×</button>
+		</div>
+	{/if}
 </div>
+
+<!-- Import Modal -->
+{#if showImportModal}
+	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+	<div class="modal-backdrop" onclick={handleCancelImport} role="presentation" transition:fade={{ duration: 150 }}>
+		<div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="import-modal-title" onclick={(e) => e.stopPropagation()}>
+			<div class="modal-header">
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="modal-icon">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+				</svg>
+				<h3 id="import-modal-title" class="modal-title">Import Rules</h3>
+			</div>
+
+			<div class="modal-body">
+				<div class="file-info">
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="file-icon">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+					</svg>
+					<div class="file-details">
+						<span class="file-name">{importFileName}</span>
+						<span class="file-rules">{parsedRuleCount} rule{parsedRuleCount !== 1 ? 's' : ''} found</span>
+					</div>
+				</div>
+
+				<p class="modal-description">
+					How would you like to import these rules?
+				</p>
+
+				<div class="import-options">
+					<button class="import-option merge" onclick={() => handleImport(true)}>
+						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="option-icon">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+						</svg>
+						<div class="option-text">
+							<span class="option-title">Merge</span>
+							<span class="option-desc">Add new rules, keep existing</span>
+						</div>
+					</button>
+
+					<button class="import-option replace" onclick={() => handleImport(false)}>
+						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="option-icon">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+						</svg>
+						<div class="option-text">
+							<span class="option-title">Replace</span>
+							<span class="option-desc">Remove all existing rules</span>
+						</div>
+					</button>
+				</div>
+
+				{#if importError}
+					<div class="modal-error" transition:fade={{ duration: 150 }}>
+						{importError}
+					</div>
+				{/if}
+			</div>
+
+			<div class="modal-footer">
+				<button class="cancel-btn" onclick={handleCancelImport}>
+					Cancel
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
 
 <style>
 	.rules-list {
@@ -836,5 +1050,294 @@
 
 	:global(.text-accent) {
 		color: oklch(0.70 0.12 310);
+	}
+
+	/* Import/Export buttons */
+	.import-export-btns {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+	}
+
+	.io-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 32px;
+		height: 32px;
+		background: oklch(0.22 0.02 250);
+		border: 1px solid oklch(0.30 0.02 250);
+		border-radius: 6px;
+		color: oklch(0.60 0.02 250);
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.io-btn:hover:not(:disabled) {
+		background: oklch(0.28 0.02 250);
+		color: oklch(0.80 0.02 250);
+	}
+
+	.io-btn:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
+
+	.import-btn:hover:not(:disabled) {
+		background: oklch(0.28 0.06 145);
+		border-color: oklch(0.40 0.10 145);
+		color: oklch(0.80 0.10 145);
+	}
+
+	.export-btn:hover:not(:disabled) {
+		background: oklch(0.28 0.06 200);
+		border-color: oklch(0.40 0.10 200);
+		color: oklch(0.80 0.10 200);
+	}
+
+	.hidden {
+		display: none;
+	}
+
+	/* Import messages */
+	.import-message {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.625rem 1rem;
+		font-size: 0.8rem;
+		font-weight: 500;
+		border-top: 1px solid oklch(0.25 0.02 250);
+	}
+
+	.import-message.success {
+		background: oklch(0.20 0.08 145);
+		color: oklch(0.85 0.12 145);
+	}
+
+	.import-message.error {
+		background: oklch(0.20 0.08 25);
+		color: oklch(0.85 0.12 25);
+	}
+
+	.message-icon {
+		width: 18px;
+		height: 18px;
+		flex-shrink: 0;
+	}
+
+	.dismiss-btn {
+		margin-left: auto;
+		padding: 0.125rem 0.375rem;
+		background: transparent;
+		border: none;
+		color: oklch(0.70 0.08 25);
+		font-size: 1rem;
+		cursor: pointer;
+		line-height: 1;
+		border-radius: 4px;
+		transition: background 0.15s ease;
+	}
+
+	.dismiss-btn:hover {
+		background: oklch(0.30 0.08 25);
+	}
+
+	/* Import Modal */
+	.modal-backdrop {
+		position: fixed;
+		inset: 0;
+		background: oklch(0.10 0.02 250 / 0.8);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 1000;
+		backdrop-filter: blur(4px);
+	}
+
+	.modal-content {
+		background: oklch(0.16 0.02 250);
+		border: 1px solid oklch(0.30 0.02 250);
+		border-radius: 12px;
+		box-shadow: 0 20px 40px oklch(0 0 0 / 0.4);
+		min-width: 380px;
+		max-width: 90vw;
+	}
+
+	.modal-header {
+		display: flex;
+		align-items: center;
+		gap: 0.625rem;
+		padding: 1rem 1.25rem;
+		border-bottom: 1px solid oklch(0.25 0.02 250);
+		background: oklch(0.14 0.02 250);
+		border-radius: 12px 12px 0 0;
+	}
+
+	.modal-icon {
+		width: 22px;
+		height: 22px;
+		color: oklch(0.70 0.12 145);
+	}
+
+	.modal-title {
+		font-size: 1rem;
+		font-weight: 600;
+		color: oklch(0.90 0.02 250);
+		margin: 0;
+		font-family: ui-monospace, monospace;
+	}
+
+	.modal-body {
+		padding: 1.25rem;
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	.file-info {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.75rem 1rem;
+		background: oklch(0.20 0.02 250);
+		border: 1px solid oklch(0.28 0.02 250);
+		border-radius: 8px;
+	}
+
+	.file-icon {
+		width: 28px;
+		height: 28px;
+		color: oklch(0.60 0.08 200);
+		flex-shrink: 0;
+	}
+
+	.file-details {
+		display: flex;
+		flex-direction: column;
+		gap: 0.125rem;
+		min-width: 0;
+	}
+
+	.file-name {
+		font-size: 0.85rem;
+		font-weight: 500;
+		color: oklch(0.85 0.02 250);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		font-family: ui-monospace, monospace;
+	}
+
+	.file-rules {
+		font-size: 0.75rem;
+		color: oklch(0.60 0.02 250);
+	}
+
+	.modal-description {
+		font-size: 0.85rem;
+		color: oklch(0.70 0.02 250);
+		margin: 0;
+	}
+
+	.import-options {
+		display: flex;
+		gap: 0.75rem;
+	}
+
+	.import-option {
+		flex: 1;
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.875rem 1rem;
+		background: oklch(0.20 0.02 250);
+		border: 1px solid oklch(0.30 0.02 250);
+		border-radius: 8px;
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.import-option:hover {
+		background: oklch(0.24 0.02 250);
+		border-color: oklch(0.40 0.02 250);
+	}
+
+	.import-option.merge:hover {
+		background: oklch(0.22 0.06 145);
+		border-color: oklch(0.45 0.12 145);
+	}
+
+	.import-option.replace:hover {
+		background: oklch(0.22 0.06 200);
+		border-color: oklch(0.45 0.12 200);
+	}
+
+	.option-icon {
+		width: 24px;
+		height: 24px;
+		color: oklch(0.65 0.02 250);
+		flex-shrink: 0;
+	}
+
+	.import-option.merge:hover .option-icon {
+		color: oklch(0.75 0.12 145);
+	}
+
+	.import-option.replace:hover .option-icon {
+		color: oklch(0.75 0.12 200);
+	}
+
+	.option-text {
+		display: flex;
+		flex-direction: column;
+		gap: 0.125rem;
+		text-align: left;
+	}
+
+	.option-title {
+		font-size: 0.85rem;
+		font-weight: 600;
+		color: oklch(0.90 0.02 250);
+	}
+
+	.option-desc {
+		font-size: 0.7rem;
+		color: oklch(0.55 0.02 250);
+	}
+
+	.modal-error {
+		padding: 0.625rem 0.875rem;
+		background: oklch(0.20 0.08 25);
+		border: 1px solid oklch(0.35 0.12 25);
+		border-radius: 6px;
+		font-size: 0.8rem;
+		color: oklch(0.85 0.12 25);
+	}
+
+	.modal-footer {
+		display: flex;
+		justify-content: flex-end;
+		padding: 0.875rem 1.25rem;
+		border-top: 1px solid oklch(0.25 0.02 250);
+		background: oklch(0.14 0.02 250);
+		border-radius: 0 0 12px 12px;
+	}
+
+	.cancel-btn {
+		padding: 0.5rem 1rem;
+		font-size: 0.8rem;
+		font-weight: 500;
+		background: oklch(0.25 0.02 250);
+		border: 1px solid oklch(0.35 0.02 250);
+		border-radius: 6px;
+		color: oklch(0.75 0.02 250);
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.cancel-btn:hover {
+		background: oklch(0.30 0.02 250);
+		color: oklch(0.85 0.02 250);
 	}
 </style>

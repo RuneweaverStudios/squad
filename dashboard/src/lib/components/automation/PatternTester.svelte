@@ -71,8 +71,14 @@
 
 	// Custom pattern for quick testing
 	let customPattern = $state('');
-	let customIsRegex = $state(true);
+	let customIsRegex = $state(false);  // Default to literal mode - more intuitive for users
 	let customCaseSensitive = $state(false);
+	let customRegexError = $state<string | null>(null);
+
+	// Escape special regex characters for literal matching
+	function escapeRegex(str: string): string {
+		return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	}
 
 	// Sample rules for standalone testing (when no rules prop provided)
 	const sampleRules: AutomationRule[] = [
@@ -135,8 +141,8 @@
 	// Use provided rules or sample rules
 	const activeRules = $derived(rules.length > 0 ? rules : sampleRules);
 
-	// Pattern matching function
-	function findMatches(text: string, pattern: string, isRegex: boolean, caseSensitive: boolean): RuleMatch['matches'] {
+	// Pattern matching function - returns matches and optional error
+	function findMatches(text: string, pattern: string, isRegex: boolean, caseSensitive: boolean): { matches: RuleMatch['matches']; error?: string } {
 		const matches: RuleMatch['matches'] = [];
 
 		try {
@@ -158,7 +164,7 @@
 					});
 				}
 			} else {
-				// String matching
+				// String matching (literal mode)
 				const searchText = caseSensitive ? text : text.toLowerCase();
 				const searchPattern = caseSensitive ? pattern : pattern.toLowerCase();
 				let pos = 0;
@@ -177,11 +183,12 @@
 					pos += pattern.length;
 				}
 			}
-		} catch (e) {
-			// Invalid regex - return empty matches
+		} catch (e: any) {
+			// Invalid regex - return error message
+			return { matches: [], error: e.message || 'Invalid regex pattern' };
 		}
 
-		return matches;
+		return { matches };
 	}
 
 	// Compute all rule matches
@@ -191,9 +198,9 @@
 		for (const rule of activeRules) {
 			if (!rule.enabled) continue;
 
-			const matches = findMatches(sampleOutput, rule.pattern, rule.isRegex, rule.caseSensitive);
-			if (matches.length > 0) {
-				results.push({ rule, matches });
+			const result = findMatches(sampleOutput, rule.pattern, rule.isRegex, rule.caseSensitive);
+			if (result.matches.length > 0) {
+				results.push({ rule, matches: result.matches });
 			}
 		}
 
@@ -201,10 +208,13 @@
 	});
 
 	// Custom pattern matches
-	const customMatches = $derived.by(() => {
-		if (!customPattern.trim()) return [];
+	const customMatchResult = $derived.by(() => {
+		if (!customPattern.trim()) return { matches: [] as RuleMatch['matches'], error: undefined };
 		return findMatches(sampleOutput, customPattern, customIsRegex, customCaseSensitive);
 	});
+
+	const customMatches = $derived(customMatchResult.matches);
+	const customError = $derived(customMatchResult.error);
 
 	// Total matches from all sources
 	const totalMatches = $derived(
@@ -313,9 +323,9 @@
 
 	// Handle testing a specific rule
 	function testRule(rule: AutomationRule) {
-		const matches = findMatches(sampleOutput, rule.pattern, rule.isRegex, rule.caseSensitive);
+		const result = findMatches(sampleOutput, rule.pattern, rule.isRegex, rule.caseSensitive);
 		if (onRuleTest) {
-			onRuleTest(rule, matches);
+			onRuleTest(rule, result.matches);
 		}
 	}
 
@@ -470,9 +480,26 @@
 						<span class="font-mono text-[10px]" style="color: oklch(0.60 0.02 250);">Case</span>
 					</label>
 				</div>
-				{#if customMatches.length > 0}
+				{#if customError}
+					<div class="mt-2 text-[10px] font-mono" style="color: oklch(0.75 0.18 25);">
+						⚠️ Invalid regex: {customError}
+						{#if customIsRegex}
+							<button
+								class="ml-2 underline hover:no-underline"
+								style="color: oklch(0.70 0.15 200);"
+								onclick={() => { customPattern = escapeRegex(customPattern); }}
+							>
+								Auto-escape
+							</button>
+						{/if}
+					</div>
+				{:else if customMatches.length > 0}
 					<div class="mt-2 text-[10px] font-mono" style="color: oklch(0.80 0.20 280);">
 						{customMatches.length} match{customMatches.length !== 1 ? 'es' : ''} found
+					</div>
+				{:else if customPattern.trim() && !customIsRegex}
+					<div class="mt-2 text-[10px] font-mono" style="color: oklch(0.55 0.02 250);">
+						No matches (literal search)
 					</div>
 				{/if}
 			</div>
