@@ -1466,15 +1466,17 @@
 	}
 
 	// Handle click anywhere in the card to center it and focus input
-	// This combines: scroll to center, glow animation, and focus input textarea
+	// This combines: maximize panel, scroll to top, glow animation, and focus input textarea
 	function handleCardClick() {
-		// Scroll to center and trigger glow animation via store
+		// Maximize panel, scroll to top, and trigger glow animation via store
 		jumpToSession(sessionName, agentName);
 
-		// Focus the input textarea after a short delay for scroll animation
+		// Focus the input textarea after scroll completes
+		// Delay must be longer than jumpToSession's scroll delay (400ms + rAF ≈ 450ms)
+		// Use preventScroll to avoid browser's default scroll-into-view behavior
 		setTimeout(() => {
-			inputRef?.focus();
-		}, 100);
+			inputRef?.focus({ preventScroll: true });
+		}, 550);
 	}
 
 	// Attached files (pending upload) - supports images, PDFs, text, code, etc.
@@ -3618,6 +3620,7 @@
 				: isJumpHighlighted
 					? 'box-shadow: 0 0 20px oklch(0.60 0.15 220 / 0.6);'
 					: ''}
+			scroll-margin-top: 3.5rem;
 		"
 		data-agent-name={agentName}
 	>
@@ -3684,7 +3687,7 @@
 				<button
 					type="button"
 					class="p-0.5 rounded hover:bg-base-content/10 transition-colors group"
-					title={sessionCopied ? "Copied!" : "Copy session contents"}
+					title={sessionCopied ? "Copied!" : "Copy session contents (Alt+Shift+C)"}
 					onclick={copySessionContents}
 				>
 					{#if sessionCopied}
@@ -3860,6 +3863,7 @@
 				: 'inset 0 1px 0 oklch(1 0 0 / 0.05), 0 2px 8px oklch(0 0 0 / 0.1)'};
 			width: {effectiveWidth ?? DEFAULT_CARD_WIDTH}px;
 			flex-shrink: 0;
+			scroll-margin-top: 3.5rem;
 		"
 		data-agent-name={agentName}
 		in:fly={{ x: 50, duration: 300, delay: 50 }}
@@ -4239,7 +4243,7 @@
 					<button
 						type="button"
 						class="p-1 rounded hover:bg-base-content/10 transition-colors group"
-						title={sessionCopied ? "Copied!" : "Copy session contents to clipboard"}
+						title={sessionCopied ? "Copied!" : "Copy session contents (Alt+Shift+C)"}
 						onclick={copySessionContents}
 					>
 						{#if sessionCopied}
@@ -4424,7 +4428,7 @@
 					<button
 						type="button"
 						class="p-1 rounded hover:bg-base-content/10 transition-colors group"
-						title={sessionCopied ? "Copied!" : "Copy server output"}
+						title={sessionCopied ? "Copied!" : "Copy server output (Alt+Shift+C)"}
 						onclick={copySessionContents}
 					>
 						{#if sessionCopied}
