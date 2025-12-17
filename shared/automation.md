@@ -137,8 +137,10 @@ Pre-configured rules in `automationConfig.ts`:
 | API Overloaded Recovery | recovery | `API is overloaded` | Wait, send Enter |
 | Rate Limit Recovery | recovery | `rate limit\|429\|too many requests` | Wait 60s, retry |
 | Network Error Recovery | recovery | `ECONNREFUSED\|ETIMEDOUT\|network` | Wait, retry |
+| YOLO Mode Auto-Accept | recovery | `Do you wish to proceed?` | Send Enter |
 | Auto-Continue Prompts | prompt | `Continue\?\|Press Enter\|proceed` | Send Enter |
 | Auto-Retry on Failure | prompt | `Retry\?\|Try again\?` | Send `y` |
+| Auto-Proceed Confirmation | prompt | `Do you want to proceed?...1. Yes` | Send Enter |
 | Waiting for Input Detection | stall | `waiting for.*input\|⎿` | Notify |
 | Task Completion Notification | notification | `Task completed\|jat:complete` | Notify |
 | Error Detection Notification | notification | `Error:\|Exception:\|FATAL` | Notify |

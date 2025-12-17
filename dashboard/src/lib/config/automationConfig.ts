@@ -277,6 +277,43 @@ export const AUTOMATION_PRESETS: AutomationPreset[] = [
 			priority: 60
 		}
 	},
+	{
+		id: 'preset-auto-proceed',
+		name: 'Auto-Proceed Confirmation',
+		description: 'Automatically accept "Do you want to proceed?" prompts from AskUserQuestion tool',
+		category: 'prompt',
+		rule: {
+			name: 'Auto-Proceed Confirmation',
+			description: 'Auto-accept proceed confirmation dialogs (selects "Yes" option)',
+			enabled: true,
+			patterns: [
+				{
+					// Match "Do you want to proceed?" within Claude Code AskUserQuestion UI
+					// The pattern matches the question followed by numbered Yes option
+					// Note: ❯ or > indicates the cursor, 1. Yes is first option
+					// Using [\s\S] for multiline matching (terminal output has newlines)
+					pattern: 'Do you want to proceed\\?[\\s\\S]*?1\\.\\s*Yes',
+					mode: 'regex',
+					caseSensitive: false
+				}
+			],
+			actions: [
+				{
+					type: 'notify_only',
+					payload: 'Auto-accepting proceed confirmation...'
+				},
+				{
+					type: 'send_keys',
+					payload: 'Enter',
+					delay: 500
+				}
+			],
+			cooldownSeconds: 5,
+			maxTriggersPerSession: 50,
+			category: 'prompt',
+			priority: 55
+		}
+	},
 
 	// -------------------------------------------------------------------------
 	// Stall Detection Presets
