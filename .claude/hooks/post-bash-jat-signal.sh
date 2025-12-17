@@ -214,4 +214,35 @@ if [[ -n "$TMUX_SESSION" ]]; then
     echo "$SIGNAL_JSON" >> "$TIMELINE_FILE" 2>/dev/null || true
 fi
 
+# Write per-task signal timeline for TaskDetailDrawer
+# Stored in .beads/signals/{taskId}.jsonl so it persists with the repo
+if [[ -n "$TASK_ID" ]]; then
+    # Find the project root by checking each search directory for .beads/
+    for BASE_DIR in $SEARCH_DIRS; do
+        if [[ -d "${BASE_DIR}/.beads" ]]; then
+            SIGNALS_DIR="${BASE_DIR}/.beads/signals"
+            mkdir -p "$SIGNALS_DIR" 2>/dev/null || true
+
+            # Add agent name to the signal for task context
+            AGENT_FROM_TMUX=""
+            if [[ -n "$TMUX_SESSION" ]] && [[ "$TMUX_SESSION" =~ ^jat-(.+)$ ]]; then
+                AGENT_FROM_TMUX="${BASH_REMATCH[1]}"
+            fi
+
+            # Enrich signal with agent name if available
+            if [[ -n "$AGENT_FROM_TMUX" ]]; then
+                TASK_SIGNAL_JSON=$(echo "$SIGNAL_JSON" | jq -c --arg agent "$AGENT_FROM_TMUX" '. + {agent_name: $agent}' 2>/dev/null || echo "$SIGNAL_JSON")
+            else
+                TASK_SIGNAL_JSON="$SIGNAL_JSON"
+            fi
+
+            # Append to task-specific timeline
+            TASK_TIMELINE_FILE="${SIGNALS_DIR}/${TASK_ID}.jsonl"
+            echo "$TASK_SIGNAL_JSON" >> "$TASK_TIMELINE_FILE" 2>/dev/null || true
+
+            break  # Only write to first matching project
+        fi
+    done
+fi
+
 exit 0

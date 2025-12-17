@@ -226,6 +226,37 @@
 	let logContent = $state<string | null>(null);
 	let logContentLoading = $state(false);
 
+	// Task signals state (new structured timeline replacing raw logs)
+	interface TaskSignal {
+		type: string;
+		state?: string;
+		session_id: string;
+		tmux_session: string;
+		timestamp: string;
+		task_id?: string;
+		data?: Record<string, unknown>;
+		git_sha?: string;
+		agent_name?: string;
+	}
+	interface TaskSignalsResponse {
+		task_id: string;
+		signals: TaskSignal[];
+		count: number;
+		stats?: {
+			startTime?: string;
+			endTime?: string;
+			agents: string[];
+			stateChanges: number;
+			hasCompletion: boolean;
+			hasReview: boolean;
+			hasSuggestedTasks: boolean;
+		};
+	}
+	let taskSignals = $state<TaskSignal[]>([]);
+	let signalsLoading = $state(false);
+	let signalsExpanded = $state(true);  // Expanded by default since it's the primary view
+	let signalsStats = $state<TaskSignalsResponse['stats'] | null>(null);
+
 	// Autofocus action for inputs
 	function autofocusAction(node: HTMLElement) {
 		requestAnimationFrame(() => {
@@ -321,11 +352,12 @@
 			task = data.task;
 			originalTask = { ...data.task };
 
-			// Fetch task history, attachments, logs, and available tasks in parallel
+			// Fetch task history, attachments, signals, and available tasks in parallel
 			// Pass the signal to allow cancellation
 			fetchTaskHistory(id, signal);
 			fetchAttachments(id, signal);
-			fetchSessionLogs(id, signal);
+			fetchTaskSignals(id, signal);  // New structured signals (primary)
+			fetchSessionLogs(id, signal);   // Legacy logs (fallback)
 			fetchAvailableTasks(id, signal);
 		} catch (err: any) {
 			// Ignore abort errors (expected when switching tasks or closing drawer)
@@ -513,7 +545,34 @@
 		}
 	}
 
-	// Fetch session logs for this task
+	// Fetch task signals (structured timeline)
+	async function fetchTaskSignals(id: string, signal?: AbortSignal) {
+		if (!id) return;
+
+		signalsLoading = true;
+
+		try {
+			const response = await fetch(`/api/tasks/${id}/signals`, { signal });
+			if (!response.ok) {
+				throw new Error(`Failed to fetch task signals: ${response.statusText}`);
+			}
+			const data: TaskSignalsResponse = await response.json();
+			taskSignals = data.signals || [];
+			signalsStats = data.stats || null;
+		} catch (err: any) {
+			// Ignore abort errors
+			if (err.name === 'AbortError') {
+				return;
+			}
+			console.error('Error fetching task signals:', err);
+			taskSignals = [];
+			signalsStats = null;
+		} finally {
+			signalsLoading = false;
+		}
+	}
+
+	// Fetch session logs for this task (legacy - kept as fallback)
 	async function fetchSessionLogs(id: string, signal?: AbortSignal) {
 		if (!id) return;
 
@@ -1340,6 +1399,10 @@
 			logsExpanded = false;
 			selectedLog = null;
 			logContent = null;
+			// Reset signals state
+			taskSignals = [];
+			signalsStats = null;
+			signalsExpanded = true;
 			// Reset loading states
 			loading = false;
 			historyLoading = false;
@@ -1350,6 +1413,7 @@
 			attachmentsLoading = false;
 			attachments = [];
 			logsLoading = false;
+			signalsLoading = false;
 		}
 	}
 
@@ -1835,7 +1899,164 @@
 							{/if}
 						</div>
 
-						<!-- Session Logs - Industrial -->
+						<!-- Task Activity Timeline (Signals) -->
+						<div>
+							<div class="flex items-center justify-between mb-2">
+								<h4 class="text-xs font-semibold font-mono uppercase tracking-wider" style="color: oklch(0.55 0.02 250);">
+									Activity Timeline
+									{#if taskSignals.length > 0}
+										<span class="ml-1 badge badge-xs" style="background: oklch(0.30 0.02 250); color: oklch(0.70 0.02 250);">{taskSignals.length}</span>
+									{/if}
+								</h4>
+								{#if taskSignals.length > 0}
+									<button
+										class="btn btn-xs btn-ghost gap-1"
+										onclick={() => signalsExpanded = !signalsExpanded}
+									>
+										<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 transition-transform {signalsExpanded ? 'rotate-180' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+										</svg>
+										{signalsExpanded ? 'Collapse' : 'Expand'}
+									</button>
+								{/if}
+							</div>
+							{#if signalsLoading}
+								<div class="flex items-center gap-2 p-3 rounded" style="background: oklch(0.18 0.01 250);">
+									<span class="loading loading-spinner loading-sm"></span>
+									<span class="text-sm" style="color: oklch(0.55 0.02 250);">Loading activity timeline...</span>
+								</div>
+							{:else if taskSignals.length > 0}
+								<!-- Stats summary -->
+								{#if signalsStats}
+									<div class="flex flex-wrap gap-2 mb-3">
+										{#if signalsStats.agents.length > 0}
+											<span class="badge badge-xs badge-primary">{signalsStats.agents.join(', ')}</span>
+										{/if}
+										{#if signalsStats.hasCompletion}
+											<span class="badge badge-xs badge-success">Completed</span>
+										{:else if signalsStats.hasReview}
+											<span class="badge badge-xs badge-warning">In Review</span>
+										{/if}
+										{#if signalsStats.hasSuggestedTasks}
+											<span class="badge badge-xs badge-info">Has Tasks</span>
+										{/if}
+									</div>
+								{/if}
+								<!-- Timeline events -->
+								{#if signalsExpanded}
+									<div class="space-y-2">
+										{#each taskSignals as signal, i (signal.timestamp + i)}
+											{@const signalState = signal.state || signal.type}
+											{@const stateColors: Record<string, string> = {
+												working: 'oklch(0.75 0.15 85)',
+												review: 'oklch(0.70 0.15 200)',
+												completed: 'oklch(0.65 0.18 145)',
+												needs_input: 'oklch(0.70 0.15 310)',
+												completing: 'oklch(0.70 0.12 180)',
+												starting: 'oklch(0.70 0.12 200)',
+												idle: 'oklch(0.50 0.02 250)',
+												tasks: 'oklch(0.70 0.15 280)',
+												complete: 'oklch(0.65 0.18 145)',
+												action: 'oklch(0.70 0.15 45)'
+											}}
+											{@const stateLabels: Record<string, string> = {
+												working: 'Working',
+												review: 'Ready for Review',
+												completed: 'Completed',
+												needs_input: 'Needs Input',
+												completing: 'Completing',
+												starting: 'Starting',
+												idle: 'Idle',
+												tasks: 'Suggested Tasks',
+												complete: 'Complete Bundle',
+												action: 'Action Required'
+											}}
+											<div
+												class="p-3 rounded group transition-colors"
+												style="background: oklch(0.18 0.01 250); border-left: 3px solid {stateColors[signalState] || 'oklch(0.40 0.02 250)'};"
+											>
+												<div class="flex items-center justify-between mb-1">
+													<div class="flex items-center gap-2">
+														<!-- State badge -->
+														<span class="badge badge-xs" style="background: {stateColors[signalState] || 'oklch(0.30 0.02 250)'}; color: oklch(0.15 0.01 250);">
+															{stateLabels[signalState] || signalState}
+														</span>
+														{#if signal.agent_name}
+															<span class="text-xs font-mono" style="color: oklch(0.55 0.02 250);">{signal.agent_name}</span>
+														{/if}
+													</div>
+													<span class="text-xs" style="color: oklch(0.45 0.02 250);">
+														{formatRelativeTimestamp(signal.timestamp)}
+													</span>
+												</div>
+												<!-- Signal data content -->
+												{#if signal.data}
+													{@const data = signal.data as Record<string, unknown>}
+													{#if data.taskTitle}
+														<div class="text-sm font-medium mt-1" style="color: oklch(0.70 0.02 250);">
+															{data.taskTitle}
+														</div>
+													{/if}
+													{#if data.approach}
+														<div class="text-xs mt-1" style="color: oklch(0.55 0.02 250);">
+															{data.approach}
+														</div>
+													{/if}
+													{#if Array.isArray(data.summary) && data.summary.length > 0}
+														<ul class="text-xs mt-2 space-y-1 list-disc list-inside" style="color: oklch(0.55 0.02 250);">
+															{#each data.summary.slice(0, 3) as item}
+																<li>{item}</li>
+															{/each}
+															{#if data.summary.length > 3}
+																<li class="opacity-60">+{data.summary.length - 3} more...</li>
+															{/if}
+														</ul>
+													{/if}
+													{#if data.question}
+														<div class="text-sm mt-1 p-2 rounded" style="background: oklch(0.22 0.01 250); color: oklch(0.70 0.15 310);">
+															{data.question}
+														</div>
+													{/if}
+													{#if data.currentStep}
+														<div class="text-xs mt-1" style="color: oklch(0.55 0.02 250);">
+															Step: {data.currentStep}
+														</div>
+													{/if}
+													{#if data.outcome}
+														<div class="text-xs mt-1" style="color: oklch(0.65 0.18 145);">
+															Outcome: {data.outcome}
+														</div>
+													{/if}
+												{/if}
+												{#if signal.git_sha}
+													<div class="text-xs mt-2 font-mono opacity-50" style="color: oklch(0.50 0.02 250);">
+														git: {signal.git_sha}
+													</div>
+												{/if}
+											</div>
+										{/each}
+									</div>
+								{:else}
+									<!-- Collapsed view - show just the latest signal -->
+									{@const latest = taskSignals[taskSignals.length - 1]}
+									{@const latestState = latest.state || latest.type}
+									<div class="p-2 rounded text-sm" style="background: oklch(0.18 0.01 250); color: oklch(0.60 0.02 250);">
+										Latest: <span class="font-medium">{latestState}</span>
+										{#if latest.agent_name}
+											by {latest.agent_name}
+										{/if}
+										<span class="text-xs opacity-60 ml-2">{formatRelativeTimestamp(latest.timestamp)}</span>
+									</div>
+								{/if}
+							{:else}
+								<div class="p-3 rounded text-center" style="background: oklch(0.18 0.01 250);">
+									<span class="text-sm" style="color: oklch(0.45 0.02 250);">No activity recorded yet</span>
+									<p class="text-xs mt-1" style="color: oklch(0.40 0.02 250);">Signals are captured when agents work on this task</p>
+								</div>
+							{/if}
+						</div>
+
+						<!-- Session Logs - Industrial (Legacy fallback) -->
 						<div>
 							<div class="flex items-center justify-between mb-2">
 								<h4 class="text-xs font-semibold font-mono uppercase tracking-wider" style="color: oklch(0.55 0.02 250);">

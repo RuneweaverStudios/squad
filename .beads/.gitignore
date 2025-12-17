@@ -27,3 +27,7 @@ beads.right.meta.json
 !issues.jsonl
 !metadata.json
 !config.json
+
+# Keep signal timeline files (task history for detail drawer)
+!signals/
+!signals/*.jsonl
