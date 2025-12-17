@@ -2872,9 +2872,11 @@
 		}
 		setSendingInput(true);
 		try {
-			// Send Ctrl+C first to clear any stray characters in input
-			console.log(`[SessionCard] sendWorkflowCommand: sending ctrl-c`);
-			await onSendInput("ctrl-c", "key");
+			// Send Ctrl+U first to clear any stray characters in input
+			// Note: Previously used Ctrl+C but that sends an interrupt signal which
+			// caused issues on Mac Chrome where the terminal would become unresponsive
+			console.log(`[SessionCard] sendWorkflowCommand: sending ctrl-u to clear line`);
+			await onSendInput("ctrl-u", "key");
 			await new Promise((r) => setTimeout(r, 50));
 			// Send the command text (API appends Enter for type='text')
 			console.log(`[SessionCard] sendWorkflowCommand: sending text "${command}"`);
