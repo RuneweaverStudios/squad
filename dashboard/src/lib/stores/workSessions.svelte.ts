@@ -727,65 +727,99 @@ export function getLastFetch(): Date | null {
 let activityPollingInterval: ReturnType<typeof setInterval> | null = null;
 const ACTIVITY_STALE_MS = 30000; // Treat activity older than 30s as stale
 
+// Track consecutive activity fetch failures for exponential backoff
+let activityFailureCount = 0;
+let activityBackoffUntil = 0;
+const ACTIVITY_MAX_BACKOFF_MS = 30000; // Max 30 second backoff
+const ACTIVITY_BASE_BACKOFF_MS = 1000; // Start with 1 second backoff
+
 /**
  * Fetch activity state for all active sessions and update the store
- * This is the central polling mechanism that replaces per-component polling
+ * Uses batch endpoint to fetch all activities in one request, solving
+ * the ERR_INSUFFICIENT_RESOURCES browser connection limit issue.
  */
 export async function fetchActivityStates(): Promise<void> {
 	// Get current session names
 	const sessions = state.sessions;
 	if (sessions.length === 0) return;
 
-	// Fetch activity for all sessions in parallel
-	const activityPromises = sessions.map(async (session) => {
-		try {
-			const response = await globalThis.fetch(`/api/sessions/${session.sessionName}/activity`);
-			if (!response.ok) return { sessionName: session.sessionName, state: 'idle' as const };
+	// Check if we're in backoff period
+	const now = Date.now();
+	if (now < activityBackoffUntil) {
+		return;
+	}
 
-			const data = await response.json();
-			if (data.hasActivity && data.activity?.state) {
+	try {
+		// Build comma-separated list of session names for the batch endpoint
+		const sessionNames = sessions.map(s => s.sessionName).join(',');
+		const response = await globalThis.fetch(`/api/sessions/activity?sessions=${encodeURIComponent(sessionNames)}`);
+
+		if (!response.ok) {
+			throw new Error(`Activity fetch failed: ${response.status}`);
+		}
+
+		const data = await response.json();
+
+		// Success - reset failure count
+		activityFailureCount = 0;
+
+		if (!data.success || !data.activities) {
+			return;
+		}
+
+		// Build a map for quick lookup from the batch response
+		const activityMap = new Map<string, 'generating' | 'thinking' | 'idle'>();
+
+		for (const [sessionName, activityData] of Object.entries(data.activities)) {
+			const activity = activityData as {
+				hasActivity: boolean;
+				activity: { state: string } | null;
+				fileModifiedAt: string | null;
+			};
+
+			if (activity.hasActivity && activity.activity?.state) {
 				// Check if activity file is stale (not updated in 30s)
-				// Use fileModifiedAt (file mtime) instead of 'since' field because
-				// 'since' only updates on state changes, but file mtime reflects actual updates
-				const fileModified = data.fileModifiedAt ? new Date(data.fileModifiedAt).getTime() : 0;
+				const fileModified = activity.fileModifiedAt ? new Date(activity.fileModifiedAt).getTime() : 0;
 				const age = Date.now() - fileModified;
 				if (age > ACTIVITY_STALE_MS) {
-					return { sessionName: session.sessionName, state: 'idle' as const };
+					activityMap.set(sessionName, 'idle');
+				} else {
+					activityMap.set(sessionName, activity.activity.state as 'generating' | 'thinking' | 'idle');
 				}
+			} else {
+				activityMap.set(sessionName, 'idle');
+			}
+		}
+
+		// Update sessions with activity state
+		let hasChanges = false;
+		const updatedSessions = state.sessions.map((session) => {
+			const newState = activityMap.get(session.sessionName) || 'idle';
+			if (session._activityState !== newState) {
+				hasChanges = true;
 				return {
-					sessionName: session.sessionName,
-					state: data.activity.state as 'generating' | 'thinking' | 'idle'
+					...session,
+					_activityState: newState,
+					_activityStateTimestamp: Date.now()
 				};
 			}
-			return { sessionName: session.sessionName, state: 'idle' as const };
-		} catch {
-			return { sessionName: session.sessionName, state: 'idle' as const };
+			return session;
+		});
+
+		// Only update state if there are actual changes (avoid re-renders)
+		if (hasChanges) {
+			state.sessions = updatedSessions;
 		}
-	});
+	} catch (err) {
+		// Increment failure count and calculate backoff
+		activityFailureCount++;
+		const backoffMs = Math.min(ACTIVITY_BASE_BACKOFF_MS * Math.pow(2, activityFailureCount - 1), ACTIVITY_MAX_BACKOFF_MS);
+		activityBackoffUntil = Date.now() + backoffMs;
 
-	const results = await Promise.all(activityPromises);
-
-	// Build a map for quick lookup
-	const activityMap = new Map(results.map((r) => [r.sessionName, r.state]));
-
-	// Update sessions with activity state
-	let hasChanges = false;
-	const updatedSessions = state.sessions.map((session) => {
-		const newState = activityMap.get(session.sessionName) || 'idle';
-		if (session._activityState !== newState) {
-			hasChanges = true;
-			return {
-				...session,
-				_activityState: newState,
-				_activityStateTimestamp: Date.now()
-			};
+		// Only log on first failure or after long backoff
+		if (activityFailureCount === 1 || activityFailureCount % 5 === 0) {
+			console.error(`workSessions.fetchActivityStates error (backing off ${backoffMs / 1000}s):`, err);
 		}
-		return session;
-	});
-
-	// Only update state if there are actual changes (avoid re-renders)
-	if (hasChanges) {
-		state.sessions = updatedSessions;
 	}
 }
 
