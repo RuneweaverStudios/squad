@@ -3,14 +3,14 @@
  * POST /api/projects/init - Initialize a new project with Beads
  *
  * Request body:
- *   { path: string }  - Path to the project directory (must be under ~/code/)
+ *   { path: string }  - Path to the project directory (must be under home directory)
  *
  * Response:
  *   { success: true, project: { name, path, prefix }, message: string }
  *   or { error: true, message: string, type: string }
  *
  * Security:
- *   - Only allows paths under ~/code/
+ *   - Only allows paths under user's home directory
  *   - Validates path exists and is a directory
  *   - Validates path is a git repository
  */
@@ -18,17 +18,12 @@
 import { json } from '@sveltejs/kit';
 import { existsSync, statSync } from 'fs';
 import { homedir } from 'os';
-import { join, basename, resolve } from 'path';
+import { join, basename, resolve, normalize } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { invalidateCache } from '$lib/server/cache.js';
 
 const execAsync = promisify(exec);
-
-// Allowed base directories (security: only allow paths under these)
-const ALLOWED_BASE_PATHS = [
-	join(homedir(), 'code')
-];
 
 /**
  * Expand ~ to home directory and resolve to absolute path
@@ -41,12 +36,16 @@ function expandPath(inputPath) {
 }
 
 /**
- * Check if path is under an allowed base directory
+ * Check if path is safe (under home directory)
+ * Case-insensitive on macOS/Windows where filesystems are case-insensitive
  * @param {string} absolutePath
  * @returns {boolean}
  */
 function isPathAllowed(absolutePath) {
-	return ALLOWED_BASE_PATHS.some(basePath => absolutePath.startsWith(basePath + '/') || absolutePath === basePath);
+	const home = homedir();
+	const normalized = normalize(absolutePath);
+	// macOS and Windows have case-insensitive filesystems
+	return normalized.toLowerCase().startsWith(home.toLowerCase());
 }
 
 /**
@@ -99,12 +98,12 @@ export async function POST({ request }) {
 		// Expand and resolve path
 		const absolutePath = expandPath(inputPath);
 
-		// Security: Check path is under allowed directories
+		// Security: Check path is under home directory
 		if (!isPathAllowed(absolutePath)) {
 			return json(
 				{
 					error: true,
-					message: `Path must be under ~/code/. Got: ${inputPath}`,
+					message: `Path must be under your home directory. Got: ${inputPath}`,
 					type: 'security_error'
 				},
 				{ status: 403 }
