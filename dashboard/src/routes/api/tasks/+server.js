@@ -254,23 +254,30 @@ export async function POST({ request }) {
 		invalidateCache.agents();
 		_resetTaskCache();
 
-		// Fetch the created task to return full object
+		// Try to fetch the created task to return full object
+		// Note: This may fail for cross-project tasks since getTaskById only looks in current project
 		const createdTask = getTaskById(taskId);
 
-		if (!createdTask) {
-			return json(
-				{
-					error: true,
-					message: 'Task created but failed to retrieve',
-					taskId: taskId
-				},
-				{ status: 500 }
-			);
+		if (createdTask) {
+			return json({
+				success: true,
+				task: createdTask,
+				message: `Task ${taskId} created successfully`
+			}, { status: 201 });
 		}
 
+		// Task was created but we can't fetch it (cross-project creation)
+		// Return success with minimal task info
 		return json({
 			success: true,
-			task: createdTask,
+			task: {
+				id: taskId,
+				title: title,
+				type: type,
+				priority: priority,
+				status: 'open',
+				project: project || null
+			},
 			message: `Task ${taskId} created successfully`
 		}, { status: 201 });
 
