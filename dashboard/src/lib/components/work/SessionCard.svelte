@@ -1999,8 +1999,8 @@
 
 		if (needsQuestionPolling && !questionPollInterval) {
 			// Start polling when entering needs-input state
-			fetchQuestionData(); // Immediate fetch
-			questionPollInterval = setInterval(fetchQuestionData, 1500); // 1.5s interval (was 500ms)
+			fetchQuestionData().catch(() => {}); // Immediate fetch (catch timeout errors)
+			questionPollInterval = setInterval(() => fetchQuestionData().catch(() => {}), 1500); // 1.5s interval (was 500ms)
 		} else if (!needsQuestionPolling && questionPollInterval) {
 			// Stop polling when leaving needs-input state
 			clearInterval(questionPollInterval);
@@ -2012,7 +2012,7 @@
 	// This populates the "Start Next" action in the dropdown with actual task info
 	$effect(() => {
 		if (sessionState === 'completed' && !nextTaskInfo && !nextTaskLoading && !nextTaskFetchFailed) {
-			fetchNextTask();
+			fetchNextTask().catch(() => {}); // Catch any unhandled promise rejections
 		} else if (sessionState !== 'completed') {
 			// Clear next task info and reset failed flag when leaving completed state
 			nextTaskInfo = null;
