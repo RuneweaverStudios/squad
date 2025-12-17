@@ -25,6 +25,7 @@ import {
 	AGENT_MAIL_URL
 } from '$lib/config/spawnConfig.js';
 import { getTaskById } from '$lib/server/beads.js';
+import { getProjectPath } from '$lib/server/projectPaths.js';
 
 const execAsync = promisify(exec);
 
@@ -39,24 +40,34 @@ export async function POST({ request }) {
 		// project is optional - if provided, use that path; otherwise infer from task ID prefix
 
 		// Determine project path:
-		// 1. If explicit project provided, use it
-		// 2. If taskId provided, infer from prefix (e.g., "jomarchy-abc" → ~/code/jomarchy)
+		// 1. If explicit project provided, look it up in JAT config
+		// 2. If taskId provided, infer from prefix and look up in JAT config
 		// 3. Fall back to current project (jat)
-		let projectPath = project;
+		let projectPath = null;
 		let inferredFromTaskId = false;
+
+		if (project) {
+			// Explicit project provided - look up its path
+			const projectInfo = await getProjectPath(project);
+			if (projectInfo.exists) {
+				projectPath = projectInfo.path;
+			}
+		}
 
 		if (!projectPath && taskId) {
 			// Task IDs follow format: {project}-{hash}
-			const taskPrefix = taskId.split('-')[0];
-			if (taskPrefix && taskPrefix !== 'jat') {
-				// Infer project path from task ID prefix
-				const inferredPath = `${process.env.HOME}/code/${taskPrefix}`;
-				// Validate the inferred directory exists
-				if (existsSync(inferredPath)) {
-					projectPath = inferredPath;
+			// Handle underscores in project names (e.g., "Community_Connect-abc")
+			const lastDashIndex = taskId.lastIndexOf('-');
+			const taskPrefix = lastDashIndex > 0 ? taskId.substring(0, lastDashIndex) : taskId.split('-')[0];
+
+			if (taskPrefix && taskPrefix.toLowerCase() !== 'jat') {
+				// Look up project path from JAT config (supports custom paths)
+				const projectInfo = await getProjectPath(taskPrefix);
+				if (projectInfo.exists) {
+					projectPath = projectInfo.path;
 					inferredFromTaskId = true;
 				} else {
-					console.warn(`[spawn] Inferred project path ${inferredPath} does not exist, falling back to current project`);
+					console.warn(`[spawn] Project ${taskPrefix} not found at ${projectInfo.path}, falling back to current project`);
 				}
 			}
 		}
