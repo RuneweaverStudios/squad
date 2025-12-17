@@ -66,4 +66,50 @@ if [[ -n "$TMUX_SESSION" ]]; then
     echo "$QUESTION_DATA" > "$TMUX_QUESTION_FILE" 2>/dev/null || true
 fi
 
+# Also emit a needs_input signal so the dashboard transitions to needs-input state
+# This triggers the question polling in SessionCard
+if [[ -n "$TMUX_SESSION" ]]; then
+    # Extract the first question text for the signal
+    QUESTION_TEXT=$(echo "$TOOL_INFO" | jq -r '.tool_input.questions[0].question // "Question from agent"' 2>/dev/null || echo "Question from agent")
+    QUESTION_TYPE=$(echo "$TOOL_INFO" | jq -r 'if .tool_input.questions[0].multiSelect then "multi-select" else "choice" end' 2>/dev/null || echo "choice")
+
+    # Get current task ID from beads if available
+    TASK_ID=""
+    if command -v bd &>/dev/null && [[ -n "$AGENT_NAME" ]]; then
+        TASK_ID=$(bd list --json 2>/dev/null | jq -r --arg agent "$AGENT_NAME" '.[] | select(.assignee == $agent and .status == "in_progress") | .id' 2>/dev/null | head -1 || echo "")
+    fi
+
+    # Build signal data - use type: "state" and state: "needs_input"
+    # This matches the format expected by the SSE server in +server.ts
+    # which maps signal states using SIGNAL_STATE_MAP (needs_input -> needs-input)
+    SIGNAL_DATA=$(jq -n -c \
+        --arg state "needs_input" \
+        --arg session_id "$SESSION_ID" \
+        --arg tmux "$TMUX_SESSION" \
+        --arg task_id "$TASK_ID" \
+        --arg question "$QUESTION_TEXT" \
+        --arg question_type "$QUESTION_TYPE" \
+        '{
+            type: "state",
+            state: $state,
+            session_id: $session_id,
+            tmux_session: $tmux,
+            timestamp: (now | todate),
+            task_id: $task_id,
+            data: {
+                taskId: $task_id,
+                question: $question,
+                questionType: $question_type
+            }
+        }' 2>/dev/null || echo "{}")
+
+    # Write signal files
+    echo "$SIGNAL_DATA" > "/tmp/jat-signal-${SESSION_ID}.json" 2>/dev/null || true
+    echo "$SIGNAL_DATA" > "/tmp/jat-signal-tmux-${TMUX_SESSION}.json" 2>/dev/null || true
+
+    # Also append to timeline for history tracking (JSONL format)
+    TIMELINE_FILE="/tmp/jat-timeline-${TMUX_SESSION}.jsonl"
+    echo "$SIGNAL_DATA" >> "$TIMELINE_FILE" 2>/dev/null || true
+fi
+
 exit 0
