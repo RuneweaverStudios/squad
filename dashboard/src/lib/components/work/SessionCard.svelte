@@ -4641,9 +4641,9 @@
 		>
 			<!-- Rich Signal Cards - display context-aware signal information above terminal -->
 			<!-- Container uses flex-shrink-0 to prevent collapse, max-height constrains expansion -->
-			<!-- overflow-hidden ensures content stays within bounds even with nested scrolling -->
+			<!-- overflow-y-auto allows scrolling if content exceeds max-height -->
 			{#if hasRichSignal && isAgentMode}
-				<div class="px-3 py-2 overflow-hidden flex-shrink-0" style="border-bottom: 1px solid oklch(0.5 0 0 / 0.12); max-height: min(50%, 350px);">
+				<div class="px-3 py-2 overflow-y-auto flex-shrink-0" style="border-bottom: 1px solid oklch(0.5 0 0 / 0.12); max-height: 350px;">
 					{#if workingSignal}
 						<WorkingSignalCard
 							signal={workingSignal}

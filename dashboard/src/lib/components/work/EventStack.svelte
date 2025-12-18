@@ -214,7 +214,8 @@
 
 			// Check if this is a duplicate/update of a previous event
 			// Merge if: same type AND same task_id AND type is one that updates frequently
-			const mergableTypes = ['completing', 'compacting'];
+			// Include 'completed' to prevent duplicate "Task completed" entries when hook fires multiple times
+			const mergableTypes = ['completing', 'compacting', 'completed'];
 			const shouldMerge = prev &&
 				currentType === prevType &&
 				current.task_id === prev.task_id &&
@@ -237,6 +238,7 @@
 	}
 
 	// Auto-expand when latest event is completion or tasks and autoExpand is enabled
+	// Only auto-expand ONCE per completion event - not on every 5-second poll refresh
 	$effect(() => {
 		if (autoExpand && filteredEvents.length > 0) {
 			const latestEvent = filteredEvents[0];
@@ -246,7 +248,12 @@
 				latestEvent?.type === 'tasks' ||
 				latestEvent?.state === 'completed';
 			if (isCompletion) {
-				isExpanded = true;
+				const eventKey = getEventKey(latestEvent);
+				// Only auto-expand if this is a NEW completion event we haven't expanded for yet
+				if (eventKey !== autoExpandedForEventKey) {
+					autoExpandedForEventKey = eventKey;
+					isExpanded = true;
+				}
 			}
 		}
 	});
@@ -256,6 +263,10 @@
 	// Track new events for entrance animation
 	let newEventIds = $state<Set<string>>(new Set());
 	let previousEventCount = $state(0);
+
+	// Track which completion event we've already auto-expanded for
+	// This prevents re-expanding on every 5-second poll when state is 'completed'
+	let autoExpandedForEventKey = $state<string | null>(null);
 
 	// State for suggested tasks management (per-event)
 	// Key: event timestamp+idx, Value: map of task key -> selection/edit state

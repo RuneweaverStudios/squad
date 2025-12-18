@@ -185,9 +185,10 @@
 	</div>
 {:else}
 	<!-- Full mode: detailed completed signal card -->
-	<!-- h-full and overflow-hidden ensure the card fits within parent's max-height constraint -->
+	<!-- Card sizes based on content, parent container handles max-height and scrolling -->
+	<!-- overflow-hidden clips any nested content that might overflow -->
 	<div
-		class="rounded-lg overflow-hidden h-full flex flex-col {className}"
+		class="rounded-lg overflow-hidden flex flex-col {className}"
 		style="background: linear-gradient(135deg, oklch(0.22 0.06 145) 0%, oklch(0.18 0.04 140) 100%); border: 1px solid oklch(0.45 0.15 145);"
 	>
 		<!-- Header - flex-shrink-0 ensures it doesn't shrink when body scrolls -->
@@ -252,8 +253,8 @@
 			</div>
 		</div>
 
-		<!-- Body - flex-1 with min-h-0 and overflow-y-auto for proper scrolling within parent's height constraint -->
-		<div class="p-3 flex flex-col gap-3 overflow-y-auto flex-1 min-h-0">
+		<!-- Body - content naturally sizes, parent container handles scrolling -->
+		<div class="p-3 flex flex-col gap-3">
 			<!-- Summary Bullets -->
 			{#if signal.summary && signal.summary.length > 0}
 				<div class="flex flex-col gap-1.5">

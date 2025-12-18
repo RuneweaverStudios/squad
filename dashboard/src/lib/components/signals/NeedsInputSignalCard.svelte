@@ -119,9 +119,10 @@
 	});
 </script>
 
-<!-- h-full and overflow-hidden ensure the card fits within parent's max-height constraint -->
+<!-- Card sizes based on content, parent container handles max-height and scrolling -->
+<!-- overflow-hidden clips any nested content that might overflow -->
 <div
-	class="rounded-lg overflow-hidden h-full flex flex-col {className}"
+	class="rounded-lg overflow-hidden flex flex-col {className}"
 	style="background: linear-gradient(135deg, oklch(0.22 0.06 280) 0%, oklch(0.18 0.04 275) 100%); border: 1px solid oklch(0.45 0.12 280);"
 >
 	<!-- Header - flex-shrink-0 ensures it doesn't shrink when body scrolls -->
@@ -171,8 +172,8 @@
 		{/if}
 	</div>
 
-	<!-- Body - flex-1 with min-h-0 and overflow-y-auto for proper scrolling -->
-	<div class="p-3 flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto">
+	<!-- Body -->
+	<div class="p-3 flex flex-col gap-3">
 		<!-- Question -->
 		<div class="flex flex-col gap-1">
 			<div class="text-sm font-semibold" style="color: oklch(0.95 0.08 280);">

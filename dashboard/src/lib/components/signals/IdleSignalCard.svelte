@@ -160,9 +160,10 @@
 	</div>
 {:else}
 	<!-- Full mode: detailed idle signal card -->
-	<!-- h-full and overflow-hidden ensure the card fits within parent's max-height constraint -->
+	<!-- Card sizes based on content, parent container handles max-height and scrolling -->
+	<!-- overflow-hidden clips any nested content that might overflow -->
 	<div
-		class="rounded-lg overflow-hidden h-full flex flex-col {className}"
+		class="rounded-lg overflow-hidden flex flex-col {className}"
 		style="background: linear-gradient(135deg, oklch(0.22 0.04 250) 0%, oklch(0.18 0.03 245) 100%); border: 1px solid oklch(0.40 0.08 250);"
 	>
 		<!-- Header - flex-shrink-0 ensures it doesn't shrink when body scrolls -->
@@ -203,8 +204,8 @@
 			{/if}
 		</div>
 
-		<!-- Body - flex-1 with min-h-0 and overflow-y-auto for proper scrolling -->
-		<div class="p-3 flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto">
+		<!-- Body -->
+		<div class="p-3 flex flex-col gap-3">
 			<!-- Blocked Reason -->
 			{#if signal.blockedReason}
 				<div

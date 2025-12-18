@@ -83,8 +83,9 @@
 	</div>
 {:else}
 	<!-- Full mode: detailed progress card -->
-	<!-- h-full and overflow-hidden ensure card fits within parent's max-height constraint -->
-	<div class="card bg-base-200 shadow-sm h-full overflow-hidden flex flex-col">
+	<!-- Card sizes based on content, parent container handles max-height and scrolling -->
+	<!-- overflow-hidden clips any nested content that might overflow -->
+	<div class="card bg-base-200 shadow-sm overflow-hidden flex flex-col">
 		<div class="card-body p-4 flex-1 min-h-0 overflow-y-auto">
 			<!-- Header -->
 			<div class="flex items-center justify-between mb-4">

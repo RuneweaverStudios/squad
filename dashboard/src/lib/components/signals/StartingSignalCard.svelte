@@ -102,8 +102,10 @@
 	</div>
 {:else}
 	<!-- Full mode: detailed starting signal card -->
+	<!-- Card sizes based on content, parent container handles max-height and scrolling -->
+	<!-- overflow-hidden clips any nested content that might overflow -->
 	<div
-		class="rounded-lg overflow-hidden h-full flex flex-col {className}"
+		class="rounded-lg overflow-hidden flex flex-col {className}"
 		style="background: linear-gradient(135deg, oklch(0.22 0.06 200) 0%, oklch(0.18 0.04 195) 100%); border: 1px solid oklch(0.45 0.12 200);"
 	>
 		<!-- Header -->
@@ -139,7 +141,7 @@
 		</div>
 
 		<!-- Body -->
-		<div class="p-3 flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto">
+		<div class="p-3 flex flex-col gap-3">
 			<!-- Session ID (copyable) -->
 			<div class="flex items-center gap-2">
 				<span class="text-[10px] font-semibold opacity-60" style="color: oklch(0.75 0.05 200);">

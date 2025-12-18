@@ -343,9 +343,9 @@
 	</div>
 {:else}
 	<!-- Full mode: detailed review signal card -->
-	<!-- h-full and overflow-hidden ensure the card fits within parent's max-height constraint -->
+	<!-- Card sizes based on content, parent container handles max-height and scrolling -->
 	<div
-		class="rounded-lg overflow-hidden h-full flex flex-col {className}"
+		class="rounded-lg overflow-hidden flex flex-col {className}"
 		style="background: linear-gradient(135deg, oklch(0.22 0.06 200) 0%, oklch(0.18 0.04 195) 100%); border: 1px solid oklch(0.45 0.12 200);"
 	>
 		<!-- Header - flex-shrink-0 ensures it doesn't shrink when body scrolls -->
@@ -404,8 +404,8 @@
 			</div>
 		</div>
 
-		<!-- Body - flex-1 with min-h-0 and overflow-y-auto for proper scrolling -->
-		<div class="p-3 flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto">
+		<!-- Body - content naturally sizes, parent container handles scrolling -->
+		<div class="p-3 flex flex-col gap-3">
 			<!-- Task Title -->
 			{#if signal.taskTitle}
 				<div class="text-sm font-semibold" style="color: oklch(0.95 0.08 200);">
