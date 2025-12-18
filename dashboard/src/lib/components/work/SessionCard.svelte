@@ -77,7 +77,7 @@
 	import ReviewSignalCard from "$lib/components/signals/ReviewSignalCard.svelte";
 	import NeedsInputSignalCard from "$lib/components/signals/NeedsInputSignalCard.svelte";
 	import CompletingSignalCard from "$lib/components/signals/CompletingSignalCard.svelte";
-	import CompletedSignalCard from "$lib/components/signals/CompletedSignalCard.svelte";
+	// CompletedSignalCard removed - completion info now shown in EventStack only
 	import IdleSignalCard from "$lib/components/signals/IdleSignalCard.svelte";
 	import StartingSignalCard from "$lib/components/signals/StartingSignalCard.svelte";
 	import CompactingSignalCard from "$lib/components/signals/CompactingSignalCard.svelte";
@@ -2420,55 +2420,6 @@
 	/** Check if any suggested tasks are detected */
 	const hasSuggestedTasks = $derived(detectedSuggestedTasks.length > 0);
 
-	/**
-	 * Check if completion bundle is available and fresh (within TTL)
-	 * Uses longer TTL (30 min) since completion data should persist until user acts
-	 */
-	const hasCompletionBundle = $derived.by(() => {
-		const BUNDLE_TTL_MS = 30 * 60 * 1000; // 30 minutes for completion bundles
-		if (!completionBundle || !completionBundleTimestamp) return false;
-		const ageMs = Date.now() - completionBundleTimestamp;
-		return ageMs < BUNDLE_TTL_MS;
-	});
-
-	/** Quality signal color mapping */
-	function getQualityColor(type: 'tests' | 'build', value: string): string {
-		if (type === 'tests') {
-			switch (value) {
-				case 'passing': return 'oklch(0.70 0.18 145)'; // green
-				case 'failing': return 'oklch(0.65 0.20 25)';  // red
-				case 'skipped': return 'oklch(0.70 0.15 85)';  // amber
-				default: return 'oklch(0.65 0.08 250)';        // gray
-			}
-		} else {
-			switch (value) {
-				case 'clean': return 'oklch(0.70 0.18 145)';   // green
-				case 'warnings': return 'oklch(0.70 0.15 85)'; // amber
-				case 'errors': return 'oklch(0.65 0.20 25)';   // red
-				default: return 'oklch(0.65 0.08 250)';        // gray
-			}
-		}
-	}
-
-	/** Get icon for quality signal */
-	function getQualityIcon(type: 'tests' | 'build', value: string): string {
-		if (type === 'tests') {
-			switch (value) {
-				case 'passing': return '✓';
-				case 'failing': return '✗';
-				case 'skipped': return '⊘';
-				default: return '○';
-			}
-		} else {
-			switch (value) {
-				case 'clean': return '✓';
-				case 'warnings': return '⚠';
-				case 'errors': return '✗';
-				default: return '○';
-			}
-		}
-	}
-
 	/** Whether task creation is in progress */
 	let isCreatingSuggestedTasks = $state(false);
 
@@ -3905,6 +3856,8 @@
 						onAction={handleStatusAction}
 						variant="integrated"
 						alignRight={true}
+						showCommands={true}
+						onCommand={sendWorkflowCommand}
 					/>
 				{/if}
 			</div>
@@ -4465,6 +4418,8 @@
 						disabled={sendingInput}
 						alignRight={true}
 						variant="integrated"
+						showCommands={true}
+						onCommand={sendWorkflowCommand}
 					/>
 				</div>
 			</div>
@@ -4698,16 +4653,6 @@
 							signal={completingSignal}
 							compact={false}
 						/>
-					{:else if completedSignal}
-						<CompletedSignalCard
-							signal={completedSignal}
-							onTaskClick={(taskId) => onTaskClick?.(taskId)}
-							onCleanup={onKillSession ? async () => {
-								// Cleanup/close the completed session
-								await onKillSession?.();
-							} : undefined}
-							compact={false}
-						/>
 					{:else if idleSignal}
 						<IdleSignalCard
 							signal={idleSignal}
@@ -4758,157 +4703,6 @@
 					<p class="text-base-content/40 italic m-0">No output yet...</p>
 				{/if}
 			</div>
-
-			<!-- Completion Bundle Section (legacy - only show if no completedSignal card is rendering) -->
-			<!-- Container has max-height and overflow-y-auto to prevent content from spilling outside card -->
-			{#if hasCompletionBundle && completionBundle && isAgentMode && !completedSignal}
-				<div class="px-3 py-2 overflow-y-auto overflow-x-hidden" style="border-top: 1px solid oklch(0.5 0 0 / 0.08); background: linear-gradient(135deg, oklch(0.20 0.05 145 / 0.3) 0%, oklch(0.18 0.03 145 / 0.2) 100%); max-height: 40%;">
-					<!-- Header -->
-					<div class="flex items-center gap-2 mb-2">
-						<span class="font-semibold text-sm" style="color: oklch(0.85 0.12 145);">
-							✅ Task Completed
-						</span>
-						{#if completionBundle.quality}
-							<!-- Quality badges inline -->
-							<span
-								class="badge badge-xs font-mono"
-								style="background: {getQualityColor('tests', completionBundle.quality.tests)}20; color: {getQualityColor('tests', completionBundle.quality.tests)}; border: 1px solid {getQualityColor('tests', completionBundle.quality.tests)}40;"
-								title="Tests: {completionBundle.quality.tests}"
-							>
-								{getQualityIcon('tests', completionBundle.quality.tests)} tests
-							</span>
-							<span
-								class="badge badge-xs font-mono"
-								style="background: {getQualityColor('build', completionBundle.quality.build)}20; color: {getQualityColor('build', completionBundle.quality.build)}; border: 1px solid {getQualityColor('build', completionBundle.quality.build)}40;"
-								title="Build: {completionBundle.quality.build}"
-							>
-								{getQualityIcon('build', completionBundle.quality.build)} build
-							</span>
-						{/if}
-					</div>
-
-					<!-- Summary bullets -->
-					{#if completionBundle.summary && completionBundle.summary.length > 0}
-						<div class="mb-2">
-							<ul class="list-none m-0 p-0 space-y-0.5">
-								{#each completionBundle.summary as item}
-									<li class="flex items-start gap-1.5 text-xs" style="color: oklch(0.80 0.03 250);">
-										<span style="color: oklch(0.70 0.12 145);">•</span>
-										<span>{item}</span>
-									</li>
-								{/each}
-							</ul>
-						</div>
-					{/if}
-
-					<!-- Human Actions (if any) -->
-					{#if completionBundle.humanActions && completionBundle.humanActions.length > 0}
-						<div class="mb-2 p-2 rounded" style="background: oklch(0.25 0.08 45 / 0.3); border: 1px solid oklch(0.50 0.12 45 / 0.3);">
-							<div class="flex items-center gap-1.5 mb-1.5">
-								<span class="text-xs font-semibold" style="color: oklch(0.85 0.12 45);">
-									👤 Human Actions Required
-								</span>
-							</div>
-							{#each completionBundle.humanActions as action}
-								<div class="mb-1.5 last:mb-0">
-									{#if action.title}
-										<div class="text-xs font-medium" style="color: oklch(0.80 0.08 45);">
-											{action.title}
-										</div>
-									{/if}
-									{#if action.description}
-										<div class="text-xs" style="color: oklch(0.70 0.04 250);">
-											{action.description}
-										</div>
-									{/if}
-									{#if action.items && action.items.length > 0}
-										<ul class="list-none m-0 p-0 mt-1 space-y-0.5">
-											{#each action.items as item}
-												<li class="flex items-center gap-1.5 text-xs" style="color: oklch(0.75 0.04 250);">
-													<input type="checkbox" class="checkbox checkbox-xs" />
-													<span>{item}</span>
-												</li>
-											{/each}
-										</ul>
-									{/if}
-								</div>
-							{/each}
-						</div>
-					{/if}
-
-					<!-- Cross-Agent Intel (if any) -->
-					{#if completionBundle.crossAgentIntel && (completionBundle.crossAgentIntel.files?.length || completionBundle.crossAgentIntel.patterns?.length || completionBundle.crossAgentIntel.gotchas?.length)}
-						<div class="p-2 rounded" style="background: oklch(0.22 0.06 250 / 0.5); border: 1px solid oklch(0.40 0.08 250 / 0.3);">
-							<div class="flex items-center gap-1.5 mb-1.5">
-								<span class="text-xs font-semibold" style="color: oklch(0.80 0.10 250);">
-									🤖 Cross-Agent Intel
-								</span>
-							</div>
-							{#if completionBundle.crossAgentIntel.files && completionBundle.crossAgentIntel.files.length > 0}
-								<div class="mb-1">
-									<span class="text-[10px] uppercase font-semibold" style="color: oklch(0.60 0.06 250);">Files Modified</span>
-									<div class="flex flex-wrap gap-1 mt-0.5">
-										{#each completionBundle.crossAgentIntel.files as file}
-											<span class="badge badge-xs font-mono" style="background: oklch(0.28 0.04 250); color: oklch(0.75 0.04 250);">
-												{file}
-											</span>
-										{/each}
-									</div>
-								</div>
-							{/if}
-							{#if completionBundle.crossAgentIntel.patterns && completionBundle.crossAgentIntel.patterns.length > 0}
-								<div class="mb-1">
-									<span class="text-[10px] uppercase font-semibold" style="color: oklch(0.60 0.06 250);">Patterns</span>
-									<ul class="list-none m-0 p-0 mt-0.5 space-y-0.5">
-										{#each completionBundle.crossAgentIntel.patterns as pattern}
-											<li class="text-xs" style="color: oklch(0.75 0.04 250);">• {pattern}</li>
-										{/each}
-									</ul>
-								</div>
-							{/if}
-							{#if completionBundle.crossAgentIntel.gotchas && completionBundle.crossAgentIntel.gotchas.length > 0}
-								<div>
-									<span class="text-[10px] uppercase font-semibold" style="color: oklch(0.65 0.10 25);">⚠ Gotchas</span>
-									<ul class="list-none m-0 p-0 mt-0.5 space-y-0.5">
-										{#each completionBundle.crossAgentIntel.gotchas as gotcha}
-											<li class="text-xs" style="color: oklch(0.75 0.08 25);">• {gotcha}</li>
-										{/each}
-									</ul>
-								</div>
-							{/if}
-						</div>
-					{/if}
-
-					<!-- Pre-existing issues note -->
-					{#if completionBundle.quality?.preExisting}
-						<div class="mt-2 text-[10px] italic" style="color: oklch(0.60 0.08 45);">
-							Note: {completionBundle.quality.preExisting}
-						</div>
-					{/if}
-				</div>
-			{/if}
-
-			<!-- Suggested Tasks Section (when detected in output) -->
-			<!-- Container has max-height and overflow-y-auto to prevent content from spilling outside card -->
-			<!-- Hide when completedSignal exists - CompletedSignalCard in EventStack handles showing suggested tasks -->
-			{#if hasSuggestedTasks && isAgentMode && !completedSignal}
-				<div class="px-3 py-2 overflow-y-auto overflow-x-hidden" style="border-top: 1px solid oklch(0.5 0 0 / 0.08); max-height: 40%;">
-					<SuggestedTasksSection
-						tasks={detectedSuggestedTasks}
-						selectedCount={selectedSuggestedTasksCount}
-						onToggleSelection={toggleSuggestedTaskSelection}
-						getTaskKey={getSuggestedTaskKey}
-						onCreateTasks={createSuggestedTasks}
-						onEditTask={updateSuggestedTaskEdit}
-						onClearEdits={clearSuggestedTaskEdits}
-						isCreating={isCreatingSuggestedTasks}
-						{createResults}
-						showFeedback={showCreateFeedback}
-						onDismissFeedback={dismissCreateFeedback}
-						{availableProjects}
-					/>
-				</div>
-			{/if}
 
 			<!-- Event Timeline Stack (peeks above input, expands on hover) -->
 			{#if mode === 'agent' && sessionName}
@@ -6129,82 +5923,12 @@
 									alignRight={true}
 									onAction={handleStatusAction}
 									disabled={sendingInput || !onSendInput}
+									showCommands={true}
+									onCommand={sendWorkflowCommand}
 								/>
 							{/if}
-						{:else if sessionState === "ready-for-review"}
-							<!-- Ready for review: show Complete button -->
-							<button
-								onclick={() => sendWorkflowCommand("/jat:complete")}
-								class="btn btn-xs gap-1"
-								style="background: linear-gradient(135deg, oklch(0.50 0.18 145) 0%, oklch(0.42 0.15 160) 100%); border: none; color: white; font-weight: 600;"
-								title="Mark task as complete"
-								disabled={sendingInput || !onSendInput}
-							>
-								<svg
-									class="w-3 h-3"
-									fill="none"
-									viewBox="0 0 24 24"
-									stroke="currentColor"
-									stroke-width="2.5"
-								>
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										d="M5 13l4 4L19 7"
-									/>
-								</svg>
-								Complete
-							</button>
-						{:else if sessionState === "idle"}
-							<!-- Idle state: show Start button -->
-							<button
-								onclick={() => sendWorkflowCommand("/jat:start")}
-								class="btn btn-xs gap-1"
-								style="background: linear-gradient(135deg, oklch(0.50 0.18 250) 0%, oklch(0.42 0.15 265) 100%); border: none; color: white; font-weight: 600;"
-								title="Start working on a task"
-								disabled={sendingInput || !onSendInput}
-							>
-								<svg
-									class="w-3 h-3"
-									fill="none"
-									viewBox="0 0 24 24"
-									stroke="currentColor"
-									stroke-width="2"
-								>
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"
-									/>
-								</svg>
-								Start
-							</button>
-						{:else if sessionState === "working" && task}
-							<!-- Working state with task: always show Complete button -->
-							<button
-								onclick={() => sendWorkflowCommand("/jat:complete")}
-								class="btn btn-xs gap-1"
-								style="background: linear-gradient(135deg, oklch(0.40 0.12 145) 0%, oklch(0.35 0.10 160) 100%); border: none; color: white; font-weight: 500;"
-								title="Complete this task"
-								disabled={sendingInput || !onSendInput}
-							>
-								<svg
-									class="w-3 h-3"
-									fill="none"
-									viewBox="0 0 24 24"
-									stroke="currentColor"
-									stroke-width="2"
-								>
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										d="M5 13l4 4L19 7"
-									/>
-								</svg>
-								Complete
-							</button>
-						{:else if sessionState === "completing"}
-							<!-- Completing state: show actionable badge with attach/kill options -->
+						{:else if sessionState === "ready-for-review" || sessionState === "idle" || (sessionState === "working" && task) || sessionState === "completing" || detectedWorkflowCommands.length > 0}
+							<!-- Unified status badge with state-appropriate actions and all commands -->
 							<StatusActionBadge
 								{sessionState}
 								{sessionName}
@@ -6216,36 +5940,9 @@
 								alignRight={true}
 								onAction={handleStatusAction}
 								disabled={sendingInput || !onSendInput}
+								showCommands={true}
+								onCommand={sendWorkflowCommand}
 							/>
-						{:else if detectedWorkflowCommands.length > 0}
-							<!-- Workflow commands detected: show Done as primary action -->
-							{@const hasComplete = detectedWorkflowCommands.some(
-								(c) => c.command === "/jat:complete",
-							)}
-							{#if hasComplete}
-								<button
-									onclick={() => sendWorkflowCommand("/jat:complete")}
-									class="btn btn-xs gap-1"
-									style="background: linear-gradient(135deg, oklch(0.45 0.18 145) 0%, oklch(0.38 0.15 160) 100%); border: none; color: white; font-weight: 600;"
-									title="Complete this task"
-									disabled={sendingInput || !onSendInput}
-								>
-									<svg
-										class="w-3 h-3"
-										fill="none"
-										viewBox="0 0 24 24"
-										stroke="currentColor"
-										stroke-width="2.5"
-									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											d="M5 13l4 4L19 7"
-										/>
-									</svg>
-									Done
-								</button>
-							{/if}
 						{:else if detectedOptions.length > 0}
 							<!-- Prompt options detected: show quick action buttons -->
 							{#each detectedOptions as opt (opt.number)}
