@@ -26,7 +26,7 @@
 		CompletingSignalCard
 	} from '$lib/components/signals';
 	import type { SuggestedTask } from '$lib/types/signals';
-	import { workSessionsState } from '$lib/stores/workSessions.svelte';
+	import { workSessionsState, sendInput } from '$lib/stores/workSessions.svelte';
 	import type {
 		WorkingSignal,
 		ReviewSignal,
@@ -128,6 +128,55 @@
 	let actionSubmitting = $state(false);
 	let copiedEventKey = $state<string | null>(null);
 	let copiedField = $state<string | null>(null);  // Track which field was copied (e.g., "sessionId-abc123")
+
+	// Track answered questions: Map<eventKey, { answer: string, timestamp: string }>
+	let answeredQuestions = $state<Map<string, { answer: string; label: string; timestamp: string }>>(new Map());
+
+	// Track input field value for input-type questions
+	let inputQuestionValue = $state<Map<string, string>>(new Map());
+
+	// Derived: Check if there are unanswered questions in the timeline
+	const hasUnansweredQuestion = $derived.by(() => {
+		for (const event of filteredEvents) {
+			if ((event.type === 'question' || event.state === 'question') && event.data?.options) {
+				const eventKey = getEventKey(event);
+				if (!answeredQuestions.has(eventKey)) {
+					return true;
+				}
+			}
+		}
+		return false;
+	});
+
+	// Get the first unanswered question event (for notification purposes)
+	const firstUnansweredQuestion = $derived.by(() => {
+		for (const event of filteredEvents) {
+			if ((event.type === 'question' || event.state === 'question')) {
+				const eventKey = getEventKey(event);
+				if (!answeredQuestions.has(eventKey)) {
+					return event;
+				}
+			}
+		}
+		return null;
+	});
+
+	// Track which questions we've already played sound for
+	let soundPlayedForQuestions = $state<Set<string>>(new Set());
+
+	// Play sound when new unanswered question appears
+	import { playNeedsInputSound } from '$lib/utils/soundEffects';
+
+	$effect(() => {
+		if (firstUnansweredQuestion) {
+			const eventKey = getEventKey(firstUnansweredQuestion);
+			if (!soundPlayedForQuestions.has(eventKey)) {
+				playNeedsInputSound();
+				soundPlayedForQuestions.add(eventKey);
+				soundPlayedForQuestions = new Set(soundPlayedForQuestions); // trigger reactivity
+			}
+		}
+	});
 
 	/** Copy text to clipboard with visual feedback */
 	async function copyToClipboard(text: string, fieldKey: string) {
@@ -745,9 +794,11 @@
 				<div class="p-2 flex flex-col-reverse gap-1">
 					{#each filteredEvents as event, idx (event.timestamp + idx)}
 						{@const style = getEventStyle(event)}
+						{@const isQuestionEvent = event.type === 'question' || event.state === 'question'}
+						{@const isUnansweredQuestion = isQuestionEvent && !answeredQuestions.has(getEventKey(event))}
 						<div
-							class="rounded-md cursor-pointer transition-all hover:scale-[1.01]"
-							style="background: {style.bg}; border: 1px solid {style.border};"
+							class="rounded-md cursor-pointer transition-all hover:scale-[1.01] {isUnansweredQuestion ? 'animate-pulse ring-2 ring-offset-1' : ''}"
+							style="background: {style.bg}; border: {isUnansweredQuestion ? '2px solid oklch(0.60 0.18 280)' : '1px solid ' + style.border}; {isUnansweredQuestion ? 'box-shadow: 0 0 12px oklch(0.55 0.15 280 / 0.4); --tw-ring-color: oklch(0.55 0.15 280); --tw-ring-offset-color: oklch(0.18 0.01 250);' : ''}"
 							transition:fly={{ y: 20, duration: 150, delay: idx * 30, easing: cubicOut }}
 						>
 							<!-- Event header -->
@@ -757,6 +808,14 @@
 							>
 								<div class="flex items-center gap-2">
 									<span class="text-sm">{style.icon}</span>
+									{#if isUnansweredQuestion}
+										<span
+											class="px-1.5 py-0.5 rounded text-[9px] font-bold"
+											style="background: oklch(0.45 0.15 280); color: oklch(0.95 0.05 280);"
+										>
+											NEEDS ANSWER
+										</span>
+									{/if}
 									<span
 										class="font-mono text-xs font-medium {idx === 0 && isGenerating ? 'shimmer-text-fast' : ''}"
 										style="color: {style.text};"
@@ -1124,46 +1183,202 @@
 										</div>
 									{:else if event.state === 'question' || event.type === 'question'}
 										<!-- Question signal card -->
+										{@const questionEventKey = getEventKey(event)}
+										{@const answeredInfo = answeredQuestions.get(questionEventKey)}
+										{@const questionType = event.data?.questionType || 'choice'}
+										{@const hasTimeout = event.data?.timeout && !answeredInfo}
 										<div class="space-y-3">
-											<div class="flex items-center gap-2 text-xs" style="color: oklch(0.80 0.15 280);">
-												<span>💬</span>
-												<span class="font-medium">Question for Dashboard</span>
+											<div class="flex items-center justify-between">
+												<div class="flex items-center gap-2 text-xs" style="color: {answeredInfo ? 'oklch(0.70 0.15 145)' : 'oklch(0.80 0.15 280)'};">
+													<span>{answeredInfo ? '✅' : '💬'}</span>
+													<span class="font-medium">{answeredInfo ? 'Question Answered' : 'Question for Dashboard'}</span>
+												</div>
+												<!-- Re-answer button (only show when answered) -->
+												{#if answeredInfo}
+													<button
+														class="text-[10px] px-2 py-0.5 rounded transition-all hover:brightness-110"
+														style="background: oklch(0.30 0.06 280); color: oklch(0.75 0.08 280);"
+														onclick={(e) => {
+															e.stopPropagation();
+															answeredQuestions.delete(questionEventKey);
+															answeredQuestions = new Map(answeredQuestions);
+														}}
+													>
+														Change answer
+													</button>
+												{/if}
 											</div>
 											<!-- Question text -->
 											{#if event.data?.question}
-												<div class="p-2 rounded text-sm" style="background: oklch(0.25 0.02 280); color: oklch(0.90 0.02 280);">
+												<div class="p-2 rounded text-sm" style="background: {answeredInfo ? 'oklch(0.22 0.04 145)' : 'oklch(0.25 0.02 280)'}; color: {answeredInfo ? 'oklch(0.80 0.08 145)' : 'oklch(0.90 0.02 280)'};">
 													{event.data.question}
 												</div>
 											{/if}
-											<!-- Question type badge -->
-											{#if event.data?.questionType}
+											<!-- Show answered state OR question type badge with timeout countdown -->
+											{#if answeredInfo}
+												<div class="flex items-center gap-2 p-2 rounded" style="background: oklch(0.25 0.08 145); border: 1px solid oklch(0.40 0.12 145);">
+													<span class="text-[10px] px-2 py-0.5 rounded font-medium" style="background: oklch(0.35 0.12 145); color: oklch(0.90 0.10 145);">
+														✓ Answered
+													</span>
+													<span class="text-xs font-medium" style="color: oklch(0.85 0.10 145);">
+														{answeredInfo.label}
+													</span>
+												</div>
+											{:else}
 												<div class="flex items-center gap-2">
 													<span class="text-[10px] px-2 py-0.5 rounded" style="background: oklch(0.35 0.10 280); color: oklch(0.85 0.10 280);">
-														{event.data.questionType}
+														{questionType}
 													</span>
-													{#if event.data.timeout}
-														<span class="text-[10px]" style="color: oklch(0.50 0.02 250);">
-															Timeout: {event.data.timeout}s
+													{#if hasTimeout}
+														{@const timeoutStart = new Date(event.timestamp).getTime()}
+														{@const timeoutEnd = timeoutStart + (event.data.timeout * 1000)}
+														{@const now = Date.now()}
+														{@const remaining = Math.max(0, Math.ceil((timeoutEnd - now) / 1000))}
+														{@const isExpired = remaining <= 0}
+														{@const isUrgent = remaining <= 30 && remaining > 0}
+														<span
+															class="text-[10px] font-mono {isUrgent ? 'animate-pulse' : ''}"
+															style="color: {isExpired ? 'oklch(0.55 0.15 25)' : isUrgent ? 'oklch(0.70 0.15 45)' : 'oklch(0.50 0.02 250)'};"
+														>
+															{#if isExpired}
+																⏱ Expired
+															{:else}
+																⏱ {remaining}s
+															{/if}
 														</span>
 													{/if}
 												</div>
 											{/if}
-											<!-- Options list -->
-											{#if event.data?.options && Array.isArray(event.data.options) && event.data.options.length > 0}
+											<!-- Confirm type: Yes/No buttons -->
+											{#if !answeredInfo && questionType === 'confirm'}
+												<div class="flex gap-2">
+													<button
+														class="flex-1 p-2 rounded text-xs font-medium transition-all hover:scale-[1.02] hover:brightness-110 active:scale-[0.98]"
+														style="background: oklch(0.30 0.12 145); border: 1px solid oklch(0.45 0.15 145); color: oklch(0.90 0.10 145);"
+														onclick={async (e) => {
+															e.stopPropagation();
+															await sendInput(sessionName, 'yes', 'text');
+															answeredQuestions.set(questionEventKey, {
+																answer: 'yes',
+																label: 'Yes',
+																timestamp: new Date().toISOString()
+															});
+															answeredQuestions = new Map(answeredQuestions);
+															try { await fetch(`/api/sessions/${sessionName}/custom-question`, { method: 'DELETE' }); } catch {}
+														}}
+													>
+														✓ Yes
+													</button>
+													<button
+														class="flex-1 p-2 rounded text-xs font-medium transition-all hover:scale-[1.02] hover:brightness-110 active:scale-[0.98]"
+														style="background: oklch(0.30 0.10 25); border: 1px solid oklch(0.45 0.12 25); color: oklch(0.90 0.08 25);"
+														onclick={async (e) => {
+															e.stopPropagation();
+															await sendInput(sessionName, 'no', 'text');
+															answeredQuestions.set(questionEventKey, {
+																answer: 'no',
+																label: 'No',
+																timestamp: new Date().toISOString()
+															});
+															answeredQuestions = new Map(answeredQuestions);
+															try { await fetch(`/api/sessions/${sessionName}/custom-question`, { method: 'DELETE' }); } catch {}
+														}}
+													>
+														✗ No
+													</button>
+												</div>
+											{/if}
+											<!-- Input type: Text field with submit -->
+											{#if !answeredInfo && questionType === 'input'}
+												{@const inputValue = inputQuestionValue.get(questionEventKey) || ''}
+												<div class="flex gap-2">
+													<input
+														type="text"
+														class="flex-1 px-3 py-2 rounded text-xs"
+														style="background: oklch(0.20 0.02 280); border: 1px solid oklch(0.40 0.08 280); color: oklch(0.90 0.02 280);"
+														placeholder="Type your answer..."
+														value={inputValue}
+														oninput={(e) => {
+															inputQuestionValue.set(questionEventKey, e.currentTarget.value);
+															inputQuestionValue = new Map(inputQuestionValue);
+														}}
+														onkeydown={(e) => {
+															if (e.key === 'Enter' && inputValue.trim()) {
+																e.preventDefault();
+																sendInput(sessionName, inputValue.trim(), 'text');
+																answeredQuestions.set(questionEventKey, {
+																	answer: inputValue.trim(),
+																	label: inputValue.trim(),
+																	timestamp: new Date().toISOString()
+																});
+																answeredQuestions = new Map(answeredQuestions);
+																inputQuestionValue.delete(questionEventKey);
+																inputQuestionValue = new Map(inputQuestionValue);
+																fetch(`/api/sessions/${sessionName}/custom-question`, { method: 'DELETE' }).catch(() => {});
+															}
+														}}
+													/>
+													<button
+														class="px-4 py-2 rounded text-xs font-medium transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
+														style="background: oklch(0.40 0.12 280); color: oklch(0.95 0.05 280);"
+														disabled={!inputValue.trim()}
+														onclick={async (e) => {
+															e.stopPropagation();
+															if (!inputValue.trim()) return;
+															await sendInput(sessionName, inputValue.trim(), 'text');
+															answeredQuestions.set(questionEventKey, {
+																answer: inputValue.trim(),
+																label: inputValue.trim(),
+																timestamp: new Date().toISOString()
+															});
+															answeredQuestions = new Map(answeredQuestions);
+															inputQuestionValue.delete(questionEventKey);
+															inputQuestionValue = new Map(inputQuestionValue);
+															try { await fetch(`/api/sessions/${sessionName}/custom-question`, { method: 'DELETE' }); } catch {}
+														}}
+													>
+														Submit
+													</button>
+												</div>
+											{/if}
+											<!-- Choice type: Options list - clickable buttons to send answer (only show if not answered) -->
+											{#if !answeredInfo && questionType === 'choice' && event.data?.options && Array.isArray(event.data.options) && event.data.options.length > 0}
 												<div class="space-y-1.5">
-													<div class="text-[10px] font-medium" style="color: oklch(0.60 0.02 250);">Options:</div>
+													<div class="text-[10px] font-medium" style="color: oklch(0.60 0.02 250);">Click to answer:</div>
 													{#each event.data.options as option, i}
-														<div class="flex items-start gap-2 p-1.5 rounded text-xs" style="background: oklch(0.22 0.02 250);">
-															<span class="font-mono text-[10px] px-1 rounded" style="background: oklch(0.35 0.10 280); color: oklch(0.85 0.10 280);">
+														<button
+															class="w-full flex items-start gap-2 p-2 rounded text-xs text-left transition-all hover:scale-[1.02] hover:brightness-110 active:scale-[0.98]"
+															style="background: oklch(0.28 0.06 280); border: 1px solid oklch(0.40 0.10 280);"
+															onclick={async (e) => {
+																e.stopPropagation();
+																// Send the option value (or label if no value) to the session
+																const answer = option.value || option.label || String(i + 1);
+																await sendInput(sessionName, answer, 'text');
+																// Track as answered
+																answeredQuestions.set(questionEventKey, {
+																	answer,
+																	label: option.label,
+																	timestamp: new Date().toISOString()
+																});
+																answeredQuestions = new Map(answeredQuestions); // Trigger reactivity
+																// Clear the question file
+																try {
+																	await fetch(`/api/sessions/${sessionName}/custom-question`, { method: 'DELETE' });
+																} catch (err) {
+																	// Ignore errors clearing question file
+																}
+															}}
+														>
+															<span class="font-mono text-[10px] px-1.5 py-0.5 rounded font-bold" style="background: oklch(0.45 0.15 280); color: oklch(0.95 0.05 280);">
 																{i + 1}
 															</span>
 															<div class="flex-1">
-																<div style="color: oklch(0.85 0.02 250);">{option.label}</div>
+																<div class="font-medium" style="color: oklch(0.90 0.05 280);">{option.label}</div>
 																{#if option.description}
-																	<div class="text-[10px]" style="color: oklch(0.55 0.02 250);">{option.description}</div>
+																	<div class="text-[10px] mt-0.5" style="color: oklch(0.65 0.02 250);">{option.description}</div>
 																{/if}
 															</div>
-														</div>
+														</button>
 													{/each}
 												</div>
 											{/if}
@@ -1359,6 +1574,15 @@
 									{/if}
 								</div>
 								<div class="flex items-center gap-2">
+									{#if hasUnansweredQuestion}
+										<span
+											class="px-1.5 py-0.5 rounded text-[9px] font-medium animate-pulse"
+											style="background: oklch(0.35 0.12 280); color: oklch(0.90 0.10 280);"
+											title="Question waiting for answer"
+										>
+											❓ Question
+										</span>
+									{/if}
 									<span class="font-mono text-[10px]" style="color: oklch(0.50 0.02 250);">
 										{formatRelativeTime(event.timestamp)}
 									</span>
