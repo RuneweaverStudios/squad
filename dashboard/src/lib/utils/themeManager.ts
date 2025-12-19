@@ -12,10 +12,11 @@ import {
 	setTheme as setThemeInStore
 } from '$lib/stores/preferences.svelte';
 
-const DEFAULT_THEME = 'nord';
+const DEFAULT_THEME = 'jat';
 
 // All available DaisyUI themes
 export const AVAILABLE_THEMES = [
+	'jat',
 	'light',
 	'dark',
 	'cupcake',
@@ -96,6 +97,7 @@ export function isValidTheme(theme: string): theme is Theme {
  * DaisyUI dark themes - used for Monaco Editor theme sync
  */
 const DARK_THEMES: Set<Theme> = new Set([
+	'jat',
 	'dark',
 	'synthwave',
 	'halloween',
