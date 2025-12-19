@@ -8,9 +8,15 @@
 		project?: { key: string; config: ProjectConfig } | null;
 		onSave?: (key: string, config: ProjectConfig) => void;
 		onCancel?: () => void;
+		onDelete?: (key: string) => void;
 	}
 
-	let { isOpen = $bindable(false), project = null, onSave, onCancel }: Props = $props();
+	let { isOpen = $bindable(false), project = null, onSave, onCancel, onDelete }: Props = $props();
+
+	// Delete confirmation state
+	let showDeleteConfirm = $state(false);
+	let isDeleting = $state(false);
+	let deleteError = $state<string | null>(null);
 
 	// Form state
 	let key = $state('');
@@ -60,6 +66,10 @@
 			}
 			errors = {};
 			touched = {};
+			// Reset delete state
+			showDeleteConfirm = false;
+			isDeleting = false;
+			deleteError = null;
 		}
 	});
 
@@ -192,7 +202,40 @@
 
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') {
-			handleCancel();
+			if (showDeleteConfirm) {
+				showDeleteConfirm = false;
+			} else {
+				handleCancel();
+			}
+		}
+	}
+
+	async function handleDelete() {
+		if (!project?.key) return;
+
+		isDeleting = true;
+		deleteError = null;
+
+		try {
+			const response = await fetch('/api/projects', {
+				method: 'DELETE',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ project: project.key })
+			});
+
+			if (!response.ok) {
+				const data = await response.json();
+				throw new Error(data.error || 'Failed to delete project');
+			}
+
+			// Success - close drawer and notify parent
+			showDeleteConfirm = false;
+			isOpen = false;
+			onDelete?.(project.key);
+		} catch (error) {
+			deleteError = error instanceof Error ? error.message : 'Failed to delete project';
+		} finally {
+			isDeleting = false;
 		}
 	}
 </script>
@@ -449,13 +492,103 @@
 		</div>
 
 		<!-- Footer -->
-		<div class="flex justify-end gap-2 p-4 border-t border-base-300">
-			<button class="btn btn-ghost" onclick={handleCancel}>
-				Cancel
-			</button>
-			<button class="btn btn-primary" onclick={handleSave}>
-				{isNewProject ? 'Create Project' : 'Save Changes'}
-			</button>
+		<div class="flex justify-between p-4 border-t border-base-300">
+			<!-- Delete button (only for existing projects) -->
+			<div>
+				{#if !isNewProject}
+					<button
+						class="btn btn-error btn-outline"
+						onclick={() => showDeleteConfirm = true}
+						disabled={isDeleting}
+					>
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+						</svg>
+						Delete
+					</button>
+				{/if}
+			</div>
+			<!-- Save/Cancel buttons -->
+			<div class="flex gap-2">
+				<button class="btn btn-ghost" onclick={handleCancel}>
+					Cancel
+				</button>
+				<button class="btn btn-primary" onclick={handleSave}>
+					{isNewProject ? 'Create Project' : 'Save Changes'}
+				</button>
+			</div>
 		</div>
 	</div>
+
+	<!-- Delete Confirmation Modal -->
+	{#if showDeleteConfirm}
+		<div
+			class="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4"
+			transition:fade={{ duration: 150 }}
+			onclick={(e) => e.target === e.currentTarget && (showDeleteConfirm = false)}
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="delete-confirm-title"
+		>
+			<div
+				class="bg-base-100 rounded-xl shadow-2xl max-w-md w-full"
+				transition:fly={{ y: 20, duration: 200 }}
+			>
+				<div class="p-6">
+					<div class="flex items-center gap-3 mb-4">
+						<div class="w-12 h-12 rounded-full bg-error/10 flex items-center justify-center">
+							<svg class="w-6 h-6 text-error" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+							</svg>
+						</div>
+						<div>
+							<h3 id="delete-confirm-title" class="text-lg font-semibold">Delete Project</h3>
+							<p class="text-sm text-base-content/70">This action cannot be undone</p>
+						</div>
+					</div>
+
+					<p class="mb-4">
+						Are you sure you want to remove <span class="font-semibold text-error">{project?.key}</span> from the configuration?
+					</p>
+
+					<div class="bg-base-200 rounded-lg p-3 mb-4 text-sm">
+						<p class="text-base-content/70">
+							<strong>Note:</strong> This only removes the project from the JAT configuration file. The actual project directory and files will not be deleted.
+						</p>
+					</div>
+
+					{#if deleteError}
+						<div class="alert alert-error mb-4">
+							<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+							</svg>
+							<span>{deleteError}</span>
+						</div>
+					{/if}
+
+					<div class="flex justify-end gap-2">
+						<button
+							class="btn btn-ghost"
+							onclick={() => showDeleteConfirm = false}
+							disabled={isDeleting}
+						>
+							Cancel
+						</button>
+						<button
+							class="btn btn-error"
+							onclick={handleDelete}
+							disabled={isDeleting}
+						>
+							{#if isDeleting}
+								<span class="loading loading-spinner loading-sm"></span>
+								Deleting...
+							{:else}
+								Delete Project
+							{/if}
+						</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	{/if}
 {/if}
