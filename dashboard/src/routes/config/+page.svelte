@@ -33,9 +33,11 @@
 	import CommandsList from '$lib/components/config/CommandsList.svelte';
 	import CommandEditor from '$lib/components/config/CommandEditor.svelte';
 	import ProjectsList from '$lib/components/config/ProjectsList.svelte';
+	import McpConfigEditor from '$lib/components/config/McpConfigEditor.svelte';
 	import HooksEditor from '$lib/components/config/HooksEditor.svelte';
 	import ClaudeMdList from '$lib/components/config/ClaudeMdList.svelte';
 	import ClaudeMdEditor from '$lib/components/config/ClaudeMdEditor.svelte';
+	import DocsList from '$lib/components/config/DocsList.svelte';
 	import type { SlashCommand, ProjectConfig, HooksConfig } from '$lib/types/config';
 
 	// Page state
@@ -51,13 +53,23 @@
 	let editingCommand = $state<SlashCommand | null>(null);
 	let isCommandEditorOpen = $state(false);
 
+	// CLAUDE.md editor state
+	interface ClaudeMdFile {
+		path: string;
+		displayName: string;
+		location: string;
+		lastModified: string;
+		size: number;
+	}
+	let selectedClaudeMdFile = $state<ClaudeMdFile | null>(null);
+
 	// Derived store values
 	const projects = $derived(getProjects());
 	const projectsLoading = $derived(isProjectsLoading());
 	const projectsError = $derived(getProjectsError());
 
 	// Valid tabs for URL sync
-	const validTabs = ['commands', 'projects', 'hooks', 'claude'];
+	const validTabs = ['commands', 'projects', 'mcp', 'hooks', 'claude', 'docs'];
 
 	// Sync activeTab from URL query parameter
 	$effect(() => {
@@ -223,6 +235,16 @@
 							onDeleteProject={handleDeleteProject}
 						/>
 					</div>
+				{:else if activeTab === 'mcp'}
+					<!-- MCP Tab -->
+					<div
+						role="tabpanel"
+						id="mcp-panel"
+						aria-labelledby="mcp-tab"
+						transition:fade={{ duration: 150 }}
+					>
+						<McpConfigEditor />
+					</div>
 				{:else if activeTab === 'hooks'}
 					<!-- Hooks Tab -->
 					<div
@@ -245,26 +267,27 @@
 						role="tabpanel"
 						id="claude-panel"
 						aria-labelledby="claude-tab"
+						class="claude-panel"
 						transition:fade={{ duration: 150 }}
 					>
-						<div class="empty-state">
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke-width="1.5"
-								stroke="currentColor"
-								class="empty-icon"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
-								/>
-							</svg>
-							<p class="empty-title">CLAUDE.md Editor</p>
-							<p class="empty-hint">View and edit project CLAUDE.md documentation (coming soon)</p>
-						</div>
+						<ClaudeMdList
+							selectedPath={selectedClaudeMdFile?.path}
+							onSelect={(file) => (selectedClaudeMdFile = file)}
+						/>
+						<ClaudeMdEditor
+							filePath={selectedClaudeMdFile?.path}
+							displayName={selectedClaudeMdFile?.displayName}
+						/>
+					</div>
+				{:else if activeTab === 'docs'}
+					<!-- Shared Docs Tab -->
+					<div
+						role="tabpanel"
+						id="docs-panel"
+						aria-labelledby="docs-tab"
+						transition:fade={{ duration: 150 }}
+					>
+						<DocsList />
 					</div>
 				{/if}
 			</div>
@@ -318,6 +341,19 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
+	}
+
+	/* CLAUDE.md panel - side by side layout */
+	.claude-panel {
+		display: flex;
+		gap: 1.5rem;
+		min-height: 600px;
+	}
+
+	@media (max-width: 900px) {
+		.claude-panel {
+			flex-direction: column;
+		}
 	}
 
 	/* Commands content */
