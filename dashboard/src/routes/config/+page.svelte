@@ -39,6 +39,7 @@
 	import ClaudeMdList from '$lib/components/config/ClaudeMdList.svelte';
 	import ClaudeMdEditor from '$lib/components/config/ClaudeMdEditor.svelte';
 	import DocsList from '$lib/components/config/DocsList.svelte';
+	import DocsEditor from '$lib/components/config/DocsEditor.svelte';
 	import DefaultsEditor from '$lib/components/config/DefaultsEditor.svelte';
 	import type { SlashCommand, ProjectConfig, HooksConfig } from '$lib/types/config';
 
@@ -68,6 +69,14 @@
 		size: number;
 	}
 	let selectedClaudeMdFile = $state<ClaudeMdFile | null>(null);
+
+	// Docs editor state
+	interface DocFile {
+		filename: string;
+		title: string;
+		path: string;
+	}
+	let selectedDocFile = $state<DocFile | null>(null);
 
 	// Derived store values
 	const projects = $derived(getProjects());
@@ -375,9 +384,17 @@
 						role="tabpanel"
 						id="docs-panel"
 						aria-labelledby="docs-tab"
+						class="docs-panel"
 						transition:fade={{ duration: 150 }}
 					>
-						<DocsList />
+						<DocsList
+							selectedPath={selectedDocFile?.path}
+							onSelect={(file) => (selectedDocFile = file)}
+						/>
+						<DocsEditor
+							filename={selectedDocFile?.filename}
+							displayName={selectedDocFile?.title}
+						/>
 					</div>
 				{/if}
 			</div>
@@ -449,8 +466,19 @@
 		min-height: 600px;
 	}
 
+	/* Shared Docs panel - side by side layout (same as claude-panel) */
+	.docs-panel {
+		display: flex;
+		gap: 1.5rem;
+		min-height: 600px;
+	}
+
 	@media (max-width: 900px) {
 		.claude-panel {
+			flex-direction: column;
+		}
+
+		.docs-panel {
 			flex-direction: column;
 		}
 	}
