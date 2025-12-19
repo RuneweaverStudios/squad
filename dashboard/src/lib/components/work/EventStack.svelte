@@ -311,6 +311,17 @@
 		return event.data && typeof event.data === 'object' && !Array.isArray(event.data);
 	}
 
+	let expandedEventIdx = $state<number | null>(null);
+	let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+	// Track new events for entrance animation
+	let newEventIds = $state<Set<string>>(new Set());
+	let previousEventCount = $state(0);
+
+	// Track which completion event we've already auto-expanded for
+	// This prevents re-expanding on every 5-second poll when state is 'completed'
+	let autoExpandedForEventKey = $state<string | null>(null);
+
 	// Auto-expand when latest event is completion or tasks and autoExpand is enabled
 	// Only auto-expand ONCE per completion event - not on every 5-second poll refresh
 	$effect(() => {
@@ -327,20 +338,13 @@
 				if (eventKey !== autoExpandedForEventKey) {
 					autoExpandedForEventKey = eventKey;
 					isExpanded = true;
+					// Also expand the completion event details so users see full debrief immediately
+					// (not just the collapsed label that requires clicking to expand)
+					expandedEventIdx = 0;
 				}
 			}
 		}
 	});
-	let expandedEventIdx = $state<number | null>(null);
-	let pollTimer: ReturnType<typeof setInterval> | null = null;
-
-	// Track new events for entrance animation
-	let newEventIds = $state<Set<string>>(new Set());
-	let previousEventCount = $state(0);
-
-	// Track which completion event we've already auto-expanded for
-	// This prevents re-expanding on every 5-second poll when state is 'completed'
-	let autoExpandedForEventKey = $state<string | null>(null);
 
 	// State for suggested tasks management (per-event)
 	// Key: event timestamp+idx, Value: map of task key -> selection/edit state
