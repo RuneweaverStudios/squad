@@ -22,6 +22,8 @@
 	// State
 	let loading = $state(true);
 	let saving = $state(false);
+	let resetting = $state(false);
+	let showResetConfirm = $state(false);
 	let error = $state<string | null>(null);
 	let success = $state<string | null>(null);
 	let configPath = $state('');
@@ -47,6 +49,38 @@
 			agentStagger !== originalValues.agent_stagger ||
 			claudeStartupTimeout !== originalValues.claude_startup_timeout
 		)
+	);
+
+	// Validation rules
+	const VALIDATION_RULES = {
+		agentStagger: { min: 5, max: 300 },
+		claudeStartupTimeout: { min: 10, max: 120 }
+	};
+
+	// Validation error messages (reactive)
+	let agentStaggerError = $derived.by(() => {
+		if (agentStagger < VALIDATION_RULES.agentStagger.min) {
+			return `Minimum is ${VALIDATION_RULES.agentStagger.min} seconds`;
+		}
+		if (agentStagger > VALIDATION_RULES.agentStagger.max) {
+			return `Maximum is ${VALIDATION_RULES.agentStagger.max} seconds`;
+		}
+		return null;
+	});
+
+	let claudeStartupTimeoutError = $derived.by(() => {
+		if (claudeStartupTimeout < VALIDATION_RULES.claudeStartupTimeout.min) {
+			return `Minimum is ${VALIDATION_RULES.claudeStartupTimeout.min} seconds`;
+		}
+		if (claudeStartupTimeout > VALIDATION_RULES.claudeStartupTimeout.max) {
+			return `Maximum is ${VALIDATION_RULES.claudeStartupTimeout.max} seconds`;
+		}
+		return null;
+	});
+
+	// Track if form has validation errors
+	let hasValidationErrors = $derived(
+		agentStaggerError !== null || claudeStartupTimeoutError !== null
 	);
 
 	// Load defaults on mount
@@ -144,6 +178,45 @@
 			claudeStartupTimeout = originalValues.claude_startup_timeout;
 		}
 	}
+
+	async function resetToFactory() {
+		resetting = true;
+		error = null;
+		success = null;
+
+		try {
+			const response = await fetch('/api/config/defaults', {
+				method: 'DELETE'
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.error || 'Failed to reset defaults');
+			}
+
+			// Update form with factory values
+			const defaults = data.defaults;
+			terminal = defaults.terminal;
+			editor = defaults.editor;
+			toolsPath = defaults.tools_path;
+			claudeFlags = defaults.claude_flags;
+			model = defaults.model;
+			agentStagger = defaults.agent_stagger;
+			claudeStartupTimeout = defaults.claude_startup_timeout;
+
+			// Update original values
+			originalValues = { ...defaults };
+
+			success = 'Defaults reset to factory values';
+			setTimeout(() => { success = null; }, 3000);
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to reset defaults';
+		} finally {
+			resetting = false;
+			showResetConfirm = false;
+		}
+	}
 </script>
 
 <div class="defaults-editor">
@@ -182,7 +255,7 @@
 		</div>
 	{:else}
 		<!-- Form -->
-		<form class="defaults-form" onsubmit={(e) => { e.preventDefault(); saveDefaults(); }}>
+		<form class="defaults-form" onsubmit={(e) => { e.preventDefault(); if (!hasValidationErrors) saveDefaults(); }}>
 			<!-- Status messages -->
 			{#if error}
 				<div class="alert alert-error">
@@ -237,37 +310,45 @@
 					<div class="form-group">
 						<label class="form-label" for="agent-stagger">
 							Agent Stagger
-							<span class="label-hint">Seconds between batch spawns</span>
+							<span class="label-hint">Seconds between batch spawns (min {VALIDATION_RULES.agentStagger.min})</span>
 						</label>
 						<div class="input-with-unit">
 							<input
 								type="number"
 								id="agent-stagger"
 								class="form-input"
+								class:input-error={agentStaggerError}
 								bind:value={agentStagger}
-								min="1"
-								max="300"
+								min={VALIDATION_RULES.agentStagger.min}
+								max={VALIDATION_RULES.agentStagger.max}
 							/>
 							<span class="input-unit">seconds</span>
 						</div>
+						{#if agentStaggerError}
+							<span class="field-error">{agentStaggerError}</span>
+						{/if}
 					</div>
 
 					<div class="form-group">
 						<label class="form-label" for="startup-timeout">
 							Startup Timeout
-							<span class="label-hint">Wait time for Claude TUI to start</span>
+							<span class="label-hint">Wait time for Claude TUI (min {VALIDATION_RULES.claudeStartupTimeout.min})</span>
 						</label>
 						<div class="input-with-unit">
 							<input
 								type="number"
 								id="startup-timeout"
 								class="form-input"
+								class:input-error={claudeStartupTimeoutError}
 								bind:value={claudeStartupTimeout}
-								min="5"
-								max="120"
+								min={VALIDATION_RULES.claudeStartupTimeout.min}
+								max={VALIDATION_RULES.claudeStartupTimeout.max}
 							/>
 							<span class="input-unit">seconds</span>
 						</div>
+						{#if claudeStartupTimeoutError}
+							<span class="field-error">{claudeStartupTimeoutError}</span>
+						{/if}
 					</div>
 				</div>
 			</div>
@@ -323,28 +404,78 @@
 			<div class="form-actions">
 				<button
 					type="button"
-					class="btn btn-secondary"
-					onclick={resetToOriginal}
-					disabled={!hasChanges || saving}
+					class="btn btn-danger"
+					onclick={() => showResetConfirm = true}
+					disabled={saving || resetting}
 				>
-					Reset
+					Reset to Factory
 				</button>
-				<button
-					type="submit"
-					class="btn btn-primary"
-					disabled={!hasChanges || saving}
-				>
-					{#if saving}
-						<span class="btn-spinner"></span>
-						Saving...
-					{:else}
-						Save Changes
-					{/if}
-				</button>
+				<div class="actions-right">
+					<button
+						type="button"
+						class="btn btn-secondary"
+						onclick={resetToOriginal}
+						disabled={!hasChanges || saving || resetting}
+					>
+						Undo Changes
+					</button>
+					<button
+						type="submit"
+						class="btn btn-primary"
+						disabled={!hasChanges || saving || resetting || hasValidationErrors}
+					>
+						{#if saving}
+							<span class="btn-spinner"></span>
+							Saving...
+						{:else}
+							Save Changes
+						{/if}
+					</button>
+				</div>
 			</div>
 		</form>
 	{/if}
 </div>
+
+<!-- Reset Confirmation Modal -->
+{#if showResetConfirm}
+	<div class="modal-overlay" onclick={() => showResetConfirm = false}>
+		<div class="modal-content" onclick={(e) => e.stopPropagation()}>
+			<div class="modal-header">
+				<svg class="modal-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+				</svg>
+				<h3 class="modal-title">Reset to Factory Defaults?</h3>
+			</div>
+			<p class="modal-description">
+				This will reset all settings to their original factory values. Your custom configuration will be removed from the config file.
+			</p>
+			<div class="modal-actions">
+				<button
+					type="button"
+					class="btn btn-secondary"
+					onclick={() => showResetConfirm = false}
+					disabled={resetting}
+				>
+					Cancel
+				</button>
+				<button
+					type="button"
+					class="btn btn-danger"
+					onclick={resetToFactory}
+					disabled={resetting}
+				>
+					{#if resetting}
+						<span class="btn-spinner"></span>
+						Resetting...
+					{:else}
+						Reset to Factory
+					{/if}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
 
 <style>
 	.defaults-editor {
@@ -590,12 +721,35 @@
 		color: oklch(0.55 0.02 250);
 	}
 
+	/* Error states */
+	.input-error {
+		border-color: oklch(0.55 0.18 25) !important;
+	}
+
+	.input-error:focus {
+		border-color: oklch(0.55 0.18 25) !important;
+		box-shadow: 0 0 0 3px oklch(0.55 0.18 25 / 0.15) !important;
+	}
+
+	.field-error {
+		display: block;
+		margin-top: 0.375rem;
+		font-size: 0.75rem;
+		color: oklch(0.70 0.15 25);
+	}
+
 	/* Actions */
 	.form-actions {
 		display: flex;
-		justify-content: flex-end;
+		justify-content: space-between;
+		align-items: center;
 		gap: 0.75rem;
 		padding-top: 0.5rem;
+	}
+
+	.actions-right {
+		display: flex;
+		gap: 0.75rem;
 	}
 
 	.btn {
@@ -638,6 +792,16 @@
 		color: oklch(0.85 0.02 250);
 	}
 
+	.btn-danger {
+		background: oklch(0.35 0.12 25);
+		border: 1px solid oklch(0.45 0.15 25);
+		color: oklch(0.90 0.08 25);
+	}
+
+	.btn-danger:hover:not(:disabled) {
+		background: oklch(0.40 0.15 25);
+	}
+
 	.btn-spinner {
 		width: 14px;
 		height: 14px;
@@ -645,5 +809,62 @@
 		border-top-color: oklch(0.98 0.02 200);
 		border-radius: 50%;
 		animation: spin 1s linear infinite;
+	}
+
+	/* Modal */
+	.modal-overlay {
+		position: fixed;
+		inset: 0;
+		background: oklch(0 0 0 / 0.6);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 100;
+		backdrop-filter: blur(2px);
+	}
+
+	.modal-content {
+		background: oklch(0.18 0.02 250);
+		border: 1px solid oklch(0.30 0.02 250);
+		border-radius: 12px;
+		padding: 1.5rem;
+		max-width: 420px;
+		width: 90%;
+		box-shadow: 0 20px 40px oklch(0 0 0 / 0.4);
+	}
+
+	.modal-header {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		margin-bottom: 1rem;
+	}
+
+	.modal-icon {
+		width: 28px;
+		height: 28px;
+		color: oklch(0.70 0.18 45);
+		flex-shrink: 0;
+	}
+
+	.modal-title {
+		font-size: 1.1rem;
+		font-weight: 600;
+		color: oklch(0.90 0.02 250);
+		margin: 0;
+		font-family: ui-monospace, monospace;
+	}
+
+	.modal-description {
+		font-size: 0.9rem;
+		color: oklch(0.65 0.02 250);
+		margin: 0 0 1.5rem 0;
+		line-height: 1.5;
+	}
+
+	.modal-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.75rem;
 	}
 </style>

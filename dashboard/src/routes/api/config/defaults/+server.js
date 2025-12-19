@@ -139,3 +139,33 @@ export async function PUT({ request }) {
 		}, { status: 500 });
 	}
 }
+
+/**
+ * DELETE /api/config/defaults
+ * Reset defaults to factory values by removing the defaults section from config
+ */
+/** @type {import('./$types').RequestHandler} */
+export async function DELETE() {
+	try {
+		// Read existing config to preserve projects
+		const config = await readConfig();
+
+		// Remove the defaults section entirely - GET will merge with DEFAULT_CONFIG
+		delete config.defaults;
+
+		// Write back (preserves projects and other sections)
+		await writeConfig(config);
+
+		return json({
+			success: true,
+			defaults: DEFAULT_CONFIG,
+			message: 'Defaults reset to factory values'
+		});
+	} catch (error) {
+		console.error('[config/defaults] DELETE error:', error);
+		return json({
+			error: 'Failed to reset defaults',
+			message: error instanceof Error ? error.message : String(error)
+		}, { status: 500 });
+	}
+}
