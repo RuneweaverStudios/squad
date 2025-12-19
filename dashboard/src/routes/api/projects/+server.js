@@ -466,12 +466,35 @@ export async function GET({ url }) {
  */
 async function writeJatConfig(config) {
 	try {
+		// Ensure config directory exists
+		if (!existsSync(CONFIG_DIR)) {
+			await import('fs/promises').then(fs => fs.mkdir(CONFIG_DIR, { recursive: true }));
+		}
 		await writeFile(CONFIG_FILE, JSON.stringify(config, null, 2));
 		return true;
 	} catch (error) {
 		console.error('Failed to write JAT config:', error);
 		return false;
 	}
+}
+
+/**
+ * Validate project key format
+ * Must be lowercase alphanumeric with hyphens, 2-50 chars
+ * @param {string} key
+ * @returns {{ valid: boolean, error?: string }}
+ */
+function validateProjectKey(key) {
+	if (!key || typeof key !== 'string') {
+		return { valid: false, error: 'Project key is required' };
+	}
+	if (key.length < 2 || key.length > 50) {
+		return { valid: false, error: 'Project key must be 2-50 characters' };
+	}
+	if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]{1,2}$/.test(key)) {
+		return { valid: false, error: 'Project key must be lowercase alphanumeric with optional hyphens (not at start/end)' };
+	}
+	return { valid: true };
 }
 
 /**
@@ -532,13 +555,82 @@ export async function PATCH({ request }) {
 }
 
 /**
- * POST /api/projects - Update project visibility settings
- * Body: { action: 'hide' | 'show', project: string }
+ * POST /api/projects - Create project or update visibility settings
+ * Body for create: { action: 'create', key: string, path?: string, name?: string, port?: number, description?: string }
+ * Body for visibility: { action: 'hide' | 'show', project: string }
  *       or { hiddenProjects: string[] } to set all at once
  */
 export async function POST({ request }) {
 	try {
 		const body = await request.json();
+
+		// Handle create action
+		if (body.action === 'create') {
+			const { key, path: projectPath, name, port, description } = body;
+
+			// Validate key format
+			const keyValidation = validateProjectKey(key);
+			if (!keyValidation.valid) {
+				return json({ error: keyValidation.error }, { status: 400 });
+			}
+
+			// Resolve path (default to ~/code/{key})
+			const resolvedPath = projectPath
+				? projectPath.replace(/^~/, homedir())
+				: join(homedir(), 'code', key);
+
+			// Verify directory exists
+			if (!existsSync(resolvedPath)) {
+				return json({ error: `Directory does not exist: ${resolvedPath}` }, { status: 400 });
+			}
+
+			// Read current config
+			let jatConfig = await readJatConfig();
+			if (!jatConfig) {
+				jatConfig = { projects: {} };
+			}
+			if (!jatConfig.projects) {
+				jatConfig.projects = {};
+			}
+
+			// Check if project already exists
+			if (jatConfig.projects[key]) {
+				return json({ error: `Project '${key}' already exists` }, { status: 409 });
+			}
+
+			// Create project entry
+			jatConfig.projects[key] = {
+				name: name || key.toUpperCase(),
+				path: resolvedPath
+			};
+
+			// Add optional fields
+			if (port !== undefined && port !== null) {
+				jatConfig.projects[key].port = port;
+			}
+			if (description) {
+				jatConfig.projects[key].description = description;
+			}
+
+			// Save config
+			const success = await writeJatConfig(jatConfig);
+			if (!success) {
+				return json({ error: 'Failed to save config' }, { status: 500 });
+			}
+
+			// Invalidate cache
+			invalidateCache.projects();
+
+			return json({
+				success: true,
+				project: {
+					key,
+					...jatConfig.projects[key]
+				}
+			});
+		}
+
+		// Handle visibility settings
 		const settings = await readDashboardSettings();
 
 		if (body.hiddenProjects !== undefined) {
@@ -552,6 +644,8 @@ export async function POST({ request }) {
 				hiddenSet.add(body.project);
 			} else if (body.action === 'show') {
 				hiddenSet.delete(body.project);
+			} else {
+				return json({ error: `Unknown action: ${body.action}` }, { status: 400 });
 			}
 
 			settings.hiddenProjects = Array.from(hiddenSet);
@@ -570,6 +664,56 @@ export async function POST({ request }) {
 		return json({ success: true, hiddenProjects: settings.hiddenProjects });
 	} catch (error) {
 		console.error('Failed to update project settings:', error);
+		return json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+	}
+}
+
+/**
+ * DELETE /api/projects - Remove project from config
+ * Body: { project: string }
+ *
+ * Note: This only removes the project from the config, not the actual directory.
+ */
+export async function DELETE({ request }) {
+	try {
+		const body = await request.json();
+		const { project } = body;
+
+		if (!project || typeof project !== 'string') {
+			return json({ error: 'Project name required' }, { status: 400 });
+		}
+
+		// Read current config
+		const jatConfig = await readJatConfig();
+		if (!jatConfig?.projects?.[project]) {
+			return json({ error: `Project '${project}' not found in config` }, { status: 404 });
+		}
+
+		// Remove project from config
+		delete jatConfig.projects[project];
+
+		// Save config
+		const success = await writeJatConfig(jatConfig);
+		if (!success) {
+			return json({ error: 'Failed to save config' }, { status: 500 });
+		}
+
+		// Also remove from hidden projects if present
+		const settings = await readDashboardSettings();
+		if (settings.hiddenProjects?.includes(project)) {
+			settings.hiddenProjects = settings.hiddenProjects.filter((/** @type {string} */ p) => p !== project);
+			await writeDashboardSettings(settings);
+		}
+
+		// Invalidate cache
+		invalidateCache.projects();
+
+		return json({
+			success: true,
+			message: `Project '${project}' removed from config`
+		});
+	} catch (error) {
+		console.error('Failed to delete project:', error);
 		return json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
 	}
 }
