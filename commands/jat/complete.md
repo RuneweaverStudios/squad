@@ -2,12 +2,12 @@
 argument-hint:
 ---
 
-Complete current task properly with full verification, then show menu of available tasks and recommend next task.
+Complete current task properly with full verification. Session ends after completion.
 
 # Agent Complete - Finish Task Properly
 
 **Usage:**
-- `/jat:complete` - Complete current task with full verification, show menu
+- `/jat:complete` - Complete current task with full verification
 
 **What this command does:**
 1. **Read & Respond to Agent Mail** (ALWAYS - before completing)
@@ -18,10 +18,7 @@ Complete current task properly with full verification, then show menu of availab
    - Mark task as complete in Beads (`bd close`)
    - Release file reservations
 4. **Announce Completion** in Agent Mail
-5. **Next Task Selection**:
-   - Show available tasks menu
-   - Display recommended next task with one-line command
-   - Wait for user to choose (does NOT auto-start)
+5. **End Session** - Session is complete, user spawns new agent for next task
 
 **Key behaviors:**
 - **ALWAYS check Agent Mail first** - before completing work
@@ -29,10 +26,7 @@ Complete current task properly with full verification, then show menu of availab
 
 **When to use:**
 - After you display "🔍 READY FOR REVIEW" and user approves
-- **Careful workflow**: You want to choose next task manually
-- **Context switch**: Might want different type of work next
-- **Review point**: Want to check status before continuing
-- **End of work**: Last task before closing terminal
+- Task is complete and ready to close
 
 **When NOT to use:**
 - Need to pivot quickly → use `/jat:pause` instead
@@ -484,9 +478,7 @@ am-send "[$task_id] Completed: $task_title" \
 
 Status: Complete
 Type: $task_type
-Verification: Full (tests, lint, security)
-
-Agent is now available for next task." \
+Verification: Full (tests, lint, security)" \
   --from "$agent_name" \
   --to @active \
   --thread "$task_id"
@@ -877,33 +869,99 @@ jat-signal complete '{
 - Escape any internal single quotes with `'\''` if needed
 - Test with `echo '...' | jq .` to validate
 
-#### Then Output Terminal Summary
+#### Then Output Full Terminal Debrief
 
-After emitting the signal, output a brief terminal summary for the agent's log:
+After emitting the signal, output a comprehensive completion summary. **This is a full debrief for the user, not just a log.**
+
+The terminal summary should mirror everything in the signal - the user viewing the terminal deserves the same complete information as the dashboard UI.
 
 ```
-┌────────────────────────────────────────────────────────┐
-│  ✅ Task Completed: $task_id                           │
-│  👤 Agent: $agent_name                                 │
-└────────────────────────────────────────────────────────┘
+╔════════════════════════════════════════════════════════════════════════════════╗
+║  ✅ TASK COMPLETED: $task_id                                                   ║
+║  👤 Agent: $agent_name                                                         ║
+╚════════════════════════════════════════════════════════════════════════════════╝
 
-📋 What was accomplished:
-   • [Brief summary - same as signal]
+┌─ 📋 WHAT WAS ACCOMPLISHED ─────────────────────────────────────────────────────┐
+│                                                                                 │
+│  • [Summary bullet 1 - specific accomplishment]                                │
+│  • [Summary bullet 2 - specific accomplishment]                                │
+│  • [Summary bullet 3 - specific accomplishment]                                │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
 
-🧑 Human actions: [N action(s) signaled to dashboard]
+┌─ ⚡ QUALITY STATUS ─────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Tests: [passing/failing/none/skipped] ([N/N] if applicable)                   │
+│  Build: [clean/warnings/errors]                                                 │
+│  Pre-existing: [note if any issues were pre-existing]                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
 
-📊 Suggested tasks: [N task(s) signaled to dashboard]
+┌─ 🧑 HUMAN ACTIONS REQUIRED ────────────────────────────────────────────────────┐
+│  (Manual steps needed to complete this work)                                    │
+│                                                                                 │
+│  1. [Action title]                                                             │
+│     → [Detailed description of what to do]                                     │
+│                                                                                 │
+│  2. [Action title]                                                             │
+│     → [Detailed description of what to do]                                     │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
 
-⚡ Quality: Tests [status] | Build [status]
+┌─ 💡 SUGGESTED FOLLOW-UP TASKS ─────────────────────────────────────────────────┐
+│  (Ideas discovered during this work - use dashboard to create in Beads)        │
+│                                                                                 │
+│  [P2] [feature] Add Apple Sign-In support                                      │
+│       Similar flow to Google OAuth, needs Apple Developer account setup        │
+│       Reason: Discovered while implementing Google OAuth                       │
+│                                                                                 │
+│  [P3] [task] Add OAuth error tracking                                          │
+│       Log failed OAuth attempts to Sentry for debugging                        │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
 
-💡 Session complete. Dashboard will show interactive completion UI.
+┌─ 🔗 CROSS-AGENT INTEL ─────────────────────────────────────────────────────────┐
+│  (Knowledge to share with other agents working in this codebase)               │
+│                                                                                 │
+│  📁 Files modified:                                                            │
+│     • src/lib/auth/oauth.ts                                                    │
+│     • src/routes/auth/callback/+server.ts                                      │
+│                                                                                 │
+│  📐 Patterns to follow:                                                        │
+│     • Use authError() helper for consistent error responses                    │
+│                                                                                 │
+│  ⚠️ Gotchas:                                                                   │
+│     • Token refresh can fail silently - always check response.ok               │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ 🔄 PATTERN APPLICABILITY ─────────────────────────────────────────────────────┐
+│  (How this work pattern could apply elsewhere in the project)                  │
+│                                                                                 │
+│  The retry-with-backoff pattern used for token refresh could also be applied   │
+│  to: API calls in src/lib/api.ts, webhook deliveries, database reconnection.   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 Session complete. Dashboard shows interactive UI for creating suggested tasks.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
-**The terminal output is just a log.** The dashboard reads the structured signal and renders:
-- Human actions as a checklist with checkboxes
-- Suggested tasks as cards with "Create in Beads" buttons
-- Quality signals with visual indicators
-- Cross-agent intel in a collapsible section
+**Section Guidelines:**
+
+| Section | When to Include | What to Show |
+|---------|-----------------|--------------|
+| WHAT WAS ACCOMPLISHED | Always | All summary bullets from signal |
+| QUALITY STATUS | Always | Tests and build status with details |
+| HUMAN ACTIONS REQUIRED | If humanActions in signal | Full title + description for each |
+| SUGGESTED FOLLOW-UP TASKS | If suggestedTasks in signal | Priority, type, title, description, reason |
+| CROSS-AGENT INTEL | If crossAgentIntel in signal | Files, patterns, gotchas |
+| PATTERN APPLICABILITY | When applicable | How patterns used here apply elsewhere |
+
+**Omit sections if empty** - don't show "None" for empty sections, just skip them.
+
+**The dashboard ALSO renders this information** via the structured signal, but the terminal debrief ensures users who primarily interact via terminal get the full context.
 
 ---
 
@@ -1037,25 +1095,78 @@ jat-signal complete '{
 }'
 ```
 
-Terminal output:
+Terminal output (full debrief):
 ```
-┌────────────────────────────────────────────────────────┐
-│  ✅ Task Completed: chimaro-xyz                        │
-│  👤 Agent: CalmMeadow                                  │
-└────────────────────────────────────────────────────────┘
+╔════════════════════════════════════════════════════════════════════════════════╗
+║  ✅ TASK COMPLETED: chimaro-xyz                                                ║
+║  👤 Agent: CalmMeadow                                                          ║
+╚════════════════════════════════════════════════════════════════════════════════╝
 
-📋 What was accomplished:
-   • Created migration for auth_mode column
-   • Added anonymous session handling
-   • Updated session middleware to detect auth mode
+┌─ 📋 WHAT WAS ACCOMPLISHED ─────────────────────────────────────────────────────┐
+│                                                                                 │
+│  • Created migration for auth_mode column                                      │
+│  • Added anonymous session handling                                            │
+│  • Updated session middleware to detect auth mode                              │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
 
-🧑 Human actions: 2 action(s) signaled to dashboard
+┌─ ⚡ QUALITY STATUS ─────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Tests: passing                                                                │
+│  Build: warnings (pre-existing - unrelated type errors)                        │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
 
-📊 Suggested tasks: 2 task(s) signaled to dashboard
+┌─ 🧑 HUMAN ACTIONS REQUIRED ────────────────────────────────────────────────────┐
+│  (Manual steps needed to complete this work)                                    │
+│                                                                                 │
+│  1. Run database migration                                                     │
+│     → Run: npx prisma migrate deploy                                           │
+│       This adds the auth_mode column to the sessions table.                    │
+│                                                                                 │
+│  2. Enable Anonymous Auth                                                      │
+│     → In Supabase dashboard:                                                   │
+│       1. Go to Authentication > Providers                                      │
+│       2. Enable Anonymous Sign-ins                                             │
+│       3. Set session duration to 24 hours                                      │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
 
-⚡ Quality: Tests passing | Build warnings (pre-existing)
+┌─ 💡 SUGGESTED FOLLOW-UP TASKS ─────────────────────────────────────────────────┐
+│  (Ideas discovered during this work - use dashboard to create in Beads)        │
+│                                                                                 │
+│  [P2] [feature] Add auth mode indicator to UI                                  │
+│       Show users whether they are in anonymous or authenticated mode.          │
+│       Display upgrade prompt for anon users.                                   │
+│       Reason: UX improvement discovered while implementing auth modes          │
+│                                                                                 │
+│  [P3] [task] Add anon session cleanup job                                      │
+│       Cron job to delete anonymous sessions older than 7 days to prevent       │
+│       database bloat.                                                          │
+│       Reason: Tech debt - anon sessions will accumulate without cleanup        │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
 
-💡 Session complete. Dashboard will show interactive completion UI.
+┌─ 🔗 CROSS-AGENT INTEL ─────────────────────────────────────────────────────────┐
+│  (Knowledge to share with other agents working in this codebase)               │
+│                                                                                 │
+│  📁 Files modified:                                                            │
+│     • prisma/migrations/20251208_add_auth_mode.sql                             │
+│     • src/lib/server/session.ts                                                │
+│     • src/hooks.server.ts                                                      │
+│                                                                                 │
+│  📐 Patterns to follow:                                                        │
+│     • Session objects now have authMode: anon | authenticated                  │
+│     • Use isAnonymous(session) helper to check auth state                      │
+│                                                                                 │
+│  ⚠️ Gotchas:                                                                   │
+│     • Supabase anon sessions have different JWT structure - check for aud      │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 Session complete. Dashboard shows interactive UI for creating suggested tasks.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
 ---
@@ -1205,22 +1316,48 @@ Create a backfilled task record? [Proceed? Y/n] Y
 Signal: completed (task: jat-abc, outcome: success)
 [JAT-SIGNAL:completed] {"taskId":"jat-abc","outcome":"success"}
 
-┌────────────────────────────────────────────────────────┐
-│  ✅ Task Completed: jat-abc                            │
-│  👤 Agent: SwiftMoon (Backfilled)                      │
-└────────────────────────────────────────────────────────┘
+╔════════════════════════════════════════════════════════════════════════════════╗
+║  ✅ TASK COMPLETED: jat-abc                                                    ║
+║  👤 Agent: SwiftMoon (Backfilled)                                              ║
+╚════════════════════════════════════════════════════════════════════════════════╝
 
-📋 What was accomplished:
-   • Fixed jat CLI -p flag for non-interactive sessions
-   • Changed to positional argument for prompt passing
+┌─ 📋 WHAT WAS ACCOMPLISHED ─────────────────────────────────────────────────────┐
+│                                                                                 │
+│  • Fixed jat CLI -p flag for non-interactive sessions                          │
+│  • Changed to positional argument for prompt passing                           │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
 
-⚡ Quality: Tests passing | Build clean
+┌─ ⚡ QUALITY STATUS ─────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Tests: none (no tests configured)                                             │
+│  Build: clean                                                                   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
 
-🔗 Cross-agent intel:
-   • Files: cli/jat
-   • Gotchas: Use positional args, not flags for prompts
+┌─ 💡 SUGGESTED FOLLOW-UP TASKS ─────────────────────────────────────────────────┐
+│  (Ideas discovered during this work - use dashboard to create in Beads)        │
+│                                                                                 │
+│  [P3] [task] Add tests for jat CLI argument parsing                            │
+│       Cover edge cases: quotes, special characters, multi-word prompts         │
+│       Reason: No tests exist for CLI argument handling                         │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
 
-💡 Session complete. Close terminal when ready.
+┌─ 🔗 CROSS-AGENT INTEL ─────────────────────────────────────────────────────────┐
+│  (Knowledge to share with other agents working in this codebase)               │
+│                                                                                 │
+│  📁 Files modified:                                                            │
+│     • cli/jat                                                                  │
+│                                                                                 │
+│  ⚠️ Gotchas:                                                                   │
+│     • Use positional args, not flags for prompts in Claude Code invocation     │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 Session complete. Dashboard shows interactive UI for creating suggested tasks.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
 ---
@@ -1256,22 +1393,79 @@ Signal: completed (task: jat-abc, outcome: success)
 Signal: completed (task: jat-abc, outcome: success)
 [JAT-SIGNAL:completed] {"taskId":"jat-abc","outcome":"success"}
 
-┌────────────────────────────────────────────────────────┐
-│  ✅ Task Completed: jat-abc                            │
-│  👤 Agent: JustGrove                                   │
-└────────────────────────────────────────────────────────┘
+╔════════════════════════════════════════════════════════════════════════════════╗
+║  ✅ TASK COMPLETED: jat-abc                                                    ║
+║  👤 Agent: JustGrove                                                           ║
+╚════════════════════════════════════════════════════════════════════════════════╝
 
-📋 What was accomplished:
-   • Added user settings page at /account/settings
-   • Implemented form fields for profile, notifications
+┌─ 📋 WHAT WAS ACCOMPLISHED ─────────────────────────────────────────────────────┐
+│                                                                                 │
+│  • Added user settings page at /account/settings                               │
+│  • Implemented form fields for profile, notifications                          │
+│  • Added form validation with error messages                                   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
 
-⚡ Quality: Tests passing | Build clean
+┌─ ⚡ QUALITY STATUS ─────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Tests: passing (12/12)                                                        │
+│  Build: clean                                                                   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
 
-🔗 Cross-agent intel:
-   • Files: routes/account/settings/+page.svelte
-   • Gotchas: Flatten nested API response for form binding
+┌─ 🧑 HUMAN ACTIONS REQUIRED ────────────────────────────────────────────────────┐
+│  (Manual steps needed to complete this work)                                    │
+│                                                                                 │
+│  1. Update navigation menu                                                     │
+│     → Add link to Settings page in the account dropdown menu                   │
+│       Location: src/lib/components/NavMenu.svelte, line ~45                    │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
 
-💡 Session complete. Close terminal when ready.
+┌─ 💡 SUGGESTED FOLLOW-UP TASKS ─────────────────────────────────────────────────┐
+│  (Ideas discovered during this work - use dashboard to create in Beads)        │
+│                                                                                 │
+│  [P2] [feature] Add email notification preferences                             │
+│       Allow users to configure which emails they receive                       │
+│       Reason: Settings page exists but notification controls are minimal       │
+│                                                                                 │
+│  [P3] [task] Add settings page to E2E test suite                               │
+│       Cover form submission, validation errors, and success states             │
+│       Reason: Currently only unit tests exist for this page                    │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ 🔗 CROSS-AGENT INTEL ─────────────────────────────────────────────────────────┐
+│  (Knowledge to share with other agents working in this codebase)               │
+│                                                                                 │
+│  📁 Files modified:                                                            │
+│     • src/routes/account/settings/+page.svelte                                 │
+│     • src/routes/account/settings/+page.server.ts                              │
+│     • src/lib/api/user.ts                                                      │
+│                                                                                 │
+│  📐 Patterns to follow:                                                        │
+│     • Use form actions for server-side validation                              │
+│     • Use $page.form for progressive enhancement                               │
+│                                                                                 │
+│  ⚠️ Gotchas:                                                                   │
+│     • API returns nested user.profile object - flatten before form binding     │
+│     • Form reset after successful save requires manual invalidation            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ 🔄 PATTERN APPLICABILITY ─────────────────────────────────────────────────────┐
+│  (How this work pattern could apply elsewhere in the project)                  │
+│                                                                                 │
+│  The form-with-server-validation pattern used here could be applied to:        │
+│  • Account deletion flow (src/routes/account/delete)                           │
+│  • Team settings page (src/routes/team/settings)                               │
+│  • Any other form that needs server-side validation with progressive enhance.  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 Session complete. Dashboard shows interactive UI for creating suggested tasks.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
 **Signals explained:**
@@ -1594,9 +1788,10 @@ Or run /jat:verify to see detailed error report
    - Quality over speed
 
 3. **One agent = one session = one task**
-   - Session typically ends after completion
+   - Session ENDS after completion (do NOT show "Available Tasks")
    - User spawns new agent for next task
    - Keeps context clean and focused
+   - Completion summary shows: what was accomplished, suggested follow-ups, human actions
 
 ---
 
@@ -1731,32 +1926,77 @@ When you pick up an epic that has become READY (all children completed), your jo
 
 ### Epic Completion Output Template
 
-When completing an epic, use this modified summary:
+When completing an epic, use this modified summary with full debrief sections:
 
 ```
-┌──────────────────────────────────────────────────────────────────────────┐
-│  ✅ Epic Verified: jat-abc "Improve Dashboard Performance"               │
-│  👤 Agent: $agent_name                                                   │
-│                                                                          │
-│  📦 Child Tasks Completed:                                               │
-│     ✓ jat-abc.1: Add caching layer (by CalmMeadow)                      │
-│     ✓ jat-abc.2: Optimize database queries (by SwiftMoon)               │
-│     ✓ jat-abc.3: Add performance tests (by JustGrove)                   │
-│                                                                          │
-│  🔍 Verification Results:                                                │
-│     • Integration tests: passing                                         │
-│     • Performance target: achieved (P99 < 200ms)                         │
-│     • No regressions detected                                            │
-│                                                                          │
-│  🧑 Human actions required (from child tasks):                           │
-│     [List any outstanding human actions from children]                   │
-│                                                                          │
-│  📊 Epic Impact:                                                         │
-│     • Dashboard load time reduced by 75%                                 │
-│     • Database query time reduced by 60%                                 │
-│                                                                          │
-│  💡 Epic complete. All work verified and integrated.                     │
-└──────────────────────────────────────────────────────────────────────────┘
+╔════════════════════════════════════════════════════════════════════════════════╗
+║  ✅ EPIC VERIFIED: jat-abc "Improve Dashboard Performance"                     ║
+║  👤 Agent: $agent_name                                                         ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+┌─ 📦 CHILD TASKS COMPLETED ─────────────────────────────────────────────────────┐
+│                                                                                 │
+│  ✓ jat-abc.1: Add caching layer (by CalmMeadow)                                │
+│  ✓ jat-abc.2: Optimize database queries (by SwiftMoon)                         │
+│  ✓ jat-abc.3: Add performance tests (by JustGrove)                             │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ 🔍 VERIFICATION RESULTS ──────────────────────────────────────────────────────┐
+│                                                                                 │
+│  • Integration tests: passing                                                  │
+│  • Performance target: achieved (P99 < 200ms)                                  │
+│  • No regressions detected                                                     │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ 🧑 HUMAN ACTIONS REQUIRED (from child tasks) ─────────────────────────────────┐
+│                                                                                 │
+│  1. Deploy cache layer to production                                           │
+│     → From jat-abc.1: Run cache warmup script after deploy                     │
+│                                                                                 │
+│  2. Update monitoring dashboards                                               │
+│     → From jat-abc.3: Add P99 latency alerts for new endpoints                 │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ 📊 EPIC IMPACT ───────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  • Dashboard load time reduced by 75%                                          │
+│  • Database query time reduced by 60%                                          │
+│  • User-facing latency P99 now under 200ms                                     │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ 💡 SUGGESTED FOLLOW-UP TASKS ─────────────────────────────────────────────────┐
+│  (Discovered during epic verification)                                          │
+│                                                                                 │
+│  [P3] [task] Add cache invalidation monitoring                                 │
+│       Track cache hit/miss ratios, alert on degradation                        │
+│       Reason: Caching layer deployed but no observability yet                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ 🔗 CROSS-AGENT INTEL (aggregated from children) ──────────────────────────────┐
+│                                                                                 │
+│  📁 Files modified across epic:                                                │
+│     • src/lib/cache/redis.ts (jat-abc.1)                                       │
+│     • src/lib/db/queries.ts (jat-abc.2)                                        │
+│     • tests/integration/performance.test.ts (jat-abc.3)                        │
+│                                                                                 │
+│  📐 Patterns established:                                                      │
+│     • Use Redis client from $lib/cache for all caching                         │
+│     • Performance tests should use P99 not average latency                     │
+│                                                                                 │
+│  ⚠️ Gotchas:                                                                   │
+│     • Cache TTL must match session duration (from jat-abc.1)                   │
+│     • Query planner hints needed for complex joins (from jat-abc.2)            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 Epic complete. All work verified and integrated.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
 ---
@@ -1779,20 +2019,33 @@ if [[ -z "$remaining" ]]; then
 fi
 ```
 
-**Step 3: Include in completion summary:**
+**Step 3: Include epic status in completion summary:**
+
+When completing a child task that belongs to an epic, add an "EPIC STATUS" section after the header:
 
 ```
-┌──────────────────────────────────────────────────────────────────────────┐
-│  ✅ Task Completed: jat-abc.3 "Add performance tests"                    │
-│  👤 Agent: JustGrove                                                     │
-│                                                                          │
-│  📦 Epic Status:                                                         │
-│     Parent: jat-abc "Improve Dashboard Performance"                      │
-│     Progress: 3/3 children complete                                      │
-│     🎉 Epic is now READY for verification!                               │
-│                                                                          │
-│  [rest of standard summary...]                                           │
-└──────────────────────────────────────────────────────────────────────────┘
+╔════════════════════════════════════════════════════════════════════════════════╗
+║  ✅ TASK COMPLETED: jat-abc.3 "Add performance tests"                          ║
+║  👤 Agent: JustGrove                                                           ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+┌─ 📦 EPIC STATUS ───────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Parent: jat-abc "Improve Dashboard Performance"                               │
+│  Progress: 3/3 children complete                                               │
+│  🎉 Epic is now READY for verification!                                        │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ 📋 WHAT WAS ACCOMPLISHED ─────────────────────────────────────────────────────┐
+│                                                                                 │
+│  • Added integration performance test suite                                    │
+│  • Implemented P99 latency assertions                                          │
+│  • Set up load test fixtures                                                   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+[... rest of standard full debrief sections ...]
 ```
 
 This helps the commander know when an epic is ready for final verification.
