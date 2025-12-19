@@ -17,6 +17,7 @@
 		getTemplateVariables,
 		getDefaultVariableValues,
 		validateVariables,
+		substituteVariables,
 		type CommandTemplate,
 		type TemplateVariable
 	} from '$lib/config/commandTemplates';
@@ -72,6 +73,31 @@
 	let templateVariables = $state<TemplateVariable[]>([]);
 	let variableValues = $state<Record<string, string>>({});
 	let variableErrors = $state<string[]>([]);
+	let showPreview = $state(true);
+
+	// Real-time preview of template with variable substitutions
+
+	let templatePreview = $derived.by(() => {
+		if (!selectedTemplate) return '';
+		return substituteVariables(selectedTemplate.content, variableValues);
+	});
+
+	// HTML-escaped preview with highlighting for unfilled variables
+	let templatePreviewHtml = $derived.by(() => {
+		if (!templatePreview) return '';
+		// Escape HTML entities first to prevent XSS
+		const escaped = templatePreview
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&#039;');
+		// Highlight remaining unfilled variables
+		return escaped.replace(
+			/\{\{([^}]+)\}\}/g,
+			'<span class="text-warning bg-warning/10 px-1 rounded">{{$1}}</span>'
+		);
+	});
 
 	// Validation state
 	let validation = $state<ValidationResult | null>(null);
@@ -809,6 +835,65 @@ Command content here...
 										{/if}
 									</div>
 								{/each}
+							</div>
+
+							<!-- Template Preview Section -->
+							<div class="mt-6">
+								<button
+									type="button"
+									class="flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left transition-colors hover:bg-base-300/50"
+									style="border-color: oklch(0.3 0.02 250); background: oklch(0.18 0.02 250);"
+									onclick={() => (showPreview = !showPreview)}
+								>
+									<div class="flex items-center gap-2">
+										<svg
+											class="h-5 w-5 opacity-70"
+											fill="none"
+											viewBox="0 0 24 24"
+											stroke="currentColor"
+										>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												stroke-width="2"
+												d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+											/>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												stroke-width="2"
+												d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+											/>
+										</svg>
+										<span class="font-medium">Preview</span>
+										<span class="badge badge-sm badge-ghost">Live</span>
+									</div>
+									<svg
+										class="h-4 w-4 transition-transform {showPreview ? 'rotate-180' : ''}"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M19 9l-7 7-7-7"
+										/>
+									</svg>
+								</button>
+
+								{#if showPreview}
+									<div
+										class="mt-2 max-h-64 overflow-y-auto rounded-lg border"
+										style="border-color: oklch(0.3 0.02 250); background: oklch(0.12 0.02 250);"
+									>
+										<pre class="whitespace-pre-wrap p-4 text-sm font-mono text-base-content/90">{@html templatePreviewHtml}</pre>
+									</div>
+									<p class="mt-2 text-xs opacity-50">
+										Variables highlighted in <span class="text-warning">yellow</span> will be replaced with your values
+									</p>
+								{/if}
 							</div>
 
 							<!-- Variables step actions -->
