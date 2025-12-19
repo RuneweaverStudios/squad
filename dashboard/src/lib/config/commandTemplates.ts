@@ -595,13 +595,653 @@ Error: Task 'task-id' not found in Beads.
 };
 
 /**
+ * API Integration Template
+ *
+ * Template for commands that interact with REST or GraphQL APIs.
+ * Includes endpoint configuration, authentication, and response handling.
+ */
+const apiIntegrationTemplate: CommandTemplate = {
+	id: 'api-integration',
+	name: 'API Integration',
+	description: 'REST/GraphQL API endpoint integration with auth',
+	icon: '🔌',
+	useCase: 'API calls, webhooks, external service integration',
+	frontmatter: {
+		description: '',
+		author: '',
+		version: '1.0.0',
+		tags: 'api, integration, http'
+	},
+	variables: [
+		{
+			name: 'apiName',
+			label: 'API Name',
+			placeholder: 'User Service API',
+			required: true,
+			hint: 'Name of the API or service being integrated'
+		},
+		{
+			name: 'baseUrl',
+			label: 'Base URL',
+			placeholder: 'https://api.example.com/v1',
+			required: true,
+			hint: 'Base URL for the API endpoints'
+		},
+		{
+			name: 'endpointPath',
+			label: 'Endpoint Path',
+			placeholder: '/users',
+			defaultValue: '/resource',
+			hint: 'API endpoint path (e.g., /users, /orders)'
+		},
+		{
+			name: 'httpMethod',
+			label: 'HTTP Method',
+			placeholder: 'GET',
+			defaultValue: 'GET',
+			hint: 'HTTP method: GET, POST, PUT, PATCH, DELETE'
+		},
+		{
+			name: 'authType',
+			label: 'Authentication Type',
+			placeholder: 'Bearer Token',
+			defaultValue: 'Bearer Token',
+			hint: 'Auth method: Bearer Token, API Key, Basic Auth, OAuth2'
+		},
+		{
+			name: 'responseFormat',
+			label: 'Response Format',
+			placeholder: 'JSON',
+			defaultValue: 'JSON',
+			hint: 'Expected response format: JSON, XML, Text'
+		}
+	],
+	content: `---
+description: {{apiName}} integration
+author:
+version: 1.0.0
+tags: api, integration, http
+---
+
+# {{apiName}} Integration
+
+Integrate with {{apiName}} at \`{{baseUrl}}\`.
+
+## Endpoint
+
+\`\`\`
+{{httpMethod}} {{baseUrl}}{{endpointPath}}
+\`\`\`
+
+## Authentication
+
+**Type:** {{authType}}
+
+\`\`\`bash
+# Set up authentication
+export API_TOKEN="your-token-here"
+
+# For Bearer Token
+curl -H "Authorization: Bearer $API_TOKEN" {{baseUrl}}{{endpointPath}}
+
+# For API Key
+curl -H "X-API-Key: $API_TOKEN" {{baseUrl}}{{endpointPath}}
+\`\`\`
+
+## Request Examples
+
+### Basic Request
+
+\`\`\`bash
+curl -X {{httpMethod}} \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer $API_TOKEN" \\
+  {{baseUrl}}{{endpointPath}}
+\`\`\`
+
+### With Request Body (POST/PUT/PATCH)
+
+\`\`\`bash
+curl -X {{httpMethod}} \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer $API_TOKEN" \\
+  -d '{
+    "field1": "value1",
+    "field2": "value2"
+  }' \\
+  {{baseUrl}}{{endpointPath}}
+\`\`\`
+
+### With Query Parameters
+
+\`\`\`bash
+curl -X {{httpMethod}} \\
+  -H "Authorization: Bearer $API_TOKEN" \\
+  "{{baseUrl}}{{endpointPath}}?page=1&limit=10"
+\`\`\`
+
+## Response Format
+
+**Expected:** {{responseFormat}}
+
+### Success Response (2xx)
+
+\`\`\`json
+{
+  "status": "success",
+  "data": {
+    // Response data here
+  }
+}
+\`\`\`
+
+### Error Response (4xx/5xx)
+
+\`\`\`json
+{
+  "status": "error",
+  "message": "Error description",
+  "code": "ERROR_CODE"
+}
+\`\`\`
+
+## Error Handling
+
+| Status Code | Meaning | Action |
+|-------------|---------|--------|
+| 200 | Success | Process response |
+| 400 | Bad Request | Validate input parameters |
+| 401 | Unauthorized | Check/refresh authentication |
+| 403 | Forbidden | Verify permissions |
+| 404 | Not Found | Verify endpoint path |
+| 429 | Rate Limited | Implement backoff/retry |
+| 500 | Server Error | Retry with exponential backoff |
+
+## Rate Limiting
+
+\`\`\`bash
+# Check rate limit headers in response
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 999
+X-RateLimit-Reset: 1234567890
+\`\`\`
+
+## Implementation Notes
+
+- Always validate response status before parsing
+- Implement retry logic for transient failures
+- Cache responses where appropriate
+- Log all API calls for debugging
+`
+};
+
+/**
+ * Database Operations Template
+ *
+ * Template for commands that interact with databases.
+ * Includes query patterns, connection handling, and transaction management.
+ */
+const databaseOperationsTemplate: CommandTemplate = {
+	id: 'database-operations',
+	name: 'Database Operations',
+	description: 'SQL/ORM database queries and migrations',
+	icon: '🗃️',
+	useCase: 'Database queries, migrations, data operations',
+	frontmatter: {
+		description: '',
+		author: '',
+		version: '1.0.0',
+		tags: 'database, sql, query'
+	},
+	variables: [
+		{
+			name: 'operationName',
+			label: 'Operation Name',
+			placeholder: 'User Lookup',
+			required: true,
+			hint: 'Name of this database operation'
+		},
+		{
+			name: 'tableName',
+			label: 'Table Name',
+			placeholder: 'users',
+			required: true,
+			hint: 'Primary table for this operation'
+		},
+		{
+			name: 'databaseType',
+			label: 'Database Type',
+			placeholder: 'PostgreSQL',
+			defaultValue: 'PostgreSQL',
+			hint: 'Database engine: PostgreSQL, MySQL, SQLite, MongoDB'
+		},
+		{
+			name: 'operationType',
+			label: 'Operation Type',
+			placeholder: 'SELECT',
+			defaultValue: 'SELECT',
+			hint: 'Query type: SELECT, INSERT, UPDATE, DELETE, UPSERT'
+		},
+		{
+			name: 'keyColumn',
+			label: 'Key Column',
+			placeholder: 'id',
+			defaultValue: 'id',
+			hint: 'Primary key or lookup column'
+		},
+		{
+			name: 'connectionVar',
+			label: 'Connection Variable',
+			placeholder: 'DATABASE_URL',
+			defaultValue: 'DATABASE_URL',
+			hint: 'Environment variable for database connection'
+		}
+	],
+	content: `---
+description: {{operationName}} - {{tableName}} table
+author:
+version: 1.0.0
+tags: database, sql, query
+---
+
+# {{operationName}}
+
+Database operation on \`{{tableName}}\` table using {{databaseType}}.
+
+## Connection
+
+\`\`\`bash
+# Set connection string
+export {{connectionVar}}="postgresql://user:pass@localhost:5432/dbname"
+
+# Or for different databases:
+# MySQL:   mysql://user:pass@localhost:3306/dbname
+# SQLite:  sqlite:///path/to/database.db
+# MongoDB: mongodb://user:pass@localhost:27017/dbname
+\`\`\`
+
+## Query: {{operationType}}
+
+### Basic {{operationType}} Query
+
+\`\`\`sql
+-- {{operationName}}: Basic query
+{{#if operationType === 'SELECT'}}
+SELECT *
+FROM {{tableName}}
+WHERE {{keyColumn}} = $1
+LIMIT 100;
+{{/if}}
+{{#if operationType === 'INSERT'}}
+INSERT INTO {{tableName}} (column1, column2, created_at)
+VALUES ($1, $2, NOW())
+RETURNING *;
+{{/if}}
+{{#if operationType === 'UPDATE'}}
+UPDATE {{tableName}}
+SET column1 = $2, updated_at = NOW()
+WHERE {{keyColumn}} = $1
+RETURNING *;
+{{/if}}
+{{#if operationType === 'DELETE'}}
+DELETE FROM {{tableName}}
+WHERE {{keyColumn}} = $1
+RETURNING *;
+{{/if}}
+\`\`\`
+
+### With Filtering
+
+\`\`\`sql
+SELECT *
+FROM {{tableName}}
+WHERE status = 'active'
+  AND created_at > NOW() - INTERVAL '7 days'
+ORDER BY created_at DESC
+LIMIT 50;
+\`\`\`
+
+### With Joins
+
+\`\`\`sql
+SELECT
+  t.*,
+  r.name AS related_name
+FROM {{tableName}} t
+LEFT JOIN related_table r ON t.related_id = r.id
+WHERE t.{{keyColumn}} = $1;
+\`\`\`
+
+## Transaction Example
+
+\`\`\`sql
+BEGIN;
+
+-- Step 1: Lock the row
+SELECT * FROM {{tableName}}
+WHERE {{keyColumn}} = $1
+FOR UPDATE;
+
+-- Step 2: Perform update
+UPDATE {{tableName}}
+SET status = 'processed', updated_at = NOW()
+WHERE {{keyColumn}} = $1;
+
+-- Step 3: Log the change
+INSERT INTO audit_log (table_name, record_id, action, timestamp)
+VALUES ('{{tableName}}', $1, '{{operationType}}', NOW());
+
+COMMIT;
+\`\`\`
+
+## Indexes
+
+\`\`\`sql
+-- Recommended indexes for this operation
+CREATE INDEX IF NOT EXISTS idx_{{tableName}}_{{keyColumn}}
+ON {{tableName}} ({{keyColumn}});
+
+CREATE INDEX IF NOT EXISTS idx_{{tableName}}_created_at
+ON {{tableName}} (created_at DESC);
+
+-- Composite index for common queries
+CREATE INDEX IF NOT EXISTS idx_{{tableName}}_status_created
+ON {{tableName}} (status, created_at DESC);
+\`\`\`
+
+## Error Handling
+
+| Error | Cause | Resolution |
+|-------|-------|------------|
+| Connection refused | DB not running | Check database service |
+| Relation not found | Table missing | Run migrations |
+| Unique violation | Duplicate key | Use UPSERT or check existing |
+| Timeout | Slow query | Add indexes, optimize query |
+| Deadlock | Concurrent updates | Implement retry logic |
+
+## Performance Tips
+
+1. **Use EXPLAIN ANALYZE** to check query plans
+2. **Add appropriate indexes** for WHERE and JOIN columns
+3. **Use LIMIT** for large result sets
+4. **Batch operations** for bulk inserts/updates
+5. **Connection pooling** for high concurrency
+
+## CLI Access
+
+\`\`\`bash
+# PostgreSQL
+psql \${{connectionVar}} -c "SELECT COUNT(*) FROM {{tableName}};"
+
+# MySQL
+mysql -e "SELECT COUNT(*) FROM {{tableName}};" dbname
+
+# SQLite
+sqlite3 database.db "SELECT COUNT(*) FROM {{tableName}};"
+\`\`\`
+`
+};
+
+/**
+ * Testing Commands Template
+ *
+ * Template for commands that run tests and assertions.
+ * Includes test patterns, fixtures, and coverage reporting.
+ */
+const testingCommandsTemplate: CommandTemplate = {
+	id: 'testing-commands',
+	name: 'Testing Commands',
+	description: 'Test runners, assertions, and coverage',
+	icon: '🧪',
+	useCase: 'Unit tests, integration tests, E2E tests, test automation',
+	frontmatter: {
+		description: '',
+		author: '',
+		version: '1.0.0',
+		tags: 'testing, test, quality'
+	},
+	variables: [
+		{
+			name: 'testSuiteName',
+			label: 'Test Suite Name',
+			placeholder: 'User Authentication Tests',
+			required: true,
+			hint: 'Name of the test suite or feature being tested'
+		},
+		{
+			name: 'testRunner',
+			label: 'Test Runner',
+			placeholder: 'vitest',
+			defaultValue: 'vitest',
+			hint: 'Test framework: vitest, jest, pytest, go test, cargo test'
+		},
+		{
+			name: 'testDirectory',
+			label: 'Test Directory',
+			placeholder: 'src/__tests__',
+			defaultValue: 'tests',
+			hint: 'Directory containing test files'
+		},
+		{
+			name: 'testPattern',
+			label: 'Test File Pattern',
+			placeholder: '*.test.ts',
+			defaultValue: '*.test.ts',
+			hint: 'Glob pattern for test files'
+		},
+		{
+			name: 'coverageThreshold',
+			label: 'Coverage Threshold',
+			placeholder: '80',
+			defaultValue: '80',
+			hint: 'Minimum code coverage percentage required'
+		},
+		{
+			name: 'testTimeout',
+			label: 'Test Timeout (ms)',
+			placeholder: '5000',
+			defaultValue: '5000',
+			hint: 'Timeout for individual tests in milliseconds'
+		}
+	],
+	content: `---
+description: {{testSuiteName}}
+author:
+version: 1.0.0
+tags: testing, test, quality
+---
+
+# {{testSuiteName}}
+
+Test suite using **{{testRunner}}** with {{coverageThreshold}}% coverage threshold.
+
+## Quick Commands
+
+\`\`\`bash
+# Run all tests
+{{testRunner}} run
+
+# Run specific test file
+{{testRunner}} run {{testDirectory}}/auth.test.ts
+
+# Run tests matching pattern
+{{testRunner}} run --grep "should authenticate"
+
+# Watch mode (re-run on changes)
+{{testRunner}} watch
+
+# Run with coverage
+{{testRunner}} run --coverage
+\`\`\`
+
+## Test Structure
+
+\`\`\`
+{{testDirectory}}/
+├── unit/              # Unit tests (isolated, fast)
+│   ├── {{testPattern}}
+│   └── helpers.test.ts
+├── integration/       # Integration tests (with dependencies)
+│   ├── api.test.ts
+│   └── database.test.ts
+├── e2e/               # End-to-end tests (full stack)
+│   └── flows.test.ts
+├── fixtures/          # Test data and mocks
+│   └── users.json
+└── setup.ts           # Global test setup
+\`\`\`
+
+## Test Examples
+
+### Unit Test
+
+\`\`\`typescript
+import { describe, it, expect, beforeEach } from '{{testRunner}}';
+import { functionUnderTest } from '../src/module';
+
+describe('{{testSuiteName}}', () => {
+  beforeEach(() => {
+    // Setup before each test
+  });
+
+  it('should handle valid input', () => {
+    const result = functionUnderTest('valid');
+    expect(result).toBe('expected');
+  });
+
+  it('should throw on invalid input', () => {
+    expect(() => functionUnderTest(null)).toThrow('Invalid input');
+  });
+
+  it('should complete within timeout', async () => {
+    const result = await asyncFunction();
+    expect(result).toBeDefined();
+  }, {{testTimeout}});
+});
+\`\`\`
+
+### Integration Test
+
+\`\`\`typescript
+import { describe, it, expect, beforeAll, afterAll } from '{{testRunner}}';
+import { setupTestDb, teardownTestDb } from './fixtures/database';
+
+describe('{{testSuiteName}} - Integration', () => {
+  beforeAll(async () => {
+    await setupTestDb();
+  });
+
+  afterAll(async () => {
+    await teardownTestDb();
+  });
+
+  it('should persist data correctly', async () => {
+    const created = await createRecord({ name: 'test' });
+    const fetched = await fetchRecord(created.id);
+    expect(fetched.name).toBe('test');
+  });
+});
+\`\`\`
+
+### Mocking Example
+
+\`\`\`typescript
+import { describe, it, expect, vi } from '{{testRunner}}';
+import { fetchUserData } from '../src/api';
+
+// Mock the HTTP client
+vi.mock('../src/httpClient', () => ({
+  get: vi.fn().mockResolvedValue({ data: { id: 1, name: 'Test User' } })
+}));
+
+describe('API Mocking', () => {
+  it('should return mocked user data', async () => {
+    const user = await fetchUserData(1);
+    expect(user.name).toBe('Test User');
+  });
+});
+\`\`\`
+
+## Coverage Configuration
+
+\`\`\`typescript
+// vitest.config.ts or jest.config.js
+export default {
+  test: {
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html', 'lcov'],
+      include: ['src/**/*.ts'],
+      exclude: ['src/**/*.d.ts', 'src/**/*.test.ts'],
+      thresholds: {
+        lines: {{coverageThreshold}},
+        branches: {{coverageThreshold}},
+        functions: {{coverageThreshold}},
+        statements: {{coverageThreshold}}
+      }
+    },
+    testTimeout: {{testTimeout}}
+  }
+};
+\`\`\`
+
+## CI/CD Integration
+
+\`\`\`yaml
+# GitHub Actions example
+test:
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    - run: npm ci
+    - run: npm run test -- --coverage
+    - name: Check coverage threshold
+      run: |
+        COVERAGE=$(cat coverage/coverage-summary.json | jq '.total.lines.pct')
+        if (( $(echo "$COVERAGE < {{coverageThreshold}}" | bc -l) )); then
+          echo "Coverage $COVERAGE% is below threshold {{coverageThreshold}}%"
+          exit 1
+        fi
+\`\`\`
+
+## Debugging Failed Tests
+
+\`\`\`bash
+# Run single test with verbose output
+{{testRunner}} run {{testDirectory}}/failing.test.ts --reporter=verbose
+
+# Run with debugger attached
+node --inspect-brk node_modules/.bin/{{testRunner}} run
+
+# Generate detailed failure report
+{{testRunner}} run --reporter=json > test-results.json
+\`\`\`
+
+## Best Practices
+
+1. **Isolate tests** - Each test should be independent
+2. **Use descriptive names** - "should X when Y" pattern
+3. **Test edge cases** - null, empty, boundary values
+4. **Mock external dependencies** - APIs, databases, file system
+5. **Keep tests fast** - < 100ms for unit tests
+6. **Maintain coverage** - Aim for {{coverageThreshold}}%+ coverage
+`
+};
+
+/**
  * All available command templates.
  */
 export const COMMAND_TEMPLATES: CommandTemplate[] = [
 	basicTemplate,
 	workflowTemplate,
 	toolTemplate,
-	agentTemplate
+	agentTemplate,
+	apiIntegrationTemplate,
+	databaseOperationsTemplate,
+	testingCommandsTemplate
 ];
 
 /**
@@ -788,4 +1428,95 @@ export function applyTemplate(
 	}
 
 	return content;
+}
+
+// =============================================================================
+// COMBINED TEMPLATES (BUILT-IN + USER)
+// =============================================================================
+
+/**
+ * Extended template type that includes user template flag
+ */
+export interface ExtendedTemplate extends CommandTemplate {
+	/** True if this is a user-created template */
+	isUserTemplate?: boolean;
+	/** Creation timestamp for user templates */
+	createdAt?: string;
+	/** Last modified timestamp for user templates */
+	updatedAt?: string;
+}
+
+/**
+ * Get all templates including built-in and user templates.
+ *
+ * This is an async function because user templates are loaded from disk.
+ * Built-in templates appear first, followed by user templates sorted by name.
+ *
+ * @param includeUserTemplates Whether to include user templates (default: true)
+ * @returns Array of all templates (built-in first, then user)
+ *
+ * @example
+ * const templates = await getAllTemplates();
+ * // templates[0..6] = built-in templates
+ * // templates[7+] = user templates (if any)
+ */
+export async function getAllTemplates(
+	includeUserTemplates: boolean = true
+): Promise<ExtendedTemplate[]> {
+	// Start with built-in templates (marked as not user templates)
+	const builtIn: ExtendedTemplate[] = COMMAND_TEMPLATES.map((t) => ({
+		...t,
+		isUserTemplate: false
+	}));
+
+	if (!includeUserTemplates) {
+		return builtIn;
+	}
+
+	// Dynamically import userTemplates to avoid circular dependencies
+	// and allow this module to work in both server and client contexts
+	try {
+		const { getAllUserTemplatesSync } = await import('$lib/utils/userTemplates');
+		const userTemplates = getAllUserTemplatesSync();
+
+		return [...builtIn, ...userTemplates];
+	} catch (error) {
+		// User templates not available (e.g., client-side)
+		console.warn('[commandTemplates] User templates not available:', error);
+		return builtIn;
+	}
+}
+
+/**
+ * Get a template by ID from both built-in and user templates.
+ *
+ * @param id Template ID
+ * @returns Template if found, undefined otherwise
+ */
+export async function getTemplateById(id: string): Promise<ExtendedTemplate | undefined> {
+	// First check built-in templates
+	const builtIn = getTemplate(id);
+	if (builtIn) {
+		return { ...builtIn, isUserTemplate: false };
+	}
+
+	// Then check user templates
+	try {
+		const { getUserTemplateSync } = await import('$lib/utils/userTemplates');
+		const userTemplate = getUserTemplateSync(id);
+		if (userTemplate) {
+			return userTemplate;
+		}
+	} catch {
+		// User templates not available
+	}
+
+	return undefined;
+}
+
+/**
+ * Check if a template ID is a built-in template.
+ */
+export function isBuiltInTemplate(id: string): boolean {
+	return COMMAND_TEMPLATES.some((t) => t.id === id);
 }

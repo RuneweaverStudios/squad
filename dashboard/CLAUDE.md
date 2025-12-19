@@ -3489,6 +3489,149 @@ This tells `scrollIntoView({ block: 'start' })` to leave extra space at the top.
 
 - jat-35hd: Document Jump to Session behavior and fix scroll offset (completed)
 
+## User Templates
+
+### Overview
+
+The dashboard supports custom user templates stored in `~/.config/jat/templates/`. These complement the built-in templates and allow users to save their own command patterns for reuse.
+
+### Architecture
+
+**Storage Location:** `~/.config/jat/templates/{id}.json`
+
+**File Format:**
+```json
+{
+  "id": "my-template",
+  "name": "My Template",
+  "description": "Description of what this template does",
+  "icon": "🔧",
+  "content": "# Template Content\n\n{{variable1}}\n{{variable2}}",
+  "frontmatter": {
+    "description": "Optional frontmatter description",
+    "author": "AuthorName",
+    "version": "1.0.0",
+    "tags": "tag1,tag2"
+  },
+  "useCase": "When to use this template",
+  "variables": [
+    {
+      "name": "variable1",
+      "label": "Variable 1",
+      "placeholder": "Enter value...",
+      "defaultValue": "",
+      "multiline": false,
+      "hint": "Help text",
+      "required": true
+    }
+  ],
+  "createdAt": "2025-12-19T12:00:00.000Z",
+  "updatedAt": "2025-12-19T12:00:00.000Z"
+}
+```
+
+### API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/templates` | List all user templates |
+| `POST` | `/api/templates` | Create new template |
+| `GET` | `/api/templates/[id]` | Get single template |
+| `PUT` | `/api/templates/[id]` | Update template |
+| `DELETE` | `/api/templates/[id]` | Delete template |
+
+**Query Parameters:**
+- `GET /api/templates?debug` - Include debug info (directory path, exists flag)
+- `POST /api/templates?overwrite=true` - Allow overwriting existing template
+
+### UI Integration
+
+**CommandTemplates.svelte** displays both built-in and user templates:
+- Built-in templates appear in "Built-in Templates" section
+- User templates appear in "Your Templates" section with "custom" badge
+- User templates have a slightly different border color (purple tint)
+- Link to "/config?tab=templates" for template management
+
+### Utility Functions
+
+**File:** `src/lib/utils/userTemplates.ts`
+
+```typescript
+// List templates
+const templates = await getAllUserTemplates();
+const ids = getUserTemplateIds();
+
+// Get single template
+const template = await getUserTemplate('my-template');
+
+// Save template
+await saveUserTemplate({
+  id: 'my-template',
+  name: 'My Template',
+  content: '...',
+  // ... other fields
+});
+
+// Update template
+await updateUserTemplate('my-template', { name: 'Updated Name' });
+
+// Delete template
+await deleteUserTemplate('my-template');
+
+// Check existence
+const exists = userTemplateExists('my-template');
+
+// Validation
+const valid = isValidTemplateId('my-template'); // true
+const validation = validateTemplate(partialTemplate);
+
+// Import/Export
+const json = exportUserTemplate(template);
+const imported = await importUserTemplate(json, { overwrite: true });
+
+// Rename
+await renameUserTemplate('old-id', 'new-id');
+
+// Duplicate
+await duplicateUserTemplate('source-id', 'new-id', 'New Name');
+```
+
+### Extended Template Type
+
+```typescript
+import type { ExtendedTemplate } from '$lib/config/commandTemplates';
+
+// Built-in templates have isUserTemplate: false
+// User templates have isUserTemplate: true
+const allTemplates = await getAllTemplates();
+const builtIn = allTemplates.filter(t => !t.isUserTemplate);
+const userTemplates = allTemplates.filter(t => t.isUserTemplate);
+```
+
+### Template ID Requirements
+
+- Length: 2-64 characters
+- Characters: alphanumeric, hyphens, underscores
+- Must start with letter or number
+- Examples: `my-template`, `api_v2`, `workflow-2025`
+
+### Files
+
+**Core:**
+- `src/lib/utils/userTemplates.ts` - CRUD operations and validation
+- `src/lib/config/commandTemplates.ts` - Template types and built-in templates
+
+**API:**
+- `src/routes/api/templates/+server.ts` - List and create endpoints
+- `src/routes/api/templates/[id]/+server.ts` - Get, update, delete endpoints
+
+**UI:**
+- `src/lib/components/config/CommandTemplates.svelte` - Template picker UI
+
+### Task Reference
+
+- jat-4e31: Add custom user templates (completed)
+
 ## Development Commands
 
 ```bash
