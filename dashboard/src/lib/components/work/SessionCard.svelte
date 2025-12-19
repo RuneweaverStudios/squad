@@ -1999,6 +1999,21 @@
 			return 'recovering';
 		}
 
+		// Rich signal payload is the most authoritative source for certain states
+		// These states persist based on the signal type, not a short TTL, because:
+		// 1. "completing" - the task closes during this state, so no task prop will be available
+		// 2. "completed" - similar, task is closed
+		// 3. "idle" - explicitly signaled by agent, should persist
+		// Use a longer TTL (60s) for these signal-driven states since signals are emitted explicitly
+		const SIGNAL_DRIVEN_TTL_MS = 60000;
+		const signalDrivenStates: SessionState[] = ['completing', 'completed', 'idle'];
+		if (richSignalPayload?.type && signalDrivenStates.includes(richSignalPayload.type as SessionState)) {
+			const timestamp = richSignalPayloadTimestamp || 0;
+			if ((Date.now() - timestamp) < SIGNAL_DRIVEN_TTL_MS) {
+				return richSignalPayload.type as SessionState;
+			}
+		}
+
 		// If we have an SSE state, check if it should be used
 		// "completed" state persists until task changes (no TTL) - this ensures completion UI stays visible
 		// Other states use 5-second TTL for real-time responsiveness
@@ -2659,10 +2674,28 @@
 	}
 
 	// Task to display - either active task or last completed task
-	// Show lastCompletedTask in "ready-for-review", "completing", "completed", and "idle" states to maintain task linkage
-	const displayTask = $derived(
-		task || ((sessionState === "ready-for-review" || sessionState === "completing" || sessionState === "completed" || sessionState === "idle") ? lastCompletedTask : null),
-	);
+	// Show lastCompletedTask in most states to maintain task linkage throughout the session lifecycle
+	// During completing/completed states, the task prop may be null (task closed in Beads),
+	// so we fall back to extracting task info from the rich signal payload
+	const displayTask = $derived.by(() => {
+		if (task) return task;
+		if (lastCompletedTask) return lastCompletedTask;
+
+		// Fall back to rich signal payload for task info during completing/completed states
+		// This handles the race condition where the task closes before the API poll completes
+		if (richSignalPayload?.taskId) {
+			return {
+				id: richSignalPayload.taskId as string,
+				title: (richSignalPayload.taskTitle as string) || richSignalPayload.taskId as string,
+				description: richSignalPayload.taskDescription as string | undefined,
+				status: 'in_progress' as const,
+				priority: richSignalPayload.taskPriority as number | undefined,
+				issue_type: richSignalPayload.taskType as string | undefined,
+			};
+		}
+
+		return null;
+	});
 
 	// Get visual config from centralized statusColors.ts
 	const stateVisual = $derived(
