@@ -211,11 +211,26 @@ export async function POST({ request }) {
 		// Wait for Claude to initialize with verification
 		// Check that Claude Code TUI is running (not just bash prompt)
 		// Claude shows these patterns when ready: "Claude Code", "╭", input prompt ">"
-		const CLAUDE_READY_PATTERNS = ['Claude Code', '╭', '> ', 'claude-opus', 'claude-sonnet', 'Opus', 'Sonnet'];
-		const BASH_PROMPT_PATTERNS = ['-bash:', '$ ', 'bash-'];
-		const maxWaitSeconds = 15;
+		const CLAUDE_READY_PATTERNS = ['Claude Code', '╭', '> ', 'claude-opus', 'claude-sonnet', 'Opus', 'Sonnet', 'Type to stream'];
+		// Shell prompt patterns - detect when Claude hasn't started and we're still at bash/zsh
+		// Must NOT include 'claude' in the output (to avoid matching during Claude startup)
+		const SHELL_PROMPT_PATTERNS = [
+			'-bash:',           // bash error prefix
+			'$ ',               // common bash prompt
+			'bash-',            // bash version prefix
+			'❯',                // zsh/powerline prompt
+			'➜',                // oh-my-zsh default
+			'%',                // zsh default prompt
+			' on ',             // starship/powerline "dir on branch" format
+			'master [',         // git branch indicators
+			'main [',           // git branch indicators
+			'jat on',           // specific to this user's prompt
+			'No such file or directory'  // bash error when command not found
+		];
+		const maxWaitSeconds = 20;  // Increased from 15 to give more time for slow starts
 		const checkIntervalMs = 500;
 		let claudeReady = false;
+		let shellPromptDetected = false;
 
 		for (let waited = 0; waited < maxWaitSeconds * 1000 && !claudeReady; waited += checkIntervalMs) {
 			await new Promise(resolve => setTimeout(resolve, checkIntervalMs));
@@ -227,17 +242,25 @@ export async function POST({ request }) {
 
 				// Check if Claude is running (has Claude Code patterns)
 				const hasClaudePatterns = CLAUDE_READY_PATTERNS.some(p => paneOutput.includes(p));
-				// Check if we're back at bash prompt (Claude never started or exited)
-				const hasBashPrompt = BASH_PROMPT_PATTERNS.some(p => paneOutput.includes(p)) &&
-					!paneOutput.includes('claude');
+
+				// Check if we're at a shell prompt (Claude never started or exited)
+				// Only flag as shell prompt if:
+				// 1. We see shell patterns
+				// 2. The output does NOT contain 'claude' (to avoid false positives during startup)
+				// 3. We've waited at least 3 seconds (give claude command time to start)
+				const outputLowercase = paneOutput.toLowerCase();
+				const hasShellPatterns = SHELL_PROMPT_PATTERNS.some(p => paneOutput.includes(p));
+				const mentionsClaude = outputLowercase.includes('claude');
+				const isLikelyShellPrompt = hasShellPatterns && !mentionsClaude && waited > 3000;
 
 				if (hasClaudePatterns) {
 					claudeReady = true;
 					console.log(`[spawn] Claude Code ready after ${waited}ms`);
-				} else if (hasBashPrompt && waited > 5000) {
-					// If we see bash prompt after 5s, Claude likely failed to start
-					console.error(`[spawn] Claude Code failed to start - detected bash prompt`);
-					console.error(`[spawn] Terminal output: ${paneOutput.slice(-200)}`);
+				} else if (isLikelyShellPrompt && waited > 5000) {
+					// If we see shell prompt after 5s, Claude likely failed to start
+					shellPromptDetected = true;
+					console.error(`[spawn] Claude Code failed to start - detected shell prompt`);
+					console.error(`[spawn] Terminal output (last 300 chars): ${paneOutput.slice(-300)}`);
 					break;
 				}
 			} catch {
@@ -245,8 +268,22 @@ export async function POST({ request }) {
 			}
 		}
 
+		// CRITICAL: Don't send /jat:start if Claude isn't ready - it will go to bash!
 		if (!claudeReady) {
-			console.warn(`[spawn] Claude Code may not have started properly after ${maxWaitSeconds}s`);
+			if (shellPromptDetected) {
+				// Shell prompt detected - Claude definitely didn't start
+				console.error(`[spawn] ABORTING: Claude Code did not start (shell prompt detected)`);
+				return json({
+					error: 'Claude Code failed to start',
+					message: 'Claude Code did not start within the timeout period. The session was created but Claude is not running. Try attaching to the terminal manually.',
+					sessionName,
+					agentName,
+					taskId,
+					recoveryHint: `Try: tmux attach-session -t ${sessionName}`
+				}, { status: 500 });
+			}
+			// No shell prompt but no Claude patterns either - might still be starting
+			console.warn(`[spawn] Claude Code may not have started properly after ${maxWaitSeconds}s, proceeding with caution`);
 		}
 
 		/**

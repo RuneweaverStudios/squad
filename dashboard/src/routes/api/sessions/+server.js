@@ -161,11 +161,25 @@ export async function POST({ request }) {
 			// Verify Claude Code TUI is running before sending prompt
 			if (initialPrompt) {
 				// Check that Claude Code TUI is running (not just bash prompt)
-				const CLAUDE_READY_PATTERNS = ['Claude Code', '╭', '> ', 'claude-opus', 'claude-sonnet', 'Opus', 'Sonnet'];
-				const BASH_PROMPT_PATTERNS = ['-bash:', '$ ', 'bash-'];
-				const maxWaitSeconds = 15;
+				const CLAUDE_READY_PATTERNS = ['Claude Code', '╭', '> ', 'claude-opus', 'claude-sonnet', 'Opus', 'Sonnet', 'Type to stream'];
+				// Shell prompt patterns - detect when Claude hasn't started
+				const SHELL_PROMPT_PATTERNS = [
+					'-bash:',           // bash error prefix
+					'$ ',               // common bash prompt
+					'bash-',            // bash version prefix
+					'❯',                // zsh/powerline prompt
+					'➜',                // oh-my-zsh default
+					'%',                // zsh default prompt
+					' on ',             // starship/powerline "dir on branch" format
+					'master [',         // git branch indicators
+					'main [',           // git branch indicators
+					'jat on',           // specific to this user's prompt
+					'No such file or directory'  // bash error
+				];
+				const maxWaitSeconds = 20;
 				const checkIntervalMs = 500;
 				let claudeReady = false;
+				let shellPromptDetected = false;
 
 				for (let waited = 0; waited < maxWaitSeconds * 1000 && !claudeReady; waited += checkIntervalMs) {
 					await new Promise(resolve => setTimeout(resolve, checkIntervalMs));
@@ -176,14 +190,18 @@ export async function POST({ request }) {
 						);
 
 						const hasClaudePatterns = CLAUDE_READY_PATTERNS.some(p => paneOutput.includes(p));
-						const hasBashPrompt = BASH_PROMPT_PATTERNS.some(p => paneOutput.includes(p)) &&
-							!paneOutput.includes('claude');
+						const outputLowercase = paneOutput.toLowerCase();
+						const hasShellPatterns = SHELL_PROMPT_PATTERNS.some(p => paneOutput.includes(p));
+						const mentionsClaude = outputLowercase.includes('claude');
+						const isLikelyShellPrompt = hasShellPatterns && !mentionsClaude && waited > 3000;
 
 						if (hasClaudePatterns) {
 							claudeReady = true;
 							console.log(`[sessions] Claude Code ready after ${waited}ms`);
-						} else if (hasBashPrompt && waited > 5000) {
-							console.error(`[sessions] Claude Code failed to start - detected bash prompt`);
+						} else if (isLikelyShellPrompt && waited > 5000) {
+							shellPromptDetected = true;
+							console.error(`[sessions] Claude Code failed to start - detected shell prompt`);
+							console.error(`[sessions] Terminal output (last 300 chars): ${paneOutput.slice(-300)}`);
 							break;
 						}
 					} catch {
@@ -191,8 +209,19 @@ export async function POST({ request }) {
 					}
 				}
 
+				// CRITICAL: Don't send /jat:start if Claude isn't ready - it will go to bash!
 				if (!claudeReady) {
-					console.warn(`[sessions] Claude Code may not have started properly after ${maxWaitSeconds}s`);
+					if (shellPromptDetected) {
+						console.error(`[sessions] ABORTING: Claude Code did not start (shell prompt detected)`);
+						return json({
+							error: 'Claude Code failed to start',
+							message: 'Claude Code did not start within the timeout period. The session was created but Claude is not running. Try attaching to the terminal manually.',
+							sessionName,
+							agentName: agentName || sessionName.replace('jat-', ''),
+							recoveryHint: `Try: tmux attach-session -t ${sessionName}`
+						}, { status: 500 });
+					}
+					console.warn(`[sessions] Claude Code may not have started properly after ${maxWaitSeconds}s, proceeding with caution`);
 				}
 
 				/**
