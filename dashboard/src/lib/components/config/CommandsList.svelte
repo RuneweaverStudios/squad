@@ -17,6 +17,7 @@
 	 */
 
 	import { fade, slide } from 'svelte/transition';
+	import { onMount } from 'svelte';
 	import type { SlashCommand, CommandGroup } from '$lib/types/config';
 	import {
 		getCommands,
@@ -48,6 +49,23 @@
 	let isImporting = $state(false);
 	let importFileInput: HTMLInputElement;
 	let importMessage = $state<{ type: 'success' | 'error'; text: string } | null>(null);
+	let exportDropdownOpen = $state(false);
+	let selectedExportNamespaces = $state<Set<string>>(new Set()); // Empty = all namespaces
+	let exportDropdownRef: HTMLDivElement;
+
+	// Close dropdown when clicking outside
+	function handleClickOutside(event: MouseEvent) {
+		if (exportDropdownOpen && exportDropdownRef && !exportDropdownRef.contains(event.target as Node)) {
+			exportDropdownOpen = false;
+		}
+	}
+
+	onMount(() => {
+		document.addEventListener('click', handleClickOutside);
+		return () => {
+			document.removeEventListener('click', handleClickOutside);
+		};
+	});
 
 	// Get reactive state from store
 	const commands = $derived(getCommands());
@@ -134,6 +152,22 @@
 	// Match count for display
 	const matchCount = $derived(filteredCommands.length);
 	const isFiltered = $derived(searchQuery.trim().length > 0);
+
+	// Get unique namespaces for export filter
+	const availableNamespaces = $derived.by(() => {
+		const namespaces = new Set<string>();
+		for (const group of commandGroups) {
+			namespaces.add(group.namespace);
+		}
+		return Array.from(namespaces).sort((a, b) => {
+			// Sort jat first, then local, then alphabetically
+			if (a === 'jat') return -1;
+			if (b === 'jat') return 1;
+			if (a === 'local') return -1;
+			if (b === 'local') return 1;
+			return a.localeCompare(b);
+		});
+	});
 
 	// Highlight matching text in a string
 	function highlightMatch(text: string, query: string): { text: string; isMatch: boolean }[] {
@@ -224,15 +258,42 @@
 		}
 	}
 
+	// Toggle namespace selection for export
+	function toggleExportNamespace(namespace: string) {
+		const newSet = new Set(selectedExportNamespaces);
+		if (newSet.has(namespace)) {
+			newSet.delete(namespace);
+		} else {
+			newSet.add(namespace);
+		}
+		selectedExportNamespaces = newSet;
+	}
+
+	// Get count of commands that will be exported
+	const exportCommandCount = $derived.by(() => {
+		if (selectedExportNamespaces.size === 0) {
+			return commands.length;
+		}
+		return commands.filter(cmd => selectedExportNamespaces.has(cmd.namespace)).length;
+	});
+
 	// Export commands to JSON file
 	async function handleExport() {
 		if (isExporting || commands.length === 0) return;
 
 		isExporting = true;
 		importMessage = null;
+		exportDropdownOpen = false;
 
 		try {
-			const response = await fetch('/api/commands/export');
+			// Build URL with namespace filter if any namespaces are selected
+			let exportUrl = '/api/commands/export';
+			if (selectedExportNamespaces.size > 0) {
+				const namespaceParam = Array.from(selectedExportNamespaces).join(',');
+				exportUrl += `?namespace=${encodeURIComponent(namespaceParam)}`;
+			}
+
+			const response = await fetch(exportUrl);
 			if (!response.ok) {
 				throw new Error(`Export failed: ${response.statusText}`);
 			}
@@ -248,7 +309,8 @@
 			document.body.removeChild(a);
 			URL.revokeObjectURL(url);
 
-			importMessage = { type: 'success', text: `Exported ${commands.length} commands` };
+			const exportedCount = selectedExportNamespaces.size > 0 ? exportCommandCount : commands.length;
+			importMessage = { type: 'success', text: `Exported ${exportedCount} commands` };
 			setTimeout(() => { importMessage = null; }, 3000);
 		} catch (err) {
 			console.error('Export failed:', err);
@@ -404,23 +466,94 @@
 				class="hidden-file-input"
 			/>
 
-			<!-- Export button -->
-			<button
-				class="export-btn"
-				onclick={handleExport}
-				disabled={isExporting || commands.length === 0}
-				title="Export all commands to JSON file"
-				aria-label="Export commands"
-			>
-				{#if isExporting}
-					<div class="btn-spinner"></div>
-				{:else}
-					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+			<!-- Export dropdown -->
+			<div class="export-dropdown" bind:this={exportDropdownRef}>
+				<button
+					class="export-btn"
+					onclick={() => exportDropdownOpen = !exportDropdownOpen}
+					disabled={isExporting || commands.length === 0}
+					title="Export commands to JSON file"
+					aria-label="Export commands"
+					aria-expanded={exportDropdownOpen}
+				>
+					{#if isExporting}
+						<div class="btn-spinner"></div>
+					{:else}
+						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+						</svg>
+					{/if}
+					Export
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3 chevron-down" class:rotated={exportDropdownOpen}>
+						<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
 					</svg>
+				</button>
+
+				{#if exportDropdownOpen}
+					<div class="export-dropdown-menu" transition:slide={{ duration: 150, axis: 'y' }}>
+						<div class="dropdown-header">
+							<span class="dropdown-title">Select namespaces to export</span>
+							<span class="dropdown-hint">
+								{#if selectedExportNamespaces.size === 0}
+									All ({commands.length})
+								{:else}
+									{selectedExportNamespaces.size} selected ({exportCommandCount})
+								{/if}
+							</span>
+						</div>
+
+						<div class="namespace-options">
+							{#each availableNamespaces as namespace}
+								{@const count = commandGroups.find(g => g.namespace === namespace)?.commands.length || 0}
+								<label class="namespace-option">
+									<input
+										type="checkbox"
+										checked={selectedExportNamespaces.has(namespace)}
+										onchange={() => toggleExportNamespace(namespace)}
+									/>
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke-width="1.5"
+										stroke="currentColor"
+										class="namespace-icon"
+										style="color: {getNamespaceColor(namespace)}"
+									>
+										<path stroke-linecap="round" stroke-linejoin="round" d={getNamespaceIcon(namespace)} />
+									</svg>
+									<span class="namespace-label">{namespace}</span>
+									<span class="namespace-count-badge">{count}</span>
+								</label>
+							{/each}
+						</div>
+
+						<div class="dropdown-actions">
+							<button
+								class="clear-selection-btn"
+								onclick={() => selectedExportNamespaces = new Set()}
+								disabled={selectedExportNamespaces.size === 0}
+							>
+								Clear
+							</button>
+							<button
+								class="export-now-btn"
+								onclick={handleExport}
+								disabled={isExporting || exportCommandCount === 0}
+							>
+								{#if isExporting}
+									<div class="btn-spinner small"></div>
+								{:else}
+									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+									</svg>
+								{/if}
+								Export {exportCommandCount > 0 ? `(${exportCommandCount})` : ''}
+							</button>
+						</div>
+					</div>
 				{/if}
-				Export
-			</button>
+			</div>
 
 			<!-- Add command button -->
 			<button
@@ -454,7 +587,7 @@
 				</svg>
 			{/if}
 			<span>{importMessage.text}</span>
-			<button class="message-close" onclick={() => importMessage = null}>
+			<button class="message-close" onclick={() => importMessage = null} aria-label="Dismiss message">
 				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
 				</svg>
@@ -1061,5 +1194,170 @@
 	.message-close:hover {
 		opacity: 1;
 		background: oklch(0 0 0 / 0.1);
+	}
+
+	/* Export dropdown */
+	.export-dropdown {
+		position: relative;
+	}
+
+	.chevron-down {
+		transition: transform 0.15s ease;
+		margin-left: 0.125rem;
+	}
+
+	.chevron-down.rotated {
+		transform: rotate(180deg);
+	}
+
+	.export-dropdown-menu {
+		position: absolute;
+		top: calc(100% + 4px);
+		right: 0;
+		min-width: 220px;
+		background: oklch(0.16 0.02 250);
+		border: 1px solid oklch(0.30 0.02 250);
+		border-radius: 8px;
+		box-shadow: 0 4px 16px oklch(0 0 0 / 0.3);
+		z-index: 100;
+		overflow: hidden;
+	}
+
+	.dropdown-header {
+		display: flex;
+		flex-direction: column;
+		gap: 0.125rem;
+		padding: 0.625rem 0.75rem;
+		background: oklch(0.14 0.02 250);
+		border-bottom: 1px solid oklch(0.25 0.02 250);
+	}
+
+	.dropdown-title {
+		font-size: 0.7rem;
+		font-weight: 600;
+		color: oklch(0.70 0.02 250);
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+	}
+
+	.dropdown-hint {
+		font-size: 0.7rem;
+		color: oklch(0.50 0.02 250);
+	}
+
+	.namespace-options {
+		display: flex;
+		flex-direction: column;
+		padding: 0.5rem 0;
+		max-height: 200px;
+		overflow-y: auto;
+	}
+
+	.namespace-option {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.5rem 0.75rem;
+		cursor: pointer;
+		transition: background 0.1s ease;
+	}
+
+	.namespace-option:hover {
+		background: oklch(0.20 0.02 250);
+	}
+
+	.namespace-option input[type="checkbox"] {
+		width: 14px;
+		height: 14px;
+		accent-color: oklch(0.60 0.15 200);
+		cursor: pointer;
+	}
+
+	.namespace-option .namespace-icon {
+		width: 14px;
+		height: 14px;
+		flex-shrink: 0;
+	}
+
+	.namespace-label {
+		font-size: 0.75rem;
+		font-weight: 500;
+		color: oklch(0.80 0.02 250);
+		font-family: ui-monospace, monospace;
+		flex: 1;
+	}
+
+	.namespace-count-badge {
+		font-size: 0.65rem;
+		font-weight: 400;
+		color: oklch(0.55 0.02 250);
+		background: oklch(0.22 0.02 250);
+		padding: 0.125rem 0.375rem;
+		border-radius: 8px;
+	}
+
+	.dropdown-actions {
+		display: flex;
+		gap: 0.5rem;
+		padding: 0.625rem 0.75rem;
+		background: oklch(0.14 0.02 250);
+		border-top: 1px solid oklch(0.25 0.02 250);
+	}
+
+	.clear-selection-btn {
+		flex: 0 0 auto;
+		padding: 0.375rem 0.625rem;
+		font-size: 0.7rem;
+		font-weight: 500;
+		background: transparent;
+		border: 1px solid oklch(0.30 0.02 250);
+		border-radius: 5px;
+		color: oklch(0.60 0.02 250);
+		cursor: pointer;
+		transition: all 0.15s ease;
+		font-family: ui-monospace, monospace;
+	}
+
+	.clear-selection-btn:hover:not(:disabled) {
+		background: oklch(0.22 0.02 250);
+		color: oklch(0.80 0.02 250);
+	}
+
+	.clear-selection-btn:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
+
+	.export-now-btn {
+		flex: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.375rem;
+		padding: 0.375rem 0.625rem;
+		font-size: 0.75rem;
+		font-weight: 500;
+		background: oklch(0.35 0.12 145);
+		border: 1px solid oklch(0.45 0.15 145);
+		border-radius: 5px;
+		color: oklch(0.95 0.05 145);
+		cursor: pointer;
+		transition: all 0.15s ease;
+		font-family: ui-monospace, monospace;
+	}
+
+	.export-now-btn:hover:not(:disabled) {
+		background: oklch(0.40 0.15 145);
+	}
+
+	.export-now-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.btn-spinner.small {
+		width: 12px;
+		height: 12px;
+		border-width: 1.5px;
 	}
 </style>
