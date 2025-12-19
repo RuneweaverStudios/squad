@@ -61,6 +61,7 @@
 		type SessionStateVisual,
 		type ServerStateVisual,
 		type ServerState,
+		type SessionState,
 		getServerStateVisual,
 	} from "$lib/config/statusColors";
 	import HorizontalResizeHandle from "$lib/components/HorizontalResizeHandle.svelte";
@@ -1971,7 +1972,7 @@
 	/**
 	 * Session State - Determines what to show in the header
 	 *
-	 * States:
+	 * States (see SessionState type in statusColors.ts):
 	 * - 'starting': Task assigned, agent initializing (no [JAT:WORKING] marker yet)
 	 * - 'working': Has active in_progress task with [JAT:WORKING] marker
 	 * - 'compacting': Context compaction in progress (via PreCompact hook)
@@ -1979,19 +1980,9 @@
 	 * - 'ready-for-review': Work done, awaiting user review (yellow)
 	 * - 'completing': User triggered /jat:complete, agent running completion steps (teal)
 	 * - 'completed': Task was closed, showing completion summary (green)
+	 * - 'recovering': Automation rule triggered recovery action (cyan)
 	 * - 'idle': No task, new session (gray)
 	 */
-	type SessionState =
-		| "starting"
-		| "working"
-		| "compacting"
-		| "needs-input"
-		| "ready-for-review"
-		| "completing"
-		| "completed"
-		| "recovering"
-		| "idle";
-
 	const sessionState = $derived.by((): SessionState => {
 		// Check for recovering state first (automation rule triggered recovery)
 		// This takes priority over other states to show the user that recovery is in progress

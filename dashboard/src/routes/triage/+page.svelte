@@ -14,6 +14,7 @@
 	import type { WorkSession } from '$lib/stores/workSessions.svelte.js';
 	import SessionCard from '$lib/components/work/SessionCard.svelte';
 	import { TriageSkeleton } from '$lib/components/skeleton';
+	import { type SessionState } from '$lib/config/statusColors';
 
 	// State
 	let sessions = $state<WorkSession[]>([]);
@@ -25,7 +26,6 @@
 	let expandedSession = $state<string | null>(null);
 
 	// Session state detection (mirrors SessionCard logic)
-	type SessionState = 'working' | 'needs-input' | 'ready-for-review' | 'completed' | 'idle';
 
 	function getSessionState(session: WorkSession): SessionState {
 		const recentOutput = session.output ? session.output.slice(-3000) : '';

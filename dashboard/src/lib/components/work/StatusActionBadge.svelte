@@ -14,7 +14,8 @@
 		getSessionStateVisual,
 		getSessionStateActions,
 		type SessionStateVisual,
-		type SessionStateAction
+		type SessionStateAction,
+		type SessionState
 	} from '$lib/config/statusColors';
 	import {
 		playTaskCompleteSound,
@@ -25,8 +26,6 @@
 		playTaskStartSound
 	} from '$lib/utils/soundEffects';
 	import { slide } from 'svelte/transition';
-
-	type SessionState = 'starting' | 'working' | 'compacting' | 'needs-input' | 'ready-for-review' | 'completing' | 'completed' | 'idle';
 
 	interface SlashCommand {
 		name: string;

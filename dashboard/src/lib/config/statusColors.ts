@@ -415,6 +415,22 @@ export function getIssueTypeVisual(issueType: string | undefined | null): IssueT
 
 export type SessionStateIconType = 'rocket' | 'gear' | 'question' | 'eye' | 'check' | 'circle';
 
+/**
+ * Centralized SessionState type - single source of truth for all session states.
+ * Used by SessionCard, StatusActionBadge, triage page, and any other components
+ * that need to work with session states.
+ */
+export type SessionState =
+	| 'starting'
+	| 'working'
+	| 'compacting'
+	| 'needs-input'
+	| 'ready-for-review'
+	| 'completing'
+	| 'completed'
+	| 'recovering'
+	| 'idle';
+
 export interface SessionStateVisual {
 	// Display
 	label: string;                 // Display label with emoji (e.g., "✅ DONE")
