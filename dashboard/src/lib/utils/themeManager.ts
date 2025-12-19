@@ -91,3 +91,38 @@ export function initializeTheme() {
 export function isValidTheme(theme: string): theme is Theme {
 	return AVAILABLE_THEMES.includes(theme as Theme);
 }
+
+/**
+ * DaisyUI dark themes - used for Monaco Editor theme sync
+ */
+const DARK_THEMES: Set<Theme> = new Set([
+	'dark',
+	'synthwave',
+	'halloween',
+	'forest',
+	'black',
+	'luxury',
+	'dracula',
+	'night',
+	'coffee',
+	'dim',
+	'sunset',
+	'business'
+]);
+
+/**
+ * Check if a DaisyUI theme is a dark theme.
+ * Used for syncing Monaco Editor theme (vs-dark vs vs-light).
+ */
+export function isDarkTheme(theme: string): boolean {
+	return DARK_THEMES.has(theme as Theme);
+}
+
+/**
+ * Get the appropriate Monaco Editor theme for a DaisyUI theme.
+ * @param daisyTheme - The current DaisyUI theme name
+ * @returns 'vs-dark' for dark themes, 'vs' for light themes
+ */
+export function getMonacoTheme(daisyTheme: string): 'vs-dark' | 'vs' {
+	return isDarkTheme(daisyTheme) ? 'vs-dark' : 'vs';
+}

@@ -2,12 +2,13 @@
 	import { onMount, onDestroy } from 'svelte';
 	import loader from '@monaco-editor/loader';
 	import type * as Monaco from 'monaco-editor';
+	import { getMonacoTheme } from '$lib/utils/themeManager';
 
 	// Props
 	let {
 		value = $bindable(''),
 		language = 'markdown',
-		theme = 'vs-dark',
+		theme = undefined,
 		readonly = false,
 		onchange = undefined
 	}: {
@@ -24,10 +25,36 @@
 	let monaco: typeof Monaco | null = $state(null);
 	let isReady = $state(false);
 	let resizeObserver: ResizeObserver | null = null;
+	let themeObserver: MutationObserver | null = null;
+
+	// Track the current DaisyUI theme for reactivity
+	let daisyTheme = $state('nord');
+
+	// Compute effective theme: use prop if provided, otherwise sync with DaisyUI theme
+	const effectiveTheme = $derived(theme ?? getMonacoTheme(daisyTheme));
 
 	// Initialize Monaco Editor
 	onMount(async () => {
 		if (!containerRef) return;
+
+		// Initialize DaisyUI theme from document
+		daisyTheme = document.documentElement.getAttribute('data-theme') || 'nord';
+
+		// Watch for DaisyUI theme changes via MutationObserver
+		themeObserver = new MutationObserver((mutations) => {
+			for (const mutation of mutations) {
+				if (mutation.type === 'attributes' && mutation.attributeName === 'data-theme') {
+					const newTheme = document.documentElement.getAttribute('data-theme') || 'nord';
+					if (newTheme !== daisyTheme) {
+						daisyTheme = newTheme;
+					}
+				}
+			}
+		});
+		themeObserver.observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ['data-theme']
+		});
 
 		try {
 			// Load Monaco using the loader
@@ -37,7 +64,7 @@
 			editor = monaco.editor.create(containerRef, {
 				value: value,
 				language: language,
-				theme: theme,
+				theme: effectiveTheme,
 				readOnly: readonly,
 				// Editor options per spec
 				minimap: { enabled: false },
@@ -84,6 +111,7 @@
 
 	// Handle cleanup
 	onDestroy(() => {
+		themeObserver?.disconnect();
 		resizeObserver?.disconnect();
 		editor?.dispose();
 		editor = null;
@@ -115,10 +143,10 @@
 		}
 	});
 
-	// Sync theme changes
+	// Sync theme changes (responds to both prop changes and DaisyUI theme changes)
 	$effect(() => {
 		if (monaco && isReady) {
-			monaco.editor.setTheme(theme);
+			monaco.editor.setTheme(effectiveTheme);
 		}
 	});
 
