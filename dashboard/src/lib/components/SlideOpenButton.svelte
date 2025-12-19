@@ -65,6 +65,36 @@
 	onmouseenter={() => (hovered = true)}
 	onmouseleave={() => (hovered = false)}
 >
+	<!-- Secondary: Slide-out Button (slides from LEFT so cursor stays over primary) -->
+	<button
+		class="btn btn-sm gap-1 rounded-none border-0 transition-all duration-200 ease-out"
+		style="
+			background: linear-gradient(135deg, {secondaryGradientFrom} 0%, {secondaryGradientTo} 100%);
+			color: oklch(0.95 0.02 250);
+			border-right: 1px solid oklch(0.50 0.10 55);
+			max-width: {hovered ? '120px' : '0px'};
+			padding: {hovered ? '0.5rem 0.75rem' : '0.5rem 0'};
+			opacity: {hovered ? '1' : '0'};
+		"
+		onclick={onsecondary}
+		disabled={disabled || loading}
+		title={secondaryTitle}
+	>
+		{#if secondaryIcon}
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				class="w-3.5 h-3.5"
+				fill="none"
+				viewBox="0 0 24 24"
+				stroke="currentColor"
+				stroke-width="2"
+			>
+				<path stroke-linecap="round" stroke-linejoin="round" d={secondaryIcon} />
+			</svg>
+		{/if}
+		<span class="whitespace-nowrap text-xs font-medium">{secondaryLabel}</span>
+	</button>
+
 	<!-- Primary Button -->
 	<button
 		class="btn btn-sm gap-2 rounded-none border-0"
@@ -93,35 +123,5 @@
 			{/if}
 			{primaryLabel}
 		{/if}
-	</button>
-
-	<!-- Secondary: Slide-out Button -->
-	<button
-		class="btn btn-sm gap-1 rounded-none border-0 transition-all duration-200 ease-out"
-		style="
-			background: linear-gradient(135deg, {secondaryGradientFrom} 0%, {secondaryGradientTo} 100%);
-			color: oklch(0.95 0.02 250);
-			border-left: 1px solid oklch(0.50 0.10 55);
-			max-width: {hovered ? '120px' : '0px'};
-			padding: {hovered ? '0.5rem 0.75rem' : '0.5rem 0'};
-			opacity: {hovered ? '1' : '0'};
-		"
-		onclick={onsecondary}
-		disabled={disabled || loading}
-		title={secondaryTitle}
-	>
-		{#if secondaryIcon}
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				class="w-3.5 h-3.5"
-				fill="none"
-				viewBox="0 0 24 24"
-				stroke="currentColor"
-				stroke-width="2"
-			>
-				<path stroke-linecap="round" stroke-linejoin="round" d={secondaryIcon} />
-			</svg>
-		{/if}
-		<span class="whitespace-nowrap text-xs font-medium">{secondaryLabel}</span>
 	</button>
 </div>
