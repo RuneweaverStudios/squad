@@ -4,9 +4,45 @@
  * Starter templates for creating new slash commands.
  * Templates include YAML frontmatter, description section, and implementation patterns.
  *
+ * ## Template Variables
+ *
+ * Templates support placeholder variables using the `{{variableName}}` syntax.
+ * Variables are defined in the `variables` field and replaced during application.
+ *
+ * Example:
+ * ```typescript
+ * {
+ *   content: '# {{commandTitle}}\n\n{{commandDescription}}',
+ *   variables: [
+ *     { name: 'commandTitle', label: 'Command Title', placeholder: 'My Command' },
+ *     { name: 'commandDescription', label: 'Description', placeholder: 'What this command does', multiline: true }
+ *   ]
+ * }
+ * ```
+ *
  * @see dashboard/src/lib/components/config/CommandEditor.svelte
  * @see commands/jat/ for example implementations
  */
+
+/**
+ * Template variable definition
+ */
+export interface TemplateVariable {
+	/** Variable name used in template (e.g., 'commandName' for {{commandName}}) */
+	name: string;
+	/** Human-readable label for the input field */
+	label: string;
+	/** Placeholder text shown in empty input */
+	placeholder?: string;
+	/** Default value */
+	defaultValue?: string;
+	/** Use textarea instead of input (for long text) */
+	multiline?: boolean;
+	/** Brief help text shown below input */
+	hint?: string;
+	/** Whether this variable is required */
+	required?: boolean;
+}
 
 export interface CommandTemplate {
 	/** Unique identifier */
@@ -17,7 +53,7 @@ export interface CommandTemplate {
 	description: string;
 	/** Icon emoji for visual distinction */
 	icon: string;
-	/** Template content with placeholders */
+	/** Template content with {{variable}} placeholders */
 	content: string;
 	/** Default frontmatter values */
 	frontmatter: {
@@ -28,6 +64,8 @@ export interface CommandTemplate {
 	};
 	/** When to use this template */
 	useCase: string;
+	/** Template variables that can be replaced during application */
+	variables?: TemplateVariable[];
 }
 
 /**
@@ -48,6 +86,39 @@ const basicTemplate: CommandTemplate = {
 		version: '1.0.0',
 		tags: ''
 	},
+	variables: [
+		{
+			name: 'commandTitle',
+			label: 'Command Title',
+			placeholder: 'My Command',
+			required: true,
+			hint: 'The heading for your command documentation'
+		},
+		{
+			name: 'commandDescription',
+			label: 'Brief Description',
+			placeholder: 'What this command does',
+			hint: 'A one-line summary of the command purpose'
+		},
+		{
+			name: 'firstAction',
+			label: 'First Action',
+			placeholder: 'First action',
+			defaultValue: 'First action'
+		},
+		{
+			name: 'secondAction',
+			label: 'Second Action',
+			placeholder: 'Second action',
+			defaultValue: 'Second action'
+		},
+		{
+			name: 'thirdAction',
+			label: 'Third Action',
+			placeholder: 'Third action',
+			defaultValue: 'Third action'
+		}
+	],
 	content: `---
 description:
 author:
@@ -55,9 +126,9 @@ version: 1.0.0
 tags:
 ---
 
-# Command Title
+# {{commandTitle}}
 
-Brief description of what this command does.
+{{commandDescription}}
 
 ## Usage
 
@@ -67,9 +138,9 @@ Brief description of what this command does.
 
 ## What This Command Does
 
-1. First action
-2. Second action
-3. Third action
+1. {{firstAction}}
+2. {{secondAction}}
+3. {{thirdAction}}
 
 ## Examples
 
@@ -541,9 +612,154 @@ export function getTemplate(id: string): CommandTemplate | undefined {
 }
 
 /**
+ * Extract variable names from template content.
+ *
+ * Finds all {{variableName}} patterns and returns unique variable names.
+ * This is useful for discovering variables in templates that don't have
+ * an explicit variables definition.
+ *
+ * @param content Template content to scan
+ * @returns Array of unique variable names found
+ */
+export function extractVariablesFromContent(content: string): string[] {
+	const regex = /\{\{([a-zA-Z][a-zA-Z0-9_-]*)\}\}/g;
+	const variables = new Set<string>();
+	let match;
+
+	while ((match = regex.exec(content)) !== null) {
+		variables.add(match[1]);
+	}
+
+	return Array.from(variables);
+}
+
+/**
+ * Get all variables for a template.
+ *
+ * If the template has explicit variable definitions, returns those.
+ * Otherwise, extracts variables from content and creates basic definitions.
+ *
+ * @param template The command template
+ * @returns Array of template variable definitions
+ */
+export function getTemplateVariables(template: CommandTemplate): TemplateVariable[] {
+	// If explicit variables defined, use those
+	if (template.variables && template.variables.length > 0) {
+		return template.variables;
+	}
+
+	// Otherwise, extract from content and create basic definitions
+	const extractedNames = extractVariablesFromContent(template.content);
+	return extractedNames.map((name) => ({
+		name,
+		label: formatVariableLabel(name),
+		placeholder: '',
+		required: false
+	}));
+}
+
+/**
+ * Format a variable name as a human-readable label.
+ *
+ * Examples:
+ * - 'commandName' -> 'Command Name'
+ * - 'my-variable' -> 'My Variable'
+ * - 'API_KEY' -> 'API KEY'
+ *
+ * @param name Variable name
+ * @returns Human-readable label
+ */
+export function formatVariableLabel(name: string): string {
+	return name
+		// Insert space before uppercase letters (camelCase)
+		.replace(/([a-z])([A-Z])/g, '$1 $2')
+		// Replace hyphens and underscores with spaces
+		.replace(/[-_]/g, ' ')
+		// Capitalize first letter of each word
+		.replace(/\b\w/g, (c) => c.toUpperCase())
+		// Trim and collapse multiple spaces
+		.replace(/\s+/g, ' ')
+		.trim();
+}
+
+/**
+ * Substitute variables in template content.
+ *
+ * Replaces all {{variableName}} patterns with provided values.
+ * Variables without provided values are left unchanged.
+ *
+ * @param content Template content with {{variable}} placeholders
+ * @param values Map of variable names to their values
+ * @returns Content with variables replaced
+ */
+export function substituteVariables(
+	content: string,
+	values: Record<string, string>
+): string {
+	return content.replace(/\{\{([a-zA-Z][a-zA-Z0-9_-]*)\}\}/g, (match, name) => {
+		return name in values ? values[name] : match;
+	});
+}
+
+/**
+ * Validate that all required variables have values.
+ *
+ * @param template The command template
+ * @param values Provided variable values
+ * @returns Object with valid flag and array of missing variable names
+ */
+export function validateVariables(
+	template: CommandTemplate,
+	values: Record<string, string>
+): { valid: boolean; missing: string[] } {
+	const variables = getTemplateVariables(template);
+	const missing: string[] = [];
+
+	for (const variable of variables) {
+		if (variable.required && !values[variable.name]?.trim()) {
+			missing.push(variable.name);
+		}
+	}
+
+	return {
+		valid: missing.length === 0,
+		missing
+	};
+}
+
+/**
+ * Get default values for template variables.
+ *
+ * Creates a values object with default values for all variables
+ * that have defaults defined.
+ *
+ * @param template The command template
+ * @returns Object mapping variable names to default values
+ */
+export function getDefaultVariableValues(template: CommandTemplate): Record<string, string> {
+	const variables = getTemplateVariables(template);
+	const defaults: Record<string, string> = {};
+
+	for (const variable of variables) {
+		if (variable.defaultValue !== undefined) {
+			defaults[variable.name] = variable.defaultValue;
+		}
+	}
+
+	return defaults;
+}
+
+/**
  * Apply template to create initial command content.
  *
- * Replaces placeholders with provided values.
+ * Replaces {{variable}} placeholders with provided values, and also
+ * handles legacy placeholders (namespace, command, tool-name) for
+ * backwards compatibility.
+ *
+ * @param template The command template to apply
+ * @param options Legacy options (namespace, name, description, author)
+ * @param variableValues Values for {{variable}} placeholders
+ * @returns Template content with all placeholders replaced
  */
 export function applyTemplate(
 	template: CommandTemplate,
@@ -552,16 +768,19 @@ export function applyTemplate(
 		name?: string;
 		description?: string;
 		author?: string;
-	} = {}
+	} = {},
+	variableValues: Record<string, string> = {}
 ): string {
 	let content = template.content;
 
-	// Replace namespace placeholder
+	// First, apply new-style {{variable}} substitutions
+	content = substituteVariables(content, variableValues);
+
+	// Then, apply legacy replacements for backwards compatibility
 	if (options.namespace) {
 		content = content.replace(/namespace/g, options.namespace);
 	}
 
-	// Replace command name placeholder
 	if (options.name) {
 		content = content.replace(/command/g, options.name);
 		content = content.replace(/tool-name/g, options.name);

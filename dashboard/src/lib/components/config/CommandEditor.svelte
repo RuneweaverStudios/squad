@@ -14,7 +14,11 @@
 	import {
 		COMMAND_TEMPLATES,
 		applyTemplate,
-		type CommandTemplate
+		getTemplateVariables,
+		getDefaultVariableValues,
+		validateVariables,
+		type CommandTemplate,
+		type TemplateVariable
 	} from '$lib/config/commandTemplates';
 
 	// Configure marked for safe rendering
@@ -52,7 +56,11 @@
 
 	// Template selection state (for create mode)
 	let showTemplateStep = $state(true);
+	let showVariablesStep = $state(false);
 	let selectedTemplate = $state<CommandTemplate | null>(null);
+	let templateVariables = $state<TemplateVariable[]>([]);
+	let variableValues = $state<Record<string, string>>({});
+	let variableErrors = $state<string[]>([]);
 
 	// Validation state
 	let validation = $state<ValidationResult | null>(null);
@@ -103,7 +111,11 @@
 			version = '';
 			tags = '';
 			showTemplateStep = true; // Show template picker first
+			showVariablesStep = false;
 			selectedTemplate = null;
+			templateVariables = [];
+			variableValues = {};
+			variableErrors = [];
 			content = `---
 description:
 author:
@@ -130,24 +142,61 @@ Command content here...
 		author = template.frontmatter.author || '';
 		version = template.frontmatter.version || '1.0.0';
 		tags = template.frontmatter.tags || '';
+
+		// Initialize variables for this template
+		templateVariables = getTemplateVariables(template);
+		variableValues = getDefaultVariableValues(template);
+		variableErrors = [];
+	}
+
+	// Proceed from template selection - show variables step if needed
+	function proceedFromTemplateStep() {
+		if (!selectedTemplate) return;
+
+		// If template has variables, show variables step
+		if (templateVariables.length > 0) {
+			showTemplateStep = false;
+			showVariablesStep = true;
+		} else {
+			// No variables, go directly to editor
+			applySelectedTemplate();
+		}
 	}
 
 	// Apply selected template and move to editor step
 	function applySelectedTemplate() {
 		if (selectedTemplate) {
-			content = applyTemplate(selectedTemplate, {
-				namespace,
-				name: name || 'command',
-				description
-			});
+			// Validate required variables
+			const validation = validateVariables(selectedTemplate, variableValues);
+			if (!validation.valid) {
+				variableErrors = validation.missing;
+				return;
+			}
+
+			content = applyTemplate(
+				selectedTemplate,
+				{
+					namespace,
+					name: name || 'command',
+					description
+				},
+				variableValues
+			);
 		}
 		showTemplateStep = false;
+		showVariablesStep = false;
 
 		// Update editor if already initialized
 		if (editor) {
 			editor.setValue(content);
 			validateContent(content);
 		}
+	}
+
+	// Go back to template selection from variables step
+	function backToTemplatesFromVariables() {
+		showVariablesStep = false;
+		showTemplateStep = true;
 	}
 
 	// Skip template selection and use default
@@ -582,10 +631,14 @@ Command content here...
 							<button
 								type="button"
 								class="btn btn-primary btn-sm"
-								onclick={applySelectedTemplate}
+								onclick={proceedFromTemplateStep}
 								disabled={!selectedTemplate}
 							>
-								{selectedTemplate ? `Use ${selectedTemplate.name} Template` : 'Select a template'}
+								{selectedTemplate
+									? templateVariables.length > 0
+										? `Configure ${selectedTemplate.name}`
+										: `Use ${selectedTemplate.name} Template`
+									: 'Select a template'}
 								<svg
 									xmlns="http://www.w3.org/2000/svg"
 									class="ml-1 h-4 w-4"
@@ -601,6 +654,132 @@ Command content here...
 									/>
 								</svg>
 							</button>
+						</div>
+					{:else if isCreateMode && showVariablesStep}
+						<!-- Variables Step -->
+						<div class="mb-6">
+							<div class="mb-4 flex items-center gap-2">
+								<button
+									type="button"
+									class="btn btn-ghost btn-xs"
+									onclick={backToTemplatesFromVariables}
+								>
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										class="mr-1 h-3 w-3"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M15 19l-7-7 7-7"
+										/>
+									</svg>
+									Change template
+								</button>
+								{#if selectedTemplate}
+									<span class="badge badge-sm badge-ghost">
+										{selectedTemplate.icon} {selectedTemplate.name}
+									</span>
+								{/if}
+							</div>
+
+							<h3 class="mb-4 text-lg font-medium text-base-content">
+								Configure Template Variables
+							</h3>
+							<p class="mb-6 text-sm opacity-70">
+								Fill in the values below to customize your command template.
+							</p>
+
+							{#if variableErrors.length > 0}
+								<div class="alert alert-error mb-4">
+									<span>Please fill in required fields: {variableErrors.map(name =>
+										templateVariables.find(v => v.name === name)?.label || name
+									).join(', ')}</span>
+								</div>
+							{/if}
+
+							<div class="space-y-4">
+								{#each templateVariables as variable}
+									<div class="form-control">
+										<label class="label" for={`var-${variable.name}`}>
+											<span class="label-text font-medium">
+												{variable.label}
+												{#if variable.required}
+													<span class="text-error">*</span>
+												{/if}
+											</span>
+										</label>
+										{#if variable.multiline}
+											<textarea
+												id={`var-${variable.name}`}
+												class="textarea textarea-bordered"
+												class:textarea-error={variableErrors.includes(variable.name)}
+												placeholder={variable.placeholder || ''}
+												rows="3"
+												bind:value={variableValues[variable.name]}
+												oninput={() => {
+													// Clear error for this field when user types
+													variableErrors = variableErrors.filter(e => e !== variable.name);
+												}}
+											></textarea>
+										{:else}
+											<input
+												id={`var-${variable.name}`}
+												type="text"
+												class="input input-bordered"
+												class:input-error={variableErrors.includes(variable.name)}
+												placeholder={variable.placeholder || ''}
+												bind:value={variableValues[variable.name]}
+												oninput={() => {
+													// Clear error for this field when user types
+													variableErrors = variableErrors.filter(e => e !== variable.name);
+												}}
+											/>
+										{/if}
+										{#if variable.hint}
+											<label class="label">
+												<span class="label-text-alt opacity-70">{variable.hint}</span>
+											</label>
+										{/if}
+									</div>
+								{/each}
+							</div>
+
+							<!-- Variables step actions -->
+							<div class="mt-6 flex justify-between">
+								<button
+									type="button"
+									class="btn btn-ghost btn-sm"
+									onclick={backToTemplatesFromVariables}
+								>
+									Back
+								</button>
+								<button
+									type="button"
+									class="btn btn-primary btn-sm"
+									onclick={applySelectedTemplate}
+								>
+									Apply Template
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										class="ml-1 h-4 w-4"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M9 5l7 7-7 7"
+										/>
+									</svg>
+								</button>
+							</div>
 						</div>
 					{:else}
 						<!-- Editor Step -->
@@ -850,6 +1029,9 @@ Command content here...
 			>
 				{#if isCreateMode && showTemplateStep}
 					<!-- Template step footer -->
+					<button class="btn btn-ghost" onclick={handleClose}>Cancel</button>
+				{:else if isCreateMode && showVariablesStep}
+					<!-- Variables step footer -->
 					<button class="btn btn-ghost" onclick={handleClose}>Cancel</button>
 				{:else}
 					<!-- Editor step footer -->
