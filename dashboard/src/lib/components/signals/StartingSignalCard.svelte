@@ -38,27 +38,27 @@
 		}
 	}
 
-	// Model badge styling
+	// Model badge styling - using DaisyUI semantic color classes
 	const modelBadge = $derived.by(() => {
 		const model = signal.model?.toLowerCase() || '';
 		if (model.includes('opus')) {
-			return { label: signal.model, color: 'oklch(0.55 0.18 280)', icon: '🎭' };
+			return { label: signal.model, colorClass: 'bg-secondary text-secondary-content', icon: '🎭' };
 		}
 		if (model.includes('sonnet')) {
-			return { label: signal.model, color: 'oklch(0.55 0.18 200)', icon: '🎵' };
+			return { label: signal.model, colorClass: 'bg-info text-info-content', icon: '🎵' };
 		}
 		if (model.includes('haiku')) {
-			return { label: signal.model, color: 'oklch(0.55 0.15 145)', icon: '🌸' };
+			return { label: signal.model, colorClass: 'bg-success text-success-content', icon: '🌸' };
 		}
-		return { label: signal.model || 'Unknown', color: 'oklch(0.50 0.08 250)', icon: '🤖' };
+		return { label: signal.model || 'Unknown', colorClass: 'bg-base-300 text-base-content', icon: '🤖' };
 	});
 
-	// Git status badge
+	// Git status badge - using DaisyUI semantic color classes
 	const gitStatusBadge = $derived.by(() => {
 		if (signal.gitStatus === 'clean') {
-			return { label: 'CLEAN', color: 'oklch(0.55 0.18 145)', icon: '✓' };
+			return { label: 'CLEAN', colorClass: 'bg-success/20 text-success border-success/40', icon: '✓' };
 		}
-		return { label: 'DIRTY', color: 'oklch(0.55 0.18 45)', icon: '●' };
+		return { label: 'DIRTY', colorClass: 'bg-warning/20 text-warning border-warning/40', icon: '●' };
 	});
 
 	// Format session ID for display (truncate middle)
@@ -74,8 +74,7 @@
 {#if compact}
 	<!-- Compact mode: minimal card for timeline/inline display -->
 	<div
-		class="rounded-lg px-3 py-2 flex items-center gap-3 {className}"
-		style="background: linear-gradient(90deg, oklch(0.25 0.10 200 / 0.3) 0%, oklch(0.22 0.05 200 / 0.1) 100%); border: 1px solid oklch(0.45 0.12 200);"
+		class="rounded-lg px-3 py-2 flex items-center gap-3 bg-info/10 border border-info/30 {className}"
 	>
 		<!-- Status indicator -->
 		<div class="flex-shrink-0">
@@ -84,18 +83,17 @@
 
 		<!-- Agent info -->
 		<div class="flex-1 min-w-0 flex items-center gap-2">
-			<span class="text-sm font-semibold" style="color: oklch(0.90 0.08 200);">
+			<span class="text-sm font-semibold text-info">
 				{signal.agentName}
 			</span>
-			<span class="text-xs opacity-60" style="color: oklch(0.80 0.05 200);">
+			<span class="text-xs opacity-60 text-base-content/60">
 				starting...
 			</span>
 		</div>
 
 		<!-- Model badge -->
 		<span
-			class="text-[10px] px-1.5 py-0.5 rounded font-mono flex-shrink-0"
-			style="background: {modelBadge.color}; color: oklch(0.98 0.01 250);"
+			class="text-[10px] px-1.5 py-0.5 rounded font-mono flex-shrink-0 {modelBadge.colorClass}"
 		>
 			{modelBadge.icon} {modelBadge.label}
 		</span>
@@ -105,27 +103,24 @@
 	<!-- Card sizes based on content, parent container handles max-height and scrolling -->
 	<!-- overflow-hidden clips any nested content that might overflow -->
 	<div
-		class="rounded-lg overflow-hidden flex flex-col {className}"
-		style="background: linear-gradient(135deg, oklch(0.22 0.06 200) 0%, oklch(0.18 0.04 195) 100%); border: 1px solid oklch(0.45 0.12 200);"
+		class="rounded-lg overflow-hidden flex flex-col bg-info/10 border border-info/30 {className}"
 	>
 		<!-- Header -->
 		<div
-			class="px-3 py-2 flex items-center justify-between gap-2 flex-shrink-0"
-			style="background: oklch(0.25 0.08 200); border-bottom: 1px solid oklch(0.40 0.10 200);"
+			class="px-3 py-2 flex items-center justify-between gap-2 flex-shrink-0 bg-info/20 border-b border-info/20"
 		>
 			<div class="flex items-center gap-2">
 				<!-- Starting indicator -->
 				<span class="loading loading-spinner loading-xs text-info"></span>
 
 				<!-- Agent name -->
-				<span class="font-semibold text-sm" style="color: oklch(0.95 0.08 200);">
+				<span class="font-semibold text-sm text-info">
 					{signal.agentName}
 				</span>
 
 				<!-- Project badge -->
 				<span
-					class="text-[10px] px-1.5 py-0.5 rounded font-mono"
-					style="background: oklch(0.30 0.08 145); color: oklch(0.90 0.12 145); border: 1px solid oklch(0.45 0.10 145);"
+					class="text-[10px] px-1.5 py-0.5 rounded font-mono bg-success/20 text-success border border-success/30"
 				>
 					{signal.project}
 				</span>
@@ -133,8 +128,7 @@
 
 			<!-- Model badge -->
 			<span
-				class="text-[10px] px-1.5 py-0.5 rounded font-mono"
-				style="background: {modelBadge.color}; color: oklch(0.98 0.01 250);"
+				class="text-[10px] px-1.5 py-0.5 rounded font-mono {modelBadge.colorClass}"
 			>
 				{modelBadge.icon} {modelBadge.label}
 			</span>
@@ -144,14 +138,13 @@
 		<div class="p-3 flex flex-col gap-3">
 			<!-- Session ID (copyable) -->
 			<div class="flex items-center gap-2">
-				<span class="text-[10px] font-semibold opacity-60" style="color: oklch(0.75 0.05 200);">
+				<span class="text-[10px] font-semibold opacity-60 text-base-content/60">
 					SESSION
 				</span>
 				<button
 					type="button"
 					onclick={copySessionId}
-					class="text-[11px] font-mono px-2 py-0.5 rounded hover:opacity-80 transition-opacity cursor-pointer flex items-center gap-1"
-					style="background: oklch(0.20 0.04 200); color: oklch(0.80 0.06 200); border: 1px solid oklch(0.35 0.06 200);"
+					class="text-[11px] font-mono px-2 py-0.5 rounded hover:opacity-80 transition-opacity cursor-pointer flex items-center gap-1 bg-base-300 text-base-content border border-base-content/20"
 					title="Click to copy full session ID"
 				>
 					{formatSessionId(signal.sessionId)}
@@ -169,20 +162,18 @@
 
 			<!-- Git Status -->
 			<div
-				class="flex items-center justify-between px-2 py-1.5 rounded"
-				style="background: oklch(0.18 0.02 200); border: 1px solid oklch(0.30 0.04 200);"
+				class="flex items-center justify-between px-2 py-1.5 rounded bg-base-300 border border-base-content/10"
 			>
 				<div class="flex items-center gap-2">
-					<svg class="w-4 h-4 opacity-60" style="color: oklch(0.70 0.05 200);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+					<svg class="w-4 h-4 opacity-60 text-base-content/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" />
 					</svg>
-					<span class="text-[11px] font-mono" style="color: oklch(0.85 0.06 200);">
+					<span class="text-[11px] font-mono text-base-content">
 						{signal.gitBranch}
 					</span>
 				</div>
 				<span
-					class="text-[10px] px-1.5 py-0.5 rounded font-bold"
-					style="background: {gitStatusBadge.color}20; color: {gitStatusBadge.color}; border: 1px solid {gitStatusBadge.color}40;"
+					class="text-[10px] px-1.5 py-0.5 rounded font-bold border {gitStatusBadge.colorClass}"
 				>
 					{gitStatusBadge.icon} {gitStatusBadge.label}
 				</span>
@@ -191,21 +182,20 @@
 			<!-- Uncommitted files (if dirty) -->
 			{#if signal.gitStatus === 'dirty' && signal.uncommittedFiles && signal.uncommittedFiles.length > 0}
 				<div class="flex flex-col gap-1.5">
-					<div class="text-[10px] font-semibold opacity-60" style="color: oklch(0.75 0.05 45);">
+					<div class="text-[10px] font-semibold opacity-60 text-warning">
 						⚠️ UNCOMMITTED ({signal.uncommittedFiles.length})
 					</div>
 					<div class="flex flex-wrap gap-1">
 						{#each signal.uncommittedFiles.slice(0, 5) as file}
 							<span
-								class="text-[10px] px-1.5 py-0.5 rounded font-mono truncate max-w-[200px]"
-								style="background: oklch(0.25 0.06 45); color: oklch(0.85 0.10 45); border: 1px solid oklch(0.40 0.10 45);"
+								class="text-[10px] px-1.5 py-0.5 rounded font-mono truncate max-w-[200px] bg-warning/20 text-warning border border-warning/40"
 								title={file}
 							>
 								{file}
 							</span>
 						{/each}
 						{#if signal.uncommittedFiles.length > 5}
-							<span class="text-[10px] opacity-60" style="color: oklch(0.70 0.05 45);">
+							<span class="text-[10px] opacity-60 text-warning/70">
 								+{signal.uncommittedFiles.length - 5} more
 							</span>
 						{/if}
@@ -216,24 +206,21 @@
 			<!-- Tools (collapsible) -->
 			{#if signal.tools && signal.tools.length > 0}
 				<div
-					class="rounded overflow-hidden"
-					style="background: oklch(0.20 0.04 200); border: 1px solid oklch(0.35 0.06 200);"
+					class="rounded overflow-hidden bg-base-300 border border-base-content/10"
 				>
 					<button
 						type="button"
 						onclick={() => toolsExpanded = !toolsExpanded}
-						class="w-full px-2 py-1.5 flex items-center justify-between text-left hover:opacity-90 transition-opacity"
-						style="background: oklch(0.23 0.05 200);"
+						class="w-full px-2 py-1.5 flex items-center justify-between text-left hover:opacity-90 transition-opacity bg-base-200"
 					>
 						<div class="flex items-center gap-1.5">
-							<span class="text-[10px] font-bold" style="color: oklch(0.80 0.06 200);">
+							<span class="text-[10px] font-bold text-base-content">
 								🔧 TOOLS ({signal.tools.length})
 							</span>
 						</div>
 						<svg
-							class="w-3.5 h-3.5 transition-transform duration-200"
+							class="w-3.5 h-3.5 transition-transform duration-200 text-base-content/60"
 							class:rotate-180={toolsExpanded}
-							style="color: oklch(0.70 0.05 200);"
 							fill="none"
 							viewBox="0 0 24 24"
 							stroke="currentColor"
@@ -246,8 +233,7 @@
 						<div class="px-2 py-2 flex flex-wrap gap-1">
 							{#each signal.tools as tool}
 								<span
-									class="text-[10px] px-1.5 py-0.5 rounded font-mono"
-									style="background: oklch(0.25 0.04 200); color: oklch(0.80 0.06 200); border: 1px solid oklch(0.35 0.05 200);"
+									class="text-[10px] px-1.5 py-0.5 rounded font-mono bg-base-content/10 text-base-content border border-base-content/10"
 								>
 									{tool}
 								</span>
@@ -258,9 +244,9 @@
 			{/if}
 
 			<!-- Status message -->
-			<div class="flex items-center gap-2 mt-auto pt-2" style="border-top: 1px solid oklch(0.30 0.04 200);">
+			<div class="flex items-center gap-2 mt-auto pt-2 border-t border-base-content/10">
 				<span class="loading loading-dots loading-xs text-info"></span>
-				<span class="text-[11px] opacity-70" style="color: oklch(0.80 0.05 200);">
+				<span class="text-[11px] opacity-70 text-base-content/70">
 					Initializing session...
 				</span>
 			</div>

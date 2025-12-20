@@ -91,19 +91,19 @@
 		return `${link.description} in VS Code`;
 	}
 
-	// Get question type badge info
+	// Get question type badge info - using DaisyUI semantic color classes
 	const questionTypeBadge = $derived.by(() => {
 		switch (signal.questionType) {
 			case 'choice':
-				return { label: 'CHOICE', color: 'oklch(0.55 0.18 250)', icon: '🔘' };
+				return { label: 'CHOICE', colorClass: 'bg-primary text-primary-content', icon: '🔘' };
 			case 'text':
-				return { label: 'TEXT', color: 'oklch(0.55 0.15 200)', icon: '✏️' };
+				return { label: 'TEXT', colorClass: 'bg-info text-info-content', icon: '✏️' };
 			case 'approval':
-				return { label: 'APPROVAL', color: 'oklch(0.55 0.18 145)', icon: '✅' };
+				return { label: 'APPROVAL', colorClass: 'bg-success text-success-content', icon: '✅' };
 			case 'clarification':
-				return { label: 'CLARIFY', color: 'oklch(0.55 0.18 45)', icon: '❓' };
+				return { label: 'CLARIFY', colorClass: 'bg-warning text-warning-content', icon: '❓' };
 			default:
-				return { label: 'INPUT', color: 'oklch(0.50 0.10 250)', icon: '💬' };
+				return { label: 'INPUT', colorClass: 'bg-secondary text-secondary-content', icon: '💬' };
 		}
 	});
 
@@ -122,19 +122,16 @@
 <!-- Card sizes based on content, parent container handles max-height and scrolling -->
 <!-- overflow-hidden clips any nested content that might overflow -->
 <div
-	class="rounded-lg overflow-hidden flex flex-col {className}"
-	style="background: linear-gradient(135deg, oklch(0.22 0.06 280) 0%, oklch(0.18 0.04 275) 100%); border: 1px solid oklch(0.45 0.12 280);"
+	class="rounded-lg overflow-hidden flex flex-col bg-secondary/10 border border-secondary/30 {className}"
 >
 	<!-- Header - flex-shrink-0 ensures it doesn't shrink when body scrolls -->
 	<div
-		class="px-3 py-2 flex items-center justify-between gap-2 flex-shrink-0"
-		style="background: oklch(0.25 0.08 280); border-bottom: 1px solid oklch(0.40 0.10 280);"
+		class="px-3 py-2 flex items-center justify-between gap-2 flex-shrink-0 bg-secondary/20 border-b border-secondary/20"
 	>
 		<div class="flex items-center gap-2">
 			<!-- Question type badge -->
 			<span
-				class="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold"
-				style="background: {questionTypeBadge.color}; color: oklch(0.98 0.01 250);"
+				class="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold {questionTypeBadge.colorClass}"
 			>
 				{questionTypeBadge.icon} {questionTypeBadge.label}
 			</span>
@@ -143,8 +140,7 @@
 			{#if signal.taskId}
 				<button
 					type="button"
-					class="text-[10px] px-1.5 py-0.5 rounded font-mono cursor-pointer hover:opacity-80 transition-opacity"
-					style="background: oklch(0.30 0.05 250); color: oklch(0.85 0.08 250); border: 1px solid oklch(0.40 0.08 250);"
+					class="text-[10px] px-1.5 py-0.5 rounded font-mono cursor-pointer hover:opacity-80 transition-opacity bg-base-300 text-base-content border border-base-content/20"
 					onclick={() => onTaskClick?.(signal.taskId)}
 					title="View task {signal.taskId}"
 				>
@@ -156,8 +152,7 @@
 		<!-- Timeout indicator -->
 		{#if timeoutDisplay}
 			<div
-				class="flex items-center gap-1 text-[10px]"
-				style="color: oklch(0.70 0.15 45);"
+				class="flex items-center gap-1 text-[10px] text-warning"
 				title={signal.timeoutAction || 'Will proceed automatically after timeout'}
 			>
 				<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -176,11 +171,11 @@
 	<div class="p-3 flex flex-col gap-3">
 		<!-- Question -->
 		<div class="flex flex-col gap-1">
-			<div class="text-sm font-semibold" style="color: oklch(0.95 0.08 280);">
+			<div class="text-sm font-semibold text-secondary-content">
 				{signal.question}
 			</div>
 			{#if signal.taskTitle}
-				<div class="text-[11px] opacity-70" style="color: oklch(0.80 0.05 280);">
+				<div class="text-[11px] opacity-70 text-base-content/70">
 					Task: {signal.taskTitle}
 				</div>
 			{/if}
@@ -189,8 +184,7 @@
 		<!-- Context -->
 		{#if signal.context}
 			<div
-				class="text-xs p-2 rounded"
-				style="background: oklch(0.20 0.03 280); color: oklch(0.85 0.03 280);"
+				class="text-xs p-2 rounded bg-base-300 text-base-content"
 			>
 				<div class="text-[10px] font-semibold mb-1 opacity-60">CONTEXT</div>
 				{signal.context}
@@ -200,25 +194,22 @@
 		<!-- Relevant Code (syntax highlighted) -->
 		{#if signal.relevantCode}
 			<div
-				class="rounded overflow-hidden"
-				style="background: oklch(0.15 0.02 250); border: 1px solid oklch(0.30 0.03 250);"
+				class="rounded overflow-hidden bg-base-300 border border-base-content/10"
 			>
 				<div
-					class="px-2 py-1 text-[10px] font-semibold"
-					style="background: oklch(0.18 0.02 250); color: oklch(0.70 0.02 250); border-bottom: 1px solid oklch(0.25 0.02 250);"
+					class="px-2 py-1 text-[10px] font-semibold bg-base-200 text-base-content/70 border-b border-base-content/10"
 				>
 					📄 RELATED CODE
 				</div>
 				<pre
-					class="p-2 text-[11px] overflow-x-auto"
-					style="color: oklch(0.90 0.02 250); font-family: 'JetBrains Mono', monospace;">{signal.relevantCode}</pre>
+					class="p-2 text-[11px] overflow-x-auto text-base-content font-mono">{signal.relevantCode}</pre>
 			</div>
 		{/if}
 
 		<!-- Relevant Files -->
 		{#if signal.relevantFiles && signal.relevantFiles.length > 0}
 			<div class="flex flex-col gap-1">
-				<div class="text-[10px] font-semibold opacity-60" style="color: oklch(0.75 0.03 280);">
+				<div class="text-[10px] font-semibold opacity-60 text-base-content/60">
 					RELATED FILES
 				</div>
 				<div class="flex flex-wrap gap-1">
@@ -226,8 +217,7 @@
 						<button
 							type="button"
 							onclick={() => handleFileClick(file)}
-							class="text-[11px] px-2 py-0.5 rounded hover:opacity-80 transition-opacity cursor-pointer flex items-center gap-1"
-							style="background: oklch(0.25 0.05 200); color: oklch(0.85 0.10 200); border: 1px solid oklch(0.35 0.08 200);"
+							class="text-[11px] px-2 py-0.5 rounded hover:opacity-80 transition-opacity cursor-pointer flex items-center gap-1 bg-info/20 text-info border border-info/30"
 							title={getFileTooltip(file)}
 						>
 							<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
@@ -243,7 +233,7 @@
 		<!-- Options (for choice questions) -->
 		{#if isChoiceQuestion && signal.options}
 			<div class="flex flex-col gap-2">
-				<div class="text-[10px] font-semibold opacity-60" style="color: oklch(0.75 0.03 280);">
+				<div class="text-[10px] font-semibold opacity-60 text-base-content/60">
 					SELECT AN OPTION
 				</div>
 				<div class="flex flex-col gap-1.5">
@@ -252,21 +242,17 @@
 							type="button"
 							onclick={() => handleOptionClick(option, index)}
 							disabled={submitting}
-							class="text-left p-2.5 rounded transition-all"
+							class="text-left p-2.5 rounded transition-all {option.recommended
+								? 'bg-success/20 border border-success/40'
+								: 'bg-base-300 border border-base-content/20'}"
 							class:opacity-50={submitting}
-							style="background: {option.recommended
-								? 'oklch(0.28 0.08 145)'
-								: 'oklch(0.25 0.04 280)'}; border: 1px solid {option.recommended
-								? 'oklch(0.45 0.15 145)'
-								: 'oklch(0.40 0.06 280)'};"
 						>
 							<div class="flex items-start gap-2">
 								<!-- Option indicator -->
 								<span
-									class="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5"
-									style="background: {option.recommended
-										? 'oklch(0.45 0.18 145)'
-										: 'oklch(0.35 0.05 280)'}; color: oklch(0.98 0.01 250);"
+									class="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5 {option.recommended
+										? 'bg-success text-success-content'
+										: 'bg-base-content/30 text-base-content'}"
 								>
 									{#if option.recommended}
 										<svg
@@ -290,17 +276,15 @@
 								<div class="flex-1 min-w-0">
 									<div class="flex items-center gap-2">
 										<span
-											class="text-xs font-semibold"
-											style="color: {option.recommended
-												? 'oklch(0.95 0.10 145)'
-												: 'oklch(0.90 0.05 280)'};"
+											class="text-xs font-semibold {option.recommended
+												? 'text-success'
+												: 'text-base-content'}"
 										>
 											{option.label}
 										</span>
 										{#if option.recommended}
 											<span
-												class="text-[9px] px-1 py-0.5 rounded font-bold"
-												style="background: oklch(0.50 0.18 145); color: oklch(0.98 0.01 250);"
+												class="text-[9px] px-1 py-0.5 rounded font-bold bg-success text-success-content"
 											>
 												RECOMMENDED
 											</span>
@@ -308,16 +292,14 @@
 									</div>
 									{#if option.description}
 										<div
-											class="text-[11px] mt-0.5 opacity-80"
-											style="color: oklch(0.80 0.03 280);"
+											class="text-[11px] mt-0.5 opacity-80 text-base-content/80"
 										>
 											{option.description}
 										</div>
 									{/if}
 									{#if option.tradeoffs}
 										<div
-											class="text-[10px] mt-1 italic opacity-60"
-											style="color: oklch(0.70 0.05 45);"
+											class="text-[10px] mt-1 italic opacity-60 text-warning"
 										>
 											⚖️ {option.tradeoffs}
 										</div>
@@ -333,7 +315,7 @@
 		<!-- Text Input (for text/clarification questions) -->
 		{#if isTextQuestion || isClarificationQuestion}
 			<div class="flex flex-col gap-2">
-				<div class="text-[10px] font-semibold opacity-60" style="color: oklch(0.75 0.03 280);">
+				<div class="text-[10px] font-semibold opacity-60 text-base-content/60">
 					YOUR RESPONSE
 				</div>
 				<div class="flex gap-2">
@@ -341,8 +323,7 @@
 						type="text"
 						bind:value={textInputValue}
 						placeholder="Type your response..."
-						class="input input-sm flex-1 text-xs"
-						style="background: oklch(0.18 0.02 250); border-color: oklch(0.40 0.08 280); color: oklch(0.95 0.02 250);"
+						class="input input-sm flex-1 text-xs bg-base-300 border-secondary/40 text-base-content"
 						onkeydown={(e) => {
 							if (e.key === 'Enter' && textInputValue.trim()) {
 								handleTextSubmit();
@@ -420,12 +401,10 @@
 		<!-- Impact Warning -->
 		{#if signal.impact}
 			<div
-				class="flex items-start gap-2 p-2 rounded"
-				style="background: oklch(0.25 0.10 45 / 0.3); border: 1px solid oklch(0.50 0.15 45);"
+				class="flex items-start gap-2 p-2 rounded bg-warning/20 border border-warning/50"
 			>
 				<svg
-					class="w-4 h-4 flex-shrink-0 mt-0.5"
-					style="color: oklch(0.80 0.18 45);"
+					class="w-4 h-4 flex-shrink-0 mt-0.5 text-warning"
 					fill="none"
 					viewBox="0 0 24 24"
 					stroke="currentColor"
@@ -438,8 +417,8 @@
 					/>
 				</svg>
 				<div class="flex-1 min-w-0">
-					<div class="text-[10px] font-bold mb-0.5" style="color: oklch(0.85 0.15 45);">IMPACT</div>
-					<div class="text-[11px]" style="color: oklch(0.90 0.10 45);">
+					<div class="text-[10px] font-bold mb-0.5 text-warning">IMPACT</div>
+					<div class="text-[11px] text-warning-content">
 						{signal.impact}
 					</div>
 				</div>
@@ -449,14 +428,13 @@
 		<!-- Blocking Items -->
 		{#if signal.blocking && signal.blocking.length > 0}
 			<div class="flex flex-col gap-1">
-				<div class="text-[10px] font-semibold" style="color: oklch(0.75 0.15 25);">
+				<div class="text-[10px] font-semibold text-error">
 					⛔ BLOCKED UNTIL ANSWERED
 				</div>
 				<div class="flex flex-wrap gap-1">
 					{#each signal.blocking as item}
 						<span
-							class="text-[10px] px-1.5 py-0.5 rounded"
-							style="background: oklch(0.30 0.10 25 / 0.5); color: oklch(0.85 0.10 25); border: 1px solid oklch(0.45 0.15 25);"
+							class="text-[10px] px-1.5 py-0.5 rounded bg-error/30 text-error border border-error/50"
 						>
 							{item}
 						</span>
@@ -468,8 +446,7 @@
 		<!-- Timeout Action -->
 		{#if signal.timeoutAction && signal.timeoutMinutes}
 			<div
-				class="text-[10px] p-1.5 rounded opacity-70"
-				style="background: oklch(0.22 0.04 45 / 0.3); color: oklch(0.75 0.10 45);"
+				class="text-[10px] p-1.5 rounded opacity-70 bg-warning/20 text-warning"
 			>
 				⏰ <strong>Auto-action:</strong>
 				{signal.timeoutAction}

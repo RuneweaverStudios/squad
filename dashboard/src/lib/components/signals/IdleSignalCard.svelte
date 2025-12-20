@@ -96,25 +96,24 @@
 		await onStartIdle();
 	}
 
-	// Priority badge styling
+	// Priority badge styling - using DaisyUI semantic color classes
 	function getPriorityBadge(priority?: number) {
-		if (priority === 0) return { label: 'P0', color: 'oklch(0.55 0.22 25)' };
-		if (priority === 1) return { label: 'P1', color: 'oklch(0.60 0.18 45)' };
-		if (priority === 2) return { label: 'P2', color: 'oklch(0.55 0.15 85)' };
-		if (priority === 3) return { label: 'P3', color: 'oklch(0.50 0.10 200)' };
-		return { label: 'P4', color: 'oklch(0.45 0.08 250)' };
+		if (priority === 0) return { label: 'P0', colorClass: 'bg-error text-error-content' };
+		if (priority === 1) return { label: 'P1', colorClass: 'bg-warning text-warning-content' };
+		if (priority === 2) return { label: 'P2', colorClass: 'bg-info text-info-content' };
+		if (priority === 3) return { label: 'P3', colorClass: 'bg-base-300 text-base-content' };
+		return { label: 'P4', colorClass: 'bg-base-300 text-base-content/70' };
 	}
 </script>
 
 {#if compact}
 	<!-- Compact mode: minimal idle card for timeline/inline display -->
 	<div
-		class="rounded-lg px-3 py-2 flex items-center gap-3 {className}"
-		style="background: linear-gradient(90deg, oklch(0.25 0.05 250 / 0.3) 0%, oklch(0.22 0.03 250 / 0.1) 100%); border: 1px solid oklch(0.40 0.06 250);"
+		class="rounded-lg px-3 py-2 flex items-center gap-3 bg-base-200 border border-base-content/20 {className}"
 	>
 		<!-- Status indicator -->
 		<div class="flex-shrink-0">
-			<svg class="w-4 h-4" style="color: oklch(0.65 0.08 250);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+			<svg class="w-4 h-4 text-base-content/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
 			</svg>
 		</div>
@@ -122,17 +121,16 @@
 		<!-- Status info -->
 		<div class="flex-1 min-w-0 flex items-center gap-2">
 			<span
-				class="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold"
-				style="background: oklch(0.45 0.08 250); color: oklch(0.98 0.01 250);"
+				class="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold bg-base-300 text-base-content"
 			>
 				💤 IDLE
 			</span>
 			{#if signal.blockedReason}
-				<span class="text-xs truncate" style="color: oklch(0.75 0.08 45);">
+				<span class="text-xs truncate text-warning">
 					{signal.blockedReason}
 				</span>
 			{:else if signal.readyForWork}
-				<span class="text-xs truncate" style="color: oklch(0.80 0.08 145);">
+				<span class="text-xs truncate text-success">
 					Ready for work
 				</span>
 			{/if}
@@ -144,8 +142,7 @@
 				type="button"
 				onclick={handleStartIdle}
 				disabled={submitting}
-				class="btn btn-xs gap-1"
-				style="background: oklch(0.50 0.15 250); color: oklch(0.98 0.01 250); border: none;"
+				class="btn btn-xs btn-primary gap-1"
 			>
 				{#if submitting}
 					<span class="loading loading-spinner loading-xs"></span>
@@ -163,24 +160,21 @@
 	<!-- Card sizes based on content, parent container handles max-height and scrolling -->
 	<!-- overflow-hidden clips any nested content that might overflow -->
 	<div
-		class="rounded-lg overflow-hidden flex flex-col {className}"
-		style="background: linear-gradient(135deg, oklch(0.22 0.04 250) 0%, oklch(0.18 0.03 245) 100%); border: 1px solid oklch(0.40 0.08 250);"
+		class="rounded-lg overflow-hidden flex flex-col bg-base-200 border border-base-content/20 {className}"
 	>
 		<!-- Header - flex-shrink-0 ensures it doesn't shrink when body scrolls -->
 		<div
-			class="px-3 py-2 flex items-center justify-between gap-2 flex-shrink-0"
-			style="background: oklch(0.25 0.05 250); border-bottom: 1px solid oklch(0.35 0.06 250);"
+			class="px-3 py-2 flex items-center justify-between gap-2 flex-shrink-0 bg-base-300 border-b border-base-content/10"
 		>
 			<div class="flex items-center gap-2">
 				<!-- Idle indicator -->
-				<svg class="w-4 h-4" style="color: oklch(0.65 0.08 250);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+				<svg class="w-4 h-4 text-base-content/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
 				</svg>
 
 				<!-- Badge -->
 				<span
-					class="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold"
-					style="background: oklch(0.45 0.08 250); color: oklch(0.98 0.01 250);"
+					class="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold bg-base-content/20 text-base-content"
 				>
 					💤 IDLE
 				</span>
@@ -189,15 +183,13 @@
 			<!-- Status badge -->
 			{#if signal.readyForWork}
 				<span
-					class="text-[10px] px-1.5 py-0.5 rounded"
-					style="background: oklch(0.25 0.08 145 / 0.3); color: oklch(0.80 0.12 145); border: 1px solid oklch(0.45 0.12 145);"
+					class="text-[10px] px-1.5 py-0.5 rounded bg-success/20 text-success border border-success/40"
 				>
 					Ready
 				</span>
 			{:else}
 				<span
-					class="text-[10px] px-1.5 py-0.5 rounded"
-					style="background: oklch(0.25 0.08 45 / 0.3); color: oklch(0.80 0.12 45); border: 1px solid oklch(0.45 0.12 45);"
+					class="text-[10px] px-1.5 py-0.5 rounded bg-warning/20 text-warning border border-warning/40"
 				>
 					Blocked
 				</span>
@@ -209,15 +201,14 @@
 			<!-- Blocked Reason -->
 			{#if signal.blockedReason}
 				<div
-					class="flex items-start gap-2 p-2 rounded"
-					style="background: oklch(0.25 0.08 45 / 0.2); border: 1px solid oklch(0.45 0.12 45);"
+					class="flex items-start gap-2 p-2 rounded bg-warning/20 border border-warning/50"
 				>
-					<svg class="w-4 h-4 flex-shrink-0 mt-0.5" style="color: oklch(0.80 0.15 45);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+					<svg class="w-4 h-4 flex-shrink-0 mt-0.5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
 					</svg>
 					<div class="flex-1 min-w-0">
-						<div class="text-[10px] font-bold mb-0.5" style="color: oklch(0.85 0.12 45);">BLOCKED</div>
-						<div class="text-xs" style="color: oklch(0.90 0.08 45);">
+						<div class="text-[10px] font-bold mb-0.5 text-warning">BLOCKED</div>
+						<div class="text-xs text-warning-content">
 							{signal.blockedReason}
 						</div>
 					</div>
@@ -227,47 +218,43 @@
 			<!-- Session Summary -->
 			{#if signal.sessionSummary}
 				<div class="flex flex-col gap-1.5">
-					<div class="text-[10px] font-semibold opacity-70" style="color: oklch(0.75 0.05 250);">
+					<div class="text-[10px] font-semibold text-base-content/60">
 						📊 SESSION SUMMARY
 					</div>
 					<div class="grid grid-cols-2 gap-2">
 						<!-- Tasks Completed -->
 						<div
-							class="px-2 py-1.5 rounded"
-							style="background: oklch(0.20 0.03 250); border: 1px solid oklch(0.30 0.04 250);"
+							class="px-2 py-1.5 rounded bg-base-300 border border-base-content/10"
 						>
-							<div class="text-[10px] opacity-60" style="color: oklch(0.70 0.03 250);">Tasks</div>
-							<div class="text-sm font-bold" style="color: oklch(0.90 0.08 145);">
+							<div class="text-[10px] text-base-content/50">Tasks</div>
+							<div class="text-sm font-bold text-success">
 								{signal.sessionSummary.tasksCompleted.length}
 							</div>
 						</div>
 						<!-- Duration -->
 						<div
-							class="px-2 py-1.5 rounded"
-							style="background: oklch(0.20 0.03 250); border: 1px solid oklch(0.30 0.04 250);"
+							class="px-2 py-1.5 rounded bg-base-300 border border-base-content/10"
 						>
-							<div class="text-[10px] opacity-60" style="color: oklch(0.70 0.03 250);">Duration</div>
-							<div class="text-sm font-bold" style="color: oklch(0.90 0.05 250);">
+							<div class="text-[10px] text-base-content/50">Duration</div>
+							<div class="text-sm font-bold text-base-content">
 								{formatDuration(signal.sessionSummary.totalDuration)}
 							</div>
 						</div>
 						<!-- Tokens Used -->
 						<div
-							class="px-2 py-1.5 rounded"
-							style="background: oklch(0.20 0.03 250); border: 1px solid oklch(0.30 0.04 250);"
+							class="px-2 py-1.5 rounded bg-base-300 border border-base-content/10"
 						>
-							<div class="text-[10px] opacity-60" style="color: oklch(0.70 0.03 250);">Tokens</div>
-							<div class="text-sm font-bold" style="color: oklch(0.90 0.05 250);">
+							<div class="text-[10px] text-base-content/50">Tokens</div>
+							<div class="text-sm font-bold text-base-content">
 								{formatTokens(signal.sessionSummary.tokensUsed)}
 							</div>
 						</div>
 						<!-- Files Modified -->
 						<div
-							class="px-2 py-1.5 rounded"
-							style="background: oklch(0.20 0.03 250); border: 1px solid oklch(0.30 0.04 250);"
+							class="px-2 py-1.5 rounded bg-base-300 border border-base-content/10"
 						>
-							<div class="text-[10px] opacity-60" style="color: oklch(0.70 0.03 250);">Files</div>
-							<div class="text-sm font-bold" style="color: oklch(0.90 0.05 250);">
+							<div class="text-[10px] text-base-content/50">Files</div>
+							<div class="text-sm font-bold text-base-content">
 								{signal.sessionSummary.filesModified}
 							</div>
 						</div>
@@ -279,8 +266,7 @@
 								<button
 									type="button"
 									onclick={() => onTaskClick?.(taskId)}
-									class="text-[10px] px-1.5 py-0.5 rounded font-mono hover:opacity-80 transition-opacity cursor-pointer"
-									style="background: oklch(0.28 0.08 145); color: oklch(0.85 0.10 145); border: 1px solid oklch(0.40 0.10 145);"
+									class="text-[10px] px-1.5 py-0.5 rounded font-mono hover:opacity-80 transition-opacity cursor-pointer bg-success/20 text-success border border-success/30"
 									title="View completed task {taskId}"
 								>
 									✓ {taskId}
@@ -294,14 +280,12 @@
 			<!-- Suggested Next Task -->
 			{#if signal.suggestedNextTask && signal.readyForWork}
 				<div
-					class="rounded overflow-hidden"
-					style="background: oklch(0.20 0.05 200); border: 1px solid oklch(0.38 0.10 200);"
+					class="rounded overflow-hidden bg-info/10 border border-info/30"
 				>
 					<div
-						class="px-2 py-1.5"
-						style="background: oklch(0.23 0.06 200); border-bottom: 1px solid oklch(0.35 0.08 200);"
+						class="px-2 py-1.5 bg-info/20 border-b border-info/20"
 					>
-						<div class="text-[10px] font-bold" style="color: oklch(0.80 0.10 200);">
+						<div class="text-[10px] font-bold text-info">
 							✨ SUGGESTED NEXT
 						</div>
 					</div>
@@ -311,13 +295,12 @@
 								<button
 									type="button"
 									onclick={() => onTaskClick?.(signal.suggestedNextTask!.taskId)}
-									class="text-xs font-mono px-1.5 py-0.5 rounded hover:opacity-80 transition-opacity cursor-pointer mb-1"
-									style="background: oklch(0.28 0.06 200); color: oklch(0.88 0.10 200); border: 1px solid oklch(0.38 0.10 200);"
+									class="text-xs font-mono px-1.5 py-0.5 rounded hover:opacity-80 transition-opacity cursor-pointer mb-1 bg-info/20 text-info border border-info/30"
 									title="View task {signal.suggestedNextTask.taskId}"
 								>
 									{signal.suggestedNextTask.taskId}
 								</button>
-								<div class="text-xs font-semibold" style="color: oklch(0.92 0.06 200);">
+								<div class="text-xs font-semibold text-info-content">
 									{signal.suggestedNextTask.title}
 								</div>
 							</div>
@@ -326,8 +309,7 @@
 									type="button"
 									onclick={handleStartSuggested}
 									disabled={submitting}
-									class="btn btn-xs gap-1 flex-shrink-0"
-									style="background: oklch(0.50 0.15 200); color: oklch(0.98 0.01 250); border: none;"
+									class="btn btn-xs btn-info gap-1 flex-shrink-0"
 									title="Start working on {signal.suggestedNextTask.taskId}"
 								>
 									{#if submitting}
@@ -342,7 +324,7 @@
 							{/if}
 						</div>
 						{#if signal.suggestedNextTask.reason}
-							<div class="text-[11px] opacity-80" style="color: oklch(0.80 0.05 200);">
+							<div class="text-[11px] opacity-80 text-info-content/80">
 								💡 {signal.suggestedNextTask.reason}
 							</div>
 						{/if}
@@ -353,14 +335,13 @@
 			<!-- Assign Task Dropdown -->
 			{#if signal.readyForWork && availableTasks.length > 0}
 				<div class="flex flex-col gap-1.5">
-					<div class="text-[10px] font-semibold opacity-70" style="color: oklch(0.75 0.05 250);">
+					<div class="text-[10px] font-semibold text-base-content/60">
 						📋 ASSIGN TASK
 					</div>
 					<div class="flex gap-2">
 						<select
 							bind:value={selectedTaskId}
-							class="select select-sm flex-1 text-xs"
-							style="background: oklch(0.18 0.02 250); border-color: oklch(0.35 0.05 250); color: oklch(0.90 0.02 250);"
+							class="select select-sm flex-1 text-xs bg-base-300 border-base-content/20 text-base-content"
 							disabled={submitting}
 						>
 							<option value={null}>Select a task...</option>
@@ -375,8 +356,7 @@
 							type="button"
 							onclick={handleAssignTask}
 							disabled={submitting || !selectedTaskId}
-							class="btn btn-sm gap-1"
-							style="background: oklch(0.50 0.15 250); color: oklch(0.98 0.01 250); border: none;"
+							class="btn btn-sm btn-primary gap-1"
 							title={selectedTaskId ? `Start working on ${selectedTaskId}` : 'Select a task first'}
 						>
 							{#if submitting}
@@ -394,13 +374,12 @@
 
 			<!-- Start Idle Action (if no suggested task and ready for work) -->
 			{#if signal.readyForWork && !signal.suggestedNextTask && onStartIdle}
-				<div class="pt-2 border-t" style="border-color: oklch(0.35 0.05 250);">
+				<div class="pt-2 border-t border-base-content/10">
 					<button
 						type="button"
 						onclick={handleStartIdle}
 						disabled={submitting}
-						class="btn btn-sm w-full gap-1"
-						style="background: oklch(0.45 0.12 250); color: oklch(0.98 0.01 250); border: none;"
+						class="btn btn-sm btn-primary w-full gap-1"
 						title="Start agent to pick a task"
 					>
 						{#if submitting}

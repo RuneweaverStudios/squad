@@ -73,45 +73,45 @@
 	let questionText = $state('');
 	let checkedReviewItems = $state<Set<number>>(new Set());
 
-	// Tests status badge styling
+	// Tests status badge styling - using DaisyUI semantic color classes
 	const testsStatusBadge = $derived.by(() => {
 		switch (signal.testsStatus) {
 			case 'passing':
-				return { label: 'PASSING', color: 'oklch(0.55 0.18 145)', icon: '✅', bgColor: 'oklch(0.25 0.10 145 / 0.3)' };
+				return { label: 'PASSING', colorClass: 'text-success', icon: '✅', bgClass: 'bg-success/20' };
 			case 'failing':
-				return { label: 'FAILING', color: 'oklch(0.55 0.22 25)', icon: '❌', bgColor: 'oklch(0.25 0.12 25 / 0.3)' };
+				return { label: 'FAILING', colorClass: 'text-error', icon: '❌', bgClass: 'bg-error/20' };
 			case 'skipped':
-				return { label: 'SKIPPED', color: 'oklch(0.55 0.15 45)', icon: '⏭️', bgColor: 'oklch(0.25 0.08 45 / 0.3)' };
+				return { label: 'SKIPPED', colorClass: 'text-warning', icon: '⏭️', bgClass: 'bg-warning/20' };
 			case 'none':
 			default:
-				return { label: 'NO TESTS', color: 'oklch(0.50 0.08 250)', icon: '➖', bgColor: 'oklch(0.25 0.04 250 / 0.3)' };
+				return { label: 'NO TESTS', colorClass: 'text-base-content/50', icon: '➖', bgClass: 'bg-base-300/30' };
 		}
 	});
 
-	// Build status badge styling
+	// Build status badge styling - using DaisyUI semantic color classes
 	const buildStatusBadge = $derived.by(() => {
 		switch (signal.buildStatus) {
 			case 'clean':
-				return { label: 'CLEAN', color: 'oklch(0.55 0.18 145)', icon: '✅', bgColor: 'oklch(0.25 0.10 145 / 0.3)' };
+				return { label: 'CLEAN', colorClass: 'text-success', icon: '✅', bgClass: 'bg-success/20' };
 			case 'warnings':
-				return { label: 'WARNINGS', color: 'oklch(0.55 0.18 45)', icon: '⚠️', bgColor: 'oklch(0.25 0.10 45 / 0.3)' };
+				return { label: 'WARNINGS', colorClass: 'text-warning', icon: '⚠️', bgClass: 'bg-warning/20' };
 			case 'errors':
-				return { label: 'ERRORS', color: 'oklch(0.55 0.22 25)', icon: '❌', bgColor: 'oklch(0.25 0.12 25 / 0.3)' };
+				return { label: 'ERRORS', colorClass: 'text-error', icon: '❌', bgClass: 'bg-error/20' };
 			default:
-				return { label: 'UNKNOWN', color: 'oklch(0.50 0.08 250)', icon: '❓', bgColor: 'oklch(0.25 0.04 250 / 0.3)' };
+				return { label: 'UNKNOWN', colorClass: 'text-base-content/50', icon: '❓', bgClass: 'bg-base-300/30' };
 		}
 	});
 
-	// Change type icon and color
+	// Change type icon and color - using DaisyUI semantic classes
 	function getChangeTypeStyle(changeType: string) {
 		switch (changeType) {
 			case 'added':
-				return { icon: '+', color: 'oklch(0.65 0.20 145)', label: 'NEW' };
+				return { icon: '+', colorClass: 'bg-success text-success-content', label: 'NEW' };
 			case 'deleted':
-				return { icon: '-', color: 'oklch(0.65 0.20 25)', label: 'DEL' };
+				return { icon: '-', colorClass: 'bg-error text-error-content', label: 'DEL' };
 			case 'modified':
 			default:
-				return { icon: '~', color: 'oklch(0.65 0.15 85)', label: 'MOD' };
+				return { icon: '~', colorClass: 'bg-warning text-warning-content', label: 'MOD' };
 		}
 	}
 
@@ -298,12 +298,11 @@
 {#if compact}
 	<!-- Compact mode: minimal review card for timeline/inline display -->
 	<div
-		class="rounded-lg px-3 py-2 flex items-center gap-3 {className}"
-		style="background: linear-gradient(90deg, oklch(0.25 0.10 200 / 0.3) 0%, oklch(0.22 0.05 200 / 0.1) 100%); border: 1px solid oklch(0.45 0.12 200);"
+		class="rounded-lg px-3 py-2 flex items-center gap-3 bg-info/10 border border-info/30 {className}"
 	>
 		<!-- Status indicator -->
 		<div class="flex-shrink-0">
-			<svg class="w-4 h-4" style="color: oklch(0.75 0.15 200);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+			<svg class="w-4 h-4 text-info" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
 				<path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
 			</svg>
@@ -313,14 +312,13 @@
 		<div class="flex-1 min-w-0 flex items-center gap-2">
 			<button
 				type="button"
-				class="text-xs font-mono px-1.5 py-0.5 rounded hover:opacity-80 transition-opacity cursor-pointer"
-				style="background: oklch(0.30 0.08 200); color: oklch(0.90 0.12 200); border: 1px solid oklch(0.45 0.10 200);"
+				class="text-xs font-mono px-1.5 py-0.5 rounded bg-base-300 text-info border border-info/30 hover:opacity-80 transition-opacity cursor-pointer"
 				onclick={() => onTaskClick?.(signal.taskId)}
 				title="View task {signal.taskId}"
 			>
 				{signal.taskId}
 			</button>
-			<span class="text-sm truncate" style="color: oklch(0.90 0.05 200);">
+			<span class="text-sm truncate text-base-content/90">
 				Ready for review
 			</span>
 		</div>
@@ -328,14 +326,12 @@
 		<!-- Quality badges -->
 		<div class="flex items-center gap-1.5 flex-shrink-0">
 			<span
-				class="text-[10px] px-1.5 py-0.5 rounded font-mono"
-				style="background: {testsStatusBadge.bgColor}; color: {testsStatusBadge.color};"
+				class="text-[10px] px-1.5 py-0.5 rounded font-mono {testsStatusBadge.bgClass} {testsStatusBadge.colorClass}"
 			>
 				{testsStatusBadge.icon}
 			</span>
 			<span
-				class="text-[10px] px-1.5 py-0.5 rounded font-mono"
-				style="background: {buildStatusBadge.bgColor}; color: {buildStatusBadge.color};"
+				class="text-[10px] px-1.5 py-0.5 rounded font-mono {buildStatusBadge.bgClass} {buildStatusBadge.colorClass}"
 			>
 				{buildStatusBadge.icon}
 			</span>
@@ -345,34 +341,28 @@
 	<!-- Full mode: detailed review signal card -->
 	<!-- Card sizes based on content, parent container handles max-height and scrolling -->
 	<div
-		class="rounded-lg overflow-hidden flex flex-col {className}"
-		style="background: linear-gradient(135deg, oklch(0.22 0.06 200) 0%, oklch(0.18 0.04 195) 100%); border: 1px solid oklch(0.45 0.12 200);"
+		class="rounded-lg overflow-hidden flex flex-col bg-base-200 border border-info/40 {className}"
 	>
 		<!-- Header - flex-shrink-0 ensures it doesn't shrink when body scrolls -->
 		<div
-			class="px-3 py-2 flex items-center justify-between gap-2 flex-shrink-0"
-			style="background: oklch(0.25 0.08 200); border-bottom: 1px solid oklch(0.40 0.10 200);"
+			class="px-3 py-2 flex items-center justify-between gap-2 flex-shrink-0 bg-base-300 border-b border-info/30"
 		>
 			<div class="flex items-center gap-2">
 				<!-- Review indicator -->
-				<svg class="w-4 h-4" style="color: oklch(0.75 0.15 200);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+				<svg class="w-4 h-4 text-info" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
 					<path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
 				</svg>
 
 				<!-- Badge -->
-				<span
-					class="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold"
-					style="background: oklch(0.55 0.15 200); color: oklch(0.98 0.01 250);"
-				>
+				<span class="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold bg-info text-info-content">
 					👁️ REVIEW
 				</span>
 
 				<!-- Task ID -->
 				<button
 					type="button"
-					class="text-[10px] px-1.5 py-0.5 rounded font-mono cursor-pointer hover:opacity-80 transition-opacity"
-					style="background: oklch(0.30 0.05 200); color: oklch(0.85 0.08 200); border: 1px solid oklch(0.40 0.08 200);"
+					class="text-[10px] px-1.5 py-0.5 rounded font-mono cursor-pointer hover:opacity-80 transition-opacity bg-base-100 text-info border border-info/30"
 					onclick={() => onTaskClick?.(signal.taskId)}
 					title="View task {signal.taskId}"
 				>
@@ -384,8 +374,7 @@
 			<div class="flex items-center gap-1.5">
 				<!-- Tests badge -->
 				<span
-					class="text-[10px] px-1.5 py-0.5 rounded font-mono flex items-center gap-1"
-					style="background: {testsStatusBadge.bgColor}; color: {testsStatusBadge.color}; border: 1px solid {testsStatusBadge.color};"
+					class="text-[10px] px-1.5 py-0.5 rounded font-mono flex items-center gap-1 {testsStatusBadge.bgClass} {testsStatusBadge.colorClass} border border-current/30"
 					title="Tests: {testsStatusBadge.label}{signal.testsRun ? ` (${signal.testsPassed}/${signal.testsRun})` : ''}"
 				>
 					{testsStatusBadge.icon}
@@ -394,8 +383,7 @@
 
 				<!-- Build badge -->
 				<span
-					class="text-[10px] px-1.5 py-0.5 rounded font-mono flex items-center gap-1"
-					style="background: {buildStatusBadge.bgColor}; color: {buildStatusBadge.color}; border: 1px solid {buildStatusBadge.color};"
+					class="text-[10px] px-1.5 py-0.5 rounded font-mono flex items-center gap-1 {buildStatusBadge.bgClass} {buildStatusBadge.colorClass} border border-current/30"
 					title="Build: {buildStatusBadge.label}"
 				>
 					{buildStatusBadge.icon}
@@ -408,7 +396,7 @@
 		<div class="p-3 flex flex-col gap-3">
 			<!-- Task Title -->
 			{#if signal.taskTitle}
-				<div class="text-sm font-semibold" style="color: oklch(0.95 0.08 200);">
+				<div class="text-sm font-semibold text-base-content">
 					{signal.taskTitle}
 				</div>
 			{/if}
@@ -416,13 +404,13 @@
 			<!-- Summary Bullets -->
 			{#if signal.summary && signal.summary.length > 0}
 				<div class="flex flex-col gap-1.5">
-					<div class="text-[10px] font-semibold opacity-70" style="color: oklch(0.75 0.05 200);">
+					<div class="text-[10px] font-semibold text-base-content/70">
 						📋 SUMMARY
 					</div>
 					<ul class="flex flex-col gap-1">
 						{#each signal.summary as item}
-							<li class="flex items-start gap-2 text-xs" style="color: oklch(0.90 0.04 200);">
-								<span style="color: oklch(0.65 0.15 145);">✓</span>
+							<li class="flex items-start gap-2 text-xs text-base-content/90">
+								<span class="text-success">✓</span>
 								<span>{item}</span>
 							</li>
 						{/each}
@@ -432,10 +420,7 @@
 
 			<!-- Approach (if different from summary) -->
 			{#if signal.approach}
-				<div
-					class="text-xs p-2 rounded"
-					style="background: oklch(0.20 0.03 200); color: oklch(0.85 0.03 200);"
-				>
+				<div class="text-xs p-2 rounded bg-base-100 text-base-content/85">
 					<div class="text-[10px] font-semibold mb-1 opacity-60">🎯 APPROACH</div>
 					{signal.approach}
 				</div>
@@ -446,7 +431,7 @@
 				<div class="flex flex-col gap-1.5">
 					<div class="flex items-center justify-between">
 						<div class="flex items-center gap-2">
-							<div class="text-[10px] font-semibold opacity-70" style="color: oklch(0.75 0.05 200);">
+							<div class="text-[10px] font-semibold text-base-content/70">
 								📁 FILES MODIFIED ({signal.filesModified.length})
 							</div>
 							<!-- Open All Links button -->
@@ -454,8 +439,7 @@
 								<button
 									type="button"
 									onclick={openAllLinks}
-									class="text-[9px] px-1.5 py-0.5 rounded hover:opacity-80 transition-opacity flex items-center gap-1"
-									style="background: oklch(0.35 0.12 145); color: oklch(0.95 0.05 145); border: 1px solid oklch(0.45 0.12 145);"
+									class="text-[9px] px-1.5 py-0.5 rounded hover:opacity-80 transition-opacity flex items-center gap-1 bg-success/30 text-success border border-success/40"
 									title="Open all files and routes ({allLinks.length} links)"
 								>
 									<svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -465,10 +449,10 @@
 								</button>
 							{/if}
 						</div>
-						<div class="text-[10px] font-mono" style="color: oklch(0.70 0.08 145);">
-							<span style="color: oklch(0.70 0.15 145);">+{signal.totalLinesAdded || 0}</span>
+						<div class="text-[10px] font-mono">
+							<span class="text-success">+{signal.totalLinesAdded || 0}</span>
 							<span class="opacity-50">/</span>
-							<span style="color: oklch(0.70 0.15 25);">-{signal.totalLinesRemoved || 0}</span>
+							<span class="text-error">-{signal.totalLinesRemoved || 0}</span>
 						</div>
 					</div>
 					<div class="flex flex-col gap-1 max-h-48 overflow-y-auto">
@@ -476,13 +460,11 @@
 							{@const style = getChangeTypeStyle(file.changeType)}
 							{@const localhostRoute = getLocalhostRoute(file)}
 							<div
-								class="flex items-center gap-2 px-2 py-1.5 rounded text-[11px]"
-								style="background: oklch(0.20 0.03 200); border: 1px solid oklch(0.32 0.05 200);"
+								class="flex items-center gap-2 px-2 py-1.5 rounded text-[11px] bg-base-100 border border-base-300"
 							>
 								<!-- Change type indicator -->
 								<span
-									class="w-5 h-5 flex items-center justify-center rounded text-[10px] font-bold"
-									style="background: {style.color}; color: oklch(0.98 0.01 250);"
+									class="w-5 h-5 flex items-center justify-center rounded text-[10px] font-bold {style.colorClass}"
 									title={style.label}
 								>
 									{style.icon}
@@ -492,15 +474,14 @@
 								<button
 									type="button"
 									onclick={() => handleFileClick(file)}
-									class="flex-1 text-left truncate hover:opacity-80 transition-opacity cursor-pointer font-mono"
-									style="color: oklch(0.88 0.08 200);"
+									class="flex-1 text-left truncate hover:opacity-80 transition-opacity cursor-pointer font-mono text-info"
 									title={getFileTooltip(file)}
 								>
 									{file.path}
 								</button>
 
 								<!-- Lines changed -->
-								<span class="text-[10px] font-mono flex-shrink-0" style="color: oklch(0.65 0.06 200);">
+								<span class="text-[10px] font-mono flex-shrink-0 text-base-content/60">
 									{formatLinesChanged(file.linesAdded, file.linesRemoved)}
 								</span>
 
@@ -509,8 +490,7 @@
 									<button
 										type="button"
 										onclick={() => handleLocalhostClick(localhostRoute)}
-										class="flex-shrink-0 px-1.5 py-0.5 rounded hover:opacity-80 transition-opacity"
-										style="background: oklch(0.28 0.08 145); color: oklch(0.85 0.12 145); border: 1px solid oklch(0.40 0.10 145);"
+										class="flex-shrink-0 px-1.5 py-0.5 rounded hover:opacity-80 transition-opacity bg-success/20 text-success border border-success/30"
 										title="Open {localhostRoute} in browser"
 									>
 										<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -523,8 +503,7 @@
 								<button
 									type="button"
 									onclick={() => handleDiffClick(file)}
-									class="flex-shrink-0 px-1.5 py-0.5 rounded hover:opacity-80 transition-opacity"
-									style="background: oklch(0.28 0.06 250); color: oklch(0.80 0.10 250); border: 1px solid oklch(0.38 0.08 250);"
+									class="flex-shrink-0 px-1.5 py-0.5 rounded hover:opacity-80 transition-opacity bg-primary/20 text-primary border border-primary/30"
 									title={getDiffTooltip(file)}
 								>
 									<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -539,25 +518,20 @@
 
 			<!-- Key Decisions (expandable) -->
 			{#if signal.keyDecisions && signal.keyDecisions.length > 0}
-				<div
-					class="rounded overflow-hidden"
-					style="background: oklch(0.20 0.04 200); border: 1px solid oklch(0.35 0.06 200);"
-				>
+				<div class="rounded overflow-hidden bg-base-100 border border-base-300">
 					<button
 						type="button"
 						onclick={() => decisionsExpanded = !decisionsExpanded}
-						class="w-full px-2 py-1.5 flex items-center justify-between text-left hover:opacity-90 transition-opacity"
-						style="background: oklch(0.23 0.05 200);"
+						class="w-full px-2 py-1.5 flex items-center justify-between text-left hover:opacity-90 transition-opacity bg-base-200"
 					>
 						<div class="flex items-center gap-1.5">
-							<span class="text-[10px] font-bold" style="color: oklch(0.80 0.08 200);">
+							<span class="text-[10px] font-bold text-info">
 								🤔 KEY DECISIONS ({signal.keyDecisions.length})
 							</span>
 						</div>
 						<svg
-							class="w-3.5 h-3.5 transition-transform duration-200"
+							class="w-3.5 h-3.5 transition-transform duration-200 text-base-content/60"
 							class:rotate-180={decisionsExpanded}
-							style="color: oklch(0.70 0.05 200);"
 							fill="none"
 							viewBox="0 0 24 24"
 							stroke="currentColor"
@@ -569,14 +543,11 @@
 					{#if decisionsExpanded}
 						<div class="p-2 flex flex-col gap-2">
 							{#each signal.keyDecisions as decision, i}
-								<div
-									class="p-2 rounded"
-									style="background: oklch(0.18 0.02 200); border-left: 2px solid oklch(0.50 0.12 200);"
-								>
-									<div class="text-xs font-semibold mb-1" style="color: oklch(0.90 0.06 200);">
+								<div class="p-2 rounded bg-base-300/50 border-l-2 border-info">
+									<div class="text-xs font-semibold mb-1 text-base-content">
 										{decision.decision}
 									</div>
-									<div class="text-[11px] opacity-80" style="color: oklch(0.80 0.03 200);">
+									<div class="text-[11px] text-base-content/70">
 										<span class="font-semibold opacity-60">Why:</span> {decision.rationale}
 									</div>
 								</div>
@@ -590,10 +561,10 @@
 			{#if signal.reviewFocus && signal.reviewFocus.length > 0}
 				<div class="flex flex-col gap-1.5">
 					<div class="flex items-center justify-between">
-						<div class="text-[10px] font-semibold opacity-70" style="color: oklch(0.75 0.05 200);">
+						<div class="text-[10px] font-semibold text-base-content/70">
 							🎯 REVIEW FOCUS
 						</div>
-						<div class="text-[10px]" style="color: oklch(0.70 0.10 {reviewProgress === 100 ? '145' : '200'});">
+						<div class="text-[10px] {reviewProgress === 100 ? 'text-success' : 'text-info'}">
 							{checkedReviewItems.size}/{signal.reviewFocus.length} checked
 						</div>
 					</div>
@@ -604,20 +575,19 @@
 							{@const hasFileLink = !!focusItem?.filePath}
 							{@const hasLocalhostLink = !!focusItem?.localhostRoute || (focusItem?.filePath && detectRouteFromPath(focusItem.filePath))}
 							{@const localhostRoute = focusItem?.localhostRoute || (focusItem?.filePath ? detectRouteFromPath(focusItem.filePath) : null)}
+							{@const isChecked = checkedReviewItems.has(index)}
 							<div
-								class="flex items-start gap-2 p-2 rounded text-left transition-all"
-								style="background: {checkedReviewItems.has(index) ? 'oklch(0.22 0.06 145 / 0.3)' : 'oklch(0.20 0.03 200)'}; border: 1px solid {checkedReviewItems.has(index) ? 'oklch(0.45 0.12 145)' : 'oklch(0.32 0.05 200)'};"
+								class="flex items-start gap-2 p-2 rounded text-left transition-all {isChecked ? 'bg-success/20 border border-success/40' : 'bg-base-100 border border-base-300'}"
 							>
 								<!-- Checkbox (clickable) -->
 								<button
 									type="button"
 									onclick={() => toggleReviewItem(index)}
-									class="w-4 h-4 flex items-center justify-center rounded flex-shrink-0 mt-0.5 hover:opacity-80 transition-opacity cursor-pointer"
-									style="background: {checkedReviewItems.has(index) ? 'oklch(0.50 0.18 145)' : 'oklch(0.30 0.04 200)'}; border: 1px solid {checkedReviewItems.has(index) ? 'oklch(0.55 0.18 145)' : 'oklch(0.40 0.06 200)'};"
+									class="w-4 h-4 flex items-center justify-center rounded flex-shrink-0 mt-0.5 hover:opacity-80 transition-opacity cursor-pointer {isChecked ? 'bg-success border border-success' : 'bg-base-200 border border-base-content/30'}"
 									title="Mark as reviewed"
 								>
-									{#if checkedReviewItems.has(index)}
-										<svg class="w-2.5 h-2.5" style="color: oklch(0.98 0.01 250);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+									{#if isChecked}
+										<svg class="w-2.5 h-2.5 text-success-content" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
 											<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 										</svg>
 									{/if}
@@ -625,10 +595,9 @@
 
 								<!-- Review focus text -->
 								<span
-									class="text-xs flex-1"
-									class:line-through={checkedReviewItems.has(index)}
-									class:opacity-60={checkedReviewItems.has(index)}
-									style="color: oklch(0.88 0.04 200);"
+									class="text-xs flex-1 text-base-content/90"
+									class:line-through={isChecked}
+									class:opacity-60={isChecked}
 								>
 									{itemText}
 								</span>
@@ -641,8 +610,7 @@
 											<button
 												type="button"
 												onclick={() => openInVSCode(focusItem.filePath!, { line: focusItem.line })}
-												class="px-1 py-0.5 rounded hover:opacity-80 transition-opacity"
-												style="background: oklch(0.28 0.06 250); color: oklch(0.80 0.10 250); border: 1px solid oklch(0.38 0.08 250);"
+												class="px-1 py-0.5 rounded hover:opacity-80 transition-opacity bg-primary/20 text-primary border border-primary/30"
 												title="Open {focusItem.filePath}{focusItem.line ? `:${focusItem.line}` : ''} in VS Code"
 											>
 												<svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -656,8 +624,7 @@
 											<button
 												type="button"
 												onclick={() => handleLocalhostClick(localhostRoute)}
-												class="px-1 py-0.5 rounded hover:opacity-80 transition-opacity"
-												style="background: oklch(0.28 0.08 145); color: oklch(0.85 0.12 145); border: 1px solid oklch(0.40 0.10 145);"
+												class="px-1 py-0.5 rounded hover:opacity-80 transition-opacity bg-success/20 text-success border border-success/30"
 												title="Open {localhostRoute} in browser"
 											>
 												<svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -675,14 +642,11 @@
 
 			<!-- Known Limitations -->
 			{#if signal.knownLimitations && signal.knownLimitations.length > 0}
-				<div
-					class="flex flex-col gap-1.5 p-2 rounded"
-					style="background: oklch(0.25 0.08 45 / 0.2); border: 1px solid oklch(0.45 0.12 45);"
-				>
-					<div class="text-[10px] font-bold" style="color: oklch(0.80 0.12 45);">
+				<div class="flex flex-col gap-1.5 p-2 rounded bg-warning/20 border border-warning/40">
+					<div class="text-[10px] font-bold text-warning">
 						⚠️ KNOWN LIMITATIONS
 					</div>
-					<ul class="text-[11px] list-disc list-inside" style="color: oklch(0.85 0.06 45);">
+					<ul class="text-[11px] list-disc list-inside text-warning-content">
 						{#each signal.knownLimitations as limitation}
 							<li>{limitation}</li>
 						{/each}
@@ -692,14 +656,11 @@
 
 			<!-- Build Warnings -->
 			{#if signal.buildWarnings && signal.buildWarnings.length > 0}
-				<div
-					class="flex flex-col gap-1 p-2 rounded"
-					style="background: oklch(0.22 0.06 45 / 0.3); border: 1px solid oklch(0.45 0.12 45);"
-				>
-					<div class="text-[10px] font-bold" style="color: oklch(0.80 0.12 45);">
+				<div class="flex flex-col gap-1 p-2 rounded bg-warning/25 border border-warning/40">
+					<div class="text-[10px] font-bold text-warning">
 						⚠️ BUILD WARNINGS
 					</div>
-					<div class="text-[10px] font-mono max-h-24 overflow-y-auto" style="color: oklch(0.80 0.08 45);">
+					<div class="text-[10px] font-mono max-h-24 overflow-y-auto text-warning-content/80">
 						{#each signal.buildWarnings as warning}
 							<div class="py-0.5">{warning}</div>
 						{/each}
@@ -710,20 +671,19 @@
 			<!-- Commits -->
 			{#if signal.commits && signal.commits.length > 0}
 				<div class="flex flex-col gap-1.5">
-					<div class="text-[10px] font-semibold opacity-70" style="color: oklch(0.75 0.05 200);">
+					<div class="text-[10px] font-semibold text-base-content/70">
 						📝 COMMITS ({signal.commits.length})
 					</div>
 					<div class="flex flex-wrap gap-1.5">
 						{#each signal.commits as commit}
 							<div
-								class="flex items-center gap-1.5 px-2 py-1 rounded text-[11px]"
-								style="background: oklch(0.20 0.03 250); border: 1px solid oklch(0.32 0.05 250);"
+								class="flex items-center gap-1.5 px-2 py-1 rounded text-[11px] bg-base-100 border border-base-300"
 								title={commit.message}
 							>
-								<span class="font-mono font-bold" style="color: oklch(0.75 0.10 250);">
+								<span class="font-mono font-bold text-primary">
 									{formatCommit(commit.sha)}
 								</span>
-								<span class="truncate max-w-[200px]" style="color: oklch(0.80 0.03 250);">
+								<span class="truncate max-w-[200px] text-base-content/80">
 									{commit.message.split('\n')[0]}
 								</span>
 							</div>
@@ -734,15 +694,14 @@
 
 			<!-- Action Buttons -->
 			{#if onApprove || onRequestChanges || onAskQuestion}
-				<div class="flex flex-col gap-2 pt-2 border-t" style="border-color: oklch(0.35 0.06 200);">
+				<div class="flex flex-col gap-2 pt-2 border-t border-base-300">
 					<!-- Input areas (shown conditionally) -->
 					{#if showRequestChangesInput}
 						<div class="flex flex-col gap-2">
 							<textarea
 								bind:value={feedbackText}
 								placeholder="Describe the changes you'd like to see..."
-								class="textarea textarea-sm w-full text-xs"
-								style="background: oklch(0.18 0.02 250); border-color: oklch(0.40 0.08 25); color: oklch(0.95 0.02 250);"
+								class="textarea textarea-sm w-full text-xs bg-base-100 border-error text-base-content"
 								rows="3"
 								disabled={submitting}
 							></textarea>
@@ -759,8 +718,7 @@
 									type="button"
 									onclick={handleRequestChanges}
 									disabled={submitting || !feedbackText.trim()}
-									class="btn btn-sm gap-1"
-									style="background: oklch(0.50 0.18 25); color: oklch(0.98 0.01 250); border: none;"
+									class="btn btn-sm btn-error gap-1"
 								>
 									{#if submitting}
 										<span class="loading loading-spinner loading-xs"></span>
@@ -779,8 +737,7 @@
 								type="text"
 								bind:value={questionText}
 								placeholder="What would you like to know?"
-								class="input input-sm w-full text-xs"
-								style="background: oklch(0.18 0.02 250); border-color: oklch(0.40 0.08 280); color: oklch(0.95 0.02 250);"
+								class="input input-sm w-full text-xs bg-base-100 border-secondary text-base-content"
 								onkeydown={(e) => {
 									if (e.key === 'Enter' && questionText.trim()) {
 										handleAskQuestion();
@@ -801,8 +758,7 @@
 									type="button"
 									onclick={handleAskQuestion}
 									disabled={submitting || !questionText.trim()}
-									class="btn btn-sm gap-1"
-									style="background: oklch(0.50 0.15 280); color: oklch(0.98 0.01 250); border: none;"
+									class="btn btn-sm btn-secondary gap-1"
 								>
 									{#if submitting}
 										<span class="loading loading-spinner loading-xs"></span>
@@ -819,8 +775,7 @@
 									type="button"
 									onclick={handleApprove}
 									disabled={submitting}
-									class="btn btn-sm flex-1 gap-1"
-									style="background: oklch(0.50 0.18 145); color: oklch(0.98 0.01 250); border: none;"
+									class="btn btn-sm btn-success flex-1 gap-1"
 								>
 									{#if submitting}
 										<span class="loading loading-spinner loading-xs"></span>
@@ -837,8 +792,7 @@
 									type="button"
 									onclick={() => showRequestChangesInput = true}
 									disabled={submitting}
-									class="btn btn-sm flex-1 gap-1"
-									style="background: oklch(0.50 0.18 25); color: oklch(0.98 0.01 250); border: none;"
+									class="btn btn-sm btn-error flex-1 gap-1"
 								>
 									<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 										<path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -851,8 +805,7 @@
 									type="button"
 									onclick={() => showAskQuestionInput = true}
 									disabled={submitting}
-									class="btn btn-sm flex-1 gap-1"
-									style="background: oklch(0.45 0.12 280); color: oklch(0.98 0.01 250); border: none;"
+									class="btn btn-sm btn-secondary flex-1 gap-1"
 								>
 									<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 										<path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />

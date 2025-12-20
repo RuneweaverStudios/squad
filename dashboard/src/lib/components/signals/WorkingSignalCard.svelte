@@ -60,43 +60,43 @@
 	// Whether approach section is expanded (default collapsed in compact mode)
 	let approachExpanded = $state(!compact);
 
-	// Task type badge styling
+	// Task type badge styling - using DaisyUI semantic color classes
 	const taskTypeBadge = $derived.by(() => {
 		switch (signal.taskType?.toLowerCase()) {
 			case 'bug':
-				return { label: 'BUG', color: 'oklch(0.55 0.20 25)', icon: '🐛' };
+				return { label: 'BUG', colorClass: 'bg-error text-error-content', icon: '🐛' };
 			case 'feature':
-				return { label: 'FEATURE', color: 'oklch(0.55 0.18 145)', icon: '✨' };
+				return { label: 'FEATURE', colorClass: 'bg-success text-success-content', icon: '✨' };
 			case 'task':
-				return { label: 'TASK', color: 'oklch(0.55 0.15 250)', icon: '📋' };
+				return { label: 'TASK', colorClass: 'bg-primary text-primary-content', icon: '📋' };
 			case 'chore':
-				return { label: 'CHORE', color: 'oklch(0.50 0.08 250)', icon: '🔧' };
+				return { label: 'CHORE', colorClass: 'bg-base-300 text-base-content', icon: '🔧' };
 			case 'epic':
-				return { label: 'EPIC', color: 'oklch(0.55 0.18 280)', icon: '🎯' };
+				return { label: 'EPIC', colorClass: 'bg-secondary text-secondary-content', icon: '🎯' };
 			default:
-				return { label: 'TASK', color: 'oklch(0.55 0.15 250)', icon: '📋' };
+				return { label: 'TASK', colorClass: 'bg-primary text-primary-content', icon: '📋' };
 		}
 	});
 
-	// Priority badge styling
+	// Priority badge styling - using DaisyUI semantic color classes
 	const priorityBadge = $derived.by(() => {
 		const p = signal.taskPriority;
-		if (p === 0) return { label: 'P0', color: 'oklch(0.55 0.22 25)', urgent: true };
-		if (p === 1) return { label: 'P1', color: 'oklch(0.60 0.18 45)', urgent: true };
-		if (p === 2) return { label: 'P2', color: 'oklch(0.55 0.15 85)', urgent: false };
-		if (p === 3) return { label: 'P3', color: 'oklch(0.50 0.10 200)', urgent: false };
-		return { label: 'P4', color: 'oklch(0.45 0.08 250)', urgent: false };
+		if (p === 0) return { label: 'P0', colorClass: 'bg-error text-error-content', urgent: true };
+		if (p === 1) return { label: 'P1', colorClass: 'bg-warning text-warning-content', urgent: true };
+		if (p === 2) return { label: 'P2', colorClass: 'bg-info text-info-content', urgent: false };
+		if (p === 3) return { label: 'P3', colorClass: 'bg-base-300 text-base-content', urgent: false };
+		return { label: 'P4', colorClass: 'bg-base-300 text-base-content/70', urgent: false };
 	});
 
-	// Scope badge styling
+	// Scope badge styling - using DaisyUI semantic color classes
 	const scopeBadge = $derived.by(() => {
 		switch (signal.estimatedScope) {
 			case 'small':
-				return { label: 'SMALL', color: 'oklch(0.55 0.18 145)', icon: '📏' };
+				return { label: 'SMALL', colorClass: 'bg-success text-success-content', icon: '📏' };
 			case 'medium':
-				return { label: 'MEDIUM', color: 'oklch(0.55 0.15 85)', icon: '📐' };
+				return { label: 'MEDIUM', colorClass: 'bg-warning text-warning-content', icon: '📐' };
 			case 'large':
-				return { label: 'LARGE', color: 'oklch(0.55 0.18 25)', icon: '📊' };
+				return { label: 'LARGE', colorClass: 'bg-error text-error-content', icon: '📊' };
 			default:
 				return null;
 		}
@@ -135,8 +135,7 @@
 {#if compact}
 	<!-- Compact mode: minimal task card for timeline/inline display -->
 	<div
-		class="rounded-lg px-3 py-2 flex items-center gap-3 {className}"
-		style="background: linear-gradient(90deg, oklch(0.25 0.10 85 / 0.3) 0%, oklch(0.22 0.05 85 / 0.1) 100%); border: 1px solid oklch(0.45 0.12 85);"
+		class="rounded-lg px-3 py-2 flex items-center gap-3 bg-warning/20 border border-warning/50 {className}"
 	>
 		<!-- Status indicator -->
 		<div class="flex-shrink-0">
@@ -147,22 +146,20 @@
 		<div class="flex-1 min-w-0 flex items-center gap-2">
 			<button
 				type="button"
-				class="text-xs font-mono px-1.5 py-0.5 rounded hover:opacity-80 transition-opacity cursor-pointer"
-				style="background: oklch(0.30 0.08 85); color: oklch(0.90 0.12 85); border: 1px solid oklch(0.45 0.10 85);"
+				class="text-xs font-mono px-1.5 py-0.5 rounded bg-warning/30 text-warning-content border border-warning/40 hover:opacity-80 transition-opacity cursor-pointer"
 				onclick={() => onTaskClick?.(signal.taskId)}
 				title="View task {signal.taskId}"
 			>
 				{signal.taskId}
 			</button>
-			<span class="text-sm truncate" style="color: oklch(0.90 0.05 85);">
+			<span class="text-sm truncate text-warning-content/90">
 				{signal.taskTitle}
 			</span>
 		</div>
 
 		<!-- Priority badge -->
 		<span
-			class="text-[10px] px-1.5 py-0.5 rounded font-bold flex-shrink-0"
-			style="background: {priorityBadge.color}; color: oklch(0.98 0.01 250);"
+			class="text-[10px] px-1.5 py-0.5 rounded font-bold flex-shrink-0 {priorityBadge.colorClass}"
 		>
 			{priorityBadge.label}
 		</span>
@@ -172,13 +169,11 @@
 	<!-- Card sizes based on content, parent container handles max-height and scrolling -->
 	<!-- overflow-hidden clips any nested content that might overflow -->
 	<div
-		class="rounded-lg overflow-hidden flex flex-col {className}"
-		style="background: linear-gradient(135deg, oklch(0.22 0.06 85) 0%, oklch(0.18 0.04 80) 100%); border: 1px solid oklch(0.45 0.12 85);"
+		class="rounded-lg overflow-hidden flex flex-col bg-warning/10 border border-warning/50 {className}"
 	>
 		<!-- Header - flex-shrink-0 ensures it doesn't shrink when body scrolls -->
 		<div
-			class="px-3 py-2 flex items-center justify-between gap-2 flex-shrink-0"
-			style="background: oklch(0.25 0.08 85); border-bottom: 1px solid oklch(0.40 0.10 85);"
+			class="px-3 py-2 flex items-center justify-between gap-2 flex-shrink-0 bg-warning/20 border-b border-warning/30"
 		>
 			<div class="flex items-center gap-2">
 				<!-- Working indicator -->
@@ -186,8 +181,7 @@
 
 				<!-- Task type badge -->
 				<span
-					class="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold"
-					style="background: {taskTypeBadge.color}; color: oklch(0.98 0.01 250);"
+					class="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold {taskTypeBadge.colorClass}"
 				>
 					{taskTypeBadge.icon} {taskTypeBadge.label}
 				</span>
@@ -195,8 +189,7 @@
 				<!-- Task ID -->
 				<button
 					type="button"
-					class="text-[10px] px-1.5 py-0.5 rounded font-mono cursor-pointer hover:opacity-80 transition-opacity"
-					style="background: oklch(0.30 0.05 85); color: oklch(0.85 0.08 85); border: 1px solid oklch(0.40 0.08 85);"
+					class="text-[10px] px-1.5 py-0.5 rounded font-mono cursor-pointer hover:opacity-80 transition-opacity bg-warning/20 text-warning-content border border-warning/30"
 					onclick={() => onTaskClick?.(signal.taskId)}
 					title="View task {signal.taskId}"
 				>
@@ -207,9 +200,8 @@
 			<div class="flex items-center gap-1.5">
 				<!-- Priority badge -->
 				<span
-					class="text-[10px] px-1.5 py-0.5 rounded font-bold"
+					class="text-[10px] px-1.5 py-0.5 rounded font-bold {priorityBadge.colorClass}"
 					class:animate-pulse={priorityBadge.urgent}
-					style="background: {priorityBadge.color}; color: oklch(0.98 0.01 250);"
 				>
 					{priorityBadge.label}
 				</span>
@@ -217,8 +209,7 @@
 				<!-- Scope badge -->
 				{#if scopeBadge}
 					<span
-						class="text-[10px] px-1.5 py-0.5 rounded font-mono"
-						style="background: {scopeBadge.color}; color: oklch(0.98 0.01 250);"
+						class="text-[10px] px-1.5 py-0.5 rounded font-mono {scopeBadge.colorClass}"
 					>
 						{scopeBadge.icon} {scopeBadge.label}
 					</span>
@@ -230,11 +221,11 @@
 		<div class="p-3 flex flex-col gap-3">
 			<!-- Task Title & Description -->
 			<div class="flex flex-col gap-1">
-				<div class="text-sm font-semibold" style="color: oklch(0.95 0.08 85);">
+				<div class="text-sm font-semibold text-warning-content">
 					{signal.taskTitle}
 				</div>
 				{#if signal.taskDescription}
-					<div class="text-[11px] opacity-80 line-clamp-2" style="color: oklch(0.85 0.04 85);">
+					<div class="text-[11px] opacity-80 line-clamp-2 text-warning-content/80">
 						{signal.taskDescription}
 					</div>
 				{/if}
@@ -243,24 +234,21 @@
 			<!-- Approach Section (collapsible) -->
 			{#if signal.approach}
 				<div
-					class="rounded overflow-hidden"
-					style="background: oklch(0.20 0.04 85); border: 1px solid oklch(0.35 0.06 85);"
+					class="rounded overflow-hidden bg-base-300 border border-base-content/20"
 				>
 					<button
 						type="button"
 						onclick={toggleApproach}
-						class="w-full px-2 py-1.5 flex items-center justify-between text-left hover:opacity-90 transition-opacity"
-						style="background: oklch(0.23 0.05 85);"
+						class="w-full px-2 py-1.5 flex items-center justify-between text-left hover:opacity-90 transition-opacity bg-base-300"
 					>
 						<div class="flex items-center gap-1.5">
-							<span class="text-[10px] font-bold" style="color: oklch(0.80 0.08 85);">
+							<span class="text-[10px] font-bold text-warning">
 								🎯 APPROACH
 							</span>
 						</div>
 						<svg
-							class="w-3.5 h-3.5 transition-transform duration-200"
+							class="w-3.5 h-3.5 transition-transform duration-200 text-base-content/60"
 							class:rotate-180={approachExpanded}
-							style="color: oklch(0.70 0.05 85);"
 							fill="none"
 							viewBox="0 0 24 24"
 							stroke="currentColor"
@@ -270,7 +258,7 @@
 						</svg>
 					</button>
 					{#if approachExpanded}
-						<div class="px-2 py-2 text-xs" style="color: oklch(0.90 0.03 85);">
+						<div class="px-2 py-2 text-xs text-base-content/90">
 							{signal.approach}
 						</div>
 					{/if}
@@ -280,7 +268,7 @@
 			<!-- Expected Files -->
 			{#if signal.expectedFiles && signal.expectedFiles.length > 0}
 				<div class="flex flex-col gap-1.5">
-					<div class="text-[10px] font-semibold opacity-70" style="color: oklch(0.75 0.05 85);">
+					<div class="text-[10px] font-semibold text-base-content/60">
 						📁 EXPECTED FILES
 					</div>
 					<div class="flex flex-wrap gap-1">
@@ -289,12 +277,11 @@
 							<button
 								type="button"
 								onclick={() => handleFileClick(file)}
-								class="text-[11px] px-2 py-0.5 rounded transition-opacity flex items-center gap-1"
+								class="text-[11px] px-2 py-0.5 rounded transition-opacity flex items-center gap-1 bg-info/20 text-info border border-info/30"
 								class:hover:opacity-80={!isGlob}
 								class:cursor-pointer={!isGlob}
 								class:cursor-default={isGlob}
 								class:opacity-70={isGlob}
-								style="background: oklch(0.25 0.06 200); color: oklch(0.88 0.10 200); border: 1px solid oklch(0.38 0.10 200);"
 								title={getFileTooltip(file)}
 							>
 								{#if isGlob}
@@ -318,7 +305,7 @@
 			<!-- Dependencies -->
 			{#if signal.dependencies && signal.dependencies.length > 0}
 				<div class="flex flex-col gap-1.5">
-					<div class="text-[10px] font-semibold opacity-70" style="color: oklch(0.75 0.05 85);">
+					<div class="text-[10px] font-semibold text-base-content/60">
 						🔗 DEPENDS ON
 					</div>
 					<div class="flex flex-wrap gap-1">
@@ -326,8 +313,7 @@
 							<button
 								type="button"
 								onclick={() => onTaskClick?.(dep)}
-								class="text-[11px] px-2 py-0.5 rounded hover:opacity-80 transition-opacity cursor-pointer"
-								style="background: oklch(0.28 0.06 280); color: oklch(0.85 0.10 280); border: 1px solid oklch(0.40 0.10 280);"
+								class="text-[11px] px-2 py-0.5 rounded hover:opacity-80 transition-opacity cursor-pointer bg-secondary/20 text-secondary border border-secondary/30"
 								title="View dependency {dep}"
 							>
 								{dep}
@@ -340,13 +326,12 @@
 			<!-- Blockers -->
 			{#if signal.blockers && signal.blockers.length > 0}
 				<div
-					class="flex flex-col gap-1.5 p-2 rounded"
-					style="background: oklch(0.25 0.10 25 / 0.3); border: 1px solid oklch(0.50 0.15 25);"
+					class="flex flex-col gap-1.5 p-2 rounded bg-error/20 border border-error/50"
 				>
-					<div class="text-[10px] font-bold" style="color: oklch(0.85 0.15 25);">
+					<div class="text-[10px] font-bold text-error">
 						⚠️ BLOCKERS
 					</div>
-					<ul class="text-[11px] list-disc list-inside" style="color: oklch(0.90 0.08 25);">
+					<ul class="text-[11px] list-disc list-inside text-error-content">
 						{#each signal.blockers as blocker}
 							<li>{blocker}</li>
 						{/each}
@@ -357,20 +342,18 @@
 			<!-- Baseline (for rollback) -->
 			{#if signal.baselineCommit}
 				<div
-					class="flex items-center justify-between px-2 py-1.5 rounded"
-					style="background: oklch(0.18 0.02 250); border: 1px solid oklch(0.30 0.04 250);"
+					class="flex items-center justify-between px-2 py-1.5 rounded bg-base-200 border border-base-content/20"
 				>
 					<div class="flex items-center gap-2">
-						<span class="text-[10px] font-semibold opacity-60" style="color: oklch(0.70 0.03 250);">
+						<span class="text-[10px] font-semibold text-base-content/50">
 							⏪ BASELINE
 						</span>
-						<span class="font-mono text-[11px]" style="color: oklch(0.80 0.05 250);">
+						<span class="font-mono text-[11px] text-base-content/70">
 							{formatCommit(signal.baselineCommit)}
 						</span>
 						{#if signal.baselineBranch}
 							<span
-								class="text-[10px] px-1 py-0.5 rounded"
-								style="background: oklch(0.25 0.04 145); color: oklch(0.80 0.08 145);"
+								class="text-[10px] px-1 py-0.5 rounded bg-success/20 text-success"
 							>
 								{signal.baselineBranch}
 							</span>
@@ -380,8 +363,7 @@
 						<button
 							type="button"
 							onclick={() => onRollbackClick?.(signal.baselineCommit)}
-							class="text-[10px] px-1.5 py-0.5 rounded hover:opacity-80 transition-opacity"
-							style="background: oklch(0.35 0.08 25); color: oklch(0.90 0.10 25); border: 1px solid oklch(0.45 0.12 25);"
+							class="text-[10px] px-1.5 py-0.5 rounded hover:opacity-80 transition-opacity bg-error/30 text-error border border-error/40"
 							title="Rollback to {formatCommit(signal.baselineCommit)}"
 						>
 							Rollback
@@ -392,14 +374,13 @@
 
 			<!-- Action Buttons -->
 			{#if onInterrupt || onPause}
-				<div class="flex gap-2 pt-2 border-t" style="border-color: oklch(0.35 0.06 85);">
+				<div class="flex gap-2 pt-2 border-t border-warning/30">
 					{#if onInterrupt}
 						<button
 							type="button"
 							onclick={handleInterrupt}
 							disabled={submitting}
-							class="btn btn-sm flex-1 gap-1"
-							style="background: oklch(0.50 0.18 25); color: oklch(0.98 0.01 250); border: none;"
+							class="btn btn-sm btn-error flex-1 gap-1"
 							title="Send Ctrl+C to interrupt current operation"
 						>
 							{#if submitting}
@@ -417,8 +398,7 @@
 							type="button"
 							onclick={handlePause}
 							disabled={submitting}
-							class="btn btn-sm flex-1 gap-1"
-							style="background: oklch(0.50 0.15 45); color: oklch(0.98 0.01 250); border: none;"
+							class="btn btn-sm btn-warning flex-1 gap-1"
 							title="Pause work on this task"
 						>
 							{#if submitting}
