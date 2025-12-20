@@ -26,6 +26,90 @@
 
 	let { hooksConfig = {}, selectedEventType = 'PostToolUse', onEventTypeChange }: Props = $props();
 
+	// Execution state
+	interface ExecutionResult {
+		stdout: string;
+		stderr: string;
+		exitCode: number | null;
+		timedOut: boolean;
+		duration: number;
+		error?: string;
+		command: string;
+	}
+
+	let executingHooks = $state<Set<string>>(new Set());
+	let executionResults = $state<Map<string, ExecutionResult>>(new Map());
+	let showExecutionPanel = $state(false);
+	let selectedExecutionCommand = $state<string | null>(null);
+
+	// Execute a hook command with current scenario input
+	async function executeHook(command: string) {
+		const hookKey = command;
+
+		// Mark as executing
+		executingHooks = new Set([...executingHooks, hookKey]);
+
+		try {
+			const response = await fetch('/api/hooks/execute', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					command,
+					input: hookInputJson,
+					timeout: 10000
+				})
+			});
+
+			const result = await response.json();
+
+			// Store result
+			executionResults = new Map([...executionResults, [hookKey, result]]);
+			selectedExecutionCommand = hookKey;
+			showExecutionPanel = true;
+		} catch (error) {
+			// Store error result
+			executionResults = new Map([
+				...executionResults,
+				[
+					hookKey,
+					{
+						stdout: '',
+						stderr: error instanceof Error ? error.message : 'Unknown error',
+						exitCode: 1,
+						timedOut: false,
+						duration: 0,
+						error: 'Failed to execute hook',
+						command
+					}
+				]
+			]);
+			selectedExecutionCommand = hookKey;
+			showExecutionPanel = true;
+		} finally {
+			// Remove from executing set
+			const newSet = new Set(executingHooks);
+			newSet.delete(hookKey);
+			executingHooks = newSet;
+		}
+	}
+
+	// Get execution result for a command
+	function getExecutionResult(command: string): ExecutionResult | undefined {
+		return executionResults.get(command);
+	}
+
+	// Check if a command is currently executing
+	function isExecuting(command: string): boolean {
+		return executingHooks.has(command);
+	}
+
+	// Clear all execution results
+	function clearResults() {
+		executionResults = new Map();
+		showExecutionPanel = false;
+		selectedExecutionCommand = null;
+	}
+
 	// Track local event type, synced with prop
 	let eventType = $state<HookEventType>(selectedEventType);
 
@@ -715,16 +799,75 @@
 								</div>
 							{/if}
 
-							<!-- Hooks list -->
+							<!-- Hooks list with execute buttons -->
 							{#if result.matched}
 								<div
 									class="px-3 py-1.5"
 									style="background: oklch(0.16 0.01 250); border-top: 1px solid oklch(0.25 0.02 250);"
 								>
 									{#each result.entry.hooks as hook, i}
-										<div class="text-[9px] font-mono" style="color: oklch(0.55 0.02 250);">
-											<span style="color: oklch(0.45 0.02 250);">{i + 1}.</span>
-											<code style="color: oklch(0.65 0.10 200);">{hook.command}</code>
+										{@const hookResult = getExecutionResult(hook.command)}
+										{@const executing = isExecuting(hook.command)}
+										<div class="flex items-center justify-between gap-2 py-0.5">
+											<div class="text-[9px] font-mono flex-1 min-w-0" style="color: oklch(0.55 0.02 250);">
+												<span style="color: oklch(0.45 0.02 250);">{i + 1}.</span>
+												<code class="truncate" style="color: oklch(0.65 0.10 200);" title={hook.command}>
+													{hook.command}
+												</code>
+											</div>
+											<div class="flex items-center gap-1 flex-shrink-0">
+												<!-- Result indicator -->
+												{#if hookResult && !executing}
+													{#if hookResult.exitCode === 0}
+														<span
+															class="px-1 py-0.5 rounded text-[8px] font-mono"
+															style="background: oklch(0.35 0.12 145); color: oklch(0.80 0.12 145);"
+															title="Exit code: 0"
+														>
+															OK
+														</span>
+													{:else if hookResult.timedOut}
+														<span
+															class="px-1 py-0.5 rounded text-[8px] font-mono"
+															style="background: oklch(0.35 0.12 60); color: oklch(0.80 0.12 60);"
+															title="Execution timed out"
+														>
+															TIMEOUT
+														</span>
+													{:else}
+														<span
+															class="px-1 py-0.5 rounded text-[8px] font-mono"
+															style="background: oklch(0.35 0.12 25); color: oklch(0.80 0.12 25);"
+															title="Exit code: {hookResult.exitCode}"
+														>
+															ERR:{hookResult.exitCode}
+														</span>
+													{/if}
+												{/if}
+												<!-- Execute button -->
+												<button
+													onclick={() => executeHook(hook.command)}
+													disabled={executing}
+													class="px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors flex items-center gap-1"
+													style="
+														background: {executing ? 'oklch(0.30 0.02 250)' : 'oklch(0.35 0.10 200)'};
+														color: {executing ? 'oklch(0.50 0.02 250)' : 'oklch(0.85 0.08 200)'};
+														border: 1px solid {executing ? 'oklch(0.35 0.02 250)' : 'oklch(0.45 0.12 200)'};
+													"
+													title={executing ? 'Executing...' : 'Execute hook with current scenario'}
+												>
+													{#if executing}
+														<svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+															<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-dasharray="30 70" />
+														</svg>
+													{:else}
+														<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+															<path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+														</svg>
+													{/if}
+													{executing ? 'Running...' : 'Execute'}
+												</button>
+											</div>
 										</div>
 									{/each}
 								</div>
@@ -774,4 +917,134 @@
 			</div>
 		</div>
 	</div>
+
+	<!-- Execution Output Panel -->
+	{#if showExecutionPanel && selectedExecutionCommand}
+		{@const selectedResult = getExecutionResult(selectedExecutionCommand)}
+		{#if selectedResult}
+			<div
+				class="mt-3 rounded-lg overflow-hidden"
+				style="background: oklch(0.15 0.01 250); border: 1px solid oklch(0.30 0.02 250);"
+			>
+				<!-- Panel Header -->
+				<div
+					class="px-4 py-2 flex items-center justify-between"
+					style="background: oklch(0.20 0.01 250); border-bottom: 1px solid oklch(0.28 0.02 250);"
+				>
+					<div class="flex items-center gap-2">
+						<svg
+							class="w-4 h-4"
+							style="color: oklch(0.70 0.12 200);"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<path stroke-linecap="round" stroke-linejoin="round" d="m6.75 7.5 3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0 0 21 18V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v12a2.25 2.25 0 0 0 2.25 2.25Z" />
+						</svg>
+						<span class="font-mono text-xs font-semibold" style="color: oklch(0.85 0.02 250);">
+							Execution Output
+						</span>
+						<!-- Status badge -->
+						{#if selectedResult.exitCode === 0}
+							<span
+								class="px-1.5 py-0.5 rounded text-[9px] font-mono"
+								style="background: oklch(0.35 0.12 145); color: oklch(0.85 0.10 145);"
+							>
+								Exit: 0 (success)
+							</span>
+						{:else if selectedResult.timedOut}
+							<span
+								class="px-1.5 py-0.5 rounded text-[9px] font-mono"
+								style="background: oklch(0.35 0.12 60); color: oklch(0.85 0.10 60);"
+							>
+								Timeout after {selectedResult.duration}ms
+							</span>
+						{:else}
+							<span
+								class="px-1.5 py-0.5 rounded text-[9px] font-mono"
+								style="background: oklch(0.35 0.12 25); color: oklch(0.85 0.10 25);"
+							>
+								Exit: {selectedResult.exitCode}
+							</span>
+						{/if}
+						<span class="text-[9px] font-mono" style="color: oklch(0.50 0.02 250);">
+							{selectedResult.duration}ms
+						</span>
+					</div>
+					<button
+						onclick={clearResults}
+						class="px-2 py-1 rounded text-xs font-mono transition-colors hover:bg-base-300/50"
+						style="color: oklch(0.60 0.02 250);"
+						title="Close output panel"
+					>
+						Close
+					</button>
+				</div>
+
+				<!-- Command path -->
+				<div class="px-4 py-1.5" style="background: oklch(0.17 0.01 250); border-bottom: 1px solid oklch(0.25 0.02 250);">
+					<code class="text-[10px] font-mono" style="color: oklch(0.60 0.02 250);">
+						$ {selectedResult.command}
+					</code>
+				</div>
+
+				<!-- Output content -->
+				<div class="p-3 max-h-64 overflow-auto">
+					{#if selectedResult.stdout}
+						<div class="mb-3">
+							<div class="text-[9px] font-mono font-semibold mb-1" style="color: oklch(0.55 0.10 145);">
+								STDOUT
+							</div>
+							<pre
+								class="text-[11px] font-mono whitespace-pre-wrap break-all p-2 rounded"
+								style="background: oklch(0.12 0.01 250); color: oklch(0.80 0.02 250); border: 1px solid oklch(0.25 0.02 250);"
+							>{selectedResult.stdout}</pre>
+						</div>
+					{/if}
+
+					{#if selectedResult.stderr}
+						<div class="mb-3">
+							<div class="text-[9px] font-mono font-semibold mb-1" style="color: oklch(0.55 0.10 25);">
+								STDERR
+							</div>
+							<pre
+								class="text-[11px] font-mono whitespace-pre-wrap break-all p-2 rounded"
+								style="background: oklch(0.15 0.02 25); color: oklch(0.80 0.08 25); border: 1px solid oklch(0.30 0.05 25);"
+							>{selectedResult.stderr}</pre>
+						</div>
+					{/if}
+
+					{#if !selectedResult.stdout && !selectedResult.stderr}
+						<div class="text-center py-4">
+							<svg
+								class="w-8 h-8 mx-auto mb-2"
+								style="color: oklch(0.40 0.02 250);"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+								stroke-width="1.5"
+							>
+								<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+							</svg>
+							<p class="text-[11px] font-mono" style="color: oklch(0.50 0.02 250);">
+								Hook executed successfully with no output
+							</p>
+						</div>
+					{/if}
+				</div>
+
+				<!-- Note about preview mode -->
+				<div
+					class="px-4 py-2"
+					style="background: oklch(0.18 0.02 200 / 0.3); border-top: 1px solid oklch(0.30 0.05 200);"
+				>
+					<p class="text-[9px] font-mono" style="color: oklch(0.65 0.08 200);">
+						💡 This is a preview execution. The hook ran with JAT_HOOK_PREVIEW=true environment variable.
+						Side effects may be suppressed by hook scripts that check for this variable.
+					</p>
+				</div>
+			</div>
+		{/if}
+	{/if}
 </div>
