@@ -745,8 +745,8 @@ Command content here...
 						</div>
 					{:else if isCreateMode && showVariablesStep}
 						<!-- Variables Step -->
-						<div class="mb-6">
-							<div class="mb-4 flex items-center gap-2">
+						<div class="flex flex-1 flex-col overflow-hidden">
+							<div class="mb-4 shrink-0 flex items-center gap-2">
 								<button
 									type="button"
 									class="btn btn-ghost btn-xs"
@@ -775,70 +775,73 @@ Command content here...
 								{/if}
 							</div>
 
-							<h3 class="mb-4 text-lg font-medium text-base-content">
-								Configure Template Variables
-							</h3>
-							<p class="mb-6 text-sm opacity-70">
-								Fill in the values below to customize your command template.
-							</p>
+							<!-- Variables Section - shrinks to fit content -->
+							<div class="shrink-0">
+								<h3 class="mb-4 text-lg font-medium text-base-content">
+									Configure Template Variables
+								</h3>
+								<p class="mb-4 text-sm opacity-70">
+									Fill in the values below to customize your command template.
+								</p>
 
-							{#if variableErrors.length > 0}
-								<div class="alert alert-error mb-4">
-									<span>Please fill in required fields: {variableErrors.map(name =>
-										templateVariables.find(v => v.name === name)?.label || name
-									).join(', ')}</span>
-								</div>
-							{/if}
-
-							<div class="space-y-4">
-								{#each templateVariables as variable}
-									<div class="form-control">
-										<label class="label" for={`var-${variable.name}`}>
-											<span class="label-text font-medium">
-												{variable.label}
-												{#if variable.required}
-													<span class="text-error">*</span>
-												{/if}
-											</span>
-										</label>
-										{#if variable.multiline}
-											<textarea
-												id={`var-${variable.name}`}
-												class="textarea textarea-bordered"
-												class:textarea-error={variableErrors.includes(variable.name)}
-												placeholder={variable.placeholder || ''}
-												rows="3"
-												bind:value={variableValues[variable.name]}
-												oninput={() => {
-													// Clear error for this field when user types
-													variableErrors = variableErrors.filter(e => e !== variable.name);
-												}}
-											></textarea>
-										{:else}
-											<input
-												id={`var-${variable.name}`}
-												type="text"
-												class="input input-bordered"
-												class:input-error={variableErrors.includes(variable.name)}
-												placeholder={variable.placeholder || ''}
-												bind:value={variableValues[variable.name]}
-												oninput={() => {
-													// Clear error for this field when user types
-													variableErrors = variableErrors.filter(e => e !== variable.name);
-												}}
-											/>
-										{/if}
-										{#if variable.hint}
-											<label class="label">
-												<span class="label-text-alt opacity-70">{variable.hint}</span>
-											</label>
-										{/if}
+								{#if variableErrors.length > 0}
+									<div class="alert alert-error mb-4">
+										<span>Please fill in required fields: {variableErrors.map(name =>
+											templateVariables.find(v => v.name === name)?.label || name
+										).join(', ')}</span>
 									</div>
-								{/each}
+								{/if}
+
+								<div class="space-y-3">
+									{#each templateVariables as variable}
+										<div class="form-control">
+											<label class="label py-1" for={`var-${variable.name}`}>
+												<span class="label-text font-medium">
+													{variable.label}
+													{#if variable.required}
+														<span class="text-error">*</span>
+													{/if}
+												</span>
+											</label>
+											{#if variable.multiline}
+												<textarea
+													id={`var-${variable.name}`}
+													class="textarea textarea-bordered textarea-sm"
+													class:textarea-error={variableErrors.includes(variable.name)}
+													placeholder={variable.placeholder || ''}
+													rows="2"
+													bind:value={variableValues[variable.name]}
+													oninput={() => {
+														// Clear error for this field when user types
+														variableErrors = variableErrors.filter(e => e !== variable.name);
+													}}
+												></textarea>
+											{:else}
+												<input
+													id={`var-${variable.name}`}
+													type="text"
+													class="input input-bordered input-sm"
+													class:input-error={variableErrors.includes(variable.name)}
+													placeholder={variable.placeholder || ''}
+													bind:value={variableValues[variable.name]}
+													oninput={() => {
+														// Clear error for this field when user types
+														variableErrors = variableErrors.filter(e => e !== variable.name);
+													}}
+												/>
+											{/if}
+											{#if variable.hint}
+												<label class="label py-0.5">
+													<span class="label-text-alt opacity-70">{variable.hint}</span>
+												</label>
+											{/if}
+										</div>
+									{/each}
+								</div>
 							</div>
 
-							<!-- Template Preview Section -->
-							<div class="mt-6">
+							<!-- Template Preview Section - expands to fill remaining space -->
+							<div class="mt-4 flex min-h-0 flex-1 flex-col">
 								<button
 									type="button"
 									class="flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left transition-colors hover:bg-base-300/50"
@@ -885,19 +888,19 @@ Command content here...
 
 								{#if showPreview}
 									<div
-										class="mt-2 max-h-64 overflow-y-auto rounded-lg border"
+										class="mt-2 min-h-0 flex-1 overflow-y-auto rounded-lg border"
 										style="border-color: oklch(0.3 0.02 250); background: oklch(0.12 0.02 250);"
 									>
 										<pre class="whitespace-pre-wrap p-4 text-sm font-mono text-base-content/90">{@html templatePreviewHtml}</pre>
 									</div>
-									<p class="mt-2 text-xs opacity-50">
+									<p class="mt-2 shrink-0 text-xs opacity-50">
 										Variables highlighted in <span class="text-warning">yellow</span> will be replaced with your values
 									</p>
 								{/if}
 							</div>
 
 							<!-- Variables step actions -->
-							<div class="mt-6 flex justify-between">
+							<div class="mt-4 shrink-0 flex justify-between">
 								<button
 									type="button"
 									class="btn btn-ghost btn-sm"
