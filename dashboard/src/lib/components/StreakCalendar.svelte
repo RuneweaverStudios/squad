@@ -93,20 +93,25 @@
 		return columns;
 	});
 
-	// Month labels
+	// Month labels - skip labels that would overlap (need ~3 columns of space)
 	const monthLabels = $derived.by(() => {
 		const labels: { month: string; col: number }[] = [];
 		let lastMonth = -1;
+		let lastLabelCol = -999; // Track last label position to avoid overlap
 
 		weekColumns.forEach((week, colIndex) => {
 			const firstDay = week[0];
 			if (firstDay) {
 				const month = firstDay.date.getMonth();
 				if (month !== lastMonth) {
-					labels.push({
-						month: firstDay.date.toLocaleString('default', { month: 'short' }),
-						col: colIndex
-					});
+					// Only add label if there's enough space (3 columns = ~42px for "Sep" etc)
+					if (colIndex - lastLabelCol >= 3) {
+						labels.push({
+							month: firstDay.date.toLocaleString('default', { month: 'short' }),
+							col: colIndex
+						});
+						lastLabelCol = colIndex;
+					}
 					lastMonth = month;
 				}
 			}
@@ -158,8 +163,8 @@
 </script>
 
 <div class="streak-calendar">
-	<!-- Month labels -->
-	<div class="month-labels">
+	<!-- Month labels - positioned to align with week columns -->
+	<div class="month-labels" style="grid-template-columns: 32px repeat({weekColumns.length}, 14px)">
 		<div class="day-label-spacer"></div>
 		{#each monthLabels as { month, col }}
 			<span
@@ -253,17 +258,20 @@
 	}
 
 	.month-labels {
-		display: flex;
-		gap: 3px;
-		padding-left: 32px;
+		display: grid;
 		font-size: 10px;
-		color: oklch(0.55 0.02 250);
+		color: var(--color-base-content);
+		opacity: 0.55;
 		font-family: ui-monospace, monospace;
 		letter-spacing: 0.02em;
 	}
 
+	.day-label-spacer {
+		grid-column: 1;
+	}
+
 	.month-label {
-		min-width: 11px;
+		white-space: nowrap;
 	}
 
 	.calendar-grid {
@@ -276,7 +284,8 @@
 		flex-direction: column;
 		gap: 3px;
 		font-size: 9px;
-		color: oklch(0.50 0.02 250);
+		color: var(--color-base-content);
+		opacity: 0.5;
 		font-family: ui-monospace, monospace;
 		width: 28px;
 		padding-top: 2px;
@@ -311,35 +320,35 @@
 
 	.day-cell:hover, .day-cell:focus {
 		transform: scale(1.2);
-		outline: 2px solid oklch(0.70 0.15 85);
+		outline: 2px solid var(--color-warning);
 		outline-offset: 1px;
 	}
 
 	.day-cell.is-today {
-		outline: 1px solid oklch(0.65 0.10 200);
+		outline: 1px solid var(--color-info);
 		outline-offset: 0px;
 	}
 
 	/* Intensity levels - gold/amber theme for completions */
 	.intensity-0 {
-		background: oklch(0.22 0.01 250);
+		background: var(--color-base-300);
 	}
 
 	.intensity-1 {
-		background: oklch(0.40 0.08 85);
+		background: color-mix(in oklch, var(--color-warning) 40%, var(--color-base-300));
 	}
 
 	.intensity-2 {
-		background: oklch(0.55 0.12 85);
+		background: color-mix(in oklch, var(--color-warning) 60%, var(--color-base-300));
 	}
 
 	.intensity-3 {
-		background: oklch(0.70 0.16 85);
+		background: color-mix(in oklch, var(--color-warning) 80%, var(--color-base-300));
 	}
 
 	.intensity-4 {
-		background: oklch(0.80 0.18 85);
-		box-shadow: 0 0 6px oklch(0.75 0.15 85 / 0.4);
+		background: var(--color-warning);
+		box-shadow: 0 0 6px color-mix(in oklch, var(--color-warning) 40%, transparent);
 	}
 
 	.legend {
@@ -352,7 +361,8 @@
 
 	.legend-label {
 		font-size: 9px;
-		color: oklch(0.50 0.02 250);
+		color: var(--color-base-content);
+		opacity: 0.5;
 		font-family: ui-monospace, monospace;
 	}
 
@@ -371,15 +381,15 @@
 	.calendar-tooltip {
 		position: fixed;
 		transform: translate(-50%, -100%);
-		background: oklch(0.15 0.02 250);
-		border: 1px solid oklch(0.35 0.02 250);
+		background: var(--color-base-100);
+		border: 1px solid var(--color-base-300);
 		border-radius: 6px;
 		padding: 8px 10px;
 		font-family: ui-monospace, monospace;
 		font-size: 11px;
 		z-index: 1000;
 		pointer-events: none;
-		box-shadow: 0 8px 24px oklch(0 0 0 / 0.5);
+		box-shadow: 0 8px 24px color-mix(in oklch, var(--color-neutral) 50%, transparent);
 		min-width: 140px;
 		max-width: 280px;
 	}
@@ -392,38 +402,41 @@
 		transform: translateX(-50%);
 		border-left: 6px solid transparent;
 		border-right: 6px solid transparent;
-		border-top: 6px solid oklch(0.35 0.02 250);
+		border-top: 6px solid var(--color-base-300);
 	}
 
 	.tooltip-count {
-		color: oklch(0.85 0.15 85);
+		color: var(--color-warning);
 		font-weight: 600;
 		font-size: 12px;
 	}
 
 	.tooltip-date {
-		color: oklch(0.60 0.02 250);
+		color: var(--color-base-content);
+		opacity: 0.6;
 		margin-top: 2px;
 	}
 
 	.tooltip-tasks {
 		margin-top: 6px;
 		padding-top: 6px;
-		border-top: 1px solid oklch(0.30 0.02 250);
+		border-top: 1px solid var(--color-base-300);
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
 	}
 
 	.tooltip-task {
-		color: oklch(0.75 0.02 250);
+		color: var(--color-base-content);
+		opacity: 0.75;
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
 
 	.tooltip-more {
-		color: oklch(0.55 0.02 250);
+		color: var(--color-base-content);
+		opacity: 0.55;
 		font-style: italic;
 	}
 
