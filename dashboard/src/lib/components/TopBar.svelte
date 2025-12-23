@@ -19,6 +19,7 @@
 	 */
 
 	import { page } from "$app/stores";
+	import { get } from "svelte/store";
 	import AgentCountBadge from "./AgentCountBadge.svelte";
 	import TokenUsageBadge from "./TokenUsageBadge.svelte";
 	import TasksCompletedBadge from "./TasksCompletedBadge.svelte";
@@ -31,10 +32,15 @@
 	import {
 		openTaskDrawer,
 		openTaskDetailDrawer,
+		closeTaskDetailDrawer,
+		isTaskDetailDrawerOpen,
 		openProjectDrawer,
 		isSpawnModalOpen,
 		isStartDropdownOpen,
 		closeStartDropdown,
+		startDropdownOpenedViaKeyboard,
+		toggleSidebar,
+		isSidebarCollapsed,
 	} from "$lib/stores/drawerStore";
 	import {
 		startSpawning,
@@ -401,9 +407,14 @@
 	let startNextLoading = $state(false); // Track "Start Next" primary button loading
 	let selectedProjectTab = $state<string | null>(null); // null = show all projects
 
-	// Sync with global store (for Alt+S keyboard shortcut)
+	// Keyboard navigation state for dropdown
+	let focusedTaskIndex = $state(-1); // -1 = nothing focused
+	let dropdownRef: HTMLDivElement | null = $state(null);
+	let openedViaKeyboard = $state(false); // Track if opened via Alt+S
+
+	// Sync with global stores (for Alt+S keyboard shortcut)
 	$effect(() => {
-		const unsubscribe = isStartDropdownOpen.subscribe((isOpen) => {
+		const unsubscribeOpen = isStartDropdownOpen.subscribe((isOpen) => {
 			if (isOpen) {
 				showSwarmDropdown = true;
 				// Clear any existing timeout
@@ -413,7 +424,149 @@
 				}
 			}
 		});
-		return unsubscribe;
+		const unsubscribeKeyboard = startDropdownOpenedViaKeyboard.subscribe((viaKeyboard) => {
+			if (viaKeyboard) {
+				openedViaKeyboard = true;
+				focusedTaskIndex = 0; // Focus first task when opened via keyboard
+			}
+		});
+		return () => {
+			unsubscribeOpen();
+			unsubscribeKeyboard();
+		};
+	});
+
+	// Handle keyboard navigation in dropdown
+	function handleDropdownKeydown(event: KeyboardEvent) {
+		if (!showSwarmDropdown) return;
+
+		const taskCount = flatTaskList.length;
+
+		switch (event.key) {
+			case 'ArrowLeft':
+				// Navigate to previous project tab
+				event.preventDefault();
+				if (selectedProjectTab === null) {
+					// On "All" tab, wrap to last project
+					selectedProjectTab = projectNames.length > 0 ? projectNames[projectNames.length - 1] : null;
+				} else {
+					const currentIndex = projectNames.indexOf(selectedProjectTab);
+					if (currentIndex <= 0) {
+						// First project or not found, go to "All"
+						selectedProjectTab = null;
+					} else {
+						selectedProjectTab = projectNames[currentIndex - 1];
+					}
+				}
+				// Reset task focus to first item when changing tabs
+				focusedTaskIndex = 0;
+				break;
+			case 'ArrowRight':
+				// Navigate to next project tab
+				event.preventDefault();
+				if (selectedProjectTab === null) {
+					// On "All" tab, go to first project
+					selectedProjectTab = projectNames.length > 0 ? projectNames[0] : null;
+				} else {
+					const currentIndex = projectNames.indexOf(selectedProjectTab);
+					if (currentIndex >= projectNames.length - 1) {
+						// Last project, wrap to "All"
+						selectedProjectTab = null;
+					} else {
+						selectedProjectTab = projectNames[currentIndex + 1];
+					}
+				}
+				// Reset task focus to first item when changing tabs
+				focusedTaskIndex = 0;
+				break;
+			case 'ArrowDown':
+				event.preventDefault();
+				if (taskCount === 0) break;
+				if (focusedTaskIndex < 0) {
+					focusedTaskIndex = 0;
+				} else {
+					focusedTaskIndex = Math.min(focusedTaskIndex + 1, taskCount - 1);
+				}
+				scrollFocusedTaskIntoView();
+				break;
+			case 'ArrowUp':
+				event.preventDefault();
+				if (taskCount === 0) break;
+				if (focusedTaskIndex < 0) {
+					focusedTaskIndex = taskCount - 1;
+				} else {
+					focusedTaskIndex = Math.max(focusedTaskIndex - 1, 0);
+				}
+				scrollFocusedTaskIntoView();
+				break;
+			case 'Enter':
+				event.preventDefault();
+				if (focusedTaskIndex >= 0 && focusedTaskIndex < taskCount) {
+					const task = flatTaskList[focusedTaskIndex];
+					handleSpawnSingle(task.id);
+					showSwarmDropdown = false;
+					closeStartDropdown();
+				}
+				break;
+			case ' ':
+				// Space opens task detail drawer for the focused task
+				event.preventDefault();
+				if (focusedTaskIndex >= 0 && focusedTaskIndex < taskCount) {
+					const task = flatTaskList[focusedTaskIndex];
+					openTaskDetailDrawer(task.id);
+					// Keep dropdown open so user can return to it
+				}
+				break;
+			case 'Escape':
+				// If task detail drawer is open, close it and stop - don't close the dropdown
+				if (get(isTaskDetailDrawerOpen)) {
+					event.preventDefault();
+					event.stopPropagation();
+					closeTaskDetailDrawer();
+					// Return focus to dropdown after drawer closes
+					setTimeout(() => dropdownRef?.focus(), 50);
+					return;
+				}
+				// Close the dropdown
+				event.preventDefault();
+				showSwarmDropdown = false;
+				closeStartDropdown();
+				focusedTaskIndex = -1;
+				openedViaKeyboard = false;
+				break;
+		}
+	}
+
+	// Scroll the focused task into view within the dropdown
+	function scrollFocusedTaskIntoView() {
+		setTimeout(() => {
+			const focusedElement = dropdownRef?.querySelector(`[data-task-index="${focusedTaskIndex}"]`);
+			if (focusedElement) {
+				focusedElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+			}
+		}, 10);
+	}
+
+	// Focus dropdown when opened via keyboard and select first task
+	$effect(() => {
+		if (showSwarmDropdown && openedViaKeyboard && dropdownRef) {
+			// Small delay to ensure DOM is ready
+			setTimeout(() => {
+				dropdownRef?.focus();
+				// Auto-select first task for immediate arrow key navigation
+				if (flatTaskList.length > 0 && focusedTaskIndex < 0) {
+					focusedTaskIndex = 0;
+				}
+			}, 50);
+		}
+	});
+
+	// Reset focus when dropdown closes
+	$effect(() => {
+		if (!showSwarmDropdown) {
+			focusedTaskIndex = -1;
+			openedViaKeyboard = false;
+		}
 	});
 
 	// Epic submenu state
@@ -720,6 +873,15 @@
 		return result;
 	});
 
+	// Get flat list of visible tasks for keyboard navigation
+	const flatTaskList = $derived.by(() => {
+		const tasks: ReadyTask[] = [];
+		for (const [, projectTasks] of filteredTasksByProject.entries()) {
+			tasks.push(...projectTasks);
+		}
+		return tasks;
+	});
+
 	// Get priority badge color
 	function getPriorityColor(priority: number): string {
 		switch (priority) {
@@ -749,9 +911,9 @@
 	"
 >
 	<!-- Sidebar toggle (industrial) -->
-	<label
-		for="main-drawer"
-		aria-label="open sidebar"
+	<button
+		onclick={toggleSidebar}
+		aria-label={$isSidebarCollapsed ? "expand sidebar" : "collapse sidebar"}
 		class="flex items-center justify-center w-7 h-7 ml-3 rounded cursor-pointer transition-all hover:scale-105"
 		style="background: oklch(0.30 0.02 250); border: 1px solid oklch(0.40 0.02 250);"
 	>
@@ -763,7 +925,7 @@
 			stroke-width="2"
 			fill="none"
 			stroke="currentColor"
-			class="w-4 h-4"
+			class="w-4 h-4 transition-transform {$isSidebarCollapsed ? 'rotate-180' : ''}"
 			style="color: oklch(0.70 0.18 240);"
 		>
 			<path
@@ -772,7 +934,7 @@
 			<path d="M9 4v16"></path>
 			<path d="M14 10l2 2l-2 2"></path>
 		</svg>
-	</label>
+	</button>
 
 	<!-- Left side utilities -->
 	<div class="flex-1 flex items-center gap-3 px-2">
@@ -1017,9 +1179,12 @@
 				{#if showSwarmDropdown && !swarmLoading && !startNextLoading}
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<div
+						bind:this={dropdownRef}
 						class="swarm-dropdown-panel"
+						tabindex="-1"
 						onmouseenter={keepSwarmMenuOpen}
 						onmouseleave={hideSwarmMenuDelayed}
+						onkeydown={handleDropdownKeydown}
 					>
 						<!-- Project Tabs Header -->
 						<div
@@ -1084,7 +1249,14 @@
 									{/if}
 									<!-- Tasks for this project -->
 									{#each tasks as task}
-										<div class="swarm-task-row">
+										{@const taskFlatIndex = flatTaskList.findIndex(t => t.id === task.id)}
+										{@const isFocused = focusedTaskIndex >= 0 && focusedTaskIndex === taskFlatIndex}
+										<div
+											class="swarm-task-row"
+											class:keyboard-focused={isFocused}
+											data-task-index={taskFlatIndex}
+											style={isFocused ? 'background: oklch(0.40 0.15 200 / 0.3); outline: 2px solid oklch(0.60 0.18 200);' : ''}
+										>
 											<div
 												class="flex items-start justify-between gap-2 w-full"
 											>

@@ -11,10 +11,17 @@
 	 * - Smooth transitions between collapsed/open states
 	 *
 	 * Usage: Place inside drawer-side div in root layout
+	 *
+	 * Collapsible Sidebar:
+	 * - Uses isSidebarCollapsed store for desktop collapse state
+	 * - When collapsed: narrow width (w-14), shows tooltips on hover
+	 * - When expanded: full width (w-64), shows labels
+	 * - Toggle via hamburger button in TopBar
 	 */
 
 	import { page } from '$app/stores';
 	import { unifiedNavConfig } from '$lib/config/navConfig';
+	import { isSidebarCollapsed } from '$lib/stores/drawerStore';
 
 	// Helper to check if nav item is active
 	function isActive(href: string): boolean {
@@ -60,13 +67,13 @@
 </script>
 
 <!-- Industrial/Terminal Sidebar -->
-<div class="drawer-side is-drawer-close:overflow-visible">
+<div class="drawer-side {$isSidebarCollapsed ? 'overflow-visible' : ''}">
 	<!-- Drawer overlay -->
 	<label for="main-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
 
 	<!-- Sidebar content -->
 	<div
-		class="flex h-screen flex-col overflow-hidden is-drawer-close:w-14 is-drawer-open:w-64 relative"
+		class="flex h-screen flex-col transition-all duration-200 relative {$isSidebarCollapsed ? 'w-14 overflow-visible' : 'w-64 overflow-hidden'}"
 		style="
 			background: linear-gradient(180deg, oklch(0.22 0.01 250) 0%, oklch(0.18 0.01 250) 100%);
 		"
@@ -112,7 +119,7 @@
 				<a
 					href={navItem.href}
 					class="w-full flex items-center gap-3 px-3 py-2.5 rounded transition-all duration-200 group
-						is-drawer-close:justify-center is-drawer-close:tooltip is-drawer-close:tooltip-right
+						{$isSidebarCollapsed ? 'justify-center tooltip tooltip-right' : ''}
 						{active ? '' : 'industrial-hover'}"
 					style="
 						background: {active ? 'linear-gradient(90deg, oklch(0.70 0.18 240 / 0.2) 0%, transparent 100%)' : 'transparent'};
@@ -144,20 +151,22 @@
 					</div>
 
 					<!-- Label (hidden when collapsed) -->
-					<span
-						class="font-mono text-xs tracking-wider uppercase is-drawer-close:hidden transition-colors
-							{active ? '' : 'group-hover:text-base-content/80'}"
-						style="text-shadow: {active ? '0 0 10px oklch(0.70 0.18 240 / 0.4)' : 'none'};"
-					>
-						{navItem.label}
-					</span>
+					{#if !$isSidebarCollapsed}
+						<span
+							class="font-mono text-xs tracking-wider uppercase transition-colors
+								{active ? '' : 'group-hover:text-base-content/80'}"
+							style="text-shadow: {active ? '0 0 10px oklch(0.70 0.18 240 / 0.4)' : 'none'};"
+						>
+							{navItem.label}
+						</span>
 
-					<!-- Active indicator line (extended) -->
-					{#if active}
-						<div
-							class="flex-1 h-px is-drawer-close:hidden"
-							style="background: linear-gradient(90deg, oklch(0.70 0.18 240 / 0.4), transparent);"
-						></div>
+						<!-- Active indicator line (extended) -->
+						{#if active}
+							<div
+								class="flex-1 h-px"
+								style="background: linear-gradient(90deg, oklch(0.70 0.18 240 / 0.4), transparent);"
+							></div>
+						{/if}
 					{/if}
 				</a>
 			{/each}
@@ -174,7 +183,7 @@
 				<a
 					href={navItem.href}
 					class="w-full flex items-center gap-3 px-3 py-2 rounded transition-all duration-200 group
-						is-drawer-close:justify-center is-drawer-close:tooltip is-drawer-close:tooltip-right
+						{$isSidebarCollapsed ? 'justify-center tooltip tooltip-right' : ''}
 						{active ? '' : 'industrial-hover'}"
 					style="
 						background: {active ? 'linear-gradient(90deg, oklch(0.70 0.18 240 / 0.15) 0%, transparent 100%)' : 'transparent'};
@@ -205,20 +214,22 @@
 					</div>
 
 					<!-- Label (hidden when collapsed) -->
-					<span
-						class="font-mono text-[10px] tracking-wider uppercase is-drawer-close:hidden transition-colors
-							{active ? '' : 'group-hover:text-base-content/70'}"
-						style="color: {active ? 'oklch(0.70 0.10 240)' : 'oklch(0.50 0.02 250)'};"
-					>
-						{navItem.label}
-					</span>
+					{#if !$isSidebarCollapsed}
+						<span
+							class="font-mono text-[10px] tracking-wider uppercase transition-colors
+								{active ? '' : 'group-hover:text-base-content/70'}"
+							style="color: {active ? 'oklch(0.70 0.10 240)' : 'oklch(0.50 0.02 250)'};"
+						>
+							{navItem.label}
+						</span>
 
-					<!-- Active indicator line (extended) -->
-					{#if active}
-						<div
-							class="flex-1 h-px is-drawer-close:hidden"
-							style="background: linear-gradient(90deg, oklch(0.70 0.18 240 / 0.3), transparent);"
-						></div>
+						<!-- Active indicator line (extended) -->
+						{#if active}
+							<div
+								class="flex-1 h-px"
+								style="background: linear-gradient(90deg, oklch(0.70 0.18 240 / 0.3), transparent);"
+							></div>
+						{/if}
 					{/if}
 				</a>
 			{/each}
@@ -239,7 +250,7 @@
 					href="/settings"
 					aria-label="Settings"
 					class="w-full flex items-center gap-3 px-3 py-2.5 rounded transition-all duration-200 group
-						is-drawer-close:justify-center is-drawer-close:tooltip is-drawer-close:tooltip-right
+						{$isSidebarCollapsed ? 'justify-center tooltip tooltip-right' : ''}
 						{settingsActive ? '' : 'industrial-hover'}"
 					style="
 						background: {settingsActive ? 'linear-gradient(90deg, oklch(0.70 0.18 240 / 0.2) 0%, transparent 100%)' : 'transparent'};
@@ -262,13 +273,15 @@
 							<path stroke-linecap="round" stroke-linejoin="round" d={icons.settings} />
 						</svg>
 					</div>
-					<span
-						class="font-mono text-xs tracking-wider uppercase is-drawer-close:hidden transition-colors
-							{settingsActive ? '' : 'group-hover:text-base-content/70'}"
-						style="text-shadow: {settingsActive ? '0 0 10px oklch(0.70 0.18 240 / 0.4)' : 'none'};"
-					>
-						Settings
-					</span>
+					{#if !$isSidebarCollapsed}
+						<span
+							class="font-mono text-xs tracking-wider uppercase transition-colors
+								{settingsActive ? '' : 'group-hover:text-base-content/70'}"
+							style="text-shadow: {settingsActive ? '0 0 10px oklch(0.70 0.18 240 / 0.4)' : 'none'};"
+						>
+							Settings
+						</span>
+					{/if}
 				</a>
 			{/if}
 
@@ -277,7 +290,7 @@
 				onclick={toggleHelp}
 				aria-label="Show help guide"
 				class="w-full flex items-center gap-3 px-3 py-2.5 rounded transition-all duration-200 group
-					is-drawer-close:justify-center is-drawer-close:tooltip is-drawer-close:tooltip-right
+					{$isSidebarCollapsed ? 'justify-center tooltip tooltip-right' : ''}
 					industrial-hover"
 				style="color: oklch(0.60 0.02 250);"
 				data-tip="Help & Shortcuts"
@@ -295,9 +308,11 @@
 						<path stroke-linecap="round" stroke-linejoin="round" d={icons.help} />
 					</svg>
 				</div>
-				<span class="font-mono text-xs tracking-wider uppercase is-drawer-close:hidden group-hover:text-base-content/70">
-					Help
-				</span>
+				{#if !$isSidebarCollapsed}
+					<span class="font-mono text-xs tracking-wider uppercase group-hover:text-base-content/70">
+						Help
+					</span>
+				{/if}
 			</button>
 		</div>
 

@@ -1,9 +1,30 @@
 /**
  * Drawer Store
- * Manages state for task creation drawer and spawn modal
+ * Manages state for task creation drawer, spawn modal, and sidebar collapse
  */
 
-import { writable } from 'svelte/store';
+import { writable, get } from 'svelte/store';
+
+// Sidebar collapsed state (for desktop - separate from DaisyUI drawer mechanism)
+// When collapsed: sidebar is narrow (w-14), shows tooltips on hover
+// When expanded: sidebar is wide (w-64), shows full labels
+export const isSidebarCollapsed = writable(false);
+
+export function toggleSidebar() {
+	isSidebarCollapsed.update(v => !v);
+}
+
+export function collapseSidebar() {
+	isSidebarCollapsed.set(true);
+}
+
+export function expandSidebar() {
+	isSidebarCollapsed.set(false);
+}
+
+export function getSidebarCollapsed(): boolean {
+	return get(isSidebarCollapsed);
+}
 
 // Task drawer state
 export const isTaskDrawerOpen = writable(false);
@@ -120,14 +141,24 @@ export function closeProjectDrawer() {
 // Keyboard shortcut: Alt+S to open
 export const isStartDropdownOpen = writable(false);
 
+// Track if dropdown was opened via keyboard (for auto-focus behavior)
+export const startDropdownOpenedViaKeyboard = writable(false);
+
 export function openStartDropdown() {
 	isStartDropdownOpen.set(true);
 }
 
 export function closeStartDropdown() {
 	isStartDropdownOpen.set(false);
+	startDropdownOpenedViaKeyboard.set(false);
 }
 
 export function toggleStartDropdown() {
 	isStartDropdownOpen.update(v => !v);
+}
+
+// Open dropdown via keyboard shortcut (triggers auto-focus behavior)
+export function openStartDropdownViaKeyboard() {
+	startDropdownOpenedViaKeyboard.set(true);
+	isStartDropdownOpen.set(true);
 }
