@@ -17,6 +17,8 @@
 		model: string;
 		agent_stagger: number;
 		claude_startup_timeout: number;
+		projects_session_height: number;
+		projects_task_height: number;
 	}
 
 	// State
@@ -36,6 +38,8 @@
 	let model = $state('opus');
 	let agentStagger = $state(15);
 	let claudeStartupTimeout = $state(20);
+	let projectsSessionHeight = $state(400);
+	let projectsTaskHeight = $state(400);
 
 	// Track if form has changes
 	let originalValues = $state<JatDefaults | null>(null);
@@ -47,14 +51,18 @@
 			claudeFlags !== originalValues.claude_flags ||
 			model !== originalValues.model ||
 			agentStagger !== originalValues.agent_stagger ||
-			claudeStartupTimeout !== originalValues.claude_startup_timeout
+			claudeStartupTimeout !== originalValues.claude_startup_timeout ||
+			projectsSessionHeight !== originalValues.projects_session_height ||
+			projectsTaskHeight !== originalValues.projects_task_height
 		)
 	);
 
 	// Validation rules
 	const VALIDATION_RULES = {
 		agentStagger: { min: 5, max: 300 },
-		claudeStartupTimeout: { min: 10, max: 120 }
+		claudeStartupTimeout: { min: 10, max: 120 },
+		projectsSessionHeight: { min: 100, max: 1200 },
+		projectsTaskHeight: { min: 100, max: 1200 }
 	};
 
 	// Validation error messages (reactive)
@@ -78,9 +86,32 @@
 		return null;
 	});
 
+	let projectsSessionHeightError = $derived.by(() => {
+		if (projectsSessionHeight < VALIDATION_RULES.projectsSessionHeight.min) {
+			return `Minimum is ${VALIDATION_RULES.projectsSessionHeight.min}px`;
+		}
+		if (projectsSessionHeight > VALIDATION_RULES.projectsSessionHeight.max) {
+			return `Maximum is ${VALIDATION_RULES.projectsSessionHeight.max}px`;
+		}
+		return null;
+	});
+
+	let projectsTaskHeightError = $derived.by(() => {
+		if (projectsTaskHeight < VALIDATION_RULES.projectsTaskHeight.min) {
+			return `Minimum is ${VALIDATION_RULES.projectsTaskHeight.min}px`;
+		}
+		if (projectsTaskHeight > VALIDATION_RULES.projectsTaskHeight.max) {
+			return `Maximum is ${VALIDATION_RULES.projectsTaskHeight.max}px`;
+		}
+		return null;
+	});
+
 	// Track if form has validation errors
 	let hasValidationErrors = $derived(
-		agentStaggerError !== null || claudeStartupTimeoutError !== null
+		agentStaggerError !== null ||
+		claudeStartupTimeoutError !== null ||
+		projectsSessionHeightError !== null ||
+		projectsTaskHeightError !== null
 	);
 
 	// Load defaults on mount
@@ -108,6 +139,8 @@
 			model = defaults.model || 'opus';
 			agentStagger = defaults.agent_stagger || 15;
 			claudeStartupTimeout = defaults.claude_startup_timeout || 20;
+			projectsSessionHeight = defaults.projects_session_height || 400;
+			projectsTaskHeight = defaults.projects_task_height || 400;
 			configPath = data.configPath || '';
 
 			// Store original values for change detection
@@ -136,7 +169,9 @@
 						claude_flags: claudeFlags,
 						model,
 						agent_stagger: agentStagger,
-						claude_startup_timeout: claudeStartupTimeout
+						claude_startup_timeout: claudeStartupTimeout,
+						projects_session_height: projectsSessionHeight,
+						projects_task_height: projectsTaskHeight
 					}
 				})
 			});
@@ -155,7 +190,9 @@
 				claude_flags: claudeFlags,
 				model,
 				agent_stagger: agentStagger,
-				claude_startup_timeout: claudeStartupTimeout
+				claude_startup_timeout: claudeStartupTimeout,
+				projects_session_height: projectsSessionHeight,
+				projects_task_height: projectsTaskHeight
 			};
 
 			success = 'Defaults saved successfully';
@@ -176,6 +213,8 @@
 			model = originalValues.model;
 			agentStagger = originalValues.agent_stagger;
 			claudeStartupTimeout = originalValues.claude_startup_timeout;
+			projectsSessionHeight = originalValues.projects_session_height;
+			projectsTaskHeight = originalValues.projects_task_height;
 		}
 	}
 
@@ -204,6 +243,8 @@
 			model = defaults.model;
 			agentStagger = defaults.agent_stagger;
 			claudeStartupTimeout = defaults.claude_startup_timeout;
+			projectsSessionHeight = defaults.projects_session_height;
+			projectsTaskHeight = defaults.projects_task_height;
 
 			// Update original values
 			originalValues = { ...defaults };
@@ -397,6 +438,57 @@
 						bind:value={toolsPath}
 						placeholder="~/.local/bin"
 					/>
+				</div>
+			</div>
+
+			<!-- Layout Section -->
+			<div class="form-section">
+				<h3 class="section-title">Projects Page Layout</h3>
+
+				<div class="form-row">
+					<div class="form-group">
+						<label class="form-label" for="session-height">
+							Sessions Panel Height
+							<span class="label-hint">Default height for sessions section</span>
+						</label>
+						<div class="input-with-unit">
+							<input
+								type="number"
+								id="session-height"
+								class="form-input"
+								class:input-error={projectsSessionHeightError}
+								bind:value={projectsSessionHeight}
+								min={VALIDATION_RULES.projectsSessionHeight.min}
+								max={VALIDATION_RULES.projectsSessionHeight.max}
+							/>
+							<span class="input-unit">px</span>
+						</div>
+						{#if projectsSessionHeightError}
+							<span class="field-error">{projectsSessionHeightError}</span>
+						{/if}
+					</div>
+
+					<div class="form-group">
+						<label class="form-label" for="task-height">
+							Tasks Panel Height
+							<span class="label-hint">Default height for tasks section</span>
+						</label>
+						<div class="input-with-unit">
+							<input
+								type="number"
+								id="task-height"
+								class="form-input"
+								class:input-error={projectsTaskHeightError}
+								bind:value={projectsTaskHeight}
+								min={VALIDATION_RULES.projectsTaskHeight.min}
+								max={VALIDATION_RULES.projectsTaskHeight.max}
+							/>
+							<span class="input-unit">px</span>
+						</div>
+						{#if projectsTaskHeightError}
+							<span class="field-error">{projectsTaskHeightError}</span>
+						{/if}
+					</div>
 				</div>
 			</div>
 

@@ -35,7 +35,7 @@
 	} from '$lib/stores/workSessions.svelte.js';
 	import { broadcastSessionEvent, lastSessionEvent } from '$lib/stores/sessionEvents';
 	import { lastTaskEvent } from '$lib/stores/taskEvents';
-	import { getProjectFromTaskId, filterTasksByProject } from '$lib/utils/projectUtils';
+	import { getProjectFromTaskId, filterTasksByProject, buildEpicChildMap, getParentEpicId } from '$lib/utils/projectUtils';
 	import { getProjectColor } from '$lib/utils/projectColors';
 	import { openTaskDrawer, openProjectDrawer } from '$lib/stores/drawerStore';
 	import { SORT_OPTIONS, getSortBy, getSortDir, handleSortClick, initSort, type SortOption } from '$lib/stores/workSort.svelte';
@@ -87,11 +87,16 @@
 	const SECTION_STATE_KEY = 'projects-section-';
 	const PROJECT_ORDER_KEY = 'projects-order';
 	const SESSION_ORDER_KEY = 'projects-session-order-';
+	const EPIC_GROUP_COLLAPSE_KEY = 'projects-epic-collapse-';
 
-	// Section defaults
-	const DEFAULT_SESSION_HEIGHT = 300;
-	const DEFAULT_TASK_HEIGHT = 400;
+	// Section defaults (will be loaded from config)
+	let configSessionHeight = $state(400);
+	let configTaskHeight = $state(400);
 	const MIN_SECTION_HEIGHT = 100;
+
+	// Derived default heights (using config values)
+	const DEFAULT_SESSION_HEIGHT = $derived(configSessionHeight);
+	const DEFAULT_TASK_HEIGHT = $derived(configTaskHeight);
 
 	// State
 	let tasks = $state<Task[]>([]);
@@ -131,6 +136,10 @@
 	// Session drag state (separate from project drag)
 	let draggedSession = $state<{ project: string; sessionName: string } | null>(null);
 	let dragOverSession = $state<{ project: string; sessionName: string } | null>(null);
+
+	// Epic group collapse state - tracks which epic groups are collapsed per project
+	// Key format: "project:epicId" or "project:other" for non-epic sessions
+	let collapsedEpicGroups = $state<Set<string>>(new Set());
 
 	// Keyboard navigation state
 	let focusedProjectIndex = $state<number>(-1);
@@ -213,6 +222,54 @@
 		}
 		return groups;
 	});
+
+	// Build epic->child mapping for session grouping (same as TaskTable)
+	const epicChildMap = $derived.by(() => {
+		const taskList = allTasks.length > 0 ? allTasks : tasks;
+		return buildEpicChildMap(taskList);
+	});
+
+	// Group sessions by epic for a given project
+	// Returns { epicSessions: Map<epicId, sessions[]>, nonEpicSessions: sessions[] }
+	function getSessionsByEpic(sessions: typeof workSessionsState.sessions) {
+		const epicSessions = new Map<string, typeof workSessionsState.sessions>();
+		const nonEpicSessions: typeof workSessionsState.sessions = [];
+
+		for (const session of sessions) {
+			const taskId = session.task?.id;
+			if (!taskId) {
+				nonEpicSessions.push(session);
+				continue;
+			}
+
+			// Check if this task is an epic itself
+			const task = [...allTasks, ...tasks].find(t => t.id === taskId);
+			if (task?.issue_type === 'epic') {
+				// Session is working on an epic directly
+				const existing = epicSessions.get(taskId) || [];
+				existing.push(session);
+				epicSessions.set(taskId, existing);
+				continue;
+			}
+
+			// Check if task belongs to an epic (via hierarchy or dependency)
+			const parentEpic = getParentEpicId(taskId, epicChildMap);
+			if (parentEpic) {
+				const existing = epicSessions.get(parentEpic) || [];
+				existing.push(session);
+				epicSessions.set(parentEpic, existing);
+			} else {
+				nonEpicSessions.push(session);
+			}
+		}
+
+		return { epicSessions, nonEpicSessions };
+	}
+
+	// Get epic task info for display
+	function getEpicTask(epicId: string): Task | undefined {
+		return [...allTasks, ...tasks].find(t => t.id === epicId);
+	}
 
 	// Helper to get section key
 	function getSectionKey(project: string, section: 'sessions' | 'tasks'): string {
@@ -354,6 +411,45 @@
 		newState.set(project, !current);
 		projectCollapseState = newState;
 		saveProjectCollapse(project, !current);
+	}
+
+	// Epic group collapse helpers
+	function getEpicGroupKey(project: string, groupId: string): string {
+		return `${project}:${groupId}`;
+	}
+
+	function loadCollapsedEpicGroups(): Set<string> {
+		if (!browser) return new Set();
+		const saved = localStorage.getItem(EPIC_GROUP_COLLAPSE_KEY);
+		if (saved) {
+			try {
+				return new Set(JSON.parse(saved));
+			} catch {
+				return new Set();
+			}
+		}
+		return new Set();
+	}
+
+	function saveCollapsedEpicGroups(groups: Set<string>) {
+		if (!browser) return;
+		localStorage.setItem(EPIC_GROUP_COLLAPSE_KEY, JSON.stringify(Array.from(groups)));
+	}
+
+	function isEpicGroupCollapsed(project: string, groupId: string): boolean {
+		return collapsedEpicGroups.has(getEpicGroupKey(project, groupId));
+	}
+
+	function toggleEpicGroupCollapse(project: string, groupId: string) {
+		const key = getEpicGroupKey(project, groupId);
+		const newSet = new Set(collapsedEpicGroups);
+		if (newSet.has(key)) {
+			newSet.delete(key);
+		} else {
+			newSet.add(key);
+		}
+		collapsedEpicGroups = newSet;
+		saveCollapsedEpicGroups(newSet);
 	}
 
 	// Handle section resize
@@ -870,6 +966,21 @@
 		}
 	}
 
+	// Fetch JAT defaults (for layout heights)
+	async function fetchConfigDefaults() {
+		try {
+			const response = await fetch('/api/config/defaults');
+			const data = await response.json();
+			if (data.success && data.defaults) {
+				configSessionHeight = data.defaults.projects_session_height || 400;
+				configTaskHeight = data.defaults.projects_task_height || 400;
+			}
+		} catch (error) {
+			console.error('Failed to fetch config defaults:', error);
+			// Keep the defaults on error
+		}
+	}
+
 	// Open task creation drawer with project pre-selected
 	function handleCreateTaskForProject(project: string) {
 		openTaskDrawer(project);
@@ -906,7 +1017,9 @@
 
 	onMount(async () => {
 		customProjectOrder = loadProjectOrder();
+		collapsedEpicGroups = loadCollapsedEpicGroups();
 		initSort(); // Initialize session sort from localStorage
+		await fetchConfigDefaults(); // Load layout defaults before project data
 		await fetchConfigProjects(); // Load all configured projects FIRST
 		fetchTaskData();
 		await fetchSessions();
@@ -1201,68 +1314,174 @@
 						{@const taskState = getSectionState(project, 'tasks')}
 						{@const isEmptyProject = !hasSessions && projectTasks.length === 0}
 						<div class="flex flex-col">
-							<!-- Sessions Section (no header row - controlled by badge) -->
+							<!-- Sessions Section - grouped by epic -->
 							{#if filteredSessions.length > 0 && !sessionState.collapsed}
+								{@const { epicSessions, nonEpicSessions } = getSessionsByEpic(filteredSessions)}
 								<div class="border-b border-base-300" transition:slide={{ duration: 200 }}>
-									<!-- Sessions content -->
+									<!-- Sessions content - fixed height constrains cards, user can resize via divider -->
 									<div
 										class="overflow-hidden transition-all duration-200"
 										style="height: {sessionState.height}px;"
 									>
-										<div class="flex gap-3 overflow-x-auto h-full p-2 scrollbar-thin scrollbar-thumb-base-300 scrollbar-track-transparent">
-											{#each filteredSessions as session (session.sessionName)}
-												{@const isSessionDragging = draggedSession?.sessionName === session.sessionName}
-												{@const isSessionDragOver = dragOverSession?.sessionName === session.sessionName && dragOverSession?.project === project}
-												<!-- svelte-ignore a11y_no_static_element_interactions -->
-												<div
-													class="h-[calc(100%-8px)] transition-all duration-150 relative"
-													class:opacity-50={isSessionDragging}
-													class:ring-2={isSessionDragOver}
-													class:ring-primary={isSessionDragOver}
-													class:cursor-grab={isManualSort}
-													draggable={isManualSort}
-													ondragstart={(e) => handleSessionDragStart(e, project, session.sessionName)}
-													ondragend={handleSessionDragEnd}
-												>
-													<!-- Drop zone overlay - captures drop events during drag -->
-													{#if isManualSort && draggedSession && !isSessionDragging}
-														<!-- svelte-ignore a11y_no_static_element_interactions -->
-														<div
-															class="absolute inset-0 z-50"
-															ondragover={(e) => handleSessionDragOver(e, project, session.sessionName)}
-															ondragleave={handleSessionDragLeave}
-															ondrop={(e) => handleSessionDrop(e, project, session.sessionName)}
-														></div>
+										<div class="flex flex-col gap-2 overflow-y-auto h-full p-2 scrollbar-thin scrollbar-thumb-base-300 scrollbar-track-transparent">
+											<!-- Epic session groups -->
+											{#each Array.from(epicSessions.entries()) as [epicId, epicSessionList] (epicId)}
+												{@const epicTask = getEpicTask(epicId)}
+												{@const isEpicCollapsed = isEpicGroupCollapsed(project, epicId)}
+												<div class="flex flex-col gap-1 {isEpicCollapsed ? '' : 'flex-1'} min-h-0">
+													<!-- Epic header (clickable to collapse) -->
+													<!-- svelte-ignore a11y_no_static_element_interactions -->
+													<div
+														class="flex items-center gap-2 px-2 py-1 bg-base-200/50 rounded-lg border-l-2 border-purple-500/50 cursor-pointer hover:bg-base-200 transition-colors select-none"
+														onclick={() => toggleEpicGroupCollapse(project, epicId)}
+														onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleEpicGroupCollapse(project, epicId); } }}
+														role="button"
+														tabindex="0"
+														title="Click to {isEpicCollapsed ? 'expand' : 'collapse'} epic sessions"
+													>
+														<span class="text-purple-400 text-sm transition-transform duration-200 {isEpicCollapsed ? '-rotate-90' : ''}">📦</span>
+														<span class="text-xs font-semibold text-purple-300 uppercase tracking-wide">{epicTask?.title || epicId}</span>
+														<span class="badge badge-xs {isEpicCollapsed ? 'badge-primary' : 'badge-ghost'}">{epicSessionList.length}</span>
+													</div>
+													<!-- Epic sessions (horizontal scroll) -->
+													{#if !isEpicCollapsed}
+													<div class="flex gap-3 overflow-x-auto pl-3 h-full scrollbar-thin scrollbar-thumb-base-300 scrollbar-track-transparent" transition:slide={{ duration: 200 }}>
+														{#each epicSessionList as session (session.sessionName)}
+															{@const isSessionDragging = draggedSession?.sessionName === session.sessionName}
+															{@const isSessionDragOver = dragOverSession?.sessionName === session.sessionName && dragOverSession?.project === project}
+															<!-- svelte-ignore a11y_no_static_element_interactions -->
+															<div
+																class="h-full transition-all duration-150 relative flex-shrink-0"
+																class:opacity-50={isSessionDragging}
+																class:ring-2={isSessionDragOver}
+																class:ring-primary={isSessionDragOver}
+																class:cursor-grab={isManualSort}
+																draggable={isManualSort}
+																ondragstart={(e) => handleSessionDragStart(e, project, session.sessionName)}
+																ondragend={handleSessionDragEnd}
+															>
+																{#if isManualSort && draggedSession && !isSessionDragging}
+																	<!-- svelte-ignore a11y_no_static_element_interactions -->
+																	<div
+																		class="absolute inset-0 z-50"
+																		ondragover={(e) => handleSessionDragOver(e, project, session.sessionName)}
+																		ondragleave={handleSessionDragLeave}
+																		ondrop={(e) => handleSessionDrop(e, project, session.sessionName)}
+																	></div>
+																{/if}
+																<SessionCard
+																	mode="agent"
+																	sessionName={session.sessionName}
+																	agentName={session.agentName}
+																	task={session.task}
+																	lastCompletedTask={session.lastCompletedTask}
+																	output={session.output}
+																	lineCount={session.lineCount}
+																	tokens={session.tokens}
+																	cost={session.cost}
+																	sparklineData={session.sparklineData}
+																	contextPercent={session.contextPercent ?? undefined}
+																	startTime={session.created ? new Date(session.created) : null}
+																	sseState={session._sseState}
+																	sseStateTimestamp={session._sseStateTimestamp}
+																	signalSuggestedTasks={session._signalSuggestedTasks}
+																	signalSuggestedTasksTimestamp={session._signalSuggestedTasksTimestamp}
+																	completionBundle={session._completionBundle}
+																	completionBundleTimestamp={session._completionBundleTimestamp}
+																	onKillSession={() => handleKillSession(session.sessionName)}
+																	onInterrupt={() => handleInterrupt(session.sessionName)}
+																	onContinue={() => handleContinue(session.sessionName)}
+																	onAttachTerminal={() => handleAttachTerminal(session.sessionName)}
+																	onSendInput={(input, type) => handleSendInput(session.sessionName, input, type)}
+																	onTaskClick={handleTaskClick}
+																	isHighlighted={highlightedAgent === session.agentName}
+																/>
+															</div>
+														{/each}
+													</div>
 													{/if}
-													<SessionCard
-														mode="agent"
-														sessionName={session.sessionName}
-														agentName={session.agentName}
-														task={session.task}
-														lastCompletedTask={session.lastCompletedTask}
-														output={session.output}
-														lineCount={session.lineCount}
-														tokens={session.tokens}
-														cost={session.cost}
-														sparklineData={session.sparklineData}
-														contextPercent={session.contextPercent ?? undefined}
-														startTime={session.created ? new Date(session.created) : null}
-														sseState={session._sseState}
-														sseStateTimestamp={session._sseStateTimestamp}
-														signalSuggestedTasks={session._signalSuggestedTasks}
-														signalSuggestedTasksTimestamp={session._signalSuggestedTasksTimestamp}
-														completionBundle={session._completionBundle}
-														completionBundleTimestamp={session._completionBundleTimestamp}
-														onKillSession={() => handleKillSession(session.sessionName)}
-														onInterrupt={() => handleInterrupt(session.sessionName)}
-														onContinue={() => handleContinue(session.sessionName)}
-														onAttachTerminal={() => handleAttachTerminal(session.sessionName)}
-														onSendInput={(input, type) => handleSendInput(session.sessionName, input, type)}
-														onTaskClick={handleTaskClick}
-														isHighlighted={highlightedAgent === session.agentName}
-													/>
 												</div>
 											{/each}
+
+											<!-- Non-epic sessions -->
+											{#if nonEpicSessions.length > 0}
+												{@const isOtherCollapsed = isEpicGroupCollapsed(project, 'other')}
+												<div class="flex flex-col gap-1 {isOtherCollapsed ? '' : 'flex-1'} min-h-0">
+													<!-- Only show header if there are also epic sessions -->
+													{#if epicSessions.size > 0}
+														<!-- svelte-ignore a11y_no_static_element_interactions -->
+														<div
+															class="flex items-center gap-2 px-2 py-1 bg-base-200/50 rounded-lg border-l-2 border-base-content/20 cursor-pointer hover:bg-base-200 transition-colors select-none"
+															onclick={() => toggleEpicGroupCollapse(project, 'other')}
+															onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleEpicGroupCollapse(project, 'other'); } }}
+															role="button"
+															tabindex="0"
+															title="Click to {isOtherCollapsed ? 'expand' : 'collapse'} other sessions"
+														>
+															<span class="text-base-content/50 text-sm transition-transform duration-200 {isOtherCollapsed ? '-rotate-90' : ''}">📋</span>
+															<span class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Other Sessions</span>
+															<span class="badge badge-xs {isOtherCollapsed ? 'badge-primary' : 'badge-ghost'}">{nonEpicSessions.length}</span>
+														</div>
+													{/if}
+													<!-- Non-epic sessions (horizontal scroll) -->
+													{#if !isOtherCollapsed || epicSessions.size === 0}
+													<div class="flex gap-3 overflow-x-auto h-full {epicSessions.size > 0 ? 'pl-3' : ''} scrollbar-thin scrollbar-thumb-base-300 scrollbar-track-transparent" transition:slide={{ duration: 200 }}>
+														{#each nonEpicSessions as session (session.sessionName)}
+															{@const isSessionDragging = draggedSession?.sessionName === session.sessionName}
+															{@const isSessionDragOver = dragOverSession?.sessionName === session.sessionName && dragOverSession?.project === project}
+															<!-- svelte-ignore a11y_no_static_element_interactions -->
+															<div
+																class="h-full transition-all duration-150 relative flex-shrink-0"
+																class:opacity-50={isSessionDragging}
+																class:ring-2={isSessionDragOver}
+																class:ring-primary={isSessionDragOver}
+																class:cursor-grab={isManualSort}
+																draggable={isManualSort}
+																ondragstart={(e) => handleSessionDragStart(e, project, session.sessionName)}
+																ondragend={handleSessionDragEnd}
+															>
+																{#if isManualSort && draggedSession && !isSessionDragging}
+																	<!-- svelte-ignore a11y_no_static_element_interactions -->
+																	<div
+																		class="absolute inset-0 z-50"
+																		ondragover={(e) => handleSessionDragOver(e, project, session.sessionName)}
+																		ondragleave={handleSessionDragLeave}
+																		ondrop={(e) => handleSessionDrop(e, project, session.sessionName)}
+																	></div>
+																{/if}
+																<SessionCard
+																	mode="agent"
+																	sessionName={session.sessionName}
+																	agentName={session.agentName}
+																	task={session.task}
+																	lastCompletedTask={session.lastCompletedTask}
+																	output={session.output}
+																	lineCount={session.lineCount}
+																	tokens={session.tokens}
+																	cost={session.cost}
+																	sparklineData={session.sparklineData}
+																	contextPercent={session.contextPercent ?? undefined}
+																	startTime={session.created ? new Date(session.created) : null}
+																	sseState={session._sseState}
+																	sseStateTimestamp={session._sseStateTimestamp}
+																	signalSuggestedTasks={session._signalSuggestedTasks}
+																	signalSuggestedTasksTimestamp={session._signalSuggestedTasksTimestamp}
+																	completionBundle={session._completionBundle}
+																	completionBundleTimestamp={session._completionBundleTimestamp}
+																	onKillSession={() => handleKillSession(session.sessionName)}
+																	onInterrupt={() => handleInterrupt(session.sessionName)}
+																	onContinue={() => handleContinue(session.sessionName)}
+																	onAttachTerminal={() => handleAttachTerminal(session.sessionName)}
+																	onSendInput={(input, type) => handleSendInput(session.sessionName, input, type)}
+																	onTaskClick={handleTaskClick}
+																	isHighlighted={highlightedAgent === session.agentName}
+																/>
+															</div>
+														{/each}
+													</div>
+													{/if}
+												</div>
+											{/if}
 										</div>
 									</div>
 
@@ -1277,7 +1496,7 @@
 							<!-- Tasks Section (no header row - controlled by badge) -->
 							{#if !taskState.collapsed}
 							<div transition:slide={{ duration: 200 }}>
-								<!-- Tasks content -->
+								<!-- Tasks content - fixed height, user can resize via divider -->
 								<div
 									class="overflow-hidden transition-all duration-200"
 									style="height: {taskState.height}px;"

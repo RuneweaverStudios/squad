@@ -191,6 +191,31 @@ export const ANIMATIONS = {
 } as const;
 
 // =============================================================================
+// JAT DEFAULTS (stored in ~/.config/jat/projects.json)
+// =============================================================================
+
+export const JAT_DEFAULTS = {
+	/** Terminal emulator for new sessions */
+	terminal: 'alacritty',
+	/** Code editor command */
+	editor: 'code',
+	/** Path to JAT tools directory */
+	tools_path: '~/.local/bin',
+	/** CLI flags passed to claude command */
+	claude_flags: '--dangerously-skip-permissions',
+	/** Default Claude model: opus, sonnet, haiku */
+	model: 'opus',
+	/** Seconds between batch agent spawns */
+	agent_stagger: 15,
+	/** Seconds to wait for Claude TUI to start */
+	claude_startup_timeout: 20,
+	/** Default height for sessions panel on /projects page (px) */
+	projects_session_height: 400,
+	/** Default height for tasks panel on /projects page (px) */
+	projects_task_height: 400
+} as const;
+
+// =============================================================================
 // HELPER TYPE EXPORTS
 // =============================================================================
 

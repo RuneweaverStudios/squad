@@ -9,19 +9,9 @@ import { readFile, writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
+import { JAT_DEFAULTS } from '$lib/config/constants';
 
 const CONFIG_PATH = join(homedir(), '.config', 'jat', 'projects.json');
-
-// Default values
-const DEFAULT_CONFIG = {
-	terminal: 'alacritty',
-	editor: 'code',
-	tools_path: '~/.local/bin',
-	claude_flags: '--dangerously-skip-permissions',
-	model: 'opus',
-	agent_stagger: 15,
-	claude_startup_timeout: 20
-};
 
 /**
  * Read the full config file
@@ -64,7 +54,7 @@ export async function GET() {
 		const defaults = config.defaults || {};
 
 		// Merge with default values (user values override defaults)
-		const merged = { ...DEFAULT_CONFIG, ...defaults };
+		const merged = { ...JAT_DEFAULTS, ...defaults };
 
 		return json({
 			success: true,
@@ -98,7 +88,7 @@ export async function PUT({ request }) {
 		}
 
 		// Validate numeric fields
-		const numericFields = ['agent_stagger', 'claude_startup_timeout'];
+		const numericFields = ['agent_stagger', 'claude_startup_timeout', 'projects_session_height', 'projects_task_height'];
 		for (const field of numericFields) {
 			if (field in newDefaults && typeof newDefaults[field] !== 'number') {
 				return json({
@@ -150,7 +140,7 @@ export async function DELETE() {
 		// Read existing config to preserve projects
 		const config = await readConfig();
 
-		// Remove the defaults section entirely - GET will merge with DEFAULT_CONFIG
+		// Remove the defaults section entirely - GET will merge with JAT_DEFAULTS
 		delete config.defaults;
 
 		// Write back (preserves projects and other sections)
@@ -158,7 +148,7 @@ export async function DELETE() {
 
 		return json({
 			success: true,
-			defaults: DEFAULT_CONFIG,
+			defaults: JAT_DEFAULTS,
 			message: 'Defaults reset to factory values'
 		});
 	} catch (error) {
