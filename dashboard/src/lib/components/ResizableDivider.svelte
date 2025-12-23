@@ -128,7 +128,7 @@
 
 <div
 	bind:this={dividerElement}
-	class="divider-container flex items-center justify-center select-none {className} {isCollapsed ? 'cursor-pointer divider-collapsed' : 'cursor-row-resize'}"
+	class="divider-container flex items-center justify-center select-none {className} {isCollapsed ? 'cursor-pointer divider-collapsed' : 'cursor-row-resize'} {isDragging ? 'bg-primary/25' : isExpanded && isCollapsed ? 'bg-primary/40' : isExpanded ? 'bg-primary/15' : ''}"
 	class:expanded={isExpanded}
 	class:dragging={isDragging}
 	role="separator"
@@ -174,20 +174,20 @@
 	}
 
 	/* Expanded state: larger hit target + glow */
+	/* NOTE: background uses Tailwind class (bg-primary/15) on element instead of CSS */
 	.divider-container.expanded {
 		height: 16px;
 		min-height: 16px;
-		background: color-mix(in oklch, var(--color-primary) 15%, transparent);
 		box-shadow:
 			0 0 12px color-mix(in oklch, var(--color-primary) 40%, transparent),
 			inset 0 0 8px color-mix(in oklch, var(--color-primary) 20%, transparent);
 	}
 
 	/* Dragging state: stronger glow */
+	/* NOTE: background uses Tailwind class (bg-primary/25) on element instead of CSS */
 	.divider-container.dragging {
 		height: 16px;
 		min-height: 16px;
-		background: color-mix(in oklch, var(--color-primary) 25%, transparent);
 		box-shadow:
 			0 0 20px color-mix(in oklch, var(--color-primary) 50%, transparent),
 			inset 0 0 12px color-mix(in oklch, var(--color-primary) 30%, transparent);
@@ -246,10 +246,10 @@
 	}
 
 	/* Collapsed + expanded (proximity/hover): grow larger for easy targeting */
+	/* NOTE: background uses Tailwind class (bg-primary/40) on element instead of CSS */
 	.divider-collapsed.expanded {
 		height: 20px;
 		min-height: 20px;
-		background: color-mix(in oklch, var(--color-primary) 40%, transparent);
 		box-shadow:
 			0 0 16px color-mix(in oklch, var(--color-primary) 50%, transparent),
 			inset 0 0 10px color-mix(in oklch, var(--color-primary) 30%, transparent);

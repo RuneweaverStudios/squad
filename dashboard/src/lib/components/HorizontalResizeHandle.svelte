@@ -72,7 +72,7 @@
 </script>
 
 <div
-	class="resize-handle {className}"
+	class="resize-handle {className} hover:bg-primary/15 {isDragging ? 'bg-primary/15' : ''}"
 	class:dragging={isDragging}
 	role="separator"
 	aria-orientation="vertical"
@@ -105,10 +105,7 @@
 		transition: background 0.15s ease;
 	}
 
-	.resize-handle:hover,
-	.resize-handle.dragging {
-		background: color-mix(in oklch, var(--color-primary) 15%, transparent);
-	}
+	/* NOTE: background uses Tailwind class (hover:bg-primary/15) on element instead of CSS */
 
 	.grippy {
 		display: flex;
