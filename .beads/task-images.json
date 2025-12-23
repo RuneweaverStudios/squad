@@ -570,6 +570,21 @@
       "path": "/home/jw/.local/share/jat/task-images/upload-task-jat-57m8h-1766500459058-e8t25q.png",
       "uploadedAt": "2025-12-23T14:34:19.076Z",
       "id": "file-1766500459072-5bmyy3"
+    },
+    {
+      "path": "/home/jw/.local/share/jat/task-images/upload-task-jat-57m8h-1766505425174-ts0idg.png",
+      "uploadedAt": "2025-12-23T15:57:05.185Z",
+      "id": "file-1766505425180-4td7v9"
+    },
+    {
+      "path": "/home/jw/.local/share/jat/task-images/upload-task-jat-57m8h-1766505823776-zp5cy8.png",
+      "uploadedAt": "2025-12-23T16:03:43.783Z",
+      "id": "file-1766505823779-1rubhd"
+    },
+    {
+      "path": "/home/jw/.local/share/jat/task-images/upload-task-jat-57m8h-1766505823831-hjoig2.png",
+      "uploadedAt": "2025-12-23T16:03:43.838Z",
+      "id": "file-1766505823833-kj66lh"
     }
   ],
   "jat-phuk9": [
@@ -587,6 +602,35 @@
       "path": "/home/jw/.local/share/jat/task-images/upload-task-jat-phuk9-1766500343601-51v2fr.png",
       "uploadedAt": "2025-12-23T14:32:23.615Z",
       "id": "att-1766500331321-ibjmdh"
+    }
+  ],
+  "jat-66slg": [
+    {
+      "path": "/home/jw/.local/share/jat/task-images/upload-task-jat-66slg-1766518691598-0p9wrl.png",
+      "uploadedAt": "2025-12-23T19:38:11.611Z",
+      "id": "file-1766518691607-hh4bh1"
+    }
+  ],
+  "jat-q9340": [
+    {
+      "path": "/home/jw/.local/share/jat/task-images/upload-task-jat-q9340-1766518840599-d50n4p.png",
+      "uploadedAt": "2025-12-23T19:40:40.617Z",
+      "id": "att-1766518837493-76461q"
+    },
+    {
+      "path": "/home/jw/.local/share/jat/task-images/upload-task-jat-q9340-1766518840662-r13nnm.png",
+      "uploadedAt": "2025-12-23T19:40:40.673Z",
+      "id": "att-1766518837493-dd0wlq"
+    },
+    {
+      "path": "/home/jw/.local/share/jat/task-images/upload-task-jat-q9340-1766519034056-4k2x6g.png",
+      "uploadedAt": "2025-12-23T19:43:54.069Z",
+      "id": "file-1766519034066-wb063r"
+    },
+    {
+      "path": "/home/jw/.local/share/jat/task-images/upload-task-jat-q9340-1766519041940-lh1jjm.png",
+      "uploadedAt": "2025-12-23T19:44:01.955Z",
+      "id": "file-1766519041953-c851uq"
     }
   ]
 }
