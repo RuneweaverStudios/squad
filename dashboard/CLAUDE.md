@@ -173,6 +173,165 @@ export function initializeTheme() {
 
 **Solution**: Update `app.css` to Tailwind v4 syntax with proper `@plugin "daisyui"` configuration.
 
+## CSS color-mix() Patterns in app.css
+
+### Overview
+
+The `app.css` file contains approximately 45 uses of `color-mix()` to create semi-transparent colors. **Most of these CANNOT be replaced with Tailwind opacity classes** because they appear in contexts where Tailwind classes aren't applicable.
+
+### Why color-mix() is Required
+
+**Tailwind classes only work in HTML/Svelte templates.** CSS features like `@keyframes`, `box-shadow`, and `linear-gradient()` require actual CSS values. The `color-mix()` function allows us to:
+
+1. Create semi-transparent colors from CSS custom properties
+2. Use theme-aware animation colors (the `--anim-*` variables)
+3. Maintain consistency with the custom `jat` theme color system
+
+### Pattern Categories
+
+#### 1. @keyframes Animation Backgrounds (NOT replaceable)
+
+**Why:** Tailwind classes cannot be used inside `@keyframes` blocks. Animation keyframes must use raw CSS values.
+
+**Count:** ~20 uses across 8 animations
+
+| Animation | Purpose | Example |
+|-----------|---------|---------|
+| `task-entrance` | New task slide-in glow | `background-color: color-mix(in oklch, var(--anim-primary) 30%, transparent)` |
+| `task-exit` | Task deletion fade-out | `background-color: color-mix(in oklch, var(--anim-error) 20%, transparent)` |
+| `task-starting` | Green glow when starting | `background-color: color-mix(in oklch, var(--anim-success-bright) 25%, transparent)` |
+| `task-completed` | Gold glow on completion | `background-color: color-mix(in oklch, var(--anim-warning) 25%, transparent)` |
+| `working-to-completed` | Amber→green transition | Gradient with multiple color-mix stops |
+| `epic-completed` | Gold/purple triumphant glow | Complex gradient mixing warning-gold + secondary |
+| `epic-running` | Subtle amber pulsing | `background: linear-gradient(90deg, color-mix(...), transparent)` |
+| `agent-entrance` | New agent card glow | `box-shadow: 0 0 30px 10px color-mix(...)` |
+| `agent-highlight-flash` | Jump-to-session highlight | Multiple box-shadow keyframes |
+| `radar-pulse` | Empty state radar animation | `box-shadow: 0 0 30px color-mix(...)` |
+
+#### 2. Box-Shadow Glow Effects (NOT replaceable)
+
+**Why:** Tailwind's `shadow-*` utilities don't support custom colors with opacity. The `box-shadow` CSS property requires color values.
+
+**Count:** ~18 uses
+
+**Examples:**
+```css
+/* Glow around task row during animation */
+box-shadow: 0 0 20px color-mix(in oklch, var(--anim-primary) 40%, transparent);
+
+/* Multi-layer glow for epic completion */
+box-shadow: 0 0 40px color-mix(in oklch, var(--anim-warning-bright) 60%, transparent),
+            0 0 60px color-mix(in oklch, var(--anim-secondary-bright) 30%, transparent),
+            inset 0 0 25px color-mix(in oklch, var(--anim-warning-gold) 25%, transparent);
+```
+
+#### 3. Linear Gradient Backgrounds (NOT replaceable)
+
+**Why:** Gradients with semi-transparent color stops require actual color values. Tailwind's gradient utilities (`from-*`, `via-*`, `to-*`) don't support custom properties with opacity.
+
+**Count:** ~10 uses
+
+**Examples:**
+```css
+/* Horizontal fade for working state */
+background: linear-gradient(90deg,
+  color-mix(in oklch, var(--anim-warning) 15%, transparent),
+  transparent);
+
+/* Multi-color epic gradient */
+background: linear-gradient(90deg,
+  color-mix(in oklch, var(--anim-warning-gold) 30%, transparent),
+  color-mix(in oklch, var(--anim-secondary) 15%, transparent),
+  transparent);
+```
+
+#### 4. Row Shimmer Effect (NOT replaceable)
+
+**Why:** The `::after` pseudo-element gradient for active task shimmer requires CSS gradient values.
+
+**Location:** Lines 669-671
+
+```css
+.row-shimmer::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklch, var(--anim-warning) 12%, transparent) 25%,
+    color-mix(in oklch, var(--anim-warning-bright) 18%, transparent) 50%,
+    color-mix(in oklch, var(--anim-warning) 12%, transparent) 75%,
+    transparent 100%
+  );
+}
+```
+
+#### 5. Terminal Search Highlights (POTENTIALLY replaceable)
+
+**Why:** These are utility classes applied to elements, so Tailwind classes COULD work. However, they use theme-aware colors that need to match the animation system.
+
+**Location:** Lines 577-583
+
+```css
+.terminal-search-match {
+  background-color: color-mix(in oklch, var(--anim-warning-gold) 40%, transparent);
+}
+
+.terminal-search-match.current {
+  background-color: color-mix(in oklch, var(--anim-error) 60%, transparent);
+}
+```
+
+**Note:** These COULD be refactored to use `bg-warning/40` and `bg-error/60` with DaisyUI colors, but would lose the custom `--anim-*` color consistency.
+
+### Summary: What CAN vs CANNOT Be Replaced
+
+| Context | Replaceable? | Reason |
+|---------|--------------|--------|
+| `@keyframes` blocks | ❌ No | CSS-only, no class support |
+| `box-shadow` values | ❌ No | Tailwind shadows don't support custom colors |
+| `linear-gradient()` | ❌ No | Gradient utilities don't support custom props with opacity |
+| `::after` pseudo-elements | ❌ No | Cannot apply Tailwind classes to pseudo-elements in CSS |
+| Utility classes (`.terminal-search-match`) | ⚠️ Maybe | Could use Tailwind, but loses `--anim-*` consistency |
+
+### The --anim-* Color System
+
+The `color-mix()` patterns use a set of animation-specific CSS custom properties defined in the `[data-theme='jat']` block (lines 53-93):
+
+```css
+/* Primary blue - entrance animations, radar, links */
+--anim-primary: oklch(0.70 0.18 240);
+--anim-primary-bright: oklch(0.80 0.18 240);
+
+/* Success green - task starting, completion */
+--anim-success: oklch(0.65 0.20 145);
+--anim-success-bright: oklch(0.70 0.22 145);
+
+/* Warning amber/gold - working state, task completed badge */
+--anim-warning: oklch(0.75 0.15 85);
+--anim-warning-bright: oklch(0.80 0.18 85);
+
+/* etc... */
+```
+
+These provide theme-consistent colors across all animations. Using DaisyUI's `bg-warning/40` would use DaisyUI's warning color, which may not match.
+
+### Best Practices for Future Development
+
+1. **Don't try to convert @keyframes color-mix to Tailwind** - It won't work
+2. **Keep animation colors in --anim-\* variables** - Maintains theme consistency
+3. **Use color-mix for box-shadow glows** - Only way to get semi-transparent custom colors
+4. **For new utility classes**, consider:
+   - Use Tailwind opacity classes if DaisyUI colors are acceptable
+   - Use color-mix if custom animation colors are needed
+
+### Files Reference
+
+- `src/app.css` - All color-mix patterns (lines 163-687)
+- `src/app.css` - Animation color variables (lines 53-93)
+
+### Task Reference
+
+- jat-k6zps: Audit app.css animations - Document non-replaceable color-mix patterns (this section)
+
 ## DaisyUI Common Patterns
 
 ### ⚠️ CRITICAL: Drawer Overlay Pattern
@@ -3788,6 +3947,168 @@ npm run preview
 # Clean build cache
 rm -rf .svelte-kit node_modules/.vite
 ```
+
+## CSS color-mix Patterns: Why They Cannot Use Tailwind
+
+### Overview
+
+The `app.css` file contains **45** `color-mix()` uses (189 total across the dashboard, including Svelte components). This section documents why these patterns are **NOT replaceable** with Tailwind utility classes, preventing future contributors from attempting unnecessary refactoring.
+
+### Why color-mix is Used
+
+`color-mix()` provides:
+1. **oklch color space** - Perceptually uniform color blending
+2. **Variable transparency** - Mix any color with `transparent` at specific percentages
+3. **Dynamic theming** - Uses CSS custom properties (`--anim-*`) for theme-aware animations
+
+### Categories of color-mix Usage
+
+#### 1. Animation Keyframes (NOT Replaceable)
+
+**40 of 45 uses** are inside `@keyframes` declarations. **Tailwind classes cannot be used inside @keyframes at all.**
+
+```css
+/* ❌ IMPOSSIBLE - Tailwind classes don't work here */
+@keyframes task-entrance {
+  0% {
+    /* Need color values, not classes */
+    background-color: color-mix(in oklch, var(--anim-primary) 30%, transparent);
+  }
+}
+```
+
+**Affected animations:**
+| Animation | Uses | Purpose |
+|-----------|------|---------|
+| `task-entrance` | 4 | New task slide-in with blue glow |
+| `task-exit` | 2 | Task removal with red fade |
+| `task-starting` | 4 | Green glow when work begins |
+| `task-completed` | 4 | Gold glow on completion |
+| `working-to-completed` | 7 | Amber→green transition effect |
+| `epic-completed` | 8 | Triumphant gold/purple celebration |
+| `epic-running` | 4 | Pulsing amber for active epics |
+| `radar-pulse` | 1 | Empty state radar effect |
+| `agent-entrance` | 2 | Agent card pop-in glow |
+| `agent-highlight-flash` | 4 | Click-to-jump highlight |
+
+**Total: 40 uses in @keyframes** - None replaceable.
+
+#### 2. Pseudo-Element Gradients (NOT Replaceable)
+
+**3 uses** are in `::after` pseudo-element gradients:
+
+```css
+.row-shimmer::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklch, var(--anim-warning) 12%, transparent) 25%,
+    color-mix(in oklch, var(--anim-warning-bright) 18%, transparent) 50%,
+    color-mix(in oklch, var(--anim-warning) 12%, transparent) 75%,
+    transparent 100%
+  );
+}
+```
+
+**Why not replaceable:**
+- Tailwind cannot define custom gradient stops inside pseudo-elements
+- The gradient requires precise percentage-based color mixing
+- Uses CSS variables for theme-awareness
+
+#### 3. Static Utility Classes (Theoretically Replaceable, But...)
+
+**2 uses** are in regular CSS classes that could theoretically use Tailwind:
+
+```css
+.terminal-search-match {
+  background-color: color-mix(in oklch, var(--anim-warning-gold) 40%, transparent);
+}
+.terminal-search-match.current {
+  background-color: color-mix(in oklch, var(--anim-error) 60%, transparent);
+}
+```
+
+**Why we keep color-mix:**
+1. **oklch precision** - `bg-warning/40` uses sRGB, not oklch color space
+2. **Theme variable usage** - `--anim-warning-gold` is a custom animation color, not a Tailwind color
+3. **Consistency** - Keeps all animation colors in one system
+
+### Summary: What's Replaceable?
+
+| Context | Count | Replaceable? | Reason |
+|---------|-------|--------------|--------|
+| `@keyframes` declarations | 40 | ❌ NO | Tailwind classes can't be used in keyframes |
+| `::after` pseudo-element | 3 | ❌ NO | Custom gradient stops not possible |
+| Static classes | 2 | ⚠️ Partial | Would lose oklch precision and theme vars |
+| **TOTAL** | **45** | **0-2** | |
+
+### Box-Shadow Patterns
+
+Many color-mix uses create glow effects in `box-shadow`:
+
+```css
+box-shadow: 0 0 20px color-mix(in oklch, var(--anim-primary) 40%, transparent);
+```
+
+These appear in:
+- Animation keyframes (40 uses) - NOT replaceable
+- Combined with `inset` shadows for depth effects
+- Multi-layered shadows (e.g., `0 0 40px ..., 0 0 60px ..., inset 0 0 25px ...`)
+
+Tailwind's `shadow-*` utilities cannot reproduce these custom glow effects with:
+- Dynamic colors from CSS variables
+- Multiple layers with different blur radii
+- Animated transitions between shadow states
+
+### Gradient Patterns
+
+Linear gradients using color-mix:
+
+```css
+background: linear-gradient(90deg,
+  color-mix(in oklch, var(--anim-warning) 15%, transparent),
+  transparent
+);
+```
+
+These create:
+- Horizontal fades from colored to transparent
+- Multi-stop gradients with theme colors
+- Animated gradient transitions
+
+Tailwind's `bg-gradient-*` cannot:
+- Use CSS variables in gradient stops
+- Create arbitrary percentage-based mixing
+- Animate gradient colors via keyframes
+
+### For Future Contributors
+
+**DO NOT attempt to replace these patterns with Tailwind classes.** They are:
+1. Technically impossible (keyframes, pseudo-elements)
+2. Would lose visual fidelity (oklch vs sRGB)
+3. Would break theme-awareness (CSS variable usage)
+
+**If adding new animations:**
+- Use the existing `--anim-*` CSS variables (defined in `[data-theme='jat']`)
+- Follow the `color-mix(in oklch, var(--anim-*) XX%, transparent)` pattern
+- Place in app.css with the other animation keyframes
+
+**CSS Variables Available:**
+```css
+--anim-primary, --anim-primary-bright, --anim-primary-dim
+--anim-success, --anim-success-bright, --anim-success-dim
+--anim-warning, --anim-warning-bright, --anim-warning-gold
+--anim-error, --anim-error-dim
+--anim-info, --anim-info-bright, --anim-info-highlight
+--anim-secondary, --anim-secondary-bright, --anim-secondary-dim
+--anim-base-hover, --anim-base-row
+--anim-shimmer-highlight, --anim-shimmer-bright, --anim-shimmer-slow
+--anim-transition-mid, --anim-transition-mid-border
+```
+
+### Task Reference
+
+- jat-k6zps: Audit app.css animations and document non-replaceable patterns
 
 ## References
 
