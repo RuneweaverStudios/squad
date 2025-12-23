@@ -872,7 +872,7 @@
 									{/if}
 									<span
 										class="font-mono text-xs font-medium {idx === 0 && isGenerating ? 'shimmer-text-fast' : ''}"
-										style="color: {style.text}; --shimmer-text-color: {style.text};"
+										style={idx === 0 && isGenerating ? `--shimmer-text-color: ${style.text};` : `color: ${style.text};`}
 									>
 										{getEventLabel(event)}
 									</span>
@@ -1718,7 +1718,7 @@
 							<div class="px-3 h-full flex items-center justify-between">
 								<div class="flex items-center gap-2">
 									<span class="text-xs">{style.icon}</span>
-									<span class="font-mono text-[11px] font-medium {isNewest && isGenerating ? 'shimmer-text-fast' : ''}" style="color: {style.text}; --shimmer-text-color: {style.text};">
+									<span class="font-mono text-[11px] font-medium {isNewest && isGenerating ? 'shimmer-text-fast' : ''}" style={isNewest && isGenerating ? `--shimmer-text-color: ${style.text};` : `color: ${style.text};`}>
 										{getEventLabel(event)}
 									</span>
 									{#if event.git_sha}

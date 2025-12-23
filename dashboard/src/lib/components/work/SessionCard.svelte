@@ -4342,7 +4342,7 @@
 				<!-- Subtle shimmer effect -->
 				<div
 					class="absolute inset-0 opacity-30"
-					style="background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent); animation: shimmer 2s infinite;"
+					style="background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent); animation: shimmer 3s infinite;"
 				></div>
 
 				<div class="relative px-4 py-3">
@@ -4595,7 +4595,7 @@
 								'generating' || outputActivityState === 'thinking'
 								? 'shimmer-text-fast'
 								: ''}"
-							style="color: {displayAccent};"
+							style={!(outputActivityState === 'generating' || outputActivityState === 'thinking') ? `color: ${displayAccent};` : ""}
 						>
 							{agentName}
 						</span>

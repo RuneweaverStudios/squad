@@ -3310,7 +3310,7 @@
 											<div>
 												<div
 													class="font-medium text-sm {taskIsActive && isAgentGenerating(task.assignee) ? 'shimmer-text-fast' : ''}"
-													style="color: oklch(0.85 0.02 250);"
+													style={!(taskIsActive && isAgentGenerating(task.assignee)) ? "color: oklch(0.85 0.02 250);" : ""}
 												>{task.title}</div>
 												{#if task.description}
 													<div class="text-xs line-clamp-5" style="color: oklch(0.55 0.02 250);">
