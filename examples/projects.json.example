@@ -1,0 +1,38 @@
+{
+  "defaults": {
+    "terminal": "alacritty",
+    "editor": "code",
+    "tools_path": "~/.local/bin",
+    "claude_flags": "--dangerously-skip-permissions",
+    "model": "opus",
+    "agent_stagger": 15,
+    "claude_startup_timeout": 20
+  },
+  "projects": {
+    "my-webapp": {
+      "name": "MY-WEBAPP",
+      "path": "~/code/my-webapp",
+      "port": 3000,
+      "description": "My awesome web application",
+      "active_color": "rgb(0, 180, 120)",
+      "inactive_color": "rgb(0, 120, 80)"
+    },
+    "api-server": {
+      "name": "API-SERVER",
+      "path": "~/code/api-server",
+      "port": 8080,
+      "database_url": "postgresql://user:password@localhost:5432/mydb",
+      "description": "Backend API server",
+      "active_color": "rgb(100, 150, 255)",
+      "inactive_color": "rgb(60, 100, 180)"
+    },
+    "mobile-app": {
+      "name": "MOBILE-APP",
+      "path": "~/code/mobile-app",
+      "port": null,
+      "description": "React Native mobile application",
+      "active_color": "rgb(255, 100, 100)",
+      "inactive_color": "rgb(180, 60, 60)"
+    }
+  }
+}

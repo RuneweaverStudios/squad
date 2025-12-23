@@ -1,4 +1,12 @@
-# SQLite databases
+# .beads/.gitignore
+# This directory contains user-specific task data that should NOT be committed
+# Each user creates their own tasks when they run 'bd init' on their projects
+
+# =============================================================================
+# IGNORE ALL USER DATA (each user creates their own)
+# =============================================================================
+
+# SQLite databases (local cache, rebuilt from JSONL)
 *.db
 *.db?*
 *.db-journal
@@ -15,6 +23,17 @@ bd.sock
 db.sqlite
 bd.db
 
+# Task data - user-specific, don't commit
+issues.jsonl
+deletions.jsonl
+completions.json
+task-images.json
+task-images.json.bak
+review-rules.json
+
+# Signals - user session history, don't commit
+signals/
+
 # Merge artifacts (temporary files from 3-way merge)
 beads.base.jsonl
 beads.base.meta.json
@@ -23,11 +42,20 @@ beads.left.meta.json
 beads.right.jsonl
 beads.right.meta.json
 
-# Keep JSONL exports and config (source of truth for git)
-!issues.jsonl
-!metadata.json
-!config.json
+# Database backups
+*.backup-*
+*.bak
+*.gz
 
-# Keep signal timeline files (task history for detail drawer)
-!signals/
-!signals/*.jsonl
+# =============================================================================
+# KEEP THESE (templates/config)
+# =============================================================================
+
+# Config template (shows available options)
+!config.yaml
+
+# This gitignore file
+!.gitignore
+
+# Metadata (just structure info, not user data)
+!metadata.json
