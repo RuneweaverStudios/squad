@@ -331,6 +331,44 @@ addRule({
 });
 ```
 
+### Editing Existing Rules
+
+**Via UI:**
+1. Navigate to `/automation`
+2. Find the rule in the **Rules List** panel (left side, grouped by category)
+3. Each rule row has action buttons on the right:
+   - **Pencil icon** (Edit) - Opens the Rule Editor modal
+   - **Copy icon** (Clone) - Creates a duplicate of the rule
+   - **Trash icon** (Delete) - Removes the rule (with confirmation)
+4. Click the **pencil icon** to open the Rule Editor
+5. Modify any field (name, patterns, actions, cooldown, etc.)
+6. Click "Save" to apply changes
+
+**Key Fields to Check:**
+- **Cooldown (seconds)** - Minimum time between triggers (e.g., 30 = once per 30 seconds)
+- **Max triggers per hour** - Rate limit (0 = unlimited)
+- **Enabled toggle** - Quick on/off without deleting the rule
+
+**Via Code:**
+```typescript
+import { updateRule, getRules } from '$lib/stores/automationRules.svelte';
+
+// Find and update a rule
+const rules = getRules();
+const myRule = rules.find(r => r.name === 'My Rule');
+if (myRule) {
+  updateRule(myRule.id, {
+    cooldownSeconds: 10,  // Reduce cooldown from 30s to 10s
+    enabled: true
+  });
+}
+```
+
+**Quick Actions (No Modal Required):**
+- **Toggle enable/disable** - Click the toggle switch on any rule row
+- **Drag to reorder** - Drag rules to change priority order
+- **Clone for testing** - Create a copy to experiment without affecting original
+
 ### Adding New Presets
 
 Edit `dashboard/src/lib/config/automationConfig.ts`:

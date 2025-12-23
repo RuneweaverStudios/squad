@@ -306,6 +306,49 @@ Then hard refresh browser (Ctrl+Shift+R).
 
 **Why**: Svelte uses `{expression}` for JavaScript interpolation. When it sees `{{`, it interprets the inner `{variableName}` as an expression. Using backticks inside `{}` creates a string literal that renders the curly braces literally.
 
+### 6. Inline Styles Override Tailwind Classes (Hover Visibility Bug)
+**Problem**: Elements with both inline `style="opacity: 0;"` AND Tailwind classes like `opacity-0 group-hover:opacity-100` will NEVER become visible on hover.
+
+```svelte
+<!-- ❌ WRONG - Inline style always overrides Tailwind classes -->
+<div class="opacity-0 group-hover:opacity-100" style="opacity: 0;">
+  <button>Edit</button>  <!-- Never visible! -->
+</div>
+
+<!-- ❌ ALSO WRONG - group-hover requires parent with 'group' class -->
+<div class="some-parent">  <!-- Missing 'group' class! -->
+  <div class="opacity-0 group-hover:opacity-100">
+    <button>Edit</button>  <!-- Never visible! -->
+  </div>
+</div>
+```
+
+**Solution**: Use EITHER inline styles OR Tailwind classes, not both. For hover visibility, ensure parent has `group` class:
+
+```svelte
+<!-- ✅ CORRECT - Tailwind only, parent has 'group' -->
+<div class="group">
+  <div class="opacity-0 group-hover:opacity-100 transition-opacity">
+    <button>Edit</button>  <!-- Visible on hover! -->
+  </div>
+</div>
+
+<!-- ✅ ALSO CORRECT - Just remove opacity entirely if always visible -->
+<div class="flex items-center gap-1.5">
+  <button>Edit</button>  <!-- Always visible -->
+</div>
+```
+
+**Why this happens**:
+1. Inline styles have highest CSS specificity - they ALWAYS win over classes
+2. `group-hover:` variants require a parent element with `class="group"` to work
+3. Both issues together = completely invisible elements
+
+**Fixed in (December 2024):**
+- `RulesList.svelte` (line 449) - Automation rule action buttons (Edit, Clone, Delete)
+
+**Detection**: If hover effects don't work, search for elements with BOTH `style="opacity` AND `class="...opacity..."` - this is always a bug.
+
 ## Z-Index Stacking Order
 
 This project uses a consistent z-index hierarchy to manage layer stacking across components.

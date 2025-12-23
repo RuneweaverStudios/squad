@@ -274,48 +274,47 @@
 	}
 </script>
 
-<div class="rules-list {className}">
+<div class="flex flex-col bg-base-200 border border-base-300 rounded-xl overflow-hidden {className}">
 	<!-- Header with master toggle -->
-	<header class="list-header">
-		<div class="header-left">
-			<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="header-icon">
+	<header class="flex items-center justify-between gap-4 px-4 py-3 bg-base-300 border-b border-base-content/10">
+		<div class="flex items-center gap-2">
+			<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-[18px] h-[18px] text-info">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
 			</svg>
-			<span class="header-title">Automation Rules</span>
-			<span class="rule-count">{rules.length} rule{rules.length !== 1 ? 's' : ''}</span>
+			<span class="text-sm font-semibold text-base-content font-mono">Automation Rules</span>
+			<span class="text-xs font-normal text-base-content/50 bg-base-100 px-2 py-0.5 rounded-full">{rules.length} rule{rules.length !== 1 ? 's' : ''}</span>
 		</div>
 
-		<div class="header-right">
+		<div class="flex items-center gap-3">
 			<!-- Master toggle -->
-			<div class="master-toggle">
-				<span class="toggle-label" class:disabled={!config.enabled}>
+			<div class="flex items-center gap-2">
+				<span class="text-xs font-medium font-mono uppercase tracking-wide {config.enabled ? 'text-success' : 'text-base-content/50'}">
 					{config.enabled ? 'Enabled' : 'Disabled'}
 				</span>
 				<button
-					class="toggle-btn"
-					class:enabled={config.enabled}
+					class="p-0 bg-transparent border-none cursor-pointer"
 					onclick={handleMasterToggle}
 					aria-label={config.enabled ? 'Disable automation' : 'Enable automation'}
 				>
-					<span class="toggle-track">
-						<span class="toggle-thumb"></span>
+					<span class="flex items-center w-9 h-5 rounded-full p-0.5 transition-colors duration-200 {config.enabled ? 'bg-success' : 'bg-base-content/20'}">
+						<span class="w-4 h-4 bg-base-content/80 rounded-full transition-transform duration-200 {config.enabled ? 'translate-x-4' : ''}"></span>
 					</span>
 				</button>
 			</div>
 
 			<!-- Import/Export buttons -->
-			<div class="import-export-btns">
+			<div class="flex items-center gap-1">
 				<!-- Hidden file input for import -->
 				<input
 					type="file"
 					accept=".json,application/json"
-					class="hidden"
+					class="!hidden"
 					bind:this={importFileInput}
 					onchange={handleImportFileChange}
 				/>
 				<!-- Import button -->
 				<button
-					class="io-btn import-btn"
+					class="btn btn-sm btn-square btn-ghost text-base-content/50 hover:text-base-content hover:bg-success/20 hover:text-success"
 					onclick={() => importFileInput?.click()}
 					aria-label="Import rules"
 					title="Import rules from JSON file"
@@ -326,7 +325,7 @@
 				</button>
 				<!-- Export button -->
 				<button
-					class="io-btn export-btn"
+					class="btn btn-sm btn-square btn-ghost text-base-content/50 hover:text-base-content hover:bg-info/20 hover:text-info disabled:opacity-40 disabled:cursor-not-allowed"
 					onclick={handleExport}
 					aria-label="Export rules"
 					title="Export rules to JSON file"
@@ -340,7 +339,7 @@
 
 			<!-- Add rule button -->
 			<button
-				class="add-btn"
+				class="btn btn-sm btn-info btn-outline gap-1.5 font-mono"
 				onclick={() => onAddRule()}
 				aria-label="Add new rule"
 			>
@@ -353,16 +352,16 @@
 	</header>
 
 	<!-- Rules content -->
-	<div class="rules-content" class:disabled={!config.enabled}>
+	<div class="flex-1 overflow-auto max-h-[500px] transition-opacity duration-200 {config.enabled ? '' : 'opacity-50 pointer-events-none'}">
 		{#if rules.length === 0}
-			<div class="empty-state" transition:fade={{ duration: 150 }}>
-				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="empty-icon">
+			<div class="flex flex-col items-center justify-center py-12 px-4 gap-2 text-base-content/50" transition:fade={{ duration: 150 }}>
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12 text-base-content/30 mb-2">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
 					<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
 				</svg>
-				<p class="empty-title">No automation rules</p>
-				<p class="empty-hint">Add rules to automate session responses</p>
-				<button class="empty-action" onclick={() => onAddRule()}>
+				<p class="text-sm font-medium text-base-content/60 m-0">No automation rules</p>
+				<p class="text-xs text-base-content/40 m-0">Add rules to automate session responses</p>
+				<button class="btn btn-sm btn-info btn-outline mt-4 gap-1.5" onclick={() => onAddRule()}>
 					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
 					</svg>
@@ -375,23 +374,20 @@
 				{@const categoryRules = rulesByCategory.get(category)}
 				{#if categoryRules && categoryRules.length > 0}
 					{@const meta = getCategoryMeta(category)}
-					<div class="category-group" transition:slide={{ duration: 200, axis: 'y' }}>
-						<div class="category-header">
-							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="category-icon {meta.color}">
+					<div class="border-b border-base-content/10 last:border-b-0" transition:slide={{ duration: 200, axis: 'y' }}>
+						<div class="flex items-center gap-2 px-4 py-2.5 bg-base-300/50 border-b border-base-content/10">
+							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 {meta.color}">
 								<path stroke-linecap="round" stroke-linejoin="round" d={meta.icon} />
 							</svg>
-							<span class="category-label">{meta.label}</span>
-							<span class="category-count">{categoryRules.length}</span>
+							<span class="text-xs font-semibold text-base-content/60 uppercase tracking-wider">{meta.label}</span>
+							<span class="text-[0.6rem] text-base-content/50 bg-base-100 px-1.5 py-0.5 rounded-lg">{categoryRules.length}</span>
 						</div>
 
-						<div class="rules-group">
+						<div class="flex flex-col">
 							{#each categoryRules as rule (rule.id)}
 								{@const triggerCount = getTriggerCount(rule.id)}
 								<div
-									class="rule-item"
-									class:dragging={draggedRuleId === rule.id}
-									class:drag-over={dragOverRuleId === rule.id}
-									class:disabled={!rule.enabled}
+									class="flex items-center gap-3 px-4 py-2.5 bg-base-200 border-b border-base-content/5 transition-all duration-150 cursor-grab last:border-b-0 hover:bg-base-300 {draggedRuleId === rule.id ? 'opacity-50 bg-base-300' : ''} {dragOverRuleId === rule.id ? 'bg-info/10 border-t-2 border-t-info' : ''} {!rule.enabled ? 'opacity-60' : ''}"
 									draggable="true"
 									ondragstart={(e) => handleDragStart(e, rule.id)}
 									ondragover={(e) => handleDragOver(e, rule.id)}
@@ -402,7 +398,7 @@
 									transition:slide={{ duration: 150, axis: 'y' }}
 								>
 									<!-- Drag handle -->
-									<div class="drag-handle" aria-label="Drag to reorder">
+									<div class="flex items-center justify-center w-5 text-base-content/30 cursor-grab transition-colors duration-150 hover:text-base-content/50 active:cursor-grabbing" aria-label="Drag to reorder">
 										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
 											<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5m-16.5 6.75h16.5" />
 										</svg>
@@ -410,50 +406,49 @@
 
 									<!-- Enable/disable toggle -->
 									<button
-										class="rule-toggle"
-										class:enabled={rule.enabled}
+										class="p-0 bg-transparent border-none cursor-pointer flex-shrink-0"
 										onclick={() => handleToggleRule(rule.id)}
 										aria-label={rule.enabled ? 'Disable rule' : 'Enable rule'}
 									>
-										<span class="toggle-track-sm">
-											<span class="toggle-thumb-sm"></span>
+										<span class="flex items-center w-7 h-4 rounded-lg p-0.5 transition-colors duration-200 {rule.enabled ? 'bg-success' : 'bg-base-content/20'}">
+											<span class="w-3 h-3 bg-base-content/80 rounded-full transition-transform duration-200 {rule.enabled ? 'translate-x-3' : ''}"></span>
 										</span>
 									</button>
 
 									<!-- Rule info -->
-									<div class="rule-info">
-										<div class="rule-name-row">
-											<span class="rule-name" class:disabled={!rule.enabled}>
+									<div class="flex-1 min-w-0 flex flex-col gap-1">
+										<div class="flex items-center gap-2">
+											<span class="text-sm font-medium truncate {rule.enabled ? 'text-base-content' : 'text-base-content/50'}">
 												{rule.name}
 											</span>
 											{#if rule.isPreset}
-												<span class="preset-badge">Preset</span>
+												<span class="badge badge-xs badge-secondary font-semibold uppercase tracking-wide">Preset</span>
 											{/if}
 											{#if triggerCount > 0}
-												<span class="trigger-badge" title="{triggerCount} triggers this session">
+												<span class="badge badge-xs badge-warning font-semibold min-w-[18px] text-center" title="{triggerCount} triggers this session">
 													{triggerCount}
 												</span>
 											{/if}
 										</div>
-										<div class="rule-meta">
-											<span class="rule-pattern" title={rule.patterns[0]?.pattern}>
+										<div class="flex items-center gap-1.5 text-xs text-base-content/50 font-mono">
+											<span class="text-warning/80 max-w-[180px] truncate" title={rule.patterns[0]?.pattern}>
 												{rule.patterns[0]?.mode === 'regex' ? '/' : '"'}
 												{rule.patterns[0]?.pattern.length > 25
 													? rule.patterns[0]?.pattern.slice(0, 25) + '...'
 													: rule.patterns[0]?.pattern}
 												{rule.patterns[0]?.mode === 'regex' ? '/' : '"'}
 											</span>
-											<span class="rule-arrow">→</span>
-											<span class="rule-action">
+											<span class="text-base-content/30">→</span>
+											<span class="text-info/80">
 												{formatActionType(rule.actions[0]?.type || 'unknown')}
 											</span>
 										</div>
 									</div>
 
 									<!-- Action buttons -->
-									<div class="rule-actions">
+									<div class="flex items-center gap-1.5">
 										<button
-											class="action-btn edit"
+											class="btn btn-xs btn-square btn-ghost text-base-content/50 hover:text-base-content hover:bg-info/20 hover:text-info"
 											onclick={() => onEditRule(rule)}
 											title="Edit rule"
 											aria-label="Edit rule"
@@ -463,7 +458,7 @@
 											</svg>
 										</button>
 										<button
-											class="action-btn clone"
+											class="btn btn-xs btn-square btn-ghost text-base-content/50 hover:text-base-content hover:bg-secondary/20 hover:text-secondary"
 											onclick={() => handleCloneRule(rule.id)}
 											title="Clone rule"
 											aria-label="Clone rule"
@@ -473,7 +468,7 @@
 											</svg>
 										</button>
 										<button
-											class="action-btn delete"
+											class="btn btn-xs btn-square btn-ghost text-base-content/50 hover:text-base-content hover:bg-error/20 hover:text-error"
 											onclick={() => handleDeleteRule(rule)}
 											title="Delete rule"
 											aria-label="Delete rule"
@@ -494,20 +489,20 @@
 
 	<!-- Import success/error messages -->
 	{#if importSuccess}
-		<div class="import-message success" transition:fade={{ duration: 150 }}>
-			<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="message-icon">
+		<div class="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-t border-base-content/10 bg-success/20 text-success" transition:fade={{ duration: 150 }}>
+			<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-[18px] h-[18px] flex-shrink-0">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
 			</svg>
 			<span>Successfully imported {parsedRuleCount} rule{parsedRuleCount !== 1 ? 's' : ''}</span>
 		</div>
 	{/if}
 	{#if importError && !showImportModal}
-		<div class="import-message error" transition:fade={{ duration: 150 }}>
-			<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="message-icon">
+		<div class="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-t border-base-content/10 bg-error/20 text-error" transition:fade={{ duration: 150 }}>
+			<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-[18px] h-[18px] flex-shrink-0">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
 			</svg>
 			<span>{importError}</span>
-			<button class="dismiss-btn" onclick={() => importError = null}>×</button>
+			<button class="ml-auto px-1.5 py-0.5 bg-transparent border-none text-error/70 text-base cursor-pointer leading-none rounded transition-colors duration-150 hover:bg-error/20" onclick={() => importError = null}>×</button>
 		</div>
 	{/if}
 </div>
@@ -515,61 +510,61 @@
 <!-- Import Modal -->
 {#if showImportModal}
 	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-	<div class="modal-backdrop" onclick={handleCancelImport} role="presentation" transition:fade={{ duration: 150 }}>
-		<div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="import-modal-title" onclick={(e) => e.stopPropagation()}>
-			<div class="modal-header">
-				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="modal-icon">
+	<div class="fixed inset-0 bg-base-300/80 flex items-center justify-center z-[1000] backdrop-blur-sm" onclick={handleCancelImport} role="presentation" transition:fade={{ duration: 150 }}>
+		<div class="bg-base-200 border border-base-content/20 rounded-xl shadow-2xl min-w-[380px] max-w-[90vw]" role="dialog" aria-modal="true" aria-labelledby="import-modal-title" onclick={(e) => e.stopPropagation()}>
+			<div class="flex items-center gap-2.5 px-5 py-4 border-b border-base-content/10 bg-base-300 rounded-t-xl">
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-[22px] h-[22px] text-success">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
 				</svg>
-				<h3 id="import-modal-title" class="modal-title">Import Rules</h3>
+				<h3 id="import-modal-title" class="text-base font-semibold text-base-content m-0 font-mono">Import Rules</h3>
 			</div>
 
-			<div class="modal-body">
-				<div class="file-info">
-					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="file-icon">
+			<div class="p-5 flex flex-col gap-4">
+				<div class="flex items-center gap-3 px-4 py-3 bg-base-300 border border-base-content/10 rounded-lg">
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7 text-info flex-shrink-0">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
 					</svg>
-					<div class="file-details">
-						<span class="file-name">{importFileName}</span>
-						<span class="file-rules">{parsedRuleCount} rule{parsedRuleCount !== 1 ? 's' : ''} found</span>
+					<div class="flex flex-col gap-0.5 min-w-0">
+						<span class="text-sm font-medium text-base-content truncate font-mono">{importFileName}</span>
+						<span class="text-xs text-base-content/60">{parsedRuleCount} rule{parsedRuleCount !== 1 ? 's' : ''} found</span>
 					</div>
 				</div>
 
-				<p class="modal-description">
+				<p class="text-sm text-base-content/70 m-0">
 					How would you like to import these rules?
 				</p>
 
-				<div class="import-options">
-					<button class="import-option merge" onclick={() => handleImport(true)}>
-						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="option-icon">
+				<div class="flex gap-3">
+					<button class="flex-1 flex items-center gap-3 px-4 py-3.5 bg-base-300 border border-base-content/20 rounded-lg cursor-pointer transition-all duration-150 hover:bg-success/10 hover:border-success/40 group" onclick={() => handleImport(true)}>
+						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-base-content/60 flex-shrink-0 group-hover:text-success">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
 						</svg>
-						<div class="option-text">
-							<span class="option-title">Merge</span>
-							<span class="option-desc">Add new rules, keep existing</span>
+						<div class="flex flex-col gap-0.5 text-left">
+							<span class="text-sm font-semibold text-base-content">Merge</span>
+							<span class="text-xs text-base-content/50">Add new rules, keep existing</span>
 						</div>
 					</button>
 
-					<button class="import-option replace" onclick={() => handleImport(false)}>
-						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="option-icon">
+					<button class="flex-1 flex items-center gap-3 px-4 py-3.5 bg-base-300 border border-base-content/20 rounded-lg cursor-pointer transition-all duration-150 hover:bg-info/10 hover:border-info/40 group" onclick={() => handleImport(false)}>
+						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-base-content/60 flex-shrink-0 group-hover:text-info">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
 						</svg>
-						<div class="option-text">
-							<span class="option-title">Replace</span>
-							<span class="option-desc">Remove all existing rules</span>
+						<div class="flex flex-col gap-0.5 text-left">
+							<span class="text-sm font-semibold text-base-content">Replace</span>
+							<span class="text-xs text-base-content/50">Remove all existing rules</span>
 						</div>
 					</button>
 				</div>
 
 				{#if importError}
-					<div class="modal-error" transition:fade={{ duration: 150 }}>
+					<div class="alert alert-error py-2.5 px-3.5 text-sm" transition:fade={{ duration: 150 }}>
 						{importError}
 					</div>
 				{/if}
 			</div>
 
-			<div class="modal-footer">
-				<button class="cancel-btn" onclick={handleCancelImport}>
+			<div class="flex justify-end px-5 py-3.5 border-t border-base-content/10 bg-base-300 rounded-b-xl">
+				<button class="btn btn-sm btn-ghost" onclick={handleCancelImport}>
 					Cancel
 				</button>
 			</div>
@@ -578,766 +573,5 @@
 {/if}
 
 <style>
-	.rules-list {
-		display: flex;
-		flex-direction: column;
-		background: oklch(0.16 0.02 250);
-		border: 1px solid oklch(0.28 0.02 250);
-		border-radius: 10px;
-		overflow: hidden;
-	}
-
-	/* Header */
-	.list-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 1rem;
-		padding: 0.75rem 1rem;
-		background: oklch(0.14 0.02 250);
-		border-bottom: 1px solid oklch(0.25 0.02 250);
-	}
-
-	.header-left {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	.header-icon {
-		width: 18px;
-		height: 18px;
-		color: oklch(0.65 0.10 200);
-	}
-
-	.header-title {
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: oklch(0.85 0.02 250);
-		font-family: ui-monospace, monospace;
-	}
-
-	.rule-count {
-		font-size: 0.7rem;
-		font-weight: 400;
-		color: oklch(0.50 0.02 250);
-		background: oklch(0.22 0.02 250);
-		padding: 0.125rem 0.5rem;
-		border-radius: 10px;
-	}
-
-	.header-right {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-	}
-
-	/* Master toggle */
-	.master-toggle {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	.toggle-label {
-		font-size: 0.7rem;
-		font-weight: 500;
-		color: oklch(0.70 0.10 145);
-		font-family: ui-monospace, monospace;
-		text-transform: uppercase;
-		letter-spacing: 0.02em;
-	}
-
-	.toggle-label.disabled {
-		color: oklch(0.50 0.02 250);
-	}
-
-	.toggle-btn {
-		padding: 0;
-		background: none;
-		border: none;
-		cursor: pointer;
-	}
-
-	.toggle-track {
-		display: flex;
-		align-items: center;
-		width: 36px;
-		height: 20px;
-		background: oklch(0.30 0.02 250);
-		border-radius: 10px;
-		padding: 2px;
-		transition: background 0.2s ease;
-	}
-
-	.toggle-btn.enabled .toggle-track {
-		background: oklch(0.55 0.15 145);
-	}
-
-	.toggle-thumb {
-		width: 16px;
-		height: 16px;
-		background: oklch(0.85 0.02 250);
-		border-radius: 50%;
-		transition: transform 0.2s ease;
-	}
-
-	.toggle-btn.enabled .toggle-thumb {
-		transform: translateX(16px);
-	}
-
-	/* Add button */
-	.add-btn {
-		display: flex;
-		align-items: center;
-		gap: 0.375rem;
-		padding: 0.375rem 0.75rem;
-		font-size: 0.75rem;
-		font-weight: 500;
-		background: oklch(0.35 0.10 200);
-		border: 1px solid oklch(0.45 0.12 200);
-		border-radius: 6px;
-		color: oklch(0.90 0.08 200);
-		cursor: pointer;
-		transition: all 0.15s ease;
-		font-family: ui-monospace, monospace;
-	}
-
-	.add-btn:hover {
-		background: oklch(0.40 0.12 200);
-		border-color: oklch(0.50 0.15 200);
-	}
-
-	/* Rules content */
-	.rules-content {
-		flex: 1;
-		overflow: auto;
-		max-height: 500px;
-		transition: opacity 0.2s ease;
-	}
-
-	.rules-content.disabled {
-		opacity: 0.5;
-		pointer-events: none;
-	}
-
-	/* Empty state */
-	.empty-state {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		padding: 3rem 1rem;
-		gap: 0.5rem;
-		color: oklch(0.50 0.02 250);
-	}
-
-	.empty-icon {
-		width: 48px;
-		height: 48px;
-		color: oklch(0.35 0.02 250);
-		margin-bottom: 0.5rem;
-	}
-
-	.empty-title {
-		font-size: 0.9rem;
-		font-weight: 500;
-		color: oklch(0.55 0.02 250);
-		margin: 0;
-	}
-
-	.empty-hint {
-		font-size: 0.75rem;
-		color: oklch(0.45 0.02 250);
-		margin: 0;
-	}
-
-	.empty-action {
-		display: flex;
-		align-items: center;
-		gap: 0.375rem;
-		margin-top: 1rem;
-		padding: 0.5rem 1rem;
-		font-size: 0.8rem;
-		font-weight: 500;
-		background: oklch(0.30 0.08 200);
-		border: 1px solid oklch(0.40 0.10 200);
-		border-radius: 6px;
-		color: oklch(0.85 0.08 200);
-		cursor: pointer;
-		transition: all 0.15s ease;
-	}
-
-	.empty-action:hover {
-		background: oklch(0.35 0.10 200);
-	}
-
-	/* Category group */
-	.category-group {
-		border-bottom: 1px solid oklch(0.22 0.02 250);
-	}
-
-	.category-group:last-child {
-		border-bottom: none;
-	}
-
-	.category-header {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.625rem 1rem;
-		background: oklch(0.18 0.02 250);
-		border-bottom: 1px solid oklch(0.22 0.02 250);
-	}
-
-	.category-icon {
-		width: 16px;
-		height: 16px;
-	}
-
-	.category-label {
-		font-size: 0.7rem;
-		font-weight: 600;
-		color: oklch(0.65 0.02 250);
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-	}
-
-	.category-count {
-		font-size: 0.6rem;
-		color: oklch(0.50 0.02 250);
-		background: oklch(0.22 0.02 250);
-		padding: 0.125rem 0.375rem;
-		border-radius: 8px;
-	}
-
-	/* Rules group */
-	.rules-group {
-		display: flex;
-		flex-direction: column;
-	}
-
-	/* Rule item */
-	.rule-item {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		padding: 0.625rem 1rem;
-		background: oklch(0.16 0.02 250);
-		border-bottom: 1px solid oklch(0.20 0.02 250);
-		transition: all 0.15s ease;
-		cursor: grab;
-	}
-
-	.rule-item:last-child {
-		border-bottom: none;
-	}
-
-	.rule-item:hover {
-		background: oklch(0.20 0.02 250);
-	}
-
-	.rule-item.dragging {
-		opacity: 0.5;
-		background: oklch(0.22 0.02 250);
-	}
-
-	.rule-item.drag-over {
-		background: oklch(0.25 0.05 200);
-		border-top: 2px solid oklch(0.60 0.15 200);
-	}
-
-	.rule-item.disabled {
-		opacity: 0.6;
-	}
-
-	/* Drag handle */
-	.drag-handle {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 20px;
-		color: oklch(0.40 0.02 250);
-		cursor: grab;
-		transition: color 0.15s ease;
-	}
-
-	.rule-item:hover .drag-handle {
-		color: oklch(0.55 0.02 250);
-	}
-
-	.drag-handle:active {
-		cursor: grabbing;
-	}
-
-	/* Rule toggle (smaller version) */
-	.rule-toggle {
-		padding: 0;
-		background: none;
-		border: none;
-		cursor: pointer;
-		flex-shrink: 0;
-	}
-
-	.toggle-track-sm {
-		display: flex;
-		align-items: center;
-		width: 28px;
-		height: 16px;
-		background: oklch(0.30 0.02 250);
-		border-radius: 8px;
-		padding: 2px;
-		transition: background 0.2s ease;
-	}
-
-	.rule-toggle.enabled .toggle-track-sm {
-		background: oklch(0.55 0.15 145);
-	}
-
-	.toggle-thumb-sm {
-		width: 12px;
-		height: 12px;
-		background: oklch(0.85 0.02 250);
-		border-radius: 50%;
-		transition: transform 0.2s ease;
-	}
-
-	.rule-toggle.enabled .toggle-thumb-sm {
-		transform: translateX(12px);
-	}
-
-	/* Rule info */
-	.rule-info {
-		flex: 1;
-		min-width: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
-	}
-
-	.rule-name-row {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	.rule-name {
-		font-size: 0.8rem;
-		font-weight: 500;
-		color: oklch(0.85 0.02 250);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	.rule-name.disabled {
-		color: oklch(0.55 0.02 250);
-	}
-
-	.preset-badge {
-		font-size: 0.55rem;
-		font-weight: 600;
-		color: oklch(0.70 0.10 280);
-		background: oklch(0.25 0.06 280);
-		padding: 0.125rem 0.375rem;
-		border-radius: 4px;
-		text-transform: uppercase;
-		letter-spacing: 0.02em;
-	}
-
-	.trigger-badge {
-		font-size: 0.6rem;
-		font-weight: 600;
-		color: oklch(0.85 0.15 85);
-		background: oklch(0.30 0.10 85);
-		padding: 0.125rem 0.375rem;
-		border-radius: 4px;
-		min-width: 18px;
-		text-align: center;
-	}
-
-	.rule-meta {
-		display: flex;
-		align-items: center;
-		gap: 0.375rem;
-		font-size: 0.7rem;
-		color: oklch(0.55 0.02 250);
-		font-family: ui-monospace, monospace;
-	}
-
-	.rule-pattern {
-		color: oklch(0.65 0.08 55);
-		max-width: 180px;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	.rule-arrow {
-		color: oklch(0.45 0.02 250);
-	}
-
-	.rule-action {
-		color: oklch(0.65 0.08 200);
-	}
-
-	/* Action buttons */
-	.rule-actions {
-		display: flex;
-		align-items: center;
-		gap: 0.375rem;
-		opacity: 0;
-		transition: opacity 0.15s ease;
-	}
-
-	.rule-item:hover .rule-actions {
-		opacity: 1;
-	}
-
-	.action-btn {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 28px;
-		height: 28px;
-		background: oklch(0.22 0.02 250);
-		border: 1px solid oklch(0.30 0.02 250);
-		border-radius: 6px;
-		color: oklch(0.60 0.02 250);
-		cursor: pointer;
-		transition: all 0.15s ease;
-	}
-
-	.action-btn:hover {
-		background: oklch(0.28 0.02 250);
-		color: oklch(0.80 0.02 250);
-	}
-
-	.action-btn.edit:hover {
-		background: oklch(0.28 0.06 200);
-		border-color: oklch(0.40 0.10 200);
-		color: oklch(0.80 0.10 200);
-	}
-
-	.action-btn.clone:hover {
-		background: oklch(0.28 0.06 280);
-		border-color: oklch(0.40 0.10 280);
-		color: oklch(0.80 0.10 280);
-	}
-
-	.action-btn.delete:hover {
-		background: oklch(0.28 0.08 25);
-		border-color: oklch(0.45 0.12 25);
-		color: oklch(0.80 0.15 25);
-	}
-
-	/* DaisyUI text color classes */
-	:global(.text-success) {
-		color: oklch(0.65 0.15 145);
-	}
-
-	:global(.text-info) {
-		color: oklch(0.65 0.15 200);
-	}
-
-	:global(.text-warning) {
-		color: oklch(0.75 0.15 85);
-	}
-
-	:global(.text-secondary) {
-		color: oklch(0.65 0.10 280);
-	}
-
-	:global(.text-accent) {
-		color: oklch(0.70 0.12 310);
-	}
-
-	/* Import/Export buttons */
-	.import-export-btns {
-		display: flex;
-		align-items: center;
-		gap: 0.25rem;
-	}
-
-	.io-btn {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 32px;
-		height: 32px;
-		background: oklch(0.22 0.02 250);
-		border: 1px solid oklch(0.30 0.02 250);
-		border-radius: 6px;
-		color: oklch(0.60 0.02 250);
-		cursor: pointer;
-		transition: all 0.15s ease;
-	}
-
-	.io-btn:hover:not(:disabled) {
-		background: oklch(0.28 0.02 250);
-		color: oklch(0.80 0.02 250);
-	}
-
-	.io-btn:disabled {
-		opacity: 0.4;
-		cursor: not-allowed;
-	}
-
-	.import-btn:hover:not(:disabled) {
-		background: oklch(0.28 0.06 145);
-		border-color: oklch(0.40 0.10 145);
-		color: oklch(0.80 0.10 145);
-	}
-
-	.export-btn:hover:not(:disabled) {
-		background: oklch(0.28 0.06 200);
-		border-color: oklch(0.40 0.10 200);
-		color: oklch(0.80 0.10 200);
-	}
-
-	.hidden {
-		display: none;
-	}
-
-	/* Import messages */
-	.import-message {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.625rem 1rem;
-		font-size: 0.8rem;
-		font-weight: 500;
-		border-top: 1px solid oklch(0.25 0.02 250);
-	}
-
-	.import-message.success {
-		background: oklch(0.20 0.08 145);
-		color: oklch(0.85 0.12 145);
-	}
-
-	.import-message.error {
-		background: oklch(0.20 0.08 25);
-		color: oklch(0.85 0.12 25);
-	}
-
-	.message-icon {
-		width: 18px;
-		height: 18px;
-		flex-shrink: 0;
-	}
-
-	.dismiss-btn {
-		margin-left: auto;
-		padding: 0.125rem 0.375rem;
-		background: transparent;
-		border: none;
-		color: oklch(0.70 0.08 25);
-		font-size: 1rem;
-		cursor: pointer;
-		line-height: 1;
-		border-radius: 4px;
-		transition: background 0.15s ease;
-	}
-
-	.dismiss-btn:hover {
-		background: oklch(0.30 0.08 25);
-	}
-
-	/* Import Modal */
-	.modal-backdrop {
-		position: fixed;
-		inset: 0;
-		background: oklch(0.10 0.02 250 / 0.8);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		z-index: 1000;
-		backdrop-filter: blur(4px);
-	}
-
-	.modal-content {
-		background: oklch(0.16 0.02 250);
-		border: 1px solid oklch(0.30 0.02 250);
-		border-radius: 12px;
-		box-shadow: 0 20px 40px oklch(0 0 0 / 0.4);
-		min-width: 380px;
-		max-width: 90vw;
-	}
-
-	.modal-header {
-		display: flex;
-		align-items: center;
-		gap: 0.625rem;
-		padding: 1rem 1.25rem;
-		border-bottom: 1px solid oklch(0.25 0.02 250);
-		background: oklch(0.14 0.02 250);
-		border-radius: 12px 12px 0 0;
-	}
-
-	.modal-icon {
-		width: 22px;
-		height: 22px;
-		color: oklch(0.70 0.12 145);
-	}
-
-	.modal-title {
-		font-size: 1rem;
-		font-weight: 600;
-		color: oklch(0.90 0.02 250);
-		margin: 0;
-		font-family: ui-monospace, monospace;
-	}
-
-	.modal-body {
-		padding: 1.25rem;
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-	}
-
-	.file-info {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		padding: 0.75rem 1rem;
-		background: oklch(0.20 0.02 250);
-		border: 1px solid oklch(0.28 0.02 250);
-		border-radius: 8px;
-	}
-
-	.file-icon {
-		width: 28px;
-		height: 28px;
-		color: oklch(0.60 0.08 200);
-		flex-shrink: 0;
-	}
-
-	.file-details {
-		display: flex;
-		flex-direction: column;
-		gap: 0.125rem;
-		min-width: 0;
-	}
-
-	.file-name {
-		font-size: 0.85rem;
-		font-weight: 500;
-		color: oklch(0.85 0.02 250);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		font-family: ui-monospace, monospace;
-	}
-
-	.file-rules {
-		font-size: 0.75rem;
-		color: oklch(0.60 0.02 250);
-	}
-
-	.modal-description {
-		font-size: 0.85rem;
-		color: oklch(0.70 0.02 250);
-		margin: 0;
-	}
-
-	.import-options {
-		display: flex;
-		gap: 0.75rem;
-	}
-
-	.import-option {
-		flex: 1;
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		padding: 0.875rem 1rem;
-		background: oklch(0.20 0.02 250);
-		border: 1px solid oklch(0.30 0.02 250);
-		border-radius: 8px;
-		cursor: pointer;
-		transition: all 0.15s ease;
-	}
-
-	.import-option:hover {
-		background: oklch(0.24 0.02 250);
-		border-color: oklch(0.40 0.02 250);
-	}
-
-	.import-option.merge:hover {
-		background: oklch(0.22 0.06 145);
-		border-color: oklch(0.45 0.12 145);
-	}
-
-	.import-option.replace:hover {
-		background: oklch(0.22 0.06 200);
-		border-color: oklch(0.45 0.12 200);
-	}
-
-	.option-icon {
-		width: 24px;
-		height: 24px;
-		color: oklch(0.65 0.02 250);
-		flex-shrink: 0;
-	}
-
-	.import-option.merge:hover .option-icon {
-		color: oklch(0.75 0.12 145);
-	}
-
-	.import-option.replace:hover .option-icon {
-		color: oklch(0.75 0.12 200);
-	}
-
-	.option-text {
-		display: flex;
-		flex-direction: column;
-		gap: 0.125rem;
-		text-align: left;
-	}
-
-	.option-title {
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: oklch(0.90 0.02 250);
-	}
-
-	.option-desc {
-		font-size: 0.7rem;
-		color: oklch(0.55 0.02 250);
-	}
-
-	.modal-error {
-		padding: 0.625rem 0.875rem;
-		background: oklch(0.20 0.08 25);
-		border: 1px solid oklch(0.35 0.12 25);
-		border-radius: 6px;
-		font-size: 0.8rem;
-		color: oklch(0.85 0.12 25);
-	}
-
-	.modal-footer {
-		display: flex;
-		justify-content: flex-end;
-		padding: 0.875rem 1.25rem;
-		border-top: 1px solid oklch(0.25 0.02 250);
-		background: oklch(0.14 0.02 250);
-		border-radius: 0 0 12px 12px;
-	}
-
-	.cancel-btn {
-		padding: 0.5rem 1rem;
-		font-size: 0.8rem;
-		font-weight: 500;
-		background: oklch(0.25 0.02 250);
-		border: 1px solid oklch(0.35 0.02 250);
-		border-radius: 6px;
-		color: oklch(0.75 0.02 250);
-		cursor: pointer;
-		transition: all 0.15s ease;
-	}
-
-	.cancel-btn:hover {
-		background: oklch(0.30 0.02 250);
-		color: oklch(0.85 0.02 250);
-	}
+	/* All styling converted to inline Tailwind/DaisyUI classes for Tailwind v4 compatibility */
 </style>
