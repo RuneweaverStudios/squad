@@ -91,6 +91,7 @@
 	import {
 		completeTask as epicCompleteTask,
 		getIsActive as epicIsActive,
+		getEpicId,
 	} from "$lib/stores/epicQueueStore.svelte";
 	// Rich signal card components
 	import WorkingSignalCard from "$lib/components/signals/WorkingSignalCard.svelte";
@@ -2584,10 +2585,14 @@
 			? getProjectFromTaskId(parentTaskId)
 			: undefined;
 
+		// Get epic ID if we're in epic execution mode - suggested tasks will be linked to the epic
+		const epicId = epicIsActive() ? getEpicId() : null;
+
 		console.log("[SuggestedTasks] Creating tasks via bulk API:", {
 			count: selectedTasks.length,
 			project,
 			parentTaskId,
+			epicId,
 		});
 
 		try {
@@ -2597,6 +2602,7 @@
 				body: JSON.stringify({
 					tasks: tasksToCreate,
 					project: project || undefined,
+					epicId: epicId || undefined,
 				}),
 			});
 
@@ -2704,11 +2710,15 @@
 			depends_on: t.edits?.depends_on || t.depends_on || undefined,
 		}));
 
+		// Get epic ID if we're in epic execution mode - suggested tasks will be linked to the epic
+		const epicId = epicIsActive() ? getEpicId() : null;
+
 		const response = await fetch("/api/tasks/bulk", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				tasks: tasksToCreate,
+				epicId: epicId || undefined,
 			}),
 		});
 
@@ -2757,11 +2767,14 @@
 			depends_on: t.edits?.depends_on || t.depends_on || undefined,
 		}));
 
+		// Get epic ID if we're in epic execution mode - suggested tasks will be linked to the epic
+		const epicId = epicIsActive() ? getEpicId() : null;
+
 		try {
 			const response = await fetch("/api/tasks/bulk", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ tasks: tasksToCreate }),
+				body: JSON.stringify({ tasks: tasksToCreate, epicId: epicId || undefined }),
 			});
 
 			const result = await response.json();

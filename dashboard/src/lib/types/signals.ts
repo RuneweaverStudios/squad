@@ -38,6 +38,8 @@ export interface SuggestedTask {
 	labels?: string;
 	/** Task IDs this task depends on */
 	depends_on?: string[];
+	/** Parent epic ID - if set, task will be linked as a child of this epic */
+	epicId?: string;
 }
 
 /**

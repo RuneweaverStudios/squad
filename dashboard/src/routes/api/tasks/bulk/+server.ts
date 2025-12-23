@@ -35,12 +35,16 @@ interface SuggestedTask {
 	project?: string;
 	/** Optional task IDs this task depends on */
 	depends_on?: string[];
+	/** Parent epic ID - if set, task will be linked as a child of this epic */
+	epicId?: string;
 }
 
 interface BulkCreateRequest {
 	tasks: SuggestedTask[];
 	/** Optional project name to create tasks in */
 	project?: string;
+	/** Optional epic ID to link all created tasks to (request-level default) */
+	epicId?: string;
 }
 
 interface TaskResult {
@@ -48,6 +52,10 @@ interface TaskResult {
 	taskId?: string;
 	success: boolean;
 	error?: string;
+	/** Whether the task was linked to an epic */
+	linkedToEpic?: boolean;
+	/** Error when linking to epic (task still created) */
+	epicLinkError?: string;
 }
 
 interface BulkCreateResponse {
@@ -141,9 +149,53 @@ function escapeForShell(str: string): string {
 }
 
 /**
+ * Link a task to an epic by adding epic->child dependency
+ * Uses bd dep add with CORRECT direction: epic depends on child (not child depends on epic)
+ * This ensures child is READY and epic is BLOCKED until child completes
+ *
+ * @param epicId - The parent epic task ID
+ * @param childId - The newly created child task ID
+ * @param projectPath - Optional project path to run command in
+ * @returns Success/error result
+ */
+async function linkTaskToEpic(
+	epicId: string,
+	childId: string,
+	projectPath?: string
+): Promise<{ success: boolean; error?: string }> {
+	try {
+		// CRITICAL: Dependency direction is epic depends on child
+		// This makes child READY (can be worked on) and epic BLOCKED (until children complete)
+		// The command is: bd dep add [A] [B] meaning "A depends on B"
+		let command = `bd dep add '${escapeForShell(epicId)}' '${escapeForShell(childId)}'`;
+
+		if (projectPath) {
+			command = `cd '${escapeForShell(projectPath)}' && ${command}`;
+		}
+
+		await execAsync(command);
+		return { success: true };
+	} catch (err) {
+		const error = err as Error & { stderr?: string };
+		console.error(`Error linking task ${childId} to epic ${epicId}:`, error);
+
+		let errorMessage = error.message || 'Unknown error';
+		if (error.stderr) {
+			errorMessage = error.stderr.trim();
+		}
+
+		return { success: false, error: errorMessage };
+	}
+}
+
+/**
  * Create a single task using bd create
  */
-async function createTask(task: SuggestedTask, defaultProject?: string): Promise<TaskResult> {
+async function createTask(
+	task: SuggestedTask,
+	defaultProject?: string,
+	defaultEpicId?: string
+): Promise<TaskResult> {
 	try {
 		const title = task.title.trim();
 		const description = task.description?.trim() || '';
@@ -151,6 +203,8 @@ async function createTask(task: SuggestedTask, defaultProject?: string): Promise
 		const priority = task.priority ?? 2;
 		// Use task-level project if provided, otherwise use default
 		const project = task.project || defaultProject;
+		// Use task-level epicId if provided, otherwise use request-level default
+		const epicId = task.epicId || defaultEpicId;
 
 		// Build bd create command with safe escaping
 		const args: string[] = [];
@@ -225,6 +279,8 @@ async function createTask(task: SuggestedTask, defaultProject?: string): Promise
 		// bd create --json may output warning messages before the JSON line
 		// e.g.: "⚠ Creating issue with 'Test' prefix...\n{\"id\":\"jat-abc\",...}"
 		// So we need to extract just the JSON line
+		let taskId: string | undefined;
+
 		try {
 			// Try to find a JSON line in stdout (line starting with '{')
 			const lines = stdout.trim().split('\n');
@@ -232,32 +288,55 @@ async function createTask(task: SuggestedTask, defaultProject?: string): Promise
 			if (jsonLine) {
 				const result = JSON.parse(jsonLine);
 				if (result.id) {
-					return {
-						title,
-						taskId: result.id,
-						success: true
-					};
+					taskId = result.id;
 				}
 			}
 		} catch {
 			// Fallback to regex parsing if JSON parsing fails
 			const match = stdout.match(/Created issue: ([\w]+-[\w]+)/i);
 			if (match) {
-				return {
-					title,
-					taskId: match[1],
-					success: true
-				};
+				taskId = match[1];
 			}
 		}
 
-		// If we got here, creation may have succeeded but we couldn't parse the ID
-		console.error('Failed to parse task ID from bd create output:', stdout, stderr);
-		return {
+		// If we couldn't parse the task ID, return failure
+		if (!taskId) {
+			console.error('Failed to parse task ID from bd create output:', stdout, stderr);
+			return {
+				title,
+				success: false,
+				error: 'Task may have been created but failed to parse task ID'
+			};
+		}
+
+		// Task created successfully - now link to epic if epicId is provided
+		const taskResult: TaskResult = {
 			title,
-			success: false,
-			error: 'Task may have been created but failed to parse task ID'
+			taskId,
+			success: true
 		};
+
+		if (epicId) {
+			// Get project path for epic linking command
+			let epicProjectPath: string | undefined;
+			if (project) {
+				const projectInfo = await getProjectPath(project);
+				if (projectInfo.exists) {
+					epicProjectPath = projectInfo.path;
+				}
+			}
+
+			const linkResult = await linkTaskToEpic(epicId, taskId, epicProjectPath);
+			if (linkResult.success) {
+				taskResult.linkedToEpic = true;
+				console.log(`Linked task ${taskId} to epic ${epicId}`);
+			} else {
+				taskResult.epicLinkError = linkResult.error;
+				console.error(`Failed to link task ${taskId} to epic ${epicId}: ${linkResult.error}`);
+			}
+		}
+
+		return taskResult;
 	} catch (err) {
 		const error = err as Error & { stderr?: string };
 		console.error('Error creating task:', error);
@@ -354,7 +433,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		let failed = 0;
 
 		for (const task of body.tasks) {
-			const result = await createTask(task, body.project);
+			const result = await createTask(task, body.project, body.epicId);
 			results.push(result);
 
 			if (result.success) {
