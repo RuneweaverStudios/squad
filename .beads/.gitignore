@@ -1,6 +1,16 @@
 # .beads/.gitignore
-# This directory contains user-specific task data that should NOT be committed
-# Each user creates their own tasks when they run 'bd init' on their projects
+# =============================================================================
+# ⚠️  THIS GITIGNORE IS SPECIAL FOR THE JAT REPOSITORY (open source)
+# =============================================================================
+#
+# This ignores ALL task data so JAT contributors don't commit their personal tasks.
+#
+# YOUR OWN PROJECTS use a DIFFERENT default gitignore that SYNCS tasks via git!
+# When you run 'bd init' on your project, you get the standard gitignore with:
+#   !*.jsonl  ← Keeps issues.jsonl for team collaboration
+#
+# Don't copy this file to your projects - let 'bd init' create the correct one.
+# =============================================================================
 
 # =============================================================================
 # IGNORE ALL USER DATA (each user creates their own)
