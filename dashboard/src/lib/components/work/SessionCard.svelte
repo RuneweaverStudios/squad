@@ -4582,7 +4582,7 @@
 								'generating' || outputActivityState === 'thinking'
 								? 'shimmer-text-fast'
 								: ''}"
-							style="color: {displayAccent}; text-shadow: 0 0 12px {displayGlow};"
+							style="color: {displayAccent};"
 						>
 							{agentName}
 						</span>
