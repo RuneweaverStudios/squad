@@ -26,8 +26,12 @@ mcp_agent_mail/
 # Plan mode temporary files
 .plan/
 
-# Beads: JSONL files are committed (source of truth), SQLite is local cache
-# The .beads/.gitignore handles ignoring db files while tracking jsonl
+# Beads task data (user-specific, don't commit to open source repo)
+# When users add their OWN projects via "Add Project", bd init creates
+# .beads/ with a DIFFERENT gitignore that SYNCS tasks via git.
+# This entry only affects the JAT repo itself.
+.beads/
+
 tools/
 
 # Generated avatars (per-machine, don't commit)
