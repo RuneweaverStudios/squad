@@ -248,7 +248,7 @@ async function createTask(
 				.map((d) => d.trim())
 				.join(',');
 			if (depsStr) {
-				args.push(`--depends-on '${escapeForShell(depsStr)}'`);
+				args.push(`--deps '${escapeForShell(depsStr)}'`);
 			}
 		}
 
