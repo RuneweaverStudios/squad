@@ -1,9 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
 	import DependencyGraph from '$lib/components/DependencyGraph.svelte';
 	import TaskDetailDrawer from '$lib/components/TaskDetailDrawer.svelte';
 	import { GraphSkeleton } from '$lib/components/skeleton';
+	import ProjectSelector from '$lib/components/ProjectSelector.svelte';
+	import { getProjectsFromTasks, getTaskCountByProject } from '$lib/utils/projectUtils';
 
 	// Task type compatible with DependencyGraph component
 	interface Task {
@@ -40,15 +43,30 @@
 		selectedProject = projectParam || 'All Projects';
 	});
 
-	// Filter tasks by project
-	const filteredTasks = $derived(() => {
-		if (!selectedProject || selectedProject === 'All Projects') {
-			return allTasks;
-		}
+	// Derive projects list from all tasks
+	const projects = $derived(getProjectsFromTasks(allTasks));
 
-		// Filter by project prefix (e.g., "jat-abc" matches "jat")
-		return allTasks.filter((task) => task.id.startsWith(selectedProject + '-'));
-	});
+	// Derive task counts per project for display in dropdown
+	const taskCounts = $derived(getTaskCountByProject(allTasks, selectedStatus));
+
+	// Filter tasks by project (fixed: $derived without function wrapper)
+	const filteredTasks = $derived(
+		!selectedProject || selectedProject === 'All Projects'
+			? allTasks
+			: allTasks.filter((task) => task.id.startsWith(selectedProject + '-'))
+	);
+
+	// Handle project selection change - update URL
+	function handleProjectChange(project: string) {
+		selectedProject = project;
+		const url = new URL(window.location.href);
+		if (project === 'All Projects') {
+			url.searchParams.delete('project');
+		} else {
+			url.searchParams.set('project', project);
+		}
+		goto(url.toString(), { replaceState: true, noScroll: true, keepFocus: true });
+	}
 
 	// Fetch tasks
 	async function fetchTasks() {
@@ -86,7 +104,7 @@
 
 	// Update displayed tasks when project filter or allTasks change
 	$effect(() => {
-		tasks = filteredTasks();
+		tasks = filteredTasks;
 	});
 
 	onMount(() => {
@@ -102,6 +120,22 @@
 	<!-- Filters Bar -->
 	<div class="bg-base-100 border-b border-base-300 p-4">
 		<div class="flex flex-wrap items-center gap-4">
+			<!-- Project Filter -->
+			<div class="form-control">
+				<label class="label" for="project-filter">
+					<span class="label-text">Project</span>
+				</label>
+				<div class="w-40" id="project-filter">
+					<ProjectSelector
+						{projects}
+						{selectedProject}
+						onProjectChange={handleProjectChange}
+						{taskCounts}
+						compact={true}
+					/>
+				</div>
+			</div>
+
 			<!-- Filters -->
 			<div class="form-control">
 				<label class="label" for="priority-filter">
