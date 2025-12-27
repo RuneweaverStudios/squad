@@ -36,7 +36,7 @@ Output format: `[JAT-SIGNAL:<type>] <json-payload>`
 | `review` | `jat-signal review '{...}'` | taskId |
 | `needs_input` | `jat-signal needs_input '{...}'` | taskId, question, questionType |
 | `completed` | `jat-signal completed '{...}'` | taskId, outcome |
-| `auto_proceed` | `jat-signal auto_proceed '{...}'` | taskId |
+| `auto_proceed` | `jat-signal auto_proceed '{...}'` | taskId (optional: nextTaskId, nextTaskTitle) |
 | `idle` | `jat-signal idle '{...}'` | readyForWork |
 | `question` | `jat-signal question '{...}'` | question, questionType (optional: options, timeout) |
 
@@ -98,8 +98,8 @@ jat-signal review '{
 # Task completed
 jat-signal completed '{"taskId":"jat-abc","outcome":"success"}'
 
-# Auto-proceed (will auto-close and pick next task)
-jat-signal auto_proceed '{"taskId":"jat-abc","nextTaskId":"jat-def"}'
+# Auto-proceed (will auto-close and spawn next task)
+jat-signal auto_proceed '{"taskId":"jat-abc","nextTaskId":"jat-def","nextTaskTitle":"Implement OAuth flow"}'
 
 # Session idle
 jat-signal idle '{"readyForWork":true}'
@@ -244,7 +244,7 @@ $effect(() => {
 | Ready for Review | `review` | 👁 | Cyan | Asking to mark complete |
 | Completing | `completing` | ⏳ | Teal | Running /jat:complete steps |
 | Completed | `completed` | ✅ | Green | Task finished |
-| Auto-Proceed | `auto_proceed` | 🚀 | Green | Will auto-close and pick next |
+| Auto-Proceed | `auto_proceed` | 🚀 | Green | Spawning next task, session will auto-close |
 | Idle | `idle` | 💤 | Gray | No active task |
 
 ### Timeline / EventStack
@@ -296,7 +296,7 @@ Each event type has a custom UI in the expanded timeline:
 | `starting` | Agent name, session ID (full UUID), task ID and title, project |
 | `compacting` | Reason, context size before |
 | `idle` | Ready for work status, session summary |
-| `auto_proceed` | Current task ID, next task ID |
+| `auto_proceed` | Completed task checkmark, next task with spinner, nextTaskTitle, auto-close note |
 
 **Question Signal UI:**
 
@@ -362,7 +362,7 @@ Signals must be written as compact single-line JSON (JSONL format), one event pe
 | Structured question for dashboard | `jat-signal question '{"question":"...","questionType":"..."}'` |
 | Done coding, awaiting review | `jat-signal review '{"taskId":"..."}'` |
 | Task fully completed | `jat-signal completed '{"taskId":"...","outcome":"success"}'` |
-| OK to auto-close session | `jat-signal auto_proceed '{"taskId":"..."}'` |
+| OK to auto-close and spawn next | `jat-signal auto_proceed '{"taskId":"...","nextTaskId":"...","nextTaskTitle":"..."}'` |
 | Session idle | `jat-signal idle '{"readyForWork":true}'` |
 | Suggesting follow-up work | `jat-signal tasks '[...]'` |
 | Human action required | `jat-signal action '{...}'` |
@@ -507,3 +507,96 @@ jat-signal tasks '[{"title":"Add tests","priority":2}]'
 # User approves completion via /jat:complete
 jat-signal completed '{"taskId":"jat-abc","outcome":"success"}'
 ```
+
+### Auto-Proceed Flow
+
+When `/jat:complete` determines the task can auto-proceed (based on review rules and context), it emits an `auto_proceed` signal that triggers automatic spawning of the next ready task.
+
+**Auto-Proceed Signal Flow:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        AUTO-PROCEED SIGNAL FLOW                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  1. Agent completes task via /jat:complete                                  │
+│     └─► Step 7.5 determines: auto_proceed (based on review rules)          │
+│                                                                             │
+│  2. Agent queries next ready task                                           │
+│     └─► bd ready --json | jq '.[0]'                                        │
+│         └─► Gets nextTaskId + nextTaskTitle                                │
+│                                                                             │
+│  3. Agent emits rich auto_proceed signal                                    │
+│     └─► jat-signal auto_proceed '{                                         │
+│           "taskId": "jat-abc",                                             │
+│           "nextTaskId": "jat-def",                                         │
+│           "nextTaskTitle": "Add user auth"                                 │
+│         }'                                                                  │
+│                                                                             │
+│  4. PostToolUse hook captures signal                                        │
+│     └─► Writes to /tmp/jat-signal-tmux-jat-AgentName.json                  │
+│                                                                             │
+│  5. SSE server detects file change                                          │
+│     └─► Broadcasts session-signal event with type: 'auto_proceed'          │
+│                                                                             │
+│  6. Dashboard receives SSE event                                            │
+│     └─► sessionEvents.ts handleSessionSignal()                             │
+│     └─► Detects type === 'auto_proceed'                                    │
+│     └─► Updates session state to 'auto-proceeding'                         │
+│     └─► Calls handleAutoProceed()                                          │
+│                                                                             │
+│  7. handleAutoProceed() executes                                            │
+│     └─► Calls POST /api/sessions/next                                      │
+│                                                                             │
+│  8. API spawns next session                                                 │
+│     └─► Kills old tmux session                                             │
+│     └─► Creates new tmux session (jat-pending-*)                           │
+│     └─► Runs: /jat:start {nextTaskId}                                      │
+│     └─► Returns { success, sessionName, nextTaskId }                       │
+│                                                                             │
+│  9. New agent starts working                                                │
+│     └─► /jat:start registers new agent                                     │
+│     └─► Renames session to jat-{NewAgentName}                              │
+│     └─► Emits working signal                                               │
+│     └─► Dashboard shows new session card                                   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**API Endpoint: `/api/sessions/next`**
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/sessions/next` | Spawn next ready task |
+
+**Request Body:**
+```json
+{
+  "completedTaskId": "jat-abc",
+  "completedSessionName": "jat-FairBay",
+  "project": "chimaro"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "nextTaskId": "jat-def",
+  "nextTaskTitle": "Add user authentication",
+  "sessionName": "jat-pending-1703456789",
+  "completedTaskId": "jat-abc"
+}
+```
+
+**Dashboard State Transition:**
+
+| Before | Signal | After |
+|--------|--------|-------|
+| `completing` | `auto_proceed` | `auto-proceeding` |
+| `auto-proceeding` | (spawn completes) | Session removed, new session appears |
+
+**Visual Feedback:**
+- SessionCard shows "🚀 SPAWNING NEXT" badge with pulse animation
+- EventStack displays completed task checkmark and next task with loading spinner
+- Toast notification when spawn succeeds or fails

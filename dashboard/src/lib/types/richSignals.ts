@@ -534,6 +534,8 @@ export interface AutoProceedSignal {
 	taskId: string;
 	/** Next task to pick up (if known) */
 	nextTaskId?: string;
+	/** Title of the next task */
+	nextTaskTitle?: string;
 }
 
 // =============================================================================

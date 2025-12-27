@@ -88,6 +88,10 @@ export interface WorkSession {
 	_recoveringTimestamp?: number;
 	/** Rule ID that triggered recovery (for display) */
 	_recoveringRuleId?: string;
+	/** Next task ID for auto-proceed (set when auto_proceed signal received) */
+	_autoProceedNextTaskId?: string;
+	/** Next task title for auto-proceed display */
+	_autoProceedNextTaskTitle?: string;
 	/** Suggested tasks from jat-signal (via SSE session-signal event) */
 	_signalSuggestedTasks?: Array<{
 		id?: string;

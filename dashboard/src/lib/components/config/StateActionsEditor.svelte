@@ -227,6 +227,16 @@
 		hasChanges = true;
 	}
 
+	// Make action the primary (first) action
+	function makePrimary(index: number) {
+		if (index === 0) return;
+		const newActions = [...editingActions];
+		const [action] = newActions.splice(index, 1);
+		newActions.unshift(action);
+		editingActions = newActions;
+		hasChanges = true;
+	}
+
 	// Move action down in the list
 	function moveDown(index: number) {
 		if (index === editingActions.length - 1) return;
@@ -445,7 +455,8 @@
 					<div class="actions-section" transition:slide={{ duration: 150 }}>
 						<h4>Custom Actions Order</h4>
 						<p class="section-desc">
-							Drag to reorder. These actions appear first in the dropdown.
+							The first action is the <strong>primary action</strong> - shown most prominently in the dropdown.
+							Use the ⭐ button to quickly set any action as primary.
 						</p>
 
 						{#if editingActions.length === 0}
@@ -458,6 +469,7 @@
 								{#each editingActions as action, index (action.type + '-' + (action.type === 'builtin' ? action.id : index))}
 									<div
 										class="action-item"
+										class:is-primary={index === 0}
 										animate:flip={{ duration: 200 }}
 										transition:slide={{ duration: 150 }}
 									>
@@ -469,9 +481,23 @@
 											{/if}
 											<span class="action-label">{getActionLabel(action)}</span>
 											<span class="action-type-badge">{action.type}</span>
+											{#if index === 0}
+												<span class="primary-badge">⭐ PRIMARY</span>
+											{/if}
 										</div>
 
 										<div class="action-controls">
+											{#if index !== 0}
+												<button
+													class="btn btn-xs btn-ghost btn-warning"
+													onclick={() => makePrimary(index)}
+													title="Make primary (move to top)"
+												>
+													<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+														<path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+													</svg>
+												</button>
+											{/if}
 											<button
 												class="btn btn-xs btn-ghost"
 												onclick={() => moveUp(index)}
@@ -957,6 +983,21 @@
 		background: oklch(0.18 0.02 250);
 		border: 1px solid oklch(0.28 0.02 250);
 		border-radius: 8px;
+	}
+
+	.action-item.is-primary {
+		background: oklch(0.22 0.08 85);
+		border-color: oklch(0.45 0.15 85);
+	}
+
+	.primary-badge {
+		padding: 0.1rem 0.4rem;
+		font-size: 0.65rem;
+		font-weight: 600;
+		color: oklch(0.95 0.15 85);
+		background: oklch(0.40 0.15 85);
+		border-radius: 4px;
+		margin-left: 0.5rem;
 	}
 
 	.action-info {

@@ -36,7 +36,8 @@ export type SessionEventType =
 	| 'session-signal'
 	| 'session-complete'
 	| 'session-created'
-	| 'session-destroyed';
+	| 'session-destroyed'
+	| 'session-auto-proceed';
 
 // Suggested task interface (from jat-signal)
 export interface SuggestedTask {
@@ -316,6 +317,12 @@ function handleSessionState(data: SessionEvent): void {
 	const { sessionName, state, signalPayload } = data;
 	if (!sessionName || !state) return;
 
+	// Special handling for auto_proceed - spawn next task
+	if (state === 'auto_proceed') {
+		handleAutoProceed(data);
+		return;
+	}
+
 	// Update the session state in workSessions store
 	const sessionIndex = workSessionsState.sessions.findIndex(s => s.sessionName === sessionName);
 	if (sessionIndex === -1) {
@@ -460,6 +467,64 @@ function handleSessionDestroyed(data: SessionEvent): void {
 	clearSessionTriggers(sessionName);
 
 	workSessionsState.sessions = workSessionsState.sessions.filter(s => s.sessionName !== sessionName);
+}
+
+/**
+ * Handle auto_proceed signal: spawn next task automatically
+ *
+ * When an agent emits auto_proceed signal, this handler:
+ * 1. Updates session state to show "auto-proceeding"
+ * 2. Calls /api/sessions/next to spawn a new session for the next ready task
+ * 3. The new session will appear via session-created event
+ */
+async function handleAutoProceed(data: SessionEvent): Promise<void> {
+	const { sessionName, signalPayload } = data;
+	if (!sessionName) return;
+
+	const sessionIndex = workSessionsState.sessions.findIndex(s => s.sessionName === sessionName);
+	if (sessionIndex === -1) return;
+
+	// Extract task info from signal payload
+	const taskId = signalPayload?.taskId || '';
+	const nextTaskId = (signalPayload as { nextTaskId?: string })?.nextTaskId;
+	const nextTaskTitle = (signalPayload as { nextTaskTitle?: string })?.nextTaskTitle;
+
+	console.log(`[SessionEvents] Auto-proceed: ${sessionName} completed ${taskId}, spawning ${nextTaskId || 'next ready task'}`);
+
+	// Update session state to show auto-proceeding
+	workSessionsState.sessions[sessionIndex]._sseState = 'auto-proceeding';
+	workSessionsState.sessions[sessionIndex]._sseStateTimestamp = data.timestamp;
+	workSessionsState.sessions[sessionIndex]._autoProceedNextTaskId = nextTaskId || undefined;
+	workSessionsState.sessions[sessionIndex]._autoProceedNextTaskTitle = nextTaskTitle || undefined;
+
+	// Call the spawn API
+	try {
+		const response = await fetch('/api/sessions/next', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				completedTaskId: taskId,
+				completedSessionName: sessionName,
+				nextTaskId
+			})
+		});
+
+		const result = await response.json();
+
+		if (result.success) {
+			console.log(`[SessionEvents] Spawned next session: ${result.sessionName} for task ${result.nextTaskId}`);
+			// The new session will appear via session-created SSE event
+			// The old session will be removed when tmux session is killed
+		} else {
+			console.warn(`[SessionEvents] No ready tasks to spawn: ${result.reason}`);
+			// Update state to completed instead of auto-proceeding
+			workSessionsState.sessions[sessionIndex]._sseState = 'completed';
+		}
+	} catch (error) {
+		console.error('[SessionEvents] Auto-proceed spawn failed:', error);
+		// Fall back to completed state on error
+		workSessionsState.sessions[sessionIndex]._sseState = 'completed';
+	}
 }
 
 /**

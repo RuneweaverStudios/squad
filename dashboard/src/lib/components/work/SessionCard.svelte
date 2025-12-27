@@ -1660,10 +1660,21 @@
 	}
 
 	// Track hovered session for keyboard shortcuts (Alt+A, Alt+C, etc.)
-	// NOTE: Removed auto-focus on hover - it was causing accidental input capture
-	// when user typed in other inputs while hovering over the card
+	// Focus-follows-mouse: auto-focus input on hover (Hyprland-style)
+	// Only steals focus if the current focus is not an input/textarea elsewhere
 	function handleCardMouseEnter() {
 		setHoveredSession(sessionName);
+
+		// Focus-follows-mouse: focus the input when hovering over the card
+		// Skip if user is actively typing in another input (search box, filter, etc.)
+		const activeEl = document.activeElement;
+		const isTypingElsewhere = activeEl &&
+			(activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') &&
+			activeEl !== inputRef;
+
+		if (!isTypingElsewhere && inputRef) {
+			inputRef.focus({ preventScroll: true });
+		}
 	}
 
 	function handleCardMouseLeave() {
@@ -2095,14 +2106,16 @@
 			"ready-for-review",
 			"completing",
 			"completed",
+			"auto-proceeding",
 			"recovering",
 			"idle",
 		];
 
 		if (sseState && validStates.includes(sseState as SessionState)) {
-			// "completed" state should persist - it comes from signal files or closed task, not momentary events
-			if (sseState === "completed") {
-				return "completed";
+			// "completed" and "auto-proceeding" states should persist - they indicate terminal states
+			// that are handled by the API (session cleanup, next task spawn)
+			if (sseState === "completed" || sseState === "auto-proceeding") {
+				return sseState as SessionState;
 			}
 			// Other states use TTL for freshness
 			if (

@@ -94,10 +94,10 @@ export const BUILTIN_ACTIONS_CATALOG: AvailableBuiltinAction[] = [
 	{
 		id: 'start',
 		label: 'Pick Task',
-		description: 'Run /jat:start to pick a task',
+		description: 'Run /jat:start to pick a task (not used in one-task-one-session model)',
 		icon: 'M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z',
 		variant: 'success',
-		defaultStates: ['idle']
+		defaultStates: []  // Empty: one task = one session = one agent philosophy
 	},
 	{
 		id: 'start-next',

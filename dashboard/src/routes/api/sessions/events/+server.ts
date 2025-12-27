@@ -222,7 +222,7 @@ const SIGNAL_STATE_MAP: Record<string, string> = {
 	'needs_input': 'needs-input',
 	'idle': 'idle',
 	'completed': 'completed',
-	'auto_proceed': 'completed',  // auto_proceed means task is done
+	'auto_proceed': 'auto_proceed',  // Preserve auto_proceed for special handling (spawns next task)
 	'starting': 'starting',
 	'compacting': 'compacting',
 	'completing': 'completing',
