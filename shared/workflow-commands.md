@@ -1,6 +1,6 @@
 ## Agent Workflow Commands (Jomarchy Agent Tools)
 
-**9 streamlined commands for multi-agent coordination** located in `~/code/jat/commands/jat/`
+**7 streamlined commands for multi-agent coordination** located in `~/code/jat/commands/jat/`
 
 **One agent = one session = one task.** Each Claude session handles exactly one task from start to completion.
 
@@ -18,8 +18,7 @@
 - `/jat:bead` - Convert PRD/spec into structured Beads tasks with dependencies
 
 **Maintenance:**
-- `/jat:help` - Command reference with examples
-- `/jat:doctor` - Diagnose and repair jat setup (missing imports, broken config)
+- `jat-doctor` - Bash script to diagnose installation issues (run anytime)
 
 **CRITICAL: All commands check Agent Mail FIRST (before any work):**
 - Read messages (display to user)
