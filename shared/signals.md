@@ -48,6 +48,65 @@ Output format: `[JAT-SIGNAL:<type>] <json-payload>`
 | `action` | `jat-signal action '{...}'` | Request human action (JSON object) |
 | `complete` | `jat-signal complete '{...}'` | Full completion bundle |
 
+### Signal Schemas (Full Field Reference)
+
+**`working` signal fields:**
+
+| Field | Required | Type | Description |
+|-------|----------|------|-------------|
+| taskId | **Yes** | string | Task ID (e.g., "jat-abc") |
+| taskTitle | **Yes** | string | Human-readable title |
+| taskDescription | No | string | Full description from Beads |
+| taskPriority | No | number | 0-4 |
+| taskType | No | string | feature/bug/task/chore/epic |
+| approach | No | string | How you'll implement this |
+| expectedFiles | No | string[] | Files you expect to modify |
+| estimatedScope | No | enum | "small" / "medium" / "large" |
+| baselineCommit | No | string | Git SHA for rollback |
+| baselineBranch | No | string | Current branch |
+| dependencies | No | string[] | Blocking task IDs |
+
+**`review` signal fields:**
+
+| Field | Required | Type | Description |
+|-------|----------|------|-------------|
+| taskId | **Yes** | string | Task ID |
+| taskTitle | No | string | Task title |
+| summary | Recommended | string[] | Bullet points of accomplishments |
+| approach | No | string | How it was implemented |
+| filesModified | Recommended | object[] | `{path, changeType, linesAdded, linesRemoved}` |
+| totalLinesAdded | No | number | Total lines added |
+| totalLinesRemoved | No | number | Total lines removed |
+| keyDecisions | No | object[] | `{decision, rationale}` |
+| testsStatus | Recommended | enum | "passing" / "failing" / "none" / "skipped" |
+| buildStatus | Recommended | enum | "clean" / "warnings" / "errors" |
+| reviewFocus | Recommended | string[] | Areas reviewer should check |
+| knownLimitations | No | string[] | Edge cases not handled |
+| commits | No | object[] | `{sha, message}` |
+
+**`needs_input` signal fields:**
+
+| Field | Required | Type | Description |
+|-------|----------|------|-------------|
+| taskId | **Yes** | string | Task ID |
+| question | **Yes** | string | The question to ask |
+| questionType | **Yes** | enum | "choice" / "text" / "approval" / "confirm" |
+| taskTitle | No | string | Task title for context |
+| context | No | string | Why this question arose |
+| options | No | object[] | `{label, value, description}` for choice questions |
+| impact | No | string | What depends on this answer |
+| timeout | No | number | Seconds before timing out |
+
+**`completed` signal fields:**
+
+| Field | Required | Type | Description |
+|-------|----------|------|-------------|
+| taskId | **Yes** | string | Task ID |
+| outcome | **Yes** | string | "success" / "partial" / "blocked" |
+| summary | No | string[] | What was accomplished |
+| suggestedTasks | No | object[] | Follow-up tasks for dashboard |
+| humanActions | No | object[] | Actions requiring human attention |
+
 ### Usage Examples
 
 **State Signals:**

@@ -6,7 +6,7 @@
 
 | Tool | Purpose | Key Options |
 |------|---------|-------------|
-| `am-register` | Create agent identity | `--name X --program claude-code --model sonnet-4.5` |
+| `am-register` | Create agent identity | `--name X --program claude-code` |
 | `am-inbox` | Check messages | `--unread`, `--hide-acked`, `--thread X` |
 | `am-send` | Send message | `--from X --to Y --thread Z` |
 | `am-reply` | Reply to message | `am-reply MSG_ID "text" --agent X` |
