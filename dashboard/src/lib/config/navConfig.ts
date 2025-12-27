@@ -8,18 +8,19 @@
  *   /projects - Projects (default route, multi-project sessions view)
  *   /servers  - Servers (project server sessions)
  *   /automation - Automation rules configuration
- *   /config - Config (JAT configuration files editor)
+ *   /history  - History (completed task history with streak calendar)
+ *   /config   - Config (JAT configuration files editor)
  *
  * SECONDARY (collapsible or less prominent):
  *   /graph    - Dependency visualization
  *   /timeline - Historical view (link from /projects)
  *   /kanban   - Agent kanban (sessions grouped by activity state)
  *   /triage   - Task triage (needs work, not ready for primetime)
- *   /tasks    - Tasks (task list, tmux sessions + agent work)
- *   /agents   - Agents (agent dashboard, status, activity)
  *
  * DROPPED (removed):
  *   /         - Replaced by /projects as default
+ *   /tasks    - Redundant with /projects (removed)
+ *   /agents   - Redundant with /projects (removed)
  */
 
 export interface NavItem {
@@ -70,6 +71,13 @@ export const unifiedNavConfig: UnifiedNavConfig = {
 			primary: true
 		},
 		{
+			id: 'history',
+			label: 'History',
+			href: '/history',
+			icon: 'history',
+			primary: true
+		},
+		{
 			id: 'config',
 			label: 'Config',
 			href: '/config',
@@ -103,27 +111,6 @@ export const unifiedNavConfig: UnifiedNavConfig = {
 			label: 'Triage',
 			href: '/triage',
 			icon: 'triage',
-			primary: false
-		},
-		{
-			id: 'tasks',
-			label: 'Tasks',
-			href: '/tasks',
-			icon: 'tasks',
-			primary: false
-		},
-		{
-			id: 'agents',
-			label: 'Agents',
-			href: '/agents',
-			icon: 'agents',
-			primary: false
-		},
-		{
-			id: 'history',
-			label: 'History',
-			href: '/history',
-			icon: 'history',
 			primary: false
 		}
 	],

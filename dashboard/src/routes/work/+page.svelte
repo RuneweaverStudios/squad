@@ -2,9 +2,9 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 
-	// Redirect /work to /tasks
+	// Redirect /work to /projects (tasks view merged into projects)
 	onMount(() => {
-		goto('/tasks', { replaceState: true });
+		goto('/projects', { replaceState: true });
 	});
 </script>
 

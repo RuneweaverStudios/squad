@@ -98,13 +98,13 @@
 			},
 		},
 		{
-			id: "nav-agents",
-			label: "Go to Agents",
-			description: "View agent coordination and task assignment",
-			icon: "👥",
-			keywords: ["agents", "team", "coordination", "assign"],
+			id: "nav-projects",
+			label: "Go to Projects",
+			description: "View projects with sessions and tasks",
+			icon: "📁",
+			keywords: ["projects", "agents", "team", "coordination", "assign", "sessions"],
 			execute: () => {
-				goto("/agents");
+				goto("/projects");
 				close();
 			},
 		},

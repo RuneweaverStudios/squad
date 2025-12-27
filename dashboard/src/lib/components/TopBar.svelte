@@ -88,9 +88,7 @@
 	});
 
 	// Check which page we're on for showing appropriate sort dropdown
-	const isWorkPage = $derived(
-		$page.url.pathname === "/work" || $page.url.pathname === "/tasks",
-	);
+	const isWorkPage = $derived($page.url.pathname === "/work");
 	const isAgentsPage = $derived($page.url.pathname === "/agents");
 	const isServersPage = $derived($page.url.pathname === "/servers");
 
@@ -99,7 +97,7 @@
 	let sortHovered = $state(false);
 	let sortDropdownTimeout: ReturnType<typeof setTimeout> | null = null;
 
-	// Get current sort state reactively (work/tasks page)
+	// Get current sort state reactively (work page)
 	const currentSort = $derived(getSortBy());
 	const currentDir = $derived(getSortDir());
 	const currentSortLabel = $derived(
