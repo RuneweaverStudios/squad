@@ -5077,14 +5077,14 @@
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
 				bind:this={scrollContainerRef}
-				class="overflow-y-auto px-3 leading-relaxed flex-1 min-h-0 cursor-text"
+				class="overflow-y-auto overflow-x-auto px-3 leading-relaxed flex-1 min-h-0 cursor-text"
 				style="font-family: var(--terminal-font); font-size: var(--terminal-font-size); background: oklch(0.17 0.01 250);"
 				onscroll={handleScroll}
 				onclick={handleCardClick}
 			>
 				{#if output}
 					<pre
-						class="whitespace-pre-wrap break-words m-0 text-base-content"
+						class="whitespace-pre m-0 text-base-content"
 						style="font-family: var(--terminal-font); font-size: var(--terminal-font-size);">{@html renderedOutput}</pre>
 				{:else}
 					<p class="text-base-content/40 italic m-0">No output yet...</p>

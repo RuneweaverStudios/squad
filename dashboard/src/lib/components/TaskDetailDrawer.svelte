@@ -2159,7 +2159,7 @@
 												<span class="loading loading-spinner loading-lg"></span>
 											</div>
 										{:else if logContent}
-											<pre class="text-xs font-mono whitespace-pre-wrap break-words text-base-content">{@html renderedLogContent}</pre>
+											<pre class="text-xs font-mono whitespace-pre text-base-content">{@html renderedLogContent}</pre>
 										{:else}
 											<div class="text-center py-12 text-base-content/50">
 												Failed to load log content

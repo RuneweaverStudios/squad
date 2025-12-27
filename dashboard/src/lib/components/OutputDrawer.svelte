@@ -739,7 +739,7 @@
 				</div>
 			{:else if currentSession()}
 				<!-- Single Session Output -->
-				<div class="rounded-lg p-3" style="background: oklch(0.16 0.01 250); border: 1px solid oklch(0.25 0.02 250);">
+				<div class="rounded-lg p-3 overflow-x-auto" style="background: oklch(0.16 0.01 250); border: 1px solid oklch(0.25 0.02 250);">
 					<!-- Loading history indicator -->
 					{#if loadingHistory}
 						<div class="flex items-center justify-center gap-2 py-2 mb-2 rounded" style="background: oklch(0.20 0.02 250);">
@@ -760,7 +760,7 @@
 						</span>
 					</div>
 					<pre
-						class="text-xs font-mono whitespace-pre-wrap break-words leading-relaxed"
+						class="text-xs font-mono whitespace-pre leading-relaxed"
 						style="color: oklch(0.70 0.02 250);"
 					>{@html ansiToHtml(currentSession()?.output || '')}{#if !currentSession()?.output}No output yet...{/if}</pre>
 				</div>
