@@ -1342,7 +1342,8 @@
 		if (!sessionName) return;
 
 		try {
-			const response = await fetch(
+			// Use throttledFetch to prevent overwhelming server when multiple cards mount
+			const response = await throttledFetch(
 				`/api/work/${encodeURIComponent(sessionName)}/resize`,
 				{
 					method: "POST",
@@ -1438,6 +1439,13 @@
 	// Input state
 	let inputText = $state("");
 	let inputRef: HTMLTextAreaElement | null = null;
+	let escapeFlash = $state(false); // Brief flash when Escape clears
+	let pasteFlash = $state(false); // Brief flash when content is pasted
+	let tabFlash = $state(false); // Brief flash when Tab autocomplete is sent
+	let copyFlash = $state(false); // Brief flash when text is copied
+	let submitFlash = $state(false); // Brief flash when command is submitted
+	let voiceFlash = $state(false); // Brief flash when voice recording starts/stops
+	let attachFlash = $state(false); // Brief flash when image is attached
 
 	// Live streaming input state
 	// When enabled, characters are streamed to terminal as user types
@@ -3556,6 +3564,11 @@
 				if (file.preview) URL.revokeObjectURL(file.preview);
 			}
 			attachedFiles = [];
+			// Trigger visual flash feedback for successful submit
+			submitFlash = true;
+			setTimeout(() => {
+				submitFlash = false;
+			}, 300);
 		} finally {
 			setSendingInput(false);
 		}
@@ -3575,6 +3588,11 @@
 			// When streaming, send Tab to terminal for autocomplete
 			e.preventDefault();
 			onSendInput("tab", "key");
+			// Trigger visual flash feedback
+			tabFlash = true;
+			setTimeout(() => {
+				tabFlash = false;
+			}, 300);
 		} else if (e.key === "Escape") {
 			// Send 2x Escape to tmux (matches Claude Code's clear/cancel behavior)
 			// Claude Code: 2x Escape = clear, 3x Escape = history dialog
@@ -3589,6 +3607,11 @@
 			maxStreamedLength = 0; // Reset high water mark on Escape
 			// Reset textarea height
 			setTimeout(autoResizeTextarea, 0);
+			// Trigger visual flash feedback
+			escapeFlash = true;
+			setTimeout(() => {
+				escapeFlash = false;
+			}, 300);
 		} else if (e.key === "c" && e.ctrlKey && ctrlCInterceptEnabled) {
 			// Ctrl+C: Send interrupt signal to tmux AND clear local input
 			// (Only when intercept is enabled; otherwise let browser handle copy)
@@ -3601,6 +3624,17 @@
 			if (onSendInput) {
 				sendKey("ctrl-c");
 			}
+			// Trigger visual flash feedback (same as Escape - cancel action)
+			escapeFlash = true;
+			setTimeout(() => {
+				escapeFlash = false;
+			}, 300);
+		} else if (e.key === "c" && e.ctrlKey && !ctrlCInterceptEnabled) {
+			// Ctrl+C for copy - trigger green flash (browser handles actual copy)
+			copyFlash = true;
+			setTimeout(() => {
+				copyFlash = false;
+			}, 300);
 		}
 		// Note: Ctrl+V is handled by onpaste event, not here
 	}
@@ -3623,10 +3657,20 @@
 						await saveFileToTask(blob, task.id);
 					}
 				}
+				// Trigger visual flash feedback for image paste
+				pasteFlash = true;
+				setTimeout(() => {
+					pasteFlash = false;
+				}, 300);
 				return;
 			}
 		}
 		// For text, let the native paste happen (don't preventDefault)
+		// Trigger visual flash feedback for text paste
+		pasteFlash = true;
+		setTimeout(() => {
+			pasteFlash = false;
+		}, 300);
 	}
 
 	// Attach a file (add to pending list, don't upload yet)
@@ -3663,6 +3707,12 @@
 				iconColor: typeInfo.color,
 			},
 		];
+
+		// Trigger visual flash feedback for attachment
+		attachFlash = true;
+		setTimeout(() => {
+			attachFlash = false;
+		}, 300);
 	}
 
 	// Remove an attached file
@@ -6247,7 +6297,7 @@
 							class="textarea textarea-xs w-full font-mono pr-6 resize-none overflow-hidden leading-tight {liveStreamEnabled &&
 							inputText
 								? 'ring-1 ring-info/50'
-								: ''}"
+								: ''} {escapeFlash ? 'escape-flash' : ''} {pasteFlash ? 'paste-flash' : ''} {tabFlash ? 'tab-flash' : ''} {copyFlash ? 'copy-flash' : ''} {submitFlash ? 'submit-flash' : ''} {voiceFlash ? 'voice-flash' : ''} {attachFlash ? 'attach-flash' : ''}"
 							style="background: oklch(0.22 0.02 250); border: 1px solid oklch(0.30 0.02 250); color: oklch(0.80 0.02 250); min-height: 24px; max-height: 96px;"
 							disabled={sendingInput || !onSendInput}
 							data-session-input="true"
@@ -6266,6 +6316,11 @@
 									lastStreamedText = "";
 									maxStreamedLength = 0;
 									setTimeout(handleInputChange, 0);
+									// Trigger visual flash feedback (same as Escape)
+									escapeFlash = true;
+									setTimeout(() => {
+										escapeFlash = false;
+									}, 300);
 								}}
 								aria-label="Clear input"
 								disabled={sendingInput || !onSendInput}
@@ -6301,6 +6356,18 @@
 							size="sm"
 							ontranscription={handleVoiceTranscription}
 							onerror={handleVoiceError}
+							onstart={() => {
+								voiceFlash = true;
+								setTimeout(() => {
+									voiceFlash = false;
+								}, 300);
+							}}
+							onend={() => {
+								voiceFlash = true;
+								setTimeout(() => {
+									voiceFlash = false;
+								}, 300);
+							}}
 							disabled={sendingInput || !onSendInput}
 						/>
 					</div>
