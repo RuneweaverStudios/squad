@@ -173,165 +173,6 @@ export function initializeTheme() {
 
 **Solution**: Update `app.css` to Tailwind v4 syntax with proper `@plugin "daisyui"` configuration.
 
-## CSS color-mix() Patterns in app.css
-
-### Overview
-
-The `app.css` file contains approximately 45 uses of `color-mix()` to create semi-transparent colors. **Most of these CANNOT be replaced with Tailwind opacity classes** because they appear in contexts where Tailwind classes aren't applicable.
-
-### Why color-mix() is Required
-
-**Tailwind classes only work in HTML/Svelte templates.** CSS features like `@keyframes`, `box-shadow`, and `linear-gradient()` require actual CSS values. The `color-mix()` function allows us to:
-
-1. Create semi-transparent colors from CSS custom properties
-2. Use theme-aware animation colors (the `--anim-*` variables)
-3. Maintain consistency with the custom `jat` theme color system
-
-### Pattern Categories
-
-#### 1. @keyframes Animation Backgrounds (NOT replaceable)
-
-**Why:** Tailwind classes cannot be used inside `@keyframes` blocks. Animation keyframes must use raw CSS values.
-
-**Count:** ~20 uses across 8 animations
-
-| Animation | Purpose | Example |
-|-----------|---------|---------|
-| `task-entrance` | New task slide-in glow | `background-color: color-mix(in oklch, var(--anim-primary) 30%, transparent)` |
-| `task-exit` | Task deletion fade-out | `background-color: color-mix(in oklch, var(--anim-error) 20%, transparent)` |
-| `task-starting` | Green glow when starting | `background-color: color-mix(in oklch, var(--anim-success-bright) 25%, transparent)` |
-| `task-completed` | Gold glow on completion | `background-color: color-mix(in oklch, var(--anim-warning) 25%, transparent)` |
-| `working-to-completed` | Amber→green transition | Gradient with multiple color-mix stops |
-| `epic-completed` | Gold/purple triumphant glow | Complex gradient mixing warning-gold + secondary |
-| `epic-running` | Subtle amber pulsing | `background: linear-gradient(90deg, color-mix(...), transparent)` |
-| `agent-entrance` | New agent card glow | `box-shadow: 0 0 30px 10px color-mix(...)` |
-| `agent-highlight-flash` | Jump-to-session highlight | Multiple box-shadow keyframes |
-| `radar-pulse` | Empty state radar animation | `box-shadow: 0 0 30px color-mix(...)` |
-
-#### 2. Box-Shadow Glow Effects (NOT replaceable)
-
-**Why:** Tailwind's `shadow-*` utilities don't support custom colors with opacity. The `box-shadow` CSS property requires color values.
-
-**Count:** ~18 uses
-
-**Examples:**
-```css
-/* Glow around task row during animation */
-box-shadow: 0 0 20px color-mix(in oklch, var(--anim-primary) 40%, transparent);
-
-/* Multi-layer glow for epic completion */
-box-shadow: 0 0 40px color-mix(in oklch, var(--anim-warning-bright) 60%, transparent),
-            0 0 60px color-mix(in oklch, var(--anim-secondary-bright) 30%, transparent),
-            inset 0 0 25px color-mix(in oklch, var(--anim-warning-gold) 25%, transparent);
-```
-
-#### 3. Linear Gradient Backgrounds (NOT replaceable)
-
-**Why:** Gradients with semi-transparent color stops require actual color values. Tailwind's gradient utilities (`from-*`, `via-*`, `to-*`) don't support custom properties with opacity.
-
-**Count:** ~10 uses
-
-**Examples:**
-```css
-/* Horizontal fade for working state */
-background: linear-gradient(90deg,
-  color-mix(in oklch, var(--anim-warning) 15%, transparent),
-  transparent);
-
-/* Multi-color epic gradient */
-background: linear-gradient(90deg,
-  color-mix(in oklch, var(--anim-warning-gold) 30%, transparent),
-  color-mix(in oklch, var(--anim-secondary) 15%, transparent),
-  transparent);
-```
-
-#### 4. Row Shimmer Effect (NOT replaceable)
-
-**Why:** The `::after` pseudo-element gradient for active task shimmer requires CSS gradient values.
-
-**Location:** Lines 669-671
-
-```css
-.row-shimmer::after {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    color-mix(in oklch, var(--anim-warning) 12%, transparent) 25%,
-    color-mix(in oklch, var(--anim-warning-bright) 18%, transparent) 50%,
-    color-mix(in oklch, var(--anim-warning) 12%, transparent) 75%,
-    transparent 100%
-  );
-}
-```
-
-#### 5. Terminal Search Highlights (POTENTIALLY replaceable)
-
-**Why:** These are utility classes applied to elements, so Tailwind classes COULD work. However, they use theme-aware colors that need to match the animation system.
-
-**Location:** Lines 577-583
-
-```css
-.terminal-search-match {
-  background-color: color-mix(in oklch, var(--anim-warning-gold) 40%, transparent);
-}
-
-.terminal-search-match.current {
-  background-color: color-mix(in oklch, var(--anim-error) 60%, transparent);
-}
-```
-
-**Note:** These COULD be refactored to use `bg-warning/40` and `bg-error/60` with DaisyUI colors, but would lose the custom `--anim-*` color consistency.
-
-### Summary: What CAN vs CANNOT Be Replaced
-
-| Context | Replaceable? | Reason |
-|---------|--------------|--------|
-| `@keyframes` blocks | ❌ No | CSS-only, no class support |
-| `box-shadow` values | ❌ No | Tailwind shadows don't support custom colors |
-| `linear-gradient()` | ❌ No | Gradient utilities don't support custom props with opacity |
-| `::after` pseudo-elements | ❌ No | Cannot apply Tailwind classes to pseudo-elements in CSS |
-| Utility classes (`.terminal-search-match`) | ⚠️ Maybe | Could use Tailwind, but loses `--anim-*` consistency |
-
-### The --anim-* Color System
-
-The `color-mix()` patterns use a set of animation-specific CSS custom properties defined in the `[data-theme='jat']` block (lines 53-93):
-
-```css
-/* Primary blue - entrance animations, radar, links */
---anim-primary: oklch(0.70 0.18 240);
---anim-primary-bright: oklch(0.80 0.18 240);
-
-/* Success green - task starting, completion */
---anim-success: oklch(0.65 0.20 145);
---anim-success-bright: oklch(0.70 0.22 145);
-
-/* Warning amber/gold - working state, task completed badge */
---anim-warning: oklch(0.75 0.15 85);
---anim-warning-bright: oklch(0.80 0.18 85);
-
-/* etc... */
-```
-
-These provide theme-consistent colors across all animations. Using DaisyUI's `bg-warning/40` would use DaisyUI's warning color, which may not match.
-
-### Best Practices for Future Development
-
-1. **Don't try to convert @keyframes color-mix to Tailwind** - It won't work
-2. **Keep animation colors in --anim-\* variables** - Maintains theme consistency
-3. **Use color-mix for box-shadow glows** - Only way to get semi-transparent custom colors
-4. **For new utility classes**, consider:
-   - Use Tailwind opacity classes if DaisyUI colors are acceptable
-   - Use color-mix if custom animation colors are needed
-
-### Files Reference
-
-- `src/app.css` - All color-mix patterns (lines 163-687)
-- `src/app.css` - Animation color variables (lines 53-93)
-
-### Task Reference
-
-- jat-k6zps: Audit app.css animations - Document non-replaceable color-mix patterns (this section)
-
 ## DaisyUI Common Patterns
 
 ### ⚠️ CRITICAL: Drawer Overlay Pattern
@@ -1699,154 +1540,6 @@ src/routes/
 
 Currently not needed, but the pattern supports these extensions.
 
-## UI Patterns: Unified Queue/Drop Zone
-
-### Overview
-
-The **AgentCard** component (`src/lib/components/agents/AgentCard.svelte`) implements a unified Queue/Drop Zone pattern. This is a key UX pattern in the dashboard that future contributors should understand.
-
-### The Pattern
-
-**What:** Queue section and drop zone are merged into a single, multi-state UI component.
-
-**Why:** Reduces visual redundancy, lowers cognitive load, and provides clearer user feedback.
-
-**Where:** Lines 627-693 in `AgentCard.svelte` (with detailed comment block explaining rationale)
-
-### Design Rationale
-
-**Before (Separate Sections):**
-```
-┌─ Agent Card ──────────┐
-│ Queue (3 tasks)       │
-│ • Task 1              │
-│ • Task 2              │
-│ • Task 3              │
-├───────────────────────┤
-│ Drop Zone             │
-│ [Drop tasks here]     │
-└───────────────────────┘
-```
-
-**Problem:** Redundant sections, more visual noise, wastes space.
-
-**After (Unified):**
-```
-┌─ Agent Card ──────────┐
-│ Queue (3 tasks)       │
-│ • Task 1              │
-│ • Task 2              │
-│ • Task 3              │
-│                       │
-│ [Entire section is    │
-│  drop target with     │
-│  visual feedback]     │
-└───────────────────────┘
-```
-
-**Solution:** One section serves dual purpose - cleaner, more intuitive.
-
-### Visual States (5 States)
-
-| State | Border | Background | Feedback | Can Drop? |
-|-------|--------|------------|----------|-----------|
-| **Default** | Solid neutral | None | Shows queued tasks | Yes (on drag) |
-| **Success** | Dashed green | `bg-success/10` | ✓ "Drop to assign" | Yes |
-| **Dependency Block** | Dashed red | `bg-error/10` | ✗ Shows blocking task | No |
-| **File Conflict** | Dashed red | `bg-error/10` | ⚠ Lists conflicts | No |
-| **Assigning** | Solid neutral | Blur overlay | ⏳ Loading spinner | No |
-
-**Critical:** All 5 states serve a purpose. Don't remove any without understanding impact.
-
-### State Management
-
-```svelte
-let isDragOver = $state(false);           // Drag cursor over section?
-let hasConflict = $state(false);          // File reservation conflicts?
-let hasDependencyBlock = $state(false);   // Unmet task dependencies?
-let isAssigning = $state(false);          // Assignment API call in progress?
-let assignError = $state(null);           // Assignment error message
-```
-
-**State Transitions:**
-```
-Default → (drag enters) → Success/Block/Conflict
-Success → (drop) → Assigning → Success/Error → Default
-Block/Conflict → (drag leaves) → Default
-```
-
-### Drag-Drop Implementation
-
-**Key Functions:**
-- `handleDragOver(event)` - Detect conflicts/blocks, set visual state
-- `handleDrop(event)` - Validate and execute assignment
-- `handleDragLeave()` - Reset state when drag exits
-- `detectConflicts(taskId)` - Check file reservation conflicts
-- `analyzeDependencies(task)` - Check dependency blocks
-
-**Drop Behavior:**
-- **Entire queue section is droppable** (not just empty space)
-- Conflicts/blocks prevent drop (`event.dataTransfer.dropEffect = 'none'`)
-- New tasks appear at **top** of queue after successful assignment
-- Visual feedback is immediate and reactive
-
-### Error Handling Philosophy
-
-**Inline Errors (Preferred):**
-- Shows error message **inside** the drop zone
-- User sees error in context of action
-- Detailed messages explain **why** and **how to fix**
-
-**Examples:**
-- "Dependency Block! Complete task-xyz first"
-- "File Conflict! src/\*\*/\*.ts conflicts with dashboard/\*\*"
-- "Assignment timed out after 30 seconds"
-
-**Not Used:**
-- Toast notifications (lose context)
-- Modal dialogs (interrupt flow)
-- Generic errors ("Failed to assign task")
-
-### For Contributors
-
-**When modifying this pattern:**
-
-1. **Test all 5 states** - Drag tasks with/without dependencies, conflicts
-2. **Keep error messages specific** - Tell users exactly what's wrong
-3. **Don't shrink drop target** - Entire section must remain droppable
-4. **Preserve visual feedback** - Border/background changes are critical UX
-5. **Check mobile** - Touch interactions should work (test on small screens)
-
-**Common mistakes to avoid:**
-- ❌ Making drop zone a small box inside queue
-- ❌ Removing error states ("just show success/fail")
-- ❌ Generic error messages ("Something went wrong")
-- ❌ Modal dialogs for errors (breaks inline pattern)
-- ❌ Changing border/background styles without purpose
-
-**Files to review:**
-- Component: `src/lib/components/agents/AgentCard.svelte` (lines 627-693)
-- README: `dashboard/README.md` (search "Unified Queue/Drop Zone")
-- Dependency utils: `src/lib/utils/dependencyUtils.ts`
-
-### User Testing Insights
-
-This pattern was validated through user feedback:
-
-**Users preferred:**
-- ✅ Single queue section (less clutter)
-- ✅ Inline error messages (immediate context)
-- ✅ Entire section as drop target (easier to use)
-- ✅ Detailed error messages (actionable guidance)
-
-**Users rejected:**
-- ❌ Separate drop zone (felt redundant)
-- ❌ Toast notifications (lose context)
-- ❌ Small drop zones (hard to hit)
-- ❌ Generic errors ("not helpful")
-
-**Key Quote:** *"I like that I can see exactly why the task can't be assigned right where I'm trying to drop it."*
-
 ## UI Patterns: TaskDetailDrawer Component
 
 ### Overview
@@ -2128,7 +1821,6 @@ const requestBody = {
 
 **Related Components:**
 - `TaskCreationDrawer.svelte` - Similar drawer pattern for task creation
-- `TaskDetailModal.svelte` - Legacy modal version (deprecated)
 
 **API Routes:**
 - `src/routes/api/tasks/[id]/+server.js` - GET/PUT task endpoint
@@ -2482,7 +2174,7 @@ Claude Code Sessions → JSONL Files → tokenUsage.ts → API Endpoints → UI 
 - `src/lib/utils/tokenUsage.ts` - JSONL parsing and aggregation (460 lines)
 - `src/routes/api/agents/[name]/usage/+server.js` - Single agent API (147 lines)
 - `src/routes/api/agents/+server.js` - Orchestration API with ?usage=true (modified)
-- `src/lib/components/agents/AgentCard.svelte` - Per-agent display
+- `src/lib/components/work/SessionCard.svelte` - Per-session display
 - `src/lib/config/tokenUsageConfig.ts` - Configurable thresholds
 
 **Key Functions:**
@@ -2782,7 +2474,7 @@ Check thresholds in `tokenUsageConfig.ts` and adjust to your budget.
 - `src/lib/config/tokenUsageConfig.ts` - Configurable thresholds (60 lines)
 - `src/routes/api/agents/[name]/usage/+server.js` - Single agent API (147 lines)
 - `src/routes/api/agents/+server.js` - Orchestration API (modified)
-- `src/lib/components/agents/AgentCard.svelte` - Per-agent display (modified)
+- `src/lib/components/work/SessionCard.svelte` - Per-session display (modified)
 - `src/routes/agents/+page.svelte` - System summary (modified)
 
 **Testing:**
@@ -3054,11 +2746,11 @@ SessionCard supports a `usageLoading` prop for skeleton display while usage data
 - `src/lib/components/skeleton/index.ts` - Export barrel file
 - `src/lib/components/skeleton/*.svelte` - Individual skeleton components
 
-## WorkCard Session State Lifecycle
+## SessionCard State Lifecycle
 
 ### Overview
 
-The **WorkCard** component (`src/lib/components/work/WorkCard.svelte`) tracks agent session states through a complete lifecycle. States are detected by pattern-matching the tmux session output.
+The **SessionCard** component (`src/lib/components/work/SessionCard.svelte`) tracks agent session states through a complete lifecycle. States are detected by pattern-matching the tmux session output.
 
 ### State Lifecycle
 
@@ -3139,7 +2831,7 @@ The PostToolUse hook captures these signals and writes them to `/tmp/jat-signal-
 
 ### Visual Configuration
 
-Session state visuals are centralized in `src/lib/config/statusColors.ts` under `SESSION_STATE_VISUALS`. Each state has both accent bar styling (for WorkCard) and badge styling (for StatusActionBadge):
+Session state visuals are centralized in `src/lib/config/statusColors.ts` under `SESSION_STATE_VISUALS`. Each state has both accent bar styling (for SessionCard) and badge styling (for StatusActionBadge):
 
 ```typescript
 // src/lib/config/statusColors.ts
@@ -3155,7 +2847,7 @@ export interface SessionStateVisual {
     borderColor: string;           // Border color (oklch with alpha)
     pulse?: boolean;               // Whether to animate with pulse
 
-    // WorkCard accent bar colors (left accent bar and agent badge)
+    // SessionCard accent bar colors (left accent bar and agent badge)
     accent: string;                // Vibrant accent color for bars/highlights
     bgTint: string;                // Subtle background tint
     glow: string;                  // Glow effect color (for active states)
@@ -3173,7 +2865,7 @@ export const SESSION_STATE_VISUALS: Record<string, SessionStateVisual> = {
         bgColor: 'oklch(0.60 0.15 200 / 0.3)',
         textColor: 'oklch(0.90 0.12 200)',
         borderColor: 'oklch(0.60 0.15 200 / 0.5)',
-        // WorkCard accent colors
+        // SessionCard accent colors
         accent: 'oklch(0.75 0.15 200)',
         bgTint: 'oklch(0.75 0.15 200 / 0.10)',
         glow: 'oklch(0.75 0.15 200 / 0.5)',
