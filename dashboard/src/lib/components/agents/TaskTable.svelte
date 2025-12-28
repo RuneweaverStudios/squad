@@ -1192,6 +1192,55 @@
 		return Array.from(projectsSet).sort();
 	});
 
+	// Pre-computed map: task.id → tasks that depend on it (for "Blocks" column)
+	// This avoids O(n²) filtering in the template - replaces allTasksList.filter()
+	const blockedByMap = $derived.by(() => {
+		const map = new Map<string, Task[]>();
+		const taskSource = allTasks.length > 0 ? allTasks : tasks;
+		for (const task of taskSource) {
+			if (task.status === 'closed') continue; // Only track open blockers
+			if (!task.depends_on) continue;
+			for (const dep of task.depends_on) {
+				if (!map.has(dep.id)) {
+					map.set(dep.id, []);
+				}
+				map.get(dep.id)!.push(task);
+			}
+		}
+		return map;
+	});
+
+	// Pre-computed map: epic.id → all children (for epic completion tracking)
+	// This avoids O(n) filtering per epic header in the template
+	const epicChildrenAllMap = $derived.by(() => {
+		const map = new Map<string, Task[]>();
+		const taskSource = allTasks.length > 0 ? allTasks : tasks;
+		for (const task of taskSource) {
+			// Get parent via extractParentId or epicChildMap
+			const parentFromId = extractParentId(task.id);
+			const parentFromMap = epicChildMap.get(task.id);
+			const parentId = parentFromId || parentFromMap;
+			if (parentId && parentId !== task.id) {
+				if (!map.has(parentId)) {
+					map.set(parentId, []);
+				}
+				map.get(parentId)!.push(task);
+			}
+		}
+		return map;
+	});
+
+	// Pre-computed map: task.id → task for O(1) lookups
+	// This avoids O(n) .find() operations in group headers
+	const taskLookupMap = $derived.by(() => {
+		const map = new Map<string, Task>();
+		const taskSource = allTasks.length > 0 ? allTasks : tasks;
+		for (const task of taskSource) {
+			map.set(task.id, task);
+		}
+		return map;
+	});
+
 	// Filter options for FilterDropdown components
 	const projectOptions = $derived(availableProjects.map(p => ({
 		value: p,
@@ -2530,7 +2579,7 @@
 						{#if !isProjectCollapsed}
 							{#each Array.from(epicMap.entries()) as [epicKey, epicTasks]}
 								{@const epicVisual = getGroupHeaderInfo('parent', epicKey)}
-								{@const parentTask = [...(allTasks.length > 0 ? allTasks : tasks)].find(t => t.id === epicKey)}
+								{@const parentTask = taskLookupMap.get(epicKey)}
 								{@const isEpicCollapsed = collapsedGroups.has(`${projectKey}::${epicKey}`)}
 								{@const epicAssignedAgents = [...new Set(epicTasks.filter(t => t.assignee && t.status === 'in_progress').map(t => t.assignee))]}
 								{@const hasChildTasks = epicTasks.some(t => extractParentId(t.id) === epicKey)}
@@ -2538,8 +2587,7 @@
 								{@const isEpicJustCompleted = completedEpicIds.includes(epicKey)}
 								{@const isRunningEpic = getIsActive() && getEpicId() === epicKey}
 								{@const epicQueueAgents = isRunningEpic ? getRunningAgents() : []}
-								{@const allTasksList = allTasks.length > 0 ? allTasks : tasks}
-								{@const allEpicChildren = allTasksList.filter(t => t.id !== epicKey && (extractParentId(t.id) === epicKey || epicChildMap.get(t.id) === epicKey))}
+								{@const allEpicChildren = epicChildrenAllMap.get(epicKey) || []}
 								{@const closedChildrenCount = allEpicChildren.filter(t => t.status === 'closed').length}
 								{@const totalChildrenCount = allEpicChildren.length}
 								{@const isEpicFullyComplete = closedChildrenCount === totalChildrenCount && totalChildrenCount > 0}
@@ -2701,8 +2749,7 @@
 											{@const isChildTask = extractParentId(task.id) === epicKey && task.id !== epicKey}
 											{@const isLastChild = isChildTask && taskIndex === epicTasks.length - 1}
 											{@const unresolvedBlockers = task.depends_on?.filter(d => d.status !== 'closed') || []}
-											{@const allTasksList = allTasks.length > 0 ? allTasks : tasks}
-											{@const blockedTasks = allTasksList.filter(t => t.depends_on?.some(d => d.id === task.id) && t.status !== 'closed')}
+											{@const blockedTasks = blockedByMap.get(task.id) || []}
 											{@const hasDependencyIssues = unresolvedBlockers.length > 0 || blockedTasks.length > 0}
 											{@const isSpawning = spawningSingle === task.id || ($spawningTaskIds.has(task.id))}
 											{@const hasRowGradient = isCompletedByActiveSession || taskIsActive}
@@ -2943,7 +2990,7 @@
 							<!-- Group header (pinned when scrolling) - Industrial/Terminal style -->
 							{@const typeVisual = getGroupHeaderInfo(groupingMode, groupKey)}
 						{@const epicId = groupingMode === 'parent' ? groupKey : null}
-						{@const parentTask = epicId ? [...(allTasks.length > 0 ? allTasks : tasks)].find(t => t.id === epicId) : null}
+						{@const parentTask = epicId ? taskLookupMap.get(epicId) : undefined}
 						{@const isCollapsed = collapsedGroups.has(groupKey)}
 						{@const assignedAgents = [...new Set(typeTasks.filter(t => t.assignee && t.status === 'in_progress').map(t => t.assignee))]}
 						<!-- In parent/project mode, only show collapsible header for groups with 2+ child tasks -->
@@ -2958,7 +3005,7 @@
 						{@const isParentRunningEpic = groupingMode === 'parent' && getIsActive() && getEpicId() === groupKey}
 						{@const parentEpicQueueAgents = isParentRunningEpic ? getRunningAgents() : []}
 						{@const parentAllTasksList = allTasks.length > 0 ? allTasks : tasks}
-						{@const parentAllChildren = parentAllTasksList.filter(t => t.id !== groupKey && (extractParentId(t.id) === groupKey || epicChildMap.get(t.id) === groupKey))}
+						{@const parentAllChildren = epicChildrenAllMap.get(groupKey) || []}
 						{@const parentClosedCount = parentAllChildren.filter(t => t.status === 'closed').length}
 						{@const parentTotalCount = parentAllChildren.length}
 						{@const parentIsFullyComplete = parentClosedCount === parentTotalCount && parentTotalCount > 0}
@@ -3136,8 +3183,7 @@
 									{@const isChildTask = groupingMode === 'parent' && extractParentId(task.id) === groupKey && task.id !== groupKey}
 									{@const isLastChild = isChildTask && taskIndex === typeTasks.length - 1}
 									{@const unresolvedBlockers = task.depends_on?.filter(d => d.status !== 'closed') || []}
-									{@const allTasksList = allTasks.length > 0 ? allTasks : tasks}
-									{@const blockedTasks = allTasksList.filter(t => t.depends_on?.some(d => d.id === task.id) && t.status !== 'closed')}
+									{@const blockedTasks = blockedByMap.get(task.id) || []}
 									{@const elapsed = task.status === 'in_progress' ? getElapsedTime(task.updated_at) : null}
 									{@const fireScale = elapsed ? getFireScale(elapsed.minutes) : 1}
 									{@const hasRowGradient = isCompletedByActiveSession || dragOverTask === task.id || selectedTasks.has(task.id) || isHuman || taskIsActive}
@@ -3382,8 +3428,7 @@
 					<tbody>
 						{#each exitingTasks as task (task.id)}
 							{@const isTaskCompleted = task.status === 'closed'}
-							{@const allTasksList = allTasks.length > 0 ? allTasks : tasks}
-							{@const blockedTasks = allTasksList.filter(t => t.depends_on?.some(d => d.id === task.id) && t.status !== 'closed')}
+							{@const blockedTasks = blockedByMap.get(task.id) || []}
 							<tr
 								class="{isTaskCompleted ? 'task-completed-exit' : 'task-exit'}"
 								style="

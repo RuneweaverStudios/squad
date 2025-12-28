@@ -1154,7 +1154,9 @@
 		await fetchConfigProjects(); // Load all configured projects FIRST
 		fetchTaskData();
 		await fetchSessions();
-		setTimeout(() => fetchSessionUsage(), 5000);
+		// Delay usage fetch to avoid blocking UI during initial user interactions
+		// Usage parsing scans ~40K lines of JSONL files and takes 7+ seconds
+		setTimeout(() => fetchSessionUsage(), 30000);
 
 		// Subscribe to maximizeSessionPanel for click-to-center behavior
 		console.log('[projects/+page] Setting up maximizeSessionPanel subscription');

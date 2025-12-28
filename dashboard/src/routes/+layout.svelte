@@ -201,8 +201,13 @@
 			loadEpicsWithReady();
 			loadReviewRules();
 			loadSparklineData();
-			loadAllTasks(); // Full data with usage (expensive, background)
 		}, 100);
+
+		// Phase 3: Expensive usage data (heavily deferred, runs after user has had time to interact)
+		// loadAllTasks parses ~40K lines of JSONL files and takes 7+ seconds
+		setTimeout(() => {
+			loadAllTasks(); // Full data with usage (expensive, background)
+		}, 30000);
 
 		// Load sessions for activity polling
 		fetchWorkSessions(); // Don't await - page can render without it
