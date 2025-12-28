@@ -129,7 +129,7 @@
 
 			<!-- Priority Filter -->
 			<div class="flex items-center gap-1.5">
-				<span class="text-xs text-base-content/50">Priority:</span>
+				<span class="industrial-label mb-0">Priority</span>
 				{#each [0, 1, 2, 3] as priority}
 					<button
 						class="badge badge-sm cursor-pointer transition-all {selectedPriorities.has(priority)
@@ -143,11 +143,13 @@
 			</div>
 
 			<!-- Search -->
-			<div class="form-control">
+			<div class="flex flex-col">
+				<label class="industrial-label" for="kanban-search">Search</label>
 				<input
+					id="kanban-search"
 					type="text"
 					placeholder="Search agents/tasks..."
-					class="input input-bordered input-sm w-48"
+					class="industrial-input w-48"
 					bind:value={searchQuery}
 				/>
 			</div>

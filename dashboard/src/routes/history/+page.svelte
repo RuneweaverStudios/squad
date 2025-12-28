@@ -13,6 +13,7 @@
 
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
 	import StreakCalendar from '$lib/components/StreakCalendar.svelte';
 	import AnimatedDigits from '$lib/components/AnimatedDigits.svelte';
 	import TaskDetailDrawer from '$lib/components/TaskDetailDrawer.svelte';
@@ -78,6 +79,18 @@
 		}
 		return ['All Projects', ...Array.from(projectSet).sort()];
 	});
+
+	// Handle project selection change - update URL
+	function handleProjectChange(project: string) {
+		selectedProject = project;
+		const url = new URL(window.location.href);
+		if (project === 'All Projects') {
+			url.searchParams.delete('project');
+		} else {
+			url.searchParams.set('project', project);
+		}
+		goto(url.toString(), { replaceState: true, noScroll: true, keepFocus: true });
+	}
 
 	// Filtered tasks
 	const filteredTasks = $derived.by(() => {
@@ -362,7 +375,7 @@
 										<input
 											type="text"
 											placeholder="Search tasks..."
-											class="input input-bordered input-sm w-40"
+											class="industrial-input w-40"
 											bind:value={searchQuery}
 										/>
 										<div class="dropdown dropdown-end">
@@ -388,7 +401,7 @@
 														<button
 															type="button"
 															class="filter-option {selectedProject === project ? 'active' : ''}"
-															onclick={() => { selectedProject = project; document.activeElement?.blur(); }}
+															onclick={() => { handleProjectChange(project); document.activeElement?.blur(); }}
 														>
 															{#if project !== 'All Projects'}
 																<span

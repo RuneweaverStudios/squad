@@ -282,7 +282,7 @@
 		<input
 			type="text"
 			placeholder="Search {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''}..."
-			class="input input-bordered input-sm w-full mb-3"
+			class="industrial-input w-full mb-3"
 			bind:value={searchQuery}
 			oninput={() => updateURL()}
 		/>
@@ -290,10 +290,8 @@
 		<!-- Filters -->
 		<div class="flex flex-col gap-1">
 			<!-- Priority Filter -->
-			<div class="form-control">
-				<label class="label py-1">
-					<span class="label-text text-xs flex items-center gap-0.5">Priority (<AnimatedDigits value={selectedPriorities.size.toString()} /> selected)</span>
-				</label>
+			<div class="flex flex-col">
+				<span class="industrial-label flex items-center gap-0.5">Priority (<AnimatedDigits value={selectedPriorities.size.toString()} /> selected)</span>
 				<div class="p-2 bg-base-200 rounded-lg">
 					<FilterDropdown
 						label="Priority"
@@ -306,10 +304,8 @@
 			</div>
 
 			<!-- Status Filter -->
-			<div class="form-control">
-				<label class="label py-1">
-					<span class="label-text text-xs flex items-center gap-0.5">Status (<AnimatedDigits value={selectedStatuses.size.toString()} /> selected)</span>
-				</label>
+			<div class="flex flex-col">
+				<span class="industrial-label flex items-center gap-0.5">Status (<AnimatedDigits value={selectedStatuses.size.toString()} /> selected)</span>
 				<div class="p-2 bg-base-200 rounded-lg">
 					<FilterDropdown
 						label="Status"
@@ -323,10 +319,8 @@
 
 			<!-- Type Filter -->
 			{#if typeOptions.length > 0}
-				<div class="form-control">
-					<label class="label py-1">
-						<span class="label-text text-xs flex items-center gap-0.5">Type (<AnimatedDigits value={selectedTypes.size > 0 ? selectedTypes.size.toString() : 'all'} /> selected)</span>
-					</label>
+				<div class="flex flex-col">
+					<span class="industrial-label flex items-center gap-0.5">Type (<AnimatedDigits value={selectedTypes.size > 0 ? selectedTypes.size.toString() : 'all'} /> selected)</span>
 					<div class="p-2 bg-base-200 rounded-lg">
 						<FilterDropdown
 							label="Type"
@@ -341,10 +335,8 @@
 
 			<!-- Labels Filter -->
 			{#if labelOptions.length > 0}
-				<div class="form-control">
-					<label class="label py-1">
-						<span class="label-text text-xs flex items-center gap-0.5">Labels (<AnimatedDigits value={selectedLabels.size.toString()} /> selected)</span>
-					</label>
+				<div class="flex flex-col">
+					<span class="industrial-label flex items-center gap-0.5">Labels (<AnimatedDigits value={selectedLabels.size.toString()} /> selected)</span>
 					<div class="p-2 bg-base-200 rounded-lg max-h-40 overflow-y-auto">
 						<FilterDropdown
 							label="Labels"

@@ -121,10 +121,8 @@
 	<div class="bg-base-100 border-b border-base-300 p-4">
 		<div class="flex flex-wrap items-center gap-4">
 			<!-- Project Filter -->
-			<div class="form-control">
-				<label class="label" for="project-filter">
-					<span class="label-text">Project</span>
-				</label>
+			<div class="flex flex-col">
+				<label class="industrial-label" for="project-filter">Project</label>
 				<div class="w-40" id="project-filter">
 					<ProjectSelector
 						{projects}
@@ -137,13 +135,11 @@
 			</div>
 
 			<!-- Filters -->
-			<div class="form-control">
-				<label class="label" for="priority-filter">
-					<span class="label-text">Priority</span>
-				</label>
+			<div class="flex flex-col">
+				<label class="industrial-label" for="priority-filter">Priority</label>
 				<select
 					id="priority-filter"
-					class="select select-bordered select-sm"
+					class="industrial-select"
 					bind:value={selectedPriority}
 				>
 					<option value="all">All Priorities</option>
@@ -154,13 +150,11 @@
 				</select>
 			</div>
 
-			<div class="form-control">
-				<label class="label" for="status-filter">
-					<span class="label-text">Status</span>
-				</label>
+			<div class="flex flex-col">
+				<label class="industrial-label" for="status-filter">Status</label>
 				<select
 					id="status-filter"
-					class="select select-bordered select-sm"
+					class="industrial-select"
 					bind:value={selectedStatus}
 				>
 					<option value="all">All Statuses</option>
@@ -171,15 +165,13 @@
 				</select>
 			</div>
 
-			<div class="form-control">
-				<label class="label" for="search-filter">
-					<span class="label-text">Search</span>
-				</label>
+			<div class="flex flex-col">
+				<label class="industrial-label" for="search-filter">Search</label>
 				<input
 					id="search-filter"
 					type="text"
 					placeholder="Search tasks..."
-					class="input input-bordered input-sm"
+					class="industrial-input"
 					bind:value={searchQuery}
 				/>
 			</div>
