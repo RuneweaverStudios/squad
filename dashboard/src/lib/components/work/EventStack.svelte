@@ -39,6 +39,10 @@
 	interface SuggestedTaskWithState extends SuggestedTask {
 		selected: boolean;
 		edited: boolean;
+		/** Whether this task already exists in Beads (matched by title) */
+		alreadyCreated?: boolean;
+		/** Task ID if this task was already created (for displaying clickable badge) */
+		taskId?: string;
 		edits?: {
 			type?: string;
 			title?: string;
@@ -378,6 +382,36 @@
 	let createResults = $state<{ success: any[]; failed: any[] }>({ success: [], failed: [] });
 	let showCreateFeedback = $state(false);
 
+	// Track existing task titles for "already created" detection
+	// Map from normalized title -> task ID (allows showing clickable task ID badge)
+	let existingTaskTitles = $state<Map<string, string>>(new Map());
+
+	// Fetch existing task titles from Beads (normalized for comparison)
+	async function fetchExistingTaskTitles(): Promise<void> {
+		try {
+			const response = await fetch(
+				"/api/tasks?status=open&status=in_progress&status=closed",
+			);
+			if (!response.ok) {
+				console.warn("[EventStack] fetchExistingTaskTitles: response not ok", response.status);
+				return;
+			}
+
+			const data = await response.json();
+			const titleToId = new Map<string, string>();
+			for (const task of data.tasks || []) {
+				if (task.title && task.id) {
+					// Normalize: lowercase and trim for comparison
+					// Store mapping to task ID for clickable badges
+					titleToId.set(task.title.toLowerCase().trim(), task.id);
+				}
+			}
+			existingTaskTitles = titleToId;
+		} catch (error) {
+			console.error("[EventStack] Error fetching existing task titles:", error);
+		}
+	}
+
 	// Generate a unique key for an event
 	function getEventKey(event: TimelineEvent): string {
 		return `${event.timestamp}-${event.type}-${event.state || ''}`;
@@ -401,11 +435,19 @@
 		return event.data.map((task: SuggestedTask, idx: number) => {
 			const taskKey = getSuggestedTaskKey(task, idx);
 			const state = eventTasksState!.get(taskKey) || { selected: false, edited: false };
+
+			// Check if this task already exists in Beads (by normalized title)
+			const normalizedTitle = task.title?.toLowerCase().trim();
+			const existingTaskId = normalizedTitle ? existingTaskTitles.get(normalizedTitle) : undefined;
+			const alreadyCreated = !!existingTaskId;
+
 			return {
 				...task,
 				selected: state.selected,
 				edited: state.edited,
-				edits: state.edits
+				edits: state.edits,
+				alreadyCreated,
+				taskId: existingTaskId
 			};
 		});
 	}
@@ -423,11 +465,19 @@
 		return suggestedTasks.map((task: SuggestedTask, idx: number) => {
 			const taskKey = getSuggestedTaskKey(task, idx);
 			const state = eventTasksState!.get(taskKey) || { selected: false, edited: false };
+
+			// Check if this task already exists in Beads (by normalized title)
+			const normalizedTitle = task.title?.toLowerCase().trim();
+			const existingTaskId = normalizedTitle ? existingTaskTitles.get(normalizedTitle) : undefined;
+			const alreadyCreated = !!existingTaskId;
+
 			return {
 				...task,
 				selected: state.selected,
 				edited: state.edited,
-				edits: state.edits
+				edits: state.edits,
+				alreadyCreated,
+				taskId: existingTaskId
 			};
 		});
 	}
@@ -866,6 +916,11 @@
 	}
 
 	onMount(() => {
+		// Fetch existing task titles for "already created" detection
+		// This is needed regardless of initialEvents since we need to know
+		// what tasks already exist in Beads to mark suggested tasks correctly
+		fetchExistingTaskTitles();
+
 		// If initialEvents provided, use them directly (no polling)
 		if (initialEvents) {
 			events = initialEvents;
