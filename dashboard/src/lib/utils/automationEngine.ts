@@ -15,6 +15,7 @@ import type {
 	AutomationActivityEvent,
 	QuestionUIConfig
 } from '$lib/types/automation';
+import { stripAnsi } from '$lib/utils/ansiToHtml';
 import {
 	getRulesForSession,
 	isOnCooldown,
@@ -628,7 +629,7 @@ export async function processSessionOutput(
 	output: string,
 	agentName?: string
 ): Promise<void> {
-	// Always log when called for debugging
+	// Always log when called for debugging (strip ANSI codes for clean console output)
 	console.log(`[automationEngine] processSessionOutput called for ${sessionName}, output length: ${output.length}`);
 
 	if (!isAutomationEnabled()) {
@@ -640,7 +641,9 @@ export async function processSessionOutput(
 
 	// Find matching rules
 	const matches = findMatchingRules(sessionName, output);
-	console.log(`[automationEngine] Found ${matches.length} matching rules for "${output.substring(0, 50)}..."`);
+	// Strip ANSI codes from output preview to avoid corrupted console display
+	const cleanPreview = stripAnsi(output).substring(0, 50).replace(/\n/g, ' ');
+	console.log(`[automationEngine] Found ${matches.length} matching rules for "${cleanPreview}..."`);
 	if (matches.length === 0) return;
 
 	// Process first matching rule (highest priority)
