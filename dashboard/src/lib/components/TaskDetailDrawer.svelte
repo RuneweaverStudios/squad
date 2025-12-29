@@ -1728,18 +1728,78 @@
 										</span>
 									</div>
 								{:else if actionMode === 'closed'}
-									<!-- Closed: Show reopen option -->
-									<button
-										class="btn btn-xs btn-ghost gap-1"
-										onclick={handleReopen}
-										disabled={isSaving}
-										title="Reopen task"
-									>
-										<svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-											<path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-										</svg>
-										<span>Reopen</span>
-									</button>
+									<!-- Closed: Show resume + reopen options -->
+									<div class="flex items-center gap-1">
+										<!-- Resume: Continue Claude conversation (more common action) -->
+										{#if uniqueSessions.length === 1}
+											<button
+												class="btn btn-xs btn-primary gap-1"
+												onclick={() => handleResumeSession(uniqueSessions[0].session_id, uniqueSessions[0].agent_name)}
+												disabled={resumingSessionId !== null}
+												title="Continue the Claude conversation where it left off"
+											>
+												{#if resumingSessionId === uniqueSessions[0].session_id}
+													<span class="loading loading-spinner loading-xs"></span>
+												{:else}
+													<svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+														<path d="M8 5v14l11-7z"/>
+													</svg>
+												{/if}
+												<span>Resume</span>
+											</button>
+										{:else if uniqueSessions.length > 1}
+											<!-- Multiple sessions - show dropdown -->
+											<div class="dropdown dropdown-end">
+												<button
+													tabindex="0"
+													class="btn btn-xs btn-primary gap-1"
+													disabled={resumingSessionId !== null}
+													title="Continue the Claude conversation where it left off"
+												>
+													<svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+														<path d="M8 5v14l11-7z"/>
+													</svg>
+													<span>Resume</span>
+													<svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+														<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+													</svg>
+												</button>
+												<ul tabindex="0" class="dropdown-content menu rounded-box z-50 w-52 p-1 shadow-lg bg-base-200 border border-base-300">
+													{#each uniqueSessions as session}
+														<li>
+															<button
+																class="text-xs"
+																onclick={() => { handleResumeSession(session.session_id, session.agent_name); document.activeElement?.blur(); }}
+																disabled={resumingSessionId === session.session_id}
+															>
+																{#if resumingSessionId === session.session_id}
+																	<span class="loading loading-spinner loading-xs"></span>
+																{:else}
+																	<svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+																		<path d="M8 5v14l11-7z"/>
+																	</svg>
+																{/if}
+																<span>{session.agent_name || 'Session'}</span>
+																<span class="text-base-content/50">{formatRelativeTimestamp(session.timestamp)}</span>
+															</button>
+														</li>
+													{/each}
+												</ul>
+											</div>
+										{/if}
+										<!-- Reopen: Change task status back to open -->
+										<button
+											class="btn btn-xs btn-ghost gap-1"
+											onclick={handleReopen}
+											disabled={isSaving}
+											title="Change task status from closed to open (doesn't restore conversation)"
+										>
+											<svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+											</svg>
+											<span>Reopen</span>
+										</button>
+									</div>
 								{/if}
 							</span>
 						{/if}
@@ -1960,63 +2020,6 @@
 									{/if}
 								</h4>
 								<div class="flex items-center gap-1">
-									<!-- Resume Session button(s) -->
-									{#if uniqueSessions.length === 1}
-										<!-- Single session - show simple button -->
-										<button
-											class="btn btn-xs btn-ghost gap-1 text-primary hover:btn-primary"
-											onclick={() => handleResumeSession(uniqueSessions[0].session_id, uniqueSessions[0].agent_name)}
-											disabled={resumingSessionId !== null}
-											title="Resume this session in a new terminal"
-										>
-											{#if resumingSessionId === uniqueSessions[0].session_id}
-												<span class="loading loading-spinner loading-xs"></span>
-											{:else}
-												<svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-													<path d="M8 5v14l11-7z"/>
-												</svg>
-											{/if}
-											<span>Resume</span>
-										</button>
-									{:else if uniqueSessions.length > 1}
-										<!-- Multiple sessions - show dropdown -->
-										<div class="dropdown dropdown-end">
-											<button
-												tabindex="0"
-												class="btn btn-xs btn-ghost gap-1 text-primary hover:btn-primary"
-												disabled={resumingSessionId !== null}
-											>
-												<svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-													<path d="M8 5v14l11-7z"/>
-												</svg>
-												<span>Resume</span>
-												<svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-												</svg>
-											</button>
-											<ul tabindex="0" class="dropdown-content menu rounded-box z-50 w-52 p-1 shadow-lg bg-base-200 border border-base-300">
-												{#each uniqueSessions as session}
-													<li>
-														<button
-															class="text-xs"
-															onclick={() => { handleResumeSession(session.session_id, session.agent_name); document.activeElement?.blur(); }}
-															disabled={resumingSessionId === session.session_id}
-														>
-															{#if resumingSessionId === session.session_id}
-																<span class="loading loading-spinner loading-xs"></span>
-															{:else}
-																<svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-																	<path d="M8 5v14l11-7z"/>
-																</svg>
-															{/if}
-															<span>{session.agent_name || 'Session'}</span>
-															<span class="text-base-content/50">{formatRelativeTimestamp(session.timestamp)}</span>
-														</button>
-													</li>
-												{/each}
-											</ul>
-										</div>
-									{/if}
 									{#if taskSignals.length > 0}
 										<button
 											class="btn btn-xs btn-ghost gap-1"
