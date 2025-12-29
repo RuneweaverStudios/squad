@@ -30,6 +30,7 @@ let aggregationInterval: ReturnType<typeof setInterval> | null = null;
  * - jat-timeline-*.jsonl - Timeline logs
  * - jat-question-*.json - Question files
  * - jat-monitor-*.pid - Monitor PID files
+ * - claude-*-cwd - Claude Code working directory markers (hex IDs)
  */
 function cleanupStaleSignalFiles(): { cleaned: number; errors: number } {
 	const tmpDir = '/tmp';
@@ -38,7 +39,8 @@ function cleanupStaleSignalFiles(): { cleaned: number; errors: number } {
 		/^jat-activity-.*\.json$/,
 		/^jat-timeline-.*\.jsonl$/,
 		/^jat-question-.*\.json$/,
-		/^jat-monitor-.*\.pid$/
+		/^jat-monitor-.*\.pid$/,
+		/^claude-[0-9a-f]+-cwd$/ // Claude Code working directory markers
 	];
 
 	let cleaned = 0;
@@ -75,7 +77,7 @@ function cleanupStaleSignalFiles(): { cleaned: number; errors: number } {
 // Run startup tasks (cleanup + aggregation)
 async function initializeStartupTasks() {
 	// Run signal file cleanup immediately (non-blocking, fast)
-	console.log('[Signal Cleanup] Cleaning stale JAT signal files from /tmp...');
+	console.log('[Signal Cleanup] Cleaning stale temp files from /tmp...');
 	const cleanupResult = cleanupStaleSignalFiles();
 	if (cleanupResult.cleaned > 0) {
 		console.log(
