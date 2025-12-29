@@ -2,6 +2,7 @@
 	import { computeAgentStatus, type AgentStatusInput, type AgentStatus } from '$lib/utils/agentStatusUtils';
 	import { createPutRequest } from '$lib/utils/bulkApiHelpers';
 	import { broadcastTaskEvent } from '$lib/stores/taskEvents';
+	import { successToast } from '$lib/stores/toasts.svelte';
 	import AgentAvatar from '$lib/components/AgentAvatar.svelte';
 
 	interface Task {
@@ -149,6 +150,8 @@
 				}
 				console.error('Resume failed:', data.message || data.error);
 			} else {
+				// Show success toast
+				successToast('Session resumed', `Resuming ${task.assignee}'s session`);
 				// Broadcast event so pages refresh immediately
 				broadcastTaskEvent('session-resumed', task.id);
 				dropdownOpen = false;
