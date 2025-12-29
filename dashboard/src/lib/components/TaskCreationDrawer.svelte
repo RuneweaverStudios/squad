@@ -1170,12 +1170,12 @@
 				<div class="space-y-6">
 					<!-- Title (Required) - Industrial -->
 					<div class="form-control">
-						<label class="label" for="task-title">
+						<label class="label justify-between w-full mb-2" for="task-title">
 							<span class="label-text text-xs font-semibold font-mono uppercase tracking-wider text-base-content/70">
 								Title
 								<span class="text-error">*</span>
 							</span>
-							<!-- Human Action Toggle - subtle, inline with title label -->
+							<!-- Human Action Toggle - subtle, right-aligned in title label -->
 							<label class="flex items-center gap-1.5 cursor-pointer" title="Mark as human action (not for agents)">
 								<input
 									type="checkbox"
