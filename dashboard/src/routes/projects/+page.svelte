@@ -149,6 +149,10 @@
 	let projectToHide = $state<string | null>(null);
 	let isHiding = $state(false);
 
+	// Reactive sort state - must be derived for template reactivity
+	const currentSortBy = $derived(getSortBy());
+	const currentSortDir = $derived(getSortDir());
+
 	// Derive all projects (from JAT config, sessions, AND tasks)
 	// Config projects are shown even if empty (for onboarding new projects)
 	const allProjects = $derived.by(() => {
@@ -908,10 +912,14 @@
 	}
 
 	// Sort sessions based on current sort settings
-	// sessionOrder is passed explicitly for Svelte reactivity tracking
-	function sortSessionsWithOrder(sessions: typeof workSessionsState.sessions, project: string, sessionOrder: string[]) {
-		const sortBy = getSortBy();
-		const sortDir = getSortDir();
+	// sortBy and sortDir are passed explicitly for Svelte reactivity tracking
+	function sortSessionsWithOrder(
+		sessions: typeof workSessionsState.sessions,
+		project: string,
+		sessionOrder: string[],
+		sortBy: SortOption,
+		sortDir: 'asc' | 'desc'
+	) {
 		const multiplier = sortDir === 'asc' ? 1 : -1;
 
 		// Manual sort - use custom order
@@ -1257,12 +1265,10 @@
 				{@const sessionsExpanded = !isProjectCollapsed && !getSectionState(project, 'sessions').collapsed}
 				{@const tasksExpanded = !isProjectCollapsed && !getSectionState(project, 'tasks').collapsed}
 				{@const searchTerm = getSearchTerm(project)}
-				{@const currentSort = getSortBy()}
-				{@const currentDir = getSortDir()}
-				{@const currentSortOption = SORT_OPTIONS.find(o => o.value === currentSort)}
-				{@const isManualSort = currentSort === 'manual'}
+				{@const currentSortOption = SORT_OPTIONS.find(o => o.value === currentSortBy)}
+				{@const isManualSort = currentSortBy === 'manual'}
 				{@const sessionOrder = sessionOrderByProject.get(project) || []}
-				{@const filteredSessions = sortSessionsWithOrder(filterSessions(sessions, searchTerm), project, sessionOrder)}
+				{@const filteredSessions = sortSessionsWithOrder(filterSessions(sessions, searchTerm), project, sessionOrder, currentSortBy, currentSortDir)}
 				{@const filteredTasks = filterTasks(projectTasks, searchTerm)}
 				{@const openTaskCount = projectTasks.filter(t => t.status !== 'closed').length}
 				{@const filteredOpenTaskCount = filteredTasks.filter(t => t.status !== 'closed').length}
@@ -1397,19 +1403,19 @@
 							>
 								<span>{currentSortOption?.icon || '🔔'}</span>
 								<span class="hidden sm:inline">{currentSortOption?.label || 'State'}</span>
-								<span class="text-[9px]">{currentDir === 'asc' ? '▲' : '▼'}</span>
+								<span class="text-[9px]">{currentSortDir === 'asc' ? '▲' : '▼'}</span>
 							</button>
 							<ul tabindex="0" class="dropdown-content menu menu-xs bg-base-200 rounded-box z-50 w-36 p-1 shadow-lg border border-base-300">
 								{#each SORT_OPTIONS as opt (opt.value)}
 									<li>
 										<button
-											class="flex items-center gap-2 {currentSort === opt.value ? 'active' : ''}"
+											class="flex items-center gap-2 {currentSortBy === opt.value ? 'active' : ''}"
 											onclick={() => handleSortClick(opt.value)}
 										>
 											<span>{opt.icon}</span>
 											<span class="flex-1">{opt.label}</span>
-											{#if currentSort === opt.value}
-												<span class="text-[9px] opacity-70">{currentDir === 'asc' ? '▲' : '▼'}</span>
+											{#if currentSortBy === opt.value}
+												<span class="text-[9px] opacity-70">{currentSortDir === 'asc' ? '▲' : '▼'}</span>
 											{/if}
 										</button>
 									</li>
