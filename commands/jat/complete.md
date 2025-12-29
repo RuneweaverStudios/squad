@@ -653,6 +653,13 @@ if [[ "$COMPLETION_MODE" == "review_required" ]]; then
   # Standard completed signal - task finished, awaiting review
   jat-signal completed '{"taskId":"'"$task_id"'","outcome":"success"}'
 elif [[ "$COMPLETION_MODE" == "auto_proceed" ]]; then
+  # Check if there's an active epic swarm - don't let standalone agents grab epic children
+  active_epic_file="/tmp/jat-epic-active.json"
+  epic_task_ids=""
+  if [[ -f "$active_epic_file" ]]; then
+    epic_task_ids=$(jq -r '.taskIds[]' "$active_epic_file" 2>/dev/null | tr '\n' ' ')
+  fi
+
   # Query next ready task before emitting auto_proceed signal
   next_task_json=$(bd ready --json 2>/dev/null | jq -r '.[0] // empty')
   next_task_id=""
@@ -662,8 +669,15 @@ elif [[ "$COMPLETION_MODE" == "auto_proceed" ]]; then
     next_task_title=$(echo "$next_task_json" | jq -r '.title // empty')
   fi
 
-  # Emit auto_proceed signal - dashboard will spawn next task automatically
-  jat-signal auto_proceed '{"taskId":"'"$task_id"'","nextTaskId":"'"$next_task_id"'","nextTaskTitle":"'"$next_task_title"'"}'
+  # If next task is part of active epic swarm, don't auto-proceed
+  # Let the epic swarm coordinator handle those tasks
+  if [[ -n "$epic_task_ids" ]] && [[ " $epic_task_ids " == *" $next_task_id "* ]]; then
+    echo "⚠️ Next task $next_task_id is part of active epic swarm - requiring review"
+    jat-signal completed '{"taskId":"'"$task_id"'","outcome":"success"}'
+  else
+    # Emit auto_proceed signal - dashboard will spawn next task automatically
+    jat-signal auto_proceed '{"taskId":"'"$task_id"'","nextTaskId":"'"$next_task_id"'","nextTaskTitle":"'"$next_task_title"'"}'
+  fi
 fi
 ```
 

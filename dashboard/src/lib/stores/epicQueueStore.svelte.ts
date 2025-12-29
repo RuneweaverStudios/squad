@@ -138,6 +138,48 @@ function clearPersistedEpic(): void {
 }
 
 /**
+ * Write active epic file to /tmp so agents can check before auto-proceeding
+ * This prevents standalone agents from grabbing epic children
+ */
+async function writeActiveEpicFile(
+	epicId: string,
+	epicTitle: string,
+	taskIds: string[],
+	reviewThreshold: string
+): Promise<void> {
+	try {
+		const response = await fetch('/api/epics/active', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ epicId, epicTitle, taskIds, reviewThreshold })
+		});
+		if (!response.ok) {
+			console.error('[epicQueueStore] Failed to write active epic file:', await response.text());
+		} else {
+			console.log(`[epicQueueStore] Wrote active epic file: ${epicId} with ${taskIds.length} tasks`);
+		}
+	} catch (e) {
+		console.error('[epicQueueStore] Error writing active epic file:', e);
+	}
+}
+
+/**
+ * Clear active epic file when stopping the epic
+ */
+async function clearActiveEpicFile(): Promise<void> {
+	try {
+		const response = await fetch('/api/epics/active', { method: 'DELETE' });
+		if (!response.ok) {
+			console.error('[epicQueueStore] Failed to clear active epic file:', await response.text());
+		} else {
+			console.log('[epicQueueStore] Cleared active epic file');
+		}
+	} catch (e) {
+		console.error('[epicQueueStore] Error clearing active epic file:', e);
+	}
+}
+
+/**
  * Get persisted epic state if available
  */
 function getPersistedEpic(): PersistedEpicState | null {
@@ -309,7 +351,11 @@ export async function launchEpic(
 		// 4. Persist to localStorage for page refresh survival
 		persistActiveEpic(epicId, mergedSettings);
 
-		// 5. If autoSpawn is enabled, spawn initial agents
+		// 5. Write active epic file so agents know not to grab these tasks
+		const childTaskIds = data.children.map((c: { id: string }) => c.id);
+		await writeActiveEpicFile(epicId, data.epicTitle, childTaskIds, mergedSettings.reviewThreshold);
+
+		// 6. If autoSpawn is enabled, spawn initial agents
 		if (mergedSettings.autoSpawn) {
 			const spawnResults = await spawnInitialAgents();
 			return { success: true, spawnResults };
@@ -762,6 +808,9 @@ export function isEpicComplete(): boolean {
 export function stopEpic(): void {
 	// Clear persisted state
 	clearPersistedEpic();
+
+	// Clear active epic file (fire and forget - don't block)
+	clearActiveEpicFile().catch((e) => console.error('[epicQueueStore] Error clearing active epic file:', e));
 
 	// Mutate properties instead of reassigning (required for Svelte 5 exported state)
 	state.epicId = null;
