@@ -161,7 +161,10 @@ async function isEpicOpen(epicId: string, projectPath?: string): Promise<boolean
 			command = `cd '${escapeForShell(projectPath)}' && ${command}`;
 		}
 		const { stdout } = await execAsync(command);
-		const epic = JSON.parse(stdout.trim());
+		const epics = JSON.parse(stdout.trim());
+		// bd show --json returns an array, not a single object
+		const epic = Array.isArray(epics) ? epics[0] : epics;
+		if (!epic) return false;
 		return epic.status !== 'closed';
 	} catch {
 		// If we can't check, assume epic doesn't exist or is closed

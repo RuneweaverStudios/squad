@@ -238,8 +238,21 @@ launch_dashboard() {
 
     echo -e "${DIM}  → Dashboard :$dashboard_port${NC}"
 
-    # Launch dashboard dev server in a terminal
-    $TERMINAL -T "$name: Dashboard :$dashboard_port" -e bash -c "cd '$dashboard_path' && npm run dev -- --port $dashboard_port; exec bash" &
+    # Use a fixed tmux session name so the attach feature can find it
+    local session_name="jat-dashboard"
+
+    # Launch dashboard dev server inside a tmux session
+    # This allows the attach feature to work with tmux windows
+    $TERMINAL -T "$name: Dashboard :$dashboard_port" -e bash -c "
+        cd '$dashboard_path'
+        # Kill existing session if present (server may have crashed)
+        tmux kill-session -t '$session_name' 2>/dev/null || true
+        tmux new-session -d -s '$session_name' -x 120 -y 40 -c '$dashboard_path'
+        # Wait for shell to initialize
+        sleep 0.3
+        tmux send-keys -t '$session_name' 'npm run dev -- --port $dashboard_port' Enter
+        tmux attach-session -t '$session_name'
+    " &
 
     # Open browser after delay for server to start
     (
