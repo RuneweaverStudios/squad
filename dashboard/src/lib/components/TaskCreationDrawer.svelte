@@ -125,6 +125,9 @@
 	let submitError = $state<string | null>(null);
 	let successMessage = $state<string | null>(null);
 	let titleInput: HTMLInputElement;
+	let projectDropdownBtn: HTMLButtonElement;
+	let projectDropdownOpen = $state(false);
+	let projectDropdownIndex = $state(0);
 
 	// AI suggestion state
 	let isLoadingSuggestions = $state(false);
@@ -983,8 +986,70 @@
 		await handleSubmit(syntheticEvent);
 	}
 
+	// Handle project dropdown keyboard navigation
+	function openProjectDropdown() {
+		projectDropdownOpen = true;
+		projectDropdownIndex = formData.project ? dynamicProjects.indexOf(formData.project) : 0;
+		if (projectDropdownIndex < 0) projectDropdownIndex = 0;
+	}
+
+	function closeProjectDropdown() {
+		projectDropdownOpen = false;
+		projectDropdownBtn?.focus();
+	}
+
+	function selectProjectByIndex(index: number) {
+		if (index >= 0 && index < dynamicProjects.length) {
+			formData.project = dynamicProjects[index];
+			closeProjectDropdown();
+		}
+	}
+
+	function handleProjectDropdownKeydown(event: KeyboardEvent) {
+		if (!projectDropdownOpen) {
+			// Open on Enter, Space, or ArrowDown when focused on button
+			if (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowDown') {
+				event.preventDefault();
+				openProjectDropdown();
+			}
+			return;
+		}
+
+		switch (event.key) {
+			case 'ArrowDown':
+				event.preventDefault();
+				projectDropdownIndex = (projectDropdownIndex + 1) % dynamicProjects.length;
+				break;
+			case 'ArrowUp':
+				event.preventDefault();
+				projectDropdownIndex = projectDropdownIndex <= 0 ? dynamicProjects.length - 1 : projectDropdownIndex - 1;
+				break;
+			case 'Enter':
+			case ' ':
+				event.preventDefault();
+				selectProjectByIndex(projectDropdownIndex);
+				break;
+			case 'Escape':
+				event.preventDefault();
+				closeProjectDropdown();
+				break;
+			case 'Tab':
+				closeProjectDropdown();
+				break;
+		}
+	}
+
 	// Handle keyboard shortcuts
 	function handleKeydown(event: KeyboardEvent) {
+		// Alt + P = Focus/open project dropdown
+		if (event.altKey && event.key.toLowerCase() === 'p') {
+			event.preventDefault();
+			if (projectDropdownBtn) {
+				projectDropdownBtn.focus();
+				openProjectDropdown();
+			}
+			return;
+		}
 		// Cmd/Ctrl + Shift + Enter = Save and New
 		if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key === 'Enter') {
 			event.preventDefault();
@@ -1032,8 +1097,60 @@
 				<div
 					class="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-primary to-primary/30"
 				></div>
-				<div>
-					<h2 id="drawer-title" class="text-xl font-bold font-mono uppercase tracking-wider text-base-content">Create New Task</h2>
+				<div class="flex-1 min-w-0">
+					<div class="flex items-center gap-3 flex-wrap">
+						<h2 id="drawer-title" class="text-xl font-bold font-mono uppercase tracking-wider text-base-content">Create New Task</h2>
+						<!-- Project dropdown in header (Alt+P to open, arrows to navigate) -->
+						<div class="dropdown dropdown-end {projectDropdownOpen ? 'dropdown-open' : ''}">
+							<button
+								type="button"
+								tabindex="0"
+								bind:this={projectDropdownBtn}
+								class="ml-8 badge badge-lg gap-1.5 px-2.5 py-2 font-mono text-sm transition-colors cursor-pointer {formData.project ? 'bg-primary/20 border-primary/40 text-primary hover:bg-primary/30' : 'bg-warning/20 border-warning/40 text-warning hover:bg-warning/30'}"
+								disabled={isSubmitting}
+								title={formData.project ? 'Click to change project (Alt+P)' : 'Select a project (Alt+P)'}
+								onclick={() => projectDropdownOpen ? closeProjectDropdown() : openProjectDropdown()}
+								onkeydown={handleProjectDropdownKeydown}
+								onblur={(e) => {
+									// Close dropdown if focus leaves the dropdown entirely
+									const relatedTarget = e.relatedTarget as HTMLElement;
+									if (!relatedTarget?.closest('.dropdown')) {
+										projectDropdownOpen = false;
+									}
+								}}
+							>
+								<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+								</svg>
+								{formData.project || 'Select project'}
+								<svg class="w-2.5 h-2.5 opacity-60 transition-transform {projectDropdownOpen ? 'rotate-180' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+								</svg>
+							</button>
+							<ul class="dropdown-content menu bg-base-200 rounded-box z-50 w-52 p-2 shadow-lg border border-base-content/20 mt-1">
+								{#each dynamicProjects as project, i}
+									<li>
+										<button
+											type="button"
+											class="font-mono {formData.project === project ? 'active' : ''} {projectDropdownOpen && projectDropdownIndex === i ? 'focus' : ''}"
+											onclick={() => { formData.project = project; closeProjectDropdown(); }}
+											onmouseenter={() => projectDropdownIndex = i}
+										>
+											<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+											</svg>
+											{project}
+											{#if formData.project === project}
+												<svg class="w-4 h-4 ml-auto text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+												</svg>
+											{/if}
+										</button>
+									</li>
+								{/each}
+							</ul>
+						</div>
+					</div>
 					<p class="text-sm mt-1 text-base-content/70">
 						Fill in the details below to create a new task
 					</p>
@@ -1058,6 +1175,19 @@
 								Title
 								<span class="text-error">*</span>
 							</span>
+							<!-- Human Action Toggle - subtle, inline with title label -->
+							<label class="flex items-center gap-1.5 cursor-pointer" title="Mark as human action (not for agents)">
+								<input
+									type="checkbox"
+									class="toggle toggle-xs {isHumanAction ? 'toggle-warning' : ''}"
+									bind:checked={isHumanAction}
+									disabled={isSubmitting}
+								/>
+								<span class="flex items-center gap-1 text-xs {isHumanAction ? 'text-warning font-medium' : 'text-base-content/50'}">
+									<span style="font-size: 0.85rem;">🧑</span>
+									Human
+								</span>
+							</label>
 						</label>
 						<div class="flex items-center gap-2">
 							<input
@@ -1261,49 +1391,6 @@
 								</label>
 							{/if}
 						</div>
-					</div>
-
-					<!-- Human Action Toggle - Industrial -->
-					<div class="form-control">
-						<label class="label cursor-pointer justify-start gap-3">
-							<input
-								type="checkbox"
-								class="toggle toggle-sm {isHumanAction ? 'toggle-warning' : ''}"
-								bind:checked={isHumanAction}
-								disabled={isSubmitting}
-							/>
-							<span class="flex items-center gap-2">
-								<span style="font-size: 1.1rem;">🧑</span>
-								<span class="label-text text-xs font-semibold font-mono uppercase tracking-wider {isHumanAction ? 'text-warning' : 'text-base-content/70'}">
-									Human action required
-								</span>
-							</span>
-						</label>
-						<span class="text-xs ml-12 text-base-content/50">
-							Tasks that require human intervention (not agent work)
-						</span>
-					</div>
-
-					<!-- Project - Industrial -->
-					<div class="form-control">
-						<label class="label" for="task-project">
-							<span class="label-text text-xs font-semibold font-mono uppercase tracking-wider text-base-content/70">
-								Project
-								<span class="text-error">*</span>
-							</span>
-						</label>
-						<select
-							id="task-project"
-							class="select w-full font-mono bg-base-200 border-base-content/30 text-base-content"
-							bind:value={formData.project}
-							disabled={isSubmitting}
-							required
-						>
-							<option value="" disabled>Select a project</option>
-							{#each dynamicProjects as project}
-								<option value={project}>{project}</option>
-							{/each}
-						</select>
 					</div>
 
 					<!-- Labels (Optional) - Industrial -->
