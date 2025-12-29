@@ -508,7 +508,7 @@ This step implements the review rules system that allows project-level configura
    └─ Find rule matching task.issue_type
    └─ Compare task.priority to rule.maxAutoPriority
 
-3. If config missing → Use hardcoded defaults
+3. If config missing → review required (safe default)
 ```
 
 **Note on priority semantics:** Lower priority number = higher importance (P0 is critical, P4 is lowest).
@@ -632,40 +632,28 @@ if [[ -z "$COMPLETION_MODE" ]]; then
       fi
     fi
   else
-    # Step 3: Fallback to hardcoded defaults
-    echo "📋 Using hardcoded defaults (no review-rules.json)"
-
-    # Default rules:
-    # - Epics: always review (maxAutoPriority: -1)
-    # - Chores: always auto-proceed (maxAutoPriority: 4)
-    # - Other (bug, feature, task): auto-proceed for P0-P3
-    case "$task_type" in
-      epic)
-        COMPLETION_MODE="review_required"  # Epics always require review
-        ;;
-      chore)
-        COMPLETION_MODE="auto_proceed"  # Chores always auto-proceed
-        ;;
-      *)
-        # bug, feature, task: auto-proceed for P0-P3, review for P4
-        if (( task_priority <= 3 )); then
-          COMPLETION_MODE="auto_proceed"
-        else
-          COMPLETION_MODE="review_required"
-        fi
-        ;;
-    esac
+    # Step 3: Fallback - NO auto-proceed without explicit configuration
+    #
+    # CRITICAL: Auto-proceed should ONLY happen when deliberately enabled:
+    # 1. Epic context file exists (dashboard spawned agent for swarm)
+    # 2. Per-task override in notes ([REVIEW_OVERRIDE:auto_proceed])
+    # 3. Project has .beads/review-rules.json with explicit rules
+    #
+    # Without any of these, the user should decide what to do next.
+    # Spawning random unrelated tasks is confusing and wrong.
+    echo "📋 No review-rules.json and no epic context → review required (default)"
+    COMPLETION_MODE="review_required"
   fi
   fi  # End of: if [[ -z "$COMPLETION_MODE" ]]
 fi  # End of: else (no REVIEW_OVERRIDE found)
 
 # Emit the completion signal with JSON payload
-# Both cases use 'completed' signal - autoProceed=true triggers next task spawn
+# Use 'completed' for review required, 'auto_proceed' for auto-spawn
 if [[ "$COMPLETION_MODE" == "review_required" ]]; then
   # Standard completed signal - task finished, awaiting review
   jat-signal completed '{"taskId":"'"$task_id"'","outcome":"success"}'
 elif [[ "$COMPLETION_MODE" == "auto_proceed" ]]; then
-  # Query next ready task before emitting completed signal with autoProceed
+  # Query next ready task before emitting auto_proceed signal
   next_task_json=$(bd ready --json 2>/dev/null | jq -r '.[0] // empty')
   next_task_id=""
   next_task_title=""
@@ -674,8 +662,8 @@ elif [[ "$COMPLETION_MODE" == "auto_proceed" ]]; then
     next_task_title=$(echo "$next_task_json" | jq -r '.title // empty')
   fi
 
-  # Emit completed with autoProceed=true - dashboard will spawn next task
-  jat-signal completed '{"taskId":"'"$task_id"'","outcome":"success","autoProceed":true,"nextTaskId":"'"$next_task_id"'","nextTaskTitle":"'"$next_task_title"'"}'
+  # Emit auto_proceed signal - dashboard will spawn next task automatically
+  jat-signal auto_proceed '{"taskId":"'"$task_id"'","nextTaskId":"'"$next_task_id"'","nextTaskTitle":"'"$next_task_title"'"}'
 fi
 ```
 
@@ -683,9 +671,9 @@ fi
 
 | Override Value | COMPLETION_MODE | Signal Emitted | Use Case |
 |----------------|-----------------|----------------|----------|
-| `always_review` | `review_required` | `completed` (no autoProceed) | Testing override behavior |
-| `auto_proceed` | `auto_proceed` | `completed` with `autoProceed=true` | Skip review for specific task |
-| `force_review` | `review_required` | `completed` (no autoProceed) | Force review even if rules say auto |
+| `always_review` | `review_required` | `completed` | Testing override behavior |
+| `auto_proceed` | `auto_proceed` | `auto_proceed` | Skip review for specific task |
+| `force_review` | `review_required` | `completed` | Force review even if rules say auto |
 
 #### Example review-rules.json
 
@@ -1480,7 +1468,7 @@ Signal: completed (task: jat-abc, outcome: success)
 
 **Signals explained:**
 - `jat-signal completed '{"taskId":"...","outcome":"success"}'` - Task finished, requires review; dashboard shows COMPLETED state
-- `jat-signal completed '{"taskId":"...","outcome":"success","autoProceed":true,"nextTaskId":"...","nextTaskTitle":"..."}'` - Auto-proceed enabled; dashboard spawns next task
+- `jat-signal auto_proceed '{"taskId":"...","nextTaskId":"...","nextTaskTitle":"..."}'` - Auto-proceed enabled; dashboard spawns next task
 - `jat-signal tasks '[...]'` - Follow-up tasks discovered during work
 
 The signal used depends on review rules (see Step 7.5).
@@ -1495,7 +1483,7 @@ The completion flow uses these signals (captured by PostToolUse hook):
 |----------------|-------------|------------------|
 | `jat-signal completing '{...}'` | During each completion step | Shows progress bar and current step |
 | `jat-signal completed '{"taskId":"...","outcome":"success"}'` | After `bd close`, when review required | Shows "COMPLETED" state (green), session stays open for review |
-| `jat-signal completed '{"taskId":"...","autoProceed":true,...}'` | After `bd close`, when auto-proceed enabled | Dashboard spawns next task automatically |
+| `jat-signal auto_proceed '{"taskId":"...","nextTaskId":"...","nextTaskTitle":"..."}'` | After `bd close`, when auto-proceed enabled | Dashboard spawns next task automatically |
 | `jat-signal action '{...}'` | When manual steps are required | Shows prominent action checklist |
 | `jat-signal tasks '[...]'` | When follow-up work discovered | Shows "N Suggested Tasks" badge, offers Beads creation |
 | `jat-signal complete '{...}'` | After all completion steps | Full completion bundle with summary, suggested tasks, cross-agent intel |
@@ -1531,7 +1519,7 @@ jat-signal completing '{
 **Signal selection is automatic** - Step 7.5 determines which signal to run based on:
 1. Per-task override in notes (`[REVIEW_OVERRIDE:...]`)
 2. Project review rules (`.beads/review-rules.json`)
-3. Hardcoded defaults (epics require review, chores auto-proceed, others P0-P3 auto)
+3. Safe default: review required (no auto-proceed without explicit configuration)
 
 **Critical timing:**
 - Do NOT run completion signals until AFTER all completion steps succeed
