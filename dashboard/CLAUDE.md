@@ -1701,8 +1701,8 @@ jat-signal needs_input '{"taskId":"jat-abc","question":"Which lib?","questionTyp
 # Agent signals ready for review (requires JSON)
 jat-signal review '{"taskId":"jat-abc","summary":["Added login"]}'
 
-# Agent signals completion (requires JSON)
-jat-signal completed '{"taskId":"jat-abc","outcome":"success"}'
+# Agent signals completion (requires JSON - full bundle)
+jat-signal complete '{"taskId":"jat-abc","agentName":"Agent","completionMode":"review_required","summary":["Added login"],"quality":{"tests":"passing","build":"clean"},"suggestedTasks":[]}'
 ```
 
 The PostToolUse hook captures these signals and writes them to `/tmp/jat-signal-{session}.json`. The SSE server reads these files and broadcasts state changes to connected dashboard clients via `session-signal` events.

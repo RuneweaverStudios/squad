@@ -91,6 +91,37 @@ browser-eval.js "const x = 5; const y = 10; return x + y"
 bd-epic-child jat-epic jat-child  # Epic blocked until child completes
 ```
 
+### JAT Completion
+
+`jat-complete-bundle` - Generate CompletionBundle JSON via LLM
+
+**Purpose:** Gathers git context and task info, calls Anthropic API to generate a structured completion bundle for the `jat-signal complete` command.
+
+| Option | Description |
+|--------|-------------|
+| `--task <id>` | Task ID (required) |
+| `--agent <name>` | Agent name (required) |
+| `--mode <mode>` | `review_required` (default) or `auto_proceed` |
+| `--next-task <id>` | Next task ID (for auto_proceed mode) |
+
+**Requires:** `ANTHROPIC_API_KEY` environment variable
+
+**Example:**
+```bash
+# Generate bundle and emit signal
+BUNDLE=$(jat-complete-bundle --task jat-abc --agent FreeOcean)
+jat-signal complete "$BUNDLE"
+
+# Auto-proceed to next task
+jat-complete-bundle --task jat-abc --agent FreeOcean --mode auto_proceed --next-task jat-def
+```
+
+**What it does:**
+1. Fetches task details from Beads
+2. Collects git status, diff stats, and recent commits
+3. Sends context to LLM to generate structured summary
+4. Outputs JSON suitable for `jat-signal complete`
+
 ### Quick Patterns
 
 **Reserve → Work → Release:**

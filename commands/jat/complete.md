@@ -6,7 +6,11 @@ Complete current task properly with full verification. Session ends after comple
 # Agent Complete - Finish Task Properly
 
 **Usage:**
-- `/jat:complete` - Complete current task with full verification
+- `/jat:complete` - Complete current task and show completion block for review
+- `/jat:complete --kill` - Complete task and auto-kill session (self-destruct, no review)
+
+**Flags:**
+- `--kill` - Sets completion mode to `auto_kill`, session self-destructs after completion (no review)
 
 **What this command does:**
 1. **Read & Respond to Agent Mail** (ALWAYS - before completing)
@@ -29,6 +33,19 @@ Complete current task properly with full verification. Session ends after comple
 
 **When NOT to use:**
 - Need to pivot quickly → use `/jat:pause` instead
+
+**How the dashboard triggers this command:**
+
+When the agent enters "ready-for-review" state, the dashboard checks review rules:
+
+| Review Rules Result | Dashboard Action |
+|---------------------|------------------|
+| **AUTO** (e.g., P4 chore) | Dashboard auto-triggers `/jat:complete --kill` |
+| **REVIEW** (e.g., P1 bug) | User reviews, then clicks "Complete" or "Complete & Kill" |
+
+- **"Complete"** → Dashboard sends `/jat:complete` (session stays for review)
+- **"Complete & Kill"** → Dashboard sends `/jat:complete --kill` (session self-destructs)
+- **Auto-complete** → Dashboard sends `/jat:complete --kill` (no user interaction)
 
 ---
 
@@ -489,7 +506,7 @@ Verification: Full (tests, lint, security)" \
 
 **After announcing completion, determine which completion signal to emit based on configurable rules.**
 
-This step implements the review rules system that allows project-level configuration of which tasks require human review vs auto-proceed.
+This step implements the review rules system that allows project-level configuration of which tasks require human review vs auto-kill.
 
 #### Rule Evaluation Order
 
@@ -497,12 +514,12 @@ This step implements the review rules system that allows project-level configura
 0. Check session epic context (.claude/sessions/context-{session_id}.json)
    └─ If epic context exists with reviewThreshold:
       └─ Compare task.priority to threshold
-      └─ If priority > threshold: COMPLETION_MODE="review_required" → completed signal (no autoProceed)
-      └─ If priority <= threshold: COMPLETION_MODE="auto_proceed" → completed signal with autoProceed: true
+      └─ If priority > threshold: COMPLETION_MODE="review_required" → completed signal (no autoKill)
+      └─ If priority <= threshold: COMPLETION_MODE="auto_kill" → completed signal with autoKill: true
    └─ Epic context takes precedence over all other rules
 
 1. Check task.notes for [REVIEW_OVERRIDE:...] pattern
-   └─ If found → Use override action (always_review, auto_proceed, force_review)
+   └─ If found → Use override action (always_review, auto_kill, force_review)
 
 2. Load .beads/review-rules.json
    └─ Find rule matching task.issue_type
@@ -512,22 +529,40 @@ This step implements the review rules system that allows project-level configura
 ```
 
 **Note on priority semantics:** Lower priority number = higher importance (P0 is critical, P4 is lowest).
-The threshold represents the HIGHEST priority number that should auto-proceed.
-- `threshold: 1` → Only P0 and P1 auto-proceed, P2-P4 require review
-- `threshold: 3` → P0-P3 auto-proceed, only P4 requires review
+The threshold represents the HIGHEST priority number that should auto-kill.
+- `threshold: 1` → Only P0 and P1 auto-kill, P2-P4 require review
+- `threshold: 3` → P0-P3 auto-kill, only P4 requires review
 
 #### Implementation
 
 ```bash
-# Get task details
-task_json=$(bd show "$task_id" --json)
-task_notes=$(echo "$task_json" | jq -r '.[0].notes // ""')
-task_priority=$(echo "$task_json" | jq -r '.[0].priority')
-task_type=$(echo "$task_json" | jq -r '.[0].issue_type')
+# Parse command-line flags (set by dashboard based on user choice)
+# --kill: Session should self-destruct after completion (no review)
+KILL_FLAG=false
 
-COMPLETION_MODE=""  # Will be set by first matching rule: "review_required" or "auto_proceed"
+for arg in "$@"; do
+  case "$arg" in
+    --kill) KILL_FLAG=true ;;
+  esac
+done
 
-# Step 0: Check session epic context (highest priority)
+# If --kill flag provided, skip all rule evaluation and auto-kill
+if [[ "$KILL_FLAG" == "true" ]]; then
+  COMPLETION_MODE="auto_kill"
+  echo "📋 Mode: Complete & Kill (self-destruct session)"
+else
+  # No flag provided - evaluate rules to determine completion mode
+  # This happens when user clicks "Complete" button (show completion block)
+
+  # Get task details
+  task_json=$(bd show "$task_id" --json)
+  task_notes=$(echo "$task_json" | jq -r '.[0].notes // ""')
+  task_priority=$(echo "$task_json" | jq -r '.[0].priority')
+  task_type=$(echo "$task_json" | jq -r '.[0].issue_type')
+
+  COMPLETION_MODE=""  # Will be set by first matching rule: "review_required" or "auto_kill"
+
+  # Step 0: Check session epic context (highest priority)
 # Session context is set by dashboard when spawning agents for epic execution
 session_id=$(~/code/jat/scripts/get-current-session-id)
 context_file=".claude/sessions/context-${session_id}.json"
@@ -539,46 +574,46 @@ if [[ -f "$context_file" ]]; then
     # Convert reviewThreshold string to numeric threshold
     # 'all' = always review (threshold -1)
     # 'none' = never review (threshold 4)
-    # 'p0' = only P0 requires review (threshold -1 means P0+ auto-proceed is wrong)
-    # 'p0-p1' = P0-P1 require review (threshold 1, P2+ auto-proceed)
-    # 'p0-p2' = P0-P2 require review (threshold 2, P3+ auto-proceed)
+    # 'p0' = only P0 requires review (threshold -1 means P0+ auto-kill is wrong)
+    # 'p0-p1' = P0-P1 require review (threshold 1, P2+ auto-kill)
+    # 'p0-p2' = P0-P2 require review (threshold 2, P3+ auto-kill)
     case "$epic_threshold" in
       "all")
         echo "📋 Epic context: reviewThreshold='all' → All tasks require review"
         COMPLETION_MODE="review_required"
         ;;
       "none")
-        echo "📋 Epic context: reviewThreshold='none' → All tasks auto-proceed"
-        COMPLETION_MODE="auto_proceed"
+        echo "📋 Epic context: reviewThreshold='none' → All tasks auto-kill"
+        COMPLETION_MODE="auto_kill"
         ;;
       "p0")
-        # Only P0 requires review; P1+ auto-proceed
+        # Only P0 requires review; P1+ auto-kill
         if (( task_priority == 0 )); then
           echo "📋 Epic context: P0 task requires review (threshold: p0)"
           COMPLETION_MODE="review_required"
         else
-          echo "📋 Epic context: P${task_priority} task auto-proceeds (threshold: p0)"
-          COMPLETION_MODE="auto_proceed"
+          echo "📋 Epic context: P${task_priority} task auto-kills (threshold: p0)"
+          COMPLETION_MODE="auto_kill"
         fi
         ;;
       "p0-p1")
-        # P0-P1 require review; P2+ auto-proceed
+        # P0-P1 require review; P2+ auto-kill
         if (( task_priority <= 1 )); then
           echo "📋 Epic context: P${task_priority} task requires review (threshold: p0-p1)"
           COMPLETION_MODE="review_required"
         else
-          echo "📋 Epic context: P${task_priority} task auto-proceeds (threshold: p0-p1)"
-          COMPLETION_MODE="auto_proceed"
+          echo "📋 Epic context: P${task_priority} task auto-kills (threshold: p0-p1)"
+          COMPLETION_MODE="auto_kill"
         fi
         ;;
       "p0-p2")
-        # P0-P2 require review; P3+ auto-proceed
+        # P0-P2 require review; P3+ auto-kill
         if (( task_priority <= 2 )); then
           echo "📋 Epic context: P${task_priority} task requires review (threshold: p0-p2)"
           COMPLETION_MODE="review_required"
         else
-          echo "📋 Epic context: P${task_priority} task auto-proceeds (threshold: p0-p2)"
-          COMPLETION_MODE="auto_proceed"
+          echo "📋 Epic context: P${task_priority} task auto-kills (threshold: p0-p2)"
+          COMPLETION_MODE="auto_kill"
         fi
         ;;
       *)
@@ -596,9 +631,9 @@ if [[ -z "$COMPLETION_MODE" ]]; then
   if echo "$task_notes" | grep -q '\[REVIEW_OVERRIDE:always_review\]'; then
     echo "📋 Review override detected: always_review"
     COMPLETION_MODE="review_required"
-  elif echo "$task_notes" | grep -q '\[REVIEW_OVERRIDE:auto_proceed\]'; then
-    echo "📋 Review override detected: auto_proceed"
-    COMPLETION_MODE="auto_proceed"
+  elif echo "$task_notes" | grep -q '\[REVIEW_OVERRIDE:auto_kill\]'; then
+    echo "📋 Review override detected: auto_kill"
+    COMPLETION_MODE="auto_kill"
   elif echo "$task_notes" | grep -q '\[REVIEW_OVERRIDE:force_review\]'; then
     echo "📋 Review override detected: force_review"
     COMPLETION_MODE="review_required"
@@ -613,11 +648,11 @@ if [[ -z "$COMPLETION_MODE" ]]; then
       "$rules_file")
 
     if [[ "$max_auto" != "-1" && "$max_auto" != "null" && -n "$max_auto" ]]; then
-      # Compare: task can auto-proceed if priority <= maxAutoPriority
+      # Compare: task can auto-kill if priority <= maxAutoPriority
       # (lower number = higher priority, e.g., P0 < P3)
       if (( task_priority <= max_auto )); then
-        echo "📋 Auto-proceed: P${task_priority} ${task_type} (max: P${max_auto})"
-        COMPLETION_MODE="auto_proceed"
+        echo "📋 Auto-kill: P${task_priority} ${task_type} (max: P${max_auto})"
+        COMPLETION_MODE="auto_kill"
       else
         echo "📋 Review required: P${task_priority} ${task_type} (max auto: P${max_auto})"
         COMPLETION_MODE="review_required"
@@ -626,17 +661,17 @@ if [[ -z "$COMPLETION_MODE" ]]; then
       # No rule for this type, check defaultAction
       default_action=$(jq -r '.defaultAction // "review"' "$rules_file")
       if [[ "$default_action" == "auto" ]]; then
-        COMPLETION_MODE="auto_proceed"
+        COMPLETION_MODE="auto_kill"
       else
         COMPLETION_MODE="review_required"
       fi
     fi
   else
-    # Step 3: Fallback - NO auto-proceed without explicit configuration
+    # Step 3: Fallback - NO auto-kill without explicit configuration
     #
-    # CRITICAL: Auto-proceed should ONLY happen when deliberately enabled:
+    # CRITICAL: Auto-kill should ONLY happen when deliberately enabled:
     # 1. Epic context file exists (dashboard spawned agent for swarm)
-    # 2. Per-task override in notes ([REVIEW_OVERRIDE:auto_proceed])
+    # 2. Per-task override in notes ([REVIEW_OVERRIDE:auto_kill])
     # 3. Project has .beads/review-rules.json with explicit rules
     #
     # Without any of these, the user should decide what to do next.
@@ -646,6 +681,7 @@ if [[ -z "$COMPLETION_MODE" ]]; then
   fi
   fi  # End of: if [[ -z "$COMPLETION_MODE" ]]
 fi  # End of: else (no REVIEW_OVERRIDE found)
+fi  # End of: if/elif/else for --kill flag
 
 # COMPLETION_MODE is now set - will be used in Step 8 when emitting jat-signal complete
 # The actual signal emission happens in Step 8 with the full completion bundle
@@ -657,7 +693,7 @@ echo "📋 Completion mode determined: ${COMPLETION_MODE}"
 | Override Value | COMPLETION_MODE | Behavior | Use Case |
 |----------------|-----------------|----------|----------|
 | `always_review` | `review_required` | Session stays open for human review | Testing override behavior |
-| `auto_proceed` | `auto_proceed` | Dashboard auto-spawns next task | Skip review for specific task |
+| `auto_kill` | `auto_kill` | Session self-destructs after completion | Skip review for specific task |
 | `force_review` | `review_required` | Session stays open for human review | Force review even if rules say auto |
 
 #### Example review-rules.json
@@ -668,10 +704,10 @@ echo "📋 Completion mode determined: ${COMPLETION_MODE}"
   "defaultAction": "review",
   "priorityThreshold": 3,
   "rules": [
-    { "type": "bug", "maxAutoPriority": 3, "note": "P0-P3 bugs auto-proceed" },
-    { "type": "feature", "maxAutoPriority": 3, "note": "P0-P3 features auto-proceed" },
+    { "type": "bug", "maxAutoPriority": 3, "note": "P0-P3 bugs auto-kill" },
+    { "type": "feature", "maxAutoPriority": 3, "note": "P0-P3 features auto-kill" },
     { "type": "task", "maxAutoPriority": 3 },
-    { "type": "chore", "maxAutoPriority": 4, "note": "All chores auto-proceed" },
+    { "type": "chore", "maxAutoPriority": 4, "note": "All chores auto-kill" },
     { "type": "epic", "maxAutoPriority": -1, "note": "Epics always require review" }
   ],
   "overrides": []
@@ -679,11 +715,11 @@ echo "📋 Completion mode determined: ${COMPLETION_MODE}"
 ```
 
 **Understanding maxAutoPriority:**
-- Value represents highest priority number that can auto-proceed
+- Value represents highest priority number that can auto-kill
 - Lower priority number = higher importance (P0 is most critical)
-- `maxAutoPriority: 3` means P0, P1, P2, P3 can auto-proceed; P4 requires review
-- `maxAutoPriority: -1` means no auto-proceed (always review)
-- `maxAutoPriority: 4` means all priorities auto-proceed
+- `maxAutoPriority: 3` means P0, P1, P2, P3 can auto-kill; P4 requires review
+- `maxAutoPriority: -1` means no auto-kill (always review)
+- `maxAutoPriority: 4` means all priorities auto-kill
 
 #### Session Epic Context
 
@@ -738,149 +774,40 @@ await writeFile(contextPath, JSON.stringify(context, null, 2));
 
 ### STEP 8: Emit Structured Completion Signal
 
-**CRITICAL: Emit a structured completion signal so the dashboard can render an interactive UI.**
+**Use the `jat-complete-bundle` tool to generate the completion bundle.**
 
-Instead of just outputting text, you MUST build a JSON completion bundle and emit it via `jat-signal complete`. This enables:
-- One-click task creation for suggested follow-up work
-- Interactive checklist for human actions
-- Structured display of quality signals and cross-agent intel
-
-**Before building the bundle, actively search for follow-up work.** Look at:
-- Files you modified - any related issues?
-- Adjacent code - tech debt or improvements?
-- Test coverage - gaps you noticed?
-- Documentation - needs updating?
-
-You MUST include at least one suggested task (see suggestedTasks below).
-
-#### Build the Completion Bundle
-
-Analyze your work and build a JSON object with these fields:
-
-```typescript
-interface CompletionBundle {
-  // REQUIRED
-  taskId: string;           // The task ID (e.g., "jat-abc")
-  agentName: string;        // Your agent name
-  summary: string[];        // Array of accomplishment bullet points
-
-  // REQUIRED - Completion mode from Step 7.5
-  completionMode: "review_required" | "auto_proceed";
-  // If auto_proceed, include next task info
-  nextTaskId?: string;      // ID of next task to auto-spawn
-  nextTaskTitle?: string;   // Title of next task
-
-  // REQUIRED - Quality signals
-  quality: {
-    tests: "passing" | "failing" | "none" | "skipped";
-    build: "clean" | "warnings" | "errors";
-    preExisting?: string;   // Note if issues were pre-existing
-  };
-
-  // OPTIONAL - Only if manual steps needed
-  humanActions?: Array<{
-    title: string;          // Short title (3-8 words)
-    description: string;    // Detailed steps
-  }>;
-
-  // REQUIRED - Always look for follow-up work!
-  // If you genuinely found nothing, explain why in a single task with type "task"
-  suggestedTasks: Array<{
-    type: "feature" | "bug" | "task" | "chore";
-    title: string;          // Task title
-    description: string;    // What needs to be done
-    priority: number;       // 0-4 (P0=critical, P4=backlog)
-    reason?: string;        // Why this was discovered
-    project?: string;       // Project ID (e.g., "jat", "chimaro") - defaults to current project
-    labels?: string;        // Comma-separated labels (e.g., "ui,auth,critical")
-    depends_on?: string[];  // Task IDs this depends on (e.g., ["jat-abc", "jat-def"])
-  }>;
-
-  // OPTIONAL - Intel for other agents
-  crossAgentIntel?: {
-    files?: string[];       // Key files modified
-    patterns?: string[];    // Conventions to follow
-    gotchas?: string[];     // Surprises or tricky areas
-  };
-
-  // OPTIONAL - Suggested rename for the task (if it evolved/pivoted)
-  suggestedRename?: string; // AI-suggested new title reflecting actual work done
-}
-```
-
-#### Emit the Signal
+The tool gathers all context (task details, git status, diffs, commits) and calls the Anthropic API to generate a structured CompletionBundle JSON.
 
 ```bash
-# Build the JSON (escape quotes properly!)
-# Use COMPLETION_MODE from Step 7.5
-jat-signal complete '{
-  "taskId": "jat-abc",
-  "agentName": "WisePrairie",
-  "completionMode": "review_required",
-  "summary": [
-    "Fixed authentication flow for OAuth providers",
-    "Added retry logic for failed token refreshes"
-  ],
-  "quality": {
-    "tests": "passing",
-    "build": "clean"
-  },
-  "humanActions": [
-    {
-      "title": "Enable OAuth in Supabase",
-      "description": "Go to Authentication > Providers and enable Google OAuth"
-    }
-  ],
-  "suggestedTasks": [
-    {
-      "type": "feature",
-      "title": "Add Apple Sign-In support",
-      "description": "Similar flow to Google OAuth, needs Apple Developer account setup",
-      "priority": 2,
-      "reason": "Discovered while implementing Google OAuth",
-      "project": "chimaro",
-      "labels": "auth,oauth,ios"
-    },
-    {
-      "type": "task",
-      "title": "Add OAuth error tracking",
-      "description": "Log failed OAuth attempts to Sentry for debugging",
-      "priority": 3,
-      "depends_on": ["jat-abc"]
-    }
-  ],
-  "crossAgentIntel": {
-    "files": ["src/lib/auth/oauth.ts", "src/routes/auth/callback/+server.ts"],
-    "patterns": ["Use authError() helper for consistent error responses"],
-    "gotchas": ["Token refresh can fail silently - always check response.ok"]
-  }
-}'
+# Generate the completion bundle (uses COMPLETION_MODE from Step 7.5)
+BUNDLE=$(jat-complete-bundle --task "$task_id" --agent "$agent_name" --mode "$COMPLETION_MODE")
+
+# If auto_kill with next task:
+# BUNDLE=$(jat-complete-bundle --task "$task_id" --agent "$agent_name" --mode auto_proceed --next-task "$next_task_id")
+
+# Emit the signal
+jat-signal complete "$BUNDLE"
 ```
 
-**For auto-proceed mode:** Include `nextTaskId` and `nextTaskTitle`:
-```bash
-jat-signal complete '{
-  "taskId": "jat-abc",
-  "agentName": "WisePrairie",
-  "completionMode": "auto_proceed",
-  "nextTaskId": "jat-def",
-  "nextTaskTitle": "Add tests for OAuth flow",
-  "summary": [...],
-  ...
-}'
-```
+**What jat-complete-bundle does:**
+1. Fetches task details from Beads (title, type, priority, description)
+2. Collects git status, diff stats, recent commits
+3. Sends context to LLM to generate structured summary with:
+   - Summary bullets
+   - Quality signals (tests, build status)
+   - Human actions (if manual steps needed)
+   - Suggested follow-up tasks
+   - Cross-agent intel (files, patterns, gotchas)
+   - AI insights (suggested rename, labels, risk level)
+4. Outputs valid JSON for `jat-signal complete`
 
-**JSON Escaping Rules:**
-- Use single quotes around the entire JSON argument
-- Use double quotes inside JSON (standard JSON format)
-- Escape any internal single quotes with `'\''` if needed
-- Test with `echo '...' | jq .` to validate
+**Requirements:**
+- `ANTHROPIC_API_KEY` environment variable must be set
+- Task must exist in Beads
 
-#### Then Output Full Terminal Debrief
+#### Then Output Terminal Debrief
 
-After emitting the signal, output a comprehensive completion summary. **This is a full debrief for the user, not just a log.**
-
-The terminal summary should mirror everything in the signal - the user viewing the terminal deserves the same complete information as the dashboard UI.
+After emitting the signal, output a completion summary. The bundle JSON contains all the fields - parse and display them:
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════╗
@@ -888,314 +815,7 @@ The terminal summary should mirror everything in the signal - the user viewing t
 ║  👤 Agent: $agent_name                                                    ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 
-┌─ 📋 WHAT WAS ACCOMPLISHED ────────────────────────────────────────────────┐
-│                                                                          │
-│  • [Summary bullet 1 - specific accomplishment]                          │
-│  • [Summary bullet 2 - specific accomplishment]                          │
-│  • [Summary bullet 3 - specific accomplishment]                          │
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
-
-┌─ ⚡ QUALITY STATUS ───────────────────────────────────────────────────────┐
-│                                                                          │
-│  Tests: [passing/failing/none/skipped] ([N/N] if applicable)             │
-│  Build: [clean/warnings/errors]                                          │
-│  Pre-existing: [note if any issues were pre-existing]                    │
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
-
-┌─ 🧑 HUMAN ACTIONS REQUIRED ───────────────────────────────────────────────┐
-│  (Manual steps needed to complete this work)                             │
-│                                                                          │
-│  1. [Action title]                                                       │
-│     → [Detailed description of what to do]                               │
-│                                                                          │
-│  2. [Action title]                                                       │
-│     → [Detailed description of what to do]                               │
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
-
-┌─ 💡 SUGGESTED FOLLOW-UP TASKS ────────────────────────────────────────────┐
-│  (Ideas discovered during this work - use dashboard to create in Beads)  │
-│                                                                          │
-│  [P2] [feature] Add Apple Sign-In support                                │
-│       Similar flow to Google OAuth, needs Apple Developer account setup  │
-│       Reason: Discovered while implementing Google OAuth                 │
-│                                                                          │
-│  [P3] [task] Add OAuth error tracking                                    │
-│       Log failed OAuth attempts to Sentry for debugging                  │
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
-
-┌─ 🔗 CROSS-AGENT INTEL ────────────────────────────────────────────────────┐
-│  (Knowledge to share with other agents working in this codebase)         │
-│                                                                          │
-│  📁 Files modified:                                                       │
-│     • src/lib/auth/oauth.ts                                              │
-│     • src/routes/auth/callback/+server.ts                                │
-│                                                                          │
-│  📐 Patterns to follow:                                                   │
-│     • Use authError() helper for consistent error responses              │
-│                                                                          │
-│  ⚠️ Gotchas:                                                             │
-│     • Token refresh can fail silently - always check response.ok         │
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
-
-┌─ 🔄 PATTERN APPLICABILITY ────────────────────────────────────────────────┐
-│  (How this work pattern could apply elsewhere in the project)            │
-│                                                                          │
-│  The retry-with-backoff pattern used for token refresh could also be appl│
-│  to: API calls in src/lib/api.ts, webhook deliveries, database reconnecti│
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 Session complete. Dashboard shows interactive UI for creating suggested tasks.
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
-
-**Section Guidelines:**
-
-| Section | When to Include | What to Show |
-|---------|-----------------|--------------|
-| WHAT WAS ACCOMPLISHED | Always | All summary bullets from signal |
-| QUALITY STATUS | Always | Tests and build status with details |
-| HUMAN ACTIONS REQUIRED | If humanActions in signal | Full title + description for each |
-| SUGGESTED FOLLOW-UP TASKS | If suggestedTasks in signal | Priority, type, title, description, reason |
-| CROSS-AGENT INTEL | If crossAgentIntel in signal | Files, patterns, gotchas |
-| PATTERN APPLICABILITY | When applicable | How patterns used here apply elsewhere |
-
-**Omit sections if empty** - don't show "None" for empty sections, just skip them.
-
-**The dashboard ALSO renders this information** via the structured signal, but the terminal debrief ensures users who primarily interact via terminal get the full context.
-
----
-
-### Field Guidelines
-
-#### Human Actions (humanActions)
-
-Include when the user must take manual steps for the task to be truly complete:
-- Run migration in production
-- Enable feature flags
-- Configure third-party services
-- Update environment variables
-- Deploy to production
-- Manual testing required
-
-**Do NOT include:**
-- "Review the code" (that's implied)
-- "Test in browser" (you should have done this)
-- General suggestions (those go in suggestedTasks)
-
-#### Suggested Tasks (suggestedTasks) - REQUIRED
-
-**You MUST always include suggested tasks.** Before completing, actively search for:
-- Similar code that needs the same fix
-- Tech debt you noticed while working
-- Features that would improve the area you worked on
-- Bugs you found but didn't fix (out of scope)
-- Documentation that needs updating
-- Tests that should be added
-- Error handling improvements
-- Performance optimizations noticed
-
-**If you genuinely found nothing after searching**, include one task explaining this:
-```json
-{
-  "type": "task",
-  "title": "Review [area] for improvements",
-  "description": "Completed [task] - code was clean, no obvious follow-up needed. Future reviewer should check for edge cases.",
-  "priority": 4,
-  "reason": "No immediate follow-up discovered during task completion"
-}
-```
-
-**Priority Guide:**
-- P0: Critical - blocks other work or has security implications
-- P1: High - should be done soon, impacts users
-- P2: Medium - normal backlog priority
-- P3: Low - nice to have
-- P4: Backlog - someday/maybe
-
-**Optional but Recommended Fields:**
-- **project**: Set to the current project ID (e.g., "jat", "chimaro"). Defaults to current project if omitted.
-- **labels**: Comma-separated labels for categorization (e.g., "ui,auth,performance"). Use when the task belongs to a specific area.
-- **depends_on**: Array of task IDs that must complete first (e.g., `["jat-abc"]`). Use when:
-  - The suggested task requires output from another task
-  - Tasks have a natural ordering (create feature, then add tests)
-  - You're suggesting multiple related tasks where one builds on another
-
-#### Cross-Agent Intel (crossAgentIntel)
-
-Share knowledge that helps other agents working in the same codebase:
-- **files**: Key files you modified (helps avoid conflicts)
-- **patterns**: Conventions you followed or established
-- **gotchas**: Non-obvious issues you encountered
-
-#### Suggested Task Rename (suggestedRename)
-
-When a task has evolved or pivoted significantly from its original title, include a `suggestedRename` field with a better title that reflects the actual work done.
-
-**When to include:**
-- Original title was vague (e.g., "Fix bug" → "Fix race condition in OAuth token refresh")
-- Work evolved beyond original scope (e.g., "Add button" → "Implement complete user settings UI")
-- Title no longer describes the work (e.g., "Research caching" → "Implement Redis caching layer")
-- Task pivoted to different approach (e.g., "Add database field" → "Migrate to new user preferences schema")
-
-**When NOT to include:**
-- Original title accurately describes the work
-- Changes are minor clarifications that don't add value
-- Task was completed exactly as specified
-
-**Example:**
-```json
-{
-  "suggestedRename": "Implement OAuth 2.0 authentication with token refresh and session management"
-}
-```
-
-The dashboard will show this suggestion and allow the user to apply it with one click.
-
----
-
-### Example: Full Completion Flow
-
-```bash
-# Step 7.5 determined COMPLETION_MODE (review_required or auto_proceed)
-
-# Step 8: Emit structured completion signal with completionMode from Step 7.5
-jat-signal complete '{
-  "taskId": "chimaro-xyz",
-  "agentName": "CalmMeadow",
-  "completionMode": "review_required",
-  "summary": [
-    "Created migration for auth_mode column",
-    "Added anonymous session handling",
-    "Updated session middleware to detect auth mode"
-  ],
-  "quality": {
-    "tests": "passing",
-    "build": "warnings",
-    "preExisting": "Build warnings pre-existing (unrelated type errors)"
-  },
-  "humanActions": [
-    {
-      "title": "Run database migration",
-      "description": "Run: npx prisma migrate deploy\nThis adds the auth_mode column to the sessions table."
-    },
-    {
-      "title": "Enable Anonymous Auth",
-      "description": "In Supabase dashboard:\n1. Go to Authentication > Providers\n2. Enable Anonymous Sign-ins\n3. Set session duration to 24 hours"
-    }
-  ],
-  "suggestedTasks": [
-    {
-      "type": "feature",
-      "title": "Add auth mode indicator to UI",
-      "description": "Show users whether they are in anonymous or authenticated mode. Display upgrade prompt for anon users.",
-      "priority": 2,
-      "reason": "UX improvement discovered while implementing auth modes",
-      "project": "chimaro",
-      "labels": "ui,auth,ux"
-    },
-    {
-      "type": "task",
-      "title": "Add anon session cleanup job",
-      "description": "Cron job to delete anonymous sessions older than 7 days to prevent database bloat.",
-      "priority": 3,
-      "reason": "Tech debt - anon sessions will accumulate without cleanup",
-      "labels": "backend,cron,cleanup",
-      "depends_on": ["chimaro-xyz"]
-    }
-  ],
-  "crossAgentIntel": {
-    "files": [
-      "prisma/migrations/20251208_add_auth_mode.sql",
-      "src/lib/server/session.ts",
-      "src/hooks.server.ts"
-    ],
-    "patterns": [
-      "Session objects now have authMode: anon | authenticated",
-      "Use isAnonymous(session) helper to check auth state"
-    ],
-    "gotchas": [
-      "Supabase anon sessions have different JWT structure - check for aud claim"
-    ]
-  },
-  "suggestedRename": "Add anonymous session support with auth mode detection"
-}'
-```
-
-Terminal output (full debrief):
-```
-╔══════════════════════════════════════════════════════════════════════════╗
-║  ✅ TASK COMPLETED: chimaro-xyz                                           ║
-║  👤 Agent: CalmMeadow                                                     ║
-╚══════════════════════════════════════════════════════════════════════════╝
-
-┌─ 📋 WHAT WAS ACCOMPLISHED ────────────────────────────────────────────────┐
-│                                                                          │
-│  • Created migration for auth_mode column                                │
-│  • Added anonymous session handling                                      │
-│  • Updated session middleware to detect auth mode                        │
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
-
-┌─ ⚡ QUALITY STATUS ───────────────────────────────────────────────────────┐
-│                                                                          │
-│  Tests: passing                                                          │
-│  Build: warnings (pre-existing - unrelated type errors)                  │
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
-
-┌─ 🧑 HUMAN ACTIONS REQUIRED ───────────────────────────────────────────────┐
-│  (Manual steps needed to complete this work)                             │
-│                                                                          │
-│  1. Run database migration                                               │
-│     → Run: npx prisma migrate deploy                                     │
-│       This adds the auth_mode column to the sessions table.              │
-│                                                                          │
-│  2. Enable Anonymous Auth                                                │
-│     → In Supabase dashboard:                                             │
-│       1. Go to Authentication > Providers                                │
-│       2. Enable Anonymous Sign-ins                                       │
-│       3. Set session duration to 24 hours                                │
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
-
-┌─ 💡 SUGGESTED FOLLOW-UP TASKS ────────────────────────────────────────────┐
-│  (Ideas discovered during this work - use dashboard to create in Beads)  │
-│                                                                          │
-│  [P2] [feature] Add auth mode indicator to UI                            │
-│       Show users whether they are in anonymous or authenticated mode.    │
-│       Display upgrade prompt for anon users.                             │
-│       Reason: UX improvement discovered while implementing auth modes    │
-│                                                                          │
-│  [P3] [task] Add anon session cleanup job                                │
-│       Cron job to delete anonymous sessions older than 7 days to prevent │
-│       database bloat.                                                    │
-│       Reason: Tech debt - anon sessions will accumulate without cleanup  │
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
-
-┌─ 🔗 CROSS-AGENT INTEL ────────────────────────────────────────────────────┐
-│  (Knowledge to share with other agents working in this codebase)         │
-│                                                                          │
-│  📁 Files modified:                                                       │
-│     • prisma/migrations/20251208_add_auth_mode.sql                       │
-│     • src/lib/server/session.ts                                          │
-│     • src/hooks.server.ts                                                │
-│                                                                          │
-│  📐 Patterns to follow:                                                   │
-│     • Session objects now have authMode: anon | authenticated            │
-│     • Use isAnonymous(session) helper to check auth state                │
-│                                                                          │
-│  ⚠️ Gotchas:                                                             │
-│     • Supabase anon sessions have different JWT structure - check for aud│
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
+[Display summary, quality status, human actions, suggested tasks, and cross-agent intel from the bundle]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 💡 Session complete. Dashboard shows interactive UI for creating suggested tasks.
@@ -1228,70 +848,6 @@ When it receives the `complete` signal:
 
 ---
 
-### Individual Signal Commands
-
-The individual signal commands can be used separately if needed:
-
-```bash
-# Separate signals (prefer jat-signal complete bundle)
-jat-signal action '{"title":"...","description":"..."}'
-jat-signal tasks '[{"type":"feature","title":"...","priority":2}]'
-jat-signal completed '{"taskId":"...","agentName":"...","sessionStats":{...},"finalCommit":"..."}'
-```
-
-**Prefer `jat-signal complete '{...}'`** - it bundles everything in one call and provides a better dashboard experience.
-
-### Enhanced Completed Signal
-
-The `completed` signal now includes session statistics and final state information:
-
-```bash
-jat-signal completed '{
-  "taskId": "jat-abc",
-  "agentName": "WisePrairie",
-  "summary": ["Implemented OAuth flow", "Added login page"],
-  "quality": {
-    "tests": "passing",
-    "build": "clean"
-  },
-  "suggestedTasks": [
-    {
-      "type": "feature",
-      "title": "Add Apple Sign-In support",
-      "priority": 2
-    }
-  ],
-  "sessionStats": {
-    "duration": 45,
-    "tokensUsed": 150000,
-    "filesModified": 5,
-    "linesChanged": 320,
-    "commitsCreated": 2
-  },
-  "finalCommit": "abc123def456",
-  "prLink": "https://github.com/org/repo/pull/123"
-}'
-```
-
-#### Session Stats Fields
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `duration` | integer | Minutes spent working on the task |
-| `tokensUsed` | integer | API tokens consumed during the session |
-| `filesModified` | integer | Number of files modified |
-| `linesChanged` | integer | Total lines changed (added + removed) |
-| `commitsCreated` | integer | Number of commits created |
-
-#### Final State Fields
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `finalCommit` | string | Yes | Git SHA of the final committed state |
-| `prLink` | string | No | Pull request URL if one was created |
-
----
-
 ## Quick Mode Behavior
 
 **This command does NOT have a quick mode.**
@@ -1306,110 +862,15 @@ Full verification ensures quality before task closure.
 
 ## Output Examples
 
-**Spontaneous work completion (no prior task):**
+The completion output is generated by `jat-complete-bundle`. A typical flow looks like:
+
 ```
-📋 Checking for in_progress task...
-   No task found for SwiftMoon
-
-🔍 Analyzing session for spontaneous work...
-
-╔════════════════════════════════════════════════════════╗
-║         🔍 SPONTANEOUS WORK DETECTED                   ║
-╚════════════════════════════════════════════════════════╝
-
-No formal task was in progress, but work was detected:
-
-📋 Proposed Task:
-   Title: Fix jat CLI -p flag causing non-interactive sessions
-   Type: bug
-   Description: Fixed -p flag causing non-interactive mode
-
-📁 Files Changed: M cli/jat
-
-Create a backfilled task record? [Proceed? Y/n] Y
-
-✓ Created backfill task: jat-abc "Fix jat CLI -p flag causing non-interactive sessions"
-
 📬 Checking Agent Mail...
   No unread messages
 
-🔍 Verifying task before completion...
-   ✅ No tests configured
-   ✅ Lint clean
-
-💾 Committing changes...
-   ✅ Committed: "bug: Fix jat CLI -p flag causing non-interactive sessions"
-
-✅ Marking task complete in Beads...
-   ✅ Closed jat-abc
-
-📢 Announcing task completion...
-   ✅ Sent to @active
-
-Signal: completed (task: jat-abc, outcome: success)
-[JAT-SIGNAL:completed] {"taskId":"jat-abc","outcome":"success"}
-
-╔══════════════════════════════════════════════════════════════════════════╗
-║  ✅ TASK COMPLETED: jat-abc                                               ║
-║  👤 Agent: SwiftMoon (Backfilled)                                         ║
-╚══════════════════════════════════════════════════════════════════════════╝
-
-┌─ 📋 WHAT WAS ACCOMPLISHED ────────────────────────────────────────────────┐
-│                                                                          │
-│  • Fixed jat CLI -p flag for non-interactive sessions                    │
-│  • Changed to positional argument for prompt passing                     │
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
-
-┌─ ⚡ QUALITY STATUS ───────────────────────────────────────────────────────┐
-│                                                                          │
-│  Tests: none (no tests configured)                                       │
-│  Build: clean                                                            │
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
-
-┌─ 💡 SUGGESTED FOLLOW-UP TASKS ────────────────────────────────────────────┐
-│  (Ideas discovered during this work - use dashboard to create in Beads)  │
-│                                                                          │
-│  [P3] [task] Add tests for jat CLI argument parsing                      │
-│       Cover edge cases: quotes, special characters, multi-word prompts   │
-│       Reason: No tests exist for CLI argument handling                   │
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
-
-┌─ 🔗 CROSS-AGENT INTEL ────────────────────────────────────────────────────┐
-│  (Knowledge to share with other agents working in this codebase)         │
-│                                                                          │
-│  📁 Files modified:                                                       │
-│     • cli/jat                                                            │
-│                                                                          │
-│  ⚠️ Gotchas:                                                             │
-│     • Use positional args, not flags for prompts in Claude Code invocatio│
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 Session complete. Dashboard shows interactive UI for creating suggested tasks.
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
-
----
-
-**Standard completion (existing task):**
-```
-📬 Checking Agent Mail...
-  1 unread message
-
-  From: TeamLead (20 min ago)
-  Subject: [jat-abc] Review note
-  Body: Looks good, just add a comment to the main function
-
-  → Acknowledged (already addressed in code)
-
-🔍 Verifying task before completion...
-   ✅ Tests passed (12/12)
-   ✅ Lint clean
-   ✅ Security scan clean
+🔍 Verifying task...
+   ✅ Tests passed
+   ✅ Build clean
 
 💾 Committing changes...
    ✅ Committed: "feat: Add user settings page"
@@ -1417,95 +878,16 @@ Signal: completed (task: jat-abc, outcome: success)
 ✅ Marking task complete in Beads...
    ✅ Closed jat-abc
 
-🔓 Releasing file reservations...
-   ✅ Released 2 file patterns
-
-📢 Announcing task completion...
+📢 Announcing completion...
    ✅ Sent to @active
 
-Signal: completed (task: jat-abc, outcome: success)
-[JAT-SIGNAL:completed] {"taskId":"jat-abc","outcome":"success"}
+╔═══════════════════════════════════════════════════════════════╗
+║  ✅ TASK COMPLETED: jat-abc                                   ║
+║  👤 Agent: JustGrove                                          ║
+╚═══════════════════════════════════════════════════════════════╝
 
-╔══════════════════════════════════════════════════════════════════════════╗
-║  ✅ TASK COMPLETED: jat-abc                                               ║
-║  👤 Agent: JustGrove                                                      ║
-╚══════════════════════════════════════════════════════════════════════════╝
-
-┌─ 📋 WHAT WAS ACCOMPLISHED ────────────────────────────────────────────────┐
-│                                                                          │
-│  • Added user settings page at /account/settings                         │
-│  • Implemented form fields for profile, notifications                    │
-│  • Added form validation with error messages                             │
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
-
-┌─ ⚡ QUALITY STATUS ───────────────────────────────────────────────────────┐
-│                                                                          │
-│  Tests: passing (12/12)                                                  │
-│  Build: clean                                                            │
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
-
-┌─ 🧑 HUMAN ACTIONS REQUIRED ───────────────────────────────────────────────┐
-│  (Manual steps needed to complete this work)                             │
-│                                                                          │
-│  1. Update navigation menu                                               │
-│     → Add link to Settings page in the account dropdown menu             │
-│       Location: src/lib/components/NavMenu.svelte, line ~45              │
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
-
-┌─ 💡 SUGGESTED FOLLOW-UP TASKS ────────────────────────────────────────────┐
-│  (Ideas discovered during this work - use dashboard to create in Beads)  │
-│                                                                          │
-│  [P2] [feature] Add email notification preferences                       │
-│       Allow users to configure which emails they receive                 │
-│       Reason: Settings page exists but notification controls are minimal │
-│                                                                          │
-│  [P3] [task] Add settings page to E2E test suite                         │
-│       Cover form submission, validation errors, and success states       │
-│       Reason: Currently only unit tests exist for this page              │
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
-
-┌─ 🔗 CROSS-AGENT INTEL ────────────────────────────────────────────────────┐
-│  (Knowledge to share with other agents working in this codebase)         │
-│                                                                          │
-│  📁 Files modified:                                                       │
-│     • src/routes/account/settings/+page.svelte                           │
-│     • src/routes/account/settings/+page.server.ts                        │
-│     • src/lib/api/user.ts                                                │
-│                                                                          │
-│  📐 Patterns to follow:                                                   │
-│     • Use form actions for server-side validation                        │
-│     • Use $page.form for progressive enhancement                         │
-│                                                                          │
-│  ⚠️ Gotchas:                                                             │
-│     • API returns nested user.profile object - flatten before form bindin│
-│     • Form reset after successful save requires manual invalidation      │
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
-
-┌─ 🔄 PATTERN APPLICABILITY ────────────────────────────────────────────────┐
-│  (How this work pattern could apply elsewhere in the project)            │
-│                                                                          │
-│  The form-with-server-validation pattern used here could be applied to:  │
-│  • Account deletion flow (src/routes/account/delete)                     │
-│  • Team settings page (src/routes/team/settings)                         │
-│  • Any other form that needs server-side validation with progressive enha│
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 Session complete. Dashboard shows interactive UI for creating suggested tasks.
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[Summary, quality status, suggested tasks, cross-agent intel from bundle]
 ```
-
-**Signal explained:**
-- `jat-signal complete '{...}'` - Full completion bundle with all data; dashboard shows COMPLETED state and renders interactive UI
-- Set `completionMode: "auto_proceed"` with `nextTaskId` and `nextTaskTitle` to auto-spawn next task
-
-The completion mode is determined by review rules (see Step 7.5).
 
 ---
 
@@ -1520,9 +902,7 @@ The completion flow uses these signals (captured by PostToolUse hook):
 
 **The `jat-signal complete` bundle is the ONLY completion signal needed.** It includes:
 - `completionMode: "review_required"` → Dashboard shows COMPLETED state, session stays open for review
-- `completionMode: "auto_proceed"` with `nextTaskId` → Dashboard auto-spawns next task
-
-**Legacy signals (deprecated):** The individual `completed`, `auto_proceed`, `action`, and `tasks` signals still work but should NOT be used. The `complete` bundle replaces all of them.
+- `completionMode: "auto_kill"` with `nextTaskId` → Dashboard auto-kills session and spawns next task
 
 ### Completing Signal Progress Sequence
 
@@ -1555,7 +935,7 @@ jat-signal completing '{
 **Completion mode is determined in Step 7.5** based on:
 1. Per-task override in notes (`[REVIEW_OVERRIDE:...]`)
 2. Project review rules (`.beads/review-rules.json`)
-3. Safe default: review required (no auto-proceed without explicit configuration)
+3. Safe default: review required (no auto-kill without explicit configuration)
 
 **Critical timing:**
 - Do NOT run `jat-signal complete` until AFTER all completion steps succeed
@@ -1567,192 +947,6 @@ jat-signal completing '{
 - Dashboard renders these as an interactive checklist for manual steps
 
 **Only one signal call needed:** Use `jat-signal complete` with the full bundle (Step 8).
-
----
-
-## Handling CREATE_TASKS Input from Dashboard
-
-**When the dashboard sends `[JAT:CREATE_TASKS]` input, handle it before the completion summary.**
-
-This happens when:
-1. Agent runs `jat-signal tasks` with follow-up tasks
-2. Dashboard displays SuggestedTasksPanel UI
-3. User selects tasks and clicks "Create Selected Tasks"
-4. Dashboard sends `[JAT:CREATE_TASKS]{...json...}[/JAT:CREATE_TASKS]` to agent's terminal
-5. Agent parses this input and creates tasks in Beads
-
-### Input Format
-
-```
-[JAT:CREATE_TASKS]
-{
-  "tasks": [
-    {
-      "type": "agent",
-      "title": "Add caching to /api/agents endpoint",
-      "description": "Same Redis pattern as /api/tasks. Copy approach from cache.ts.",
-      "priority": 2
-    },
-    {
-      "type": "human",
-      "title": "Decide on cache TTL strategy",
-      "description": "Current TTL is 60s. Need product input on freshness vs performance tradeoff.",
-      "priority": 2
-    }
-  ],
-  "parent_task_id": "jat-xyz"
-}
-[/JAT:CREATE_TASKS]
-```
-
-### Field Reference
-
-| Field | Required | Type | Description |
-|-------|----------|------|-------------|
-| `tasks` | Yes | array | Array of tasks to create |
-| `tasks[].type` | Yes | `"agent"` or `"human"` | Who should do this work |
-| `tasks[].title` | Yes | string | Task title (3-10 words) |
-| `tasks[].priority` | Yes | number | 0-4 (P0=critical, P4=lowest) |
-| `tasks[].description` | No | string | Detailed description |
-| `tasks[].labels` | No | string[] | Labels for categorization |
-| `parent_task_id` | No | string | Parent task ID for linking |
-
-### Implementation Steps
-
-**When you detect CREATE_TASKS input in the terminal or receive it as user input:**
-
-#### Step 1: Parse the JSON Payload
-
-```bash
-# The input will look like:
-# [JAT:CREATE_TASKS]{"tasks":[...]}[/JAT:CREATE_TASKS]
-#
-# Parse between the markers to extract JSON
-```
-
-Extract the JSON payload and validate it has the required fields.
-
-#### Step 2: Create Each Task in Beads
-
-For each task in the `tasks` array:
-
-```bash
-# For agent tasks:
-bd create "Task title here" \
-  --description "Task description" \
-  --priority 2 \
-  --type task
-
-# For human tasks, add human-action label:
-bd create "Human task title here" \
-  --description "Task description" \
-  --priority 2 \
-  --type task \
-  --labels "human-action"
-
-# If labels were provided:
-bd create "Task title" \
-  --description "Description" \
-  --priority 2 \
-  --type task \
-  --labels "label1,label2"
-```
-
-**Capture the created task ID from the output** (format: `✓ Created issue: jat-xxx`).
-
-#### Step 3: Link to Parent Task (Optional)
-
-If `parent_task_id` was provided, link the new tasks:
-
-```bash
-# Add dependency relationship (syntax: bd dep add [new-id] [parent-id] --type discovered-from)
-bd dep add jat-newid jat-parentid --type discovered-from
-```
-
-#### Step 4: Output Confirmation
-
-```
-📋 Creating suggested tasks from dashboard...
-
-✓ Created 3 tasks:
-  • jat-abc - Add caching to /api/agents endpoint (agent)
-  • jat-def - Add cache metrics to dashboard (agent)
-  • jat-ghi - Decide on cache TTL strategy (human)
-
-  Linked to parent: jat-xyz
-```
-
-#### Step 5: Continue with Completion Flow
-
-After creating tasks, continue with the normal `/jat:complete` flow (verification, commit, close, announce).
-
-### Error Handling
-
-**JSON parse error:**
-```
-⚠️ CREATE_TASKS: Invalid JSON payload
-   Error: Unexpected token at position 45
-   Skipping task creation, continuing with completion...
-```
-
-**bd create fails for one task:**
-```
-📋 Creating suggested tasks from dashboard...
-
-✓ jat-abc - Add caching to /api/agents endpoint
-✗ Failed: Add cache metrics - bd create error: duplicate title
-✓ jat-ghi - Decide on cache TTL strategy
-
-2 of 3 tasks created successfully.
-```
-
-**Handle errors gracefully** - report which task failed but continue creating others.
-
-### Example Output
-
-```
-[User sends from dashboard:]
-[JAT:CREATE_TASKS]{"tasks":[{"type":"agent","title":"Add unit tests for cache layer","description":"Cover cache hit/miss scenarios","priority":2},{"type":"human","title":"Review cache invalidation strategy","description":"Ensure we invalidate on all write paths","priority":1}],"parent_task_id":"jat-xyz"}[/JAT:CREATE_TASKS]
-
-[Agent response:]
-📋 Creating suggested tasks from dashboard...
-
-Running: bd create "Add unit tests for cache layer" --description "Cover cache hit/miss scenarios" --priority 2 --type task
-✓ Created: jat-abc
-
-Running: bd create "Review cache invalidation strategy" --description "Ensure we invalidate on all write paths" --priority 1 --type task --labels "human-action"
-✓ Created: jat-def
-
-Linking to parent task jat-xyz...
-✓ Added dependency: jat-abc depends on jat-xyz (discovered-from)
-✓ Added dependency: jat-def depends on jat-xyz (discovered-from)
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✓ Created 2 tasks from suggestions: jat-abc, jat-def
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-[Continuing with completion flow...]
-```
-
-### Integration with Completion Flow
-
-The CREATE_TASKS handling should happen **after showing the completion summary** but **before running `jat-signal idle`**:
-
-1. Steps 1-7 run normally (verify, commit, close, release, announce)
-2. Show completion summary box (Step 8)
-3. **Wait for potential CREATE_TASKS input from dashboard**
-   - If user sends CREATE_TASKS → parse and create tasks → confirm
-   - If user sends nothing / closes terminal → proceed to IDLE
-4. Run `jat-signal idle`
-
-This allows the dashboard to:
-1. Read suggested tasks from signal file (`jat-signal tasks`)
-2. Show the SuggestedTasksPanel UI to user
-3. User selects and clicks "Create Selected Tasks"
-4. Dashboard sends CREATE_TASKS to still-running agent
-5. Agent creates tasks and confirms
-
-**Note:** The agent session should remain open briefly after showing completion summary to allow this interaction. The `jat-signal idle` call signals the session can be closed.
 
 ---
 
@@ -1804,8 +998,7 @@ Or run /jat:verify to see detailed error report
 | 6 | Release Reservations | ALWAYS | `releasing` (60%) |
 | 7 | Announce Completion | ALWAYS | `announcing` (80%) |
 | 7.5 | Determine Review Action | ALWAYS (sets COMPLETION_MODE) | - |
-| 8 | Show Final Summary with Reflection | ALWAYS | (100% implied) |
-| 9 | Handle CREATE_TASKS Input | If dashboard sends task creation request | - |
+| 8 | Emit Completion Bundle | ALWAYS | (100% implied) |
 
 ---
 

@@ -8,16 +8,12 @@
 #   jat-signal needs_input '{"taskId":"jat-abc","question":"...","questionType":"choice"}'
 #   jat-signal idle '{"readyForWork":true}'
 #   jat-signal completing '{"taskId":"jat-abc","currentStep":"committing"}'
-#   jat-signal completed '{"taskId":"jat-abc","outcome":"success"}'
 #   jat-signal starting '{"agentName":"...","project":"..."}'
 #   jat-signal compacting '{"reason":"...","contextSizeBefore":180000}'
-#   jat-signal auto_proceed '{"taskId":"jat-abc"}'
 #   jat-signal question '{"question":"...","questionType":"choice","options":[...]}'
 #
-# Usage (Data Signals - always JSON):
-#   jat-signal tasks '[{...}]'                      # Suggest follow-up tasks
-#   jat-signal action '{"title":"...","desc":"..."}' # Request human action
-#   jat-signal complete '{"suggestedTasks":[...]}'  # Full completion bundle
+# Usage (Completion Signal - bundles everything):
+#   jat-signal complete '{"taskId":"...","agentName":"...","summary":[...],"quality":{...},"suggestedTasks":[...]}'
 #
 # Options:
 #   --no-validate    Skip JSON schema validation
@@ -56,15 +52,11 @@ show_usage() {
     echo "  needs_input '{...}'   - Waiting for user input"
     echo "  idle '{...}'          - Session idle"
     echo "  completing '{...}'    - Running completion steps"
-    echo "  completed '{...}'     - Task completed"
     echo "  starting '{...}'      - Session initializing"
     echo "  compacting '{...}'    - Summarizing context"
-    echo "  auto_proceed '{...}'  - OK to auto-close"
     echo "  question '{...}'      - Structured question for dashboard"
     echo ""
-    echo "Data Signals (always JSON):"
-    echo "  tasks '[{...}]'       - Suggest follow-up tasks"
-    echo "  action '{...}'        - Request human action"
+    echo "Completion Signal (bundles summary, quality, suggested tasks, human actions):"
     echo "  complete '{...}'      - Full completion bundle"
     echo ""
     echo "Options:"
@@ -76,7 +68,7 @@ show_usage() {
     echo "  jat-signal review '{\"taskId\":\"jat-abc\",\"summary\":[\"Added login\"]}'"
     echo "  jat-signal needs_input '{\"taskId\":\"jat-abc\",\"question\":\"Which lib?\",\"questionType\":\"choice\"}'"
     echo "  jat-signal idle '{\"readyForWork\":true}'"
-    echo "  jat-signal completed '{\"taskId\":\"jat-abc\",\"outcome\":\"success\"}'"
+    echo "  jat-signal complete '{\"taskId\":\"jat-abc\",\"agentName\":\"Agent\",\"completionMode\":\"review_required\",\"summary\":[\"Added auth\"],\"quality\":{\"tests\":\"passing\",\"build\":\"clean\"},\"suggestedTasks\":[]}'"
     echo ""
     echo "Required Fields by Signal Type:"
     echo "  working:     taskId, taskTitle"
@@ -84,11 +76,10 @@ show_usage() {
     echo "  needs_input: taskId, question, questionType"
     echo "  idle:        readyForWork"
     echo "  completing:  taskId, currentStep"
-    echo "  completed:   taskId, outcome"
     echo "  starting:    agentName"
     echo "  compacting:  reason, contextSizeBefore"
-    echo "  auto_proceed: taskId"
     echo "  question:    question, questionType"
+    echo "  complete:    taskId, agentName, summary, quality, completionMode, suggestedTasks"
 }
 
 # Parse options

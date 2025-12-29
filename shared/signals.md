@@ -56,15 +56,55 @@ Output format: `[JAT-SIGNAL:<type>] <json-payload>`
 | `idle` | `jat-signal idle '{...}'` | readyForWork |
 | `question` | `jat-signal question '{...}'` | question, questionType (optional: options, timeout) |
 
-**Data Signals** - Structured payloads:
+**Completion Signals** - Two signals work together for task completion:
 
-| Signal | Command | Description |
-|--------|---------|-------------|
-| `tasks` | `jat-signal tasks '[{...}]'` | Suggest follow-up tasks (JSON array) |
-| `action` | `jat-signal action '{...}'` | Request human action (JSON object) |
-| `complete` | `jat-signal complete '{...}'` | **Full completion bundle** - sets state to "completed" AND provides rich data |
+| Signal | Command | Purpose |
+|--------|---------|---------|
+| `completing` | `jat-signal completing '{...}'` | **Progress tracking** - emitted during each step of `/jat:complete` (verifying → committing → closing → releasing → announcing). Shows dashboard progress. |
+| `complete` | `jat-signal complete '{...}'` | **Final bundle** - emitted ONCE at the end. Sets state to "completed" AND provides rich data (summary, quality, suggestedTasks, humanActions). |
 
-> **Note:** Use `jat-signal complete` (not `completed`) for task completion. It provides the full bundle (summary, quality, suggested tasks, human actions) AND sets the session state to "completed". The legacy `jat-signal completed` state signal is still supported but only sets state without rich data.
+### completing vs complete: When to Use Each
+
+**Key distinction:**
+- **`completing`** = "I'm in the middle of completing" (multiple emissions, progress updates)
+- **`complete`** = "I'm done completing" (single emission, final result)
+
+**`completing` signal** - Emitted during `/jat:complete` workflow steps:
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  /jat:complete workflow with completing signals                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  Step 3: jat-signal completing '{"currentStep":"verifying"}'   0%  │
+│       ↓                                                             │
+│  Step 4: jat-signal completing '{"currentStep":"committing"}'  20% │
+│       ↓                                                             │
+│  Step 5: jat-signal completing '{"currentStep":"closing"}'     40% │
+│       ↓                                                             │
+│  Step 6: jat-signal completing '{"currentStep":"releasing"}'   60% │
+│       ↓                                                             │
+│  Step 7: jat-signal completing '{"currentStep":"announcing"}'  80% │
+│       ↓                                                             │
+│  Step 8: jat-signal complete '{"completionMode":"..."}'       100% │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**`complete` signal** - Emitted once after all completion steps:
+- Triggers dashboard to show "COMPLETED" state
+- Contains the full CompletionBundle with summary, quality, suggested tasks
+- Determines what happens next (review_required vs auto_proceed)
+
+**Dashboard behavior:**
+| Signal | Dashboard State | Dashboard Display |
+|--------|-----------------|-------------------|
+| `completing` | ⏳ COMPLETING | Progress bar with current step |
+| `complete` | ✅ COMPLETED | Completion summary, quality badges, suggested tasks |
+
+**When completing events are hidden:**
+Once a task completes, intermediate `completing` events are automatically hidden from the timeline. Only the final `completed` event is shown. This keeps the timeline clean.
+
+> **Note:** Always emit `completing` signals during the workflow AND `complete` at the end. The `completing` signals provide real-time feedback while work is happening.
 
 ### Signal Schemas (Full Field Reference)
 
@@ -129,13 +169,6 @@ Output format: `[JAT-SIGNAL:<type>] <json-payload>`
 | crossAgentIntel | No | object | `{ files?, patterns?, gotchas? }` for other agents |
 | nextTaskId | No | string | Task ID to spawn next (if auto_proceed) |
 | nextTaskTitle | No | string | Title of next task (for display) |
-
-**`completed` signal fields (LEGACY - prefer `complete` above):**
-
-| Field | Required | Type | Description |
-|-------|----------|------|-------------|
-| taskId | **Yes** | string | Task ID |
-| outcome | **Yes** | string | "success" / "partial" / "blocked" |
 
 ### Usage Examples
 
@@ -210,27 +243,6 @@ jat-signal complete '{
   "summary": ["Fixed authentication"],
   "quality": {"tests": "passing", "build": "clean"},
   "suggestedTasks": [{"type": "task", "title": "Add tests", "description": "...", "priority": 2}]
-}'
-```
-
-**Legacy completion (sets state only, no rich data):**
-```bash
-jat-signal completed '{"taskId":"jat-abc","outcome":"success"}'
-```
-
-**Suggesting Follow-up Tasks (standalone - prefer embedding in `complete` bundle):**
-```bash
-jat-signal tasks '[
-  {"title": "Add unit tests", "priority": 2, "type": "task"},
-  {"title": "Update documentation", "priority": 3, "type": "task"}
-]'
-```
-
-**Requesting Human Action (standalone - prefer embedding in `complete` bundle):**
-```bash
-jat-signal action '{
-  "title": "Run database migration",
-  "description": "Execute: npx prisma migrate deploy"
 }'
 ```
 
@@ -464,8 +476,6 @@ Signals must be written as compact single-line JSON (JSONL format), one event pe
 | Task fully completed | `jat-signal complete '{"taskId":"...","completionMode":"review_required",...}'` |
 | Task completed + auto-proceed | `jat-signal complete '{"taskId":"...","completionMode":"auto_proceed","nextTaskId":"...","nextTaskTitle":"...",...}'` |
 | Session idle | `jat-signal idle '{"readyForWork":true}'` |
-| Suggesting follow-up work | `jat-signal tasks '[...]'` |
-| Human action required | `jat-signal action '{...}'` |
 
 **Critical:** Without signals, dashboard shows stale state. Always signal when:
 - You start or finish substantial work
@@ -601,7 +611,24 @@ jat-signal review '{
   "reviewFocus":["Verify OAuth token handling"]
 }'
 
-# User approves completion via /jat:complete - emits full bundle
+# User approves, agent runs /jat:complete which emits completing signals for each step:
+
+# Step 3: Verifying (0% progress)
+jat-signal completing '{"taskId":"jat-abc","taskTitle":"Add auth flow","currentStep":"verifying","progress":0,"stepsCompleted":[],"stepsRemaining":["committing","closing","releasing","announcing"]}'
+
+# Step 4: Committing (20% progress)
+jat-signal completing '{"taskId":"jat-abc","taskTitle":"Add auth flow","currentStep":"committing","progress":20,"stepsCompleted":["verifying"],"stepsRemaining":["closing","releasing","announcing"]}'
+
+# Step 5: Closing in Beads (40% progress)
+jat-signal completing '{"taskId":"jat-abc","taskTitle":"Add auth flow","currentStep":"closing","progress":40,"stepsCompleted":["verifying","committing"],"stepsRemaining":["releasing","announcing"]}'
+
+# Step 6: Releasing reservations (60% progress)
+jat-signal completing '{"taskId":"jat-abc","taskTitle":"Add auth flow","currentStep":"releasing","progress":60,"stepsCompleted":["verifying","committing","closing"],"stepsRemaining":["announcing"]}'
+
+# Step 7: Announcing completion (80% progress)
+jat-signal completing '{"taskId":"jat-abc","taskTitle":"Add auth flow","currentStep":"announcing","progress":80,"stepsCompleted":["verifying","committing","closing","releasing"],"stepsRemaining":[]}'
+
+# Step 8: Final completion bundle (100% - the complete signal)
 jat-signal complete '{
   "taskId":"jat-abc",
   "agentName":"FairBay",
@@ -611,6 +638,12 @@ jat-signal complete '{
   "suggestedTasks":[{"type":"task","title":"Add tests","description":"...","priority":2}]
 }'
 ```
+
+**Key points:**
+- `completing` signals are emitted at each step to show real-time progress
+- `complete` signal is emitted once at the end with the full bundle
+- Dashboard shows progress bar during `completing`, then final result on `complete`
+- Timeline hides `completing` events after task completes (shows only `complete`)
 
 ### Auto-Proceed Flow
 

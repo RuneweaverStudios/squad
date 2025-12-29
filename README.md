@@ -1491,11 +1491,8 @@ jat-signal needs_input '{"taskId":"jat-abc","question":"Which lib?","questionTyp
 # Signal that you're ready for review
 jat-signal review '{"taskId":"jat-abc","summary":["Added login page"]}'
 
-# Signal task completion
-jat-signal completed '{"taskId":"jat-abc","outcome":"success"}'
-
-# Suggest follow-up tasks
-jat-signal tasks '[{"title": "Add tests", "priority": 2}]'
+# Signal task completion (full bundle with summary, quality, suggested tasks)
+jat-signal complete '{"taskId":"jat-abc","agentName":"Agent","completionMode":"review_required","summary":["Added login"],"quality":{"tests":"passing","build":"clean"},"suggestedTasks":[]}'
 ```
 
 **Available Signals:**
@@ -1505,10 +1502,8 @@ jat-signal tasks '[{"title": "Add tests", "priority": 2}]'
 | `working` | `jat-signal working '{...}'` | Amber "Working" state |
 | `needs_input` | `jat-signal needs_input '{...}'` | Purple "Needs Input" state |
 | `review` | `jat-signal review '{...}'` | Cyan "Ready for Review" state |
-| `completed` | `jat-signal completed '{...}'` | Green "Completed" state |
+| `complete` | `jat-signal complete '{...}'` | Green "Completed" state + rich data |
 | `idle` | `jat-signal idle '{...}'` | Gray "Idle" state |
-| `tasks` | `jat-signal tasks '[...]'` | Shows suggested tasks in UI |
-| `action` | `jat-signal action '{...}'` | Shows human action request |
 
 **How It Works:**
 

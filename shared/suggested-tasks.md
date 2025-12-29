@@ -120,17 +120,6 @@ jat-signal complete '{
 }'
 ```
 
-#### Standalone Task Signal
-
-You can also signal tasks separately from completion:
-
-```bash
-jat-signal tasks '[
-  {"type": "task", "title": "Update README", "priority": 3},
-  {"type": "bug", "title": "Fix typo in error message", "priority": 4}
-]'
-```
-
 ### Dashboard Side: Task Review UI
 
 #### SuggestedTasksSection Component
