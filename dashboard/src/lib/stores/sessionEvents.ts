@@ -25,6 +25,7 @@ import { processSessionOutput, onAutomationTrigger, clearRecoveringState } from 
 import { initializeStore as initAutomationStore, clearSessionTriggers, getRuleById } from '$lib/stores/automationRules.svelte';
 import { getIsActive as isEpicSwarmActive, getChildren as getEpicChildren, getNextReadyTask as getNextEpicTask } from './epicQueueStore.svelte';
 import { getAutoKillDelayForPriority, isAutoKillEnabled } from './autoKillConfig';
+import { addToast } from './toasts.svelte';
 
 // Track scheduled auto-kill timers by session name
 // Allows cancellation if user interacts with session before kill occurs
@@ -303,6 +304,14 @@ export function cancelAutoKill(sessionName: string): void {
 			return map;
 		});
 		console.log(`[AutoKill] Cancelled scheduled kill for ${sessionName}`);
+
+		// Extract agent name from session name (e.g., "jat-AgentName" -> "AgentName")
+		const agentName = sessionName.startsWith('jat-') ? sessionName.slice(4) : sessionName;
+		addToast({
+			message: `Auto-kill cancelled for ${agentName}`,
+			type: 'info',
+			duration: 2000 // Brief feedback - 2 seconds
+		});
 	}
 }
 
