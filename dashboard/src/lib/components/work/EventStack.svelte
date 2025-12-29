@@ -1192,7 +1192,7 @@
 										</div>
 									{/if}
 								</div>
-							{:else if (event.state === 'completed' || event.type === 'completed') && event.data}
+							{:else if (event.state === 'completed' || event.type === 'completed' || event.type === 'complete') && event.data}
 								<!-- Rich Completed Signal UI -->
 								{@const completedData = event.data}
 								<div class="space-y-3">
@@ -1559,7 +1559,7 @@
 												</div>
 											{/if}
 										</div>
-									{:else if (event.state === 'completed' || event.type === 'completed') && event.data}
+									{:else if (event.state === 'completed' || event.type === 'completed' || event.type === 'complete') && event.data}
 										<!-- Rich Completed Signal UI -->
 										{@const completedData = event.data}
 										<div class="space-y-3">
