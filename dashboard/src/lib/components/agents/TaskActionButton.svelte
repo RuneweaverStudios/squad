@@ -399,12 +399,39 @@
 		{/if}
 
 	{:else}
-		<!-- Disabled state for closed tasks -->
-		<button class="btn btn-xs btn-ghost opacity-50" disabled title="Task is closed">
-			<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-			</svg>
-		</button>
+		<!-- Closed tasks - show Resume button if has assignee, otherwise disabled checkmark -->
+		{#if task.assignee}
+			<!-- Resume button for closed tasks with assignee -->
+			<button
+				class="btn btn-xs btn-ghost hover:btn-info gap-1"
+				onclick={handleResume}
+				disabled={resuming}
+				title="Resume conversation with {task.assignee}"
+			>
+				{#if resuming}
+					<span class="loading loading-spinner loading-xs"></span>
+				{:else}
+					<!-- Play/Resume icon -->
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+					</svg>
+				{/if}
+			</button>
+			{#if resumeError}
+				<div class="tooltip tooltip-left tooltip-error" data-tip={resumeError}>
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3 h-3 text-error">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+					</svg>
+				</div>
+			{/if}
+		{:else}
+			<!-- No assignee - show disabled checkmark -->
+			<button class="btn btn-xs btn-ghost opacity-50" disabled title="Task is closed">
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+				</svg>
+			</button>
+		{/if}
 	{/if}
 </div>
 
