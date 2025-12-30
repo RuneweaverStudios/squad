@@ -283,6 +283,14 @@
 		}
 	});
 
+	// Reset epics list when dropdown closes (forces fresh fetch on next open)
+	$effect(() => {
+		if (!isOpen) {
+			epics = [];
+			epicsError = null;
+		}
+	});
+
 	// Reset selected epic index when search query changes
 	$effect(() => {
 		if (epicSearchQuery !== undefined) {
