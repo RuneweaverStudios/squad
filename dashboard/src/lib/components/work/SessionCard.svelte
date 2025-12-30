@@ -270,6 +270,8 @@
 		richSignalPayloadTimestamp?: number;
 		/** Whether session is in recovering state (automation rule triggered recovery) */
 		isRecovering?: boolean;
+		/** Whether session is exiting (triggers scale-out-hor-left animation) */
+		isExiting?: boolean;
 	}
 
 	let {
@@ -331,6 +333,8 @@
 		richSignalPayloadTimestamp,
 		// Automation recovering state
 		isRecovering = false,
+		// Exit animation state
+		isExiting = false,
 	}: Props = $props();
 
 	// Derived mode helpers
@@ -4221,7 +4225,7 @@
 	<article
 		class="unified-agent-card p-2 rounded-lg relative overflow-visible {className} {isCompleteFlashing
 			? 'complete-flash-animation'
-			: ''}"
+			: ''} {isExiting ? 'session-exit' : ''}"
 		class:ring-2={effectiveHighlighted ||
 			sessionState === "needs-input" ||
 			isCompleteFlashing}
@@ -4507,7 +4511,7 @@
 	<div
 		class="card h-full flex flex-col relative rounded-none {className} {effectiveHighlighted
 			? 'agent-highlight-flash ring-2 ring-info ring-offset-2 ring-offset-base-100'
-			: ''} {isCompleteFlashing ? 'complete-flash-animation' : ''}"
+			: ''} {isCompleteFlashing ? 'complete-flash-animation' : ''} {isExiting ? 'session-exit' : ''}"
 		style="
 			background: linear-gradient(135deg, oklch(0.22 0.02 250) 0%, oklch(0.18 0.01 250) 50%, oklch(0.16 0.01 250) 100%);
 			border: 1px solid {isCompleteFlashing

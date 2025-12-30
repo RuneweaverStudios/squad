@@ -140,6 +140,61 @@
 		highlightedAgent = null
 	}: Props = $props();
 
+	// Animation duration (matches CSS animation: 0.5s)
+	const EXIT_ANIMATION_DURATION = 500;
+
+	// Map of session data for sessions that are animating out
+	// Key: sessionName, Value: frozen session data + isExiting flag
+	let exitingSessionsData = $state<Map<string, WorkSession & { _isExiting: true }>>(new Map());
+
+	// Track previous workSessions to detect removals
+	let previousWorkSessions = $state<Map<string, WorkSession>>(new Map());
+
+	// Detect removed sessions and trigger exit animation
+	$effect(() => {
+		const currentNames = new Set(workSessions.map(s => s.sessionName));
+
+		// Find sessions that were in previous but not in current (removed)
+		for (const [name, prevSession] of previousWorkSessions) {
+			if (!currentNames.has(name) && !exitingSessionsData.has(name)) {
+				// Capture session data and mark as exiting
+				const newExiting = new Map(exitingSessionsData);
+				newExiting.set(name, { ...prevSession, _isExiting: true as const });
+				exitingSessionsData = newExiting;
+
+				// Remove from exiting after animation completes
+				setTimeout(() => {
+					exitingSessionsData = new Map([...exitingSessionsData].filter(([n]) => n !== name));
+				}, EXIT_ANIMATION_DURATION);
+			}
+		}
+
+		// Session came back while animating out - cancel exit
+		for (const name of exitingSessionsData.keys()) {
+			if (currentNames.has(name)) {
+				exitingSessionsData = new Map([...exitingSessionsData].filter(([n]) => n !== name));
+			}
+		}
+
+		// Update previous for next comparison
+		previousWorkSessions = new Map(workSessions.map(s => [s.sessionName, s]));
+	});
+
+	// Combined sessions: current sessions + exiting sessions (for display)
+	const displaySessions = $derived.by(() => {
+		// Start with current sessions
+		const sessions: (WorkSession & { _isExiting?: true })[] = [...workSessions];
+
+		// Add exiting sessions that aren't in current
+		for (const [name, exitingSession] of exitingSessionsData) {
+			if (!workSessions.some(s => s.sessionName === name)) {
+				sessions.push(exitingSession);
+			}
+		}
+
+		return sessions;
+	});
+
 	// Initialize sort store on mount
 	onMount(() => {
 		initSort();
@@ -229,17 +284,18 @@
 	// This is critical for performance - getSessionState runs regex on 3000 chars of output
 	const sessionStates = $derived.by(() => {
 		const states = new Map<string, number>();
-		for (const session of workSessions) {
+		for (const session of displaySessions) {
 			states.set(session.sessionName, getSessionState(session));
 		}
 		return states;
 	});
 
 	// Sort sessions based on selected sort option and direction
+	// Note: Uses displaySessions which includes exiting sessions for animation
 	const sortedSessions = $derived.by(() => {
 		const dir = sortDir === 'asc' ? 1 : -1;
 		const states = sessionStates; // Use pre-computed states
-		return [...workSessions].sort((a, b) => {
+		return [...displaySessions].sort((a, b) => {
 			switch (sortBy) {
 				case 'state': {
 					// Sort by state (asc = attention-needed first, desc = idle first)
@@ -369,6 +425,7 @@
 							onSendInput={createSendInputHandler(session.sessionName)}
 							{onTaskClick}
 							isHighlighted={highlightedAgent === session.agentName}
+							isExiting={session._isExiting === true}
 						/>
 					</div>
 				{/each}
