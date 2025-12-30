@@ -91,6 +91,18 @@ export const POST: RequestHandler = async ({ params, request }) => {
 
 		// Check for errors
 		if (stderr && (stderr.includes('Error:') || stderr.includes('error:'))) {
+			// Handle "already linked" case gracefully (UNIQUE constraint)
+			if (stderr.includes('UNIQUE constraint failed')) {
+				console.log(`[task-epic] Task ${taskId} already linked to epic ${epicId}`);
+				return json({
+					success: true,
+					message: `Task ${taskId} is already linked to epic ${epicId}`,
+					taskId,
+					epicId,
+					alreadyLinked: true
+				});
+			}
+
 			console.error('[task-epic] bd dep add error:', stderr);
 			return json(
 				{ success: false, error: stderr.trim() },
@@ -113,12 +125,25 @@ export const POST: RequestHandler = async ({ params, request }) => {
 		});
 
 	} catch (error) {
+		const errorMessage = error instanceof Error ? error.message : String(error);
+
+		// Handle "already linked" case gracefully (UNIQUE constraint)
+		if (errorMessage.includes('UNIQUE constraint failed')) {
+			console.log(`[task-epic] Task ${taskId} already linked to an epic (duplicate dependency)`);
+			return json({
+				success: true,
+				message: `Task ${taskId} is already linked to this epic`,
+				taskId,
+				alreadyLinked: true
+			});
+		}
+
 		console.error('[task-epic] Error linking task to epic:', error);
 		return json(
 			{
 				success: false,
 				error: 'Failed to link task to epic',
-				message: error instanceof Error ? error.message : String(error)
+				message: errorMessage
 			},
 			{ status: 500 }
 		);
