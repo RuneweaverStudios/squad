@@ -100,6 +100,8 @@ export interface CompletionBundle {
 	humanActions?: HumanAction[];
 	suggestedTasks?: SuggestedTask[];
 	crossAgentIntel?: CrossAgentIntel;
+	/** Completion mode from agent - controls auto-kill/auto-spawn behavior */
+	completionMode?: 'review_required' | 'auto_proceed';
 }
 
 // Rich signal payload from jat-signal commands (working, review, needs_input, completing)
@@ -540,14 +542,18 @@ function handleSessionComplete(data: SessionEvent): void {
 	}
 
 	// Schedule auto-kill for completed session
-	// Two sources of auto-kill intent:
-	// 1. User clicked "Complete & Kill" button (tracked in pendingAutoKill store)
-	// 2. Priority-based auto-kill (from autoKillConfig settings)
+	// Three sources determine auto-kill behavior:
+	// 1. User clicked "Complete & Kill" button (tracked in pendingAutoKill store) → immediate kill
+	// 2. completionMode from signal:
+	//    - 'auto_proceed' (Epic Swarm): use priority-based auto-kill
+	//    - 'review_required' (one-off task): no auto-kill, wait for user review
+	// 3. Priority-based auto-kill (only if completionMode === 'auto_proceed' or not set)
 	const session = workSessionsState.sessions[sessionIndex];
 	const taskPriority = session.task?.priority ?? null;
 	const userWantsKill = hasPendingAutoKill(sessionName);
+	const completionMode = completionBundle.completionMode;
 
-	// User intent takes precedence over priority-based settings
+	// User intent takes precedence over everything
 	let autoKillDelay: number | null;
 	if (userWantsKill) {
 		// User explicitly wants kill - use immediate or very short delay
@@ -555,8 +561,12 @@ function handleSessionComplete(data: SessionEvent): void {
 		console.log(`[AutoKill] User intent: ${sessionName} will be killed immediately`);
 		// Clear the pending intent
 		clearPendingAutoKill(sessionName);
+	} else if (completionMode === 'review_required') {
+		// Agent signaled review_required - no auto-kill, user must explicitly kill
+		autoKillDelay = null;
+		console.log(`[AutoKill] completionMode=review_required: ${sessionName} will wait for user action`);
 	} else {
-		// Fall back to priority-based settings
+		// completionMode is 'auto_proceed' or not set - use priority-based settings
 		autoKillDelay = getAutoKillDelay(taskPriority);
 	}
 
