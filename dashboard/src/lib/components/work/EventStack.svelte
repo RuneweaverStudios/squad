@@ -1365,7 +1365,6 @@
 							{:else if (event.state === 'working' || event.type === 'working') && event.data}
 								<WorkingSignalCard
 									signal={event.data as WorkingSignal}
-									compact={true}
 									onTaskClick={onTaskClick}
 									onFileClick={onFileClick}
 									onComplete={onComplete}
@@ -1373,7 +1372,6 @@
 							{:else if (event.state === 'review' || event.type === 'review') && event.data}
 								<ReviewSignalCard
 									signal={event.data as ReviewSignal}
-									compact={true}
 									onTaskClick={onTaskClick}
 									onFileClick={onFileClick}
 									onDiffClick={onDiffClick}
@@ -1384,14 +1382,12 @@
 							{:else if (event.state === 'needs_input' || event.type === 'needs_input' || event.type === 'question') && event.data}
 								<NeedsInputSignalCard
 									signal={event.data as NeedsInputSignal}
-									compact={true}
 									onSelectOption={onSelectOption}
 									onSubmitText={onSubmitText}
 								/>
 							{:else if (event.state === 'completing' || event.type === 'completing') && event.data}
 								<CompletingSignalCard
 									signal={event.data as CompletingSignal}
-									compact={true}
 									onTaskClick={onTaskClick}
 								/>
 							{:else if event.data}

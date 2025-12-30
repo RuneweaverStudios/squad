@@ -119,6 +119,7 @@ fi
 # Extract task_id from payload if present
 TASK_ID=$(echo "$PARSED_DATA" | jq -r '.taskId // ""' 2>/dev/null)
 TASK_ID="${TASK_ID:-}"
+echo "$(date -Iseconds) TASK_ID='$TASK_ID' from PARSED_DATA" >> "$DEBUG_LOG"
 
 # Determine if this is a state signal or data signal
 # State signals: working, review, needs_input, idle, completing, completed, starting, compacting, question
@@ -268,33 +269,63 @@ fi
 
 # Write per-task signal timeline for TaskDetailDrawer
 # Stored in .beads/signals/{taskId}.jsonl so it persists with the repo
+echo "$(date -Iseconds) Checking TASK_ID='$TASK_ID' for .beads/signals write" >> "$DEBUG_LOG"
 if [[ -n "$TASK_ID" ]]; then
-    # Find the project root by checking each search directory for .beads/
+    echo "$(date -Iseconds) TASK_ID is set, searching for .beads/ in SEARCH_DIRS" >> "$DEBUG_LOG"
+
+    # Extract project prefix from task ID (e.g., "jat-abc" -> "jat")
+    TASK_PROJECT=""
+    if [[ "$TASK_ID" =~ ^([a-zA-Z0-9_-]+)- ]]; then
+        TASK_PROJECT="${BASH_REMATCH[1]}"
+        echo "$(date -Iseconds) Task project prefix: $TASK_PROJECT" >> "$DEBUG_LOG"
+    fi
+
+    # Find the project root - prioritize project matching task ID prefix
+    TARGET_DIR=""
+    FALLBACK_DIR=""
     for BASE_DIR in $SEARCH_DIRS; do
         if [[ -d "${BASE_DIR}/.beads" ]]; then
-            SIGNALS_DIR="${BASE_DIR}/.beads/signals"
-            mkdir -p "$SIGNALS_DIR" 2>/dev/null || true
-
-            # Add agent name to the signal for task context
-            AGENT_FROM_TMUX=""
-            if [[ -n "$TMUX_SESSION" ]] && [[ "$TMUX_SESSION" =~ ^jat-(.+)$ ]]; then
-                AGENT_FROM_TMUX="${BASH_REMATCH[1]}"
+            DIR_NAME=$(basename "$BASE_DIR")
+            echo "$(date -Iseconds) Found .beads/ at $BASE_DIR (dir name: $DIR_NAME)" >> "$DEBUG_LOG"
+            # If directory name matches task project prefix, use it
+            if [[ -n "$TASK_PROJECT" ]] && [[ "$DIR_NAME" == "$TASK_PROJECT" ]]; then
+                TARGET_DIR="$BASE_DIR"
+                echo "$(date -Iseconds) Matched project by task prefix!" >> "$DEBUG_LOG"
+                break
             fi
-
-            # Enrich signal with agent name if available
-            if [[ -n "$AGENT_FROM_TMUX" ]]; then
-                TASK_SIGNAL_JSON=$(echo "$SIGNAL_JSON" | jq -c --arg agent "$AGENT_FROM_TMUX" '. + {agent_name: $agent}' 2>/dev/null || echo "$SIGNAL_JSON")
-            else
-                TASK_SIGNAL_JSON="$SIGNAL_JSON"
+            # Otherwise save first match as fallback
+            if [[ -z "$FALLBACK_DIR" ]]; then
+                FALLBACK_DIR="$BASE_DIR"
             fi
-
-            # Append to task-specific timeline
-            TASK_TIMELINE_FILE="${SIGNALS_DIR}/${TASK_ID}.jsonl"
-            echo "$TASK_SIGNAL_JSON" >> "$TASK_TIMELINE_FILE" 2>/dev/null || true
-
-            break  # Only write to first matching project
         fi
     done
+
+    # Use target dir or fall back to first found
+    CHOSEN_DIR="${TARGET_DIR:-$FALLBACK_DIR}"
+
+    if [[ -n "$CHOSEN_DIR" ]]; then
+        echo "$(date -Iseconds) Using project dir: $CHOSEN_DIR" >> "$DEBUG_LOG"
+        SIGNALS_DIR="${CHOSEN_DIR}/.beads/signals"
+        mkdir -p "$SIGNALS_DIR" 2>/dev/null || true
+
+        # Add agent name to the signal for task context
+        AGENT_FROM_TMUX=""
+        if [[ -n "$TMUX_SESSION" ]] && [[ "$TMUX_SESSION" =~ ^jat-(.+)$ ]]; then
+            AGENT_FROM_TMUX="${BASH_REMATCH[1]}"
+        fi
+
+        # Enrich signal with agent name if available
+        if [[ -n "$AGENT_FROM_TMUX" ]]; then
+            TASK_SIGNAL_JSON=$(echo "$SIGNAL_JSON" | jq -c --arg agent "$AGENT_FROM_TMUX" '. + {agent_name: $agent}' 2>/dev/null || echo "$SIGNAL_JSON")
+        else
+            TASK_SIGNAL_JSON="$SIGNAL_JSON"
+        fi
+
+        # Append to task-specific timeline
+        TASK_TIMELINE_FILE="${SIGNALS_DIR}/${TASK_ID}.jsonl"
+        echo "$(date -Iseconds) Writing to $TASK_TIMELINE_FILE" >> "$DEBUG_LOG"
+        echo "$TASK_SIGNAL_JSON" >> "$TASK_TIMELINE_FILE" 2>/dev/null || true
+    fi
 fi
 
 exit 0
