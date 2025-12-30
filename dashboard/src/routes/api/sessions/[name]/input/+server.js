@@ -8,6 +8,12 @@
  * - ctrl-d: Sends Ctrl+D (EOF)
  * - ctrl-u: Sends Ctrl+U (clear line)
  * - tab: Sends Tab key (for autocomplete)
+ * - enter: Sends Enter key
+ * - escape: Sends Escape key
+ * - up/down/left/right: Arrow keys (for navigation)
+ * - delete: Delete key (delete character forward)
+ * - backspace: Backspace key (delete character backward)
+ * - space: Space key (for toggling multi-select options)
  * - raw: Send exact keys without Enter
  */
 
@@ -114,6 +120,31 @@ export async function POST({ params, request }) {
 			case 'tab':
 				// Send Tab key (for autocomplete in terminal)
 				args = ['send-keys', '-t', sessionName, 'Tab'];
+				break;
+
+			case 'left':
+				// Send Left arrow
+				args = ['send-keys', '-t', sessionName, 'Left'];
+				break;
+
+			case 'right':
+				// Send Right arrow
+				args = ['send-keys', '-t', sessionName, 'Right'];
+				break;
+
+			case 'delete':
+				// Send Delete key (delete character forward)
+				args = ['send-keys', '-t', sessionName, 'DC'];
+				break;
+
+			case 'backspace':
+				// Send Backspace key (delete character backward)
+				args = ['send-keys', '-t', sessionName, 'BSpace'];
+				break;
+
+			case 'space':
+				// Send Space key (for toggling options in multi-select prompts)
+				args = ['send-keys', '-t', sessionName, 'Space'];
 				break;
 
 			case 'raw':

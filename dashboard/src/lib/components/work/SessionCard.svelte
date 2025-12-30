@@ -270,8 +270,10 @@
 		richSignalPayloadTimestamp?: number;
 		/** Whether session is in recovering state (automation rule triggered recovery) */
 		isRecovering?: boolean;
-		/** Whether session is exiting (triggers scale-out-hor-left animation) */
+		/** Whether session is exiting (triggers slide-out-bck-bottom animation) */
 		isExiting?: boolean;
+		/** Whether session is entering (triggers slide-in-fwd-top animation) */
+		isEntering?: boolean;
 	}
 
 	let {
@@ -335,6 +337,8 @@
 		isRecovering = false,
 		// Exit animation state
 		isExiting = false,
+		// Entrance animation state
+		isEntering = false,
 	}: Props = $props();
 
 	// Derived mode helpers
@@ -1515,6 +1519,7 @@
 	let submitFlash = $state(false); // Brief flash when command is submitted
 	let voiceFlash = $state(false); // Brief flash when voice recording starts/stops
 	let attachFlash = $state(false); // Brief flash when image is attached
+	let arrowFlash = $state(false); // Brief flash when arrow key navigates
 
 	// Live streaming input state
 	// When enabled, characters are streamed to terminal as user types
@@ -3872,6 +3877,20 @@
 				ArrowRight: "right",
 			};
 			onSendInput(keyMap[e.key], "key");
+			// Trigger visual flash feedback
+			arrowFlash = true;
+			setTimeout(() => {
+				arrowFlash = false;
+			}, 300);
+		} else if (
+			(e.key === "Delete" || e.key === "Backspace") &&
+			!inputText.trim() &&
+			onSendInput
+		) {
+			// Delete/Backspace: When input is empty, transmit to tmux
+			// (e.g., for terminal history editing or Claude Code input manipulation)
+			e.preventDefault();
+			onSendInput(e.key === "Delete" ? "delete" : "backspace", "key");
 		}
 		// Note: Ctrl+V is handled by onpaste event, not here
 	}
@@ -4225,7 +4244,7 @@
 	<article
 		class="unified-agent-card p-2 rounded-lg relative overflow-visible {className} {isCompleteFlashing
 			? 'complete-flash-animation'
-			: ''} {isExiting ? 'session-exit' : ''}"
+			: ''} {isExiting ? 'session-exit' : ''} {isEntering ? 'session-entrance' : ''}"
 		class:ring-2={effectiveHighlighted ||
 			sessionState === "needs-input" ||
 			isCompleteFlashing}
@@ -4511,7 +4530,7 @@
 	<div
 		class="card h-full flex flex-col relative rounded-none {className} {effectiveHighlighted
 			? 'agent-highlight-flash ring-2 ring-info ring-offset-2 ring-offset-base-100'
-			: ''} {isCompleteFlashing ? 'complete-flash-animation' : ''} {isExiting ? 'session-exit' : ''}"
+			: ''} {isCompleteFlashing ? 'complete-flash-animation' : ''} {isExiting ? 'session-exit' : ''} {isEntering ? 'session-entrance' : ''}"
 		style="
 			background: linear-gradient(135deg, oklch(0.22 0.02 250) 0%, oklch(0.18 0.01 250) 50%, oklch(0.16 0.01 250) 100%);
 			border: 1px solid {isCompleteFlashing
@@ -5456,7 +5475,7 @@
 
 			<!-- Input Section (z-[55] to layer above collapsed AND expanded EventStack z-50) -->
 			<div
-				class="relative px-3 py-2 flex-shrink-0 z-[45]"
+				class="relative px-3 py-2 flex-shrink-0 z-[35]"
 				style="border-top: 1px solid oklch(0.5 0 0 / 0.08); background: oklch(0.18 0.01 250);"
 			>
 				<!-- Attached Files Preview -->
@@ -6605,7 +6624,7 @@
 							class="textarea textarea-xs w-full font-mono pr-6 resize-none overflow-hidden leading-tight {liveStreamEnabled &&
 							inputText
 								? 'ring-1 ring-info/50'
-								: ''} {escapeFlash ? 'escape-flash' : ''} {pasteFlash ? 'paste-flash' : ''} {tabFlash ? 'tab-flash' : ''} {copyFlash ? 'copy-flash' : ''} {submitFlash ? 'submit-flash' : ''} {voiceFlash ? 'voice-flash' : ''} {attachFlash ? 'attach-flash' : ''}"
+								: ''} {escapeFlash ? 'escape-flash' : ''} {pasteFlash ? 'paste-flash' : ''} {tabFlash ? 'tab-flash' : ''} {copyFlash ? 'copy-flash' : ''} {submitFlash ? 'submit-flash' : ''} {voiceFlash ? 'voice-flash' : ''} {attachFlash ? 'attach-flash' : ''} {arrowFlash ? 'arrow-flash' : ''}"
 							style="background: oklch(0.22 0.02 250); border: 1px solid oklch(0.30 0.02 250); color: oklch(0.80 0.02 250); min-height: 24px; max-height: 96px;"
 							disabled={sendingInput || !onSendInput}
 							data-session-input="true"

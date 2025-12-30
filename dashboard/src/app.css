@@ -291,6 +291,22 @@
 	animation: slide-out-bck-bottom 0.5s cubic-bezier(0.550, 0.085, 0.680, 0.530) both;
 }
 
+/* Session card slide-in entrance animation (for new sessions appearing in grid) */
+@keyframes slide-in-fwd-top {
+	0% {
+		transform: translateZ(-1100px) translateY(-1000px);
+		opacity: 0;
+	}
+	100% {
+		transform: translateZ(0) translateY(0);
+		opacity: 1;
+	}
+}
+
+.session-entrance {
+	animation: slide-in-fwd-top 0.5s cubic-bezier(0.250, 0.460, 0.450, 0.940) both;
+}
+
 /* Task starting work animation (green glow) */
 @keyframes task-starting {
 	0% {
@@ -545,15 +561,15 @@
    See lines 53-93 for variable definitions.
    ========================================================================== */
 
-/* Escape/Clear flash - uses --anim-error (red) for cancel/clear actions */
+/* Escape/Clear flash - uses --anim-secondary (purple) for cancel/clear actions */
 @keyframes escape-flash {
 	0% {
-		border-color: var(--anim-error);
-		box-shadow: 0 0 8px 2px color-mix(in oklch, var(--anim-error) 60%, transparent);
+		border-color: var(--anim-secondary);
+		box-shadow: 0 0 8px 2px color-mix(in oklch, var(--anim-secondary) 60%, transparent);
 	}
 	50% {
-		border-color: var(--anim-error-dim);
-		box-shadow: 0 0 12px 3px color-mix(in oklch, var(--anim-error-dim) 40%, transparent);
+		border-color: var(--anim-secondary-dim);
+		box-shadow: 0 0 12px 3px color-mix(in oklch, var(--anim-secondary-dim) 40%, transparent);
 	}
 	100% {
 		border-color: var(--anim-base-hover);
@@ -603,6 +619,26 @@
 
 .tab-flash {
 	animation: tab-flash 0.3s ease-out forwards;
+}
+
+/* Arrow navigation flash - uses --anim-primary-dim (subtle blue) for cursor movement */
+@keyframes arrow-flash {
+	0% {
+		border-color: var(--anim-primary-dim);
+		box-shadow: 0 0 4px 1px color-mix(in oklch, var(--anim-primary-dim) 40%, transparent);
+	}
+	50% {
+		border-color: var(--anim-primary-dim);
+		box-shadow: 0 0 6px 2px color-mix(in oklch, var(--anim-primary-dim) 25%, transparent);
+	}
+	100% {
+		border-color: var(--anim-base-hover);
+		box-shadow: none;
+	}
+}
+
+.arrow-flash {
+	animation: arrow-flash 0.2s ease-out forwards;
 }
 
 /* Copy flash - uses --anim-success (green) for successful copy */
