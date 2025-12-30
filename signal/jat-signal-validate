@@ -11,7 +11,6 @@
 #   jat-signal-validate completing '{"taskId":"...","currentStep":"..."}'
 #   jat-signal-validate starting '{"agentName":"...",...}'
 #   jat-signal-validate compacting '{"reason":"...","contextSizeBefore":...}'
-#   jat-signal-validate auto_proceed '{"taskId":"...",...}'
 #   jat-signal-validate question '{"question":"...","questionType":"choice",...}'
 #
 # Returns:
@@ -39,7 +38,6 @@ show_usage() {
     echo "  completing  - Validate rich completing signal"
     echo "  starting    - Validate rich starting signal"
     echo "  compacting  - Validate rich compacting signal"
-    echo "  auto_proceed - Validate rich auto_proceed signal"
     echo "  question    - Validate question signal for dashboard"
     echo ""
     echo "Examples:"
@@ -841,31 +839,6 @@ validate_compacting() {
     return 0
 }
 
-validate_auto_proceed() {
-    local payload="$1"
-
-    # Must be an object
-    if ! echo "$payload" | jq -e 'type == "object"' >/dev/null 2>&1; then
-        echo "Error: auto_proceed signal must be a JSON object" >&2
-        return 1
-    fi
-
-    # Required: taskId
-    if ! echo "$payload" | jq -e 'has("taskId")' >/dev/null 2>&1; then
-        echo "Error: auto_proceed signal missing required field 'taskId'" >&2
-        return 1
-    fi
-
-    local task_id
-    task_id=$(echo "$payload" | jq -r '.taskId // ""')
-    if [[ -z "$task_id" ]]; then
-        echo "Error: auto_proceed.taskId cannot be empty" >&2
-        return 1
-    fi
-
-    return 0
-}
-
 validate_question() {
     local payload="$1"
 
@@ -1232,15 +1205,12 @@ case "$SIGNAL_TYPE" in
     compacting)
         validate_compacting "$PAYLOAD"
         ;;
-    auto_proceed)
-        validate_auto_proceed "$PAYLOAD"
-        ;;
     question)
         validate_question "$PAYLOAD"
         ;;
     *)
         echo "Error: Unknown signal type '$SIGNAL_TYPE'" >&2
-        echo "Valid types: complete, working, review, needs_input, idle, completing, starting, compacting, auto_proceed, question" >&2
+        echo "Valid types: complete, working, review, needs_input, idle, completing, starting, compacting, question" >&2
         exit 2
         ;;
 esac

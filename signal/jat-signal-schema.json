@@ -5,7 +5,7 @@
   "definitions": {
     "signalState": {
       "type": "string",
-      "enum": ["working", "review", "idle", "auto_proceed", "needs_input", "starting", "compacting", "completing"],
+      "enum": ["working", "review", "idle", "needs_input", "starting", "compacting", "completing"],
       "description": "Valid state signal values"
     },
     "estimatedScope": {
@@ -787,22 +787,6 @@
           "type": "array",
           "items": { "type": "string" },
           "description": "Key context items being preserved"
-        }
-      }
-    },
-    "autoProceedSignal": {
-      "type": "object",
-      "description": "Auto proceed signal for automatic task closure",
-      "required": ["taskId"],
-      "additionalProperties": false,
-      "properties": {
-        "taskId": {
-          "type": "string",
-          "description": "Task ID that was completed"
-        },
-        "nextTaskId": {
-          "type": "string",
-          "description": "Next task to pick up"
         }
       }
     },
