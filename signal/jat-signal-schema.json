@@ -215,6 +215,30 @@
         },
         "crossAgentIntel": {
           "$ref": "#/definitions/crossAgentIntel"
+        },
+        "suggestedRename": {
+          "type": "string",
+          "description": "AI-suggested new title if task evolved/pivoted significantly"
+        },
+        "suggestedLabels": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "AI-suggested labels based on actual work done (e.g., auth, api, ui)"
+        },
+        "riskLevel": {
+          "type": "string",
+          "enum": ["low", "medium", "high"],
+          "description": "Risk level: low=routine, medium=core logic, high=breaking/security/data"
+        },
+        "breakingChanges": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of breaking changes introduced"
+        },
+        "documentationNeeds": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Documentation that needs updating (e.g., README, API docs)"
         }
       }
     },

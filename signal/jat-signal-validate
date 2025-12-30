@@ -1138,9 +1138,66 @@ validate_complete() {
         fi
     fi
 
+    # Validate suggestedRename if present and not null (should be string)
+    if echo "$payload" | jq -e 'has("suggestedRename") and .suggestedRename != null' >/dev/null 2>&1; then
+        if ! echo "$payload" | jq -e '.suggestedRename | type == "string"' >/dev/null 2>&1; then
+            echo "Error: complete.suggestedRename must be a string" >&2
+            return 1
+        fi
+    fi
+
+    # Validate suggestedLabels if present and not null (array of strings)
+    if echo "$payload" | jq -e 'has("suggestedLabels") and .suggestedLabels != null' >/dev/null 2>&1; then
+        if ! echo "$payload" | jq -e '.suggestedLabels | type == "array"' >/dev/null 2>&1; then
+            echo "Error: complete.suggestedLabels must be an array" >&2
+            return 1
+        fi
+        if ! echo "$payload" | jq -e '.suggestedLabels | all(type == "string")' >/dev/null 2>&1; then
+            echo "Error: complete.suggestedLabels must contain only strings" >&2
+            return 1
+        fi
+    fi
+
+    # Validate riskLevel if present
+    local risk_level
+    risk_level=$(echo "$payload" | jq -r '.riskLevel // ""')
+    if [[ -n "$risk_level" ]]; then
+        case "$risk_level" in
+            low|medium|high) ;;
+            *)
+                echo "Error: complete.riskLevel must be one of: low, medium, high" >&2
+                return 1
+                ;;
+        esac
+    fi
+
+    # Validate breakingChanges if present and not null (array of strings)
+    if echo "$payload" | jq -e 'has("breakingChanges") and .breakingChanges != null' >/dev/null 2>&1; then
+        if ! echo "$payload" | jq -e '.breakingChanges | type == "array"' >/dev/null 2>&1; then
+            echo "Error: complete.breakingChanges must be an array" >&2
+            return 1
+        fi
+        if ! echo "$payload" | jq -e '.breakingChanges | all(type == "string")' >/dev/null 2>&1; then
+            echo "Error: complete.breakingChanges must contain only strings" >&2
+            return 1
+        fi
+    fi
+
+    # Validate documentationNeeds if present and not null (array of strings)
+    if echo "$payload" | jq -e 'has("documentationNeeds") and .documentationNeeds != null' >/dev/null 2>&1; then
+        if ! echo "$payload" | jq -e '.documentationNeeds | type == "array"' >/dev/null 2>&1; then
+            echo "Error: complete.documentationNeeds must be an array" >&2
+            return 1
+        fi
+        if ! echo "$payload" | jq -e '.documentationNeeds | all(type == "string")' >/dev/null 2>&1; then
+            echo "Error: complete.documentationNeeds must contain only strings" >&2
+            return 1
+        fi
+    fi
+
     # Check for unknown fields
     local unknown
-    unknown=$(echo "$payload" | jq -r 'keys - ["taskId","agentName","completionMode","nextTaskId","nextTaskTitle","summary","quality","humanActions","suggestedTasks","crossAgentIntel"] | .[0] // ""')
+    unknown=$(echo "$payload" | jq -r 'keys - ["taskId","agentName","completionMode","nextTaskId","nextTaskTitle","summary","quality","humanActions","suggestedTasks","crossAgentIntel","suggestedRename","suggestedLabels","riskLevel","breakingChanges","documentationNeeds"] | .[0] // ""')
     if [[ -n "$unknown" ]]; then
         echo "Error: complete has unknown field '$unknown'" >&2
         return 1
