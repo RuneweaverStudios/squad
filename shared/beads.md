@@ -258,6 +258,48 @@ When all children complete, the epic becomes a **verification task**:
 
 See `/jat:complete.md` for detailed epic completion templates.
 
+**Reopening Closed Epics:**
+
+The dashboard supports **auto-reopening closed epics** when you need to add more work to a completed feature:
+
+**How it works:**
+1. Dashboard shows both open AND closed epics in the "Add to Epic" dropdown
+2. Closed epics appear with visual indicators (📦 icon, "closed" badge, reduced opacity)
+3. When you select a closed epic to add a task, the epic is automatically reopened
+4. A toast notification confirms: "Task linked to epic (epic was reopened)"
+
+**When to use:**
+- **Follow-up bugs** - New bug found in a "completed" feature? Add to the original epic
+- **Polish tasks** - Need to add final touches? Reopen the feature epic
+- **Scope creep** - Requirements changed after closing? Add tasks to existing epic
+
+**Visual indicators in dropdown:**
+```
+Open epics:     [P1] jat-abc: User Auth System
+Closed epics:   [P1] 📦 jat-xyz: Payment Flow (closed)
+```
+
+**What happens on reopen:**
+- Epic status changes from `closed` to `open`
+- Epic is blocked again (depends on the new task)
+- Epic only becomes ready again when ALL tasks complete
+- No manual intervention needed - just select and link
+
+**API behavior:**
+```bash
+# Dashboard API automatically handles reopen
+POST /api/tasks/{taskId}/epic
+Body: { "epicId": "jat-xyz" }
+Response: { "success": true, "epicReopened": true, ... }
+```
+
+**CLI equivalent:**
+```bash
+# Manual steps if not using dashboard
+bd update jat-xyz --status open       # Reopen the epic
+bd dep add jat-xyz jat-newtask        # Add new task as dependency
+```
+
 **Nesting Levels (max 3):**
 ```
 jat-abc           (epic)
