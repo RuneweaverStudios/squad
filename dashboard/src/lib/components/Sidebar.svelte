@@ -116,12 +116,12 @@
 		<!-- Main navigation items -->
 		<nav class="flex-1 px-2 py-3 space-y-1">
 			<!-- PRIMARY: Main navigation (Tasks, Agents, Servers) -->
-			{#each unifiedNavConfig.navItems.filter(item => item.primary !== false) as navItem}
+			{#each unifiedNavConfig.navItems.filter(item => item.primary !== false) as navItem, index}
 				{@const active = isActive(navItem.href)}
 				<a
 					href={navItem.href}
 					class="w-full flex items-center gap-3 px-3 py-2.5 rounded transition-all duration-200 group
-						{$isSidebarCollapsed ? 'justify-center tooltip tooltip-right' : ''}
+						{$isSidebarCollapsed ? 'justify-center tooltip tooltip-right fade-in-left fade-in-delay-' + index : ''}
 						{active ? '' : 'industrial-hover'}"
 					style="
 						background: {active ? 'linear-gradient(90deg, oklch(0.70 0.18 240 / 0.2) 0%, transparent 100%)' : 'transparent'};
@@ -133,7 +133,7 @@
 				>
 					<!-- Icon with glow on active -->
 					<div
-						class="flex items-center justify-center w-6 h-6 rounded transition-all"
+						class="flex items-center justify-center w-6 h-6 rounded transition-all {$isSidebarCollapsed ? 'puff-in-center' : ''}"
 						style="
 							background: {active ? 'oklch(0.70 0.18 240 / 0.15)' : 'transparent'};
 							box-shadow: {active ? '0 0 10px oklch(0.70 0.18 240 / 0.3)' : 'none'};
@@ -155,11 +155,11 @@
 					<!-- Label (hidden when collapsed) -->
 					{#if !$isSidebarCollapsed}
 						<span
-							class="font-mono text-xs tracking-wider uppercase transition-colors
+							class="fade-in font-mono text-xs tracking-wider uppercase transition-colors
 								{active ? '' : 'group-hover:text-base-content/80'}"
 							style="text-shadow: {active ? '0 0 10px oklch(0.70 0.18 240 / 0.4)' : 'none'};"
 						>
-							{navItem.label}
+							<span class="tracking-in-expand">{navItem.label}</span>
 						</span>
 
 						<!-- Active indicator line (extended) -->
@@ -180,12 +180,13 @@
 			></div>
 
 			<!-- SECONDARY: Less prominent routes (Triage, Timeline, Kanban, Graph) -->
-			{#each unifiedNavConfig.navItems.filter(item => item.primary === false) as navItem}
+			{#each unifiedNavConfig.navItems.filter(item => item.primary === false) as navItem, index}
 				{@const active = isActive(navItem.href)}
+				{@const primaryCount = unifiedNavConfig.navItems.filter(item => item.primary !== false).length}
 				<a
 					href={navItem.href}
 					class="w-full flex items-center gap-3 px-3 py-2 rounded transition-all duration-200 group
-						{$isSidebarCollapsed ? 'justify-center tooltip tooltip-right' : ''}
+						{$isSidebarCollapsed ? 'justify-center tooltip tooltip-right fade-in-left fade-in-delay-' + (primaryCount + index) : ''}
 						{active ? '' : 'industrial-hover'}"
 					style="
 						background: {active ? 'linear-gradient(90deg, oklch(0.70 0.18 240 / 0.15) 0%, transparent 100%)' : 'transparent'};
@@ -197,7 +198,7 @@
 				>
 					<!-- Icon (smaller for secondary) -->
 					<div
-						class="flex items-center justify-center w-5 h-5 rounded transition-all"
+						class="flex items-center justify-center w-5 h-5 rounded transition-all {$isSidebarCollapsed ? 'puff-in-center' : ''}"
 						style="
 							background: {active ? 'oklch(0.70 0.18 240 / 0.1)' : 'transparent'};
 						"
@@ -218,11 +219,11 @@
 					<!-- Label (hidden when collapsed) -->
 					{#if !$isSidebarCollapsed}
 						<span
-							class="font-mono text-[10px] tracking-wider uppercase transition-colors
+							class="fade-in font-mono text-[10px] tracking-wider uppercase transition-colors
 								{active ? '' : 'group-hover:text-base-content/70'}"
 							style="color: {active ? 'oklch(0.70 0.10 240)' : 'oklch(0.50 0.02 250)'};"
 						>
-							{navItem.label}
+							<span class="tracking-in-expand">{navItem.label}</span>
 						</span>
 
 						<!-- Active indicator line (extended) -->
@@ -248,11 +249,12 @@
 			<!-- Settings link (Industrial) -->
 			{#if true}
 				{@const settingsActive = isActive('/settings')}
+				{@const totalNavItems = unifiedNavConfig.navItems.length}
 				<a
 					href="/settings"
 					aria-label="Settings"
 					class="w-full flex items-center gap-3 px-3 py-2.5 rounded transition-all duration-200 group
-						{$isSidebarCollapsed ? 'justify-center tooltip tooltip-right' : ''}
+						{$isSidebarCollapsed ? 'justify-center tooltip tooltip-right fade-in-left fade-in-delay-' + totalNavItems : ''}
 						{settingsActive ? '' : 'industrial-hover'}"
 					style="
 						background: {settingsActive ? 'linear-gradient(90deg, oklch(0.70 0.18 240 / 0.2) 0%, transparent 100%)' : 'transparent'};
@@ -262,7 +264,7 @@
 					"
 					data-tip="Settings"
 				>
-					<div class="flex items-center justify-center w-6 h-6">
+					<div class="flex items-center justify-center w-6 h-6 {$isSidebarCollapsed ? 'puff-in-center' : ''}">
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
 							fill="none"
@@ -277,11 +279,11 @@
 					</div>
 					{#if !$isSidebarCollapsed}
 						<span
-							class="font-mono text-xs tracking-wider uppercase transition-colors
+							class="fade-in font-mono text-xs tracking-wider uppercase transition-colors
 								{settingsActive ? '' : 'group-hover:text-base-content/70'}"
 							style="text-shadow: {settingsActive ? '0 0 10px oklch(0.70 0.18 240 / 0.4)' : 'none'};"
 						>
-							Settings
+							<span class="tracking-in-expand">Settings</span>
 						</span>
 					{/if}
 				</a>
@@ -292,12 +294,12 @@
 				onclick={toggleHelp}
 				aria-label="Show help guide"
 				class="w-full flex items-center gap-3 px-3 py-2.5 rounded transition-all duration-200 group
-					{$isSidebarCollapsed ? 'justify-center tooltip tooltip-right' : ''}
+					{$isSidebarCollapsed ? 'justify-center tooltip tooltip-right fade-in-left fade-in-delay-' + (unifiedNavConfig.navItems.length + 1) : ''}
 					industrial-hover"
 				style="color: oklch(0.60 0.02 250);"
 				data-tip="Help & Shortcuts"
 			>
-				<div class="flex items-center justify-center w-6 h-6">
+				<div class="flex items-center justify-center w-6 h-6 {$isSidebarCollapsed ? 'puff-in-center' : ''}">
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
 						fill="none"
@@ -311,8 +313,8 @@
 					</svg>
 				</div>
 				{#if !$isSidebarCollapsed}
-					<span class="font-mono text-xs tracking-wider uppercase group-hover:text-base-content/70">
-						Help
+					<span class="fade-in font-mono text-xs tracking-wider uppercase group-hover:text-base-content/70">
+						<span class="tracking-in-expand">Help</span>
 					</span>
 				{/if}
 			</button>
