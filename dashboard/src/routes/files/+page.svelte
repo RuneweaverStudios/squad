@@ -30,6 +30,7 @@
 		path: string;
 		port: number | null;
 		description: string | null;
+		activeColor: string | null;
 	}
 
 	// State
@@ -37,6 +38,13 @@
 	let selectedProject = $state<string | null>(null);
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
+
+	// Derived: selected project's color
+	const selectedProjectColor = $derived(
+		selectedProject
+			? projects.find(p => p.name === selectedProject)?.activeColor || null
+			: null
+	);
 
 	// File tree state
 	let expandedFolders = $state<Set<string>>(new Set());
@@ -619,6 +627,13 @@
 				<!-- Project Selector Dropdown -->
 				<div class="dropdown dropdown-end">
 					<button class="project-selector" tabindex="0">
+						<!-- Project color dot -->
+						{#if selectedProjectColor}
+							<span
+								class="w-2.5 h-2.5 rounded-full flex-shrink-0"
+								style="background: {selectedProjectColor};"
+							></span>
+						{/if}
 						<span class="project-name">{selectedProjectDisplay}</span>
 						{#if selectedProjectPath}
 							<span class="project-path">{selectedProjectPath}</span>
@@ -636,8 +651,15 @@
 									class:active={selectedProject === project.name}
 									onclick={() => { handleProjectChange(project.name); }}
 								>
-									<span class="font-medium">{project.displayName}</span>
-									<span class="text-xs text-base-content/50 truncate w-full">{project.path}</span>
+									<div class="flex items-center gap-2">
+										<!-- Project color dot -->
+										<span
+											class="w-2 h-2 rounded-full flex-shrink-0"
+											style="background: {project.activeColor || 'oklch(0.60 0.15 145)'};"
+										></span>
+										<span class="font-medium">{project.displayName}</span>
+									</div>
+									<span class="text-xs text-base-content/50 truncate w-full pl-4">{project.path}</span>
 								</button>
 							</li>
 						{/each}
