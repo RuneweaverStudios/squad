@@ -80,7 +80,7 @@
 
 	<!-- Sidebar content -->
 	<div
-		class="flex h-screen flex-col transition-all duration-200 relative {$isSidebarCollapsed ? 'w-14 overflow-visible' : 'w-64 overflow-hidden'}"
+		class="flex h-screen flex-col transition-all duration-200 relative {$isSidebarCollapsed ? 'w-14 overflow-visible' : 'w-36 overflow-hidden'}"
 		style="
 			background: linear-gradient(180deg, oklch(0.22 0.01 250) 0%, oklch(0.18 0.01 250) 100%);
 		"

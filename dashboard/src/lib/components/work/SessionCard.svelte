@@ -6645,10 +6645,10 @@
 						<!-- Text exit animation overlay -->
 						{#if exitingText}
 							<div
-								class="absolute inset-0 flex items-center px-2 font-mono text-exit-animation overflow-hidden"
-								style="background: oklch(0.22 0.02 250); color: oklch(0.80 0.02 250); font-size: 0.75rem; perspective: 500px; transform-style: preserve-3d;"
+								class="absolute inset-0 flex items-center px-2 font-mono overflow-hidden"
+								style="background: oklch(0.22 0.02 250); color: oklch(0.80 0.02 250); font-size: 0.75rem; perspective: 500px;"
 							>
-								<span class="truncate">{exitingText}</span>
+								<span class="text-exit-animation" style="transform-origin: center center; display: inline-block;">{exitingText}</span>
 							</div>
 						{/if}
 						{#if inputText.trim()}
