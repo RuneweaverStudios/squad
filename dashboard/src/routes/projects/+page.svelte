@@ -213,13 +213,13 @@
 	<div class="sticky top-0 z-30 bg-base-200 border-b border-base-300 px-6 py-4">
 		<div class="flex items-center justify-between">
 			<div>
-				<h1 class="text-2xl font-bold text-base-content">Projects</h1>
-				<p class="text-sm text-base-content/60 mt-1">
+				<h1 class="text-2xl font-bold font-mono uppercase tracking-wider text-base-content">Projects</h1>
+				<p class="text-xs font-mono text-base-content/60 mt-1 tracking-wide">
 					Manage your JAT projects and their configuration
 				</p>
 			</div>
 			<button
-				class="btn btn-primary"
+				class="btn btn-primary font-mono uppercase tracking-wider"
 				onclick={() => createDrawerOpen = true}
 			>
 				<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -246,46 +246,58 @@
 			<div class="space-y-4">
 				{#each projects as project (project.name)}
 					<div
-						class="card bg-base-100 shadow-md border border-base-300 hover:border-primary/30 transition-colors"
+						class="card bg-base-100 shadow-md border border-base-300 hover:border-primary/30 transition-colors relative overflow-hidden"
 						transition:fade={{ duration: 150 }}
 					>
-						<div class="card-body p-5">
+						<!-- Project color accent bar -->
+						<div
+							class="absolute left-0 top-0 bottom-0 w-1"
+							style="background-color: {project.active_color || '#6b7280'}"
+						></div>
+
+						<div class="card-body p-5 pl-6">
 							<!-- Header Row -->
 							<div class="flex items-start justify-between gap-4">
 								<div class="flex items-center gap-3">
-									<!-- Status indicator -->
+									<!-- Project color indicator -->
 									<div
-										class="w-3 h-3 rounded-full {project.stats?.hasBeads ? 'bg-success' : 'bg-base-300'}"
-										title={project.stats?.hasBeads ? 'Beads initialized' : 'Beads not initialized'}
+										class="w-4 h-4 rounded-full ring-2 ring-base-content/10"
+										style="background-color: {project.active_color || '#6b7280'}"
+										title="Project color"
 									></div>
 									<div>
-										<h2 class="text-lg font-semibold text-base-content">
+										<h2 class="text-lg font-semibold font-mono uppercase tracking-wide text-base-content">
 											{project.displayName || project.name}
 										</h2>
 										{#if project.displayName && project.displayName !== project.name}
-											<span class="text-xs text-base-content/50">{project.name}</span>
+											<span class="text-xs font-mono text-base-content/50">{project.name}</span>
 										{/if}
 									</div>
+									<!-- Warning indicator for missing Beads (subtle) -->
+									{#if !project.stats?.hasBeads}
+										<button
+											class="badge badge-warning badge-sm gap-1 cursor-pointer hover:badge-outline"
+											onclick={() => initBeads(project)}
+											title="Click to initialize Beads"
+										>
+											<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+												<path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+											</svg>
+											No Beads
+										</button>
+									{/if}
 								</div>
 
 								<!-- Actions -->
 								<div class="flex items-center gap-2">
-									{#if !project.stats?.hasBeads}
-										<button
-											class="btn btn-sm btn-outline btn-warning"
-											onclick={() => initBeads(project)}
-										>
-											Init Beads
-										</button>
-									{/if}
 									<button
-										class="btn btn-sm btn-ghost"
+										class="btn btn-sm btn-ghost font-mono text-xs"
 										onclick={() => openEditDrawer(project)}
 									>
 										Edit
 									</button>
 									<button
-										class="btn btn-sm btn-ghost text-base-content/60"
+										class="btn btn-sm btn-ghost text-base-content/60 font-mono text-xs"
 										onclick={() => confirmAction = { type: 'hide', project }}
 									>
 										Hide
@@ -296,24 +308,24 @@
 							<!-- Details -->
 							<div class="mt-3 grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
 								<div class="text-base-content/60">
-									<span class="font-medium">Path:</span>
+									<span class="text-xs font-mono uppercase tracking-wider text-base-content/50">Path:</span>
 									<span class="ml-2 font-mono text-base-content/80">{project.path}</span>
 								</div>
 								{#if project.port}
 									<div class="text-base-content/60">
-										<span class="font-medium">Port:</span>
-										<span class="ml-2">{project.port}</span>
+										<span class="text-xs font-mono uppercase tracking-wider text-base-content/50">Port:</span>
+										<span class="ml-2 font-mono">{project.port}</span>
 									</div>
 								{/if}
 								{#if project.server_path && project.server_path !== project.path}
 									<div class="text-base-content/60">
-										<span class="font-medium">Server:</span>
+										<span class="text-xs font-mono uppercase tracking-wider text-base-content/50">Server:</span>
 										<span class="ml-2 font-mono text-base-content/80">{project.server_path}</span>
 									</div>
 								{/if}
 								{#if project.description}
 									<div class="text-base-content/60 col-span-2">
-										<span class="font-medium">Description:</span>
+										<span class="text-xs font-mono uppercase tracking-wider text-base-content/50">Description:</span>
 										<span class="ml-2">{project.description}</span>
 									</div>
 								{/if}
@@ -321,7 +333,7 @@
 
 							<!-- Status Badges -->
 							<div class="mt-4 flex flex-wrap gap-2">
-								<div class="badge {project.stats?.hasBeads ? 'badge-success' : 'badge-ghost'} gap-1">
+								<div class="badge {project.stats?.hasBeads ? 'badge-success' : 'badge-ghost'} gap-1 font-mono text-xs">
 									{#if project.stats?.hasBeads}
 										<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
 											<path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
@@ -334,14 +346,14 @@
 									Beads
 								</div>
 
-								<div class="badge badge-ghost gap-1">
+								<div class="badge badge-ghost gap-1 font-mono text-xs">
 									<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
 										<path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
 									</svg>
 									{project.stats?.agentCount ?? 0} agents
 								</div>
 
-								<div class="badge badge-ghost gap-1">
+								<div class="badge badge-ghost gap-1 font-mono text-xs">
 									<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
 										<path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
 										<path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd" />
@@ -349,7 +361,7 @@
 									{project.stats?.openTaskCount ?? 0}/{project.stats?.taskCount ?? 0} tasks
 								</div>
 
-								<div class="badge {project.stats?.serverRunning ? 'badge-success' : 'badge-ghost'} gap-1">
+								<div class="badge {project.stats?.serverRunning ? 'badge-success' : 'badge-ghost'} gap-1 font-mono text-xs">
 									{#if project.stats?.serverRunning}
 										<span class="w-2 h-2 rounded-full bg-success animate-pulse"></span>
 									{:else}
@@ -364,9 +376,9 @@
 
 				{#if projects.length === 0}
 					<div class="text-center py-12">
-						<div class="text-base-content/40 text-lg mb-4">No projects configured</div>
+						<div class="text-base-content/40 text-lg font-mono uppercase tracking-wider mb-4">No projects configured</div>
 						<button
-							class="btn btn-primary"
+							class="btn btn-primary font-mono uppercase tracking-wider"
 							onclick={() => createDrawerOpen = true}
 						>
 							Add Your First Project
@@ -390,33 +402,38 @@
 						>
 							<path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
 						</svg>
-						<span class="font-medium">Hidden Projects ({hiddenProjects.length})</span>
+						<span class="font-mono uppercase tracking-wider text-sm">Hidden Projects ({hiddenProjects.length})</span>
 					</button>
 
 					{#if showHidden}
 						<div class="mt-4 space-y-3" transition:slide={{ duration: 200 }}>
 							{#each hiddenProjects as project (project.name)}
-								<div class="card bg-base-100/50 border border-base-300 p-4">
-									<div class="flex items-center justify-between">
+								<div class="card bg-base-100/50 border border-base-300 p-4 relative overflow-hidden">
+									<!-- Faded project color bar -->
+									<div
+										class="absolute left-0 top-0 bottom-0 w-1 opacity-40"
+										style="background-color: {project.active_color || '#6b7280'}"
+									></div>
+									<div class="flex items-center justify-between pl-4">
 										<div class="flex items-center gap-3">
-											<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-base-content/40" viewBox="0 0 20 20" fill="currentColor">
-												<path fill-rule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z" clip-rule="evenodd" />
-												<path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.065 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
-											</svg>
+											<div
+												class="w-3 h-3 rounded-full opacity-50"
+												style="background-color: {project.active_color || '#6b7280'}"
+											></div>
 											<div>
-												<span class="font-medium text-base-content/70">{project.displayName || project.name}</span>
-												<span class="text-sm text-base-content/50 ml-2 font-mono">{project.path}</span>
+												<span class="font-mono uppercase tracking-wide text-base-content/70">{project.displayName || project.name}</span>
+												<span class="text-xs text-base-content/50 ml-2 font-mono">{project.path}</span>
 											</div>
 										</div>
 										<div class="flex items-center gap-2">
 											<button
-												class="btn btn-sm btn-ghost"
+												class="btn btn-sm btn-ghost font-mono text-xs"
 												onclick={() => toggleVisibility(project, true)}
 											>
 												Unhide
 											</button>
 											<button
-												class="btn btn-sm btn-ghost text-error/70"
+												class="btn btn-sm btn-ghost text-error/70 font-mono text-xs"
 												onclick={() => confirmAction = { type: 'remove', project }}
 											>
 												Remove
@@ -445,10 +462,25 @@
 		<input type="checkbox" class="drawer-toggle" checked={editDrawerOpen} />
 		<div class="drawer-side">
 			<label class="drawer-overlay" onclick={closeEditDrawer}></label>
-			<div class="bg-base-100 w-96 min-h-full p-6 shadow-2xl">
-				<!-- Header -->
-				<div class="flex items-center justify-between mb-6">
-					<h3 class="text-lg font-bold">Edit Project</h3>
+			<!-- Drawer Panel with industrial styling -->
+			<div class="h-full w-full max-w-md flex flex-col shadow-2xl bg-base-300 border-l border-base-content/30">
+				<!-- Header with accent bar -->
+				<div class="flex items-center justify-between p-6 relative bg-base-200 border-b border-base-content/30">
+					<!-- Project color accent bar -->
+					<div
+						class="absolute left-0 top-0 bottom-0 w-1"
+						style="background: linear-gradient(to bottom, {editingProject.active_color || '#6b7280'}, {editingProject.active_color || '#6b7280'}80)"
+					></div>
+
+					<div class="flex items-center gap-3 pl-2">
+						<div
+							class="w-4 h-4 rounded-full ring-2 ring-base-content/10"
+							style="background-color: {editForm.active_color || '#6b7280'}"
+						></div>
+						<h2 class="text-xl font-bold font-mono uppercase tracking-wider text-base-content">
+							Edit Project
+						</h2>
+					</div>
 					<button class="btn btn-sm btn-ghost btn-circle" onclick={closeEditDrawer}>
 						<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
 							<path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
@@ -456,108 +488,116 @@
 					</button>
 				</div>
 
-				<!-- Form -->
-				<div class="space-y-4">
-					<div class="form-control">
-						<label class="label">
-							<span class="label-text font-medium">Display Name</span>
-						</label>
-						<input
-							type="text"
-							class="input input-bordered"
-							bind:value={editForm.displayName}
-							placeholder={editingProject.name}
-						/>
-					</div>
+				<!-- Scrollable Content -->
+				<div class="flex-1 overflow-y-auto p-6 flex flex-col min-h-0 bg-base-300">
+					<div class="space-y-5">
+						<!-- Display Name -->
+						<div class="form-control">
+							<label class="label-text text-xs font-semibold font-mono uppercase tracking-wider text-base-content/70 mb-2">
+								Display Name
+							</label>
+							<input
+								type="text"
+								class="input input-bordered bg-base-100 font-mono"
+								bind:value={editForm.displayName}
+								placeholder={editingProject.name}
+							/>
+						</div>
 
-					<div class="form-control">
-						<label class="label">
-							<span class="label-text font-medium">Path</span>
-							<span class="label-text-alt text-error">*</span>
-						</label>
-						<input
-							type="text"
-							class="input input-bordered font-mono text-sm"
-							bind:value={editForm.path}
-							required
-						/>
-					</div>
+						<!-- Path -->
+						<div class="form-control">
+							<label class="label-text text-xs font-semibold font-mono uppercase tracking-wider text-base-content/70 mb-2 flex items-center gap-2">
+								Path
+								<span class="text-error">*</span>
+							</label>
+							<input
+								type="text"
+								class="input input-bordered bg-base-100 font-mono text-sm"
+								bind:value={editForm.path}
+								required
+							/>
+						</div>
 
-					<div class="form-control">
-						<label class="label">
-							<span class="label-text font-medium">Dev Server Port</span>
-						</label>
-						<input
-							type="number"
-							class="input input-bordered"
-							bind:value={editForm.port}
-							placeholder="3000"
-						/>
-					</div>
+						<!-- Port -->
+						<div class="form-control">
+							<label class="label-text text-xs font-semibold font-mono uppercase tracking-wider text-base-content/70 mb-2">
+								Dev Server Port
+							</label>
+							<input
+								type="number"
+								class="input input-bordered bg-base-100 font-mono"
+								bind:value={editForm.port}
+								placeholder="3000"
+							/>
+						</div>
 
-					<div class="form-control">
-						<label class="label">
-							<span class="label-text font-medium">Server Path</span>
-							<span class="label-text-alt text-base-content/50">if different from project path</span>
-						</label>
-						<input
-							type="text"
-							class="input input-bordered font-mono text-sm"
-							bind:value={editForm.server_path}
-							placeholder={editForm.path}
-						/>
-					</div>
+						<!-- Server Path -->
+						<div class="form-control">
+							<label class="label-text text-xs font-semibold font-mono uppercase tracking-wider text-base-content/70 mb-2">
+								Server Path
+								<span class="text-base-content/40 normal-case tracking-normal ml-1">(if different)</span>
+							</label>
+							<input
+								type="text"
+								class="input input-bordered bg-base-100 font-mono text-sm"
+								bind:value={editForm.server_path}
+								placeholder={editForm.path}
+							/>
+						</div>
 
-					<div class="form-control">
-						<label class="label">
-							<span class="label-text font-medium">Description</span>
-						</label>
-						<textarea
-							class="textarea textarea-bordered"
-							rows="2"
-							bind:value={editForm.description}
-							placeholder="Project description..."
-						></textarea>
-					</div>
+						<!-- Description -->
+						<div class="form-control">
+							<label class="label-text text-xs font-semibold font-mono uppercase tracking-wider text-base-content/70 mb-2">
+								Description
+							</label>
+							<textarea
+								class="textarea textarea-bordered bg-base-100"
+								rows="2"
+								bind:value={editForm.description}
+								placeholder="Project description..."
+							></textarea>
+						</div>
 
-					<div class="form-control">
-						<label class="label">
-							<span class="label-text font-medium">Badge Colors</span>
-						</label>
-						<div class="flex gap-4">
-							<div class="flex items-center gap-2">
-								<input
-									type="color"
-									class="w-8 h-8 rounded cursor-pointer"
-									bind:value={editForm.active_color}
-								/>
-								<span class="text-sm text-base-content/60">Active</span>
-							</div>
-							<div class="flex items-center gap-2">
-								<input
-									type="color"
-									class="w-8 h-8 rounded cursor-pointer"
-									bind:value={editForm.inactive_color}
-								/>
-								<span class="text-sm text-base-content/60">Inactive</span>
+						<!-- Badge Colors -->
+						<div class="form-control">
+							<label class="label-text text-xs font-semibold font-mono uppercase tracking-wider text-base-content/70 mb-3">
+								Badge Colors
+							</label>
+							<div class="flex gap-6">
+								<div class="flex items-center gap-3">
+									<input
+										type="color"
+										class="w-10 h-10 rounded-lg cursor-pointer border-2 border-base-content/10"
+										bind:value={editForm.active_color}
+									/>
+									<span class="text-xs font-mono uppercase tracking-wider text-base-content/60">Active</span>
+								</div>
+								<div class="flex items-center gap-3">
+									<input
+										type="color"
+										class="w-10 h-10 rounded-lg cursor-pointer border-2 border-base-content/10"
+										bind:value={editForm.inactive_color}
+									/>
+									<span class="text-xs font-mono uppercase tracking-wider text-base-content/60">Inactive</span>
+								</div>
 							</div>
 						</div>
-					</div>
 
-					{#if saveError}
-						<div class="alert alert-error text-sm py-2">
-							{saveError}
-						</div>
-					{/if}
+						{#if saveError}
+							<div class="alert alert-error text-sm py-2">
+								{saveError}
+							</div>
+						{/if}
+					</div>
 				</div>
 
 				<!-- Footer -->
-				<div class="mt-8 flex justify-end gap-3">
-					<button class="btn btn-ghost" onclick={closeEditDrawer}>
+				<div class="p-6 bg-base-200 border-t border-base-content/30 flex justify-end gap-3">
+					<button class="btn btn-ghost font-mono uppercase tracking-wider" onclick={closeEditDrawer}>
 						Cancel
 					</button>
 					<button
-						class="btn btn-primary"
+						class="btn btn-primary font-mono uppercase tracking-wider"
 						onclick={saveProject}
 						disabled={saving || !editForm.path}
 					>
@@ -575,33 +615,33 @@
 <!-- Confirmation Modal -->
 {#if confirmAction}
 	<div class="modal modal-open">
-		<div class="modal-box">
-			<h3 class="font-bold text-lg">
+		<div class="modal-box bg-base-300 border border-base-content/30">
+			<h3 class="font-bold text-lg font-mono uppercase tracking-wider">
 				{confirmAction.type === 'hide' ? 'Hide Project?' : 'Remove Project?'}
 			</h3>
 			<p class="py-4 text-base-content/70">
 				{#if confirmAction.type === 'hide'}
-					<strong>{confirmAction.project.displayName || confirmAction.project.name}</strong> will be hidden from the dashboard.
+					<strong class="font-mono">{confirmAction.project.displayName || confirmAction.project.name}</strong> will be hidden from the dashboard.
 					You can unhide it later from the Hidden Projects section.
 				{:else}
-					<strong>{confirmAction.project.displayName || confirmAction.project.name}</strong> will be removed from JAT.
+					<strong class="font-mono">{confirmAction.project.displayName || confirmAction.project.name}</strong> will be removed from JAT.
 					This only removes the configuration - your project files will not be deleted.
 				{/if}
 			</p>
 			<div class="modal-action">
-				<button class="btn btn-ghost" onclick={() => confirmAction = null}>
+				<button class="btn btn-ghost font-mono uppercase tracking-wider" onclick={() => confirmAction = null}>
 					Cancel
 				</button>
 				{#if confirmAction.type === 'hide'}
 					<button
-						class="btn btn-warning"
+						class="btn btn-warning font-mono uppercase tracking-wider"
 						onclick={() => toggleVisibility(confirmAction!.project, false)}
 					>
 						Hide Project
 					</button>
 				{:else}
 					<button
-						class="btn btn-error"
+						class="btn btn-error font-mono uppercase tracking-wider"
 						onclick={() => removeProject(confirmAction!.project)}
 					>
 						Remove Project

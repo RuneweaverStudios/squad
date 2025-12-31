@@ -642,7 +642,7 @@
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
 						</svg>
 					</button>
-					<ul tabindex="-1" class="dropdown-content bg-base-200 rounded-box shadow-xl border border-base-300 max-h-80 overflow-y-auto z-50 p-2">
+					<ul tabindex="-1" class="dropdown-content bg-base-200 rounded-box shadow-xl border border-base-300 max-h-80 overflow-y-auto z-50 p-2 project-name">
 						{#each projects as project (project.name)}
 							<button
 								class="flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-base-300 transition-colors text-left"
