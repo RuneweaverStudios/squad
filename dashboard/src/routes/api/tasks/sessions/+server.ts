@@ -8,6 +8,7 @@
 
 import { json } from '@sveltejs/kit';
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
+import { execSync } from 'child_process';
 import { join } from 'path';
 import type { RequestHandler } from './$types';
 
@@ -32,7 +33,6 @@ function getProjectPath(): string {
 function getOnlineAgents(): Set<string> {
 	const online = new Set<string>();
 	try {
-		const { execSync } = require('child_process');
 		const result = execSync('tmux list-sessions -F "#{session_name}" 2>/dev/null || true', {
 			encoding: 'utf-8'
 		}).trim();

@@ -33,12 +33,19 @@ fi
 COMMAND=$(echo "$TOOL_INFO" | jq -r '.tool_input.command // ""' 2>/dev/null || echo "")
 echo "$(date -Iseconds) Command: ${COMMAND:0:80}" >> "$DEBUG_LOG"
 
-# Check if it's a jat-signal command
-if ! echo "$COMMAND" | grep -q '^jat-signal '; then
-    echo "$(date -Iseconds) Not jat-signal, exiting" >> "$DEBUG_LOG"
+# Extract the tool output first - check if it contains a signal marker
+OUTPUT=$(echo "$TOOL_INFO" | jq -r '.tool_response.stdout // ""' 2>/dev/null || echo "")
+
+# Check if output contains a jat-signal marker (regardless of what command was run)
+# This handles both direct jat-signal calls AND scripts that call jat-signal internally (like jat-step)
+if ! echo "$OUTPUT" | grep -qE '\[JAT-SIGNAL:[a-z_]+\]'; then
+    # No signal in output - check if it's a direct jat-signal command for debugging
+    if echo "$COMMAND" | grep -q 'jat-signal '; then
+        echo "$(date -Iseconds) jat-signal command but no marker in output" >> "$DEBUG_LOG"
+    fi
     exit 0
 fi
-echo "$(date -Iseconds) IS a jat-signal command!" >> "$DEBUG_LOG"
+echo "$(date -Iseconds) Found JAT-SIGNAL marker in output!" >> "$DEBUG_LOG"
 
 # Extract session ID
 SESSION_ID=$(echo "$TOOL_INFO" | jq -r '.session_id // ""' 2>/dev/null || echo "")
@@ -48,8 +55,7 @@ if [[ -z "$SESSION_ID" ]]; then
     exit 0
 fi
 
-# Extract the tool output (contains [JAT-SIGNAL:...] marker)
-OUTPUT=$(echo "$TOOL_INFO" | jq -r '.tool_response.stdout // ""' 2>/dev/null || echo "")
+# OUTPUT already extracted above when checking for signal marker
 
 # Check for validation warnings in stderr
 STDERR=$(echo "$TOOL_INFO" | jq -r '.tool_response.stderr // ""' 2>/dev/null || echo "")

@@ -24,6 +24,7 @@
 	import ResizableDivider from '$lib/components/ResizableDivider.svelte';
 	import SessionPanelSkeleton from '$lib/components/skeleton/SessionPanelSkeleton.svelte';
 	import WelcomeScreen from '$lib/components/WelcomeScreen.svelte';
+	import SortDropdown from '$lib/components/SortDropdown.svelte';
 	import {
 		workSessionsState,
 		fetch as fetchSessions,
@@ -1591,48 +1592,15 @@
 															<span class="badge badge-xs {isEpicCollapsed ? 'badge-primary' : 'badge-ghost'}">{groupFilter ? `${sortedEpicSessions.length}/${epicSessionList.length}` : epicSessionList.length}</span>
 														</button>
 
-														<!-- Sort dropdown -->
-														<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-														<div class="dropdown dropdown-end flex-shrink-0" onclick={(e) => e.stopPropagation()}>
-															<button
-																tabindex="0"
-																class="btn btn-xs btn-ghost gap-1 font-mono text-[10px] uppercase tracking-wider opacity-70 hover:opacity-100"
-																title="Sort sessions"
-															>
-																<span>{groupSortOption?.icon || '🔔'}</span>
-																<span class="hidden sm:inline">{groupSortOption?.label || 'State'}</span>
-																<span class="text-[9px]">{groupSort.sortDir === 'asc' ? '▲' : '▼'}</span>
-															</button>
-															<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-															<ul tabindex="0" class="dropdown-content menu menu-xs bg-base-200 rounded-box z-50 w-36 p-1 shadow-lg border border-base-300">
-																{#each SORT_OPTIONS as opt (opt.value)}
-																	<li>
-																		<button
-																			class="flex items-center gap-2 {groupSort.sortBy === opt.value ? 'active' : ''}"
-																			onclick={() => handleGroupSortClick(project, epicId, opt.value)}
-																		>
-																			<span>{opt.icon}</span>
-																			<span class="flex-1">{opt.label}</span>
-																			{#if groupSort.sortBy === opt.value}
-																				<span class="text-[9px] opacity-70">{groupSort.sortDir === 'asc' ? '▲' : '▼'}</span>
-																			{/if}
-																		</button>
-																	</li>
-																{/each}
-															</ul>
-														</div>
-
-														<!-- Filter input -->
-														<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-														<div class="flex-shrink-0" onclick={(e) => e.stopPropagation()}>
-															<input
-																type="text"
-																placeholder="Filter..."
-																value={groupFilter}
-																oninput={(e) => setGroupFilter(project, epicId, e.currentTarget.value)}
-																class="input input-xs input-bordered w-20 focus:w-32 transition-all duration-200 bg-base-200/50"
-															/>
-														</div>
+														<!-- Sort dropdown with filter -->
+														<SortDropdown
+															sortBy={groupSort.sortBy}
+															sortDir={groupSort.sortDir}
+															filterValue={groupFilter}
+															showFilter={true}
+															onSortChange={(value, dir) => setGroupSort(project, epicId, value as import('$lib/stores/workSort.svelte.js').SortOption, dir)}
+															onFilterChange={(value) => setGroupFilter(project, epicId, value)}
+														/>
 													</div>
 													<!-- Epic sessions (horizontal scroll) -->
 													{#if !isEpicCollapsed}
@@ -1722,48 +1690,15 @@
 																<span class="badge badge-xs {isOtherCollapsed ? 'badge-primary' : 'badge-ghost'}">{otherGroupFilter ? `${sortedOtherSessions.length}/${nonEpicSessions.length}` : nonEpicSessions.length}</span>
 															</button>
 
-															<!-- Sort dropdown -->
-															<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-															<div class="dropdown dropdown-end flex-shrink-0" onclick={(e) => e.stopPropagation()}>
-																<button
-																	tabindex="0"
-																	class="btn btn-xs btn-ghost gap-1 font-mono text-[10px] uppercase tracking-wider opacity-70 hover:opacity-100"
-																	title="Sort sessions"
-																>
-																	<span>{otherGroupSortOption?.icon || '🔔'}</span>
-																	<span class="hidden sm:inline">{otherGroupSortOption?.label || 'State'}</span>
-																	<span class="text-[9px]">{otherGroupSort.sortDir === 'asc' ? '▲' : '▼'}</span>
-																</button>
-																<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-																<ul tabindex="0" class="dropdown-content menu menu-xs bg-base-200 rounded-box z-50 w-36 p-1 shadow-lg border border-base-300">
-																	{#each SORT_OPTIONS as opt (opt.value)}
-																		<li>
-																			<button
-																				class="flex items-center gap-2 {otherGroupSort.sortBy === opt.value ? 'active' : ''}"
-																				onclick={() => handleGroupSortClick(project, 'other', opt.value)}
-																			>
-																				<span>{opt.icon}</span>
-																				<span class="flex-1">{opt.label}</span>
-																				{#if otherGroupSort.sortBy === opt.value}
-																					<span class="text-[9px] opacity-70">{otherGroupSort.sortDir === 'asc' ? '▲' : '▼'}</span>
-																				{/if}
-																			</button>
-																		</li>
-																	{/each}
-																</ul>
-															</div>
-
-															<!-- Filter input -->
-															<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-															<div class="flex-shrink-0" onclick={(e) => e.stopPropagation()}>
-																<input
-																	type="text"
-																	placeholder="Filter..."
-																	value={otherGroupFilter}
-																	oninput={(e) => setGroupFilter(project, 'other', e.currentTarget.value)}
-																	class="input input-xs input-bordered w-20 focus:w-32 transition-all duration-200 bg-base-200/50"
-																/>
-															</div>
+															<!-- Sort dropdown with filter -->
+															<SortDropdown
+																sortBy={otherGroupSort.sortBy}
+																sortDir={otherGroupSort.sortDir}
+																filterValue={otherGroupFilter}
+																showFilter={true}
+																onSortChange={(value, dir) => setGroupSort(project, 'other', value as import('$lib/stores/workSort.svelte.js').SortOption, dir)}
+																onFilterChange={(value) => setGroupFilter(project, 'other', value)}
+															/>
 														</div>
 													{:else}
 														<!-- Header with sort/filter controls (when no epic groups exist) -->
@@ -1773,42 +1708,17 @@
 															<span class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Sessions</span>
 															<span class="badge badge-xs badge-ghost">{otherGroupFilter ? `${sortedOtherSessions.length}/${nonEpicSessions.length}` : nonEpicSessions.length}</span>
 
-															<!-- Sort dropdown -->
-															<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-															<div class="dropdown dropdown-end flex-shrink-0 ml-auto" onclick={(e) => e.stopPropagation()}>
-																<button
-																	tabindex="0"
-																	class="btn btn-xs btn-ghost gap-1 font-mono text-[10px] uppercase tracking-wider opacity-70 hover:opacity-100"
-																	title="Sort sessions"
-																>
-																	<span>{otherGroupSortOption?.icon || '🔔'}</span>
-																	<span class="hidden sm:inline">{otherGroupSortOption?.label || 'State'}</span>
-																	<span class="text-[9px]">{otherGroupSort.sortDir === 'asc' ? '▲' : '▼'}</span>
-																</button>
-																<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-																<ul tabindex="0" class="dropdown-content menu menu-xs bg-base-200 rounded-box z-50 w-36 p-1 shadow-lg border border-base-300">
-																	{#each SORT_OPTIONS as opt (opt.value)}
-																		<li>
-																			<button
-																				class="flex items-center gap-2 {otherGroupSort.sortBy === opt.value ? 'active' : ''}"
-																				onclick={() => handleGroupSortClick(project, 'other', opt.value)}
-																			>
-																				<span>{opt.icon}</span>
-																				<span class="flex-1">{opt.label}</span>
-																				{#if otherGroupSort.sortBy === opt.value}
-																					<span class="text-[9px] opacity-70">{otherGroupSort.sortDir === 'asc' ? '▲' : '▼'}</span>
-																				{/if}
-																			</button>
-																		</li>
-																	{/each}
-																</ul>
+															<!-- Sort dropdown with filter (ml-auto for right alignment) -->
+															<div class="ml-auto">
+																<SortDropdown
+																	sortBy={otherGroupSort.sortBy}
+																	sortDir={otherGroupSort.sortDir}
+																	filterValue={otherGroupFilter}
+																	showFilter={true}
+																	onSortChange={(value, dir) => setGroupSort(project, 'other', value as import('$lib/stores/workSort.svelte.js').SortOption, dir)}
+																	onFilterChange={(value) => setGroupFilter(project, 'other', value)}
+																/>
 															</div>
-
-															<!-- Filter input -->
-															<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-															<div class="flex-shrink-0" onclick={(e) => e.stopPropagation()}>
-																<input
-																	type="text"
 																	placeholder="Filter..."
 																	value={otherGroupFilter}
 																	oninput={(e) => setGroupFilter(project, 'other', e.currentTarget.value)}
