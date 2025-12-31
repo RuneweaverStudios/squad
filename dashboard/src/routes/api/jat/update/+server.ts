@@ -1,27 +1,57 @@
 import { json } from '@sveltejs/kit';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { homedir } from 'os';
 import { existsSync } from 'fs';
-import { join } from 'path';
+import { join, dirname, resolve } from 'path';
 
 const execAsync = promisify(exec);
+
+/**
+ * Detect JAT installation path dynamically.
+ * The dashboard runs from {jat}/dashboard, so we go up one level from cwd.
+ */
+function getJatPath(): string {
+	// process.cwd() is the dashboard directory when running dev server
+	// Go up one level to get JAT root
+	const cwd = process.cwd();
+
+	// If we're in the dashboard directory, go up one level
+	if (cwd.endsWith('/dashboard') || cwd.endsWith('\\dashboard')) {
+		return dirname(cwd);
+	}
+
+	// If cwd already is JAT root (has tools/scripts), use it directly
+	if (existsSync(join(cwd, 'tools', 'scripts', 'symlink-tools.sh'))) {
+		return cwd;
+	}
+
+	// Fallback: check if dashboard is a subdirectory
+	const parentPath = dirname(cwd);
+	if (existsSync(join(parentPath, 'tools', 'scripts', 'symlink-tools.sh'))) {
+		return parentPath;
+	}
+
+	return cwd; // Last resort, will fail validation
+}
 
 /**
  * POST /api/jat/update
  *
  * Updates JAT by:
- * 1. Running git pull in ~/code/jat
+ * 1. Running git pull in the JAT directory
  * 2. Running symlink-tools.sh to update symlinks (non-interactive)
  *
  * Returns success/failure with message
  */
 export async function POST() {
-	const jatPath = join(homedir(), 'code', 'jat');
+	const jatPath = getJatPath();
 
-	// Verify JAT directory exists
-	if (!existsSync(jatPath)) {
-		return json({ success: false, error: 'JAT directory not found at ~/code/jat' }, { status: 404 });
+	// Verify JAT directory exists and has expected structure
+	if (!existsSync(jatPath) || !existsSync(join(jatPath, 'tools', 'scripts', 'symlink-tools.sh'))) {
+		return json({
+			success: false,
+			error: `JAT installation not found or incomplete at ${jatPath}`
+		}, { status: 404 });
 	}
 
 	try {
