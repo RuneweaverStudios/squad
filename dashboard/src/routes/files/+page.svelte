@@ -49,7 +49,7 @@
 	let quickFinderOpen = $state(false);
 
 	// Layout state
-	let leftPanelWidth = $state(280); // pixels
+	let leftPanelWidth = $state(303); // pixels
 	const MIN_PANEL_WIDTH = 180;
 	const MAX_PANEL_WIDTH = 600;
 
