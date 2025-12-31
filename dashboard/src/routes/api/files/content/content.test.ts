@@ -388,9 +388,11 @@ describe('isSensitiveFile', () => {
 		});
 
 		it('should not flag .env.example', () => {
-			// Note: This returns true because it ends with .env
-			// In practice, .env.example might be allowed
-			expect(isSensitiveFile('.env.example')).toBe(true);
+			// .env.example is NOT flagged because:
+			// - it doesn't match '.env' exactly
+			// - it doesn't END with '.env' (it ends with '.example')
+			// - the path check looks for '/.env' not just '.env'
+			expect(isSensitiveFile('.env.example')).toBe(false);
 		});
 
 		it('should not flag README.md', () => {

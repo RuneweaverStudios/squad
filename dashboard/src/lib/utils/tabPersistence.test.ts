@@ -82,7 +82,7 @@ describe('saveTabsToStorage', () => {
 		const paths = ['/src/a.ts', '/src/b.ts'];
 		saveTabsToStorage('myproject', paths, '/src/a.ts');
 
-		const stored = mockStorage.getItem('jat-files-open-myproject');
+		const stored = window.localStorage.getItem('jat-files-open-myproject');
 		expect(stored).not.toBeNull();
 
 		const data = JSON.parse(stored!);
@@ -99,7 +99,7 @@ describe('saveTabsToStorage', () => {
 		// Simulate reordering (user dragged /a.ts to the end)
 		saveTabsToStorage('project', ['/b.ts', '/c.ts', '/a.ts'], '/a.ts');
 
-		const data = JSON.parse(mockStorage.getItem('jat-files-open-project')!);
+		const data = JSON.parse(window.localStorage.getItem('jat-files-open-project')!);
 		expect(data.openFiles[0].path).toBe('/b.ts');
 		expect(data.openFiles[1].path).toBe('/c.ts');
 		expect(data.openFiles[2].path).toBe('/a.ts');
@@ -108,25 +108,25 @@ describe('saveTabsToStorage', () => {
 	it('should handle null activeFilePath', () => {
 		saveTabsToStorage('project', ['/src/file.ts'], null);
 
-		const data = JSON.parse(mockStorage.getItem('jat-files-open-project')!);
+		const data = JSON.parse(window.localStorage.getItem('jat-files-open-project')!);
 		expect(data.activeFilePath).toBeNull();
 	});
 
 	it('should remove from storage when no files open', () => {
 		// First save some tabs
 		saveTabsToStorage('project', ['/src/file.ts'], '/src/file.ts');
-		expect(mockStorage.getItem('jat-files-open-project')).not.toBeNull();
+		expect(window.localStorage.getItem('jat-files-open-project')).not.toBeNull();
 
 		// Now save empty array
 		saveTabsToStorage('project', [], null);
-		expect(mockStorage.getItem('jat-files-open-project')).toBeNull();
+		expect(window.localStorage.getItem('jat-files-open-project')).toBeNull();
 	});
 
 	it('should overwrite previous saved state', () => {
 		saveTabsToStorage('project', ['/old.ts'], '/old.ts');
 		saveTabsToStorage('project', ['/new.ts'], '/new.ts');
 
-		const data = JSON.parse(mockStorage.getItem('jat-files-open-project')!);
+		const data = JSON.parse(window.localStorage.getItem('jat-files-open-project')!);
 		expect(data.openFiles).toHaveLength(1);
 		expect(data.openFiles[0].path).toBe('/new.ts');
 	});
@@ -134,14 +134,14 @@ describe('saveTabsToStorage', () => {
 	it('should handle paths with spaces', () => {
 		saveTabsToStorage('project', ['/path with spaces/file.ts'], '/path with spaces/file.ts');
 
-		const data = JSON.parse(mockStorage.getItem('jat-files-open-project')!);
+		const data = JSON.parse(window.localStorage.getItem('jat-files-open-project')!);
 		expect(data.openFiles[0].path).toBe('/path with spaces/file.ts');
 	});
 
 	it('should handle paths with special characters', () => {
 		saveTabsToStorage('project', ['/src/@types/index.d.ts'], '/src/@types/index.d.ts');
 
-		const data = JSON.parse(mockStorage.getItem('jat-files-open-project')!);
+		const data = JSON.parse(window.localStorage.getItem('jat-files-open-project')!);
 		expect(data.openFiles[0].path).toBe('/src/@types/index.d.ts');
 	});
 });
@@ -156,7 +156,7 @@ describe('loadTabsFromStorage', () => {
 			openFiles: [{ path: '/src/a.ts' }, { path: '/src/b.ts' }],
 			activeFilePath: '/src/a.ts'
 		};
-		mockStorage.setItem('jat-files-open-project', JSON.stringify(data));
+		window.localStorage.setItem('jat-files-open-project', JSON.stringify(data));
 
 		const result = loadTabsFromStorage('project');
 		expect(result).not.toBeNull();
@@ -172,15 +172,15 @@ describe('loadTabsFromStorage', () => {
 	});
 
 	it('should return null and clear storage on invalid JSON', () => {
-		mockStorage.setItem('jat-files-open-project', 'not valid json');
+		window.localStorage.setItem('jat-files-open-project', 'not valid json');
 
 		const result = loadTabsFromStorage('project');
 		expect(result).toBeNull();
-		expect(mockStorage.getItem('jat-files-open-project')).toBeNull();
+		expect(window.localStorage.getItem('jat-files-open-project')).toBeNull();
 	});
 
 	it('should return null when openFiles is not an array', () => {
-		mockStorage.setItem(
+		window.localStorage.setItem(
 			'jat-files-open-project',
 			JSON.stringify({
 				openFiles: 'not an array',
@@ -193,7 +193,7 @@ describe('loadTabsFromStorage', () => {
 	});
 
 	it('should filter out entries without valid path', () => {
-		mockStorage.setItem(
+		window.localStorage.setItem(
 			'jat-files-open-project',
 			JSON.stringify({
 				openFiles: [{ path: '/valid.ts' }, { path: '' }, { path: null }, { noPath: true }],
@@ -208,7 +208,7 @@ describe('loadTabsFromStorage', () => {
 	});
 
 	it('should handle null activeFilePath', () => {
-		mockStorage.setItem(
+		window.localStorage.setItem(
 			'jat-files-open-project',
 			JSON.stringify({
 				openFiles: [{ path: '/file.ts' }],
@@ -221,7 +221,7 @@ describe('loadTabsFromStorage', () => {
 	});
 
 	it('should treat empty string activeFilePath as null', () => {
-		mockStorage.setItem(
+		window.localStorage.setItem(
 			'jat-files-open-project',
 			JSON.stringify({
 				openFiles: [{ path: '/file.ts' }],
@@ -238,7 +238,7 @@ describe('loadTabsFromStorage', () => {
 			openFiles: [{ path: '/c.ts' }, { path: '/a.ts' }, { path: '/b.ts' }],
 			activeFilePath: '/a.ts'
 		};
-		mockStorage.setItem('jat-files-open-project', JSON.stringify(data));
+		window.localStorage.setItem('jat-files-open-project', JSON.stringify(data));
 
 		const result = loadTabsFromStorage('project');
 		expect(result!.openFiles[0].path).toBe('/c.ts');
@@ -253,19 +253,19 @@ describe('loadTabsFromStorage', () => {
 
 describe('clearTabsFromStorage', () => {
 	it('should remove saved tabs for project', () => {
-		mockStorage.setItem('jat-files-open-project', '{"openFiles":[]}');
+		window.localStorage.setItem('jat-files-open-project', '{"openFiles":[]}');
 		clearTabsFromStorage('project');
-		expect(mockStorage.getItem('jat-files-open-project')).toBeNull();
+		expect(window.localStorage.getItem('jat-files-open-project')).toBeNull();
 	});
 
 	it('should not affect other projects', () => {
-		mockStorage.setItem('jat-files-open-project1', '{"openFiles":[]}');
-		mockStorage.setItem('jat-files-open-project2', '{"openFiles":[]}');
+		window.localStorage.setItem('jat-files-open-project1', '{"openFiles":[]}');
+		window.localStorage.setItem('jat-files-open-project2', '{"openFiles":[]}');
 
 		clearTabsFromStorage('project1');
 
-		expect(mockStorage.getItem('jat-files-open-project1')).toBeNull();
-		expect(mockStorage.getItem('jat-files-open-project2')).not.toBeNull();
+		expect(window.localStorage.getItem('jat-files-open-project1')).toBeNull();
+		expect(window.localStorage.getItem('jat-files-open-project2')).not.toBeNull();
 	});
 
 	it('should be safe to call when no data exists', () => {
@@ -284,8 +284,8 @@ describe('getProjectsWithSavedTabs', () => {
 	});
 
 	it('should return project names with saved tabs', () => {
-		mockStorage.setItem('jat-files-open-project1', '{}');
-		mockStorage.setItem('jat-files-open-project2', '{}');
+		window.localStorage.setItem('jat-files-open-project1', '{}');
+		window.localStorage.setItem('jat-files-open-project2', '{}');
 
 		const result = getProjectsWithSavedTabs();
 		expect(result).toContain('project1');
@@ -294,16 +294,16 @@ describe('getProjectsWithSavedTabs', () => {
 	});
 
 	it('should not include unrelated localStorage keys', () => {
-		mockStorage.setItem('jat-files-open-myproject', '{}');
-		mockStorage.setItem('other-key', '{}');
-		mockStorage.setItem('jat-other-setting', '{}');
+		window.localStorage.setItem('jat-files-open-myproject', '{}');
+		window.localStorage.setItem('other-key', '{}');
+		window.localStorage.setItem('jat-other-setting', '{}');
 
 		const result = getProjectsWithSavedTabs();
 		expect(result).toEqual(['myproject']);
 	});
 
 	it('should handle project names with hyphens', () => {
-		mockStorage.setItem('jat-files-open-my-cool-project', '{}');
+		window.localStorage.setItem('jat-files-open-my-cool-project', '{}');
 
 		const result = getProjectsWithSavedTabs();
 		expect(result).toContain('my-cool-project');
