@@ -137,7 +137,8 @@
 		signalCount: number;
 		isOnline: boolean;
 	}
-	let taskSessions = $state<Map<string, TaskSession[]>>(new Map());
+	// Use plain object instead of Map for better Svelte 5 reactivity
+	let taskSessions = $state<Record<string, TaskSession[]>>({});
 	let taskSessionsLoading = $state(false);
 
 	// Fetch task sessions for all visible tasks
@@ -152,9 +153,10 @@
 			});
 			if (response.ok) {
 				const data = await response.json();
-				const newSessions = new Map<string, TaskSession[]>();
+				// Use plain object for Svelte 5 reactivity
+				const newSessions: Record<string, TaskSession[]> = {};
 				for (const [taskId, sessions] of Object.entries(data.sessions || {})) {
-					newSessions.set(taskId, sessions as TaskSession[]);
+					newSessions[taskId] = sessions as TaskSession[];
 				}
 				taskSessions = newSessions;
 			}
@@ -167,7 +169,7 @@
 
 	// Get resumable sessions for a task (exclude online/working agents)
 	function getResumableSessions(taskId: string): TaskSession[] {
-		const sessions = taskSessions.get(taskId) || [];
+		const sessions = taskSessions[taskId] || [];
 		return sessions.filter(s => {
 			// Exclude agents that are currently working on any task
 			if (isAgentWorking(s.agentName)) return false;
