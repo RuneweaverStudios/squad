@@ -373,6 +373,262 @@ export const GET: RequestHandler = async ({ url }) => {
 };
 
 /**
+ * DELETE /api/files/content - Delete file or directory
+ */
+export const DELETE: RequestHandler = async ({ url }) => {
+	try {
+		const projectName = url.searchParams.get('project');
+		const filePath = url.searchParams.get('path');
+
+		if (!projectName) {
+			return json({ error: 'Project name is required' }, { status: 400 });
+		}
+
+		if (!filePath) {
+			return json({ error: 'File path is required' }, { status: 400 });
+		}
+
+		// Get project path
+		const projectPath = await getProjectPath(projectName);
+		if (!projectPath) {
+			return json({ error: `Project '${projectName}' not found` }, { status: 404 });
+		}
+
+		// Validate and resolve path
+		const validation = validatePath(projectPath, filePath);
+		if (!validation.valid) {
+			return json({ error: validation.error }, { status: 403 });
+		}
+
+		const resolvedPath = validation.resolved!;
+
+		// Check if path exists
+		if (!existsSync(resolvedPath)) {
+			return json({ error: 'File not found' }, { status: 404 });
+		}
+
+		// Check if file is sensitive
+		if (isSensitiveFile(resolvedPath)) {
+			return json({ error: 'Cannot delete sensitive file' }, { status: 403 });
+		}
+
+		// Get stats to check if it's a file or directory
+		const stats = await stat(resolvedPath);
+
+		if (stats.isDirectory()) {
+			// For directories, use recursive delete
+			const { rm } = await import('fs/promises');
+			await rm(resolvedPath, { recursive: true });
+		} else {
+			// For files, use unlink
+			await unlink(resolvedPath);
+		}
+
+		return json({
+			success: true,
+			deleted: filePath
+		});
+	} catch (error) {
+		console.error('[Files Content API] DELETE error:', error);
+		return json(
+			{ error: error instanceof Error ? error.message : 'Failed to delete file' },
+			{ status: 500 }
+		);
+	}
+};
+
+/**
+ * PATCH /api/files/content - Rename file or directory
+ * Body: { newName: string }
+ */
+export const PATCH: RequestHandler = async ({ url, request }) => {
+	try {
+		const projectName = url.searchParams.get('project');
+		const filePath = url.searchParams.get('path');
+
+		if (!projectName) {
+			return json({ error: 'Project name is required' }, { status: 400 });
+		}
+
+		if (!filePath) {
+			return json({ error: 'File path is required' }, { status: 400 });
+		}
+
+		// Parse request body
+		const body = await request.json();
+		const { newName } = body;
+
+		if (!newName || typeof newName !== 'string') {
+			return json({ error: 'newName is required and must be a string' }, { status: 400 });
+		}
+
+		// Validate new name (no path separators, no traversal)
+		if (newName.includes('/') || newName.includes('\\') || newName === '.' || newName === '..') {
+			return json({ error: 'Invalid file name' }, { status: 400 });
+		}
+
+		// Get project path
+		const projectPath = await getProjectPath(projectName);
+		if (!projectPath) {
+			return json({ error: `Project '${projectName}' not found` }, { status: 404 });
+		}
+
+		// Validate and resolve source path
+		const validation = validatePath(projectPath, filePath);
+		if (!validation.valid) {
+			return json({ error: validation.error }, { status: 403 });
+		}
+
+		const resolvedPath = validation.resolved!;
+
+		// Check if source exists
+		if (!existsSync(resolvedPath)) {
+			return json({ error: 'File not found' }, { status: 404 });
+		}
+
+		// Check if file is sensitive
+		if (isSensitiveFile(resolvedPath)) {
+			return json({ error: 'Cannot rename sensitive file' }, { status: 403 });
+		}
+
+		// Calculate new path (same directory, new name)
+		const parentDir = dirname(resolvedPath);
+		const newPath = join(parentDir, newName);
+
+		// Validate new path is still within project
+		const newValidation = validatePath(projectPath, newPath.replace(projectPath + '/', ''));
+		if (!newValidation.valid) {
+			return json({ error: 'Invalid destination path' }, { status: 403 });
+		}
+
+		// Check if destination already exists
+		if (existsSync(newPath)) {
+			return json({ error: 'A file with that name already exists' }, { status: 409 });
+		}
+
+		// Perform rename
+		await rename(resolvedPath, newPath);
+
+		// Calculate new relative path
+		const newRelativePath = filePath.replace(basename(filePath), newName);
+
+		return json({
+			success: true,
+			oldPath: filePath,
+			newPath: newRelativePath
+		});
+	} catch (error) {
+		console.error('[Files Content API] PATCH error:', error);
+		return json(
+			{ error: error instanceof Error ? error.message : 'Failed to rename file' },
+			{ status: 500 }
+		);
+	}
+};
+
+/**
+ * POST /api/files/content - Create new file or folder
+ * Query params: project=<name>&path=<parent_dir>&name=<name>&type=file|folder
+ * Body (optional for file): { content?: string }
+ */
+export const POST: RequestHandler = async ({ url, request }) => {
+	try {
+		const projectName = url.searchParams.get('project');
+		const parentPath = url.searchParams.get('path') || '';
+		const name = url.searchParams.get('name');
+		const type = url.searchParams.get('type') as 'file' | 'folder' | null;
+
+		if (!projectName) {
+			return json({ error: 'Project name is required' }, { status: 400 });
+		}
+
+		if (!name) {
+			return json({ error: 'Name is required' }, { status: 400 });
+		}
+
+		if (type !== 'file' && type !== 'folder') {
+			return json({ error: 'Type must be "file" or "folder"' }, { status: 400 });
+		}
+
+		// Validate name (no path separators, no traversal)
+		if (name.includes('/') || name.includes('\\') || name === '.' || name === '..') {
+			return json({ error: 'Invalid name' }, { status: 400 });
+		}
+
+		// Get project path
+		const projectPath = await getProjectPath(projectName);
+		if (!projectPath) {
+			return json({ error: `Project '${projectName}' not found` }, { status: 404 });
+		}
+
+		// Validate parent path
+		const parentValidation = validatePath(projectPath, parentPath || '.');
+		if (!parentValidation.valid) {
+			return json({ error: parentValidation.error }, { status: 403 });
+		}
+
+		// Build full path
+		const newPath = parentPath ? join(parentPath, name) : name;
+		const fullPath = resolve(projectPath, newPath);
+
+		// Validate new path is still within project
+		const newValidation = validatePath(projectPath, newPath);
+		if (!newValidation.valid) {
+			return json({ error: 'Invalid destination path' }, { status: 403 });
+		}
+
+		// Check if file is sensitive
+		if (type === 'file' && isSensitiveFile(fullPath)) {
+			return json({ error: 'Cannot create sensitive file' }, { status: 403 });
+		}
+
+		// Check if destination already exists
+		if (existsSync(fullPath)) {
+			return json({ error: `A ${type} with that name already exists` }, { status: 409 });
+		}
+
+		if (type === 'folder') {
+			// Create directory
+			await mkdir(fullPath, { recursive: true });
+		} else {
+			// Create file
+			let content = '';
+
+			// Check for content in request body
+			try {
+				const body = await request.json();
+				if (body.content && typeof body.content === 'string') {
+					content = body.content;
+				}
+			} catch {
+				// No body or invalid JSON - create empty file
+			}
+
+			// Ensure parent directory exists
+			const parentDir = dirname(fullPath);
+			if (!existsSync(parentDir)) {
+				await mkdir(parentDir, { recursive: true });
+			}
+
+			// Create the file
+			await writeFile(fullPath, content, 'utf-8');
+		}
+
+		return json({
+			success: true,
+			path: newPath,
+			type
+		});
+	} catch (error) {
+		console.error('[Files Content API] POST error:', error);
+		return json(
+			{ error: error instanceof Error ? error.message : 'Failed to create' },
+			{ status: 500 }
+		);
+	}
+};
+
+/**
  * PUT /api/files/content - Write file content
  */
 export const PUT: RequestHandler = async ({ url, request }) => {

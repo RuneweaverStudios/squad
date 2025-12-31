@@ -20,6 +20,7 @@
 	import { fade, slide } from 'svelte/transition';
 	import { FileEditor, type OpenFile } from '$lib/components/files';
 	import FileTree from '$lib/components/files/FileTree.svelte';
+	import QuickFileFinder from '$lib/components/files/QuickFileFinder.svelte';
 
 	// Types
 	interface Project {
@@ -42,6 +43,9 @@
 	// Editor state
 	let openFiles = $state<OpenFile[]>([]);
 	let activeFilePath = $state<string | null>(null);
+
+	// Quick file finder state
+	let quickFinderOpen = $state(false);
 
 	// Layout state
 	let leftPanelWidth = $state(280); // pixels
@@ -267,6 +271,35 @@
 		console.log('[Files] Content changed:', path, 'dirty:', dirty);
 	}
 
+	// Handle file delete from tree
+	function handleFileDelete(path: string) {
+		// If the deleted file is open, close it
+		const isOpen = openFiles.some(f => f.path === path);
+		if (isOpen) {
+			openFiles = openFiles.filter(f => f.path !== path);
+			if (activeFilePath === path) {
+				activeFilePath = openFiles.length > 0 ? openFiles[0].path : null;
+			}
+		}
+	}
+
+	// Handle file rename from tree
+	function handleFileRename(oldPath: string, newPath: string) {
+		// If the renamed file is open, update its path
+		const openFile = openFiles.find(f => f.path === oldPath);
+		if (openFile) {
+			openFiles = openFiles.map(f => {
+				if (f.path === oldPath) {
+					return { ...f, path: newPath };
+				}
+				return f;
+			});
+			if (activeFilePath === oldPath) {
+				activeFilePath = newPath;
+			}
+		}
+	}
+
 	// localStorage key for persisting open files per project
 	function getStorageKey(project: string): string {
 		return `jat-files-open-${project}`;
@@ -331,6 +364,17 @@
 		}
 	});
 
+	// Handle global keyboard shortcuts
+	function handleKeyDown(e: KeyboardEvent) {
+		// Ctrl+P - Open quick file finder
+		if (e.ctrlKey && e.key === 'p') {
+			e.preventDefault();
+			if (selectedProject) {
+				quickFinderOpen = true;
+			}
+		}
+	}
+
 	onMount(() => {
 		fetchProjects();
 	});
@@ -347,6 +391,8 @@
 <svelte:head>
 	<title>Files | JAT Dashboard</title>
 </svelte:head>
+
+<svelte:window onkeydown={handleKeyDown} />
 
 <div class="files-page" style="background: oklch(0.14 0.01 250);">
 	{#if isLoading}
@@ -439,6 +485,8 @@
 								project={selectedProject}
 								selectedPath={activeFilePath}
 								onFileSelect={handleFileSelect}
+								onFileDelete={handleFileDelete}
+								onFileRename={handleFileRename}
 							/>
 						{/if}
 					</div>
@@ -509,6 +557,16 @@
 		</div>
 	{/if}
 </div>
+
+<!-- Quick File Finder Modal (Ctrl+P) -->
+{#if selectedProject}
+	<QuickFileFinder
+		isOpen={quickFinderOpen}
+		project={selectedProject}
+		onClose={() => { quickFinderOpen = false; }}
+		onFileSelect={handleFileSelect}
+	/>
+{/if}
 
 <style>
 	.files-page {

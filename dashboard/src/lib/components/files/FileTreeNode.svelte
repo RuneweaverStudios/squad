@@ -29,6 +29,7 @@
 		depth?: number;
 		onFileSelect: (path: string) => void;
 		onToggleFolder: (path: string) => void;
+		onContextMenu?: (entry: DirectoryEntry, event: MouseEvent) => void;
 		filterTerm?: string;
 	}
 
@@ -42,6 +43,7 @@
 		depth = 0,
 		onFileSelect,
 		onToggleFolder,
+		onContextMenu,
 		filterTerm = ''
 	}: Props = $props();
 
@@ -158,6 +160,14 @@
 			handleClick();
 		}
 	}
+
+	function handleContextMenu(e: MouseEvent) {
+		e.preventDefault();
+		e.stopPropagation();
+		if (onContextMenu) {
+			onContextMenu(entry, e);
+		}
+	}
 </script>
 
 <div class="tree-node" style="--depth: {depth};">
@@ -171,6 +181,7 @@
 		class:loading={isLoading}
 		onclick={handleClick}
 		onkeydown={handleKeyDown}
+		oncontextmenu={handleContextMenu}
 		title={entry.path}
 		aria-expanded={isFolder ? isExpanded : undefined}
 	>
@@ -221,6 +232,7 @@
 					depth={depth + 1}
 					{onFileSelect}
 					{onToggleFolder}
+					{onContextMenu}
 					{filterTerm}
 				/>
 			{/each}

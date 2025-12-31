@@ -9,6 +9,7 @@
 	 * - Click tab → switch to that file
 	 * - Click X → close tab (emits event for parent to handle confirmation)
 	 * - Middle-click → close tab
+	 * - Drag-and-drop to reorder tabs
 	 * - Overflow: horizontal scroll for many tabs
 	 */
 
@@ -20,14 +21,20 @@
 		activeFilePath = null,
 		onTabSelect = () => {},
 		onTabClose = () => {},
-		onTabMiddleClick = () => {}
+		onTabMiddleClick = () => {},
+		onTabReorder = () => {}
 	}: {
 		openFiles: OpenFile[];
 		activeFilePath: string | null;
 		onTabSelect?: (path: string) => void;
 		onTabClose?: (path: string) => void;
 		onTabMiddleClick?: (path: string) => void;
+		onTabReorder?: (fromIndex: number, toIndex: number) => void;
 	} = $props();
+
+	// Drag-and-drop state
+	let draggedIndex = $state<number | null>(null);
+	let dragOverIndex = $state<number | null>(null);
 
 	// Get filename from path
 	function getFileName(path: string): string {
@@ -59,18 +66,76 @@
 			onTabMiddleClick(path);
 		}
 	}
+
+	// Drag-and-drop handlers
+	function handleDragStart(e: DragEvent, index: number) {
+		if (!e.dataTransfer) return;
+		draggedIndex = index;
+		e.dataTransfer.effectAllowed = 'move';
+		e.dataTransfer.setData('text/plain', index.toString());
+		// Add a slight delay to show drag styling
+		requestAnimationFrame(() => {
+			if (e.target instanceof HTMLElement) {
+				e.target.classList.add('dragging');
+			}
+		});
+	}
+
+	function handleDragEnd(e: DragEvent) {
+		draggedIndex = null;
+		dragOverIndex = null;
+		if (e.target instanceof HTMLElement) {
+			e.target.classList.remove('dragging');
+		}
+	}
+
+	function handleDragOver(e: DragEvent, index: number) {
+		e.preventDefault();
+		if (e.dataTransfer) {
+			e.dataTransfer.dropEffect = 'move';
+		}
+		if (draggedIndex !== null && draggedIndex !== index) {
+			dragOverIndex = index;
+		}
+	}
+
+	function handleDragLeave(e: DragEvent) {
+		// Only reset if leaving the tab entirely (not entering a child)
+		const relatedTarget = e.relatedTarget as HTMLElement | null;
+		if (!relatedTarget?.closest('.file-tab')) {
+			dragOverIndex = null;
+		}
+	}
+
+	function handleDrop(e: DragEvent, index: number) {
+		e.preventDefault();
+		if (draggedIndex !== null && draggedIndex !== index) {
+			onTabReorder(draggedIndex, index);
+		}
+		draggedIndex = null;
+		dragOverIndex = null;
+	}
 </script>
 
 <div class="file-tab-bar">
 	<div class="tabs-container">
-		{#each openFiles as file (file.path)}
+		{#each openFiles as file, index (file.path)}
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
 				class="file-tab"
 				class:active={activeFilePath === file.path}
 				class:dirty={file.dirty}
+				class:drag-over={dragOverIndex === index}
+				class:drag-over-left={dragOverIndex === index && draggedIndex !== null && draggedIndex > index}
+				class:drag-over-right={dragOverIndex === index && draggedIndex !== null && draggedIndex < index}
 				onclick={() => handleTabClick(file.path)}
 				onmousedown={(e) => handleMouseDown(e, file.path)}
+				draggable="true"
+				ondragstart={(e) => handleDragStart(e, index)}
+				ondragend={handleDragEnd}
+				ondragover={(e) => handleDragOver(e, index)}
+				ondragleave={handleDragLeave}
+				ondrop={(e) => handleDrop(e, index)}
 				role="tab"
 				aria-selected={activeFilePath === file.path}
 				tabindex="0"
@@ -274,5 +339,31 @@
 	.file-tab:focus-visible {
 		outline: 2px solid oklch(0.65 0.15 200);
 		outline-offset: -2px;
+	}
+
+	/* Drag-and-drop styles */
+	.file-tab[draggable='true'] {
+		cursor: grab;
+	}
+
+	.file-tab[draggable='true']:active {
+		cursor: grabbing;
+	}
+
+	.file-tab.dragging {
+		opacity: 0.5;
+		transform: scale(0.98);
+	}
+
+	.file-tab.drag-over-left {
+		box-shadow: inset 3px 0 0 0 oklch(0.65 0.15 200);
+	}
+
+	.file-tab.drag-over-right {
+		box-shadow: inset -3px 0 0 0 oklch(0.65 0.15 200);
+	}
+
+	.file-tab.drag-over {
+		background: oklch(0.22 0.02 250);
 	}
 </style>

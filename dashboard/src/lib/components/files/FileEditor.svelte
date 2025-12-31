@@ -22,6 +22,7 @@
 		onFileSave = () => {},
 		onActiveFileChange = () => {},
 		onContentChange = () => {},
+		onTabReorder = () => {},
 		savingFiles = new Set<string>()
 	}: {
 		openFiles: OpenFile[];
@@ -30,6 +31,7 @@
 		onFileSave?: (path: string, content: string) => void;
 		onActiveFileChange?: (path: string) => void;
 		onContentChange?: (path: string, content: string, dirty: boolean) => void;
+		onTabReorder?: (fromIndex: number, toIndex: number) => void;
 		savingFiles?: Set<string>;
 	} = $props();
 
@@ -187,6 +189,46 @@
 				handleTabClose(activeFilePath);
 			}
 		}
+
+		// Ctrl+Tab to switch to next tab
+		if (e.ctrlKey && e.key === 'Tab' && !e.shiftKey) {
+			e.preventDefault();
+			switchToNextTab();
+		}
+
+		// Ctrl+Shift+Tab to switch to previous tab
+		if (e.ctrlKey && e.key === 'Tab' && e.shiftKey) {
+			e.preventDefault();
+			switchToPreviousTab();
+		}
+	}
+
+	// Switch to next tab
+	function switchToNextTab() {
+		if (openFiles.length <= 1) return;
+
+		const currentIndex = openFiles.findIndex(f => f.path === activeFilePath);
+		const nextIndex = (currentIndex + 1) % openFiles.length;
+		const nextFile = openFiles[nextIndex];
+
+		if (nextFile) {
+			activeFilePath = nextFile.path;
+			onActiveFileChange(nextFile.path);
+		}
+	}
+
+	// Switch to previous tab
+	function switchToPreviousTab() {
+		if (openFiles.length <= 1) return;
+
+		const currentIndex = openFiles.findIndex(f => f.path === activeFilePath);
+		const prevIndex = currentIndex <= 0 ? openFiles.length - 1 : currentIndex - 1;
+		const prevFile = openFiles[prevIndex];
+
+		if (prevFile) {
+			activeFilePath = prevFile.path;
+			onActiveFileChange(prevFile.path);
+		}
 	}
 
 	// Focus the editor
@@ -212,6 +254,7 @@
 				onTabSelect={handleTabSelect}
 				onTabClose={handleTabClose}
 				onTabMiddleClick={handleTabMiddleClick}
+				{onTabReorder}
 			/>
 			<!-- Save Button -->
 			<button
@@ -276,6 +319,18 @@
 					<span>+</span>
 					<kbd class="kbd kbd-xs">W</kbd>
 					<span class="ml-2">Close Tab</span>
+				</div>
+				<div class="shortcut mt-1">
+					<kbd class="kbd kbd-xs">Ctrl</kbd>
+					<span>+</span>
+					<kbd class="kbd kbd-xs">Tab</kbd>
+					<span class="ml-2">Next Tab</span>
+				</div>
+				<div class="shortcut mt-1">
+					<kbd class="kbd kbd-xs">Ctrl</kbd>
+					<span>+</span>
+					<kbd class="kbd kbd-xs">P</kbd>
+					<span class="ml-2">Quick Open</span>
 				</div>
 			</div>
 		</div>
