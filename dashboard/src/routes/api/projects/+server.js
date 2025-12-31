@@ -157,20 +157,40 @@ async function getProjectTaskCounts(projectPath) {
  */
 async function getProjectAgentCount(projectPath) {
 	try {
+		// Check both locations: .claude/sessions/ (new) and .claude/ (legacy)
+		const sessionsDir = join(projectPath, '.claude', 'sessions');
 		const claudeDir = join(projectPath, '.claude');
-		if (!existsSync(claudeDir)) {
+
+		let agentFiles = [];
+
+		// Check new location first (.claude/sessions/)
+		if (existsSync(sessionsDir)) {
+			const entries = await readdir(sessionsDir);
+			agentFiles = entries
+				.filter(f => f.startsWith('agent-') && f.endsWith('.txt'))
+				.map(f => join(sessionsDir, f));
+		}
+
+		// Also check legacy location (.claude/) for backwards compat
+		if (existsSync(claudeDir)) {
+			const entries = await readdir(claudeDir);
+			const legacyFiles = entries
+				.filter(f => f.startsWith('agent-') && f.endsWith('.txt'))
+				.map(f => join(claudeDir, f));
+			agentFiles = [...agentFiles, ...legacyFiles];
+		}
+
+		if (agentFiles.length === 0) {
 			return { active: 0, total: 0 };
 		}
 
-		const entries = await readdir(claudeDir);
-		const agentFiles = entries.filter(f => f.startsWith('agent-') && f.endsWith('.txt'));
 		const total = agentFiles.length;
 
 		// Count active (modified in last 30 min)
 		let active = 0;
 		const now = Date.now();
-		for (const file of agentFiles) {
-			const stats = await stat(join(claudeDir, file));
+		for (const filePath of agentFiles) {
+			const stats = await stat(filePath);
 			if (now - stats.mtimeMs < 30 * 60 * 1000) {
 				active++;
 			}
@@ -420,6 +440,10 @@ export async function GET({ url }) {
 		// Add stats if requested
 		if (includeStats) {
 			projects = await Promise.all(projects.map(async (project) => {
+				// Check if .beads/ directory exists
+				const beadsDir = join(project.path, '.beads');
+				const hasBeads = existsSync(beadsDir);
+
 				const [tasks, agents, status, activityData] = await Promise.all([
 					getProjectTaskCounts(project.path),
 					getProjectAgentCount(project.path),
@@ -429,6 +453,14 @@ export async function GET({ url }) {
 
 				return {
 					...project,
+					stats: {
+						hasBeads,
+						agentCount: agents.active,
+						taskCount: tasks.total,
+						openTaskCount: tasks.open,
+						serverRunning: status === 'running'
+					},
+					// Keep legacy fields for backwards compat
 					tasks,
 					agents,
 					status,

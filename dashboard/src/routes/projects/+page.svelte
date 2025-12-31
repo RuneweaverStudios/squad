@@ -16,11 +16,11 @@
 		displayName?: string;
 		path: string;
 		port?: number;
-		server_path?: string;
+		serverPath?: string;
 		description?: string;
-		active_color?: string;
-		inactive_color?: string;
-		visible: boolean;
+		activeColor?: string;
+		inactiveColor?: string;
+		hidden?: boolean;
 		source?: string;
 		stats?: {
 			hasBeads: boolean;
@@ -48,10 +48,10 @@
 		displayName: '',
 		path: '',
 		port: '',
-		server_path: '',
+		serverPath: '',
 		description: '',
-		active_color: '#22c55e',
-		inactive_color: '#6b7280'
+		activeColor: '#22c55e',
+		inactiveColor: '#6b7280'
 	});
 	let saving = $state(false);
 	let saveError = $state<string | null>(null);
@@ -71,8 +71,8 @@
 			const allProjects: Project[] = data.projects || [];
 
 			// Separate visible and hidden
-			projects = allProjects.filter(p => p.visible !== false);
-			hiddenProjects = allProjects.filter(p => p.visible === false);
+			projects = allProjects.filter(p => !p.hidden);
+			hiddenProjects = allProjects.filter(p => p.hidden);
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to load projects';
 			console.error('[Projects] Fetch error:', err);
@@ -87,10 +87,10 @@
 			displayName: project.displayName || project.name,
 			path: project.path,
 			port: project.port?.toString() || '',
-			server_path: project.server_path || '',
+			serverPath: project.serverPath || '',
 			description: project.description || '',
-			active_color: project.active_color || '#22c55e',
-			inactive_color: project.inactive_color || '#6b7280'
+			activeColor: project.activeColor || '#22c55e',
+			inactiveColor: project.inactiveColor || '#6b7280'
 		};
 		saveError = null;
 		editDrawerOpen = true;
@@ -113,16 +113,11 @@
 				method: 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
-					name: editingProject.name,
-					updates: {
-						displayName: editForm.displayName || undefined,
-						path: editForm.path,
-						port: editForm.port ? parseInt(editForm.port) : undefined,
-						server_path: editForm.server_path || undefined,
-						description: editForm.description || undefined,
-						active_color: editForm.active_color,
-						inactive_color: editForm.inactive_color
-					}
+					project: editingProject.name,
+					description: editForm.description || undefined,
+					port: editForm.port ? parseInt(editForm.port) : undefined,
+					active_color: editForm.activeColor,
+					inactive_color: editForm.inactiveColor
 				})
 			});
 
@@ -252,7 +247,7 @@
 						<!-- Project color accent bar -->
 						<div
 							class="absolute left-0 top-0 bottom-0 w-1"
-							style="background-color: {project.active_color || '#6b7280'}"
+							style="background-color: {project.activeColor || '#6b7280'}"
 						></div>
 
 						<div class="card-body p-5 pl-6">
@@ -262,7 +257,7 @@
 									<!-- Project color indicator -->
 									<div
 										class="w-4 h-4 rounded-full ring-2 ring-base-content/10"
-										style="background-color: {project.active_color || '#6b7280'}"
+										style="background-color: {project.activeColor || '#6b7280'}"
 										title="Project color"
 									></div>
 									<div>
@@ -317,10 +312,10 @@
 										<span class="ml-2 font-mono">{project.port}</span>
 									</div>
 								{/if}
-								{#if project.server_path && project.server_path !== project.path}
+								{#if project.serverPath && project.serverPath !== project.path}
 									<div class="text-base-content/60">
 										<span class="text-xs font-mono uppercase tracking-wider text-base-content/50">Server:</span>
-										<span class="ml-2 font-mono text-base-content/80">{project.server_path}</span>
+										<span class="ml-2 font-mono text-base-content/80">{project.serverPath}</span>
 									</div>
 								{/if}
 								{#if project.description}
@@ -412,13 +407,13 @@
 									<!-- Faded project color bar -->
 									<div
 										class="absolute left-0 top-0 bottom-0 w-1 opacity-40"
-										style="background-color: {project.active_color || '#6b7280'}"
+										style="background-color: {project.activeColor || '#6b7280'}"
 									></div>
 									<div class="flex items-center justify-between pl-4">
 										<div class="flex items-center gap-3">
 											<div
 												class="w-3 h-3 rounded-full opacity-50"
-												style="background-color: {project.active_color || '#6b7280'}"
+												style="background-color: {project.activeColor || '#6b7280'}"
 											></div>
 											<div>
 												<span class="font-mono uppercase tracking-wide text-base-content/70">{project.displayName || project.name}</span>
@@ -469,13 +464,13 @@
 					<!-- Project color accent bar -->
 					<div
 						class="absolute left-0 top-0 bottom-0 w-1"
-						style="background: linear-gradient(to bottom, {editingProject.active_color || '#6b7280'}, {editingProject.active_color || '#6b7280'}80)"
+						style="background: linear-gradient(to bottom, {editingProject.activeColor || '#6b7280'}, {editingProject.activeColor || '#6b7280'}80)"
 					></div>
 
 					<div class="flex items-center gap-3 pl-2">
 						<div
 							class="w-4 h-4 rounded-full ring-2 ring-base-content/10"
-							style="background-color: {editForm.active_color || '#6b7280'}"
+							style="background-color: {editForm.activeColor || '#6b7280'}"
 						></div>
 						<h2 class="text-xl font-bold font-mono uppercase tracking-wider text-base-content">
 							Edit Project
@@ -540,7 +535,7 @@
 							<input
 								type="text"
 								class="input input-bordered bg-base-100 font-mono text-sm"
-								bind:value={editForm.server_path}
+								bind:value={editForm.serverPath}
 								placeholder={editForm.path}
 							/>
 						</div>
@@ -568,7 +563,7 @@
 									<input
 										type="color"
 										class="w-10 h-10 rounded-lg cursor-pointer border-2 border-base-content/10"
-										bind:value={editForm.active_color}
+										bind:value={editForm.activeColor}
 									/>
 									<span class="text-xs font-mono uppercase tracking-wider text-base-content/60">Active</span>
 								</div>
@@ -576,7 +571,7 @@
 									<input
 										type="color"
 										class="w-10 h-10 rounded-lg cursor-pointer border-2 border-base-content/10"
-										bind:value={editForm.inactive_color}
+										bind:value={editForm.inactiveColor}
 									/>
 									<span class="text-xs font-mono uppercase tracking-wider text-base-content/60">Inactive</span>
 								</div>

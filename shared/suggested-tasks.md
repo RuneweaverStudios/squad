@@ -65,15 +65,24 @@ Suggest follow-up tasks when you discover:
 ```typescript
 interface SuggestedTask {
   type: "feature" | "bug" | "task" | "chore" | "epic";
-  title: string;           // Short, descriptive title (3-8 words)
-  description: string;     // What needs to be done
+  title: string;           // Descriptive title (5-12 words, actionable verb, specific target)
+  description: string;     // DETAILED standalone description (2-4 sentences) - see below
   priority: number;        // 0-4 (P0=critical, P4=backlog)
-  reason?: string;         // Why this was discovered (helps humans understand context)
+  reason?: string;         // Why this was discovered (specific context from the completed work)
   project?: string;        // Target project (defaults to current)
   labels?: string;         // Comma-separated labels
   depends_on?: string[];   // Task IDs this depends on
 }
 ```
+
+**CRITICAL: Task descriptions must be STANDALONE.** The agent picking up this task will NOT have context from your current work. Include:
+- **WHAT**: Specific work that needs to be done
+- **WHERE**: File paths, component names, function names
+- **WHY**: Context explaining why this matters (from your current task)
+- **HOW**: Brief approach if non-obvious
+
+**Bad example:** "Fix the issue with the modal" - Vague, which modal? What issue?
+**Good example:** "Fix race condition in TaskDetailDrawer.svelte where the drawer closes and re-opens when clicking the overlay. The issue is caused by both the 'for' attribute and onclick handler triggering simultaneously. Remove the 'for' attribute from the overlay label (line ~467) to fix the double-toggle bug."
 
 #### Priority Guidelines
 
@@ -98,23 +107,24 @@ jat-signal complete '{
   "suggestedTasks": [
     {
       "type": "feature",
-      "title": "Add Apple Sign-In support",
-      "description": "Similar flow to Google OAuth, needs Apple Developer setup",
+      "title": "Implement Apple Sign-In OAuth flow in auth module",
+      "description": "Add Apple Sign-In alongside existing Google OAuth in src/lib/auth/providers/. Reuse the OAuth callback pattern from google.ts. Requires Apple Developer account setup for Sign In with Apple service ID and private key. Reference the Google implementation in src/lib/auth/providers/google.ts for the callback URL structure and token exchange flow.",
       "priority": 2,
-      "reason": "Discovered while implementing Google OAuth"
+      "reason": "User requested during Google OAuth implementation - same auth flow needed"
     },
     {
       "type": "task",
-      "title": "Add OAuth error tracking",
-      "description": "Log failed OAuth attempts to Sentry for debugging",
-      "priority": 3
+      "title": "Add Sentry error tracking for OAuth authentication failures",
+      "description": "Instrument the OAuth callback handlers in src/lib/auth/callback.ts to log failed authentication attempts to Sentry. Capture: provider name, error type, timestamp, and anonymized user identifier. Use Sentry.captureException with custom context. This will help debug intermittent auth failures reported by users.",
+      "priority": 3,
+      "reason": "No visibility into auth failures during production OAuth testing"
     },
     {
       "type": "bug",
-      "title": "Fix token refresh race condition",
-      "description": "Two concurrent refreshes can invalidate each other",
+      "title": "Fix token refresh race condition in src/lib/auth/refresh.ts",
+      "description": "The refreshAccessToken() function can be called concurrently by multiple tabs/requests, causing both to invalidate each other's tokens. Add a mutex or deduplication mechanism using a shared promise. When a refresh is in progress, subsequent calls should await the existing promise rather than starting a new refresh. See similar pattern in src/lib/cache/dedup.ts.",
       "priority": 1,
-      "reason": "Found during testing of retry logic"
+      "reason": "Users logged out unexpectedly when multiple API calls triggered simultaneous refreshes"
     }
   ]
 }'
@@ -297,17 +307,18 @@ When creating a task manually, click "Auto-suggest" to get AI recommendations:
 
 #### For Agents
 
-1. **Be specific** - Write clear, actionable task titles
-2. **Include context** - Use `reason` field to explain why task was discovered
-3. **Prioritize thoughtfully** - Don't mark everything P1
-4. **Group related tasks** - Similar work should be separate but related
-5. **Don't duplicate** - Check if similar task already exists
+1. **Write STANDALONE descriptions** - The next agent has NO context. Include file paths, component names, function signatures, and enough detail to start immediately
+2. **Be specific in titles** - Use 5-12 words with actionable verbs (e.g., "Add rate limiting to /api/upload endpoint" not "Fix upload")
+3. **Include the WHY** - Use `reason` field to explain what you discovered and why it matters
+4. **Prioritize thoughtfully** - Don't mark everything P1. P2 is normal, P3 is nice-to-have
+5. **Group related tasks** - Similar work should be separate but related via epic
+6. **Don't duplicate** - Check if similar task already exists before suggesting
 
 #### For Humans
 
-1. **Review before creating** - Edit titles for clarity
-2. **Adjust priorities** - Agent priorities are suggestions
-3. **Add project/labels** - Help with organization
+1. **Review descriptions** - Agent suggestions should be detailed; if vague, reject or edit
+2. **Adjust priorities** - Agent priorities are suggestions based on limited context
+3. **Add project/labels** - Help with organization and filtering
 4. **Skip duplicates** - Don't create if similar task exists
 5. **Batch create** - Create multiple related tasks together
 
@@ -335,16 +346,17 @@ jat-signal complete '{
   "suggestedTasks": [
     {
       "type": "feature",
-      "title": "Add 2FA authentication",
-      "description": "Support TOTP-based two-factor auth for enhanced security",
+      "title": "Implement TOTP-based two-factor authentication for user accounts",
+      "description": "Add 2FA support to the auth module in src/lib/auth/. Create a new TwoFactorAuth.svelte component in src/lib/components/auth/ that displays QR code for authenticator apps (Google Authenticator, Authy). Store encrypted TOTP secrets in the users.totp_secret column. Add verification endpoint at /api/auth/verify-2fa. Use the otpauth npm package for TOTP generation/verification.",
       "priority": 2,
-      "reason": "Security best practice noticed during auth implementation"
+      "reason": "Security best practice - password-only auth is insufficient for sensitive user data"
     },
     {
       "type": "chore",
-      "title": "Document authentication API",
-      "description": "Add OpenAPI specs for /auth/* endpoints",
-      "priority": 3
+      "title": "Add OpenAPI documentation for all /auth/* API endpoints",
+      "description": "Create or update src/routes/api/auth/openapi.yaml with OpenAPI 3.0 specs for: /auth/login, /auth/logout, /auth/register, /auth/reset-password, /auth/verify-email. Include request/response schemas, error codes, and example payloads. Add Swagger UI route at /api/docs for interactive testing. Reference existing OpenAPI patterns in src/routes/api/users/openapi.yaml.",
+      "priority": 3,
+      "reason": "No API documentation exists for auth endpoints - blocking frontend team integration"
     }
   ]
 }'

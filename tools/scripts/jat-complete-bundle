@@ -328,10 +328,10 @@ Generate a JSON object with these fields:
     // Look for: tech debt, tests to add, docs to update, related improvements
     {
       "type": "feature" | "bug" | "task" | "chore",
-      "title": "Short task title",
-      "description": "What needs to be done",
+      "title": "Descriptive task title (5-12 words, actionable verb, specific target)",
+      "description": "DETAILED standalone description (2-4 sentences). Include:\n- WHAT specific work needs to be done\n- WHERE in the codebase (files, components, modules)\n- WHY this matters (context from the completed task)\n- HOW to approach it (brief strategy if non-obvious)\nThe description must be understandable WITHOUT reading the parent task.",
       "priority": 2,  // 0-4, where 0 is critical
-      "reason": "Why this was discovered during the work"
+      "reason": "Specific discovery context from the completed work"
     }
   ],
 
@@ -367,7 +367,7 @@ Generate a JSON object with these fields:
 7. riskLevel is REQUIRED - always include: low=routine changes, medium=core logic changes, high=breaking/security/data changes
 8. breakingChanges: list specific breaking changes, omit field entirely if none
 9. documentationNeeds: list specific docs needing updates, omit if none
-10. Be concise but informative
+10. CRITICAL for suggestedTasks: Each task MUST be a STANDALONE work item. A new agent picking up this task will NOT have context from the parent task. Include specific file paths, component names, function names, and enough context that someone unfamiliar can start immediately. Vague tasks like "improve X" or "fix the issue" are useless - be SPECIFIC.
 
 Output ONLY the JSON object. No markdown code blocks, no explanation text.
 PROMPT_EOF
