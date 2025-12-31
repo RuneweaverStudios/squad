@@ -35,6 +35,9 @@ export const selectedDrawerProject = writable<string | null>(null);
 // Available projects for task drawer (dynamically populated from tasks)
 export const availableProjects = writable<string[]>([]);
 
+// Project colors for task drawer (populated from layout's projectColors)
+export const projectColorsStore = writable<Record<string, string>>({});
+
 // Helper functions
 export function openTaskDrawer(project?: string) {
 	if (project && project !== 'All Projects') {
