@@ -18,6 +18,7 @@
 	} from '$lib/utils/soundEffects';
 	import { getSoundsEnabled } from '$lib/stores/preferences.svelte';
 	import { getVersionString } from '$lib/version';
+	import { successToast, errorToast } from '$lib/stores/toasts.svelte';
 	import {
 		getSparklineVisible,
 		setSparklineVisible,
@@ -89,7 +90,6 @@
 
 	// Update JAT state
 	let isUpdating = $state(false);
-	let updateResult = $state<{ success: boolean; message: string } | null>(null);
 
 	// Keyboard icon path
 	const keyboardIcon = 'M6.75 3a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 006.75 21h10.5a2.25 2.25 0 002.25-2.25V5.25A2.25 2.25 0 0017.25 3H6.75zm0 1.5h10.5a.75.75 0 01.75.75v13.5a.75.75 0 01-.75.75H6.75a.75.75 0 01-.75-.75V5.25a.75.75 0 01.75-.75z';
@@ -223,25 +223,20 @@
 
 	async function handleUpdate() {
 		isUpdating = true;
-		updateResult = null;
 
 		try {
 			const response = await fetch('/api/jat/update', { method: 'POST' });
 			const data = await response.json();
 
 			if (response.ok && data.success) {
-				updateResult = { success: true, message: data.message || 'Updated successfully!' };
+				successToast(data.message || 'JAT updated successfully!', data.details?.gitPull);
 			} else {
-				updateResult = { success: false, message: data.error || 'Update failed' };
+				errorToast(data.error || 'Update failed');
 			}
 		} catch (err) {
-			updateResult = { success: false, message: 'Network error during update' };
+			errorToast('Network error during update');
 		} finally {
 			isUpdating = false;
-			// Clear message after 5 seconds
-			setTimeout(() => {
-				updateResult = null;
-			}, 5000);
 		}
 	}
 </script>
@@ -596,13 +591,6 @@
 				</button>
 			</div>
 		</li>
-		{#if updateResult}
-			<li>
-				<div class="px-2 py-1 text-[10px] {updateResult.success ? 'text-success' : 'text-error'}">
-					{updateResult.message}
-				</div>
-			</li>
-		{/if}
 	</ul>
 </div>
 
