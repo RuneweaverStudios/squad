@@ -253,7 +253,7 @@ export async function POST({ request }) {
 		}
 
 		// Invalidate caches so subsequent fetches get fresh data
-		// This is critical for reactive updates on /projects page
+		// This is critical for reactive updates on /work page
 		// Also reset module-level task cache in agents endpoint
 		invalidateCache.tasks();
 		invalidateCache.agents();

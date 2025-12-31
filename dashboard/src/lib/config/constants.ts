@@ -213,9 +213,9 @@ export const JAT_DEFAULTS = {
 	max_sessions: 12,
 	/** Default number of agents to spawn in swarm */
 	default_agent_count: 4,
-	/** Default height for sessions panel on /projects page (px) */
+	/** Default height for sessions panel on /work page (px) */
 	projects_session_height: 400,
-	/** Default height for tasks panel on /projects page (px) */
+	/** Default height for tasks panel on /work page (px) */
 	projects_task_height: 400,
 	/** Auto-cleanup completed sessions (disabled by default - powerful feature) */
 	auto_kill_enabled: false,

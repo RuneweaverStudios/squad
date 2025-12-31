@@ -438,7 +438,7 @@ export async function POST({ request }) {
 				sessionName,
 				agentName,
 				task: fullTask,
-				project: projectName,  // Include project for session grouping on /projects page
+				project: projectName,  // Include project for session grouping on /work page
 				imagePath: imagePath || null,
 				output: '',
 				lineCount: 0,

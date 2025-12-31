@@ -1,9 +1,9 @@
 /**
- * ServersBadge Spawn and /projects Page Grouping Tests
+ * ServersBadge Spawn and /work Page Grouping Tests
  *
  * Tests that:
  * 1. Spawning a session via ServersBadge dropdown calls the spawn API with correct project info
- * 2. The created session appears under the correct project on the /projects page
+ * 2. The created session appears under the correct project on the /work page
  * 3. Session grouping uses session.project field as fallback when task ID isn't available
  */
 
@@ -116,7 +116,7 @@ async function simulateSpawnSession(projectKey: string) {
 }
 
 /**
- * Extracts project from task ID (same logic as /projects page)
+ * Extracts project from task ID (same logic as /work page)
  */
 function getProjectFromTaskId(taskId: string): string | null {
 	const match = taskId.match(/^([a-zA-Z0-9_-]+)-/);
@@ -124,7 +124,7 @@ function getProjectFromTaskId(taskId: string): string | null {
 }
 
 /**
- * Groups sessions by project (same logic as /projects page sessionsByProject)
+ * Groups sessions by project (same logic as /work page sessionsByProject)
  */
 function groupSessionsByProject(
 	sessions: Array<{
@@ -232,7 +232,7 @@ describe('ServersBadge Spawn API Call', () => {
 // Tests: Session Project Grouping
 // ============================================================================
 
-describe('Session Project Grouping (/projects page logic)', () => {
+describe('Session Project Grouping (/work page logic)', () => {
 	beforeEach(resetMocks);
 
 	it('should group session by task ID prefix when task exists', () => {
