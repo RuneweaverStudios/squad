@@ -22,6 +22,7 @@
 	import FileTree from '$lib/components/files/FileTree.svelte';
 	import QuickFileFinder from '$lib/components/files/QuickFileFinder.svelte';
 	import { getActiveProject, setActiveProject } from '$lib/stores/preferences.svelte';
+	import { FilesSkeleton } from '$lib/components/skeleton';
 
 	// Types
 	interface Project {
@@ -582,16 +583,7 @@
 <div class="files-page" style="background: oklch(0.14 0.01 250);">
 	{#if isLoading}
 		<!-- Loading State -->
-		<div class="files-content" transition:fade={{ duration: 150 }}>
-			<div class="files-header">
-				<div class="skeleton h-8 w-24 rounded-lg" style="background: oklch(0.18 0.02 250);"></div>
-				<div class="skeleton h-10 w-48 rounded-lg" style="background: oklch(0.18 0.02 250);"></div>
-			</div>
-			<div class="files-body">
-				<div class="skeleton h-full w-64 rounded-lg" style="background: oklch(0.18 0.02 250);"></div>
-				<div class="skeleton h-full flex-1 rounded-lg" style="background: oklch(0.18 0.02 250);"></div>
-			</div>
-		</div>
+		<FilesSkeleton treeItems={12} tabs={3} />
 	{:else if error}
 		<!-- Error State -->
 		<div class="files-content error-state" transition:fade={{ duration: 150 }}>

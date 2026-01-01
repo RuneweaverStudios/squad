@@ -9,7 +9,7 @@
 
 Without JAT, you're managing 1-2 agents in separate terminals. With JAT, you see every agent, every task, every project in one interface. Organize your entire backlog, spawn agents on demand, and watch them coordinate automatically.
 
-<!-- TODO: Screenshot/gif of dashboard /projects route -->
+<!-- PLACEHOLDER: Demo video coming - see assets/RECORDING-SCRIPT.md -->
 
 ---
 
@@ -39,7 +39,7 @@ jat demo                        # Watch 3 agents coordinate on a sample project
 
 Your command center for all agents across all projects.
 
-<!-- TODO: Screenshot -->
+<!-- PLACEHOLDER: Dashboard screenshot coming - see assets/RECORDING-SCRIPT.md -->
 
 | Route | What It Does |
 |-------|--------------|

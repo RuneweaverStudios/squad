@@ -2,6 +2,8 @@
 *.log
 *.swp
 *~
+*.sock
+*.bak
 node_modules/
 .env
 .env.local
@@ -35,3 +37,6 @@ mcp_agent_mail/
 # Generated avatars (per-machine, don't commit)
 avatars/
 .archive/
+
+# Dashboard generated files
+dashboard/theme-screenshots/
