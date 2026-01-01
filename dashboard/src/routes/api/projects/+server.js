@@ -417,7 +417,7 @@ export async function GET({ url }) {
 		let projects = [];
 
 		if (jatConfig?.projects) {
-			// Use JAT config as primary source
+			// Use JAT config as ONLY source (no auto-discovery)
 			for (const [key, config] of Object.entries(jatConfig.projects)) {
 				const projectPath = config.path?.replace(/^~/, homedir()) || join(homedir(), 'code', key);
 
@@ -438,33 +438,10 @@ export async function GET({ url }) {
 					source: 'jat-config'
 				});
 			}
-
-			// Also scan for projects with .beads/ that aren't in JAT config
-			// This allows newly-initialized projects (via bd init) to appear automatically
-			const beadsProjects = await scanBeadsProjects();
-			const existingNames = new Set(projects.map(p => p.name.toLowerCase()));
-
-			for (const bp of beadsProjects) {
-				if (!existingNames.has(bp.name.toLowerCase())) {
-					projects.push({
-						...bp,
-						displayName: bp.name.toUpperCase(),
-						port: null,
-						description: null,
-						hidden: hiddenProjects.has(bp.name)
-					});
-				}
-			}
 		} else {
-			// Fallback to filesystem scan
-			const scannedProjects = await scanCodeDirectory();
-			projects = scannedProjects.map(p => ({
-				...p,
-				displayName: p.name.toUpperCase(),
-				port: null,
-				description: null,
-				hidden: hiddenProjects.has(p.name)
-			}));
+			// No config file - return empty projects array
+			// Users must create ~/.config/jat/projects.json to add projects
+			projects = [];
 		}
 
 		// Filter hidden projects if requested

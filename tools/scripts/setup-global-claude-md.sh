@@ -47,6 +47,51 @@ if [ -d "$COMMANDS_SOURCE" ]; then
     echo ""
 fi
 
+# Create default JAT projects config if it doesn't exist
+CONFIG_DIR="$HOME/.config/jat"
+CONFIG_FILE="$CONFIG_DIR/projects.json"
+
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "  → Creating default projects config..."
+    mkdir -p "$CONFIG_DIR"
+
+    # Get the JAT install directory (2 levels up from this script)
+    JAT_DIR="$( cd "$SCRIPT_DIR/../.." && pwd )"
+
+    cat > "$CONFIG_FILE" << EOF
+{
+  "projects": {
+    "jat": {
+      "name": "JAT",
+      "path": "$JAT_DIR",
+      "port": 3333,
+      "description": "Jomarchy Agent Tools - Multi-agent coordination dashboard"
+    }
+  },
+  "defaults": {
+    "terminal": "alacritty",
+    "editor": "code",
+    "tools_path": "~/.local/bin",
+    "claude_flags": "--dangerously-skip-permissions",
+    "model": "opus",
+    "agent_stagger": 15,
+    "claude_startup_timeout": 20
+  }
+}
+EOF
+    echo -e "${GREEN}  ✓ Created default projects config${NC}"
+    echo "    Location: $CONFIG_FILE"
+    echo ""
+    echo "    Add more projects via:"
+    echo "      • Dashboard UI (Add Project button)"
+    echo "      • Edit $CONFIG_FILE manually"
+    echo ""
+else
+    echo -e "${GREEN}  ✓${NC} Projects config already exists"
+    echo "    Location: $CONFIG_FILE"
+    echo ""
+fi
+
 echo -e "${GREEN}  ✓ Global configuration complete${NC}"
 echo ""
 echo "  Agent commands available via /jat:* namespace"

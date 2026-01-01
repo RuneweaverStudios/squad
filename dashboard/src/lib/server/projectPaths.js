@@ -127,18 +127,7 @@ export async function getProjectPath(projectName) {
 		}
 	}
 
-	// 2. Check beads-discovered projects
-	const beadsProjects = await scanBeadsProjects();
-	const beadsProject = beadsProjects.find(p => normalizeProjectName(p.name) === normalizedName);
-	if (beadsProject) {
-		return {
-			path: beadsProject.path,
-			source: 'beads-discovered',
-			exists: true // If it has .beads/, it exists
-		};
-	}
-
-	// 3. Default fallback
+	// 2. Default fallback (auto-discovery disabled - config is source of truth)
 	const defaultPath = join(homedir(), 'code', projectName);
 	return {
 		path: defaultPath,
