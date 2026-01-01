@@ -50,9 +50,9 @@ DASHBOARD_DIR="$SCRIPT_DIR/dashboard"
 # Get port from JAT config
 CONFIG_FILE="$HOME/.config/jat/projects.json"
 if [ -f "$CONFIG_FILE" ]; then
-    PORT=$(jq -r '.projects.jat.port // 5173' "$CONFIG_FILE")
+    PORT=$(jq -r '.projects.jat.port // 3333' "$CONFIG_FILE")
 else
-    PORT=5173
+    PORT=3333
 fi
 
 echo -e "${GREEN}🚀 Beads Task Dashboard Launcher${NC}"
