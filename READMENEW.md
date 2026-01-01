@@ -43,18 +43,21 @@ Your command center for all agents across all projects.
 
 | Route | What It Does |
 |-------|--------------|
-| `/projects` | **The main view.** All sessions + tasks grouped by project. Spawn agents, see terminal output, click to answer questions, manage tasks. |
+| `/work` | **The main view.** Active sessions with live terminal output + task backlog. Spawn agents, click to answer questions, watch work happen. |
+| `/files` | **Built-in code editor.** Browse project files, multi-tab editing with syntax highlighting, create/rename/delete files. |
+| `/kanban` | Visual task board with drag-and-drop organization |
 | `/agents` | Agent registry, file locks, coordination status |
 | `/automation` | Rules for error recovery, prompt responses, stall detection |
-| `/config` | Edit slash commands, configure hooks, manage MCP servers |
+| `/config` | Edit slash commands, configure hooks, keyboard shortcuts, MCP servers |
 
 **Why this matters:**
 - **Scale from 1-2 to 20+ agents** - See all of them at once, not in separate terminals
 - **Unified task backlog** - Every project's `.beads/` in one view
 - **Clickable question UI** - No more typing "1" or "2" in terminals
+- **Edit code without leaving** - Built-in file browser with multi-tab editor
 - **Full configuration UI** - Edit commands, hooks, and actions without touching JSON files
 - **Real-time signals** - Know instantly when an agent needs you
-- Terminal output with ANSI rendering, token tracking, 32 themes
+- Terminal output with ANSI rendering, token tracking, 32 themes, keyboard shortcuts
 
 ### Agent Coordination
 
@@ -245,9 +248,10 @@ curl -fsSL https://raw.githubusercontent.com/joewinke/jat/master/install.sh | ba
 | Doc | What |
 |-----|------|
 | [GETTING_STARTED.md](./GETTING_STARTED.md) | Full walkthrough |
+| [QUICKSTART.md](./QUICKSTART.md) | Quick reference guide |
 | [COMMANDS.md](./COMMANDS.md) | All slash commands |
-| [TOOLS.md](./TOOLS.md) | All 28+ tools |
-| [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | Common issues |
+| [shared/tools.md](./shared/tools.md) | All 28+ tools |
+| [CONTRIBUTING.md](./CONTRIBUTING.md) | Contribution guide |
 
 ---
 
