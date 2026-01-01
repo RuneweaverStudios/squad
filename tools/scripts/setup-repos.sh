@@ -56,6 +56,32 @@ if ! command -v bd &> /dev/null; then
     exit 1
 fi
 
+# Ask if user wants to auto-setup existing projects
+echo -e "${YELLOW}JAT can automatically initialize all projects in ~/code/ with:${NC}"
+echo "  • Beads task management (.beads/ directory)"
+echo "  • JAT documentation imports (CLAUDE.md)"
+echo "  • Git hooks for agent coordination"
+echo "  • .gitignore patterns"
+echo ""
+echo -e "${BLUE}Would you like to auto-setup all existing projects? [y/N]${NC} "
+read -r response
+
+if [[ ! "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+    echo ""
+    echo -e "${GREEN}Skipping auto-setup.${NC}"
+    echo ""
+    echo "You can initialize projects individually later with:"
+    echo "  cd ~/code/<project>"
+    echo "  bd init"
+    echo ""
+    echo "Or run this script again to auto-setup all projects:"
+    echo "  bash $SCRIPT_DIR/setup-repos.sh"
+    echo ""
+    exit 0
+fi
+
+echo ""
+
 # Scan ~/code/ for projects
 CODE_DIR="$HOME/code"
 
