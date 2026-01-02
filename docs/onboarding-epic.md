@@ -1,0 +1,244 @@
+# Epic: Guided Project Onboarding for New Users
+
+**Type:** Epic
+**Priority:** P1
+**Status:** Open
+
+## Problem
+
+First-time JAT users who install the system but don't have an existing project are stuck. The dashboard shows an empty state with no clear path forward. These users need guided onboarding to:
+- Create their first project
+- Write a Product Requirements Document (PRD)
+- Initialize Beads task management
+- Generate initial tasks
+- Start working with their first agent
+
+## Solution
+
+Create a guided onboarding experience where a special "Project Setup Agent" walks new users through the complete project initialization process in a conversational SessionCard interface.
+
+## User Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     ONBOARDING USER FLOW                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. Dashboard Detects Empty State                              │
+│     └─► No projects in ~/.config/jat/projects.json             │
+│                                                                 │
+│  2. Show Onboarding CTA                                         │
+│     ┌──────────────────────────────────────────┐               │
+│     │  Welcome to JAT!                         │               │
+│     │                                          │               │
+│     │  You don't have any projects yet.        │               │
+│     │                                          │               │
+│     │  [🚀 Get Started with Your First Project]│               │
+│     │  [📁 Import Existing Project]           │               │
+│     └──────────────────────────────────────────┘               │
+│                                                                 │
+│  3. User Clicks "Get Started"                                   │
+│     └─► Spawns onboarding tmux session                         │
+│     └─► Opens SessionCard with Project Setup Agent             │
+│                                                                 │
+│  4. Agent Guides Through Setup                                  │
+│     ┌──────────────────────────────────────────┐               │
+│     │ 👋 Hi! I'm here to help you set up your │               │
+│     │ first project. Let's get started!       │               │
+│     │                                          │               │
+│     │ What would you like to build?           │               │
+│     │ ⎿ _                                      │               │
+│     └──────────────────────────────────────────┘               │
+│                                                                 │
+│  5. Agent Creates Project Structure                             │
+│     ├─► Creates ~/code/<project-name>/                         │
+│     ├─► Writes CLAUDE.md with PRD                              │
+│     ├─► Runs `bd init`                                         │
+│     └─► Adds project to JAT config                             │
+│                                                                 │
+│  6. Agent Creates Initial Tasks                                 │
+│     └─► Breaks down PRD into actionable tasks                  │
+│                                                                 │
+│  7. Agent Offers to Start Working                               │
+│     ┌──────────────────────────────────────────┐               │
+│     │ ✅ Your project is ready!                │               │
+│     │                                          │               │
+│     │ I've created 5 tasks to get started.    │               │
+│     │ Would you like me to start working on   │               │
+│     │ the first one?                          │               │
+│     └──────────────────────────────────────────┘               │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Sub-Tasks
+
+### Phase 1: Dashboard Empty State & UI
+
+- **jat-TBD1**: Detect empty state on dashboard load
+  - Check if `~/.config/jat/projects.json` has any projects
+  - Display onboarding CTA if empty
+  - Type: task, Priority: P1
+
+- **jat-TBD2**: Create OnboardingEmptyState component
+  - Hero message: "Welcome to JAT!"
+  - Two buttons: "Get Started" and "Import Existing"
+  - Modern, friendly design
+  - Type: task, Priority: P1
+
+- **jat-TBD3**: Implement "Get Started" button handler
+  - Calls `/api/onboarding/start` endpoint
+  - Spawns tmux session with onboarding agent
+  - Opens SessionCard in dashboard
+  - Type: task, Priority: P1
+
+### Phase 2: Onboarding Agent & Session Management
+
+- **jat-TBD4**: Create onboarding agent system prompt
+  - Conversational, friendly tone
+  - Guides through: idea → PRD → project structure → tasks
+  - Includes examples and templates
+  - Type: task, Priority: P0
+
+- **jat-TBD5**: Create `/api/onboarding/start` endpoint
+  - Spawns tmux session: `tmux-jat-onboarding-{timestamp}`
+  - Launches Claude Code with onboarding prompt
+  - Returns session ID to dashboard
+  - Type: task, Priority: P1
+
+- **jat-TBD6**: Create onboarding slash command `/jat:onboard`
+  - Can be manually triggered by users
+  - Reusable for multiple projects
+  - Accepts optional project name parameter
+  - Type: task, Priority: P2
+
+### Phase 3: Project Creation Workflow
+
+- **jat-TBD7**: Agent project directory creation helper
+  - Creates `~/code/<project-name>/`
+  - Validates directory doesn't exist
+  - Handles naming conflicts gracefully
+  - Type: task, Priority: P1
+
+- **jat-TBD8**: Agent PRD template and guidance
+  - Provides structured PRD template
+  - Asks clarifying questions about:
+    - Project purpose
+    - Target users
+    - Key features
+    - Tech stack preferences
+  - Writes to `CLAUDE.md`
+  - Type: task, Priority: P1
+
+- **jat-TBD9**: Agent Beads initialization
+  - Runs `bd init` in project directory
+  - Explains what Beads does
+  - Shows how to use basic bd commands
+  - Type: task, Priority: P1
+
+- **jat-TBD10**: Agent JAT config integration
+  - Adds project to `~/.config/jat/projects.json`
+  - Sets up project-specific settings
+  - Registers project in dashboard
+  - Type: task, Priority: P1
+
+### Phase 4: Task Generation & Kickoff
+
+- **jat-TBD11**: Agent task breakdown from PRD
+  - Reads PRD from CLAUDE.md
+  - Creates logical task breakdown
+  - Uses `bd create` for each task
+  - Sets appropriate priorities and dependencies
+  - Type: task, Priority: P1
+
+- **jat-TBD12**: Agent offers to start first task
+  - Lists created tasks
+  - Asks if user wants to start working
+  - If yes, runs `/jat:start` on first ready task
+  - Type: task, Priority: P2
+
+- **jat-TBD13**: Dashboard auto-refreshes after onboarding
+  - Polls for project creation completion
+  - Automatically shows new project when ready
+  - Displays success message
+  - Type: task, Priority: P2
+
+### Phase 5: Import Existing Project Flow
+
+- **jat-TBD14**: Create "Import Existing" modal
+  - File browser to select project directory
+  - Checks if directory has git repo
+  - Validates it's a real project
+  - Type: task, Priority: P2
+
+- **jat-TBD15**: Import existing project backend
+  - Runs `bd init` if no .beads exists
+  - Creates basic CLAUDE.md if missing
+  - Adds to JAT config
+  - Type: task, Priority: P2
+
+### Phase 6: Polish & Documentation
+
+- **jat-TBD16**: Add onboarding help text and tooltips
+  - Explain what each step does
+  - Link to documentation
+  - FAQ for common questions
+  - Type: task, Priority: P3
+
+- **jat-TBD17**: Write onboarding documentation
+  - Add section to main docs
+  - Record demo video
+  - Create troubleshooting guide
+  - Type: task, Priority: P3
+
+- **jat-TBD18**: Add analytics/telemetry for onboarding
+  - Track completion rate
+  - Identify drop-off points
+  - Measure time to first task
+  - Type: task, Priority: P4
+
+## Success Metrics
+
+- **Time to first task**: < 5 minutes from install to working agent
+- **Completion rate**: > 80% of users who click "Get Started" complete onboarding
+- **User satisfaction**: Positive feedback on ease of setup
+
+## Technical Notes
+
+**Onboarding Agent Lifecycle:**
+1. Spawned via special tmux session: `tmux-jat-onboarding-{timestamp}`
+2. Uses dedicated onboarding system prompt (not regular agent prompt)
+3. Has access to:
+   - File operations (mkdir, write)
+   - bd commands (init, create)
+   - JAT config modification
+4. Self-terminates after successful project creation
+
+**Session Management:**
+- Onboarding sessions are tagged differently from work sessions
+- Dashboard shows them in a special "Setup" section
+- Can be reused for creating additional projects
+
+**Error Handling:**
+- If user abandons onboarding, session remains accessible
+- Can resume from dashboard later
+- Agent prompts to continue from last step
+
+## Dependencies
+
+- Existing JAT config system (`~/.config/jat/projects.json`)
+- Beads CLI (`bd init`, `bd create`)
+- Dashboard SessionCard component
+- tmux session management
+
+## Open Questions
+
+1. Should we support multiple onboarding sessions simultaneously?
+2. Do we need a "Skip Onboarding" option for power users?
+3. Should the agent offer to clone a template project (e.g., "SvelteKit starter")?
+4. How do we handle users who close the browser during onboarding?
+
+## Related Epics
+
+- jat-xyz: Dashboard empty states and error handling
+- jat-abc: Improved project configuration management
