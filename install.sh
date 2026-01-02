@@ -217,7 +217,7 @@ if command -v npm &> /dev/null; then
     # Install dashboard dependencies (SvelteKit, etc.)
     if [ -f "$INSTALL_DIR/dashboard/package.json" ]; then
         echo "  → Installing dashboard dependencies..."
-        (cd "$INSTALL_DIR/dashboard" && npm install --legacy-peer-deps --silent 2>/dev/null) && \
+        (cd "$INSTALL_DIR/dashboard" && npm install --legacy-peer-deps --engine-strict=false --silent 2>/dev/null) && \
             echo -e "  ${GREEN}✓${NC} dashboard dependencies installed" || \
             echo -e "  ${YELLOW}⚠${NC} dashboard npm install failed (run manually: cd dashboard && npm install --legacy-peer-deps)"
     fi
