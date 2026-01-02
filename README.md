@@ -72,10 +72,8 @@ Think VS Code, but instead of helping *you* write code, it helps you orchestrate
 ## Quick Start
 
 ```bash
-# Install
-git clone https://github.com/yourusername/jat
-cd jat
-./install.sh
+# Install (one-liner)
+curl -fsSL https://raw.githubusercontent.com/joewinke/jat/master/install.sh | bash
 
 # Reload shell
 source ~/.bashrc  # or ~/.zshrc on macOS
@@ -329,8 +327,8 @@ brew install tmux sqlite jq node
 ### Install JAT
 
 ```bash
-cd ~/code/jat
-./install.sh
+# One-line installer (works on Linux and macOS)
+curl -fsSL https://raw.githubusercontent.com/joewinke/jat/master/install.sh | bash
 ```
 
 **This installs:**
@@ -501,4 +499,4 @@ You don't need to figure out how to hold the alien tool. JAT gives you:
 
 **Claim the 10X boost. Get JAT.**
 
-[Install](#installation) | [Quickstart](./QUICKSTART.md) | [Docs](./GETTING_STARTED.md) | [Issues](https://github.com/yourusername/jat/issues)
+[Install](#installation) | [Quickstart](./QUICKSTART.md) | [Docs](./GETTING_STARTED.md) | [Issues](https://github.com/joewinke/jat/issues)
