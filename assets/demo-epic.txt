@@ -1,0 +1,19 @@
+Build a simple user management system with these components:
+
+Backend (jat-demo-api):
+- GET /api/users endpoint returning mock user data
+- TypeScript implementation
+- JSON response with id, name, email fields
+
+Frontend (jat-demo-ui):
+- UserList React component
+- Fetch and display users from API
+- Table or card layout
+- IMPORTANT: Ask user whether to use Tailwind CSS or CSS Modules for styling
+
+Documentation (jat-demo-docs):
+- API endpoint documentation
+- Include curl examples
+- Response schema
+
+Please break this down into specific tasks for each project.
