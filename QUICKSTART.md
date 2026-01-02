@@ -32,8 +32,8 @@ brew install tmux sqlite jq node
 ## Step 2: Install JAT (1 min)
 
 ```bash
-cd ~/code/jat
-./install.sh
+# One-line installer (works on Linux and macOS)
+curl -fsSL https://raw.githubusercontent.com/joewinke/jat/master/install.sh | bash
 ```
 
 **This symlinks all tools to `~/.local/bin/`:**
@@ -377,7 +377,7 @@ am-send "Message" --to <agent>  # Send message
 - [shared/tools.md](shared/tools.md) - All 40+ tools
 
 ### Having Issues?
-- Check [GitHub Issues](https://github.com/yourusername/jat/issues)
+- Check [GitHub Issues](https://github.com/joewinke/jat/issues)
 - Read troubleshooting in [CLAUDE.md](CLAUDE.md)
 - Join community discussions
 
@@ -396,4 +396,4 @@ Karpathy said programmers could be **10X more powerful** if they could just stri
 
 **You're ready to claim the 10X boost. Happy orchestrating! 🚀**
 
-[Full Docs](GETTING_STARTED.md) | [README](README.md) | [Issues](https://github.com/yourusername/jat/issues)
+[Full Docs](GETTING_STARTED.md) | [README](README.md) | [Issues](https://github.com/joewinke/jat/issues)
