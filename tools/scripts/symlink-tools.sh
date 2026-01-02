@@ -207,6 +207,32 @@ else
 fi
 
 echo ""
+echo -e "${BLUE}Setting up jat-uninstall...${NC}"
+echo ""
+
+# Symlink uninstall script
+UNINSTALL_SOURCE="$PROJECT_ROOT/uninstall.sh"
+UNINSTALL_TARGET="$HOME/.local/bin/jat-uninstall"
+
+if [ -f "$UNINSTALL_SOURCE" ]; then
+    if [ -L "$UNINSTALL_TARGET" ]; then
+        CURRENT_TARGET=$(readlink "$UNINSTALL_TARGET")
+        if [ "$CURRENT_TARGET" = "$UNINSTALL_SOURCE" ]; then
+            echo -e "  ${GREEN}✓${NC} jat-uninstall (already linked)"
+        else
+            echo -e "  ${YELLOW}↻${NC} jat-uninstall (updating link)"
+            rm "$UNINSTALL_TARGET"
+            ln -s "$UNINSTALL_SOURCE" "$UNINSTALL_TARGET"
+        fi
+    else
+        echo -e "  ${GREEN}+${NC} jat-uninstall (linked)"
+        ln -s "$UNINSTALL_SOURCE" "$UNINSTALL_TARGET"
+    fi
+else
+    echo -e "  ${YELLOW}⚠${NC} jat-uninstall not found at $UNINSTALL_SOURCE"
+fi
+
+echo ""
 echo -e "${GREEN}=========================================${NC}"
 echo -e "${GREEN}Agent Tools Setup Complete${NC}"
 echo -e "${GREEN}=========================================${NC}"
