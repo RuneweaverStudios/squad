@@ -6,9 +6,9 @@ Backend (jat-demo-api):
 - JSON response with id, name, email fields
 
 Frontend (jat-demo-ui):
-- UserList React component
-- Fetch and display users from API
-- Table or card layout
+- UserList SvelteKit component (+page.svelte)
+- Fetch and display users from API using load function
+- Table or card layout with Svelte 5 runes
 - IMPORTANT: Ask user whether to use Tailwind CSS or CSS Modules for styling
 
 Documentation (jat-demo-docs):

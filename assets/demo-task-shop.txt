@@ -1,0 +1,11 @@
+Implement a discount code system for the shop:
+
+- Discount code model: code, type (percentage/fixed), value, usageLimit, usedCount, expiresAt
+- POST /api/cart/apply-discount - validate and apply discount code
+- GET /api/admin/discounts - list all discount codes (admin only)
+- Frontend discount input field in checkout
+- Show applied discount in cart summary
+- Admin page to create and manage discount codes
+- Validate expiration dates and usage limits
+
+Build this feature with SvelteKit and ensure proper error handling for invalid/expired codes.

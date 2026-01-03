@@ -1,0 +1,11 @@
+Add a comment system to the blog with these requirements:
+
+- Comment model with fields: author, email, content, postId, approved, createdAt
+- GET /api/posts/[id]/comments - fetch approved comments for a post
+- POST /api/posts/[id]/comments - submit new comment (pending approval)
+- Frontend comment display component showing approved comments
+- Comment submission form with validation
+- IMPORTANT: Ask user whether to use inline moderation or separate admin panel for comment approval
+- Style with Tailwind CSS
+
+Please create a detailed implementation plan and use /jat:bead to convert it into executable tasks.

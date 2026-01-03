@@ -1,0 +1,11 @@
+Add real-time visitor tracking to the analytics dashboard:
+
+- WebSocket connection for live updates
+- Track active visitors, page views, referrers
+- Geographic location display (country/city level)
+- Real-time graph showing visitor count over last hour
+- List of current active sessions with page paths
+- Browser and device type breakdown
+- Click heatmap overlay for tracked pages
+
+Create a widget-based layout that updates every 5 seconds. Use Chart.js for visualizations.
