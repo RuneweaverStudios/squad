@@ -41,12 +41,12 @@
 	let width = $state(800);
 	let height = $state(600);
 
-	// Status color mapping (DaisyUI-compatible)
+	// Status color mapping (DaisyUI-compatible) using oklch for theme-awareness
 	const statusColors: Record<string, string> = {
-		open: '#3b82f6',      // blue
-		in_progress: '#f59e0b', // amber
-		closed: '#10b981',     // green
-		blocked: '#ef4444'     // red
+		open: 'oklch(0.70 0.18 220)',      // blue
+		in_progress: 'oklch(0.75 0.18 60)', // amber
+		closed: 'oklch(0.70 0.18 145)',     // green
+		blocked: 'oklch(0.65 0.20 30)'      // red
 	};
 
 	// Priority stroke widths
@@ -150,7 +150,7 @@
 			.data(nodes)
 			.join('circle')
 			.attr('r', 20)
-			.attr('fill', (d: GraphNode) => statusColors[d.status] || '#6b7280')
+			.attr('fill', (d: GraphNode) => statusColors[d.status] || 'oklch(0.60 0.05 250)')
 			.attr('stroke', (d: GraphNode) => getProjectColor(d.id))
 			.attr('stroke-width', (d: GraphNode) => priorityStroke[d.priority] || 1)
 			.attr('class', 'cursor-pointer hover:opacity-80 transition-opacity')

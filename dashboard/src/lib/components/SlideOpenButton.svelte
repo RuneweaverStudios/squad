@@ -15,14 +15,14 @@
 		primaryLabel: string;
 		primaryLoadingLabel?: string;
 		primaryIcon?: string; // SVG path for the icon
-		primaryGradientFrom?: string; // oklch color
-		primaryGradientTo?: string; // oklch color
+		primaryGradientFrom?: string; // CSS color value (CSS variable or oklch)
+		primaryGradientTo?: string; // CSS color value (CSS variable or oklch)
 
 		// Secondary button config
 		secondaryLabel: string;
 		secondaryIcon?: string; // SVG path for the icon
-		secondaryGradientFrom?: string; // oklch color
-		secondaryGradientTo?: string; // oklch color
+		secondaryGradientFrom?: string; // CSS color value (CSS variable or oklch)
+		secondaryGradientTo?: string; // CSS color value (CSS variable or oklch)
 		secondaryTitle?: string; // Tooltip
 
 		// State
@@ -30,7 +30,7 @@
 		loading?: boolean;
 
 		// Border color (shared between buttons)
-		borderColor?: string; // oklch color
+		borderColor?: string; // CSS color value (CSS variable or oklch)
 
 		// Handlers
 		onprimary: () => void;
@@ -41,16 +41,16 @@
 		primaryLabel,
 		primaryLoadingLabel = 'Loading...',
 		primaryIcon,
-		primaryGradientFrom = 'oklch(0.55 0.15 55)',
-		primaryGradientTo = 'oklch(0.45 0.18 45)',
+		primaryGradientFrom = 'var(--color-warning)',
+		primaryGradientTo = 'color-mix(in oklch, var(--color-warning) 80%, black)',
 		secondaryLabel,
 		secondaryIcon,
-		secondaryGradientFrom = 'oklch(0.45 0.18 145)',
-		secondaryGradientTo = 'oklch(0.35 0.15 145)',
+		secondaryGradientFrom = 'var(--color-success)',
+		secondaryGradientTo = 'color-mix(in oklch, var(--color-success) 80%, black)',
 		secondaryTitle,
 		disabled = false,
 		loading = false,
-		borderColor = 'oklch(0.60 0.15 55)',
+		borderColor = 'color-mix(in oklch, var(--color-base-content) 30%, transparent)',
 		onprimary,
 		onsecondary
 	}: Props = $props();
@@ -70,8 +70,8 @@
 		class="btn btn-sm gap-1 rounded-none border-0 transition-all duration-200 ease-out"
 		style="
 			background: linear-gradient(135deg, {secondaryGradientFrom} 0%, {secondaryGradientTo} 100%);
-			color: oklch(0.95 0.02 250);
-			border-right: 1px solid oklch(0.50 0.10 55);
+			color: var(--color-base-100);
+			border-right: 1px solid color-mix(in oklch, var(--color-base-content) 20%, transparent);
 			max-width: {hovered ? '120px' : '0px'};
 			padding: {hovered ? '0.5rem 0.75rem' : '0.5rem 0'};
 			opacity: {hovered ? '1' : '0'};
@@ -100,7 +100,7 @@
 		class="btn btn-sm gap-2 rounded-none border-0"
 		style="
 			background: linear-gradient(135deg, {primaryGradientFrom} 0%, {primaryGradientTo} 100%);
-			color: oklch(0.95 0.02 250);
+			color: var(--color-base-100);
 		"
 		onclick={onprimary}
 		{disabled}

@@ -166,11 +166,24 @@
 	let editingColor = $state<string | null>(null); // Project name being edited (color)
 	let colorDraft = $state<string>(''); // Color in hex format for picker
 
-	// Predefined color palette for quick selection
+	// Predefined color palette for quick selection - using oklch for perceptual uniformity
+	// These are designed to work well across different themes
 	const COLOR_PALETTE = [
-		'#5588ff', '#00d4aa', '#ff6b6b', '#ffd93d', '#6bcb77',
-		'#bb66ff', '#ff9933', '#17ace6', '#8572d6', '#c90b11',
-		'#3df1ae', '#97b7fd', '#ff5555', '#44ff44', '#ffdd00'
+		'oklch(0.70 0.18 220)', // Blue
+		'oklch(0.75 0.18 160)', // Cyan
+		'oklch(0.65 0.20 30)',  // Red
+		'oklch(0.80 0.18 90)',  // Yellow
+		'oklch(0.70 0.18 145)', // Green
+		'oklch(0.65 0.18 280)', // Purple
+		'oklch(0.75 0.18 60)',  // Orange
+		'oklch(0.70 0.18 200)', // Sky blue
+		'oklch(0.60 0.18 300)', // Violet
+		'oklch(0.55 0.25 25)',  // Dark red
+		'oklch(0.80 0.20 150)', // Mint green
+		'oklch(0.75 0.12 220)', // Light blue
+		'oklch(0.70 0.22 15)',  // Bright red
+		'oklch(0.75 0.20 120)', // Lime
+		'oklch(0.85 0.18 85)'   // Bright yellow
 	];
 
 	// Convert #rrggbb to rgb(rrggbb) for JAT config (used when saving colors)
@@ -426,7 +439,7 @@
 	// Color editing functions
 	function startEditingColor(project: Project) {
 		editingColor = project.name;
-		colorDraft = project.activeColor || '#888888';
+		colorDraft = project.activeColor || 'oklch(0.60 0.05 250)'; // Neutral gray fallback
 	}
 
 	function cancelEditingColor() {
@@ -916,7 +929,7 @@
 														type="text"
 														class="flex-1 px-2 py-1 rounded font-mono text-xs bg-base-300 border border-base-content/20 text-base-content/90"
 														bind:value={colorDraft}
-														placeholder="#5588ff"
+														placeholder="oklch(0.70 0.18 220)"
 													/>
 												</div>
 												<!-- Action buttons -->
@@ -939,7 +952,7 @@
 											<!-- Current color dot (clickable to close) -->
 											<button
 												class="w-5 h-5 rounded-full transition-transform hover:scale-110 ring-2 ring-info"
-												style="background: {colorDraft || '#888888'};"
+												style="background: {colorDraft || 'oklch(0.60 0.05 250)'};"
 												onclick={(e) => { e.stopPropagation(); cancelEditingColor(); }}
 												title="Cancel"
 											></button>
@@ -947,7 +960,7 @@
 											<!-- Color dot (click to edit) -->
 											<button
 												class="w-5 h-5 rounded-full transition-all hover:scale-110 hover:ring-2 hover:ring-white/30"
-												style="background: {project.activeColor || '#888888'};"
+												style="background: {project.activeColor || 'oklch(0.60 0.05 250)'};"
 												onclick={(e) => { e.stopPropagation(); startEditingColor(project); }}
 												title="Click to change color"
 											></button>

@@ -135,7 +135,7 @@
 		showTooltip = true,
 		showGrid = false,
 		colorMode = 'usage',
-		staticColor = '#10b981',
+		staticColor = 'oklch(0.70 0.18 145)',
 		showStyleToolbar = true,
 		defaultTimeRange = '12h',
 		defaultColorMode = 'usage',
@@ -199,16 +199,16 @@
 	let internalShowGrid = $state(false); // Internal grid toggle state (starts off, user can toggle)
 	let smoothCurves = $state(true); // Enable bezier curve smoothing
 	let internalColorMode = $state<'usage' | 'static'>(defaultColorMode); // Initialize from prop
-	let selectedPaletteColor = $state('#10b981'); // Default to green
+	let selectedPaletteColor = $state('oklch(0.70 0.18 145)'); // Default to green
 
-	// Color palette options
+	// Color palette options - using oklch for theme-aware colors
 	const colorPalette = [
-		{ name: 'Green', color: '#10b981' },
-		{ name: 'Blue', color: '#3b82f6' },
-		{ name: 'Orange', color: '#f59e0b' },
-		{ name: 'Red', color: '#ef4444' },
-		{ name: 'Purple', color: '#a855f7' },
-		{ name: 'Pink', color: '#ec4899' }
+		{ name: 'Green', color: 'oklch(0.70 0.18 145)' }, // Green
+		{ name: 'Blue', color: 'oklch(0.70 0.18 220)' }, // Blue
+		{ name: 'Orange', color: 'oklch(0.75 0.18 60)' }, // Orange
+		{ name: 'Red', color: 'oklch(0.65 0.20 30)' }, // Red
+		{ name: 'Purple', color: 'oklch(0.65 0.18 280)' }, // Purple
+		{ name: 'Pink', color: 'oklch(0.75 0.18 340)' } // Pink
 	];
 
 	// ============================================================================
@@ -434,8 +434,8 @@
 		return { min, max, range: max - min };
 	});
 
-	// Color lookup - avoids repeated string allocations
-	const percentileColors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'] as const;
+	// Color lookup - avoids repeated string allocations, using oklch
+	const percentileColors = ['oklch(0.70 0.18 145)', 'oklch(0.70 0.18 220)', 'oklch(0.75 0.18 60)', 'oklch(0.65 0.20 30)'] as const;
 
 	/** Calculate color for a specific data point based on relative position in range */
 	function getColorForValue(tokens: number): string {
@@ -457,7 +457,7 @@
 
 	/** Calculate line color based on average usage */
 	const lineColor = $derived.by(() => {
-		if (!filteredData || filteredData.length === 0) return '#10b981'; // Default green
+		if (!filteredData || filteredData.length === 0) return 'oklch(0.70 0.18 145)'; // Default green
 		const avgTokens = filteredData.reduce((sum, d) => sum + d.tokens, 0) / filteredData.length;
 		return getColorForValue(avgTokens);
 	});
@@ -1134,7 +1134,7 @@
 							cy={y}
 							r="3"
 							fill={project.color}
-							stroke="white"
+							stroke="oklch(0.95 0.01 60)"
 							stroke-width="1"
 						/>
 					{/if}
@@ -1219,7 +1219,7 @@
 				{@const x = padding + (hoveredIndex / (filteredData.length - 1 || 1)) * (viewBoxWidth - 2 * padding)}
 				{@const y = scaleY(point.tokens)}
 
-				<circle cx={x} cy={y} r="2" fill={lineColor} stroke="white" stroke-width="1" />
+				<circle cx={x} cy={y} r="2" fill={lineColor} stroke="oklch(0.95 0.01 60)" stroke-width="1" />
 			{/if}
 		{/if}
 	</svg>
@@ -1264,7 +1264,7 @@
 			<div class="text-xs font-medium mb-1">{formatTimestamp(hoveredMultiSeriesPoint.timestamp)}</div>
 			<!-- Per-project breakdown -->
 			{#each Object.entries(hoveredMultiSeriesPoint.projects).filter(([_, d]) => d.tokens > 0).sort((a, b) => b[1].tokens - a[1].tokens) as [projectName, projectData]}
-				{@const projectColor = projectMeta?.find(p => p.name === projectName)?.color || '#888'}
+				{@const projectColor = projectMeta?.find(p => p.name === projectName)?.color || 'oklch(0.60 0.05 250)'}
 				<div class="flex items-center gap-1.5 text-xs">
 					<div class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: {projectColor};"></div>
 					<span class="truncate max-w-[80px]">{projectName}:</span>
@@ -1300,16 +1300,16 @@
 
 	.sparkline-tooltip {
 		position: fixed;
-		background: white;
-		border: 1px solid rgba(0, 0, 0, 0.1);
+		background: var(--color-base-100);
+		border: 1px solid color-mix(in oklch, var(--color-base-content) 10%, transparent);
 		border-radius: 0.375rem;
 		padding: 0.5rem;
 		pointer-events: none;
 		z-index: 1000;
-		box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+		box-shadow: 0 4px 6px -1px color-mix(in oklch, var(--color-base-content) 10%, transparent);
 		transform: translate(-50%, -100%);
 		white-space: nowrap;
-		color: #1f2937;
+		color: var(--color-base-content);
 	}
 
 	.sparkline-tooltip::after {
@@ -1319,6 +1319,6 @@
 		left: 50%;
 		transform: translateX(-50%);
 		border: 6px solid transparent;
-		border-top-color: white;
+		border-top-color: var(--color-base-100);
 	}
 </style>

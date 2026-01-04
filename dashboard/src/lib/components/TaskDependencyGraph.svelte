@@ -57,12 +57,12 @@
 	let width = $state(400);
 	let simulation: Simulation<GraphNode, GraphLink> | null = null;
 
-	// Status color mapping (DaisyUI-compatible)
+	// Status color mapping (DaisyUI-compatible) using oklch for theme-awareness
 	const statusColors: Record<string, string> = {
-		open: '#3b82f6',       // blue (info)
-		in_progress: '#f59e0b', // amber (warning)
-		closed: '#10b981',      // green (success)
-		blocked: '#ef4444'      // red (error)
+		open: 'oklch(0.70 0.18 220)',       // blue (info)
+		in_progress: 'oklch(0.75 0.18 60)', // amber (warning)
+		closed: 'oklch(0.70 0.18 145)',     // green (success)
+		blocked: 'oklch(0.65 0.20 30)'      // red (error)
 	};
 
 	// Priority stroke widths
@@ -220,7 +220,7 @@
 			.selectAll('line')
 			.data(links)
 			.join('line')
-			.attr('stroke', (d: GraphLink) => d.type === 'depends_on' ? '#3b82f6' : '#f59e0b')
+			.attr('stroke', (d: GraphLink) => d.type === 'depends_on' ? 'oklch(0.70 0.18 220)' : 'oklch(0.75 0.18 60)')
 			.attr('stroke-width', 2)
 			.attr('stroke-opacity', 0.6)
 			.attr('marker-end', (d: GraphLink) => d.type === 'depends_on' ? 'url(#arrow-depends)' : 'url(#arrow-blocks)');
@@ -231,8 +231,8 @@
 			.data(nodes)
 			.join('circle')
 			.attr('r', (d: GraphNode) => d.isCenter ? 18 : 14)
-			.attr('fill', (d: GraphNode) => statusColors[d.status] || '#6b7280')
-			.attr('stroke', (d: GraphNode) => d.isCenter ? '#fff' : getProjectColor(d.id))
+			.attr('fill', (d: GraphNode) => statusColors[d.status] || 'oklch(0.60 0.05 250)')
+			.attr('stroke', (d: GraphNode) => d.isCenter ? 'oklch(0.98 0.01 60)' : getProjectColor(d.id))
 			.attr('stroke-width', (d: GraphNode) => d.isCenter ? 3 : priorityStroke[d.priority] || 1)
 			.attr('class', 'cursor-pointer hover:opacity-80 transition-opacity')
 			.call(drag(simulation) as any)
