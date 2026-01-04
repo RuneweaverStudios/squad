@@ -574,6 +574,81 @@ cd ~/code/jat
 
 **Note:** The statusline and hooks are written in bash and installed to `~/.claude/`. They run as bash scripts regardless of your shell preference.
 
+## Demo System
+
+JAT includes a streamlined demo system for recording videos and showcasing dashboard features. The demo uses three pre-configured projects with distinct colors for visual differentiation.
+
+### Demo Projects
+
+| Project | Description | Color Scheme |
+|---------|-------------|--------------|
+| `jat-demo-blog` | Blog platform | Red/Pink |
+| `jat-demo-shop` | E-commerce store | Green |
+| `jat-demo-dashboard` | Analytics dashboard | Blue |
+
+### Quick Start
+
+```bash
+# One-time setup (creates projects, clears tasks, configures colors)
+jat-demo setup
+
+# Show only demo projects in dashboard (hide regular projects)
+jat-demo on
+
+# After recording, restore regular projects
+jat-demo off
+
+# Optionally remove demo projects (with confirmation)
+jat-demo clean
+```
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `jat-demo setup` | Creates demo projects in ~/code/, initializes with beads, adds to config with distinct colors |
+| `jat-demo on` | Hides all non-demo projects in dashboard, shows only demo projects |
+| `jat-demo off` | Shows regular projects, hides demo projects |
+| `jat-demo status` | Shows visibility status of all projects |
+| `jat-demo clean` | Removes all demo projects (interactive confirmation) |
+
+### What `jat-demo setup` Does
+
+1. **Creates project directories** in `~/code/` (skips if they exist)
+2. **Initializes beads** for each project (`bd init`)
+3. **Clears task lists** (empty `.beads/issues.jsonl`)
+4. **Adds to JAT config** with distinct `active_color` and `inactive_color`
+5. **Kills stale tmux sessions** (any old `jat-*Agent` sessions)
+
+### Recording Scripts
+
+Demo recording scripts are located in `assets/`:
+
+- **RECORDING-SCRIPT-FINAL.md** - Latest recording guide with step-by-step instructions
+
+**Key Features Showcased:**
+- Multi-project task management
+- Parallel agent execution across projects
+- Interactive decision-making via AskUserQuestion modals
+- Project panel organization (collapse/expand)
+- AI-powered task suggestions
+- Complete workflow from task creation to completion
+
+### After Recording
+
+```bash
+# Restore normal dashboard view
+jat-demo off
+
+# Optional: Remove demo projects entirely
+jat-demo clean
+```
+
+**Files:**
+- `tools/scripts/jat-demo` - Demo management CLI
+- `assets/RECORDING-SCRIPT-FINAL.md` - Recording instructions
+- `assets/demo-task-*.txt` - Sample task descriptions
+
 ## Common Issues
 
 ### Dashboard themes not working

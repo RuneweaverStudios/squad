@@ -105,7 +105,8 @@ setup_demo_projects() {
             echo -e "  Creating new project..."
             mkdir -p "$path"
             cd "$path"
-            bd init -y >/dev/null 2>&1
+            # Use proper bd init with defaults (no -y flag)
+            echo -e "Y\nY\nY\nY\n" | bd init >/dev/null 2>&1
             ((created++))
         fi
 
@@ -113,15 +114,45 @@ setup_demo_projects() {
         echo "[]" > "$path/.beads/issues.jsonl"
         echo -e "  Cleared task list"
 
+        # Determine color based on project type
+        local color_active=""
+        local color_inactive=""
+        case "$project" in
+            "jat-demo-shop")
+                # Green for shop
+                color_active="oklch(0.75 0.18 142)"
+                color_inactive="oklch(0.60 0.15 145)"
+                ;;
+            "jat-demo-blog")
+                # Red/Pink for blog
+                color_active="oklch(0.65 0.18 10)"
+                color_inactive="oklch(0.55 0.15 10)"
+                ;;
+            "jat-demo-dashboard")
+                # Blue for dashboard
+                color_active="oklch(0.70 0.18 230)"
+                color_inactive="oklch(0.55 0.15 230)"
+                ;;
+        esac
+
         # Add to JAT config if not already there
         if ! jq -e ".projects.\"$project\"" "$CONFIG_FILE" >/dev/null 2>&1; then
-            echo -e "  Adding to JAT config..."
+            echo -e "  Adding to JAT config with distinct color..."
             local temp_file="/tmp/jat-config-$$.json"
             jq ".projects.\"$project\" = {
                 \"name\": \"${project^^}\",
                 \"path\": \"$path\",
-                \"description\": \"$desc\"
+                \"description\": \"$desc\",
+                \"active_color\": \"$color_active\",
+                \"inactive_color\": \"$color_inactive\"
             }" "$CONFIG_FILE" > "$temp_file"
+            mv "$temp_file" "$CONFIG_FILE"
+        else
+            # Update existing config to add colors if missing
+            echo -e "  Updating colors in JAT config..."
+            local temp_file="/tmp/jat-config-$$.json"
+            jq ".projects.\"$project\".active_color = \"$color_active\" |
+                .projects.\"$project\".inactive_color = \"$color_inactive\"" "$CONFIG_FILE" > "$temp_file"
             mv "$temp_file" "$CONFIG_FILE"
         fi
 
