@@ -1454,7 +1454,7 @@
 		<!-- Project list -->
 		<div class="flex flex-col">
 			<!-- Sticky header with Add Project button -->
-			<div class="sticky top-0 z-30 bg-base-200 border-b border-base-300 px-4 py-2 flex items-center justify-between">
+			<div class="sticky top-0 z-10 bg-base-200 border-b border-base-300 px-4 py-2 flex items-center justify-between">
 				<span class="text-xs font-mono uppercase tracking-wider text-base-content/60">
 					{sortedProjects.length} project{sortedProjects.length !== 1 ? 's' : ''}
 				</span>
@@ -1509,7 +1509,7 @@
 				>
 					<!-- Project header -->
 					<div
-						class="w-full flex items-center gap-3 px-4 py-2 hover:bg-base-200/50 transition-colors bg-base-100 z-20 sticky top-0 shadow-sm {isDragOver ? 'bg-primary/10' : ''}"
+						class="w-full flex items-center gap-3 px-4 py-2 hover:bg-base-200/50 transition-colors bg-base-100 z-10 sticky top-0 shadow-sm {isDragOver ? 'bg-primary/10' : ''}"
 					>
 						<!-- Drag handle - only this element initiates drag -->
 						<!-- svelte-ignore a11y_no_static_element_interactions -->

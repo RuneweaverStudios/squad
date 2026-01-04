@@ -285,7 +285,7 @@
 		{#if loading}
 			<span class="opacity-50 mr-2">-</span>
 		{:else}
-			<AnimatedDigits value={count.toString()} class="font-medium" />
+			<AnimatedDigits value={count.toString()} class="font-medium mr-1.5" />
 		{/if}
 
 		<!-- Streak indicator - slides out on hover -->
