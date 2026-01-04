@@ -46,23 +46,61 @@ fi
 echo ""
 echo -e "${GREEN}Syncing files...${NC}"
 
-# Sync all files except node_modules and .git
-rsync -av --delete \
-    --exclude 'node_modules' \
-    --exclude '.git' \
-    --exclude '*.log' \
-    --exclude '.svelte-kit' \
-    --exclude 'dist' \
-    --exclude 'build' \
-    --exclude '.env' \
-    --exclude '.env.local' \
-    "$SOURCE_DIR/" "$TARGET_DIR/"
+# Check for rsync or use cp fallback
+if command -v rsync >/dev/null 2>&1; then
+    # Use rsync if available
+    rsync -av --delete \
+        --exclude 'node_modules' \
+        --exclude '.git' \
+        --exclude '*.log' \
+        --exclude '.svelte-kit' \
+        --exclude 'dist' \
+        --exclude 'build' \
+        --exclude '.env' \
+        --exclude '.env.local' \
+        "$SOURCE_DIR/" "$TARGET_DIR/"
+else
+    echo -e "${YELLOW}rsync not found, using cp instead (slower)${NC}"
+
+    # Remove old files first (but keep node_modules if they exist)
+    find "$TARGET_DIR" -mindepth 1 -maxdepth 1 \
+        -not -name 'node_modules' \
+        -not -name '.git' \
+        -exec rm -rf {} \;
+
+    # Copy everything except excluded files
+    for item in "$SOURCE_DIR"/*; do
+        basename_item=$(basename "$item")
+        # Skip excluded items
+        case "$basename_item" in
+            node_modules|.git|*.log|.svelte-kit|dist|build|.env|.env.local)
+                continue
+                ;;
+            *)
+                cp -r "$item" "$TARGET_DIR/"
+                ;;
+        esac
+    done
+
+    # Copy hidden files (except .git and .env*)
+    for item in "$SOURCE_DIR"/.*; do
+        basename_item=$(basename "$item")
+        case "$basename_item" in
+            .|..|.git|.env|.env.local|.svelte-kit)
+                continue
+                ;;
+            *)
+                [ -e "$item" ] && cp -r "$item" "$TARGET_DIR/"
+                ;;
+        esac
+    done
+fi
 
 echo ""
 echo -e "${GREEN}✅ Sync complete!${NC}"
 echo ""
 echo -e "Changes synced to XDG installation:"
-echo -e "  • Dashboard changes → ${CYAN}jat-dashboard${NC} will now use updated code"
+echo -e "  • Dashboard changes → ${CYAN}jat${NC} will now use updated code"
 echo -e "  • Tool changes → ${CYAN}am-*, db-*, etc.${NC} will use updated scripts"
 echo -e "  • Config changes → Templates and shared docs updated"
 echo ""
