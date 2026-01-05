@@ -222,7 +222,10 @@
 				dirty: false,
 				isMedia: true
 			};
-			openFiles = [...openFiles, newFile];
+			// Double-check to handle race conditions with concurrent handleFileSelect calls
+			if (!openFiles.some(f => f.path === path)) {
+				openFiles = [...openFiles, newFile];
+			}
 			activeFilePath = path;
 			return;
 		}
@@ -254,7 +257,10 @@
 				originalContent: content,
 				dirty: false
 			};
-			openFiles = [...openFiles, newFile];
+			// Double-check to handle race conditions with concurrent handleFileSelect calls
+			if (!openFiles.some(f => f.path === path)) {
+				openFiles = [...openFiles, newFile];
+			}
 			activeFilePath = path;
 		} catch (err) {
 			const errorMsg = err instanceof Error ? err.message : 'Failed to load file';
