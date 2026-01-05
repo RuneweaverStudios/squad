@@ -7,7 +7,7 @@ set -euo pipefail
 # Resolve real path of script (handles symlinks)
 SCRIPT_REAL_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname "$SCRIPT_REAL_PATH")"
-AVATARS_DIR="${AVATARS_DIR:-$(cd "$SCRIPT_DIR/../avatars" && pwd)}"
+AVATARS_DIR="${AVATARS_DIR:-$(cd "$SCRIPT_DIR/../../avatars" && pwd)}"
 
 show_help() {
     cat <<'EOF'
