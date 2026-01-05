@@ -21,7 +21,7 @@
       "name": "API-SERVER",
       "path": "~/code/api-server",
       "port": 8080,
-      "database_url": "postgresql://user:password@localhost:5432/mydb",
+      "database_url": "postgresql://user:CHANGE_ME@localhost:5432/mydb",
       "description": "Backend API server",
       "active_color": "rgb(100, 150, 255)",
       "inactive_color": "rgb(60, 100, 180)"
