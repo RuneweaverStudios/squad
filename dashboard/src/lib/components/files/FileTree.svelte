@@ -154,7 +154,7 @@
 		const params = new URLSearchParams({
 			project,
 			path,
-			showHidden: 'false'
+			showHidden: 'true'
 		});
 
 		const response = await fetch(`/api/files?${params}`);

@@ -271,10 +271,14 @@
 			>
 				{#if isActiveSaving}
 					<span class="save-spinner"></span>
+					<span class="save-text">Saving</span>
 				{:else}
-					<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<svg class="save-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
 					</svg>
+					{#if activeFile?.dirty}
+						<span class="save-text">Save</span>
+					{/if}
 				{/if}
 			</button>
 		</div>
@@ -401,7 +405,8 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		width: 36px;
+		gap: 0.375rem;
+		padding: 0 0.75rem;
 		min-width: 36px;
 		background: oklch(0.18 0.01 250);
 		border: none;
@@ -417,27 +422,47 @@
 	}
 
 	.save-btn.has-changes {
-		color: oklch(0.75 0.15 145);
-		animation: pulse-save 2s infinite;
+		background: oklch(0.55 0.15 145 / 0.15);
+		color: oklch(0.80 0.18 145);
+		animation: pulse-save 1.5s infinite;
 	}
 
 	.save-btn.has-changes:hover {
-		background: oklch(0.55 0.15 145 / 0.2);
-		color: oklch(0.80 0.18 145);
+		background: oklch(0.55 0.15 145 / 0.25);
+		color: oklch(0.85 0.18 145);
 	}
 
 	.save-btn.saving {
 		color: oklch(0.65 0.15 200);
+		background: oklch(0.55 0.15 200 / 0.1);
 	}
 
-	.save-btn:disabled:not(.saving) {
+	.save-btn:disabled:not(.saving):not(.has-changes) {
 		cursor: not-allowed;
 		opacity: 0.5;
 	}
 
+	.save-icon {
+		width: 16px;
+		height: 16px;
+		flex-shrink: 0;
+	}
+
+	.save-text {
+		font-size: 0.75rem;
+		font-weight: 500;
+		white-space: nowrap;
+	}
+
 	@keyframes pulse-save {
-		0%, 100% { opacity: 1; }
-		50% { opacity: 0.7; }
+		0%, 100% {
+			opacity: 1;
+			box-shadow: 0 0 0 0 oklch(0.55 0.18 145 / 0);
+		}
+		50% {
+			opacity: 0.9;
+			box-shadow: 0 0 8px 2px oklch(0.55 0.18 145 / 0.3);
+		}
 	}
 
 	.save-spinner {
@@ -447,6 +472,7 @@
 		border-top-color: oklch(0.65 0.15 200);
 		border-radius: 50%;
 		animation: spin 0.6s linear infinite;
+		flex-shrink: 0;
 	}
 
 	@keyframes spin {

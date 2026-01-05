@@ -25,11 +25,8 @@ import type { RequestHandler } from './$types';
 const MAX_FILE_SIZE = 1024 * 1024;
 
 // Sensitive file patterns that should not be written to
+// Note: .env files are allowed since users legitimately need to edit them
 const SENSITIVE_PATTERNS = [
-	'.env',
-	'.env.local',
-	'.env.production',
-	'.env.development',
 	'credentials.json',
 	'secrets.json',
 	'service-account.json',

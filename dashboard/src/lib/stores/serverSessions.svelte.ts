@@ -62,7 +62,7 @@ interface ServerSessionsState {
 // Reactive state using Svelte 5 runes
 let state = $state<ServerSessionsState>({
 	sessions: [],
-	isLoading: false,
+	isLoading: true, // Start true to show skeleton until first fetch completes
 	error: null,
 	lastFetch: null
 });
