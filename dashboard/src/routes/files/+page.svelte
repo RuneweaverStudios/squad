@@ -803,7 +803,7 @@
 
 <style>
 	.files-page {
-		min-height: 100vh;
+		height: 100%;
 		display: flex;
 		flex-direction: column;
 	}
@@ -815,7 +815,7 @@
 		padding: 0.75rem;
 		max-width: 100%;
 		width: 100%;
-		max-height: calc(100vh - 48px); /* Account for TopBar */
+		min-height: 0; /* Allow flex shrinking to fit parent */
 	}
 
 	/* Compact Project Selector (in panel header) */

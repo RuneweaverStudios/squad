@@ -10,7 +10,7 @@
 	 */
 
 	import type { WorkingSignal } from '$lib/types/richSignals';
-	import { openInVSCode, isGlobPattern, getFileLink, openInFilesPage } from '$lib/utils/fileLinks';
+	import { openInJatEditor, isGlobPattern, getFileLink, openInFilesPage } from '$lib/utils/fileLinks';
 
 	interface Props {
 		/** The rich working signal data */
@@ -123,7 +123,7 @@
 				openInFilesPage(filePath, projectName);
 			} else {
 				// Fallback: open in JAT file editor (without project context)
-				openInVSCode(filePath);
+				openInJatEditor(filePath);
 			}
 		}
 	}

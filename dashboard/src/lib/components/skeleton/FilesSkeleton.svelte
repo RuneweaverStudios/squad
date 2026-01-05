@@ -124,17 +124,9 @@
 	.files-skeleton {
 		display: flex;
 		flex-direction: column;
-		max-height: 98vh;
-		padding: 1.5rem;
+		height: 100%;
+		padding: 0.75rem;  /* Match .files-content padding */
 		background: oklch(0.14 0.01 250);
-	}
-
-	.files-header-skeleton {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 1.5rem;
-		margin-bottom: 1rem;
 	}
 
 	.files-body-skeleton {
@@ -254,12 +246,7 @@
 	/* Responsive */
 	@media (max-width: 768px) {
 		.files-skeleton {
-			padding: 1rem;
-		}
-
-		.files-header-skeleton {
-			flex-direction: column;
-			align-items: flex-start;
+			padding: 0.75rem;
 		}
 
 		.files-body-skeleton {

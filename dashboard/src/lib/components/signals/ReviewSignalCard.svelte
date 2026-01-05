@@ -12,8 +12,8 @@
 
 	import type { ReviewSignal, FileModification, KeyDecision, CommitInfo, ReviewFocusItem } from '$lib/types/richSignals';
 	import {
-		openInVSCode,
-		openDiffInVSCode,
+		openInJatEditor,
+		openDiffInJatEditor,
 		getFileLink,
 		getDiffLink,
 		getAllFileLinks,
@@ -146,7 +146,7 @@
 			onDiffClick(file.path, file.changeType);
 		} else {
 			// Default: open diff in JAT file editor
-			openDiffInVSCode(file.path);
+			openDiffInJatEditor(file.path);
 		}
 	}
 

@@ -304,8 +304,8 @@ function getDefaultProjectRoot(): string {
  * File link result containing both URL and fallback command
  */
 export interface FileLinkResult {
-	/** VS Code URL for direct opening */
-	vscodeUrl: string;
+	/** JAT file editor URL for direct opening */
+	editorUrl: string;
 	/** Shell command for terminal users */
 	shellCommand?: string;
 	/** Human-readable description */
@@ -318,7 +318,7 @@ export interface FileLinkResult {
  * @example
  * ```typescript
  * const link = getFileLink('src/lib/auth.ts', { line: 42 });
- * // link.vscodeUrl = '/files?path=src/lib/auth.ts&line=42'
+ * // link.editorUrl = '/files?path=src/lib/auth.ts&line=42'
  * // link.shellCommand = 'code src/lib/auth.ts:42'
  * // link.description = 'Open src/lib/auth.ts at line 42'
  * ```
@@ -326,7 +326,7 @@ export interface FileLinkResult {
 export function getFileLink(filePath: string, options: FileLinkOptions = {}): FileLinkResult {
 	const { line, column } = options;
 
-	const vscodeUrl = generateJatFileUrl(filePath, options);
+	const editorUrl = generateJatFileUrl(filePath, options);
 
 	// Build shell command for terminal users (still points to external editor)
 	let shellCommand = `code ${filePath}`;
@@ -347,7 +347,7 @@ export function getFileLink(filePath: string, options: FileLinkOptions = {}): Fi
 	}
 
 	return {
-		vscodeUrl,
+		editorUrl,
 		shellCommand,
 		description
 	};
@@ -359,13 +359,13 @@ export function getFileLink(filePath: string, options: FileLinkOptions = {}): Fi
  * @example
  * ```typescript
  * const link = getDiffLink('src/lib/auth.ts', { ref: 'HEAD~1' });
- * // link.vscodeUrl = '/files?path=src/lib/auth.ts&diff=true&ref=HEAD~1'
+ * // link.editorUrl = '/files?path=src/lib/auth.ts&diff=true&ref=HEAD~1'
  * // link.shellCommand = 'git diff HEAD~1 -- src/lib/auth.ts'
  * // link.description = 'Show diff for src/lib/auth.ts'
  * ```
  */
 export function getDiffLink(filePath: string, options: DiffLinkOptions = {}): FileLinkResult {
-	const vscodeUrl = generateDiffUrl(filePath, options);
+	const editorUrl = generateDiffUrl(filePath, options);
 	const shellCommand = generateGitDiffCommand(filePath, options.ref);
 
 	let description = `Show diff for ${getFileName(filePath)}`;
@@ -376,7 +376,7 @@ export function getDiffLink(filePath: string, options: DiffLinkOptions = {}): Fi
 	}
 
 	return {
-		vscodeUrl,
+		editorUrl,
 		shellCommand,
 		description
 	};
@@ -500,8 +500,8 @@ export function detectRouteFromPath(filePath: string): string | null {
  * Interface for all links related to a file
  */
 export interface FileLinks {
-	/** JAT file editor link to open the file (legacy name kept for compatibility) */
-	vscodeUrl: string;
+	/** JAT file editor link to open the file */
+	editorUrl: string;
 	/** JAT file editor link to show diff */
 	diffUrl: string;
 	/** Localhost URL if this is a route file */
@@ -522,7 +522,7 @@ export interface FileLinks {
  * ```typescript
  * getAllFileLinks('src/routes/dashboard/+page.svelte', 'jat')
  * // → {
- * //     vscodeUrl: '/files?path=src/routes/dashboard/+page.svelte',
+ * //     editorUrl: '/files?path=src/routes/dashboard/+page.svelte',
  * //     diffUrl: '/files?path=src/routes/dashboard/+page.svelte&diff=true',
  * //     localhostUrl: 'http://localhost:3333/dashboard',
  * //     detectedRoute: '/dashboard'
@@ -534,7 +534,7 @@ export function getAllFileLinks(
 	projectName: string,
 	options: FileLinkOptions & { localhostRoute?: string } = {}
 ): FileLinks {
-	const vscodeUrl = generateJatFileUrl(filePath, options);
+	const editorUrl = generateJatFileUrl(filePath, options);
 	const diffUrl = generateDiffUrl(filePath, {});
 
 	// Use explicit localhost route if provided, otherwise try to detect
@@ -542,7 +542,7 @@ export function getAllFileLinks(
 	const localhostUrl = detectedRoute ? generateLocalhostUrl(detectedRoute, projectName) : null;
 
 	return {
-		vscodeUrl,
+		editorUrl,
 		diffUrl,
 		localhostUrl,
 		detectedRoute
@@ -564,11 +564,11 @@ export function openAllFileLinks(
 	filePath: string,
 	projectName: string,
 	options: {
-		openVscode?: boolean;
+		openEditor?: boolean;
 		openDiff?: boolean;
 		openLocalhost?: boolean;
 		localhostRoute?: string;
-	} = { openVscode: true, openDiff: false, openLocalhost: true }
+	} = { openEditor: true, openDiff: false, openLocalhost: true }
 ): void {
 	const links = getAllFileLinks(filePath, projectName, { localhostRoute: options.localhostRoute });
 
@@ -578,8 +578,8 @@ export function openAllFileLinks(
 	}
 
 	// Navigate to JAT file editor (this will leave the current page)
-	if (options.openVscode) {
-		window.location.href = links.vscodeUrl;
+	if (options.openEditor) {
+		window.location.href = links.editorUrl;
 	} else if (options.openDiff) {
 		window.location.href = links.diffUrl;
 	}

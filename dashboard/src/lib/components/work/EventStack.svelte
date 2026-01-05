@@ -1367,6 +1367,7 @@
 							{:else if (event.state === 'working' || event.type === 'working') && event.data}
 								<WorkingSignalCard
 									signal={event.data as WorkingSignal}
+									projectName={defaultProject}
 									onTaskClick={onTaskClick}
 									onFileClick={onFileClick}
 									onComplete={onComplete}
@@ -1374,6 +1375,7 @@
 							{:else if (event.state === 'review' || event.type === 'review') && event.data}
 								<ReviewSignalCard
 									signal={event.data as ReviewSignal}
+									projectName={defaultProject}
 									onTaskClick={onTaskClick}
 									onFileClick={onFileClick}
 									onDiffClick={onDiffClick}
@@ -1384,6 +1386,7 @@
 							{:else if (event.state === 'needs_input' || event.type === 'needs_input' || event.type === 'question') && event.data}
 								<NeedsInputSignalCard
 									signal={event.data as NeedsInputSignal}
+									projectName={defaultProject}
 									onSelectOption={onSelectOption}
 									onSubmitText={onSubmitText}
 								/>
@@ -1791,6 +1794,7 @@
 										} as ReviewSignal}
 										<ReviewSignalCard
 											signal={reviewSignal}
+											projectName={defaultProject}
 											{onTaskClick}
 											{onFileClick}
 											{onDiffClick}
@@ -1864,6 +1868,7 @@
 										} as WorkingSignal}
 										<WorkingSignalCard
 											signal={workingSignal}
+											projectName={defaultProject}
 											{onTaskClick}
 											{onFileClick}
 											onRollbackClick={onRollback ? (commit) => onRollback({ ...event, git_sha: commit }) : undefined}
@@ -1973,6 +1978,7 @@
 											<!-- Unanswered - show the NeedsInputSignalCard -->
 											<NeedsInputSignalCard
 												signal={needsInputSignal}
+												projectName={defaultProject}
 												onSelectOption={async (optionId) => {
 													// Find the label for this option
 													let label = optionId;
