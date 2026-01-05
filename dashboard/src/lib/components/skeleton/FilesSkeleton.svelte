@@ -36,14 +36,6 @@
 
 <!-- Files Page Skeleton -->
 <div class="files-skeleton">
-	<!-- Header skeleton -->
-	<div class="files-header-skeleton">
-		<!-- Title placeholder -->
-		<div class="skeleton h-8 w-16 rounded-lg" style="background: oklch(0.22 0.02 250);"></div>
-		<!-- Project selector placeholder -->
-		<div class="skeleton h-10 w-56 rounded-lg" style="background: oklch(0.20 0.02 250);"></div>
-	</div>
-
 	<!-- Body skeleton - side by side layout -->
 	<div class="files-body-skeleton">
 		<!-- Left panel: File tree skeleton -->
@@ -132,7 +124,7 @@
 	.files-skeleton {
 		display: flex;
 		flex-direction: column;
-		height: calc(100vh - 48px);
+		max-height: 98vh;
 		padding: 1.5rem;
 		background: oklch(0.14 0.01 250);
 	}

@@ -552,6 +552,16 @@
 
 	// Handle global keyboard shortcuts
 	function handleKeyDown(e: KeyboardEvent) {
+		// Ctrl+S - Save current file
+		if (e.ctrlKey && e.key === 's') {
+			e.preventDefault();
+			// Find the active file and save it if dirty
+			const activeFile = openFiles.find(f => f.path === activeFilePath);
+			if (activeFile && activeFile.dirty && selectedProject) {
+				handleFileSave(activeFilePath!, activeFile.content);
+			}
+		}
+
 		// Alt+P - Open quick file finder (Alt instead of Ctrl to avoid browser conflict)
 		if (e.altKey && e.key === 'p') {
 			e.preventDefault();
@@ -560,6 +570,9 @@
 			}
 		}
 	}
+
+	// Track whether we've handled the initial file parameter
+	let handledFileParam = $state(false);
 
 	onMount(() => {
 		fetchProjects();
@@ -570,6 +583,22 @@
 		if (selectedProject && projects.length > 0 && !isLoading) {
 			// Small delay to ensure project is fully loaded
 			setTimeout(() => loadOpenFilesFromStorage(), 100);
+		}
+	});
+
+	// Open file from URL parameter ?file=<path> (after project is loaded)
+	$effect(() => {
+		if (selectedProject && projects.length > 0 && !isLoading && !handledFileParam) {
+			const fileParam = $page.url.searchParams.get('file');
+			if (fileParam) {
+				handledFileParam = true;
+				// Clear the file param from URL (so refresh doesn't re-open)
+				const url = new URL(window.location.href);
+				url.searchParams.delete('file');
+				goto(url.pathname + url.search, { replaceState: true, noScroll: true });
+				// Open the file after a small delay to ensure storage is loaded first
+				setTimeout(() => handleFileSelect(fileParam), 150);
+			}
 		}
 	});
 </script>
@@ -612,56 +641,41 @@
 	{:else}
 		<!-- Main Content -->
 		<div class="files-content" transition:fade={{ duration: 150 }}>
-			<!-- Header -->
-			<div class="files-header">
-				<h1 class="page-title">Files</h1>
-
-				<!-- Project Selector Dropdown -->
-				<div class="dropdown dropdown-end">
-					<button class="project-selector" tabindex="0">
-						<!-- Project color dot -->
-						{#if selectedProjectColor}
-							<span
-								class="w-2.5 h-2.5 rounded-full flex-shrink-0"
-								style="background: {selectedProjectColor};"
-							></span>
-						{/if}
-						<span class="project-name">{selectedProjectDisplay}</span>
-						{#if selectedProjectPath}
-							<span class="project-path">{selectedProjectPath}</span>
-						{/if}
-						<svg class="dropdown-arrow" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-						</svg>
-					</button>
-					<ul tabindex="-1" class="dropdown-content bg-base-200 rounded-box shadow-xl border border-base-300 max-h-80 overflow-y-auto z-50 p-2 project-name">
-						{#each projects as project (project.name)}
-							<button
-								class="flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-base-300 transition-colors text-left"
-								class:bg-base-300={selectedProject === project.name}
-								onclick={() => { handleProjectChange(project.name); }}
-							>
-								<!-- Project color dot -->
-								<span
-									class="w-2.5 h-2.5 rounded-full flex-shrink-0"
-									style="background: {project.activeColor || 'oklch(0.60 0.15 145)'};"
-								></span>
-								<div class="flex flex-col min-w-0">
-									<span class="font-semibold text-base-content">{project.displayName}</span>
-									<span class="text-xs text-base-content/50 truncate">{project.path}</span>
-								</div>
-							</button>
-						{/each}
-					</ul>
-				</div>
-			</div>
-
 			<!-- Body: Side-by-side layout -->
-			<div class="files-body max-h-[85vh]">
+			<div class="files-body">
 				<!-- Left Panel: File Tree -->
 				<div class="file-tree-panel" style="width: {leftPanelWidth}px;">
-					<div class="panel-header">
-						<span class="panel-title">Explorer</span>
+					<!-- Project Selector in Panel Header -->
+					<div class="panel-header project-header">
+						<div class="dropdown dropdown-bottom w-full">
+							<button class="project-selector-compact" tabindex="0">
+								{#if selectedProjectColor}
+									<span
+										class="w-2 h-2 rounded-full flex-shrink-0"
+										style="background: {selectedProjectColor};"
+									></span>
+								{/if}
+								<span class="project-name-compact">{selectedProjectDisplay}</span>
+								<svg class="dropdown-arrow-compact" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+								</svg>
+							</button>
+							<ul tabindex="-1" class="dropdown-content bg-base-200 rounded-box shadow-xl border border-base-300 max-h-64 overflow-y-auto z-50 p-1.5 w-full min-w-48">
+								{#each projects as project (project.name)}
+									<button
+										class="flex items-center gap-2 w-full px-2.5 py-1.5 rounded-md hover:bg-base-300 transition-colors text-left text-sm"
+										class:bg-base-300={selectedProject === project.name}
+										onclick={() => { handleProjectChange(project.name); }}
+									>
+										<span
+											class="w-2 h-2 rounded-full flex-shrink-0"
+											style="background: {project.activeColor || 'oklch(0.60 0.15 145)'};"
+										></span>
+										<span class="font-medium text-base-content truncate">{project.displayName}</span>
+									</button>
+								{/each}
+							</ul>
+						</div>
 					</div>
 					<div class="panel-content file-tree-content">
 						{#if !selectedProject}
@@ -798,70 +812,50 @@
 		flex: 1;
 		display: flex;
 		flex-direction: column;
-		padding: 1.5rem;
+		padding: 0.75rem;
 		max-width: 100%;
 		width: 100%;
-		height: calc(100vh - 48px); /* Account for TopBar */
+		max-height: calc(100vh - 48px); /* Account for TopBar */
 	}
 
-	/* Header */
-	.files-header {
+	/* Compact Project Selector (in panel header) */
+	.project-header {
+		padding: 0.375rem 0.5rem;
+	}
+
+	.project-selector-compact {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
-		gap: 1.5rem;
-		margin-bottom: 1rem;
-		flex-shrink: 0;
-	}
-
-	.page-title {
-		font-size: 1.5rem;
-		font-weight: 600;
-		color: oklch(0.90 0.02 250);
-		margin: 0;
-		font-family: ui-monospace, monospace;
-	}
-
-	/* Project Selector */
-	.project-selector {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		padding: 0.5rem 1rem;
-		background: oklch(0.18 0.02 250);
-		border: 1px solid oklch(0.25 0.02 250);
-		border-radius: 0.5rem;
+		gap: 0.5rem;
+		width: 100%;
+		padding: 0.25rem 0.5rem;
+		background: transparent;
+		border: none;
+		border-radius: 0.375rem;
 		cursor: pointer;
-		transition: all 0.15s ease;
-		min-width: 200px;
-		max-width: 400px;
+		transition: background 0.15s ease;
 	}
 
-	.project-selector:hover {
-		background: oklch(0.20 0.02 250);
-		border-color: oklch(0.30 0.02 250);
+	.project-selector-compact:hover {
+		background: oklch(0.22 0.02 250);
 	}
 
-	.project-name {
+	.project-name-compact {
+		font-size: 0.8125rem;
 		font-weight: 600;
-		color: oklch(0.85 0.02 250);
+		color: oklch(0.80 0.02 250);
 		font-family: ui-monospace, monospace;
 		white-space: nowrap;
-	}
-
-	.project-path {
-		font-size: 0.75rem;
-		color: oklch(0.50 0.02 250);
-		flex: 1;
 		overflow: hidden;
 		text-overflow: ellipsis;
-		white-space: nowrap;
+		flex: 1;
+		text-align: left;
 	}
 
-	.dropdown-arrow {
-		width: 1rem;
-		height: 1rem;
-		color: oklch(0.50 0.02 250);
+	.dropdown-arrow-compact {
+		width: 0.875rem;
+		height: 0.875rem;
+		color: oklch(0.45 0.02 250);
 		flex-shrink: 0;
 	}
 

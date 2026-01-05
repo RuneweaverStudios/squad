@@ -1,8 +1,9 @@
 /**
  * File Link Utilities
  *
- * Generates VS Code URLs for opening files with editor integration.
- * Supports line number deep links, git diff views, and localhost URLs.
+ * Generates JAT dashboard file editor links for opening files in the built-in editor.
+ * Supports line number deep links and project context.
+ * Also provides localhost URL utilities for route files.
  *
  * @see dashboard/CLAUDE.md for usage documentation
  */
@@ -46,84 +47,101 @@ export interface DiffLinkOptions {
 }
 
 /**
- * Generate a VS Code URL to open a file
+ * Generate a JAT dashboard file editor URL to open a file
  *
- * Uses the vscode:// URL scheme which opens VS Code if installed.
- * Falls back to file:// if vscode:// is not available.
+ * Opens the file in the JAT dashboard's built-in file editor (/files route).
+ * Supports line number deep links via query parameters.
  *
  * @example
  * ```typescript
  * // Open file
- * generateVSCodeUrl('src/lib/auth.ts')
- * // → vscode://file/home/user/project/src/lib/auth.ts
+ * generateJatFileUrl('src/lib/auth.ts')
+ * // → /files?path=src/lib/auth.ts
  *
  * // Open at specific line
- * generateVSCodeUrl('src/lib/auth.ts', { line: 42 })
- * // → vscode://file/home/user/project/src/lib/auth.ts:42
+ * generateJatFileUrl('src/lib/auth.ts', { line: 42 })
+ * // → /files?path=src/lib/auth.ts&line=42
  *
  * // Open at specific line and column
- * generateVSCodeUrl('src/lib/auth.ts', { line: 42, column: 10 })
- * // → vscode://file/home/user/project/src/lib/auth.ts:42:10
+ * generateJatFileUrl('src/lib/auth.ts', { line: 42, column: 10 })
+ * // → /files?path=src/lib/auth.ts&line=42&column=10
  * ```
  */
-export function generateVSCodeUrl(filePath: string, options: FileLinkOptions = {}): string {
+export function generateJatFileUrl(filePath: string, options: FileLinkOptions = {}): string {
 	const { projectRoot, line, column } = options;
 
-	// Resolve full path
-	let fullPath = filePath;
-	if (!filePath.startsWith('/')) {
-		// Relative path - prepend project root
-		const root = projectRoot || getDefaultProjectRoot();
-		fullPath = `${root}/${filePath}`;
-	}
+	// Normalize path - remove project root prefix if present
+	let normalizedPath = filePath;
+	const defaultRoot = getDefaultProjectRoot();
 
-	// Build URL with optional line:column suffix
-	let url = `vscode://file${fullPath}`;
-
-	if (line !== undefined && line > 0) {
-		url += `:${line}`;
-		if (column !== undefined && column > 0) {
-			url += `:${column}`;
+	// If it's an absolute path, make it relative to project root
+	if (filePath.startsWith('/')) {
+		if (filePath.startsWith(defaultRoot + '/')) {
+			normalizedPath = filePath.slice(defaultRoot.length + 1);
+		} else if (projectRoot && filePath.startsWith(projectRoot + '/')) {
+			normalizedPath = filePath.slice(projectRoot.length + 1);
 		}
 	}
 
-	return url;
+	// Build URL with query parameters
+	const params = new URLSearchParams();
+	params.set('path', normalizedPath);
+
+	if (line !== undefined && line > 0) {
+		params.set('line', String(line));
+		if (column !== undefined && column > 0) {
+			params.set('column', String(column));
+		}
+	}
+
+	return `/files?${params.toString()}`;
 }
 
 /**
- * Generate a VS Code diff URL to show file changes
+ * @deprecated Use generateJatFileUrl instead. This function is kept for backward compatibility.
+ */
+export function generateVSCodeUrl(filePath: string, options: FileLinkOptions = {}): string {
+	return generateJatFileUrl(filePath, options);
+}
+
+/**
+ * Generate a JAT dashboard file editor URL with diff view
  *
- * Uses vscode://vscode.git/diff to show git diff in VS Code.
- * Falls back to a shell command hint if URL scheme not supported.
+ * Opens the file in the JAT dashboard's built-in file editor with diff mode.
+ * Note: Diff view may show the file with a diff indicator, actual diff
+ * visualization depends on the /files page implementation.
  *
  * @example
  * ```typescript
- * // Show unstaged diff
+ * // Show file (diff view in JAT)
  * generateDiffUrl('src/lib/auth.ts')
- * // → vscode://vscode.git/diff?path=/home/user/project/src/lib/auth.ts
- *
- * // Show staged diff
- * generateDiffUrl('src/lib/auth.ts', { staged: true })
- * // → vscode://vscode.git/diff?path=/home/user/project/src/lib/auth.ts&staged=true
+ * // → /files?path=src/lib/auth.ts&diff=true
  *
  * // Show diff against specific ref
  * generateDiffUrl('src/lib/auth.ts', { ref: 'HEAD~1' })
- * // → vscode://vscode.git/diff?path=/home/user/project/src/lib/auth.ts&ref=HEAD~1
+ * // → /files?path=src/lib/auth.ts&diff=true&ref=HEAD~1
  * ```
  */
 export function generateDiffUrl(filePath: string, options: DiffLinkOptions = {}): string {
 	const { projectRoot, ref, staged } = options;
 
-	// Resolve full path
-	let fullPath = filePath;
-	if (!filePath.startsWith('/')) {
-		const root = projectRoot || getDefaultProjectRoot();
-		fullPath = `${root}/${filePath}`;
+	// Normalize path - remove project root prefix if present
+	let normalizedPath = filePath;
+	const defaultRoot = getDefaultProjectRoot();
+
+	// If it's an absolute path, make it relative to project root
+	if (filePath.startsWith('/')) {
+		if (filePath.startsWith(defaultRoot + '/')) {
+			normalizedPath = filePath.slice(defaultRoot.length + 1);
+		} else if (projectRoot && filePath.startsWith(projectRoot + '/')) {
+			normalizedPath = filePath.slice(projectRoot.length + 1);
+		}
 	}
 
-	// Build diff URL
+	// Build URL with query parameters
 	const params = new URLSearchParams();
-	params.set('path', fullPath);
+	params.set('path', normalizedPath);
+	params.set('diff', 'true');
 
 	if (ref) {
 		params.set('ref', ref);
@@ -132,7 +150,7 @@ export function generateDiffUrl(filePath: string, options: DiffLinkOptions = {})
 		params.set('staged', 'true');
 	}
 
-	return `vscode://vscode.git/diff?${params.toString()}`;
+	return `/files?${params.toString()}`;
 }
 
 /**
@@ -157,37 +175,64 @@ export function generateGitDiffCommand(filePath: string, ref?: string): string {
 }
 
 /**
- * Open a file in VS Code
+ * Open a file in the JAT dashboard file editor
  *
- * Attempts to open the file using the vscode:// URL scheme.
- * Falls back to window.open with file:// URL.
+ * Navigates to the /files route with the file path.
+ * Opens in the same window to provide a seamless editing experience.
  *
- * Note: This only works in browser contexts and requires VS Code URL handler.
+ * @param filePath - Path to the file (relative or absolute)
+ * @param options - Optional line/column to scroll to
  */
 export function openInVSCode(filePath: string, options: FileLinkOptions = {}): void {
-	const url = generateVSCodeUrl(filePath, options);
+	const url = generateJatFileUrl(filePath, options);
 
-	// Try to open using VS Code URL scheme
-	window.open(url, '_blank');
+	// Navigate to the JAT files page (same window for seamless experience)
+	window.location.href = url;
 }
 
 /**
- * Open a diff view in VS Code
+ * Open a file in the JAT dashboard file editor
  *
- * Attempts to open the diff using VS Code's git extension URL scheme.
+ * Alias for openInVSCode - named for clarity when using JAT links.
+ */
+export function openInJatEditor(filePath: string, options: FileLinkOptions = {}): void {
+	openInVSCode(filePath, options);
+}
+
+/**
+ * Open a diff view in the JAT dashboard file editor
  *
- * Note: This only works in browser contexts and requires VS Code with git extension.
+ * Navigates to the /files route with diff mode enabled.
+ * Opens in the same window for seamless experience.
  */
 export function openDiffInVSCode(filePath: string, options: DiffLinkOptions = {}): void {
 	const url = generateDiffUrl(filePath, options);
-	window.open(url, '_blank');
+	window.location.href = url;
 }
 
 /**
- * Check if we're in a browser context where VS Code URLs might work
+ * Open a diff view in the JAT dashboard file editor
+ *
+ * Alias for openDiffInVSCode - named for clarity when using JAT links.
+ */
+export function openDiffInJatEditor(filePath: string, options: DiffLinkOptions = {}): void {
+	openDiffInVSCode(filePath, options);
+}
+
+/**
+ * Check if we're in a browser context where JAT file editor links work
  */
 export function canOpenInVSCode(): boolean {
-	return typeof window !== 'undefined' && typeof window.open === 'function';
+	return typeof window !== 'undefined' && typeof window.location !== 'undefined';
+}
+
+/**
+ * Check if we're in a browser context where JAT file editor links work
+ *
+ * Alias for canOpenInVSCode - named for clarity.
+ */
+export function canOpenInJatEditor(): boolean {
+	return canOpenInVSCode();
 }
 
 /**
@@ -273,7 +318,7 @@ export interface FileLinkResult {
  * @example
  * ```typescript
  * const link = getFileLink('src/lib/auth.ts', { line: 42 });
- * // link.vscodeUrl = 'vscode://file/home/user/project/src/lib/auth.ts:42'
+ * // link.vscodeUrl = '/files?path=src/lib/auth.ts&line=42'
  * // link.shellCommand = 'code src/lib/auth.ts:42'
  * // link.description = 'Open src/lib/auth.ts at line 42'
  * ```
@@ -281,9 +326,9 @@ export interface FileLinkResult {
 export function getFileLink(filePath: string, options: FileLinkOptions = {}): FileLinkResult {
 	const { line, column } = options;
 
-	const vscodeUrl = generateVSCodeUrl(filePath, options);
+	const vscodeUrl = generateJatFileUrl(filePath, options);
 
-	// Build shell command for terminal users
+	// Build shell command for terminal users (still points to external editor)
 	let shellCommand = `code ${filePath}`;
 	if (line) {
 		shellCommand += `:${line}`;
@@ -314,7 +359,7 @@ export function getFileLink(filePath: string, options: FileLinkOptions = {}): Fi
  * @example
  * ```typescript
  * const link = getDiffLink('src/lib/auth.ts', { ref: 'HEAD~1' });
- * // link.vscodeUrl = 'vscode://vscode.git/diff?...'
+ * // link.vscodeUrl = '/files?path=src/lib/auth.ts&diff=true&ref=HEAD~1'
  * // link.shellCommand = 'git diff HEAD~1 -- src/lib/auth.ts'
  * // link.description = 'Show diff for src/lib/auth.ts'
  * ```
@@ -455,9 +500,9 @@ export function detectRouteFromPath(filePath: string): string | null {
  * Interface for all links related to a file
  */
 export interface FileLinks {
-	/** VS Code link to open the file */
+	/** JAT file editor link to open the file (legacy name kept for compatibility) */
 	vscodeUrl: string;
-	/** VS Code link to show diff */
+	/** JAT file editor link to show diff */
 	diffUrl: string;
 	/** Localhost URL if this is a route file */
 	localhostUrl: string | null;
@@ -477,8 +522,8 @@ export interface FileLinks {
  * ```typescript
  * getAllFileLinks('src/routes/dashboard/+page.svelte', 'jat')
  * // → {
- * //     vscodeUrl: 'vscode://file/.../src/routes/dashboard/+page.svelte',
- * //     diffUrl: 'vscode://vscode.git/diff?path=...',
+ * //     vscodeUrl: '/files?path=src/routes/dashboard/+page.svelte',
+ * //     diffUrl: '/files?path=src/routes/dashboard/+page.svelte&diff=true',
  * //     localhostUrl: 'http://localhost:3333/dashboard',
  * //     detectedRoute: '/dashboard'
  * //   }
@@ -489,7 +534,7 @@ export function getAllFileLinks(
 	projectName: string,
 	options: FileLinkOptions & { localhostRoute?: string } = {}
 ): FileLinks {
-	const vscodeUrl = generateVSCodeUrl(filePath, options);
+	const vscodeUrl = generateJatFileUrl(filePath, options);
 	const diffUrl = generateDiffUrl(filePath, {});
 
 	// Use explicit localhost route if provided, otherwise try to detect
@@ -507,6 +552,10 @@ export function getAllFileLinks(
 /**
  * Open all links for a file
  *
+ * Opens the file in JAT editor (in same window), and optionally localhost in new tab.
+ * Note: Since JAT editor links navigate in the same window, only the last one will be active.
+ * Use openInJatEditor for single file opens.
+ *
  * @param filePath - File path relative to project root
  * @param projectName - Project name for localhost URL
  * @param options - Which links to open
@@ -519,19 +568,64 @@ export function openAllFileLinks(
 		openDiff?: boolean;
 		openLocalhost?: boolean;
 		localhostRoute?: string;
-	} = { openVscode: true, openDiff: true, openLocalhost: true }
+	} = { openVscode: true, openDiff: false, openLocalhost: true }
 ): void {
 	const links = getAllFileLinks(filePath, projectName, { localhostRoute: options.localhostRoute });
 
-	if (options.openVscode) {
-		window.open(links.vscodeUrl, '_blank');
-	}
-
-	if (options.openDiff) {
-		window.open(links.diffUrl, '_blank');
-	}
-
+	// Open localhost in new tab first (since JAT navigation will leave current page)
 	if (options.openLocalhost && links.localhostUrl) {
 		window.open(links.localhostUrl, '_blank');
 	}
+
+	// Navigate to JAT file editor (this will leave the current page)
+	if (options.openVscode) {
+		window.location.href = links.vscodeUrl;
+	} else if (options.openDiff) {
+		window.location.href = links.diffUrl;
+	}
+}
+
+// =============================================================================
+// JAT FILES PAGE URL UTILITIES
+// =============================================================================
+
+/**
+ * Generate a URL to open a file in the JAT Files page (/files)
+ *
+ * @param filePath - File path relative to project root
+ * @param projectName - Project name (e.g., 'jat', 'chimaro')
+ * @returns URL to the files page with project and file parameters
+ *
+ * @example
+ * ```typescript
+ * generateFilesPageUrl('src/lib/auth.ts', 'jat')
+ * // → '/files?project=jat&file=src/lib/auth.ts'
+ * ```
+ */
+export function generateFilesPageUrl(filePath: string, projectName: string): string {
+	const params = new URLSearchParams();
+	params.set('project', projectName);
+	params.set('file', filePath);
+	return `/files?${params.toString()}`;
+}
+
+/**
+ * Open a file in the JAT Files page (/files) in the current tab
+ *
+ * This is the preferred way to open files within the JAT dashboard,
+ * as it keeps the user in the dashboard instead of switching to VS Code.
+ *
+ * @param filePath - File path relative to project root
+ * @param projectName - Project name (e.g., 'jat', 'chimaro')
+ *
+ * @example
+ * ```typescript
+ * openInFilesPage('src/lib/auth.ts', 'jat');
+ * // Navigates to /files?project=jat&file=src/lib/auth.ts
+ * ```
+ */
+export function openInFilesPage(filePath: string, projectName: string): void {
+	const url = generateFilesPageUrl(filePath, projectName);
+	// Navigate in the same tab to keep user in the dashboard
+	window.location.href = url;
 }

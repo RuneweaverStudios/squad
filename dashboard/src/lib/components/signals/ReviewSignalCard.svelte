@@ -20,6 +20,8 @@
 		openLocalhostUrl,
 		detectRouteFromPath,
 		generateLocalhostUrl,
+		openInFilesPage,
+		generateFilesPageUrl,
 		type FileLinks
 	} from '$lib/utils/fileLinks';
 
@@ -128,30 +130,29 @@
 		return sha.slice(0, 7);
 	}
 
-	// Handle file click - opens in VS Code by default
+	// Handle file click - opens in JAT /files page by default
 	function handleFileClick(file: FileModification) {
 		if (onFileClick) {
 			onFileClick(file.path);
 		} else {
-			// Default: open in VS Code
-			openInVSCode(file.path);
+			// Default: open in JAT /files page
+			openInFilesPage(file.path, projectName);
 		}
 	}
 
-	// Handle diff click - opens diff in VS Code by default
+	// Handle diff click - opens diff in JAT file editor by default
 	function handleDiffClick(file: FileModification) {
 		if (onDiffClick) {
 			onDiffClick(file.path, file.changeType);
 		} else {
-			// Default: open diff in VS Code
+			// Default: open diff in JAT file editor
 			openDiffInVSCode(file.path);
 		}
 	}
 
 	// Get tooltip for file link
 	function getFileTooltip(file: FileModification): string {
-		const link = getFileLink(file.path);
-		return `${link.description} in VS Code`;
+		return `Open ${file.path} in /files`;
 	}
 
 	// Get tooltip for diff link
@@ -160,7 +161,7 @@
 		return link.description;
 	}
 
-	// Get links for a file (VS Code, diff, localhost if applicable)
+	// Get links for a file (editor, diff, localhost if applicable)
 	function getFileLinksForFile(file: FileModification): FileLinks {
 		return getAllFileLinks(file.path, projectName, { localhostRoute: file.localhostRoute });
 	}
@@ -204,9 +205,9 @@
 			for (const file of signal.filesModified) {
 				const fileLinks = getFileLinksForFile(file);
 
-				// VS Code file link
+				// File editor link
 				if (!seenUrls.has(fileLinks.vscodeUrl)) {
-					links.push({ type: 'vscode', url: fileLinks.vscodeUrl, label: file.path });
+					links.push({ type: 'editor', url: fileLinks.vscodeUrl, label: file.path });
 					seenUrls.add(fileLinks.vscodeUrl);
 				}
 
@@ -499,7 +500,7 @@
 									</button>
 								{/if}
 
-								<!-- Diff link (always shown - opens in VS Code by default) -->
+								<!-- Diff link (always shown - opens in JAT file editor) -->
 								<button
 									type="button"
 									onclick={() => handleDiffClick(file)}
@@ -605,13 +606,13 @@
 								<!-- Link buttons (if any) -->
 								{#if hasFileLink || hasLocalhostLink}
 									<div class="flex items-center gap-1 flex-shrink-0">
-										<!-- VS Code file link -->
+										<!-- File editor link -->
 										{#if hasFileLink && focusItem?.filePath}
 											<button
 												type="button"
-												onclick={() => openInVSCode(focusItem.filePath!, { line: focusItem.line })}
+												onclick={() => openInFilesPage(focusItem.filePath!, projectName)}
 												class="px-1 py-0.5 rounded hover:opacity-80 transition-opacity bg-primary/20 text-primary border border-primary/30"
-												title="Open {focusItem.filePath}{focusItem.line ? `:${focusItem.line}` : ''} in VS Code"
+												title="Open {focusItem.filePath} in /files"
 											>
 												<svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 													<path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />

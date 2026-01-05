@@ -11,11 +11,13 @@
 	 */
 
 	import type { NeedsInputSignal, QuestionOption } from '$lib/types/richSignals';
-	import { openInVSCode, getFileLink } from '$lib/utils/fileLinks';
+	import { openInFilesPage } from '$lib/utils/fileLinks';
 
 	interface Props {
 		/** The rich needs_input signal data */
 		signal: NeedsInputSignal;
+		/** Project name for /files page navigation (e.g., 'jat', 'chimaro') */
+		projectName?: string;
 		/** Callback when user selects an option */
 		onSelectOption?: (optionId: string) => void;
 		/** Callback when user submits text input */
@@ -34,6 +36,7 @@
 
 	let {
 		signal,
+		projectName = 'jat',
 		onSelectOption,
 		onSubmitText,
 		onFileClick,
@@ -75,20 +78,19 @@
 		}
 	}
 
-	// Handle file click - opens in VS Code by default
+	// Handle file click - opens in JAT /files page by default
 	function handleFileClick(filePath: string) {
 		if (onFileClick) {
 			onFileClick(filePath);
 		} else {
-			// Default: open in VS Code
-			openInVSCode(filePath);
+			// Default: open in JAT /files page
+			openInFilesPage(filePath, projectName);
 		}
 	}
 
 	// Get tooltip for file link
 	function getFileTooltip(filePath: string): string {
-		const link = getFileLink(filePath);
-		return `${link.description} in VS Code`;
+		return `Open ${filePath} in /files`;
 	}
 
 	// Get question type badge info - using DaisyUI semantic color classes
