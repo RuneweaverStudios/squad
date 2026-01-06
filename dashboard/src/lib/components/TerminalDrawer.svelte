@@ -17,6 +17,7 @@
 	import { slide, fade } from 'svelte/transition';
 	import { ansiToHtml } from '$lib/utils/ansiToHtml';
 	import { isTerminalDrawerOpen } from '$lib/stores/drawerStore';
+	import TerminalInput from '$lib/components/work/TerminalInput.svelte';
 
 	// State
 	let isOpen = $state(false);
@@ -34,16 +35,9 @@
 	let autoScroll = $state(true);
 	let scrollContainerRef: HTMLDivElement | null = null;
 	let inputText = $state('');
-	let sendingInput = $state(false);
 	let isCreatingSession = $state(false);
 	let pollInterval: ReturnType<typeof setInterval> | null = null;
-	let inputRef: HTMLInputElement | null = null;
-
-	// Visual flash feedback states (like SessionCard)
-	let escapeFlash = $state(false);
-	let tabFlash = $state(false);
-	let arrowFlash = $state(false);
-	let submitFlash = $state(false);
+	let terminalInputRef: ReturnType<typeof TerminalInput> | null = null;
 
 	// Get currently selected session data
 	const currentSession = $derived(() => {
@@ -101,10 +95,10 @@
 
 	// Auto-focus input when drawer opens
 	$effect(() => {
-		if (isOpen && inputRef) {
+		if (isOpen && terminalInputRef) {
 			// Small delay to ensure DOM is ready after transition starts
 			requestAnimationFrame(() => {
-				inputRef?.focus();
+				terminalInputRef?.focus();
 			});
 		}
 	});
@@ -247,112 +241,33 @@
 		}
 	}
 
-	// Send input to session
-	async function sendInput() {
-		if (!inputText.trim()) return;
+	// Send input to session (used by TerminalInput component)
+	async function handleSendInput(input: string, type: 'text' | 'key') {
 		const target = currentSession();
 		if (!target) return;
 
-		sendingInput = true;
 		try {
-			await fetch(`/api/sessions/${target.name}/input`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ type: 'text', input: inputText })
-			});
-			inputText = '';
+			if (type === 'text') {
+				await fetch(`/api/sessions/${target.name}/input`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ type: 'text', input })
+				});
+			} else {
+				await fetch(`/api/sessions/${target.name}/input`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ type: input })
+				});
+			}
 			// Fetch output immediately after sending
 			setTimeout(fetchSessionOutputs, 100);
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to send input';
-		} finally {
-			sendingInput = false;
-			// Refocus the input after sending
-			requestAnimationFrame(() => {
-				inputRef?.focus();
-			});
-		}
-	}
-
-	// Send special keys
-	async function sendKey(keyType: string) {
-		const target = currentSession();
-		if (!target) return;
-
-		try {
-			await fetch(`/api/sessions/${target.name}/input`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ type: keyType })
-			});
-			setTimeout(fetchSessionOutputs, 100);
-		} catch (e) {
-			console.error(`Failed to send ${keyType}:`, e);
-		} finally {
-			// Refocus the input after sending special key
-			requestAnimationFrame(() => {
-				inputRef?.focus();
-			});
-		}
-	}
-
-	// Handle keyboard input (parity with SessionCard)
-	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Enter' && !e.shiftKey) {
-			// Enter without Shift submits the input
-			e.preventDefault();
-			// If input is empty, send Enter to tmux (for prompts)
-			if (!inputText.trim()) {
-				sendKey('enter');
-				submitFlash = true;
-				setTimeout(() => {
-					submitFlash = false;
-				}, 300);
+			if (type === 'text') {
+				error = e instanceof Error ? e.message : 'Failed to send input';
 			} else {
-				sendInput();
+				console.error(`Failed to send ${input}:`, e);
 			}
-		} else if (e.key === 'Tab') {
-			// Send Tab to terminal for autocomplete
-			e.preventDefault();
-			sendKey('tab');
-			tabFlash = true;
-			setTimeout(() => {
-				tabFlash = false;
-			}, 300);
-		} else if (e.key === 'Escape' && inputText.trim()) {
-			// Escape when input has text: clear input and send 2x Escape to tmux
-			// (If input is empty, let global handler close the drawer instead)
-			e.preventDefault();
-			e.stopPropagation(); // Prevent global handler from also firing
-			inputText = '';
-			sendKey('escape');
-			// Small delay between escapes to ensure they're registered separately
-			setTimeout(() => sendKey('escape'), 50);
-			escapeFlash = true;
-			setTimeout(() => {
-				escapeFlash = false;
-			}, 300);
-		} else if (
-			(e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') &&
-			!inputText.trim()
-		) {
-			// Arrow keys: When input is empty, transmit to tmux for navigation
-			e.preventDefault();
-			const keyMap: Record<string, string> = {
-				ArrowUp: 'up',
-				ArrowDown: 'down',
-				ArrowLeft: 'left',
-				ArrowRight: 'right'
-			};
-			sendKey(keyMap[e.key]);
-			arrowFlash = true;
-			setTimeout(() => {
-				arrowFlash = false;
-			}, 300);
-		} else if ((e.key === 'Delete' || e.key === 'Backspace') && !inputText.trim()) {
-			// Delete/Backspace: When input is empty, transmit to tmux
-			e.preventDefault();
-			sendKey(e.key === 'Delete' ? 'delete' : 'backspace');
 		}
 	}
 
@@ -369,14 +284,15 @@
 	// Hover-to-focus: focus input when mouse enters the drawer
 	// Skip if user is actively typing in another input (like search boxes)
 	function handleDrawerMouseEnter() {
+		const inputRef = terminalInputRef?.getInputRef?.();
 		const activeEl = document.activeElement as HTMLElement | null;
 		const isOtherInput =
 			activeEl &&
 			(activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') &&
 			activeEl !== inputRef;
 
-		if (!isOtherInput && inputRef && !sendingInput) {
-			inputRef.focus({ preventScroll: true });
+		if (!isOtherInput && terminalInputRef) {
+			terminalInputRef.focus();
 		}
 	}
 
@@ -679,87 +595,15 @@
 
 		<!-- Input Section -->
 		{#if sessions.length > 0 && currentSession()}
-			<div
-				class="border-t px-3 py-2 space-y-2"
-				style="background: oklch(0.18 0.01 250); border-color: oklch(0.30 0.02 250);"
-				onmouseenter={handleDrawerMouseEnter}
-			>
-				<!-- Quick action buttons -->
-				<div class="flex gap-1.5 flex-wrap">
-					<button
-						onclick={() => sendKey('ctrl-c')}
-						class="btn btn-xs"
-						style="background: oklch(0.30 0.12 25); border: none; color: oklch(0.95 0.02 250);"
-						title="Send Ctrl+C (interrupt)"
-						disabled={sendingInput}
-					>
-						^C
-					</button>
-					<button
-						onclick={() => sendKey('ctrl-d')}
-						class="btn btn-xs"
-						style="background: oklch(0.25 0.08 200); border: none; color: oklch(0.85 0.02 250);"
-						title="Send Ctrl+D (EOF)"
-						disabled={sendingInput}
-					>
-						^D
-					</button>
-					<button
-						onclick={() => sendKey('ctrl-u')}
-						class="btn btn-xs"
-						style="background: oklch(0.25 0.05 250); border: none; color: oklch(0.80 0.02 250);"
-						title="Send Ctrl+U (clear line)"
-						disabled={sendingInput}
-					>
-						^U
-					</button>
-					<button
-						onclick={() => {
-							sendKey('escape');
-							setTimeout(() => sendKey('escape'), 50);
-						}}
-						class="btn btn-xs"
-						style="background: oklch(0.30 0.10 300); border: none; color: oklch(0.85 0.02 250);"
-						title="Send 2x Escape (cancel/clear)"
-						disabled={sendingInput}
-					>
-						ESC
-					</button>
-					<button
-						onclick={() => sendKey('tab')}
-						class="btn btn-xs"
-						style="background: oklch(0.25 0.05 250); border: none; color: oklch(0.80 0.02 250);"
-						title="Send Tab (autocomplete)"
-						disabled={sendingInput}
-					>
-						Tab
-					</button>
-				</div>
-
-				<!-- Text input -->
-				<div class="flex gap-2">
-					<input
-						type="text"
-						bind:this={inputRef}
-						bind:value={inputText}
-						onkeydown={handleKeydown}
-						placeholder="Type command and press Enter..."
-						class="input input-xs flex-1 font-mono {escapeFlash ? 'escape-flash' : ''} {tabFlash ? 'tab-flash' : ''} {arrowFlash ? 'arrow-flash' : ''} {submitFlash ? 'submit-flash' : ''}"
-						style="background: oklch(0.22 0.02 250); border: 1px solid oklch(0.30 0.02 250); color: oklch(0.80 0.02 250);"
-						disabled={sendingInput}
-					/>
-					<button
-						onclick={sendInput}
-						class="btn btn-xs btn-primary"
-						disabled={sendingInput || !inputText.trim()}
-					>
-						{#if sendingInput}
-							<span class="loading loading-spinner loading-xs"></span>
-						{:else}
-							Send
-						{/if}
-					</button>
-				</div>
+			<div onmouseenter={handleDrawerMouseEnter}>
+				<TerminalInput
+					bind:this={terminalInputRef}
+					bind:inputText
+					sessionName={currentSession()?.name || ''}
+					onSendInput={handleSendInput}
+					placeholder="Type command and press Enter..."
+					multiline={false}
+				/>
 			</div>
 		{/if}
 

@@ -17,6 +17,17 @@
 		playSuccessChime
 	} from '$lib/utils/soundEffects';
 	import { getSoundsEnabled } from '$lib/stores/preferences.svelte';
+	import {
+		requestNotificationPermission,
+		getNotificationPermission,
+		areBrowserNotificationsSupported,
+		getNotificationsEnabled,
+		setNotificationsEnabled,
+		getFaviconBadgeEnabled,
+		setFaviconBadgeEnabled,
+		getTitleBadgeEnabled,
+		setTitleBadgeEnabled
+	} from '$lib/utils/pushNotifications';
 	import { getVersionString } from '$lib/version';
 	import { successToast, errorToast } from '$lib/stores/toasts.svelte';
 	import {
@@ -84,6 +95,16 @@
 	const epicAutoClose = $derived(getEpicAutoClose());
 	let isEpicCelebrationAnimating = $state(false);
 	let isEpicAutoCloseAnimating = $state(false);
+
+	// Notification settings (reactive from preferences store)
+	const browserNotificationsSupported = areBrowserNotificationsSupported();
+	const browserNotificationsEnabled = $derived(getNotificationsEnabled());
+	const faviconBadgeEnabled = $derived(getFaviconBadgeEnabled());
+	const titleBadgeEnabled = $derived(getTitleBadgeEnabled());
+	let browserNotificationPermission = $state<NotificationPermission>(getNotificationPermission());
+	let isBrowserNotificationsAnimating = $state(false);
+	let isFaviconBadgeAnimating = $state(false);
+	let isTitleBadgeAnimating = $state(false);
 
 	// Help modal
 	let showHelpModal = $state(false);
@@ -193,6 +214,64 @@
 		// Reset animation state
 		setTimeout(() => {
 			isEpicAutoCloseAnimating = false;
+		}, 400);
+	}
+
+	async function handleBrowserNotificationsToggle() {
+		// Trigger animation
+		isBrowserNotificationsAnimating = true;
+
+		// If enabling and permission not granted, request it
+		if (!browserNotificationsEnabled) {
+			if (browserNotificationPermission !== 'granted') {
+				const permission = await requestNotificationPermission();
+				browserNotificationPermission = permission;
+				if (permission !== 'granted') {
+					// Permission denied, don't enable
+					isBrowserNotificationsAnimating = false;
+					return;
+				}
+			}
+		}
+
+		// Toggle after brief delay
+		setTimeout(() => {
+			setNotificationsEnabled(!browserNotificationsEnabled);
+		}, 100);
+
+		// Reset animation state
+		setTimeout(() => {
+			isBrowserNotificationsAnimating = false;
+		}, 400);
+	}
+
+	function handleFaviconBadgeToggle() {
+		// Trigger animation
+		isFaviconBadgeAnimating = true;
+
+		// Toggle after brief delay
+		setTimeout(() => {
+			setFaviconBadgeEnabled(!faviconBadgeEnabled);
+		}, 100);
+
+		// Reset animation state
+		setTimeout(() => {
+			isFaviconBadgeAnimating = false;
+		}, 400);
+	}
+
+	function handleTitleBadgeToggle() {
+		// Trigger animation
+		isTitleBadgeAnimating = true;
+
+		// Toggle after brief delay
+		setTimeout(() => {
+			setTitleBadgeEnabled(!titleBadgeEnabled);
+		}, 100);
+
+		// Reset animation state
+		setTimeout(() => {
+			isTitleBadgeAnimating = false;
 		}, 400);
 	}
 
@@ -329,6 +408,104 @@
 					class:sound-badge-bounce={isSoundAnimating}
 				>
 					{soundsEnabled ? 'ON' : 'OFF'}
+				</span>
+			</button>
+		</li>
+
+		<!-- Notification Settings -->
+		<li class="menu-title mt-2">
+			<span class="text-xs text-base-content/50">Notifications</span>
+		</li>
+
+		{#if browserNotificationsSupported}
+			<li>
+				<button
+					onclick={handleBrowserNotificationsToggle}
+					class="flex items-center gap-2 w-full px-2 py-1.5 rounded transition-colors {browserNotificationsEnabled && browserNotificationPermission === 'granted' ? 'bg-info/20' : ''}"
+					title={browserNotificationPermission === 'denied'
+						? 'Browser notifications blocked - check browser settings'
+						: browserNotificationsEnabled
+							? 'Show browser notifications when agents need attention'
+							: 'Enable browser notifications'}
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						class="w-4 h-4 transition-transform duration-300 {browserNotificationsEnabled && browserNotificationPermission === 'granted' ? 'text-info' : 'text-base-content/50'}"
+						class:toggle-icon-pulse={isBrowserNotificationsAnimating}
+					>
+						<path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+					</svg>
+					<span class="text-xs flex-1 text-left text-base-content/70">
+						Browser Alerts
+					</span>
+					{#if browserNotificationPermission === 'denied'}
+						<span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-error/30 text-error">
+							BLOCKED
+						</span>
+					{:else}
+						<span
+							class="text-[10px] font-mono px-1.5 py-0.5 rounded transition-transform duration-300 {browserNotificationsEnabled && browserNotificationPermission === 'granted' ? 'bg-info/40 text-info' : 'bg-base-200 text-base-content/50'}"
+							class:toggle-badge-bounce={isBrowserNotificationsAnimating}
+						>
+							{browserNotificationsEnabled && browserNotificationPermission === 'granted' ? 'ON' : 'OFF'}
+						</span>
+					{/if}
+				</button>
+			</li>
+		{/if}
+
+		<li>
+			<button
+				onclick={handleFaviconBadgeToggle}
+				class="flex items-center gap-2 w-full px-2 py-1.5 rounded transition-colors {faviconBadgeEnabled ? 'bg-warning/20' : ''}"
+				title={faviconBadgeEnabled
+					? 'Show count badge on favicon when agents need attention'
+					: 'Favicon badge disabled'}
+			>
+				<span
+					class="w-4 h-4 flex items-center justify-center text-sm transition-transform duration-300"
+					class:toggle-icon-pulse={isFaviconBadgeAnimating}
+				>
+					{faviconBadgeEnabled ? '🔴' : '⚪'}
+				</span>
+				<span class="text-xs flex-1 text-left text-base-content/70">
+					Favicon Badge
+				</span>
+				<span
+					class="text-[10px] font-mono px-1.5 py-0.5 rounded transition-transform duration-300 {faviconBadgeEnabled ? 'bg-warning/40 text-warning-content' : 'bg-base-200 text-base-content/50'}"
+					class:toggle-badge-bounce={isFaviconBadgeAnimating}
+				>
+					{faviconBadgeEnabled ? 'ON' : 'OFF'}
+				</span>
+			</button>
+		</li>
+
+		<li>
+			<button
+				onclick={handleTitleBadgeToggle}
+				class="flex items-center gap-2 w-full px-2 py-1.5 rounded transition-colors {titleBadgeEnabled ? 'bg-primary/20' : ''}"
+				title={titleBadgeEnabled
+					? 'Show count in page title when agents need attention'
+					: 'Title badge disabled'}
+			>
+				<span
+					class="w-4 h-4 flex items-center justify-center font-mono text-[9px] font-bold transition-transform duration-300 {titleBadgeEnabled ? 'text-primary' : 'text-base-content/50'}"
+					class:toggle-icon-pulse={isTitleBadgeAnimating}
+				>
+					(3)
+				</span>
+				<span class="text-xs flex-1 text-left text-base-content/70">
+					Title Badge
+				</span>
+				<span
+					class="text-[10px] font-mono px-1.5 py-0.5 rounded transition-transform duration-300 {titleBadgeEnabled ? 'bg-primary/40 text-primary' : 'bg-base-200 text-base-content/50'}"
+					class:toggle-badge-bounce={isTitleBadgeAnimating}
+				>
+					{titleBadgeEnabled ? 'ON' : 'OFF'}
 				</span>
 			</button>
 		</li>

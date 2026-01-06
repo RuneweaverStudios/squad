@@ -24,7 +24,10 @@ const STORAGE_KEYS = {
 	epicAutoClose: 'epic-auto-close-enabled',
 	maxSessions: 'max-concurrent-sessions',
 	collapsedEpics: 'tasktable-collapsed-epics',
-	activeProject: 'active-project' // Currently selected project (used across pages)
+	activeProject: 'active-project', // Currently selected project (used across pages)
+	notificationsEnabled: 'push-notifications-enabled', // Browser push notifications
+	faviconBadgeEnabled: 'favicon-badge-enabled', // Favicon badge with count
+	titleBadgeEnabled: 'title-badge-enabled' // Title prefix with count
 } as const;
 
 // Terminal font family options
@@ -91,7 +94,10 @@ const DEFAULTS = {
 	epicAutoClose: false, // Automatically close epic when all children complete
 	maxSessions: 12 as MaxSessions, // Maximum concurrent agent sessions
 	collapsedEpics: [] as string[], // Task IDs of collapsed epics/groups in TaskTable
-	activeProject: null as string | null // Currently selected project (consistent across pages)
+	activeProject: null as string | null, // Currently selected project (consistent across pages)
+	notificationsEnabled: true, // Browser push notifications (requires permission)
+	faviconBadgeEnabled: true, // Show count on favicon when agents need attention
+	titleBadgeEnabled: true // Show count in document title when agents need attention
 };
 
 // Types
@@ -120,6 +126,9 @@ let epicAutoClose = $state(DEFAULTS.epicAutoClose);
 let maxSessions = $state<MaxSessions>(DEFAULTS.maxSessions);
 let collapsedEpics = $state<string[]>(DEFAULTS.collapsedEpics);
 let activeProject = $state<string | null>(DEFAULTS.activeProject);
+let notificationsEnabled = $state(DEFAULTS.notificationsEnabled);
+let faviconBadgeEnabled = $state(DEFAULTS.faviconBadgeEnabled);
+let titleBadgeEnabled = $state(DEFAULTS.titleBadgeEnabled);
 let initialized = $state(false);
 
 /**
@@ -201,6 +210,16 @@ export function initPreferences(): void {
 
 	// Load active project (string or null)
 	activeProject = localStorage.getItem(STORAGE_KEYS.activeProject);
+
+	// Load notification preferences
+	const storedNotificationsEnabled = localStorage.getItem(STORAGE_KEYS.notificationsEnabled);
+	notificationsEnabled = storedNotificationsEnabled === null ? DEFAULTS.notificationsEnabled : storedNotificationsEnabled === 'true';
+
+	const storedFaviconBadgeEnabled = localStorage.getItem(STORAGE_KEYS.faviconBadgeEnabled);
+	faviconBadgeEnabled = storedFaviconBadgeEnabled === null ? DEFAULTS.faviconBadgeEnabled : storedFaviconBadgeEnabled === 'true';
+
+	const storedTitleBadgeEnabled = localStorage.getItem(STORAGE_KEYS.titleBadgeEnabled);
+	titleBadgeEnabled = storedTitleBadgeEnabled === null ? DEFAULTS.titleBadgeEnabled : storedTitleBadgeEnabled === 'true';
 
 	// Apply terminal font CSS variables to document
 	updateTerminalFontCSSVars();
@@ -521,6 +540,66 @@ export function setActiveProject(value: string | null): void {
 			localStorage.removeItem(STORAGE_KEYS.activeProject);
 		}
 	}
+}
+
+// ============================================================================
+// Notifications (Browser Push Notifications)
+// ============================================================================
+
+export function getNotificationsEnabled(): boolean {
+	return notificationsEnabled;
+}
+
+export function setNotificationsEnabled(value: boolean): void {
+	notificationsEnabled = value;
+	if (browser) {
+		localStorage.setItem(STORAGE_KEYS.notificationsEnabled, String(value));
+	}
+}
+
+export function toggleNotificationsEnabled(): boolean {
+	setNotificationsEnabled(!notificationsEnabled);
+	return notificationsEnabled;
+}
+
+// ============================================================================
+// Favicon Badge (Show count on favicon)
+// ============================================================================
+
+export function getFaviconBadgeEnabled(): boolean {
+	return faviconBadgeEnabled;
+}
+
+export function setFaviconBadgeEnabled(value: boolean): void {
+	faviconBadgeEnabled = value;
+	if (browser) {
+		localStorage.setItem(STORAGE_KEYS.faviconBadgeEnabled, String(value));
+	}
+}
+
+export function toggleFaviconBadgeEnabled(): boolean {
+	setFaviconBadgeEnabled(!faviconBadgeEnabled);
+	return faviconBadgeEnabled;
+}
+
+// ============================================================================
+// Title Badge (Show count in document title)
+// ============================================================================
+
+export function getTitleBadgeEnabled(): boolean {
+	return titleBadgeEnabled;
+}
+
+export function setTitleBadgeEnabled(value: boolean): void {
+	titleBadgeEnabled = value;
+	if (browser) {
+		localStorage.setItem(STORAGE_KEYS.titleBadgeEnabled, String(value));
+	}
+}
+
+export function toggleTitleBadgeEnabled(): boolean {
+	setTitleBadgeEnabled(!titleBadgeEnabled);
+	return titleBadgeEnabled;
 }
 
 // ============================================================================

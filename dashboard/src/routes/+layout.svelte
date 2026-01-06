@@ -32,6 +32,14 @@
 	import { initKeyboardShortcuts, findMatchingCommand, findMatchingGlobalShortcut } from '$lib/stores/keyboardShortcuts.svelte';
 	import { loadAutoKillConfig } from '$lib/stores/autoKillConfig';
 	import { setReviewRules as setReviewRulesStore } from '$lib/stores/reviewRules.svelte';
+	import {
+		initNotifications,
+		handleStateCountChange,
+		clearAllBadges,
+		requestNotificationPermission,
+		getNotificationPermission,
+		areBrowserNotificationsSupported
+	} from '$lib/utils/pushNotifications';
 
 	let { children } = $props();
 
@@ -55,6 +63,8 @@
 		idle: number;
 	}
 	let stateCounts = $state<StateCounts>({ needsInput: 0, working: 0, review: 0, completed: 0, starting: 0, idle: 0 });
+	// Track previous state counts for notification change detection
+	let prevStateCounts = $state<{ needsInput: number; review: number } | null>(null);
 
 	// Ready task count and list for Swarm button dropdown
 	let readyTaskCount = $state(0);
@@ -192,6 +202,7 @@
 	onMount(async () => {
 		initPreferences(); // Initialize unified preferences store
 		initKeyboardShortcuts(); // Initialize keyboard shortcuts from localStorage
+		initNotifications(); // Initialize push notification system (favicon badge, title badge)
 		themeChange(false);
 		initProjectColors(); // Pre-fetch project colors for consistent task ID coloring
 		initSessionEvents(); // Initialize cross-page session events (BroadcastChannel)
@@ -233,6 +244,7 @@
 			disconnectSessionEvents(); // Disconnect from session events SSE
 			disconnectTaskEvents(); // Disconnect from task events SSE
 			stopActivityPolling(); // Stop activity polling
+			clearAllBadges(); // Clear favicon and title badges on unmount
 		};
 	});
 
@@ -250,6 +262,14 @@
 			loadStateCounts();
 			loadEpicsWithReady();
 		}
+	});
+
+	// React to state count changes for push notifications (favicon badge, title badge, browser notifications)
+	$effect(() => {
+		// Handle state count changes - updates badges and shows browser notifications when counts increase
+		handleStateCountChange(prevStateCounts, stateCounts);
+		// Update previous counts for next comparison
+		prevStateCounts = { needsInput: stateCounts.needsInput, review: stateCounts.review };
 	});
 
 	// Fetch all tasks to populate project dropdown and agent counts
