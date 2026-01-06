@@ -189,3 +189,20 @@ export function closeFilePreviewDrawer() {
 	isFilePreviewDrawerOpen.set(false);
 	// Don't clear path/project immediately to allow for smooth close animation
 }
+
+// Terminal drawer state
+// Ad-hoc terminal sessions for quick commands
+// Keyboard shortcut: Ctrl+` to toggle
+export const isTerminalDrawerOpen = writable(false);
+
+export function openTerminalDrawer() {
+	isTerminalDrawerOpen.set(true);
+}
+
+export function closeTerminalDrawer() {
+	isTerminalDrawerOpen.set(false);
+}
+
+export function toggleTerminalDrawer() {
+	isTerminalDrawerOpen.update(v => !v);
+}
