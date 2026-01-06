@@ -94,6 +94,7 @@
 	const PROJECT_ORDER_KEY = 'projects-order';
 	const SESSION_ORDER_KEY = 'projects-session-order-';
 	const EPIC_GROUP_COLLAPSE_KEY = 'projects-epic-collapse-';
+	const GROUP_SORT_SETTINGS_KEY = 'projects-group-sort-settings';
 
 	// Section defaults (will be loaded from config)
 	let configSessionHeight = $state(400);
@@ -221,6 +222,8 @@
 		const newMap = new Map(groupSortSettings);
 		newMap.set(key, { sortBy, sortDir });
 		groupSortSettings = newMap;
+		// Persist to localStorage
+		saveGroupSortSettings(newMap);
 	}
 
 	// Handle sort click for a group
@@ -689,6 +692,29 @@
 	function saveCollapsedEpicGroups(groups: Set<string>) {
 		if (!browser) return;
 		localStorage.setItem(EPIC_GROUP_COLLAPSE_KEY, JSON.stringify(Array.from(groups)));
+	}
+
+	// Group sort settings persistence
+	function loadGroupSortSettings(): Map<string, { sortBy: SortOption; sortDir: 'asc' | 'desc' }> {
+		if (!browser) return new Map();
+		const saved = localStorage.getItem(GROUP_SORT_SETTINGS_KEY);
+		if (saved) {
+			try {
+				const parsed = JSON.parse(saved);
+				// Convert object back to Map
+				return new Map(Object.entries(parsed));
+			} catch {
+				return new Map();
+			}
+		}
+		return new Map();
+	}
+
+	function saveGroupSortSettings(settings: Map<string, { sortBy: SortOption; sortDir: 'asc' | 'desc' }>) {
+		if (!browser) return;
+		// Convert Map to object for JSON serialization
+		const obj = Object.fromEntries(settings);
+		localStorage.setItem(GROUP_SORT_SETTINGS_KEY, JSON.stringify(obj));
 	}
 
 	function isEpicGroupCollapsed(project: string, groupId: string): boolean {
@@ -1378,6 +1404,7 @@
 	onMount(async () => {
 		customProjectOrder = loadProjectOrder();
 		collapsedEpicGroups = loadCollapsedEpicGroups();
+		groupSortSettings = loadGroupSortSettings(); // Initialize group sort from localStorage
 		initSort(); // Initialize session sort from localStorage
 		await fetchConfigDefaults(); // Load layout defaults before project data
 		await fetchConfigProjects(); // Load all configured projects FIRST

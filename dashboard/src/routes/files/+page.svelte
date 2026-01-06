@@ -568,6 +568,34 @@
 			}
 		}
 
+		// Alt+W - Close current tab
+		if (e.altKey && e.key === 'w') {
+			e.preventDefault();
+			if (activeFilePath && openFiles.length > 0) {
+				closeFile(activeFilePath);
+			}
+		}
+
+		// Alt+] - Next tab
+		if (e.altKey && e.key === ']') {
+			e.preventDefault();
+			if (openFiles.length > 1 && activeFilePath) {
+				const currentIndex = openFiles.findIndex(f => f.path === activeFilePath);
+				const nextIndex = (currentIndex + 1) % openFiles.length;
+				activeFilePath = openFiles[nextIndex].path;
+			}
+		}
+
+		// Alt+[ - Previous tab
+		if (e.altKey && e.key === '[') {
+			e.preventDefault();
+			if (openFiles.length > 1 && activeFilePath) {
+				const currentIndex = openFiles.findIndex(f => f.path === activeFilePath);
+				const prevIndex = (currentIndex - 1 + openFiles.length) % openFiles.length;
+				activeFilePath = openFiles[prevIndex].path;
+			}
+		}
+
 		// Alt+P - Open quick file finder (Alt instead of Ctrl to avoid browser conflict)
 		if (e.altKey && e.key === 'p') {
 			e.preventDefault();

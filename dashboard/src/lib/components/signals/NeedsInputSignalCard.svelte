@@ -97,15 +97,15 @@
 	const questionTypeBadge = $derived.by(() => {
 		switch (signal.questionType) {
 			case 'choice':
-				return { label: 'CHOICE', colorClass: 'bg-primary text-primary-content', icon: '🔘' };
+				return { label: 'CHOICE', colorClass: 'bg-primary text-primary-content', textClass: 'text-primary', icon: '🔘' };
 			case 'text':
-				return { label: 'TEXT', colorClass: 'bg-info text-info-content', icon: '✏️' };
+				return { label: 'TEXT', colorClass: 'bg-info text-info-content', textClass: 'text-info', icon: '✏️' };
 			case 'approval':
-				return { label: 'APPROVAL', colorClass: 'bg-success text-success-content', icon: '✅' };
+				return { label: 'APPROVAL', colorClass: 'bg-success text-success-content', textClass: 'text-success', icon: '✅' };
 			case 'clarification':
-				return { label: 'CLARIFY', colorClass: 'bg-warning text-warning-content', icon: '❓' };
+				return { label: 'CLARIFY', colorClass: 'bg-warning text-warning-content', textClass: 'text-warning', icon: '❓' };
 			default:
-				return { label: 'INPUT', colorClass: 'bg-secondary text-secondary-content', icon: '💬' };
+				return { label: 'INPUT', colorClass: 'bg-secondary text-secondary-content', textClass: 'text-secondary', icon: '💬' };
 		}
 	});
 
@@ -173,7 +173,7 @@
 	<div class="p-3 flex flex-col gap-3">
 		<!-- Question -->
 		<div class="flex flex-col gap-1">
-			<div class="text-sm font-semibold text-secondary-content">
+			<div class="text-sm font-semibold {questionTypeBadge.textClass}">
 				{signal.question}
 			</div>
 			{#if signal.taskTitle}
