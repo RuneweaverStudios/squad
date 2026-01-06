@@ -185,6 +185,17 @@
 		expandedTaskKey = expandedTaskKey === taskKey ? null : taskKey;
 	}
 
+	// Svelte action to auto-size textarea on mount
+	function autosize(node: HTMLTextAreaElement) {
+		const resize = () => {
+			node.style.height = 'auto';
+			node.style.height = node.scrollHeight + 'px';
+		};
+		// Resize after a tick to ensure content is rendered
+		setTimeout(resize, 0);
+		return { destroy() {} };
+	}
+
 	// Start editing title
 	function startEditingTitle(taskKey: string, currentTitle: string, event: MouseEvent) {
 		event.stopPropagation();
@@ -616,11 +627,12 @@
 									<textarea
 										value={effectiveDescription}
 										oninput={(e) => {
-										const textarea = e.currentTarget;
-										textarea.style.height = 'auto';
-										textarea.style.height = textarea.scrollHeight + 'px';
-										updateDescription(taskKey, textarea.value);
-									}}
+											const textarea = e.currentTarget;
+											textarea.style.height = 'auto';
+											textarea.style.height = textarea.scrollHeight + 'px';
+											updateDescription(taskKey, textarea.value);
+										}}
+										use:autosize
 										class="w-full text-[11px] p-2 rounded resize-none overflow-hidden bg-base-300 text-base-content border border-base-content/20 min-h-[50px]"
 										placeholder="Task description..."
 									></textarea>
