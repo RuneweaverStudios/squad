@@ -23,6 +23,7 @@
 	import TaskDetailDrawer from '$lib/components/TaskDetailDrawer.svelte';
 	import ResizableDivider from '$lib/components/ResizableDivider.svelte';
 	import SessionPanelSkeleton from '$lib/components/skeleton/SessionPanelSkeleton.svelte';
+	import { TaskTableSkeleton } from '$lib/components/skeleton';
 	import WelcomeScreen from '$lib/components/WelcomeScreen.svelte';
 	import SortDropdown from '$lib/components/SortDropdown.svelte';
 	import {
@@ -1473,8 +1474,25 @@
 
 <div class="h-full bg-base-200 flex flex-col overflow-auto">
 	{#if isInitialLoad}
-		<div class="p-4 space-y-4">
-			<SessionPanelSkeleton cards={3} />
+		<!-- Loading skeleton: mimics project structure with sessions + tasks -->
+		<div class="flex flex-col">
+			<!-- Skeleton project header -->
+			<div class="flex items-center gap-3 px-4 py-2 bg-base-100 border-b border-base-300">
+				<div class="skeleton h-4 w-4 rounded bg-base-content/15"></div>
+				<div class="skeleton h-4 w-4 rounded bg-base-content/15"></div>
+				<div class="skeleton h-3 w-3 rounded-full bg-base-content/20"></div>
+				<div class="skeleton h-4 w-24 rounded bg-base-content/15"></div>
+				<div class="skeleton h-5 w-16 rounded-full bg-base-content/10"></div>
+				<div class="skeleton h-5 w-14 rounded-full bg-base-content/10"></div>
+			</div>
+			<!-- Sessions skeleton -->
+			<div class="p-2 border-b border-base-300" style="height: 400px;">
+				<SessionPanelSkeleton cards={3} />
+			</div>
+			<!-- Tasks skeleton -->
+			<div style="height: 400px;">
+				<TaskTableSkeleton rows={6} showFilters={false} />
+			</div>
 		</div>
 	{:else if allProjects.length === 0}
 		<!-- Welcome/onboarding screen for new users -->
