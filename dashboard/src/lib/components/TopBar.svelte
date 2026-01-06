@@ -19,22 +19,13 @@
 	 */
 
 	import { page } from "$app/stores";
-	import { get } from "svelte/store";
 	import ActivityBadge from "./ActivityBadge.svelte";
+	import ActionPill from "./ActionPill.svelte";
 	import ServersBadge from "./ServersBadge.svelte";
-	import EpicSwarmBadge from "./EpicSwarmBadge.svelte";
 	import UserProfile from "./UserProfile.svelte";
 	import CommandPalette from "./CommandPalette.svelte";
 	import {
 		openTaskDrawer,
-		openTaskDetailDrawer,
-		closeTaskDetailDrawer,
-		isTaskDetailDrawerOpen,
-		openProjectDrawer,
-		isSpawnModalOpen,
-		isStartDropdownOpen,
-		closeStartDropdown,
-		startDropdownOpenedViaKeyboard,
 		toggleSidebar,
 		isSidebarCollapsed,
 	} from "$lib/stores/drawerStore";
@@ -44,7 +35,6 @@
 		startBulkSpawn,
 		endBulkSpawn,
 	} from "$lib/stores/spawningTasks";
-	import { pickNextTask, type NextTaskResult } from "$lib/utils/pickNextTask";
 	import {
 		AGENT_SORT_OPTIONS,
 		initAgentSort,
@@ -61,7 +51,7 @@
 		getServerSortDir,
 		type ServerSortOption,
 	} from "$lib/stores/serverSort.svelte.js";
-	import { onMount, onDestroy } from "svelte";
+	import { onMount } from "svelte";
 	import { SPAWN_STAGGER_MS } from "$lib/config/spawnConfig";
 	import { getMaxSessions } from "$lib/stores/preferences.svelte";
 
@@ -352,189 +342,6 @@
 		onGlobalSearchOpen,
 	}: Props = $props();
 
-	// Session dropdown state
-	let showSessionDropdown = $state(false);
-	let sessionDropdownTimeout: ReturnType<typeof setTimeout> | null = null;
-
-	// Swarm dropdown state
-	let showSwarmDropdown = $state(false);
-	let swarmDropdownTimeout: ReturnType<typeof setTimeout> | null = null;
-	let spawningTaskId = $state<string | null>(null); // Track which single task is being spawned
-	let startNextLoading = $state(false); // Track "Start Next" primary button loading
-	let selectedProjectTab = $state<string | null>(null); // null = show all projects
-
-	// Keyboard navigation state for dropdown
-	let focusedTaskIndex = $state(-1); // -1 = nothing focused
-	let dropdownRef: HTMLDivElement | null = $state(null);
-	let openedViaKeyboard = $state(false); // Track if opened via Alt+S
-
-	// Sync with global stores (for Alt+S keyboard shortcut)
-	$effect(() => {
-		const unsubscribeOpen = isStartDropdownOpen.subscribe((isOpen) => {
-			if (isOpen) {
-				showSwarmDropdown = true;
-				// Clear any existing timeout
-				if (swarmDropdownTimeout) {
-					clearTimeout(swarmDropdownTimeout);
-					swarmDropdownTimeout = null;
-				}
-			}
-		});
-		const unsubscribeKeyboard = startDropdownOpenedViaKeyboard.subscribe((viaKeyboard) => {
-			if (viaKeyboard) {
-				openedViaKeyboard = true;
-				focusedTaskIndex = 0; // Focus first task when opened via keyboard
-			}
-		});
-		return () => {
-			unsubscribeOpen();
-			unsubscribeKeyboard();
-		};
-	});
-
-	// Handle keyboard navigation in dropdown
-	function handleDropdownKeydown(event: KeyboardEvent) {
-		if (!showSwarmDropdown) return;
-
-		const taskCount = flatTaskList.length;
-
-		switch (event.key) {
-			case 'ArrowLeft':
-				// Navigate to previous project tab
-				event.preventDefault();
-				if (selectedProjectTab === null) {
-					// On "All" tab, wrap to last project
-					selectedProjectTab = projectNames.length > 0 ? projectNames[projectNames.length - 1] : null;
-				} else {
-					const currentIndex = projectNames.indexOf(selectedProjectTab);
-					if (currentIndex <= 0) {
-						// First project or not found, go to "All"
-						selectedProjectTab = null;
-					} else {
-						selectedProjectTab = projectNames[currentIndex - 1];
-					}
-				}
-				// Reset task focus to first item when changing tabs
-				focusedTaskIndex = 0;
-				break;
-			case 'ArrowRight':
-				// Navigate to next project tab
-				event.preventDefault();
-				if (selectedProjectTab === null) {
-					// On "All" tab, go to first project
-					selectedProjectTab = projectNames.length > 0 ? projectNames[0] : null;
-				} else {
-					const currentIndex = projectNames.indexOf(selectedProjectTab);
-					if (currentIndex >= projectNames.length - 1) {
-						// Last project, wrap to "All"
-						selectedProjectTab = null;
-					} else {
-						selectedProjectTab = projectNames[currentIndex + 1];
-					}
-				}
-				// Reset task focus to first item when changing tabs
-				focusedTaskIndex = 0;
-				break;
-			case 'ArrowDown':
-				event.preventDefault();
-				if (taskCount === 0) break;
-				if (focusedTaskIndex < 0) {
-					focusedTaskIndex = 0;
-				} else {
-					focusedTaskIndex = Math.min(focusedTaskIndex + 1, taskCount - 1);
-				}
-				scrollFocusedTaskIntoView();
-				break;
-			case 'ArrowUp':
-				event.preventDefault();
-				if (taskCount === 0) break;
-				if (focusedTaskIndex < 0) {
-					focusedTaskIndex = taskCount - 1;
-				} else {
-					focusedTaskIndex = Math.max(focusedTaskIndex - 1, 0);
-				}
-				scrollFocusedTaskIntoView();
-				break;
-			case 'Enter':
-				event.preventDefault();
-				if (focusedTaskIndex >= 0 && focusedTaskIndex < taskCount) {
-					const task = flatTaskList[focusedTaskIndex];
-					handleSpawnSingle(task.id);
-					showSwarmDropdown = false;
-					closeStartDropdown();
-				}
-				break;
-			case ' ':
-				// Space opens task detail drawer for the focused task
-				event.preventDefault();
-				if (focusedTaskIndex >= 0 && focusedTaskIndex < taskCount) {
-					const task = flatTaskList[focusedTaskIndex];
-					openTaskDetailDrawer(task.id);
-					// Keep dropdown open so user can return to it
-				}
-				break;
-			case 'Escape':
-				// If task detail drawer is open, close it and stop - don't close the dropdown
-				if (get(isTaskDetailDrawerOpen)) {
-					event.preventDefault();
-					event.stopPropagation();
-					closeTaskDetailDrawer();
-					// Return focus to dropdown after drawer closes
-					setTimeout(() => dropdownRef?.focus(), 50);
-					return;
-				}
-				// Close the dropdown
-				event.preventDefault();
-				showSwarmDropdown = false;
-				closeStartDropdown();
-				focusedTaskIndex = -1;
-				openedViaKeyboard = false;
-				break;
-		}
-	}
-
-	// Scroll the focused task into view within the dropdown
-	function scrollFocusedTaskIntoView() {
-		setTimeout(() => {
-			const focusedElement = dropdownRef?.querySelector(`[data-task-index="${focusedTaskIndex}"]`);
-			if (focusedElement) {
-				focusedElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-			}
-		}, 10);
-	}
-
-	// Focus dropdown when opened via keyboard and select first task
-	$effect(() => {
-		if (showSwarmDropdown && openedViaKeyboard && dropdownRef) {
-			// Small delay to ensure DOM is ready
-			setTimeout(() => {
-				dropdownRef?.focus();
-				// Auto-select first task for immediate arrow key navigation
-				if (flatTaskList.length > 0 && focusedTaskIndex < 0) {
-					focusedTaskIndex = 0;
-				}
-			}, 50);
-		}
-	});
-
-	// Reset focus when dropdown closes
-	$effect(() => {
-		if (!showSwarmDropdown) {
-			focusedTaskIndex = -1;
-			openedViaKeyboard = false;
-		}
-	});
-
-	// Epic submenu state
-	let showEpicSubmenu = $state(false);
-	let runningEpicId = $state<string | null>(null); // Track which epic is being run
-
-	// Review settings submenu state
-	let showReviewSubmenu = $state(false);
-
-	// Task dropdown state
-	let showTaskDropdown = $state(false);
-	let taskDropdownTimeout: ReturnType<typeof setTimeout> | null = null;
 
 	// Get actual project list (filter out "All Projects")
 	const actualProjects = $derived(projects.filter((p) => p !== "All Projects"));
@@ -553,109 +360,18 @@
 		Math.min(readyTaskCount, availableSlots),
 	);
 
-	// Handle dropdown show/hide with delay
-	function showDropdown() {
-		if (sessionDropdownTimeout) clearTimeout(sessionDropdownTimeout);
-		showSessionDropdown = true;
-	}
-
-	function hideDropdownDelayed() {
-		sessionDropdownTimeout = setTimeout(() => {
-			showSessionDropdown = false;
-		}, 150);
-	}
-
-	function keepDropdownOpen() {
-		if (sessionDropdownTimeout) clearTimeout(sessionDropdownTimeout);
-	}
-
-	// Handle task dropdown show/hide with delay
-	function showTaskDropdownMenu() {
-		if (taskDropdownTimeout) clearTimeout(taskDropdownTimeout);
-		showTaskDropdown = true;
-	}
-
-	function hideTaskDropdownDelayed() {
-		taskDropdownTimeout = setTimeout(() => {
-			showTaskDropdown = false;
-		}, 150);
-	}
-
-	function keepTaskDropdownOpen() {
-		if (taskDropdownTimeout) clearTimeout(taskDropdownTimeout);
-	}
-
 	// Handle task creation for selected project
 	function handleNewTask(projectName: string) {
-		showTaskDropdown = false;
 		openTaskDrawer(projectName);
 	}
 
-	// Swarm dropdown handlers
-	function showSwarmMenu() {
-		if (swarmDropdownTimeout) clearTimeout(swarmDropdownTimeout);
-		showSwarmDropdown = true;
-	}
-
-	function hideSwarmMenuDelayed() {
-		swarmDropdownTimeout = setTimeout(() => {
-			showSwarmDropdown = false;
-			closeStartDropdown(); // Sync store state
-		}, 150);
-	}
-
-	function keepSwarmMenuOpen() {
-		if (swarmDropdownTimeout) clearTimeout(swarmDropdownTimeout);
-	}
-
-	// Start Next - spawn single agent on highest-priority ready task
-	async function handleStartNext() {
-		if (startNextLoading || swarmLoading || readyTaskCount === 0) return;
-
-		startNextLoading = true;
-		showSwarmDropdown = false;
-
-		try {
-			// Use pickNextTask to get the highest-priority ready task
-			const nextTask = await pickNextTask(null, { project: selectedProject });
-
-			if (!nextTask) {
-				return;
-			}
-
-			startSpawning(nextTask.taskId);
-
-			const response = await fetch("/api/work/spawn", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ taskId: nextTask.taskId }),
-			});
-			const data = await response.json();
-
-			if (!response.ok) {
-				stopSpawning(nextTask.taskId);
-			} else {
-				setTimeout(() => stopSpawning(nextTask.taskId), 2000);
-			}
-		} catch (err) {
-		} finally {
-			startNextLoading = false;
-		}
-	}
-
-	// Open Swarm Config modal
-	function handleOpenSwarmConfig() {
-		showSwarmDropdown = false;
-		isSpawnModalOpen.set(true);
-	}
-
 	// Run Epic - spawn agents for all ready children of an epic
+	let runningEpicId = $state<string | null>(null);
+
 	async function handleRunEpic(epicId: string) {
 		if (runningEpicId || swarmLoading) return;
 
 		runningEpicId = epicId;
-		showEpicSubmenu = false;
-		showSwarmDropdown = false;
 
 		try {
 			// Fetch epic's children with ready status
@@ -712,41 +428,16 @@
 		}
 	}
 
-	// Get epics with ready children count
+	// Get epics with ready children count (used by ActionPill)
 	const epicsWithReadyChildren = $derived(
 		epicsWithReady
 			.filter((e) => e.readyCount > 0)
 			.sort((a, b) => b.readyCount - a.readyCount),
 	);
 
-	// Get total ready across all epics
-	const totalEpicReadyCount = $derived(
-		epicsWithReadyChildren.reduce((sum, e) => sum + e.readyCount, 0),
-	);
+	// Spawn a single task (called by ActionPill)
+	let spawningTaskId = $state<string | null>(null);
 
-	// Get review summary for display
-	const reviewSummary = $derived.by(() => {
-		if (!reviewRules || reviewRules.length === 0) return null;
-
-		// Find the common threshold (most common maxAutoPriority)
-		const thresholds = reviewRules.map((r) => r.maxAutoPriority);
-		const commonThreshold = thresholds[0] ?? 3;
-
-		// Count how many types auto-proceed at each level
-		const autoTypes = reviewRules.filter((r) => r.maxAutoPriority >= 0).length;
-		const reviewAlways = reviewRules.filter(
-			(r) => r.maxAutoPriority < 0,
-		).length;
-
-		return {
-			commonThreshold,
-			autoTypes,
-			reviewAlways,
-			description: `P0-P${commonThreshold} auto-proceed`,
-		};
-	});
-
-	// Spawn a single task from the dropdown
 	async function handleSpawnSingle(taskId: string) {
 		if (spawningTaskId || swarmLoading) return;
 
@@ -759,7 +450,6 @@
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ taskId }),
 			});
-			const data = await response.json();
 
 			if (!response.ok) {
 				stopSpawning(taskId);
@@ -774,7 +464,7 @@
 		}
 	}
 
-	// Group ready tasks by project for the dropdown
+	// Group ready tasks by project for ActionPill
 	const tasksByProject = $derived.by(() => {
 		const groups = new Map<string, ReadyTask[]>();
 		for (const task of readyTasks) {
@@ -790,62 +480,6 @@
 		}
 		return groups;
 	});
-
-	// Get list of project names for tabs (use order from projects prop - sorted by last activity)
-	// Filter to only show projects that have ready tasks
-	const projectNames = $derived(
-		projects.filter((p) => p !== "All Projects" && tasksByProject.has(p)),
-	);
-
-	// Filter tasks based on selected project tab (maintains projects prop order)
-	const filteredTasksByProject = $derived.by(() => {
-		const result = new Map<string, ReadyTask[]>();
-
-		if (selectedProjectTab === null) {
-			// Show all projects in the order from projects prop
-			for (const project of projectNames) {
-				const tasks = tasksByProject.get(project);
-				if (tasks && tasks.length > 0) {
-					result.set(project, tasks);
-				}
-			}
-		} else {
-			// Filter to just the selected project
-			const tasks = tasksByProject.get(selectedProjectTab);
-			if (tasks) {
-				result.set(selectedProjectTab, tasks);
-			}
-		}
-		return result;
-	});
-
-	// Get flat list of visible tasks for keyboard navigation
-	const flatTaskList = $derived.by(() => {
-		const tasks: ReadyTask[] = [];
-		for (const [, projectTasks] of filteredTasksByProject.entries()) {
-			tasks.push(...projectTasks);
-		}
-		return tasks;
-	});
-
-	// Get priority badge color using theme variables
-	function getPriorityColor(priority: number): string {
-		switch (priority) {
-			case 0:
-				return "var(--color-error)"; // P0 - red
-			case 1:
-				return "var(--color-warning)"; // P1 - orange
-			case 2:
-				return "var(--color-info)"; // P2 - blue
-			default:
-				return "var(--color-base-content)"; // P3+ - gray
-		}
-	}
-
-	// Button hover states
-	let sessionHovered = $state(false);
-	let taskHovered = $state(false);
-	let swarmHovered = $state(false);
 </script>
 
 <!-- Industrial/Terminal TopBar -->
@@ -900,378 +534,16 @@
 	</button>
 
 	<!-- Left side utilities -->
-	<div class="flex-1 flex items-center gap-3 px-2">
-		<!-- Add Task Dropdown (Industrial - pick project first) -->
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div
-			class="relative"
-			onmouseenter={showTaskDropdownMenu}
-			onmouseleave={hideTaskDropdownDelayed}
-		>
-			<button
-				class="flex items-center gap-1 py-1.5 rounded font-mono text-[10px] leading-none tracking-wider uppercase transition-all duration-200 ease-out overflow-hidden btn btn-sm btn-success btn-outline"
-				class:btn-active={taskHovered || showTaskDropdown}
-				style="
-					padding-left: {taskHovered || showTaskDropdown ? '10px' : '8px'};
-					padding-right: {taskHovered || showTaskDropdown ? '10px' : '8px'};
-					transform: {taskHovered || showTaskDropdown ? 'scale(1.05)' : 'scale(1)'};
-				"
-				title="Create new task - pick a project"
-				onmouseenter={() => (taskHovered = true)}
-				onmouseleave={() => (taskHovered = false)}
-			>
-				<svg
-					class="w-3 h-3 flex-shrink-0"
-					fill="none"
-					viewBox="0 0 24 24"
-					stroke="currentColor"
-					stroke-width="2"
-				>
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						d="M12 4.5v15m7.5-7.5h-15"
-					/>
-				</svg>
-				{#if taskHovered || showTaskDropdown}
-					<span class="whitespace-nowrap">New Task</span>
-					<svg
-						class="w-3 h-3 ml-0.5"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-						/>
-					</svg>
-				{:else}
-					<span class="hidden sm:inline pt-0.75">Task</span>
-				{/if}
-			</button>
-
-			<!-- Project Dropdown for Task -->
-			{#if showTaskDropdown}
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<div
-					class="absolute top-full left-0 mt-1 min-w-[180px] rounded-lg shadow-xl z-50 overflow-hidden dropdown-content bg-base-200 border border-base-content/20"
-					onmouseenter={keepTaskDropdownOpen}
-					onmouseleave={hideTaskDropdownDelayed}
-				>
-					<div
-						class="px-3 py-2 border-b border-base-content/10"
-					>
-						<span
-							class="text-[9px] font-mono uppercase tracking-wider text-base-content/60"
-						>
-							Select Project
-						</span>
-					</div>
-					<div class="py-1 max-h-[240px] overflow-y-auto">
-						{#if actualProjects.length === 0}
-							<div
-								class="px-3 py-2 text-xs text-base-content/50"
-							>
-								No projects found
-							</div>
-						{:else}
-							{#each actualProjects as project}
-								<button
-									class="w-full px-3 py-2 text-left text-xs font-mono flex items-center gap-2 transition-colors text-base-content hover:bg-base-300"
-									onclick={() => handleNewTask(project)}
-								>
-									<span
-										class="w-2 h-2 rounded-full flex-shrink-0 {projectColors[project] ? '' : 'bg-success opacity-60'}"
-										style="{projectColors[project] ? `background: ${projectColors[project]}` : ''}"
-									></span>
-									<span class="flex-1">{project}</span>
-								</button>
-							{/each}
-						{/if}
-					</div>
-					<!-- Add Project Button -->
-					<div class="border-t border-base-content/10">
-						<button
-							class="w-full px-3 py-2 text-left text-xs font-mono flex items-center gap-2 transition-colors text-success hover:bg-base-300"
-							onclick={() => {
-								showTaskDropdown = false;
-								openProjectDrawer();
-							}}
-						>
-							<svg
-								class="w-3 h-3 flex-shrink-0"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
-								stroke-width="2"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									d="M12 4v16m8-8H4"
-								/>
-							</svg>
-							<span>Project</span>
-						</button>
-					</div>
-				</div>
-			{/if}
-		</div>
-
-		<!-- Global Action Buttons (Industrial) -->
-		<div class="hidden md:flex items-center gap-1">
-			<!-- Start Next Dropdown (hover to open, pick task to spawn) -->
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<div
-				class="relative"
-				onmouseenter={showSwarmMenu}
-				onmouseleave={hideSwarmMenuDelayed}
-			>
-				<button
-					class="flex items-center gap-1 py-1.5 rounded font-mono text-[10px] leading-none tracking-wider uppercase transition-all duration-200 ease-out overflow-hidden btn btn-sm btn-primary"
-					class:btn-active={swarmHovered || showSwarmDropdown}
-					style="
-						padding-left: {swarmHovered || showSwarmDropdown ? '10px' : '8px'};
-						padding-right: {swarmHovered || showSwarmDropdown ? '10px' : '8px'};
-						transform: {swarmHovered || showSwarmDropdown ? 'scale(1.05)' : 'scale(1)'};
-					"
-					title={readyTaskCount > 0
-						? `Pick a task to start (${readyTaskCount} ready) • Alt+S`
-						: "No ready tasks • Alt+S"}
-					onmouseenter={() => (swarmHovered = true)}
-					onmouseleave={() => (swarmHovered = false)}
-					disabled={swarmLoading || startNextLoading}
-				>
-					{#if startNextLoading}
-						<span class="loading loading-spinner loading-xs"></span>
-						<span>Starting...</span>
-					{:else}
-						<svg
-							class="w-3.5 h-3.5 flex-shrink-0"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-							stroke-width="2"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
-							/>
-						</svg>
-						{#if swarmHovered || showSwarmDropdown}
-							<span class="whitespace-nowrap pt-0.75">Start</span>
-							{#if readyTaskCount > 0}
-								<span
-									class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-success text-success-content"
-									>{readyTaskCount}</span
-								>
-							{/if}
-							<svg
-								class="w-3 h-3 ml-0.5 transition-transform {showSwarmDropdown
-									? 'rotate-180'
-									: ''}"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
-								stroke-width="2"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-								/>
-							</svg>
-						{:else}
-							<span class="whitespace-nowrap pt-0.75">Start</span>
-							{#if readyTaskCount > 0}
-								<span
-									class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-success text-success-content"
-									>{readyTaskCount}</span
-								>
-							{/if}
-						{/if}
-					{/if}
-				</button>
-
-				<!-- Dropdown Panel -->
-				{#if showSwarmDropdown && !swarmLoading && !startNextLoading}
-					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div
-						bind:this={dropdownRef}
-						class="swarm-dropdown-panel"
-						tabindex="-1"
-						onmouseenter={keepSwarmMenuOpen}
-						onmouseleave={hideSwarmMenuDelayed}
-						onkeydown={handleDropdownKeydown}
-					>
-						<!-- Project Tabs Header -->
-						<div
-							class="px-1 py-1 flex items-center gap-1 overflow-x-auto bg-base-300 border-b border-base-content/25"
-						>
-							<!-- All Projects Tab -->
-							<button
-								class="project-tab {selectedProjectTab === null
-									? 'project-tab-active'
-									: ''}"
-								onclick={() => (selectedProjectTab = null)}
-							>
-								<span class="text-[9px] font-mono uppercase">All</span>
-								<span class="project-tab-count">{readyTaskCount}</span>
-							</button>
-							<!-- Individual Project Tabs -->
-							{#each projectNames as project}
-								{@const count = tasksByProject.get(project)?.length || 0}
-								<button
-									class="project-tab {selectedProjectTab === project
-										? 'project-tab-active'
-										: ''}"
-									onclick={() => (selectedProjectTab = project)}
-								>
-									<span
-										class="w-1.5 h-1.5 rounded-full flex-shrink-0 {projectColors[project] ? '' : 'bg-info opacity-60'}"
-										style="{projectColors[project] ? `background: ${projectColors[project]}` : ''}"
-									></span>
-									<span
-										class="text-[9px] font-mono uppercase truncate max-w-[60px]"
-										>{project}</span
-									>
-									<span class="project-tab-count">{count}</span>
-								</button>
-							{/each}
-						</div>
-
-						{#if readyTaskCount === 0}
-							<div
-								class="px-3 py-4 text-center text-xs text-base-content/50"
-							>
-								No tasks ready to spawn
-							</div>
-						{:else}
-							<!-- Task list (filtered by selected project) -->
-							<div class="max-h-[280px] overflow-y-auto">
-								{#each [...filteredTasksByProject.entries()] as [project, tasks]}
-									<!-- Project header (only show if viewing all projects) -->
-									{#if selectedProjectTab === null}
-										<div class="swarm-project-header">
-											<span
-												class="w-2 h-2 rounded-full flex-shrink-0 {projectColors[project] ? '' : 'bg-info opacity-60'}"
-												style="{projectColors[project] ? `background: ${projectColors[project]}` : ''}"
-											></span>
-											<span class="swarm-project-label">{project}</span>
-											<span class="swarm-project-count">{tasks.length}</span>
-										</div>
-									{/if}
-									<!-- Tasks for this project -->
-									{#each tasks as task}
-										{@const taskFlatIndex = flatTaskList.findIndex(t => t.id === task.id)}
-										{@const isFocused = focusedTaskIndex >= 0 && focusedTaskIndex === taskFlatIndex}
-										<div
-											class="swarm-task-row"
-											class:keyboard-focused={isFocused}
-											data-task-index={taskFlatIndex}
-											style={isFocused ? 'background: color-mix(in oklch, var(--color-info) 30%, transparent); outline: 2px solid var(--color-info);' : ''}
-										>
-											<div
-												class="flex items-start justify-between gap-2 w-full"
-											>
-												<div class="flex-1 min-w-0 text-left">
-													<div class="flex items-center gap-1.5">
-														<span
-															class="px-1 py-0.5 rounded text-[9px] font-bold text-white"
-															style="background: {getPriorityColor(
-																task.priority,
-															)}"
-															>P{task.priority}</span
-														>
-														<span
-															class="text-[10px] font-mono {projectColors[task.project || ''] ? '' : 'text-info opacity-55'}"
-															style="{projectColors[task.project || ''] ? `color: ${projectColors[task.project || '']}` : ''}"
-														>
-															{task.id}
-														</span>
-													</div>
-													<div
-														class="text-xs font-mono truncate mt-0.5 text-base-content/85"
-													>
-														{task.title || task.id}
-													</div>
-												</div>
-												<div class="flex items-center gap-1.5 flex-shrink-0">
-													<!-- Info button to view task details -->
-													<button
-														class="p-1 rounded hover:bg-base-300/50 transition-colors"
-														onclick={(e) => {
-															e.stopPropagation();
-															openTaskDetailDrawer(task.id);
-														}}
-														title="View task details"
-													>
-														<svg
-															xmlns="http://www.w3.org/2000/svg"
-															fill="none"
-															viewBox="0 0 24 24"
-															stroke-width="1.5"
-															stroke="currentColor"
-															class="w-3.5 h-3.5 opacity-50 hover:opacity-100 text-info"
-														>
-															<path
-																stroke-linecap="round"
-																stroke-linejoin="round"
-																d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
-															/>
-														</svg>
-													</button>
-													<!-- Spawn button -->
-													<button
-														class="p-1 rounded hover:bg-base-300/50 transition-colors"
-														onclick={() => handleSpawnSingle(task.id)}
-														disabled={spawningTaskId === task.id ||
-															swarmLoading}
-														title="Spawn agent for this task"
-													>
-														{#if spawningTaskId === task.id}
-															<span
-																class="loading loading-spinner loading-xs text-success"
-															></span>
-														{:else}
-															<svg
-																class="w-4 h-4 opacity-50 hover:opacity-100 text-success"
-																fill="none"
-																viewBox="0 0 24 24"
-																stroke="currentColor"
-																stroke-width="2"
-															>
-																<path
-																	stroke-linecap="round"
-																	stroke-linejoin="round"
-																	d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
-																/>
-															</svg>
-														{/if}
-													</button>
-												</div>
-											</div>
-										</div>
-									{/each}
-								{/each}
-							</div>
-						{/if}
-					</div>
-				{/if}
-			</div>
-		</div>
-
-		<!-- Epic Swarm Badge (shows swarm controls) - Action button, not reporting -->
-		<EpicSwarmBadge
-			{readyTaskCount}
-			{activeAgentCount}
-			{epicsWithReady}
-			{reviewRules}
-			{projectColors}
+	<div class="flex-1 flex items-center gap-3 px-4">
+		<!-- Unified Action Pill: + New | ▶ Start | ⚡ Swarm -->
+		<ActionPill
+			projects={actualProjects.map(p => ({ name: p, taskCount: tasksByProject.get(p)?.length }))}
+			{readyTasks}
+			epics={epicsWithReadyChildren.map(e => ({ id: e.id, title: e.title, project: e.project, childCount: e.readyCount }))}
+			idleSlots={availableSlots}
+			onNewTask={handleNewTask}
+			onStart={handleSpawnSingle}
+			onSwarm={(count, epicId) => epicId ? handleRunEpic(epicId) : handleSwarm()}
 		/>
 	</div>
 
