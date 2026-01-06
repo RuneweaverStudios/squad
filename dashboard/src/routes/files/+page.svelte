@@ -818,20 +818,26 @@
 							<div class="panel-empty">
 								<p>Select a project to browse files</p>
 							</div>
-						{:else if activeTab === 'files'}
-							<FileTree
-								bind:this={fileTreeRef}
-								project={selectedProject}
-								selectedPath={activeFilePath}
-								onFileSelect={handleFileSelect}
-								onFileDelete={handleFileDelete}
-								onFileRename={handleFileRename}
-								onFileCreate={handleFileCreate}
-								onError={handleTreeError}
-								onSuccess={handleTreeSuccess}
-							/>
 						{:else}
-							<GitPanel project={selectedProject} />
+							{#key activeTab}
+								<div class="tab-panel-wrapper" in:fade={{ duration: 150 }}>
+									{#if activeTab === 'files'}
+										<FileTree
+											bind:this={fileTreeRef}
+											project={selectedProject}
+											selectedPath={activeFilePath}
+											onFileSelect={handleFileSelect}
+											onFileDelete={handleFileDelete}
+											onFileRename={handleFileRename}
+											onFileCreate={handleFileCreate}
+											onError={handleTreeError}
+											onSuccess={handleTreeSuccess}
+										/>
+									{:else}
+										<GitPanel project={selectedProject} />
+									{/if}
+								</div>
+							{/key}
 						{/if}
 					</div>
 				</div>
@@ -1107,36 +1113,72 @@
 	}
 
 	.sidebar-tab {
+		position: relative;
 		display: flex;
 		align-items: center;
+		justify-content: center;
 		gap: 0.375rem;
 		flex: 1;
-		padding: 0.375rem 0.5rem;
+		padding: 0.5rem 0.5rem;
 		background: transparent;
-		border: 1px solid transparent;
+		border: none;
 		border-radius: 0.375rem;
 		cursor: pointer;
 		font-size: 0.75rem;
 		font-weight: 500;
 		color: oklch(0.55 0.02 250);
-		transition: all 0.15s ease;
+		transition: color 0.2s ease, background 0.2s ease, transform 0.15s ease;
+	}
+
+	.sidebar-tab::after {
+		content: '';
+		position: absolute;
+		bottom: 0;
+		left: 50%;
+		width: 0;
+		height: 2px;
+		background: oklch(0.65 0.15 200);
+		border-radius: 1px;
+		transition: width 0.2s ease, left 0.2s ease;
 	}
 
 	.sidebar-tab:hover {
-		background: oklch(0.20 0.02 250);
+		background: oklch(0.18 0.02 250);
 		color: oklch(0.70 0.02 250);
 	}
 
+	.sidebar-tab:active {
+		transform: scale(0.97);
+	}
+
 	.sidebar-tab.active {
-		background: oklch(0.22 0.02 250);
-		border-color: oklch(0.30 0.02 250);
-		color: oklch(0.85 0.02 250);
+		background: oklch(0.20 0.02 250);
+		color: oklch(0.90 0.02 250);
+	}
+
+	.sidebar-tab.active::after {
+		width: 70%;
+		left: 15%;
 	}
 
 	.sidebar-tab .tab-icon {
 		width: 14px;
 		height: 14px;
 		flex-shrink: 0;
+		transition: transform 0.2s ease;
+	}
+
+	.sidebar-tab.active .tab-icon {
+		transform: scale(1.1);
+	}
+
+	/* Tab Panel Transition Wrapper */
+	.tab-panel-wrapper {
+		display: flex;
+		flex-direction: column;
+		flex: 1;
+		min-height: 0;
+		overflow: hidden;
 	}
 
 	.panel-empty,

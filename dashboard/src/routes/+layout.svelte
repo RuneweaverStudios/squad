@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { themeChange } from 'theme-change';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
@@ -266,8 +266,11 @@
 
 	// React to state count changes for push notifications (favicon badge, title badge, browser notifications)
 	$effect(() => {
+		// Only react to stateCounts changes, not prevStateCounts changes
+		// untrack prevents reading prevStateCounts from triggering this effect
+		const prev = untrack(() => prevStateCounts);
 		// Handle state count changes - updates badges and shows browser notifications when counts increase
-		handleStateCountChange(prevStateCounts, stateCounts);
+		handleStateCountChange(prev, stateCounts);
 		// Update previous counts for next comparison
 		prevStateCounts = { needsInput: stateCounts.needsInput, review: stateCounts.review };
 	});
