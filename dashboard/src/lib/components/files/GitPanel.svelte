@@ -432,6 +432,7 @@
 			showToast(`Committed: ${data.commit?.hash?.slice(0, 7) || 'success'}`);
 			commitMessage = '';
 			await fetchStatus();
+			await fetchTimeline(); // Refresh timeline to show new commit
 		} catch (err) {
 			showToast(err instanceof Error ? err.message : 'Failed to commit', 'error');
 		} finally {
