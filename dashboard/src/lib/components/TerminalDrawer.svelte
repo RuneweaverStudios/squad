@@ -308,10 +308,17 @@
 		}
 	}
 
-	// Hover-to-focus: focus input when mouse enters the input section
-	function handleInputSectionHover() {
-		if (inputRef && !sendingInput) {
-			inputRef.focus();
+	// Hover-to-focus: focus input when mouse enters the drawer
+	// Skip if user is actively typing in another input (like search boxes)
+	function handleDrawerMouseEnter() {
+		const activeEl = document.activeElement as HTMLElement | null;
+		const isOtherInput =
+			activeEl &&
+			(activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') &&
+			activeEl !== inputRef;
+
+		if (!isOtherInput && inputRef && !sendingInput) {
+			inputRef.focus({ preventScroll: true });
 		}
 	}
 
@@ -410,6 +417,7 @@
 		class="fixed right-0 top-0 h-screen w-[680px] z-50 flex flex-col shadow-2xl"
 		style="background: oklch(0.14 0.01 250); border-left: 1px solid oklch(0.30 0.02 250);"
 		transition:slide={{ axis: 'x', duration: 200 }}
+		onmouseenter={handleDrawerMouseEnter}
 	>
 		<!-- Header -->
 		<div
@@ -616,7 +624,7 @@
 			<div
 				class="border-t px-3 py-2 space-y-2"
 				style="background: oklch(0.18 0.01 250); border-color: oklch(0.30 0.02 250);"
-				onmouseenter={handleInputSectionHover}
+				onmouseenter={handleDrawerMouseEnter}
 			>
 				<!-- Quick action buttons -->
 				<div class="flex gap-1.5 flex-wrap">
