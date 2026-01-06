@@ -1471,16 +1471,22 @@
 	.commit-item {
 		display: flex;
 		gap: 0.5rem;
-		padding: 0.375rem 0;
-		cursor: default;
+		padding: 0.375rem 0.25rem;
+		cursor: pointer;
+		background: transparent;
+		border: none;
+		width: 100%;
+		text-align: left;
+		border-radius: 0.25rem;
+		transition: background 0.1s ease;
 	}
 
 	.commit-item:hover {
-		background: oklch(0.18 0.02 250);
-		border-radius: 0.25rem;
-		margin: 0 -0.25rem;
-		padding-left: 0.25rem;
-		padding-right: 0.25rem;
+		background: oklch(0.20 0.02 250);
+	}
+
+	.commit-item:active {
+		background: oklch(0.22 0.03 250);
 	}
 
 	.commit-marker {
