@@ -12,7 +12,7 @@
 	 * - Project selector when multiple projects available
 	 */
 
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 
 	interface SearchResult {
 		file: string;
@@ -81,13 +81,19 @@
 	});
 
 	// Focus input when modal opens
+	// Use tick() to wait for DOM to render before focusing
 	$effect(() => {
-		if (isOpen && searchInput) {
-			searchInput.focus();
+		if (isOpen) {
+			// Reset state immediately
 			searchQuery = '';
 			results = [];
 			selectedIndex = 0;
 			truncated = false;
+
+			// Wait for DOM to render, then focus input
+			tick().then(() => {
+				searchInput?.focus();
+			});
 		}
 	});
 
