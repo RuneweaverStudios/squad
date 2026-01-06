@@ -9,7 +9,6 @@
 	import CreateProjectDrawer from '$lib/components/CreateProjectDrawer.svelte';
 	import SpawnModal from '$lib/components/SpawnModal.svelte';
 	import EpicSwarmModal from '$lib/components/EpicSwarmModal.svelte';
-	import OutputDrawer from '$lib/components/OutputDrawer.svelte';
 	import ToastContainer from '$lib/components/ToastContainer.svelte';
 	import TopBar from '$lib/components/TopBar.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
@@ -502,13 +501,10 @@
 	}
 
 	// Handle global search result - navigate to /files with file and line
-	function handleGlobalSearchResult(file: string, line: number) {
-		const activeProject = getActiveProject() || configProjects[0];
-		if (!activeProject) return;
-
+	function handleGlobalSearchResult(file: string, line: number, project: string) {
 		// Navigate to /files with the project, file, and line parameters
 		const url = new URL('/files', window.location.origin);
-		url.searchParams.set('project', activeProject);
+		url.searchParams.set('project', project);
 		url.searchParams.set('file', file);
 		url.searchParams.set('line', String(line));
 		goto(url.toString());
@@ -840,9 +836,6 @@
 	<Sidebar />
 </div>
 
-<!-- Output Drawer (global session output panel) -->
-<OutputDrawer />
-
 <!-- Global Task Detail Drawer (for inspecting tasks from anywhere) -->
 <TaskDetailDrawer
 	bind:taskId={$taskDetailDrawerTaskId}
@@ -869,6 +862,7 @@
 	<GlobalSearch
 		isOpen={globalSearchOpen}
 		project={getActiveProject() || configProjects[0]}
+		availableProjects={configProjects}
 		onClose={() => { globalSearchOpen = false; }}
 		onResultSelect={handleGlobalSearchResult}
 	/>

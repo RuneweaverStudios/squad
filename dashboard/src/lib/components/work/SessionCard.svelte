@@ -4612,7 +4612,7 @@
 		/>
 		<!-- Status accent bar - left edge (color reflects session state) -->
 		<div
-			class="absolute left-0 top-0 bottom-0 w-1 z-20"
+			class="absolute left-0 top-0 bottom-0 w-1 z-10"
 			style="
 			background: {sessionState === 'needs-input'
 				? 'oklch(0.70 0.20 45)' /* Orange for needs input - urgent attention */
@@ -5488,7 +5488,7 @@
 
 			<!-- Input Section (z-[55] to layer above collapsed AND expanded EventStack z-50) -->
 			<div
-				class="relative px-3 py-2 flex-shrink-0 z-[35]"
+				class="relative px-3 py-2 flex-shrink-0 z-[10]"
 				style="border-top: 1px solid oklch(0.5 0 0 / 0.08); background: oklch(0.18 0.01 250);"
 			>
 				<!-- Attached Files Preview -->

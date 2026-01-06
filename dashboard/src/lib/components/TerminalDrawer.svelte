@@ -16,6 +16,7 @@
 	import { browser } from '$app/environment';
 	import { slide, fade } from 'svelte/transition';
 	import { ansiToHtml } from '$lib/utils/ansiToHtml';
+	import { isTerminalDrawerOpen } from '$lib/stores/drawerStore';
 
 	// State
 	let isOpen = $state(false);
@@ -49,21 +50,29 @@
 	// Load persisted state and set up global listeners
 	onMount(() => {
 		if (browser) {
+			// Subscribe to store to sync state (enables keyboard shortcut to work)
+			const unsubscribe = isTerminalDrawerOpen.subscribe((value) => {
+				isOpen = value;
+			});
+
+			// Also check localStorage for persisted state on initial load
 			const persisted = localStorage.getItem('terminal-drawer-open');
-			if (persisted === 'true') {
+			if (persisted === 'true' && !isOpen) {
 				isOpen = true;
+				isTerminalDrawerOpen.set(true);
 			}
+
 			// Add global keydown listener for Escape (capture phase to handle before other handlers)
 			window.addEventListener('keydown', handleGlobalKeydown, true);
-		}
-		return () => {
-			if (browser) {
+
+			return () => {
+				unsubscribe();
 				window.removeEventListener('keydown', handleGlobalKeydown, true);
-			}
-		};
+			};
+		}
 	});
 
-	// Save state changes
+	// Save state changes to localStorage
 	$effect(() => {
 		if (browser) {
 			localStorage.setItem('terminal-drawer-open', String(isOpen));
@@ -81,6 +90,16 @@
 				clearInterval(pollInterval);
 				pollInterval = null;
 			}
+		}
+	});
+
+	// Auto-focus input when drawer opens
+	$effect(() => {
+		if (isOpen && inputRef) {
+			// Small delay to ensure DOM is ready after transition starts
+			requestAnimationFrame(() => {
+				inputRef?.focus();
+			});
 		}
 	});
 
@@ -285,6 +304,7 @@
 			e.preventDefault();
 			e.stopPropagation(); // Prevent other handlers (like /work collapse)
 			isOpen = false;
+			isTerminalDrawerOpen.set(false);
 		}
 	}
 
@@ -307,6 +327,7 @@
 	// Toggle drawer
 	function toggleDrawer() {
 		isOpen = !isOpen;
+		isTerminalDrawerOpen.set(isOpen);
 	}
 
 	// Select session
@@ -329,10 +350,12 @@
 
 	export function open() {
 		isOpen = true;
+		isTerminalDrawerOpen.set(true);
 	}
 
 	export function close() {
 		isOpen = false;
+		isTerminalDrawerOpen.set(false);
 	}
 </script>
 
@@ -341,7 +364,7 @@
 	onclick={toggleDrawer}
 	class="fixed right-0 top-1/2 -translate-y-1/2 z-40 btn btn-sm h-auto py-4 rounded-l-lg rounded-r-none"
 	style="background: oklch(0.22 0.02 250); border: 1px solid oklch(0.35 0.02 250); border-right: none; writing-mode: vertical-rl; text-orientation: mixed; margin-top: 60px;"
-	title={isOpen ? 'Close Terminal Panel (Alt+T)' : 'Open Terminal Panel (Alt+T)'}
+	title={isOpen ? 'Close Terminal Panel (Ctrl+Shift+T)' : 'Open Terminal Panel (Ctrl+Shift+T)'}
 >
 	<svg
 		xmlns="http://www.w3.org/2000/svg"
@@ -372,7 +395,10 @@
 {#if isOpen}
 	<button
 		class="fixed inset-0 z-40 bg-black/20 cursor-default"
-		onclick={() => (isOpen = false)}
+		onclick={() => {
+			isOpen = false;
+			isTerminalDrawerOpen.set(false);
+		}}
 		aria-label="Close terminal drawer"
 		transition:fade={{ duration: 150 }}
 	></button>
@@ -446,7 +472,7 @@
 				<button
 					onclick={toggleDrawer}
 					class="btn btn-xs btn-ghost"
-					title="Close (Esc or Alt+T)"
+					title="Close (Esc or Ctrl+Shift+T)"
 					style="color: oklch(0.55 0.02 250);"
 				>
 					<svg
@@ -665,7 +691,7 @@
 			style="background: oklch(0.16 0.01 250); border-color: oklch(0.30 0.02 250); color: oklch(0.45 0.02 250);"
 		>
 			<span>Polling: 500ms</span>
-			<span>Alt+T to toggle • Esc to close</span>
+			<span>Ctrl+Shift+T to toggle • Esc to close</span>
 		</div>
 	</div>
 {/if}

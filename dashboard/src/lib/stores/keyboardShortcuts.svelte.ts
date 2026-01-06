@@ -57,7 +57,7 @@ export const DEFAULT_GLOBAL_SHORTCUTS: GlobalShortcutDef[] = [
 	{ id: 'epic-swarm', description: 'Open Epic Swarm Modal', defaultShortcut: 'Alt+E', category: 'global' },
 	{ id: 'start-next', description: 'Open Start Next Dropdown', defaultShortcut: 'Alt+S', category: 'global' },
 	{ id: 'add-project', description: 'Add New Project', defaultShortcut: 'Alt+Shift+P', category: 'global' },
-	{ id: 'toggle-terminal', description: 'Toggle Terminal Drawer', defaultShortcut: 'Alt+T', category: 'global' },
+	{ id: 'toggle-terminal', description: 'Toggle Terminal Drawer', defaultShortcut: 'Ctrl+Shift+T', category: 'global' },
 
 	// Session actions (require hovered session)
 	{ id: 'attach-terminal', description: 'Attach Terminal to Session', defaultShortcut: 'Alt+A', context: 'Hovered session', category: 'session' },
@@ -412,7 +412,17 @@ export function matchesShortcut(event: KeyboardEvent, shortcut: string): boolean
 	const eventKey = event.key.toLowerCase();
 	const shortcutKey = parsed.key.toLowerCase();
 
-	return eventKey === shortcutKey;
+	// Direct key match
+	if (eventKey === shortcutKey) return true;
+
+	// Fallback: check event.code for single letter keys (more reliable with Alt modifier)
+	// Alt+key can produce special characters on some systems, but event.code is consistent
+	if (shortcutKey.length === 1 && /^[a-z]$/.test(shortcutKey)) {
+		const expectedCode = `Key${shortcutKey.toUpperCase()}`;
+		if (event.code === expectedCode) return true;
+	}
+
+	return false;
 }
 
 /**

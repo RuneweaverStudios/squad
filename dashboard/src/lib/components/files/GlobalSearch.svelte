@@ -9,6 +9,7 @@
 	 * - Results show file, line number, content with context
 	 * - Click result → opens file at specific line
 	 * - Debounced search (300ms)
+	 * - Project selector when multiple projects available
 	 */
 
 	import { onMount } from 'svelte';
@@ -24,11 +25,21 @@
 	interface Props {
 		isOpen: boolean;
 		project: string;
+		availableProjects?: string[];
 		onClose: () => void;
-		onResultSelect: (file: string, line: number) => void;
+		onResultSelect: (file: string, line: number, project: string) => void;
+		onProjectChange?: (project: string) => void;
 	}
 
-	let { isOpen, project, onClose, onResultSelect }: Props = $props();
+	let { isOpen, project, availableProjects = [], onClose, onResultSelect, onProjectChange }: Props = $props();
+
+	// Track the currently selected project (may differ from prop if user changes it)
+	let selectedProject = $state(project);
+
+	// Sync selectedProject when project prop changes
+	$effect(() => {
+		selectedProject = project;
+	});
 
 	// State
 	let searchQuery = $state('');
@@ -79,12 +90,25 @@
 		}
 	});
 
+	// Handle project change
+	function handleProjectChange(newProject: string) {
+		selectedProject = newProject;
+		results = [];
+		selectedIndex = 0;
+		truncated = false;
+		onProjectChange?.(newProject);
+		// Re-search with new project if query exists
+		if (searchQuery.trim()) {
+			performSearch(searchQuery.trim());
+		}
+	}
+
 	// Perform search
 	async function performSearch(query: string) {
 		isLoading = true;
 		try {
 			const params = new URLSearchParams({
-				project,
+				project: selectedProject,
 				q: query,
 				limit: '100',
 				context: '1'
@@ -169,7 +193,7 @@
 
 	// Select and open result
 	function selectResult(result: SearchResult) {
-		onResultSelect(result.file, result.line);
+		onResultSelect(result.file, result.line, selectedProject);
 		onClose();
 	}
 
@@ -264,6 +288,36 @@
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div class="search-overlay" onclick={onClose}>
 		<div class="search-container" onclick={(e) => e.stopPropagation()}>
+			<!-- Project Selector Row -->
+			<div class="project-row">
+				<span class="project-label">Searching in:</span>
+				{#if availableProjects.length > 1}
+					<div class="dropdown dropdown-bottom">
+						<button class="project-selector" tabindex="0">
+							<span class="project-name">{selectedProject}</span>
+							<svg class="dropdown-arrow" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+							</svg>
+						</button>
+						<ul tabindex="-1" class="dropdown-content bg-base-200 rounded-box shadow-xl border border-base-300 max-h-48 overflow-y-auto z-50 p-1 min-w-40">
+							{#each availableProjects as proj}
+								<li>
+									<button
+										class="flex items-center gap-2 w-full px-3 py-1.5 rounded-md hover:bg-base-300 transition-colors text-left text-sm"
+										class:bg-base-300={selectedProject === proj}
+										onclick={() => { handleProjectChange(proj); }}
+									>
+										{proj}
+									</button>
+								</li>
+							{/each}
+						</ul>
+					</div>
+				{:else}
+					<span class="project-name-static">{selectedProject}</span>
+				{/if}
+			</div>
+
 			<!-- Search Input -->
 			<div class="search-header">
 				<div class="search-input-row">
@@ -421,6 +475,58 @@
 	@keyframes fadeIn {
 		from { opacity: 0; }
 		to { opacity: 1; }
+	}
+
+	/* Project Selector Row */
+	.project-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.5rem 0.75rem;
+		border-bottom: 1px solid oklch(0.25 0.02 250);
+		background: oklch(0.18 0.01 250);
+	}
+
+	.project-label {
+		font-size: 0.75rem;
+		color: oklch(0.55 0.02 250);
+	}
+
+	.project-selector {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		padding: 0.25rem 0.5rem;
+		background: oklch(0.22 0.02 250);
+		border: 1px solid oklch(0.30 0.02 250);
+		border-radius: 0.375rem;
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.project-selector:hover {
+		background: oklch(0.25 0.02 250);
+		border-color: oklch(0.35 0.02 250);
+	}
+
+	.project-name {
+		font-size: 0.8125rem;
+		font-weight: 600;
+		color: oklch(0.85 0.02 250);
+		font-family: ui-monospace, monospace;
+	}
+
+	.project-name-static {
+		font-size: 0.8125rem;
+		font-weight: 600;
+		color: oklch(0.85 0.02 250);
+		font-family: ui-monospace, monospace;
+	}
+
+	.dropdown-arrow {
+		width: 0.75rem;
+		height: 0.75rem;
+		color: oklch(0.50 0.02 250);
 	}
 
 	.search-container {

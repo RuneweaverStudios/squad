@@ -38,6 +38,20 @@
 	let originalContent = $state('');
 	let language = $state('plaintext');
 	let loading = $state(false);
+
+	/**
+	 * Map language IDs to Monaco-supported languages.
+	 * Monaco doesn't have native support for some languages,
+	 * so we map them to the closest equivalent.
+	 */
+	function toMonacoLanguage(lang: string): string {
+		const monacoMapping: Record<string, string> = {
+			svelte: 'html',
+			vue: 'html',
+			astro: 'html'
+		};
+		return monacoMapping[lang] || lang;
+	}
 	let error = $state<string | null>(null);
 	let isEditing = $state(false);
 	let isSaving = $state(false);
@@ -364,7 +378,7 @@
 				<MonacoWrapper
 					bind:this={monacoRef}
 					value={content}
-					{language}
+					language={toMonacoLanguage(language)}
 					readonly={!isEditing}
 					onchange={handleContentChange}
 				/>

@@ -20,7 +20,7 @@ JAT is built for this new workflow. Instead of an IDE that helps you type faster
 
 | Route | Purpose |
 |-------|---------|
-| `/tasks` | Your backlog. Create tasks, set priorities, manage epics. |
+| `/tasks` | Convert PRDs into your backlog. Create tasks, set priorities, manage epics. |
 | `/work` | Live agent sessions. Watch them code, answer questions, review output. |
 | `/files` | Code editor + Git. Review changes, make edits, commit and push. |
 | `/servers` | Dev servers. Start/stop npm, manage browser sessions. |

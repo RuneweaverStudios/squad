@@ -246,6 +246,7 @@
 		onmouseleave={handleMouseLeave}
 		title={entry.path}
 		aria-expanded={isFolder ? isExpanded : undefined}
+		data-path={entry.path}
 	>
 		<!-- Indentation -->
 		<span class="indent" style="width: {depth * 16}px"></span>

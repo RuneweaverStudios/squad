@@ -667,6 +667,57 @@
 			loadRoot();
 		}
 	});
+
+	// Reference to tree content for scrolling
+	let treeContentRef: HTMLDivElement | null = $state(null);
+
+	/**
+	 * Get all parent directory paths for a given file path
+	 * e.g., "src/lib/utils/foo.ts" → ["src", "src/lib", "src/lib/utils"]
+	 */
+	function getParentPaths(filePath: string): string[] {
+		const parts = filePath.split('/');
+		const parents: string[] = [];
+		for (let i = 1; i < parts.length; i++) {
+			parents.push(parts.slice(0, i).join('/'));
+		}
+		return parents;
+	}
+
+	/**
+	 * Expand all parent directories of a file path and scroll to the file
+	 * This is useful when navigating to a file from search results or URL params
+	 */
+	export async function scrollToFile(filePath: string) {
+		if (!filePath) return;
+
+		// Get all parent directories that need to be expanded
+		const parentPaths = getParentPaths(filePath);
+
+		// Expand each parent directory in sequence (they may need to load)
+		for (const parentPath of parentPaths) {
+			if (!expandedFolders.has(parentPath)) {
+				// Expand this folder (will trigger loading if needed)
+				await handleToggleFolder(parentPath);
+				// Wait a bit for the DOM to update
+				await tick();
+			}
+		}
+
+		// Wait for any pending loads and DOM updates
+		await tick();
+
+		// Small delay to ensure the DOM is fully updated after all expansions
+		await new Promise(r => setTimeout(r, 50));
+
+		// Find the element and scroll to it
+		if (treeContentRef) {
+			const element = treeContentRef.querySelector(`[data-path="${CSS.escape(filePath)}"]`);
+			if (element) {
+				element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			}
+		}
+	}
 </script>
 
 <svelte:window onkeydown={handleKeyDown} onclick={handleGlobalClick} />
@@ -712,7 +763,7 @@
 	</div>
 
 	<!-- Tree Content -->
-	<div class="tree-content">
+	<div class="tree-content" bind:this={treeContentRef}>
 		{#if isLoadingRoot}
 			<div class="tree-loading">
 				<span class="loading-spinner"></span>

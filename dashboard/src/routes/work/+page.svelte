@@ -1537,7 +1537,7 @@
 				>
 					<!-- Project header -->
 					<div
-						class="w-full flex items-center gap-3 px-4 py-2 hover:bg-base-200/50 transition-colors bg-base-100 z-10 sticky top-0 shadow-sm {isDragOver ? 'bg-primary/10' : ''}"
+						class="w-full flex items-center gap-3 px-4 py-2 hover:bg-base-200/50 transition-colors bg-base-100 z-15 sticky top-0 shadow-sm {isDragOver ? 'bg-primary/10' : ''}"
 					>
 						<!-- Drag handle - only this element initiates drag -->
 						<!-- svelte-ignore a11y_no_static_element_interactions -->

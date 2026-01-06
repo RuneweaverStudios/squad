@@ -77,42 +77,6 @@ export function closeTaskDetailDrawer() {
 	taskDetailDrawerTaskId.set(null);
 }
 
-// Output drawer state
-export const isOutputDrawerOpen = writable(false);
-
-// Selected session for output drawer (null = show all sessions)
-export const selectedOutputSession = writable<string | null>(null);
-
-export function openOutputDrawer() {
-	isOutputDrawerOpen.set(true);
-}
-
-export function closeOutputDrawer() {
-	isOutputDrawerOpen.set(false);
-	// Clear selection when closing
-	selectedOutputSession.set(null);
-}
-
-export function toggleOutputDrawer() {
-	isOutputDrawerOpen.update(v => !v);
-}
-
-/**
- * Open the output drawer focused on a specific session
- * @param sessionName - The session name to focus on (e.g., "WisePrairie")
- */
-export function openOutputDrawerForSession(sessionName: string) {
-	selectedOutputSession.set(sessionName);
-	isOutputDrawerOpen.set(true);
-}
-
-/**
- * Clear the session selection (show all sessions)
- */
-export function clearOutputSessionSelection() {
-	selectedOutputSession.set(null);
-}
-
 // Epic swarm modal state
 export const isEpicSwarmModalOpen = writable(false);
 export const epicSwarmModalEpicId = writable<string | null>(null);

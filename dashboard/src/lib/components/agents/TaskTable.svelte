@@ -3028,7 +3028,7 @@
 						{@const isProjectCollapsed = collapsedProjects.has(projectKey)}
 
 						<!-- Project Header (Top-level, sticky) -->
-						<thead class="sticky z-20" style="top: 0;">
+						<thead class="sticky z-10" style="top: 0;">
 							<tr
 								class="cursor-pointer select-none hover:brightness-110 transition-all"
 								onclick={() => toggleProjectCollapse(projectKey)}

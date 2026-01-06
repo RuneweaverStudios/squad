@@ -14,7 +14,6 @@ const STORAGE_KEYS = {
 	theme: 'theme',
 	terminalHeight: 'user-terminal-height',
 	sessionMaximizeHeight: 'session-maximize-height',
-	outputDrawerOpen: 'output-drawer-open',
 	taskSaveAction: 'taskDrawer.savePreference', // Match TaskCreationDrawer
 	sparklineMode: 'sparkline-multi-series-mode',
 	ctrlCIntercept: 'ctrl-c-intercept-enabled',
@@ -82,7 +81,6 @@ const DEFAULTS = {
 	theme: 'jat',
 	terminalHeight: 50, // Match UserProfile's DEFAULT_TERMINAL_HEIGHT
 	sessionMaximizeHeight: 70 as SessionMaximizeHeight, // Viewport % when clicking to maximize session
-	outputDrawerOpen: false,
 	taskSaveAction: 'close' as TaskSaveAction,
 	sparklineMode: 'stacked' as SparklineMode,
 	ctrlCIntercept: false, // When false, Ctrl+C copies (browser default); when true, Ctrl+C sends interrupt to tmux
@@ -111,7 +109,6 @@ let soundsEnabled = $state(DEFAULTS.soundsEnabled);
 let theme = $state(DEFAULTS.theme);
 let terminalHeight = $state(DEFAULTS.terminalHeight);
 let sessionMaximizeHeight = $state<SessionMaximizeHeight>(DEFAULTS.sessionMaximizeHeight);
-let outputDrawerOpen = $state(DEFAULTS.outputDrawerOpen);
 let taskSaveAction = $state<TaskSaveAction>(DEFAULTS.taskSaveAction);
 let sparklineMode = $state<SparklineMode>(DEFAULTS.sparklineMode);
 let ctrlCIntercept = $state(DEFAULTS.ctrlCIntercept);
@@ -148,8 +145,6 @@ export function initPreferences(): void {
 	sessionMaximizeHeight = (parsedSessionMaxHeight === 50 || parsedSessionMaxHeight === 60 || parsedSessionMaxHeight === 70 || parsedSessionMaxHeight === 80 || parsedSessionMaxHeight === 90)
 		? parsedSessionMaxHeight
 		: DEFAULTS.sessionMaximizeHeight;
-
-	outputDrawerOpen = localStorage.getItem(STORAGE_KEYS.outputDrawerOpen) === 'true';
 
 	const storedSaveAction = localStorage.getItem(STORAGE_KEYS.taskSaveAction);
 	taskSaveAction = (storedSaveAction === 'close' || storedSaveAction === 'new' || storedSaveAction === 'start')
@@ -319,26 +314,6 @@ export function setSessionMaximizeHeight(value: SessionMaximizeHeight): void {
 	if (browser) {
 		localStorage.setItem(STORAGE_KEYS.sessionMaximizeHeight, String(value));
 	}
-}
-
-// ============================================================================
-// Output Drawer
-// ============================================================================
-
-export function getOutputDrawerOpen(): boolean {
-	return outputDrawerOpen;
-}
-
-export function setOutputDrawerOpen(value: boolean): void {
-	outputDrawerOpen = value;
-	if (browser) {
-		localStorage.setItem(STORAGE_KEYS.outputDrawerOpen, String(value));
-	}
-}
-
-export function toggleOutputDrawerOpen(): boolean {
-	setOutputDrawerOpen(!outputDrawerOpen);
-	return outputDrawerOpen;
 }
 
 // ============================================================================
