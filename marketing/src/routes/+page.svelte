@@ -513,13 +513,13 @@ Next ready tasks:
 				<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75"></span>
 				<span class="relative inline-flex rounded-full h-2 w-2 bg-violet-400"></span>
 			</span>
-			<span class="text-sm text-violet-200 shimmer-text-slow">The World's First Agentic IDE</span>
+			<span class="text-sm text-violet-200 shimmer-text-slow">Open Source & Local-First</span>
 		</div>
 
 		<h1 class="text-5xl md:text-7xl font-bold text-white mb-6">
-			Where AI Agents
+			The World's First
 			<span class="block bg-gradient-to-r from-violet-400 via-fuchsia-400 to-pink-400 bg-clip-text text-transparent">
-				Become a Team.
+				Agentic IDE.
 			</span>
 		</h1>
 
