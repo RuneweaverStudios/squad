@@ -1,7 +1,12 @@
 <script lang="ts">
 	import Logo from './Logo.svelte';
+	import { onMount } from 'svelte';
 
 	let copied = $state(false);
+	let creditsContainer: HTMLDivElement;
+	let fairy: HTMLDivElement;
+	let currentCreditIndex = $state(0);
+	let creditElements: HTMLAnchorElement[] = [];
 
 	const installCommand = 'curl -fsSL https://raw.githubusercontent.com/joewinke/jat/main/tools/scripts/bootstrap.sh | bash';
 
@@ -27,6 +32,119 @@
 		{ name: 'Mike Bostock', link: 'https://github.com/mbostock', label: 'D3.js' },
 		{ name: 'Anthropic', link: 'https://anthropic.com', label: 'Claude' }
 	];
+
+	// Sparkle fairy animation
+	let isHovering = $state(false);
+	let autoAnimationInterval: ReturnType<typeof setInterval> | null = null;
+	let trailInterval: ReturnType<typeof setInterval> | null = null;
+	let lastFairyX = 0;
+	let lastFairyY = 0;
+
+	function createSparkle(x: number, y: number, isTrail = false) {
+		if (!creditsContainer) return;
+		const sparkle = document.createElement('div');
+		sparkle.className = isTrail ? 'sparkle-trail' : 'sparkle-particle';
+		sparkle.style.left = `${x}px`;
+		sparkle.style.top = `${y}px`;
+		creditsContainer.appendChild(sparkle);
+		setTimeout(() => sparkle.remove(), isTrail ? 800 : 600);
+	}
+
+	function moveFairyTo(x: number, y: number) {
+		if (!fairy) return;
+
+		lastFairyX = x;
+		lastFairyY = y;
+		fairy.style.left = `${x}px`;
+		fairy.style.top = `${y}px`;
+	}
+
+	function moveFairyToCredit(index: number) {
+		if (!fairy || !creditElements[index] || !creditsContainer) return;
+
+		const containerRect = creditsContainer.getBoundingClientRect();
+		const creditRect = creditElements[index].getBoundingClientRect();
+
+		const x = creditRect.left - containerRect.left + creditRect.width / 2;
+		const y = creditRect.top - containerRect.top + creditRect.height / 2;
+
+		moveFairyTo(x, y);
+
+		// Create trail sparkles
+		for (let i = 0; i < 3; i++) {
+			setTimeout(() => {
+				const offsetX = x + (Math.random() - 0.5) * 40;
+				const offsetY = y + (Math.random() - 0.5) * 20;
+				createSparkle(offsetX, offsetY);
+			}, i * 100);
+		}
+	}
+
+	function handleMouseMove(e: MouseEvent) {
+		if (!creditsContainer || !isHovering) return;
+
+		const containerRect = creditsContainer.getBoundingClientRect();
+		const x = e.clientX - containerRect.left;
+		const y = e.clientY - containerRect.top;
+
+		moveFairyTo(x, y, false);
+	}
+
+	function handleMouseEnter() {
+		isHovering = true;
+		// Stop auto animation
+		if (autoAnimationInterval) {
+			clearInterval(autoAnimationInterval);
+			autoAnimationInterval = null;
+		}
+		// Start comet trail
+		trailInterval = setInterval(() => {
+			if (isHovering && lastFairyX && lastFairyY) {
+				const offsetX = lastFairyX + (Math.random() - 0.5) * 10;
+				const offsetY = lastFairyY + (Math.random() - 0.5) * 10;
+				createSparkle(offsetX, offsetY, true);
+			}
+		}, 50);
+	}
+
+	function handleMouseLeave() {
+		isHovering = false;
+		// Stop trail
+		if (trailInterval) {
+			clearInterval(trailInterval);
+			trailInterval = null;
+		}
+		// Resume auto animation from current position
+		moveFairyToCredit(currentCreditIndex);
+		resumeAutoAnimation();
+	}
+
+	function startAutoAnimation() {
+		// Initial position
+		setTimeout(() => moveFairyToCredit(0), 500);
+		resumeAutoAnimation();
+	}
+
+	function resumeAutoAnimation() {
+		autoAnimationInterval = setInterval(() => {
+			if (!isHovering) {
+				currentCreditIndex = (currentCreditIndex + 1) % credits.length;
+				moveFairyToCredit(currentCreditIndex);
+			}
+		}, 2500);
+	}
+
+	onMount(() => {
+		// Collect credit elements
+		creditElements = Array.from(creditsContainer.querySelectorAll('.credit-link'));
+
+		startAutoAnimation();
+
+		return () => {
+			if (autoAnimationInterval) clearInterval(autoAnimationInterval);
+			if (trailInterval) clearInterval(trailInterval);
+		};
+	});
 </script>
 
 <footer id="install" class="py-32 relative overflow-hidden">
@@ -94,15 +212,31 @@
 
 		<!-- Credits -->
 		<div class="border-t border-gray-800 pt-12">
-			<div class="text-center mb-8">
+			<div class="text-center mb-20">
 				<p class="text-sm text-gray-500 mb-4">Standing on the shoulders of giants</p>
-				<div class="flex flex-wrap items-center justify-center gap-6">
-					{#each credits as credit}
+				<div
+					bind:this={creditsContainer}
+					class="credits-container flex flex-wrap items-center justify-center gap-6 relative"
+					onmousemove={handleMouseMove}
+					onmouseenter={handleMouseEnter}
+					onmouseleave={handleMouseLeave}
+					role="region"
+					aria-label="Credits"
+				>
+					<!-- Sparkle Fairy -->
+					<div bind:this={fairy} class="sparkle-fairy" class:fairy-fast={isHovering}>
+						<div class="fairy-core"></div>
+						<div class="fairy-glow"></div>
+						<div class="fairy-ring"></div>
+					</div>
+
+					{#each credits as credit, i}
 						<a
 							href={credit.link}
 							target="_blank"
 							rel="noopener noreferrer"
-							class="group flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
+							class="credit-link group flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
+							class:credit-active={i === currentCreditIndex}
 						>
 							<span class="text-sm font-medium">{credit.name}</span>
 							<span class="text-xs text-gray-600 group-hover:text-gray-500">({credit.label})</span>
@@ -135,3 +269,182 @@
 		</div>
 	</div>
 </footer>
+
+<style>
+	.credits-container {
+		min-height: 80px;
+	}
+
+	/* Sparkle Fairy */
+	.sparkle-fairy {
+		position: absolute;
+		width: 20px;
+		height: 20px;
+		pointer-events: none;
+		z-index: 10;
+		transform: translate(-50%, -50%);
+		transition: left 1.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+		            top 1.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+		animation: fairy-float 2s ease-in-out infinite;
+	}
+
+	/* Faster movement when following cursor */
+	.sparkle-fairy.fairy-fast {
+		transition: left 0.08s ease-out,
+		            top 0.08s ease-out;
+	}
+
+	@keyframes fairy-float {
+		0%, 100% {
+			transform: translate(-50%, -50%) translateX(0px) translateY(0px) rotate(-8deg);
+		}
+		25% {
+			transform: translate(-50%, -50%) translateX(5px) translateY(-4px) rotate(0deg);
+		}
+		50% {
+			transform: translate(-50%, -50%) translateX(0px) translateY(-6px) rotate(8deg);
+		}
+		75% {
+			transform: translate(-50%, -50%) translateX(-5px) translateY(-4px) rotate(0deg);
+		}
+	}
+
+	.fairy-core {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		width: 6px;
+		height: 6px;
+		background: linear-gradient(135deg, #ffd700, #fff8dc);
+		border-radius: 50%;
+		transform: translate(-50%, -50%);
+		box-shadow: 0 0 8px 2px rgba(255, 215, 0, 0.9),
+		            0 0 16px 4px rgba(255, 215, 0, 0.6),
+		            0 0 24px 6px rgba(255, 215, 0, 0.3);
+		animation: fairy-pulse 1.5s ease-in-out infinite;
+	}
+
+	.fairy-glow {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		width: 24px;
+		height: 24px;
+		background: radial-gradient(circle, rgba(255, 215, 0, 0.4) 0%, transparent 70%);
+		border-radius: 50%;
+		transform: translate(-50%, -50%);
+		animation: fairy-glow-pulse 2s ease-in-out infinite;
+	}
+
+	.fairy-ring {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		width: 16px;
+		height: 16px;
+		border: 1px solid rgba(255, 215, 0, 0.5);
+		border-radius: 50%;
+		transform: translate(-50%, -50%);
+		animation: fairy-ring-spin 3s linear infinite;
+	}
+
+	@keyframes fairy-pulse {
+		0%, 100% {
+			transform: translate(-50%, -50%) scale(1);
+			opacity: 1;
+		}
+		50% {
+			transform: translate(-50%, -50%) scale(1.3);
+			opacity: 0.8;
+		}
+	}
+
+	@keyframes fairy-glow-pulse {
+		0%, 100% {
+			transform: translate(-50%, -50%) scale(1);
+			opacity: 0.6;
+		}
+		50% {
+			transform: translate(-50%, -50%) scale(1.5);
+			opacity: 0.3;
+		}
+	}
+
+	@keyframes fairy-ring-spin {
+		0% {
+			transform: translate(-50%, -50%) rotate(0deg) scale(1);
+			opacity: 0.6;
+		}
+		50% {
+			transform: translate(-50%, -50%) rotate(180deg) scale(1.2);
+			opacity: 0.3;
+		}
+		100% {
+			transform: translate(-50%, -50%) rotate(360deg) scale(1);
+			opacity: 0.6;
+		}
+	}
+
+	/* Sparkle particles */
+	:global(.sparkle-particle) {
+		position: absolute;
+		width: 4px;
+		height: 4px;
+		background: #ffd700;
+		border-radius: 50%;
+		pointer-events: none;
+		transform: translate(-50%, -50%);
+		animation: sparkle-fade 0.6s ease-out forwards;
+		box-shadow: 0 0 4px 1px rgba(255, 215, 0, 0.8);
+	}
+
+	@keyframes sparkle-fade {
+		0% {
+			opacity: 1;
+			transform: translate(-50%, -50%) scale(1);
+		}
+		100% {
+			opacity: 0;
+			transform: translate(-50%, calc(-50% - 20px)) scale(0);
+		}
+	}
+
+	/* Comet trail particles */
+	:global(.sparkle-trail) {
+		position: absolute;
+		width: 3px;
+		height: 3px;
+		background: linear-gradient(135deg, #ffd700, #ffec8b);
+		border-radius: 50%;
+		pointer-events: none;
+		transform: translate(-50%, -50%);
+		animation: trail-fade 0.8s ease-out forwards;
+		box-shadow: 0 0 6px 2px rgba(255, 215, 0, 0.6),
+		            0 0 12px 4px rgba(255, 215, 0, 0.3);
+	}
+
+	@keyframes trail-fade {
+		0% {
+			opacity: 0.8;
+			transform: translate(-50%, -50%) scale(1);
+		}
+		100% {
+			opacity: 0;
+			transform: translate(-50%, -50%) scale(0.3);
+		}
+	}
+
+	/* Active credit highlight */
+	.credit-link {
+		transition: all 0.3s ease;
+	}
+
+	.credit-active {
+		color: #ffd700 !important;
+		text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+	}
+
+	.credit-active span:first-child {
+		color: #ffd700;
+	}
+</style>
