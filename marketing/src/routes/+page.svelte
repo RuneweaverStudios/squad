@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Footer from '$lib/components/Footer.svelte';
+	import Nav from '$lib/components/Nav.svelte';
 	import V11FeatureCard from '$lib/components/V11FeatureCard.svelte';
 	import V14GravityWell from '$lib/components/V14GravityWell.svelte';
 	import { countUp, scrollReveal, staggerChildren } from '$lib/utils/scrollObserver';
@@ -11,13 +12,17 @@
 	let chaosSection: HTMLElement;
 	let chaosProgress = $state(0); // 0 to 1 based on scroll
 
+	// Get JAT primary color for canvas - we'll use a teal/cyan color
+	const PRIMARY_COLOR = { r: 56, g: 189, b: 248 }; // sky-400 equivalent
+	const PRIMARY_RGB = `${PRIMARY_COLOR.r}, ${PRIMARY_COLOR.g}, ${PRIMARY_COLOR.b}`;
+
 	// "Everything in One Place" chaos cards
 	const chaosCards = [
 		{
 			title: 'Multi-Agent Swarm',
 			desc: 'Run 10+ Coding agents simultaneously (Claude/OpenCode/Codex).',
 			icon: 'swarm',
-			color: 'from-violet-500 to-purple-600',
+			color: 'from-[var(--color-primary)] to-[var(--color-secondary)]',
 			initialX: -400,
 			initialY: -300,
 			initialRotate: -45
@@ -44,7 +49,7 @@
 			title: 'Auto-Proceed Rules',
 			desc: 'Configure patterns to auto-answer prompts.',
 			icon: 'auto',
-			color: 'from-blue-500 to-cyan-500',
+			color: 'from-[var(--color-primary)] to-cyan-500',
 			initialX: 600,
 			initialY: 300,
 			initialRotate: 40
@@ -73,7 +78,7 @@
 	const cards = [
 		{
 			title: 'Tasks Dashboard',
-			color: 'from-blue-600 to-cyan-500',
+			color: 'from-[var(--color-primary)] to-cyan-500',
 			tagline: 'All projects. One view.',
 			bullets: ['12 ready tasks', '3 in progress', '2 blocked'],
 			code: `$ bd ready --json
@@ -90,7 +95,7 @@ jat-7kx2m [P1] OAuth flow`
 		},
 		{
 			title: 'Agent Sessions',
-			color: 'from-purple-600 to-pink-500',
+			color: 'from-[var(--color-primary)] to-[var(--color-secondary)]',
 			tagline: 'See every agent, live.',
 			bullets: ['4 agents active', '2 awaiting input', '1 completing'],
 			code: `$ am-agents --active
@@ -105,7 +110,7 @@ Task: jat-3nf8p`
 		},
 		{
 			title: 'Epic Dependencies',
-			color: 'from-emerald-600 to-teal-500',
+			color: 'from-emerald-500 to-teal-500',
 			tagline: 'Ship features, not tasks.',
 			bullets: ['Visual dep graph', 'Auto-blocked status', 'Progress tracking'],
 			code: `$ bd dep tree jat-epic
@@ -120,7 +125,7 @@ Progress: 0/3`
 		},
 		{
 			title: 'Smart Questions',
-			color: 'from-amber-600 to-orange-500',
+			color: 'from-amber-500 to-orange-500',
 			tagline: 'Decisions surface to you.',
 			bullets: ['Click to answer', 'Context included', 'No terminal digging'],
 			code: `// Question surfaced
@@ -138,7 +143,7 @@ Progress: 0/3`
 		},
 		{
 			title: 'Task Creation',
-			color: 'from-rose-600 to-red-500',
+			color: 'from-rose-500 to-red-500',
 			tagline: 'AI fills in the details.',
 			bullets: ['Auto-suggest type', 'Smart priority', 'Label inference'],
 			code: `$ bd create "Rate limit" \\
@@ -159,14 +164,14 @@ Created: jat-3nf8p
 		{
 			category: 'Project Management',
 			icon: 'kanban' as const,
-			color: 'from-blue-500 to-cyan-500',
+			color: 'from-[var(--color-primary)] to-cyan-500',
 			desc: 'Structure that scales with your ambition',
 			items: ['Multi-repo unified dashboard', 'Epics, features, tasks hierarchy', 'Dependency tracking', 'Priority-based work selection']
 		},
 		{
 			category: 'Agent Orchestration',
 			icon: 'robots' as const,
-			color: 'from-purple-500 to-pink-500',
+			color: 'from-[var(--color-primary)] to-[var(--color-secondary)]',
 			desc: 'Command a swarm, not just one assistant',
 			items: ['Spawn 40+ agents with one command', 'Auto-assignment to ready work', 'Real-time status monitoring', 'Smart question UI for decisions']
 		},
@@ -327,7 +332,7 @@ Next ready tasks:
 
 						ctx.beginPath();
 						ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-						ctx.fillStyle = 'rgba(139, 92, 246, 0.8)';
+						ctx.fillStyle = `rgba(${PRIMARY_RGB}, 0.8)`;
 						ctx.fill();
 
 						particles.forEach((p2, j) => {
@@ -337,7 +342,7 @@ Next ready tasks:
 								ctx.beginPath();
 								ctx.moveTo(p.x, p.y);
 								ctx.lineTo(p2.x, p2.y);
-								ctx.strokeStyle = `rgba(139, 92, 246, ${(1 - d / connectionDistance) * 0.3})`;
+								ctx.strokeStyle = `rgba(${PRIMARY_RGB}, ${(1 - d / connectionDistance) * 0.3})`;
 								ctx.stroke();
 							}
 						});
@@ -434,9 +439,9 @@ Next ready tasks:
 					ctx.clearRect(0, 0, w, h);
 
 					const gradient = ctx.createLinearGradient(w/2 - 15, 0, w/2 + 15, 0);
-					gradient.addColorStop(0, 'rgba(139, 92, 246, 0)');
+					gradient.addColorStop(0, `rgba(${PRIMARY_RGB}, 0)`);
 					gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.9)');
-					gradient.addColorStop(1, 'rgba(139, 92, 246, 0)');
+					gradient.addColorStop(1, `rgba(${PRIMARY_RGB}, 0)`);
 					ctx.fillStyle = gradient;
 					ctx.fillRect(w/2 - 15, 0, 30, h);
 
@@ -462,7 +467,7 @@ Next ready tasks:
 
 						ctx.beginPath();
 						ctx.arc(p.x, p.y, 1.5, 0, Math.PI * 2);
-						ctx.fillStyle = `rgba(196, 181, 253, ${p.life * 0.7})`;
+						ctx.fillStyle = `rgba(${PRIMARY_RGB}, ${p.life * 0.7})`;
 						ctx.fill();
 					}
 
@@ -503,22 +508,24 @@ Next ready tasks:
 	<title>JAT - The World's First Agentic IDE</title>
 </svelte:head>
 
+<Nav />
+
 <!-- HERO with particle network -->
-<section class="relative min-h-screen flex items-center justify-center overflow-hidden bg-black">
+<section class="relative min-h-screen flex items-center justify-center overflow-hidden bg-[var(--bg-base)]">
 	<canvas bind:this={heroCanvasEl} class="absolute inset-0 z-0"></canvas>
 
 	<div class="relative z-10 max-w-5xl mx-auto px-6 text-center">
-		<div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-violet-500/10 backdrop-blur border border-violet-500/30 mb-8">
+		<div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--color-primary)]/10 backdrop-blur border border-[var(--color-primary)]/30 mb-8">
 			<span class="relative flex h-2 w-2">
-				<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75"></span>
-				<span class="relative inline-flex rounded-full h-2 w-2 bg-violet-400"></span>
+				<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--color-success)] opacity-75"></span>
+				<span class="relative inline-flex rounded-full h-2 w-2 bg-[var(--color-success)]"></span>
 			</span>
-			<span class="text-sm text-violet-200 shimmer-text-slow">Open Source & Local-First</span>
+			<span class="text-sm text-[var(--color-primary)]">Open Source & Local-First</span>
 		</div>
 
 		<h1 class="text-5xl md:text-7xl font-bold text-white mb-6">
 			The World's First
-			<span class="block bg-gradient-to-r from-violet-400 via-fuchsia-400 to-pink-400 bg-clip-text text-transparent">
+			<span class="block bg-gradient-to-r from-[var(--color-primary)] via-[var(--color-secondary)] to-cyan-400 bg-clip-text text-transparent">
 				Agentic IDE.
 			</span>
 		</h1>
@@ -528,7 +535,7 @@ Next ready tasks:
 		</p>
 
 		<div class="flex flex-col sm:flex-row items-center justify-center gap-4">
-			<a href="#install" class="group relative px-8 py-4 bg-gradient-to-r from-violet-600 to-fuchsia-600 rounded-full font-semibold text-white shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 transition-all">
+			<a href="#install" class="group relative px-8 py-4 bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-secondary)] rounded-full font-semibold text-white shadow-lg shadow-[var(--color-primary)]/25 hover:shadow-[var(--color-primary)]/40 transition-all">
 				<span class="relative z-10">Get Started Free</span>
 			</a>
 			<a href="#scanner" class="px-8 py-4 rounded-full font-semibold border border-white/20 text-white hover:bg-white/10 transition-all">
@@ -556,7 +563,7 @@ Next ready tasks:
 </section>
 
 <!-- SCANNER SECTION -->
-<section id="scanner" class="relative py-24 bg-black overflow-hidden">
+<section id="scanner" class="relative py-24 bg-[var(--bg-base)] overflow-hidden">
 	<div class="text-center mb-12">
 		<h2 class="text-3xl font-bold text-white mb-3">From Chaos to Clarity</h2>
 		<p class="text-gray-400">Terminal spam goes in. Beautiful, actionable UI comes out.</p>
@@ -577,7 +584,7 @@ Next ready tasks:
 								<div class="w-2 h-2 rounded-full bg-green-500/60"></div>
 								<span class="text-[9px] text-gray-500 font-mono ml-1">terminal</span>
 							</div>
-							<pre class="text-green-400/70 text-[9px] leading-tight font-mono overflow-hidden">{card.code}</pre>
+							<pre class="text-[var(--color-success)]/70 text-[9px] leading-tight font-mono overflow-hidden">{card.code}</pre>
 						</div>
 						<!-- Beautiful UI side (reveals AFTER scanner) -->
 						<div class="card-back absolute inset-0 rounded-xl bg-gradient-to-br {card.color} p-5 shadow-xl">
@@ -605,7 +612,7 @@ Next ready tasks:
 </section>
 
 <!-- EVERYTHING IN ONE PLACE - Chaos to Order -->
-<section bind:this={chaosSection} class="relative py-32 bg-gradient-to-b from-black via-gray-900 to-black overflow-hidden">
+<section bind:this={chaosSection} class="relative py-32 bg-gradient-to-b from-[var(--bg-base)] via-gray-900 to-[var(--bg-base)] overflow-hidden">
 	<!-- Gravity well background - particles pulled to center -->
 	<div class="absolute inset-0 opacity-40">
 		<V14GravityWell particleCount={80} pullStrength={0.015} />
@@ -629,7 +636,7 @@ Next ready tasks:
 					{@const currentScale = 0.8 + 0.2 * cardProgress}
 					{@const currentOpacity = cardProgress}
 					<div
-						class="chaos-card group relative p-6 rounded-2xl bg-gray-800/80 border border-gray-700 backdrop-blur-sm hover:border-gray-500"
+						class="chaos-card group relative p-6 rounded-2xl bg-gray-800/80 border border-gray-700 backdrop-blur-sm hover:border-[var(--color-primary)]/50"
 						class:chaos-complete={chaosProgress >= 1}
 						style="transform: translate({currentX}px, {currentY}px) rotate({currentRotate}deg) scale({currentScale}); opacity: {currentOpacity};"
 					>
@@ -696,12 +703,12 @@ Next ready tasks:
 				style="opacity: {Math.max(0, 1 - chaosProgress * 3)};"
 			>
 				<div class="text-center">
-					<div class="w-16 h-16 rounded-full bg-violet-500/20 border border-violet-500/50 flex items-center justify-center mx-auto mb-4 animate-pulse">
-						<svg class="w-8 h-8 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<div class="w-16 h-16 rounded-full bg-[var(--color-primary)]/20 border border-[var(--color-primary)]/50 flex items-center justify-center mx-auto mb-4 animate-pulse">
+						<svg class="w-8 h-8 text-[var(--color-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
 						</svg>
 					</div>
-					<p class="text-violet-400 text-sm font-medium">Scroll to bring order...</p>
+					<p class="text-[var(--color-primary)] text-sm font-medium">Scroll to bring order...</p>
 				</div>
 			</div>
 		</div>
@@ -719,25 +726,25 @@ Next ready tasks:
 </section>
 
 <!-- THE ALIEN TOOL PROBLEM -->
-<section class="py-32 bg-gradient-to-b from-gray-900 via-[#0c0c14] to-black relative overflow-hidden">
+<section class="py-32 bg-gradient-to-b from-gray-900 via-[#0c0c14] to-[var(--bg-base)] relative overflow-hidden">
 	<!-- Subtle grid background -->
 	<div class="absolute inset-0 opacity-[0.03]" style="background-size: 40px 40px; background-image: linear-gradient(to right, white 1px, transparent 1px), linear-gradient(to bottom, white 1px, transparent 1px);"></div>
 
 	<div class="max-w-5xl mx-auto px-6 relative z-10">
 		<!-- Quote block -->
 		<div class="relative mb-16">
-			<div class="absolute -top-6 -left-4 text-6xl text-violet-500/20 font-serif">"</div>
-			<blockquote class="text-lg md:text-xl text-gray-300 leading-relaxed pl-8 border-l-2 border-violet-500/30">
-				<p class="mb-4 shimmer-text-slow">
+			<div class="absolute -top-6 -left-4 text-6xl text-[var(--color-primary)]/20 font-serif">"</div>
+			<blockquote class="text-lg md:text-xl text-gray-300 leading-relaxed pl-8 border-l-2 border-[var(--color-primary)]/30">
+				<p class="mb-4">
 					Clearly some powerful <span class="font-semibold">alien tool</span> was handed around except it comes with no manual and everyone has to figure out how to hold it and operate it...
-					
+
 					<span class="text-gray-500 italic">
 					agents, subagents, prompts, contexts, memory, modes, permissions, tools, plugins, skills, hooks, MCP, workflows...
 					</span>
 				</p>
 			</blockquote>
 			<cite class="block mt-4 pl-8 text-sm text-gray-500">
-				— <a href="https://x.com/karpathy/status/2004607146781278521" class="text-violet-400 hover:text-violet-300">@karpathy</a>, on the state of AI-assisted programming
+				— <a href="https://x.com/karpathy/status/2004607146781278521" target="_blank" rel="noopener noreferrer" class="text-[var(--color-primary)] hover:text-[var(--color-secondary)]">@karpathy</a>, on the state of AI-assisted programming
 			</cite>
 		</div>
 
@@ -772,8 +779,8 @@ Next ready tasks:
 			</div>
 
 			<!-- Right: JAT config -->
-			<div class="p-6 rounded-2xl bg-gradient-to-br from-violet-500/10 to-cyan-500/10 border border-violet-500/30">
-				<h3 class="text-sm font-mono text-green-400 mb-4 flex items-center gap-2">
+			<div class="p-6 rounded-2xl bg-gradient-to-br from-[var(--color-primary)]/10 to-cyan-500/10 border border-[var(--color-primary)]/30">
+				<h3 class="text-sm font-mono text-[var(--color-success)] mb-4 flex items-center gap-2">
 					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
 					</svg>
@@ -782,16 +789,16 @@ Next ready tasks:
 				<div class="space-y-2 text-sm">
 					{#each [
 						{ text: 'Hooks gate dangerous operations', color: 'text-cyan-400' },
-						{ text: 'File reservations prevent conflicts', color: 'text-violet-400' },
+						{ text: 'File reservations prevent conflicts', color: 'text-[var(--color-primary)]' },
 						{ text: 'Session context persists across restarts', color: 'text-cyan-400' },
-						{ text: 'Auto-proceed rules for safe patterns', color: 'text-violet-400' },
+						{ text: 'Auto-proceed rules for safe patterns', color: 'text-[var(--color-primary)]' },
 						{ text: 'Unified settings per project', color: 'text-cyan-400' },
-						{ text: 'Structured completion with verification', color: 'text-violet-400' },
+						{ text: 'Structured completion with verification', color: 'text-[var(--color-primary)]' },
 						{ text: '40+ agents working in parallel', color: 'text-cyan-400' },
-						{ text: 'Async oversight — check in when ready', color: 'text-violet-400' }
+						{ text: 'Async oversight — check in when ready', color: 'text-[var(--color-primary)]' }
 					] as item}
 						<div class="flex items-center gap-2 {item.color}">
-							<svg class="w-4 h-4 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<svg class="w-4 h-4 text-[var(--color-success)] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
 							</svg>
 							{item.text}
@@ -803,7 +810,7 @@ Next ready tasks:
 
 		<!-- Bottom tagline -->
 		<div class="text-center mt-12">
-			<p class="text-gray-500 shimmer-text-slow">
+			<p class="text-gray-500">
 				The alien tool came with no manual. <span class="text-white">So we wrote one.</span>
 			</p>
 		</div>
@@ -811,7 +818,7 @@ Next ready tasks:
 </section>
 
 <!-- FEATURES GRID - Using V11FeatureCard -->
-<section id="features" class="py-24 bg-gradient-to-b from-black to-gray-900">
+<section id="features" class="py-24 bg-gradient-to-b from-[var(--bg-base)] to-gray-900">
 	<div class="max-w-6xl mx-auto px-6">
 		<div class="text-center mb-16" use:scrollReveal>
 			<h2 class="text-3xl md:text-4xl font-bold text-white mb-4">Everything an Agentic IDE Needs</h2>
@@ -847,15 +854,15 @@ Next ready tasks:
 
 		<div class="space-y-6" use:staggerChildren={{ stagger: 100 }}>
 			{#each workflowSteps as step, i}
-				<div class="group relative flex flex-col md:flex-row gap-6 p-6 rounded-2xl bg-gray-800/50 border border-gray-700 hover:border-violet-500/50 transition-all workflow-step">
+				<div class="group relative flex flex-col md:flex-row gap-6 p-6 rounded-2xl bg-gray-800/50 border border-gray-700 hover:border-[var(--color-primary)]/50 transition-all workflow-step">
 					<!-- Step indicator -->
 					<div class="shrink-0 flex items-start gap-4">
-						<div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-600 to-fuchsia-600 flex items-center justify-center group-hover:shadow-lg group-hover:shadow-violet-500/30 transition-shadow">
+						<div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-secondary)] flex items-center justify-center group-hover:shadow-lg group-hover:shadow-[var(--color-primary)]/30 transition-shadow">
 							<span class="text-2xl font-bold text-white">{step.step}</span>
 						</div>
 						<div class="md:hidden">
 							<div class="text-xs text-gray-500 uppercase tracking-wider">{step.label}</div>
-							<div class="inline-block px-2 py-0.5 rounded bg-violet-500/20 text-violet-400 text-xs font-medium mt-1">{step.badge}</div>
+							<div class="inline-block px-2 py-0.5 rounded bg-[var(--color-primary)]/20 text-[var(--color-primary)] text-xs font-medium mt-1">{step.badge}</div>
 						</div>
 					</div>
 
@@ -863,7 +870,7 @@ Next ready tasks:
 					<div class="flex-1 min-w-0">
 						<div class="hidden md:flex items-center gap-3 mb-2">
 							<div class="text-xs text-gray-500 uppercase tracking-wider">{step.label}</div>
-							<div class="inline-block px-2 py-0.5 rounded bg-violet-500/20 text-violet-400 text-xs font-medium">{step.badge}</div>
+							<div class="inline-block px-2 py-0.5 rounded bg-[var(--color-primary)]/20 text-[var(--color-primary)] text-xs font-medium">{step.badge}</div>
 						</div>
 						<h3 class="text-xl font-bold text-white mb-2">{step.title}</h3>
 						<p class="text-gray-400 mb-4">{step.desc}</p>
@@ -882,7 +889,7 @@ Next ready tasks:
 
 					<!-- Connector line -->
 					{#if i < workflowSteps.length - 1}
-						<div class="hidden md:block absolute left-[2.5rem] top-[5.5rem] w-0.5 h-[calc(100%-1rem)] bg-gradient-to-b from-violet-500/50 to-transparent"></div>
+						<div class="hidden md:block absolute left-[2.5rem] top-[5.5rem] w-0.5 h-[calc(100%-1rem)] bg-gradient-to-b from-[var(--color-primary)]/50 to-transparent"></div>
 					{/if}
 				</div>
 			{/each}
@@ -895,7 +902,7 @@ Next ready tasks:
 </section>
 
 <!-- VIDEO DEMO SECTION -->
-<section id="demo" class="py-24 bg-black">
+<section id="demo" class="py-24 bg-[var(--bg-base)]">
 	<div class="max-w-4xl mx-auto px-6">
 		<div class="text-center mb-12" use:scrollReveal>
 			<h2 class="text-3xl font-bold text-white mb-4">See It in Action</h2>
@@ -906,8 +913,8 @@ Next ready tasks:
 			<!-- Video placeholder -->
 			<div class="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
 				<div class="text-center">
-					<div class="w-20 h-20 rounded-full bg-violet-500/20 border border-violet-500/50 flex items-center justify-center mx-auto mb-4 cursor-pointer hover:bg-violet-500/30 hover:scale-105 transition-all">
-						<svg class="w-8 h-8 text-violet-400 ml-1" fill="currentColor" viewBox="0 0 24 24">
+					<div class="w-20 h-20 rounded-full bg-[var(--color-primary)]/20 border border-[var(--color-primary)]/50 flex items-center justify-center mx-auto mb-4 cursor-pointer hover:bg-[var(--color-primary)]/30 hover:scale-105 transition-all">
+						<svg class="w-8 h-8 text-[var(--color-primary)] ml-1" fill="currentColor" viewBox="0 0 24 24">
 							<path d="M8 5v14l11-7z"/>
 						</svg>
 					</div>
@@ -965,7 +972,7 @@ Next ready tasks:
 
 	.workflow-step:hover {
 		transform: translateX(4px);
-		box-shadow: 0 10px 30px rgba(139, 92, 246, 0.1);
+		box-shadow: 0 10px 30px rgba(56, 189, 248, 0.1);
 	}
 
 	/* Video container hover */
@@ -974,7 +981,7 @@ Next ready tasks:
 	}
 
 	.video-container:hover {
-		box-shadow: 0 20px 60px rgba(139, 92, 246, 0.15), 0 0 0 1px rgba(139, 92, 246, 0.2);
+		box-shadow: 0 20px 60px rgba(56, 189, 248, 0.15), 0 0 0 1px rgba(56, 189, 248, 0.2);
 	}
 
 	/* Reduced motion - show cards immediately */
