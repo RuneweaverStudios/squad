@@ -154,6 +154,7 @@
 
 <svelte:head>
 	<title>Automation | JAT Dashboard</title>
+	<link rel="icon" href="/favicons/automation.svg" />
 </svelte:head>
 
 <div class="h-full flex flex-col overflow-hidden" style="background: oklch(0.14 0.01 250);">

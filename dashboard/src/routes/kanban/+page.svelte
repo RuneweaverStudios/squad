@@ -112,6 +112,7 @@
 
 <svelte:head>
 	<title>Kanban | JAT Dashboard</title>
+	<link rel="icon" href="/favicons/kanban.svg" />
 </svelte:head>
 
 <div class="flex flex-col h-full bg-base-200">

@@ -1,8 +1,8 @@
 # JAT — The World's First Agentic IDE
 
-**The complete development environment built for AI agent supervision.**
+**Everything you need to vibe code. In one place. Finally.**
 
-While everyone else is building copilots that help you type faster, we built an IDE that lets you stop typing altogether. Supervise a swarm of AI agents working in parallel across your codebase.
+JAT is the complete, self-contained environment for agentic development. Task management, agent orchestration, code editor, git integration, terminal access—all unified in a single dashboard. No plugins to install, no services to configure, no pieces to assemble. Just describe what you want and supervise the swarm.
 
 ![Dashboard](https://img.shields.io/badge/Dashboard-SvelteKit-orange)
 ![Agents](https://img.shields.io/badge/Agents-20+-green)
@@ -69,7 +69,7 @@ Every feature a modern IDE needs, reimagined for agent supervision:
 
 ### Git Source Control Panel
 
-Switch to the Git tab for VS Code-style source control:
+Switch to the Git tab for full source control:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -158,9 +158,9 @@ Access any agent's terminal session or run commands:
 
 | Route | Purpose | Key Features |
 |-------|---------|--------------|
-| `/tasks` | Task Management | Create tasks, manage epics, set priorities, bulk actions |
-| `/work` | Agent Supervision | Live sessions, smart questions, state tracking |
+| `/work` | Agent Supervision | Task management, live sessions, smart questions, state tracking |
 | `/files` | Code & Git | Monaco editor, file tree, full git integration |
+| `/kanban` | Kanban Board | Visual task board with drag-drop |
 | `/servers` | Dev Servers | npm start/stop, browser sessions, port management |
 | `/config` | Settings | Automation rules, templates, keyboard shortcuts |
 | `/automation` | Auto-Actions | Pattern matching, error recovery, auto-proceed |
@@ -170,39 +170,41 @@ Access any agent's terminal session or run commands:
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
 │                                                                      │
-│   1. CREATE EPIC         "Build user authentication system"          │
+│   1. PLAN WITH AI        Describe your feature, get PRD              │
+│         ↓                 (or bring your own PRD)                    │
+│   2. /JAT:BEAD           Convert PRD → structured tasks              │
 │         ↓                                                            │
-│   2. EPIC SWARM          Dashboard spawns 4 agents on subtasks       │
+│   3. EPIC SWARM          Dashboard spawns agents on subtasks         │
 │         ↓                                                            │
-│   3. PARALLEL WORK       Agents code simultaneously                  │
+│   4. PARALLEL WORK       Agents code simultaneously                  │
 │         ↓                                                            │
-│   4. SMART QUESTIONS     "OAuth or JWT?" → click a button            │
+│   5. SMART QUESTIONS     "OAuth or JWT?" → click a button            │
 │         ↓                                                            │
-│   5. REVIEW IN /files    See diffs, check code quality               │
+│   6. REVIEW IN /files    See diffs, check code quality               │
 │         ↓                                                            │
-│   6. COMMIT & PUSH       Stage changes, write message, push          │
+│   7. COMMIT & PUSH       Stage changes, write message, push          │
 │         ↓                                                            │
-│   7. AUTO-PROCEED        Low-priority tasks complete automatically   │
+│   8. AUTO-PROCEED        Low-priority tasks complete automatically   │
 │                                                                      │
 │   Repeat. Scale to 20+ agents. Ship faster.                          │
 │                                                                      │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-## Why Not Just Use VS Code?
+## What Makes JAT Different
 
-| Feature | VS Code + Copilot | JAT |
-|---------|-------------------|-----|
-| **Code editing** | ✅ Excellent | ✅ Monaco (same engine) |
-| **Git integration** | ✅ Built-in | ✅ Full source control panel |
-| **Multi-agent management** | ❌ Not designed for it | ✅ Core feature |
-| **Task → Agent → Review** | ❌ Manual orchestration | ✅ One-click workflow |
-| **Smart question UI** | ❌ Terminal prompts | ✅ Clickable buttons |
-| **Parallel agent sessions** | ❌ One copilot | ✅ 20+ concurrent agents |
-| **Auto-proceed rules** | ❌ None | ✅ By type/priority matrix |
-| **Error recovery** | ❌ Manual | ✅ Auto-retry patterns |
+| Feature | Description |
+|---------|-------------|
+| **Multi-agent management** | Run 20+ agents simultaneously across your codebase |
+| **Task → Agent → Review** | One-click workflow from task to completion |
+| **Smart question UI** | Agent questions become clickable buttons |
+| **Epic Swarm** | Spawn parallel agents on subtasks |
+| **Auto-proceed rules** | Configure auto-completion by type/priority matrix |
+| **Error recovery** | Automatic retry patterns for failures |
+| **PRD → Tasks** | `/jat:bead` converts requirements to structured tasks |
+| **Full IDE** | Monaco editor, git panel, file explorer—all built in |
 
-**The answer:** You can use both. JAT for agent supervision, VS Code for deep debugging. But most users find they stop opening VS Code once they're comfortable with JAT.
+The magic is in agent orchestration. Everything else is just table stakes.
 
 ## Keyboard Shortcuts
 
@@ -238,17 +240,14 @@ Access any agent's terminal session or run commands:
 ## Quick Start
 
 ```bash
-# Clone and install
-git clone https://github.com/joemcgee/jat.git ~/code/jat
-cd ~/code/jat && ./install.sh
-source ~/.bashrc
+# Install (one command)
+curl -sSL https://raw.githubusercontent.com/joewinke/jat/master/tools/scripts/bootstrap.sh | bash
 
-# Launch the IDE
-jat
-
-# Open http://localhost:5174
-# Add a project → Create a task → Spawn an agent → Supervise
+# Restart shell and launch
+source ~/.bashrc && jat
 ```
+
+Open http://localhost:3333 → Add a project → Create a task → Spawn an agent → Supervise
 
 ## Architecture
 
@@ -256,7 +255,7 @@ jat
 ~/code/jat/
 ├── dashboard/          # SvelteKit app (the IDE)
 │   ├── src/
-│   │   ├── routes/     # /tasks, /work, /files, /servers, /config
+│   │   ├── routes/     # /work, /files, /kanban, /servers, /config
 │   │   └── lib/
 │   │       ├── components/
 │   │       │   ├── files/      # FileTree, FileEditor, GitPanel
@@ -268,7 +267,7 @@ jat
 │   ├── mail/           # Agent coordination (am-*)
 │   ├── browser/        # Browser automation
 │   └── signal/         # State synchronization
-├── commands/           # Slash commands (/jat:start, /jat:complete)
+├── commands/           # /jat:start, /jat:complete, /jat:bead
 └── shared/             # Agent-facing documentation
 ```
 
@@ -323,14 +322,17 @@ Yes. Run `bd init` in any git repo to add task tracking. JAT auto-discovers proj
 
 No. JAT runs 100% locally. Your code never leaves your machine.
 
-**Q: Do I need to give up VS Code?**
+**Q: Can I use my existing editor alongside JAT?**
 
-No. Many users keep VS Code for complex debugging. But the Monaco editor + Git panel handles 95% of review and edit needs.
+Yes. JAT handles agent orchestration and code review. Use your favorite editor for deep debugging when needed.
 
 ## Credits
 
-- **Monaco** — VS Code's editor engine
+- **[@joewinke](https://github.com/joewinke)** — Creator
+- **Mario Zechner** — [What if you don't need MCP?](https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/) (inspiration)
+- **Agent Mail** — Inspired by [Dicklesworthstone/mcp_agent_mail](https://github.com/Dicklesworthstone/mcp_agent_mail)
 - **Beads** — Task management ([steveyegge/beads](https://github.com/steveyegge/beads))
+- **Monaco** — Code editor engine
 - **SvelteKit** — Dashboard framework
 - **DaisyUI** — UI components
 - **simple-git** — Git operations

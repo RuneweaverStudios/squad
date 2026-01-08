@@ -293,6 +293,7 @@
 
 <svelte:head>
 	<title>Config | JAT Dashboard</title>
+	<link rel="icon" href="/favicons/config.svg" />
 </svelte:head>
 
 <div class="config-page" style="background: oklch(0.14 0.01 250);">

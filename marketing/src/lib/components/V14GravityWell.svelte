@@ -27,43 +27,76 @@
 		const ctx = container.getContext('2d');
 		if (!ctx) return;
 
-		let w = container.clientWidth;
-		let h = container.clientHeight;
-		container.width = w;
-		container.height = h;
-
 		const particles: Particle[] = [];
 		let time = 0;
 		let isVisible = true;
+		let w = 0;
+		let h = 0;
+		let initialized = false;
 
-		// Create particles scattered around the edges
-		for (let i = 0; i < particleCount; i++) {
-			// Start from edges/corners (scattered chaos)
-			const edge = Math.floor(Math.random() * 4);
-			let x, y;
-			switch (edge) {
-				case 0: x = Math.random() * w; y = -50; break; // Top
-				case 1: x = w + 50; y = Math.random() * h; break; // Right
-				case 2: x = Math.random() * w; y = h + 50; break; // Bottom
-				default: x = -50; y = Math.random() * h; break; // Left
+		// Deferred initialization - wait for layout to be computed
+		function initCanvas() {
+			// Use getBoundingClientRect for accurate dimensions after layout
+			const rect = container.getBoundingClientRect();
+			w = rect.width;
+			h = rect.height;
+
+			// Don't initialize if dimensions aren't ready yet
+			if (w === 0 || h === 0) {
+				requestAnimationFrame(initCanvas);
+				return;
 			}
 
-			particles.push({
-				x,
-				y,
-				originX: x,
-				originY: y,
-				vx: 0,
-				vy: 0,
-				size: 1 + Math.random() * 2,
-				hue: 200 + Math.random() * 100, // Cyan to violet
-				orbitRadius: 50 + Math.random() * 200,
-				orbitSpeed: 0.5 + Math.random() * 1.5,
-				orbitPhase: Math.random() * Math.PI * 2
-			});
+			// Set canvas resolution to match display size
+			container.width = w;
+			container.height = h;
+
+			// Only create particles once dimensions are valid
+			if (!initialized) {
+				initialized = true;
+				createParticles();
+			}
 		}
 
+		function createParticles() {
+			particles.length = 0; // Clear any existing
+			for (let i = 0; i < particleCount; i++) {
+				// Start from edges/corners (scattered chaos)
+				const edge = Math.floor(Math.random() * 4);
+				let x, y;
+				switch (edge) {
+					case 0: x = Math.random() * w; y = -50; break; // Top
+					case 1: x = w + 50; y = Math.random() * h; break; // Right
+					case 2: x = Math.random() * w; y = h + 50; break; // Bottom
+					default: x = -50; y = Math.random() * h; break; // Left
+				}
+
+				particles.push({
+					x,
+					y,
+					originX: x,
+					originY: y,
+					vx: 0,
+					vy: 0,
+					size: 1 + Math.random() * 2,
+					hue: 200 + Math.random() * 100, // Cyan to violet
+					orbitRadius: 50 + Math.random() * 200,
+					orbitSpeed: 0.5 + Math.random() * 1.5,
+					orbitPhase: Math.random() * Math.PI * 2
+				});
+			}
+		}
+
+		// Start initialization after a frame to ensure layout is computed
+		requestAnimationFrame(initCanvas);
+
 		function animate() {
+			// Wait for initialization before animating
+			if (!initialized) {
+				animationId = requestAnimationFrame(animate);
+				return;
+			}
+
 			if (!isVisible) {
 				animationId = requestAnimationFrame(animate);
 				return;
@@ -179,10 +212,13 @@
 		animate();
 
 		function handleResize() {
-			w = container.clientWidth;
-			h = container.clientHeight;
-			container.width = w;
-			container.height = h;
+			const rect = container.getBoundingClientRect();
+			w = rect.width;
+			h = rect.height;
+			if (w > 0 && h > 0) {
+				container.width = w;
+				container.height = h;
+			}
 		}
 
 		function handleVisibility() {

@@ -1459,6 +1459,7 @@
 
 <svelte:head>
 	<title>Work | JAT Dashboard</title>
+	<link rel="icon" href="/favicons/work.svg" />
 </svelte:head>
 
 <svelte:window onkeydown={handleKeydown} />

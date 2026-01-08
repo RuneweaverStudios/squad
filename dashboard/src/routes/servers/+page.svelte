@@ -816,6 +816,7 @@
 
 <svelte:head>
 	<title>Servers | JAT Dashboard</title>
+	<link rel="icon" href="/favicons/servers.svg" />
 </svelte:head>
 
 <svelte:window onresize={updateContainerHeight} />

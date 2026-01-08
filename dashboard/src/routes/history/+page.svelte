@@ -318,6 +318,7 @@
 
 <svelte:head>
 	<title>Task History | JAT Dashboard</title>
+	<link rel="icon" href="/favicons/history.svg" />
 </svelte:head>
 
 <div class="history-page min-h-screen bg-base-200">

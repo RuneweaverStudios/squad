@@ -707,6 +707,7 @@
 
 <svelte:head>
 	<title>Files | JAT Dashboard</title>
+	<link rel="icon" href="/favicons/files.svg" />
 </svelte:head>
 
 <svelte:window onkeydown={handleKeyDown} />

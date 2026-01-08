@@ -111,6 +111,7 @@
 
 <svelte:head>
 	<title>Swarm | JAT Dashboard</title>
+	<link rel="icon" href="/favicons/swarm.svg" />
 </svelte:head>
 
 <div class="swarm-page">

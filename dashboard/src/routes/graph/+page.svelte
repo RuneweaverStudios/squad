@@ -114,6 +114,7 @@
 
 <svelte:head>
 	<title>Graph | JAT Dashboard</title>
+	<link rel="icon" href="/favicons/graph.svg" />
 </svelte:head>
 
 <div class="min-h-screen bg-base-200">

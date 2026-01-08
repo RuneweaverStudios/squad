@@ -202,6 +202,7 @@
 
 <svelte:head>
 	<title>Projects | JAT Dashboard</title>
+	<link rel="icon" href="/favicons/projects.svg" />
 </svelte:head>
 
 <div class="h-full bg-base-200 flex flex-col overflow-auto">

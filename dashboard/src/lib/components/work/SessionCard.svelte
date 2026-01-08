@@ -499,6 +499,11 @@
 	let autoCloseHeld = $state(false); // User clicked "Hold for Review"
 	let autoCompleteTriggered = $state(false); // Track if auto-complete has been triggered for this review cycle
 
+	// Track baseline commit across state transitions (working → review)
+	// When agent transitions from working to review, the working signal's baselineCommit
+	// becomes unavailable. We persist it here so ReviewDiffDrawer can show changes.
+	let lastBaselineCommit = $state<string | null>(null);
+
 	// Real-time elapsed time clock (ticks every second)
 	let currentTime = $state(Date.now());
 	let elapsedTimeInterval: ReturnType<typeof setInterval> | null = null;
@@ -935,6 +940,14 @@
 		if (currentLength !== lastOutputLength) {
 			lastOutputLength = currentLength;
 			lastActivityTime = Date.now();
+		}
+	});
+
+	// Track baselineCommit when in working state
+	// This persists the baseline so it's available when transitioning to review state
+	$effect(() => {
+		if (workingSignal?.baselineCommit) {
+			lastBaselineCommit = workingSignal.baselineCommit;
 		}
 	});
 
@@ -5297,6 +5310,8 @@
 					{:else if reviewSignal}
 						<ReviewSignalCard
 							signal={reviewSignal}
+							projectName={defaultProject}
+							baselineCommit={lastBaselineCommit}
 							onTaskClick={(taskId) => onTaskClick?.(taskId)}
 							onApprove={async () => {
 								// When user approves from review card, trigger completion flow

@@ -24,12 +24,15 @@
 		generateFilesPageUrl,
 		type FileLinks
 	} from '$lib/utils/fileLinks';
+	import ReviewDiffDrawer from '$lib/components/review/ReviewDiffDrawer.svelte';
 
 	interface Props {
 		/** The rich review signal data */
 		signal: ReviewSignal;
 		/** Project name for localhost URL generation (e.g., 'jat', 'chimaro') */
 		projectName?: string;
+		/** Baseline commit SHA for diff comparison (from working signal) */
+		baselineCommit?: string | null;
 		/** Callback when task ID is clicked */
 		onTaskClick?: (taskId: string) => void;
 		/** Callback when a file path is clicked (for viewing) */
@@ -55,6 +58,7 @@
 	let {
 		signal,
 		projectName = 'jat',
+		baselineCommit = null,
 		onTaskClick,
 		onFileClick,
 		onDiffClick,
@@ -74,6 +78,9 @@
 	let feedbackText = $state('');
 	let questionText = $state('');
 	let checkedReviewItems = $state<Set<number>>(new Set());
+
+	// Diff drawer state
+	let showDiffDrawer = $state(false);
 
 	// Tests status badge styling - using DaisyUI semantic color classes
 	const testsStatusBadge = $derived.by(() => {
@@ -693,6 +700,23 @@
 				</div>
 			{/if}
 
+			<!-- Review All Changes Button -->
+			{#if baselineCommit && signal.filesModified?.length > 0}
+				<div class="flex gap-2 pt-2 border-t border-base-300">
+					<button
+						type="button"
+						onclick={() => showDiffDrawer = true}
+						class="btn btn-sm btn-outline btn-info flex-1 gap-2"
+					>
+						<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+						</svg>
+						Review All Changes
+						<span class="badge badge-sm badge-info">{signal.filesModified.length}</span>
+					</button>
+				</div>
+			{/if}
+
 			<!-- Action Buttons -->
 			{#if onApprove || onRequestChanges || onAskQuestion}
 				<div class="flex flex-col gap-2 pt-2 border-t border-base-300">
@@ -821,3 +845,20 @@
 		</div>
 	</div>
 {/if}
+
+<!-- Review Diff Drawer -->
+<ReviewDiffDrawer
+	isOpen={showDiffDrawer}
+	{projectName}
+	baselineCommit={baselineCommit ?? ''}
+	reviewSignal={signal}
+	onClose={() => showDiffDrawer = false}
+	onApprove={() => {
+		showDiffDrawer = false;
+		onApprove?.();
+	}}
+	onRequestChanges={(feedback) => {
+		showDiffDrawer = false;
+		onRequestChanges?.(feedback);
+	}}
+/>

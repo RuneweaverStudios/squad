@@ -116,6 +116,7 @@
 
 <svelte:head>
 	<title>Timeline | JAT Dashboard</title>
+	<link rel="icon" href="/favicons/timeline.svg" />
 </svelte:head>
 
 <div class="min-h-screen bg-base-200">
