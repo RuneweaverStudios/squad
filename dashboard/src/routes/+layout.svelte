@@ -22,7 +22,7 @@
 	import { successToast } from '$lib/stores/toasts.svelte';
 	import { initSessionEvents, closeSessionEvents, connectSessionEvents, disconnectSessionEvents, lastSessionEvent } from '$lib/stores/sessionEvents';
 	import { connectTaskEvents, disconnectTaskEvents, lastTaskEvent } from '$lib/stores/taskEvents';
-	import { availableProjects, projectColorsStore, openTaskDrawer, openProjectDrawer, isTaskDetailDrawerOpen, taskDetailDrawerTaskId, closeTaskDetailDrawer, isEpicSwarmModalOpen, epicSwarmModalEpicId, isStartDropdownOpen, openStartDropdownViaKeyboard, closeStartDropdown, isFilePreviewDrawerOpen, filePreviewDrawerPath, filePreviewDrawerProject, filePreviewDrawerLine, closeFilePreviewDrawer, toggleTerminalDrawer, isDiffPreviewDrawerOpen, diffPreviewDrawerPath, diffPreviewDrawerProject, diffPreviewDrawerIsStaged, closeDiffPreviewDrawer } from '$lib/stores/drawerStore';
+	import { availableProjects, projectColorsStore, openTaskDrawer, openProjectDrawer, isTaskDetailDrawerOpen, taskDetailDrawerTaskId, closeTaskDetailDrawer, isEpicSwarmModalOpen, epicSwarmModalEpicId, isStartDropdownOpen, openStartDropdownViaKeyboard, closeStartDropdown, isFilePreviewDrawerOpen, filePreviewDrawerPath, filePreviewDrawerProject, filePreviewDrawerLine, closeFilePreviewDrawer, toggleTerminalDrawer, isDiffPreviewDrawerOpen, diffPreviewDrawerPath, diffPreviewDrawerProject, diffPreviewDrawerIsStaged, closeDiffPreviewDrawer, setGitAheadCount } from '$lib/stores/drawerStore';
 	import { hoveredSessionName, triggerCompleteFlash, jumpToSession } from '$lib/stores/hoveredSession';
 	import { get } from 'svelte/store';
 	import { initPreferences, getActiveProject } from '$lib/stores/preferences.svelte';
@@ -225,6 +225,7 @@
 			loadReviewRules();
 			loadSparklineData();
 			loadAutoKillConfig(); // Load user's auto-kill settings for session cleanup
+			startGitStatusPolling(30000); // Poll git status every 30 seconds for push badge
 		}, 100);
 
 		// Phase 3: Expensive usage data (heavily deferred, runs after user has had time to interact)
@@ -244,6 +245,7 @@
 			disconnectSessionEvents(); // Disconnect from session events SSE
 			disconnectTaskEvents(); // Disconnect from task events SSE
 			stopActivityPolling(); // Stop activity polling
+			stopGitStatusPolling(); // Stop git status polling for Explorer badge
 			clearAllBadges(); // Clear favicon and title badges on unmount
 		};
 	});
@@ -520,6 +522,49 @@
 			} else {
 				configProjects = [];
 			}
+		}
+	}
+
+	// Fetch git status for the active project (to show push badge on Explorer)
+	// Uses the selected project, or falls back to the first config project
+	let gitStatusPollingInterval: ReturnType<typeof setInterval> | null = null;
+
+	async function loadGitStatus() {
+		// Get the project to check - prefer selected project (if not "All Projects"), otherwise use active project from preferences
+		const projectToCheck = (selectedProject !== 'All Projects' && selectedProject)
+			? selectedProject
+			: getActiveProject() || configProjects[0];
+
+		if (!projectToCheck) {
+			setGitAheadCount(0);
+			return;
+		}
+
+		try {
+			const response = await fetch(`/api/files/git/status?project=${encodeURIComponent(projectToCheck)}`);
+			if (response.ok) {
+				const data = await response.json();
+				setGitAheadCount(data.ahead || 0);
+			} else {
+				setGitAheadCount(0);
+			}
+		} catch (error) {
+			// Silently fail - git status is not critical
+			setGitAheadCount(0);
+		}
+	}
+
+	function startGitStatusPolling(intervalMs = 30000) {
+		// Load immediately
+		loadGitStatus();
+		// Then poll periodically
+		gitStatusPollingInterval = setInterval(loadGitStatus, intervalMs);
+	}
+
+	function stopGitStatusPolling() {
+		if (gitStatusPollingInterval) {
+			clearInterval(gitStatusPollingInterval);
+			gitStatusPollingInterval = null;
 		}
 	}
 

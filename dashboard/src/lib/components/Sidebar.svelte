@@ -21,7 +21,7 @@
 
 	import { page } from '$app/stores';
 	import { unifiedNavConfig } from '$lib/config/navConfig';
-	import { isSidebarCollapsed } from '$lib/stores/drawerStore';
+	import { isSidebarCollapsed, gitAheadCount } from '$lib/stores/drawerStore';
 
 	// Helper to check if nav item is active
 	function isActive(href: string): boolean {
@@ -126,7 +126,7 @@
 				{@const active = isActive(navItem.href)}
 				<a
 					href={navItem.href}
-					class="w-full flex items-center gap-3 px-3 py-2.5 rounded transition-all duration-200 group
+					class="w-full flex items-center gap-3 px-3 py-2.5 rounded transition-all duration-200 group relative
 						{$isSidebarCollapsed ? 'justify-center tooltip tooltip-right fade-in-left fade-in-delay-' + index : ''}
 						{active ? '' : 'industrial-hover'}"
 					style="
@@ -168,13 +168,35 @@
 							<span class="tracking-in-expand">{navItem.label}</span>
 						</span>
 
+						<!-- Git push badge for Explorer (commits ahead of remote) -->
+						{#if navItem.id === 'files' && $gitAheadCount > 0}
+							<span
+								class="font-mono text-[10px] px-1.5 py-0.5 rounded-full ml-auto"
+								style="
+									background: oklch(0.65 0.15 145 / 0.2);
+									color: oklch(0.70 0.15 145);
+									border: 1px solid oklch(0.65 0.15 145 / 0.3);
+								"
+								title="{$gitAheadCount} commit{$gitAheadCount === 1 ? '' : 's'} to push"
+							>
+								↑{$gitAheadCount}
+							</span>
+						{/if}
+
 						<!-- Active indicator line (extended) -->
-						{#if active}
+						{#if active && !(navItem.id === 'files' && $gitAheadCount > 0)}
 							<div
 								class="flex-1 h-px"
 								style="background: linear-gradient(90deg, oklch(0.70 0.18 240 / 0.4), transparent);"
 							></div>
 						{/if}
+					{:else if navItem.id === 'files' && $gitAheadCount > 0}
+						<!-- Badge shown when sidebar is collapsed (as dot indicator) -->
+						<span
+							class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full"
+							style="background: oklch(0.65 0.15 145); box-shadow: 0 0 6px oklch(0.65 0.15 145 / 0.6);"
+							title="{$gitAheadCount} commit{$gitAheadCount === 1 ? '' : 's'} to push"
+						></span>
 					{/if}
 				</a>
 			{/each}

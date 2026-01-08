@@ -194,3 +194,14 @@ export function closeDiffPreviewDrawer() {
 	isDiffPreviewDrawerOpen.set(false);
 	// Don't clear path/project immediately to allow for smooth close animation
 }
+
+// Git status store (for Explorer sidebar badge showing commits to push)
+export const gitAheadCount = writable(0);
+
+export function setGitAheadCount(count: number) {
+	gitAheadCount.set(count);
+}
+
+export function getGitAheadCount(): number {
+	return get(gitAheadCount);
+}
