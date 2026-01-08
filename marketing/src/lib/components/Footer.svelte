@@ -14,8 +14,18 @@
 	const credits = [
 		{ name: 'Joe Winke', link: 'https://github.com/joewinke', label: 'Creator' },
 		{ name: 'Steve Yegge', link: 'https://steve-yegge.blogspot.com/', label: 'Beads' },
-		{ name: 'Nicholas Marriot', link: 'https://github.com/tmux/tmux', label: 'Tmux' },
-		{ name: 'Jeff Emanuel', link: 'https://github.com/Dicklesworthstone/mcp_agent_mail', label: 'Agent Mail' }
+		{ name: 'Nicholas Marriott', link: 'https://github.com/tmux/tmux', label: 'Tmux' },
+		{ name: 'Jeff Emanuel', link: 'https://github.com/Dicklesworthstone/mcp_agent_mail', label: 'Agent Mail' },
+		{ name: 'Mario Zechner', link: 'https://mariozechner.at/', label: 'Inspiration' },
+		{ name: 'Andrej Karpathy', link: 'https://karpathy.ai/', label: 'Inspiration' },
+		{ name: 'DHH', link: 'https://dhh.dk/', label: 'Inspiration' },
+		{ name: 'Rich Harris', link: 'https://github.com/Rich-Harris', label: 'SvelteKit' },
+		{ name: 'Microsoft', link: 'https://github.com/microsoft/monaco-editor', label: 'Monaco' },
+		{ name: 'Adam Wathan', link: 'https://github.com/adamwathan', label: 'Tailwind' },
+		{ name: 'Pouya Saadeghi', link: 'https://github.com/saadeghi', label: 'DaisyUI' },
+		{ name: 'Evan You', link: 'https://github.com/yyx990803', label: 'Vite' },
+		{ name: 'Mike Bostock', link: 'https://github.com/mbostock', label: 'D3.js' },
+		{ name: 'Anthropic', link: 'https://anthropic.com', label: 'Claude' }
 	];
 </script>
 

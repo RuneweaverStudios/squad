@@ -65,7 +65,7 @@
 
 		<!-- Subheadline -->
 		<p class="text-xl text-gray-400 max-w-3xl mx-auto mb-4 animate-fade-up delay-200 leading-relaxed">
-			Everything you need to vibe code. In one place. Finally.
+			Agents ship, suggest, repeat. You supervise.
 		</p>
 
 		<p class="text-base text-gray-500 max-w-2xl mx-auto mb-10 animate-fade-up delay-250">

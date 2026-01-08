@@ -15,7 +15,7 @@
 
 # JAT — The World's First Agentic IDE
 
-**Everything you need to vibe code. In one place. Finally.**
+**Agents ship, suggest, repeat. You supervise.**
 
 JAT is the complete, self-contained environment for agentic development. Task management, agent orchestration, code editor, git integration, terminal access—all unified in a single dashboard. No plugins to install, no services to configure, no pieces to assemble. Just describe what you want and supervise the swarm.
 
@@ -352,6 +352,7 @@ Open a PR against `master`. All contributions are licensed under MIT.
 - **Beads** — Task management ([steveyegge/beads](https://github.com/steveyegge/beads))
 - **Mario Zechner** — [What if you don't need MCP?](https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/)
 - **Andrej Karpathy** - [Some Powerful Alien Tool](https://x.com/karpathy/status/2004607146781278521?s=20)
+- **DHH** - [Inspiration](https://dhh.dk/)
 - **Tmux** - Terminal Multiplexer by ([Nicholas Marriott](https://github.com/tmux/tmux))
 - **Monaco** — Code editor engine ([Microsoft](https://github.com/microsoft/monaco-editor))
 - **SvelteKit** — Dashboard framework ([Rich Harris](https://github.com/Rich-Harris))
