@@ -29,17 +29,63 @@
 		icon: stage.icon
 	}));
 
-	const taskStates = [
+	// Animation state (declared early so derived values can use them)
+	let currentStep = $state(0);
+	let taskProgress = $state(0);
+	let isPlaying = $state(false); // Start paused, wait for scroll
+	let hasStarted = $state(false);
+	let loopCount = $state(0);
+
+	// Task cycles - each cycle represents a different task going through the loop
+	// When we loop, the suggested task from the previous cycle becomes the current task
+	const taskCycles = [
+		// Cycle 0: OAuth setup → suggests MFA
+		{
+			task: { id: 'jat-7kx', name: 'OAuth setup' },
+			agents: 'BluePeak → jat-7kx\nFairMist → jat-7ky\nGreenRidge → jat-7kz',
+			workingFiles: 'src/auth/oauth.ts\nsrc/lib/google.ts\n+ 47 lines',
+			question: 'Auth provider?\n❯ 1. Supabase\n  2. Auth0\n  3. Custom',
+			diff: '+3 files changed\n+142 insertions\n-12 deletions',
+			nextTask: 'jat-7ky: Sessions',
+			suggested: { name: 'Add MFA', reason: 'Security enhancement' }
+		},
+		// Cycle 1: MFA (suggested from cycle 0) → suggests Rate Limiting
+		{
+			task: { id: 'jat-8ab', name: 'Add MFA' },
+			agents: 'BluePeak → jat-8ab\nFairMist → jat-8ac\nGreenRidge → jat-8ad',
+			workingFiles: 'src/auth/mfa.ts\nsrc/lib/totp.ts\n+ 89 lines',
+			question: 'MFA method?\n❯ 1. TOTP App\n  2. SMS\n  3. Email',
+			diff: '+5 files changed\n+203 insertions\n-8 deletions',
+			nextTask: 'jat-8ac: MFA UI',
+			suggested: { name: 'Rate Limiting', reason: 'Prevent brute force' }
+		},
+		// Cycle 2: Rate Limiting → suggests back to OAuth (completing the conceptual loop)
+		{
+			task: { id: 'jat-9cd', name: 'Rate Limiting' },
+			agents: 'BluePeak → jat-9cd\nFairMist → jat-9ce\nGreenRidge → jat-9cf',
+			workingFiles: 'src/middleware/rateLimit.ts\nsrc/lib/redis.ts\n+ 62 lines',
+			question: 'Rate limit strategy?\n❯ 1. Token bucket\n  2. Sliding window\n  3. Fixed window',
+			diff: '+4 files changed\n+156 insertions\n-3 deletions',
+			nextTask: 'jat-9ce: Rate limit UI',
+			suggested: { name: 'OAuth Refresh', reason: 'Token expiry handling' }
+		}
+	];
+
+	// Get current cycle based on loop count
+	let currentCycle = $derived(taskCycles[loopCount % taskCycles.length]);
+
+	// Build task states dynamically based on current cycle
+	let taskStates = $derived([
 		{ title: 'Add user authentication', status: 'idle', statusLabel: 'Idea', content: '"Users should be able to log in with Google or email..."', visual: 'thought-bubble' },
 		{ title: 'Auth System Epic', status: 'open', statusLabel: 'Tasks Created', content: '├─ jat-7kx: OAuth setup\n├─ jat-7ky: Sessions\n└─ jat-7kz: Login UI', visual: 'tree' },
-		{ title: 'jat-7kx: OAuth setup', status: 'starting', statusLabel: 'Spawning', content: 'BluePeak → jat-7kx\nFairMist → jat-7ky\nGreenRidge → jat-7kz', visual: 'agents' },
-		{ title: 'jat-7kx: OAuth setup', status: 'working', statusLabel: 'Working', content: 'src/auth/oauth.ts\nsrc/lib/google.ts\n+ 47 lines', visual: 'code' },
-		{ title: 'jat-7kx: OAuth setup', status: 'needs_input', statusLabel: 'Needs Input', content: 'Auth provider?\n❯ 1. Supabase\n  2. Auth0\n  3. Custom', visual: 'question' },
-		{ title: 'jat-7kx: OAuth setup', status: 'review', statusLabel: 'Review', content: '+3 files changed\n+142 insertions\n-12 deletions', visual: 'diff' },
-		{ title: 'jat-7kx: OAuth setup', status: 'completing', statusLabel: 'Completing', content: '✓ Committing changes\n✓ Closing task\n✓ Announcing to team', visual: 'check' },
-		{ title: 'jat-7kx: OAuth setup', status: 'completed', statusLabel: 'auto_proceed', content: '✓ Task closed\n✓ Spawning next task\n→ jat-7ky: Sessions', visual: 'check' },
-		{ title: 'Suggested: Add MFA', status: 'suggested', statusLabel: 'suggestedTask', content: 'From completionBundle:\n→ type: feature\n→ priority: P1', visual: 'sparkle' }
-	];
+		{ title: `${currentCycle.task.id}: ${currentCycle.task.name}`, status: 'starting', statusLabel: 'Spawning', content: currentCycle.agents, visual: 'agents' },
+		{ title: `${currentCycle.task.id}: ${currentCycle.task.name}`, status: 'working', statusLabel: 'Working', content: currentCycle.workingFiles, visual: 'code' },
+		{ title: `${currentCycle.task.id}: ${currentCycle.task.name}`, status: 'needs_input', statusLabel: 'Needs Input', content: currentCycle.question, visual: 'question' },
+		{ title: `${currentCycle.task.id}: ${currentCycle.task.name}`, status: 'review', statusLabel: 'Review', content: currentCycle.diff, visual: 'diff' },
+		{ title: `${currentCycle.task.id}: ${currentCycle.task.name}`, status: 'completing', statusLabel: 'Completing', content: '✓ Committing changes\n✓ Closing task\n✓ Announcing to team', visual: 'check' },
+		{ title: `${currentCycle.task.id}: ${currentCycle.task.name}`, status: 'completed', statusLabel: 'auto_proceed', content: `✓ Task closed\n✓ Spawning next task\n→ ${currentCycle.nextTask}`, visual: 'check' },
+		{ title: `Suggested: ${currentCycle.suggested.name}`, status: 'suggested', statusLabel: 'suggestedTask', content: `From completionBundle:\n→ ${currentCycle.suggested.reason}\n→ priority: P1`, visual: 'sparkle' }
+	]);
 
 	const visualIcons: Record<string, string> = {
 		'thought-bubble': '💭',
@@ -53,7 +99,8 @@
 		'sparkle': '✨'
 	};
 
-	const storySnippets = [
+	// Story snippets - step 9 is dynamic based on current cycle's suggested task
+	let storySnippets = $derived([
 		{ headline: "It starts with an idea.", text: "You describe what you want: \"Add user authentication.\" The AI helps you turn it into a structured PRD." },
 		{ headline: "The PRD becomes tasks.", text: "Run /jat:bead and watch your requirements transform into a dependency tree of actionable work." },
 		{ headline: "Agents swarm the work.", text: "Multiple AI agents claim tasks and start coding in parallel. No bottlenecks. No waiting." },
@@ -62,8 +109,8 @@
 		{ headline: "Review with clarity.", text: "See the diffs, understand the changes. Every modification tracked and presented for your approval." },
 		{ headline: "One command to ship.", text: "Run /jat:complete and watch the magic: commits, closes the task, announces to the team. Done." },
 		{ headline: "Auto-proceed kicks in.", text: "Low-priority tasks complete without your input. The system knows when to ask and when to just ship." },
-		{ headline: "And then, the magic.", text: "Completed work suggests new work. \"Add MFA support?\" The flywheel keeps spinning. Perpetual motion." }
-	];
+		{ headline: "And then, the magic.", text: `Completed work suggests new work. \"${currentCycle.suggested.name}?\" The flywheel keeps spinning. Perpetual motion.` }
+	]);
 
 	// Layout positions for panhandle shape
 	// Stem: 1, 2, 3 go down vertically at top
@@ -93,11 +140,6 @@
 
 	// Animation sequence: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 3 → 4 → ...
 	// After first run through, we loop from 9 back to 3
-	let currentStep = $state(0);
-	let taskProgress = $state(0);
-	let isPlaying = $state(false); // Start paused, wait for scroll
-	let hasStarted = $state(false);
-	let loopCount = $state(0);
 
 	let currentState = $derived(taskStates[currentStep]);
 	let currentStepData = $derived(steps[currentStep]);

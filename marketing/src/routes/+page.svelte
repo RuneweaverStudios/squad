@@ -508,7 +508,9 @@ Next ready tasks:
 		</h1>
 
 		<p class="text-xl text-gray-300 max-w-3xl mx-auto mb-10 leading-relaxed">
-			Task management. Agent orchestration. Multi-project dashboards. The complete environment for AI-assisted development at scale.
+			Task management. Agent orchestration. Multi-project dashboards. Git-Sync.
+		<br>
+			The complete environment for AI-assisted development at scale.
 		</p>
 
 		<div class="flex flex-col sm:flex-row items-center justify-center gap-4">
