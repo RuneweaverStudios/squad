@@ -36,5 +36,10 @@ export default defineConfig({
 		__BUILD_TIMESTAMP__: JSON.stringify(buildTimestamp),
 		__BUILD_DATE__: JSON.stringify(buildDate)
 	},
-	plugins: [sveltekit(), webSocketPlugin()]
+	plugins: [sveltekit(), webSocketPlugin()],
+	server: {
+		port: 3333,
+		strictPort: true,
+		host: '127.0.0.1'
+	}
 });
