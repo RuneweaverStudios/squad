@@ -27,6 +27,9 @@
 		author_name: string;
 		author_email: string;
 		refs: string;
+		isHead?: boolean;
+		isPushed?: boolean;
+		isRemoteHead?: boolean;
 	}
 
 	let { project, onFileClick }: Props = $props();
@@ -82,7 +85,7 @@
 	let isTimelineExpanded = $state(true);
 	let isLoadingTimeline = $state(false);
 	let timelineError = $state<string | null>(null);
-	let headCommitHash = $state<string | null>(null);
+	let unpushedCount = $state(0);
 
 	// UI state
 	let isLoading = $state(true);
@@ -411,7 +414,7 @@
 		timelineError = null;
 
 		try {
-			const response = await fetch(`/api/files/git/log?project=${encodeURIComponent(project)}&limit=30`);
+			const response = await fetch(`/api/files/git/log?project=${encodeURIComponent(project)}&limit=50`);
 			if (!response.ok) {
 				const data = await response.json();
 				throw new Error(data.message || 'Failed to fetch commit history');
@@ -419,11 +422,7 @@
 
 			const data = await response.json();
 			commits = data.commits || [];
-
-			// First commit is HEAD
-			if (commits.length > 0) {
-				headCommitHash = commits[0].hash;
-			}
+			unpushedCount = data.unpushedCount || 0;
 		} catch (err) {
 			timelineError = err instanceof Error ? err.message : 'Failed to fetch commits';
 			console.error('[GitPanel] Error fetching timeline:', err);
@@ -1230,27 +1229,46 @@
 					{:else}
 						<div class="commit-list">
 							{#each commits as commit, index}
-								{@const isHead = commit.hash === headCommitHash}
 								{@const firstLine = commit.message.split('\n')[0]}
 								<button
 									class="commit-item"
-									class:is-head={isHead}
-									title="Click to view commit details"
+									class:is-head={commit.isHead}
+									class:is-unpushed={!commit.isPushed}
+									class:is-pushed={commit.isPushed}
+									class:is-remote-head={commit.isRemoteHead}
+									title={commit.isHead
+										? 'HEAD - Your current commit'
+										: commit.isRemoteHead
+											? 'Remote HEAD - Last pushed commit on remote'
+											: !commit.isPushed
+												? 'Unpushed - Local commit not yet on remote'
+												: 'Pushed - Commit exists on remote'}
 									onclick={() => handleCommitClick(commit.hash)}
 								>
 									<div class="commit-marker">
-										{#if isHead}
-											<span class="head-marker">●</span>
+										{#if commit.isHead}
+											<span class="head-marker" title="HEAD">●</span>
+										{:else if commit.isRemoteHead}
+											<span class="remote-head-marker" title="Remote HEAD">◆</span>
+										{:else if !commit.isPushed}
+											<span class="unpushed-dot" title="Unpushed">●</span>
 										{:else}
-											<span class="commit-dot">○</span>
+											<span class="pushed-dot" title="Pushed">○</span>
 										{/if}
 										{#if index < commits.length - 1}
-											<div class="commit-line"></div>
+											<div class="commit-line" class:unpushed={!commit.isPushed && !commits[index + 1]?.isPushed}></div>
 										{/if}
 									</div>
 									<div class="commit-details">
 										<div class="commit-top">
-											<span class="commit-hash">{commit.hashShort}</span>
+											<span class="commit-hash" class:unpushed={!commit.isPushed}>{commit.hashShort}</span>
+											{#if commit.isHead}
+												<span class="head-badge">HEAD</span>
+											{:else if commit.isRemoteHead}
+												<span class="remote-badge">origin</span>
+											{:else if !commit.isPushed}
+												<span class="unpushed-badge">local</span>
+											{/if}
 											<span class="commit-time">{formatTimeAgo(commit.date)}</span>
 										</div>
 										<div class="commit-message">{truncate(firstLine, 50)}</div>
@@ -1708,7 +1726,6 @@
 		overflow-y: auto;
 		flex: 1;
 		min-height: 0;
-		max-height: 300px;
 		padding-right: 0.25rem;
 	}
 
@@ -1750,6 +1767,20 @@
 		background: oklch(0.22 0.03 250);
 	}
 
+	/* Unpushed commit item - subtle amber tint on hover */
+	.commit-item.is-unpushed:hover {
+		background: oklch(0.20 0.03 75);
+	}
+
+	/* HEAD commit item - subtle cyan tint */
+	.commit-item.is-head {
+		background: oklch(0.18 0.02 195 / 0.3);
+	}
+
+	.commit-item.is-head:hover {
+		background: oklch(0.20 0.03 195 / 0.4);
+	}
+
 	.commit-marker {
 		display: flex;
 		flex-direction: column;
@@ -1759,14 +1790,31 @@
 		padding-top: 2px;
 	}
 
+	/* HEAD marker - cyan/teal to stand out */
 	.head-marker {
+		color: oklch(0.70 0.15 195);
+		font-size: 0.875rem;
+		line-height: 1;
+		text-shadow: 0 0 6px oklch(0.70 0.15 195 / 0.5);
+	}
+
+	/* Remote HEAD marker - green diamond */
+	.remote-head-marker {
 		color: oklch(0.65 0.15 145);
 		font-size: 0.75rem;
 		line-height: 1;
 	}
 
-	.commit-dot {
-		color: oklch(0.45 0.02 250);
+	/* Unpushed commits - amber/orange */
+	.unpushed-dot {
+		color: oklch(0.70 0.15 75);
+		font-size: 0.75rem;
+		line-height: 1;
+	}
+
+	/* Pushed commits - muted gray-green */
+	.pushed-dot {
+		color: oklch(0.50 0.08 145);
 		font-size: 0.625rem;
 		line-height: 1;
 	}
@@ -1774,9 +1822,14 @@
 	.commit-line {
 		flex: 1;
 		width: 1px;
-		background: oklch(0.28 0.02 250);
+		background: oklch(0.35 0.02 250);
 		margin-top: 2px;
 		min-height: 20px;
+	}
+
+	/* Unpushed section of line */
+	.commit-line.unpushed {
+		background: oklch(0.55 0.12 75);
 	}
 
 	.commit-details {
@@ -1796,20 +1849,65 @@
 	.commit-hash {
 		font-family: ui-monospace, monospace;
 		font-size: 0.6875rem;
-		color: oklch(0.65 0.15 200);
-		background: oklch(0.65 0.15 200 / 0.1);
+		color: oklch(0.60 0.08 145);
+		background: oklch(0.60 0.08 145 / 0.1);
 		padding: 0.0625rem 0.25rem;
 		border-radius: 0.25rem;
 	}
 
+	/* Unpushed commit hash - amber */
+	.commit-hash.unpushed {
+		color: oklch(0.70 0.15 75);
+		background: oklch(0.70 0.15 75 / 0.15);
+	}
+
+	/* HEAD commit hash - cyan/teal */
 	.commit-item.is-head .commit-hash {
-		color: oklch(0.65 0.15 145);
-		background: oklch(0.65 0.15 145 / 0.15);
+		color: oklch(0.70 0.15 195);
+		background: oklch(0.70 0.15 195 / 0.15);
+	}
+
+	/* Badges for commit status */
+	.head-badge {
+		font-size: 0.5625rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+		padding: 0.0625rem 0.25rem;
+		border-radius: 0.1875rem;
+		color: oklch(0.90 0.12 195);
+		background: oklch(0.70 0.15 195 / 0.25);
+		border: 1px solid oklch(0.70 0.15 195 / 0.4);
+	}
+
+	.remote-badge {
+		font-size: 0.5625rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+		padding: 0.0625rem 0.25rem;
+		border-radius: 0.1875rem;
+		color: oklch(0.80 0.12 145);
+		background: oklch(0.60 0.15 145 / 0.2);
+		border: 1px solid oklch(0.60 0.15 145 / 0.35);
+	}
+
+	.unpushed-badge {
+		font-size: 0.5625rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+		padding: 0.0625rem 0.25rem;
+		border-radius: 0.1875rem;
+		color: oklch(0.85 0.12 75);
+		background: oklch(0.70 0.15 75 / 0.2);
+		border: 1px solid oklch(0.70 0.15 75 / 0.35);
 	}
 
 	.commit-time {
 		font-size: 0.6875rem;
 		color: oklch(0.50 0.02 250);
+		margin-left: auto;
 	}
 
 	.commit-message {

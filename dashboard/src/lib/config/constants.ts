@@ -304,3 +304,39 @@ export const AUTO_KILL = {
 // =============================================================================
 
 export type AgentStatus = 'live' | 'working' | 'active' | 'idle' | 'offline';
+
+// =============================================================================
+// COMMIT MESSAGE GENERATION DEFAULTS
+// =============================================================================
+
+/**
+ * Commit message style options
+ */
+export type CommitMessageStyle =
+	| 'conventional' // feat:, fix:, docs:, etc.
+	| 'descriptive' // Plain descriptive messages
+	| 'imperative' // Imperative mood (Add, Fix, Update)
+	| 'gitmoji'; // With emoji prefixes
+
+/**
+ * Claude model options for commit message generation
+ */
+export type CommitMessageModel = 'claude-3-5-haiku-20241022' | 'claude-sonnet-4-20250514';
+
+/**
+ * Default configuration for commit message generation
+ */
+export const COMMIT_MESSAGE_DEFAULTS = {
+	/** Model to use for generation (haiku = faster/cheaper, sonnet = better quality) */
+	model: 'claude-3-5-haiku-20241022' as CommitMessageModel,
+	/** Commit message style */
+	style: 'conventional' as CommitMessageStyle,
+	/** Maximum tokens for the response */
+	max_tokens: 500,
+	/** Whether to include a body section with details */
+	include_body: false,
+	/** Maximum length for the first line (subject) */
+	subject_max_length: 72,
+	/** Custom instructions to append to the prompt */
+	custom_instructions: ''
+} as const;

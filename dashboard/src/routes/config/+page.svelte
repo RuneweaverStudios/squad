@@ -47,6 +47,7 @@
 	import SwarmSettingsEditor from '$lib/components/config/SwarmSettingsEditor.svelte';
 	import ToolsList from '$lib/components/config/ToolsList.svelte';
 	import ToolsEditor from '$lib/components/config/ToolsEditor.svelte';
+	import CommitMessageSettingsEditor from '$lib/components/config/CommitMessageSettingsEditor.svelte';
 	import type { SlashCommand, ProjectConfig, HooksConfig } from '$lib/types/config';
 	import { successToast, errorToast } from '$lib/stores/toasts.svelte';
 
@@ -99,7 +100,7 @@
 	let selectedTool = $state<ToolFile | null>(null);
 
 	// Valid tabs for URL sync
-	const validTabs = ['commands', 'tools', 'projects', 'swarm', 'defaults', 'mcp', 'hooks', 'claude', 'docs', 'templates', 'actions', 'shortcuts'];
+	const validTabs = ['commands', 'tools', 'projects', 'swarm', 'defaults', 'mcp', 'hooks', 'claude', 'docs', 'templates', 'actions', 'shortcuts', 'commit'];
 
 	// Sync activeTab from URL query parameter
 	$effect(() => {
@@ -473,6 +474,16 @@
 						transition:fade={{ duration: 150 }}
 					>
 						<KeyboardShortcutsEditor />
+					</div>
+				{:else if activeTab === 'commit'}
+					<!-- Commit Message Settings Tab -->
+					<div
+						role="tabpanel"
+						id="commit-panel"
+						aria-labelledby="commit-tab"
+						transition:fade={{ duration: 150 }}
+					>
+						<CommitMessageSettingsEditor />
 					</div>
 				{/if}
 			</div>
