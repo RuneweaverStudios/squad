@@ -1137,6 +1137,63 @@
 		align-items: center;
 	}
 
+	/* Git Status Bar */
+	.git-status-bar {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.25rem 0.5rem;
+		margin-top: 0.375rem;
+		background: oklch(0.16 0.02 250);
+		border-radius: 0.25rem;
+		font-size: 0.6875rem;
+		color: oklch(0.65 0.02 250);
+	}
+
+	.git-branch {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25rem;
+		color: oklch(0.70 0.08 220);
+		font-weight: 500;
+	}
+
+	.branch-icon {
+		width: 12px;
+		height: 12px;
+	}
+
+	.git-ahead {
+		display: inline-flex;
+		align-items: center;
+		padding: 0.125rem 0.375rem;
+		background: oklch(0.65 0.15 145 / 0.2);
+		color: oklch(0.75 0.15 145);
+		border-radius: 0.25rem;
+		font-weight: 600;
+	}
+
+	.git-behind {
+		display: inline-flex;
+		align-items: center;
+		padding: 0.125rem 0.375rem;
+		background: oklch(0.65 0.15 25 / 0.2);
+		color: oklch(0.75 0.15 25);
+		border-radius: 0.25rem;
+		font-weight: 600;
+	}
+
+	.git-changes {
+		display: inline-flex;
+		align-items: center;
+		padding: 0.125rem 0.375rem;
+		background: oklch(0.65 0.15 85 / 0.2);
+		color: oklch(0.75 0.15 85);
+		border-radius: 0.25rem;
+		font-weight: 500;
+		margin-left: auto;
+	}
+
 	.filter-actions {
 		display: flex;
 		gap: 0.25rem;
