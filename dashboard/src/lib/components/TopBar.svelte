@@ -346,10 +346,6 @@
 	// Get actual project list (filter out "All Projects")
 	const actualProjects = $derived(projects.filter((p) => p !== "All Projects"));
 
-	// Debug: log when projects changes
-	$effect(() => {
-		console.log('[TopBar] projects prop:', projects.length, 'actualProjects:', actualProjects.length);
-	});
 
 	// Max sessions from user preferences (reactive)
 	const maxSessions = $derived(getMaxSessions());
