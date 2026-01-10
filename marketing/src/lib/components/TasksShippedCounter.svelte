@@ -133,7 +133,10 @@
 				{/each}
 			</div>
 		{:else}
-			<p class="count-display">{count}</p>
+			<div class="loading-state">
+				<span class="loading loading-spinner loading-md text-[var(--color-primary)]"></span>
+				<p class="loading-text">Agent working...</p>
+			</div>
 		{/if}
 	</div>
 </div>
@@ -178,6 +181,31 @@
 		margin: 0;
 		line-height: 1;
 		font-variant-numeric: tabular-nums;
+	}
+
+	.loading-state {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.5rem 0;
+	}
+
+	.loading-text {
+		font-size: 0.75rem;
+		font-weight: 500;
+		color: rgba(156, 163, 175, 1);
+		margin: 0;
+		animation: pulse-text 2s ease-in-out infinite;
+	}
+
+	@keyframes pulse-text {
+		0%, 100% {
+			opacity: 0.7;
+		}
+		50% {
+			opacity: 1;
+		}
 	}
 
 	/* Panel styling */
