@@ -543,6 +543,7 @@
 
 			showToast('Pushed to remote');
 			await fetchStatus();
+			await fetchTimeline(); // Refresh commit timeline to show pushed status
 		} catch (err) {
 			showToast(err instanceof Error ? err.message : 'Failed to push', 'error');
 		} finally {
@@ -570,6 +571,7 @@
 			const changes = data.summary?.changes || 0;
 			showToast(changes > 0 ? `Pulled ${changes} change(s)` : 'Already up to date');
 			await fetchStatus();
+			await fetchTimeline(); // Refresh commit timeline to show new commits
 		} catch (err) {
 			showToast(err instanceof Error ? err.message : 'Failed to pull', 'error');
 		} finally {

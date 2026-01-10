@@ -65,6 +65,10 @@
 	// Sidebar tab state (Files vs Git)
 	let activeTab = $state<'files' | 'git'>('files');
 
+	// Git status for tab badges (local to this page)
+	let gitChangesCount = $state(0);
+	let gitAheadCount = $state(0);
+
 	// FileTree component reference for scrolling
 	let fileTreeRef: { scrollToFile: (path: string) => Promise<void> } | null = $state(null);
 
@@ -657,15 +661,69 @@
 	// Track whether we've handled the initial file parameter
 	let handledFileParam = $state(false);
 
+	// Fetch git status for tab badges (changes count and ahead count)
+	let gitStatusInterval: ReturnType<typeof setInterval> | null = null;
+
+	async function fetchGitStatusForBadges() {
+		if (!selectedProject) {
+			gitChangesCount = 0;
+			gitAheadCount = 0;
+			return;
+		}
+
+		try {
+			const response = await fetch(`/api/files/git/status?project=${encodeURIComponent(selectedProject)}`);
+			if (response.ok) {
+				const data = await response.json();
+				// Calculate total changes (modified + deleted + untracked + created, excluding staged)
+				const staged = data.staged || [];
+				const modified = (data.modified || []).filter((f: string) => !staged.includes(f));
+				const deleted = (data.deleted || []).filter((f: string) => !staged.includes(f));
+				const untracked = (data.not_added || []).filter((f: string) => !staged.includes(f));
+				const created = (data.created || []).filter((f: string) => !staged.includes(f));
+				gitChangesCount = staged.length + modified.length + deleted.length + untracked.length + created.length;
+				gitAheadCount = data.ahead || 0;
+			} else {
+				gitChangesCount = 0;
+				gitAheadCount = 0;
+			}
+		} catch {
+			// Silently fail - git status is not critical
+			gitChangesCount = 0;
+			gitAheadCount = 0;
+		}
+	}
+
+	function startGitStatusPolling() {
+		// Avoid duplicate intervals
+		if (gitStatusInterval) return;
+		// Fetch immediately
+		fetchGitStatusForBadges();
+		// Then poll every 10 seconds
+		gitStatusInterval = setInterval(fetchGitStatusForBadges, 10000);
+	}
+
+	function stopGitStatusPolling() {
+		if (gitStatusInterval) {
+			clearInterval(gitStatusInterval);
+			gitStatusInterval = null;
+		}
+	}
+
 	onMount(() => {
 		fetchProjects();
+		return () => {
+			stopGitStatusPolling();
+		};
 	});
 
-	// Load persisted files after project is selected
+	// Load persisted files after project is selected and start git status polling
 	$effect(() => {
 		if (selectedProject && projects.length > 0 && !isLoading) {
 			// Small delay to ensure project is fully loaded
 			setTimeout(() => loadOpenFilesFromStorage(), 100);
+			// Start git status polling for tab badges
+			startGitStatusPolling();
 		}
 	});
 
@@ -802,6 +860,9 @@
 								<path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
 							</svg>
 							<span>Files</span>
+							{#if gitChangesCount > 0}
+								<span class="tab-badge tab-badge-changes" title="{gitChangesCount} file{gitChangesCount !== 1 ? 's' : ''} with changes">{gitChangesCount}</span>
+							{/if}
 						</button>
 						<button
 							class="sidebar-tab"
@@ -812,6 +873,9 @@
 								<path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
 							</svg>
 							<span>Git</span>
+							{#if gitAheadCount > 0}
+								<span class="tab-badge tab-badge-push" title="{gitAheadCount} commit{gitAheadCount !== 1 ? 's' : ''} to push">↑{gitAheadCount}</span>
+							{/if}
 						</button>
 					</div>
 					<div class="panel-content file-tree-content">
@@ -1173,6 +1237,32 @@
 
 	.sidebar-tab.active .tab-icon {
 		transform: scale(1.1);
+	}
+
+	/* Tab Badge Indicators */
+	.tab-badge {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 0.65rem;
+		font-weight: 600;
+		padding: 0.1rem 0.35rem;
+		border-radius: 0.5rem;
+		min-width: 1.1rem;
+		line-height: 1;
+		margin-left: 0.25rem;
+	}
+
+	.tab-badge-changes {
+		background: oklch(0.65 0.18 45 / 0.25);
+		color: oklch(0.85 0.15 45);
+		border: 1px solid oklch(0.65 0.15 45 / 0.4);
+	}
+
+	.tab-badge-push {
+		background: oklch(0.55 0.18 145 / 0.25);
+		color: oklch(0.80 0.15 145);
+		border: 1px solid oklch(0.55 0.15 145 / 0.4);
 	}
 
 	/* Tab Panel Transition Wrapper */

@@ -238,6 +238,9 @@ launch_dashboard() {
 
     echo -e "${DIM}  → Dashboard :$dashboard_port${NC}"
 
+    # Clear Vite cache to prevent stale chunk errors
+    rm -rf "$dashboard_path/.svelte-kit" "$dashboard_path/node_modules/.vite" 2>/dev/null
+
     # Use server-jat prefix so the /api/servers endpoint can find it
     local session_name="server-jat"
 

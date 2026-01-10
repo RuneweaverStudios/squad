@@ -921,6 +921,7 @@
 	bind:filePath={$diffPreviewDrawerPath}
 	bind:projectName={$diffPreviewDrawerProject}
 	bind:isStaged={$diffPreviewDrawerIsStaged}
+	bind:commitHash={$diffPreviewDrawerCommitHash}
 	onClose={closeDiffPreviewDrawer}
 />
 
