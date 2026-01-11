@@ -2,8 +2,20 @@
 
 # Migrate JAT from ~/code/jat to ~/.local/share/jat (XDG standard)
 # Safe to run multiple times - skips already-migrated installations
+#
+# Usage: migrate-to-xdg.sh [-y]
+#   -y  Skip confirmation prompts (for piping from curl)
 
 set -e
+
+# Parse arguments
+AUTO_YES=false
+while getopts "y" opt; do
+    case $opt in
+        y) AUTO_YES=true ;;
+        *) ;;
+    esac
+done
 
 # Colors
 GREEN='\033[0;32m'
@@ -50,11 +62,15 @@ if [ -d "$OLD_DIR" ] && [ -d "$NEW_DIR" ]; then
     echo "  2. Update symlinks to use new location"
     echo "  3. Update config files"
     echo ""
-    echo -n "Continue? [y/N] "
-    read -r response
-    if [[ ! "$response" =~ ^[Yy]$ ]]; then
-        echo "Aborted."
-        exit 1
+    if [ "$AUTO_YES" = false ]; then
+        echo -n "Continue? [y/N] "
+        read -r response
+        if [[ ! "$response" =~ ^[Yy]$ ]]; then
+            echo "Aborted."
+            exit 1
+        fi
+    else
+        echo -e "${BLUE}Auto-confirmed (-y flag)${NC}"
     fi
 fi
 
@@ -68,11 +84,15 @@ if [ -d "$OLD_DIR" ] && [ ! -d "$NEW_DIR" ]; then
     echo "  3. Update config files"
     echo "  4. Remove old location"
     echo ""
-    echo -n "Continue? [y/N] "
-    read -r response
-    if [[ ! "$response" =~ ^[Yy]$ ]]; then
-        echo "Aborted."
-        exit 1
+    if [ "$AUTO_YES" = false ]; then
+        echo -n "Continue? [y/N] "
+        read -r response
+        if [[ ! "$response" =~ ^[Yy]$ ]]; then
+            echo "Aborted."
+            exit 1
+        fi
+    else
+        echo -e "${BLUE}Auto-confirmed (-y flag)${NC}"
     fi
 fi
 
