@@ -92,50 +92,25 @@ fi
 # Determine installation directory
 # Priority: JAT_INSTALL_DIR env var > XDG standard > legacy ~/code locations
 
+# Determine installation directory
+# Priority: JAT_INSTALL_DIR env var > current dir (if JAT repo) > XDG location
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 if [ -n "$JAT_INSTALL_DIR" ]; then
     # User specified custom location via environment variable
     INSTALL_DIR="$JAT_INSTALL_DIR"
-    echo -e "${BLUE}Using custom installation directory: $INSTALL_DIR${NC}"
+    echo -e "${BLUE}Using JAT_INSTALL_DIR: $INSTALL_DIR${NC}"
+elif [ -f "$SCRIPT_DIR/install.sh" ] && [ -d "$SCRIPT_DIR/tools" ] && [ -d "$SCRIPT_DIR/dashboard" ]; then
+    # Running from a JAT repo (developer mode)
+    INSTALL_DIR="$SCRIPT_DIR"
+    echo -e "${BLUE}Using current JAT repo: $INSTALL_DIR${NC}"
 elif [ -d "${XDG_DATA_HOME:-$HOME/.local/share}/jat" ]; then
-    # Existing XDG-compliant installation (preferred)
+    # Existing XDG installation
     INSTALL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/jat"
     echo -e "${BLUE}Using existing installation: $INSTALL_DIR${NC}"
-elif [ -d "$HOME/code/jat" ]; then
-    # Existing installation in ~/code/jat (legacy or dev)
-    INSTALL_DIR="$HOME/code/jat"
-    echo -e "${BLUE}Using existing installation: $INSTALL_DIR${NC}"
-elif [ -d "$HOME/code/jomarchy-agent-tools" ]; then
-    # Legacy installation name
-    INSTALL_DIR="$HOME/code/jomarchy-agent-tools"
-    echo -e "${BLUE}Using existing installation: $INSTALL_DIR${NC}"
 else
-    # New installation - ask user for preference
-    echo -e "${BLUE}Where would you like to install JAT?${NC}"
-    echo ""
-    echo "  1) ${XDG_DATA_HOME:-$HOME/.local/share}/jat (XDG standard, recommended)"
-    echo "  2) ${HOME}/code/jat (if you're developing JAT itself)"
-    echo "  3) Custom location"
-    echo ""
-    echo -e "${BLUE}Choose [1-3] (default: 1):${NC} "
-    read -r install_choice
-
-    case "${install_choice:-1}" in
-        1)
-            INSTALL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/jat"
-            ;;
-        2)
-            INSTALL_DIR="$HOME/code/jat"
-            ;;
-        3)
-            echo -e "${BLUE}Enter custom path:${NC} "
-            read -r custom_path
-            INSTALL_DIR="${custom_path/#\~/$HOME}"  # Expand ~ to $HOME
-            ;;
-        *)
-            INSTALL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/jat"
-            ;;
-    esac
-
+    # New installation - clone to XDG location
+    INSTALL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/jat"
     echo -e "${BLUE}Installing to: $INSTALL_DIR${NC}"
     mkdir -p "$(dirname "$INSTALL_DIR")"
     git clone https://github.com/joewinke/jat.git "$INSTALL_DIR"
@@ -146,15 +121,15 @@ cd "$INSTALL_DIR"
 echo ""
 echo -e "${BOLD}╔═══════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}║                                                               ║${NC}"
-echo -e "${BOLD}║              ${BLUE}JAT (Jomarchy Agent Tools)${NC}${BOLD}                    ║${NC}"
+echo -e "${BOLD}║                   ${BLUE}JAT (Jomarchy Agent Tools)${NC}${BOLD}                  ║${NC}"
 echo -e "${BOLD}║                                                               ║${NC}"
 echo -e "${BOLD}╚═══════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo "Complete AI-assisted development environment:"
 echo ""
-echo "  • Agent Mail (11 bash/SQLite coordination tools)"
+echo "  • Agent Mail (15 bash/SQLite coordination tools)"
 echo "  • Beads CLI (dependency-aware task planning)"
-echo "  • 28 generic bash tools (am-*, browser-*, db-*, etc.)"
+echo "  • 48 bash tools (am-*, browser-*, db-*, media-*, etc.)"
 echo "  • Multi-line statusline (agent, task, git, context)"
 echo "  • Real-time hooks (auto-refresh statusline)"
 echo "  • Optional tech stack tools (SvelteKit + Supabase, etc.)"
@@ -168,7 +143,7 @@ read
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}Step 1/11: Installing Agent Mail (bash + SQLite)${NC}"
+echo -e "${BOLD}Step 1/9: Installing Agent Mail (bash + SQLite)${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
@@ -176,7 +151,7 @@ bash "$INSTALL_DIR/tools/scripts/install-agent-mail.sh"
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}Step 2/11: Installing Beads CLI${NC}"
+echo -e "${BOLD}Step 2/9: Installing Beads CLI${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
@@ -184,7 +159,7 @@ bash "$INSTALL_DIR/tools/scripts/install-beads.sh"
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}Step 3/11: Symlinking Generic Tools${NC}"
+echo -e "${BOLD}Step 3/9: Symlinking Generic Tools${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
@@ -192,7 +167,7 @@ bash "$INSTALL_DIR/tools/scripts/symlink-tools.sh"
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}Step 4/11: Installing Node.js Dependencies${NC}"
+echo -e "${BOLD}Step 4/9: Installing Node.js Dependencies${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
@@ -231,7 +206,7 @@ fi
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}Step 5/11: Statusline & Hooks Configuration${NC}"
+echo -e "${BOLD}Step 5/9: Statusline & Hooks Configuration${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
@@ -239,7 +214,7 @@ bash "$INSTALL_DIR/tools/scripts/setup-statusline-and-hooks.sh" "$INSTALL_DIR"
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}Step 6/11: Tmux Mouse Configuration${NC}"
+echo -e "${BOLD}Step 6/9: Tmux Mouse Configuration${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
@@ -247,56 +222,58 @@ bash "$INSTALL_DIR/tools/scripts/setup-tmux.sh"
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}Step 7/11: Optional Tech Stack Tools${NC}"
+echo -e "${BOLD}Step 7/9: Optional Tech Stack Tools${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-# Check if gum is available
+# Ask about optional tech stacks
+SELECTED_STACKS=""
+echo "Optional tech stack tools available:"
+echo "  • SvelteKit + Supabase (11 tools: component-deps, route-list, error-log, etc.)"
+echo ""
+
 if command -v gum &> /dev/null; then
-    echo "Select tech stack tools to install (Space to select, Enter to continue):"
-    echo ""
-
     SELECTED_STACKS=$(gum choose --no-limit \
-        "SvelteKit + Supabase (11 tools: component-deps, route-list, error-log, etc.)" \
+        "SvelteKit + Supabase" \
         "Skip - No additional stacks")
-
-    if echo "$SELECTED_STACKS" | grep -q "SvelteKit"; then
-        echo ""
-        echo "Installing SvelteKit + Supabase stack..."
-        bash "$INSTALL_DIR/stacks/sveltekit-supabase/install.sh"
-    else
-        echo ""
-        echo "Skipping stack installation"
-    fi
 else
-    echo -e "${YELLOW}  ⊘ gum not available - skipping stack selection${NC}"
-    echo "  Install gum for interactive stack selection:"
-    echo "    https://github.com/charmbracelet/gum"
+    echo -n "Install SvelteKit + Supabase tools? [y/N] "
+    read -r response
+    if [[ "$response" =~ ^[Yy]$ ]]; then
+        SELECTED_STACKS="SvelteKit"
+    fi
+fi
+
+if echo "$SELECTED_STACKS" | grep -q "SvelteKit"; then
     echo ""
-    echo "  Or install stacks manually:"
-    echo "    bash $INSTALL_DIR/stacks/sveltekit-supabase/install.sh"
+    echo "Installing SvelteKit + Supabase stack..."
+    bash "$INSTALL_DIR/stacks/sveltekit-supabase/install.sh"
+else
+    echo ""
+    echo "Skipping stack installation"
 fi
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}Step 8/11: Voice-to-Text (Optional)${NC}"
+echo -e "${BOLD}Step 8/9: Voice-to-Text (Optional)${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-# Check if gum is available
+# Ask about Voice-to-Text
 INSTALL_WHISPER="no"
+echo "Voice-to-Text enables speech input in the dashboard."
+echo "Requires: ~2GB disk, cmake, g++, ffmpeg"
+echo ""
 if command -v gum &> /dev/null; then
-    echo "Voice-to-Text enables speech input in the dashboard."
-    echo "Requires: ~2GB disk, cmake, g++, ffmpeg"
-    echo ""
     if gum confirm "Install Voice-to-Text (whisper.cpp)?"; then
         INSTALL_WHISPER="yes"
     fi
 else
-    echo -e "${YELLOW}  ⊘ Voice-to-Text installation skipped (gum not available)${NC}"
-    echo ""
-    echo "  To install manually later:"
-    echo "    bash $INSTALL_DIR/tools/scripts/install-whisper.sh"
+    echo -n "Install Voice-to-Text (whisper.cpp)? [y/N] "
+    read -r response
+    if [[ "$response" =~ ^[Yy]$ ]]; then
+        INSTALL_WHISPER="yes"
+    fi
 fi
 
 if [ "$INSTALL_WHISPER" = "yes" ]; then
@@ -309,27 +286,11 @@ fi
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}Step 9/11: Setting Up Global Configuration${NC}"
+echo -e "${BOLD}Step 9/9: Setting Up Global Configuration${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
 bash "$INSTALL_DIR/tools/scripts/setup-global-claude-md.sh"
-
-echo ""
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}Step 10/11: Setting Up Repositories${NC}"
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo ""
-
-bash "$INSTALL_DIR/tools/scripts/setup-repos.sh" "$INSTALL_DIR"
-
-echo ""
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}Step 11/11: Setting Up Bash Launcher Functions${NC}"
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo ""
-
-bash "$INSTALL_DIR/tools/scripts/setup-bash-functions.sh"
 
 echo ""
 echo ""
@@ -357,7 +318,6 @@ echo "  ✓ Real-time hooks (auto-refresh on am-*/bd commands)"
 echo "  ✓ Git pre-commit hook (agent registration check)"
 echo "  ✓ Global ~/.claude/CLAUDE.md (multi-project instructions)"
 echo "  ✓ Per-repo setup (bd init, CLAUDE.md templates)"
-echo "  ✓ Shell launcher functions (jat-<project> in $SHELL_CONFIG)"
 echo ""
 echo "Benefits:"
 echo ""
