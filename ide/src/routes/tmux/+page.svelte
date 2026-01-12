@@ -30,6 +30,7 @@
 	let selectedSession = $state<string | null>(null);
 	let actionLoading = $state<string | null>(null);
 	let copiedCmd = $state<string | null>(null);
+	let attachMessage = $state<{ session: string; message: string; method: string } | null>(null);
 
 	// Agent to project mapping (from current task)
 	let agentProjects = $state<Map<string, string>>(new Map());
@@ -141,16 +142,36 @@
 	// Attach to a session (opens in terminal)
 	async function attachSession(sessionName: string) {
 		actionLoading = sessionName;
+		attachMessage = null;
 		try {
 			const response = await fetch(`/api/sessions/${encodeURIComponent(sessionName)}/attach`, {
 				method: 'POST'
 			});
+			const data = await response.json();
 			if (!response.ok) {
-				const data = await response.json();
 				throw new Error(data.message || 'Failed to attach session');
 			}
+			// Show success message with details
+			attachMessage = {
+				session: sessionName,
+				message: data.method === 'tmux-window'
+					? `Opened in window '${data.windowName}' of ${data.parentSession}`
+					: `Opened in ${data.terminal} terminal`,
+				method: data.method
+			};
+			// Clear message after 4 seconds
+			setTimeout(() => {
+				if (attachMessage?.session === sessionName) {
+					attachMessage = null;
+				}
+			}, 4000);
 		} catch (err) {
 			console.error('Failed to attach session:', err);
+			attachMessage = {
+				session: sessionName,
+				message: err instanceof Error ? err.message : 'Failed to attach',
+				method: 'error'
+			};
 		} finally {
 			actionLoading = null;
 		}
@@ -443,6 +464,34 @@
 			</div>
 		{/if}
 	</div>
+
+	<!-- Attach feedback toast -->
+	{#if attachMessage}
+		<div
+			class="attach-toast"
+			class:error={attachMessage.method === 'error'}
+			class:success={attachMessage.method !== 'error'}
+		>
+			{#if attachMessage.method === 'error'}
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="toast-icon">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+				</svg>
+			{:else}
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="toast-icon">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+				</svg>
+			{/if}
+			<div class="toast-content">
+				<span class="toast-session">{attachMessage.session}</span>
+				<span class="toast-message">{attachMessage.message}</span>
+			</div>
+			<button class="toast-close" onclick={() => attachMessage = null}>
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+				</svg>
+			</button>
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -811,6 +860,108 @@
 		color: oklch(0.45 0.02 250);
 	}
 
+	/* Attach toast */
+	.attach-toast {
+		position: fixed;
+		bottom: 1.5rem;
+		right: 1.5rem;
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.875rem 1rem;
+		background: oklch(0.20 0.02 250);
+		border: 1px solid oklch(0.30 0.02 250);
+		border-radius: 8px;
+		box-shadow: 0 4px 12px oklch(0 0 0 / 0.3);
+		z-index: 100;
+		animation: slide-up 0.2s ease-out;
+	}
+
+	.attach-toast.success {
+		background: oklch(0.22 0.04 200);
+		border-color: oklch(0.45 0.12 200);
+	}
+
+	.attach-toast.error {
+		background: oklch(0.22 0.04 30);
+		border-color: oklch(0.45 0.12 30);
+	}
+
+	@keyframes slide-up {
+		from {
+			opacity: 0;
+			transform: translateY(10px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+
+	.toast-icon {
+		width: 20px;
+		height: 20px;
+		flex-shrink: 0;
+	}
+
+	.attach-toast.success .toast-icon {
+		color: oklch(0.70 0.15 200);
+	}
+
+	.attach-toast.error .toast-icon {
+		color: oklch(0.70 0.15 30);
+	}
+
+	.toast-content {
+		display: flex;
+		flex-direction: column;
+		gap: 0.125rem;
+	}
+
+	.toast-session {
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: oklch(0.85 0.02 250);
+		font-family: ui-monospace, monospace;
+	}
+
+	.toast-message {
+		font-size: 0.75rem;
+		color: oklch(0.60 0.02 250);
+	}
+
+	.attach-toast.success .toast-message {
+		color: oklch(0.70 0.10 200);
+	}
+
+	.attach-toast.error .toast-message {
+		color: oklch(0.70 0.10 30);
+	}
+
+	.toast-close {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 20px;
+		height: 20px;
+		padding: 0;
+		margin-left: 0.5rem;
+		background: transparent;
+		border: none;
+		color: oklch(0.50 0.02 250);
+		cursor: pointer;
+		transition: color 0.15s;
+	}
+
+	.toast-close:hover {
+		color: oklch(0.75 0.02 250);
+	}
+
+	.toast-close svg {
+		width: 14px;
+		height: 14px;
+	}
+
 	/* Responsive */
 	@media (max-width: 768px) {
 		.tmux-page {
@@ -825,6 +976,12 @@
 		.th-windows,
 		.td-windows {
 			display: none;
+		}
+
+		.attach-toast {
+			left: 1rem;
+			right: 1rem;
+			bottom: 1rem;
 		}
 	}
 </style>
