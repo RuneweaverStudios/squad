@@ -22,7 +22,7 @@
 	import { successToast } from '$lib/stores/toasts.svelte';
 	import { initSessionEvents, closeSessionEvents, connectSessionEvents, disconnectSessionEvents, lastSessionEvent } from '$lib/stores/sessionEvents';
 	import { connectTaskEvents, disconnectTaskEvents, lastTaskEvent } from '$lib/stores/taskEvents';
-	import { availableProjects, projectColorsStore, openTaskDrawer, openProjectDrawer, isTaskDetailDrawerOpen, taskDetailDrawerTaskId, closeTaskDetailDrawer, isEpicSwarmModalOpen, epicSwarmModalEpicId, isStartDropdownOpen, openStartDropdownViaKeyboard, closeStartDropdown, isFilePreviewDrawerOpen, filePreviewDrawerPath, filePreviewDrawerProject, filePreviewDrawerLine, closeFilePreviewDrawer, toggleTerminalDrawer, isDiffPreviewDrawerOpen, diffPreviewDrawerPath, diffPreviewDrawerProject, diffPreviewDrawerIsStaged, diffPreviewDrawerCommitHash, closeDiffPreviewDrawer, setGitAheadCount } from '$lib/stores/drawerStore';
+	import { availableProjects, projectColorsStore, openTaskDrawer, openProjectDrawer, isTaskDetailDrawerOpen, taskDetailDrawerTaskId, closeTaskDetailDrawer, isEpicSwarmModalOpen, epicSwarmModalEpicId, isStartDropdownOpen, openStartDropdownViaKeyboard, closeStartDropdown, isFilePreviewDrawerOpen, filePreviewDrawerPath, filePreviewDrawerProject, filePreviewDrawerLine, closeFilePreviewDrawer, toggleTerminalDrawer, isDiffPreviewDrawerOpen, diffPreviewDrawerPath, diffPreviewDrawerProject, diffPreviewDrawerIsStaged, diffPreviewDrawerCommitHash, closeDiffPreviewDrawer, setGitAheadCount, setGitChangesCount, setActiveSessionsCount, setRunningServersCount } from '$lib/stores/drawerStore';
 	import { hoveredSessionName, triggerCompleteFlash, jumpToSession } from '$lib/stores/hoveredSession';
 	import { get } from 'svelte/store';
 	import { initPreferences, getActiveProject } from '$lib/stores/preferences.svelte';
@@ -233,6 +233,10 @@
 		// Load sessions for activity polling
 		fetchWorkSessions(); // Don't await - page can render without it
 
+		// Load sessions and servers count for sidebar badges
+		loadSessionsCount();
+		loadServersCount();
+
 		// Activity polling - 500ms is responsive enough, 200ms was too aggressive
 		startActivityPolling(500);
 
@@ -261,6 +265,43 @@
 			loadEpicsWithReady();
 		}
 	});
+
+	// Update active sessions count for sidebar badge (all tmux sessions, not just agents)
+	async function loadSessionsCount() {
+		try {
+			const response = await fetch('/api/sessions?filter=all');
+			if (response.ok) {
+				const data = await response.json();
+				setActiveSessionsCount(data.sessions?.length || 0);
+			}
+		} catch {
+			// Silently fail - sessions count is not critical
+		}
+	}
+
+	// Reload sessions count when session events occur
+	$effect(() => {
+		const event = $lastSessionEvent;
+		if (!event) return;
+
+		if (event.type === 'session-created' || event.type === 'session-destroyed') {
+			loadSessionsCount();
+			loadServersCount(); // Servers are also tmux sessions
+		}
+	});
+
+	// Update running servers count for sidebar badge
+	async function loadServersCount() {
+		try {
+			const response = await fetch('/api/servers');
+			if (response.ok) {
+				const data = await response.json();
+				setRunningServersCount(data.sessions?.length || 0);
+			}
+		} catch {
+			// Silently fail - servers count is not critical
+		}
+	}
 
 	// React to state count changes for push notifications (favicon badge, title badge, browser notifications)
 	$effect(() => {

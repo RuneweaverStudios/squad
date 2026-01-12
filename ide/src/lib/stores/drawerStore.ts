@@ -230,3 +230,25 @@ export function setGitChangesCount(count: number) {
 export function getGitChangesCount(): number {
 	return get(gitChangesCount);
 }
+
+// Active sessions count store (for Sessions sidebar badge)
+export const activeSessionsCount = writable(0);
+
+export function setActiveSessionsCount(count: number) {
+	activeSessionsCount.set(count);
+}
+
+export function getActiveSessionsCount(): number {
+	return get(activeSessionsCount);
+}
+
+// Running servers count store (for Servers sidebar badge)
+export const runningServersCount = writable(0);
+
+export function setRunningServersCount(count: number) {
+	runningServersCount.set(count);
+}
+
+export function getRunningServersCount(): number {
+	return get(runningServersCount);
+}

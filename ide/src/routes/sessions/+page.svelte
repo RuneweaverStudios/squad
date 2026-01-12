@@ -56,6 +56,7 @@
 		issue_type?: string;
 		title?: string;
 		priority?: number;
+		description?: string;
 	}
 	let agentTasks = $state<Map<string, AgentTask>>(new Map());
 
@@ -143,7 +144,8 @@
 						status: session.task.status || 'open',
 						issue_type: session.task.issue_type,
 						title: session.task.title,
-						priority: session.task.priority
+						priority: session.task.priority,
+						description: session.task.description
 					});
 				}
 			}
@@ -513,9 +515,8 @@
 				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="title-icon">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" />
 				</svg>
-				Tmux Sessions
+				Sessions
 			</h1>
-			<p class="page-subtitle">All tmux sessions on this system</p>
 		</div>
 
 		<!-- Session counts -->
@@ -720,17 +721,27 @@
 														title: expandedTask.title,
 														status: expandedTask.status,
 														priority: expandedTask.priority,
-														issue_type: expandedTask.issue_type
+														issue_type: expandedTask.issue_type,
+														description: expandedTask.description
 													} : null}
 													output={expandedOutput}
 													tokens={expandedSessionInfo?.tokens ?? 0}
 													cost={expandedSessionInfo?.cost ?? 0}
+													startTime={session.created ? new Date(session.created) : null}
 													created={session.created}
 													attached={session.attached}
 													onSendInput={(text, type) => sendExpandedInput(text, type)}
 													onKillSession={() => {
 														expandedSession = null;
 														killSession(session.name);
+													}}
+													onInterrupt={() => {
+														// Send Ctrl+C to session
+														fetch(`/api/work/${encodeURIComponent(session.name)}/input`, {
+															method: 'POST',
+															headers: { 'Content-Type': 'application/json' },
+															body: JSON.stringify({ text: 'C-c', type: 'key' })
+														});
 													}}
 													onAttachTerminal={() => attachSession(session.name)}
 													onTaskClick={(taskId) => {
