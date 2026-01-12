@@ -12,12 +12,12 @@
 
 	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
+	import { getProjectColor, initProjectColors } from '$lib/utils/projectColors';
 
 	interface TmuxSession {
 		name: string;
 		created: string;
 		attached: boolean;
-		windows: number;
 		type: 'agent' | 'server' | 'ide' | 'other';
 		project?: string;
 	}
@@ -97,7 +97,7 @@
 			}
 			const data = await response.json();
 
-			sessions = (data.sessions || []).map((s: { name: string; created: string; attached: boolean; windows: number }) => {
+			sessions = (data.sessions || []).map((s: { name: string; created: string; attached: boolean }) => {
 				const { type, project } = categorizeSession(s.name);
 				return {
 					...s,
@@ -144,20 +144,19 @@
 		actionLoading = sessionName;
 		attachMessage = null;
 		try {
-			const response = await fetch(`/api/sessions/${encodeURIComponent(sessionName)}/attach`, {
+			// Use the same endpoint as /work page - spawns external terminal
+			const response = await fetch(`/api/work/${encodeURIComponent(sessionName)}/attach`, {
 				method: 'POST'
 			});
 			const data = await response.json();
 			if (!response.ok) {
-				throw new Error(data.message || 'Failed to attach session');
+				throw new Error(data.error || 'Failed to attach session');
 			}
-			// Show success message with details
+			// Show success message
 			attachMessage = {
 				session: sessionName,
-				message: data.method === 'tmux-window'
-					? `Opened in window '${data.windowName}' of ${data.parentSession}`
-					: `Opened in ${data.terminal} terminal`,
-				method: data.method
+				message: `Opened in ${data.terminal?.split('/').pop() || 'terminal'}`,
+				method: 'terminal'
 			};
 			// Clear message after 4 seconds
 			setTimeout(() => {
@@ -223,6 +222,7 @@
 	let tick = $state(0);
 
 	onMount(() => {
+		initProjectColors();
 		fetchAllData();
 		// Poll every 3 seconds
 		pollInterval = setInterval(() => {
@@ -237,7 +237,7 @@
 		}
 	});
 
-	// Sort sessions: attached first, then by type (agent > server > ide > other), then by name
+	// Sort sessions: attached first, then by type (agent > server > ide > other), then by project, then by name
 	const sortedSessions = $derived(
 		[...sessions].sort((a, b) => {
 			// Attached first
@@ -246,6 +246,12 @@
 			const typePriority = { agent: 0, server: 1, ide: 2, other: 3 };
 			if (typePriority[a.type] !== typePriority[b.type]) {
 				return typePriority[a.type] - typePriority[b.type];
+			}
+			// Then by project (sessions without project go last)
+			const projA = a.project || 'zzz';
+			const projB = b.project || 'zzz';
+			if (projA !== projB) {
+				return projA.localeCompare(projB);
 			}
 			// Then by name
 			return a.name.localeCompare(b.name);
@@ -356,7 +362,6 @@
 							<th class="th-name">Session</th>
 							<th class="th-type">Type</th>
 							<th class="th-status">Status</th>
-							<th class="th-windows">Windows</th>
 							<th class="th-uptime">Uptime</th>
 							<th class="th-actions">Actions</th>
 						</tr>
@@ -373,7 +378,17 @@
 								<td class="td-name">
 									<span class="session-name">{session.name}</span>
 									{#if session.project}
-										<span class="session-project">{session.project}</span>
+										{@const projectColor = getProjectColor(session.project)}
+										<span
+											class="session-project"
+											style="background: color-mix(in oklch, {projectColor} 20%, transparent); border-color: color-mix(in oklch, {projectColor} 50%, transparent); color: {projectColor};"
+										>
+											<span
+												class="project-dot"
+												style="background: {projectColor};"
+											></span>
+											{session.project}
+										</span>
 									{/if}
 								</td>
 								<td class="td-type">
@@ -393,9 +408,6 @@
 											detached
 										</span>
 									{/if}
-								</td>
-								<td class="td-windows">
-									{session.windows} window{session.windows !== 1 ? 's' : ''}
 								</td>
 								<td class="td-uptime">
 									{void tick}{formatElapsed(session.created)}
@@ -717,6 +729,7 @@
 	.td-name {
 		display: flex;
 		flex-direction: column;
+		align-items: flex-start;
 		gap: 0.125rem;
 	}
 
@@ -726,8 +739,22 @@
 	}
 
 	.session-project {
-		font-size: 0.75rem;
-		color: oklch(0.55 0.02 250);
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25rem;
+		font-size: 0.65rem;
+		font-family: ui-monospace, monospace;
+		padding: 0.1rem 0.4rem;
+		border-radius: 9999px;
+		border: 1px solid;
+		width: fit-content;
+	}
+
+	.project-dot {
+		width: 0.375rem;
+		height: 0.375rem;
+		border-radius: 50%;
+		flex-shrink: 0;
 	}
 
 	/* Type badge */
@@ -971,11 +998,6 @@
 		.sessions-table th,
 		.sessions-table td {
 			padding: 0.625rem 0.75rem;
-		}
-
-		.th-windows,
-		.td-windows {
-			display: none;
 		}
 
 		.attach-toast {

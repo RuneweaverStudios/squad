@@ -44,7 +44,7 @@ export async function GET({ url }) {
 					return {
 						name,
 						created: new Date(parseInt(created, 10) * 1000).toISOString(),
-						attached: attached === '1',
+						attached: parseInt(attached, 10) > 0,
 						windows: parseInt(windows, 10) || 1
 					};
 				})

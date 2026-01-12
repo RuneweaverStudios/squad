@@ -769,7 +769,7 @@ async function getTmuxSessions(): Promise<SessionInfo[]> {
 				return {
 					name,
 					created: new Date(parseInt(created, 10) * 1000).toISOString(),
-					attached: attached === '1'
+					attached: parseInt(attached, 10) > 0
 				};
 			});
 	} catch {
