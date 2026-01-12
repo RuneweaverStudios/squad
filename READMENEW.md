@@ -20,7 +20,7 @@ Without JAT, you're managing 1-2 agents in separate terminals. With JAT, you see
 curl -fsSL https://raw.githubusercontent.com/joewinke/jat/master/install.sh | bash
 source ~/.bashrc && jat
 
-# IDE opens at http://localhost:5174
+# IDE opens at http://localhost:3333
 # Add projects from the UI, spawn agents, watch them work
 ```
 

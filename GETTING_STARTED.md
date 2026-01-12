@@ -39,7 +39,7 @@ jat init                    # Auto-discover projects in ~/code/
 ### 3. Launch the IDE
 
 ```bash
-jat                         # Opens http://localhost:5173 (or configured port)
+jat                         # Opens http://localhost:3333
 ```
 
 You'll see:
@@ -178,7 +178,8 @@ For full documentation, see [README.md](./README.md).
 
 **IDE won't start?**
 ```bash
-cd ~/code/jat/ide
+# Find your install location (usually ~/.local/share/jat or ~/code/jat)
+cd ~/.local/share/jat/ide   # or ~/code/jat/ide for developers
 npm install
 npm run dev
 ```

@@ -109,7 +109,7 @@ NODE_ENV=development
 DATABASE_PATH=./data/demo.db
 
 # CORS
-CORS_ORIGIN=http://localhost:5173
+CORS_ORIGIN=http://localhost:3333
 ```
 
 ## Project Structure

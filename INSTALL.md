@@ -18,7 +18,7 @@ Then start the IDE:
 jat
 ```
 
-Open your browser to: http://localhost:5174
+Open your browser to: http://localhost:3333
 
 ## What the Installer Does
 
@@ -80,11 +80,11 @@ cd ide
 npm install
 cd ..
 
-# 4. Add to PATH (choose your shell's config file)
-echo 'export PATH="$PATH:$HOME/.local/share/jat/tools"' >> ~/.zshrc
-source ~/.zshrc
+# 4. Run the installer to create symlinks and configure shell
+./install.sh
 
-# 5. Test the installation
+# 5. Reload shell and test
+source ~/.zshrc   # or ~/.bashrc on Linux
 jat
 ```
 
@@ -252,7 +252,7 @@ npm install  # update IDE dependencies
 After installation:
 
 1. **Start the IDE**: `jat`
-2. **Open browser**: http://localhost:5174
+2. **Open browser**: http://localhost:3333
 3. **Initialize a project**:
    ```bash
    cd ~/code/myproject

@@ -9,7 +9,7 @@ Beads provides a lightweight, dependency-aware issue database and a CLI (`bd`) f
 - Task IDs are prefixed with project name (e.g., `chimaro-abc`, `jomarchy-36j`)
 - `bd` commands work in your current project directory automatically
 - **Unified view**: Chimaro's IDE aggregates all projects from `~/code/*`
-- Access at: `http://localhost:5173/account/development/beads` (when running Chimaro)
+- Access at: `http://localhost:3333/account/development/beads` (when running Chimaro)
 
 **Benefits:**
 - Clean separation: Each project's tasks are committable to its own git repo

@@ -91,6 +91,13 @@ export const unifiedNavConfig: UnifiedNavConfig = {
 		},
 		// VIEWS: Alternative visualizations
 		{
+			id: 'tmux',
+			label: 'Tmux',
+			href: '/tmux',
+			icon: 'tmux',
+			category: 'views'
+		},
+		{
 			id: 'history',
 			label: 'History',
 			href: '/history',

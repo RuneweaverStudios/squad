@@ -209,7 +209,7 @@ interface TaskResult {
 #### Example Request
 
 ```bash
-curl -X POST http://localhost:5174/api/tasks/bulk \
+curl -X POST http://localhost:3333/api/tasks/bulk \
   -H "Content-Type: application/json" \
   -d '{
     "project": "jat",

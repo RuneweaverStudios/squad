@@ -772,7 +772,7 @@ cd ~/.local/share/jat/whisper/build
 cmake .. -DWHISPER_FFMPEG=ON && make -j$(nproc) whisper-cli
 
 # Test transcription API
-curl http://localhost:5174/api/transcribe
+curl http://localhost:3333/api/transcribe
 # Should return: {"status":"ok","whisper_cli":"...","model_exists":true}
 ```
 
