@@ -1217,7 +1217,7 @@ Collapsible panel showing:
 
 **Fetch all agents with usage data:**
 ```bash
-curl 'http://localhost:5173/api/agents?full=true&usage=true'
+curl 'http://localhost:3333/api/agents?full=true&usage=true'
 ```
 
 **Response:**
@@ -1245,7 +1245,7 @@ curl 'http://localhost:5173/api/agents?full=true&usage=true'
 
 **Fetch single agent usage:**
 ```bash
-curl 'http://localhost:5173/api/agents/WisePrairie/usage?range=week'
+curl 'http://localhost:3333/api/agents/WisePrairie/usage?range=week'
 ```
 
 **Response:**

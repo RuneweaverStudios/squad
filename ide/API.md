@@ -7,7 +7,7 @@ The Beads Task IDE provides a REST API for accessing task, agent, and coordinati
 ## Base URL
 
 ```
-http://localhost:5173/api
+http://localhost:3333/api
 ```
 
 ## Endpoints
