@@ -17,6 +17,8 @@
 	import HorizontalResizeHandle from '$lib/components/HorizontalResizeHandle.svelte';
 	import TaskIdBadge from '$lib/components/TaskIdBadge.svelte';
 	import AgentAvatar from '$lib/components/AgentAvatar.svelte';
+	import ServerStatusBadge from '$lib/components/work/ServerStatusBadge.svelte';
+	import ServerSessionBadge from '$lib/components/ServerSessionBadge.svelte';
 
 	interface TmuxSession {
 		name: string;
@@ -611,34 +613,60 @@
 								onclick={() => toggleExpanded(session.name)}
 							>
 								<td class="td-name">
-									<!-- Row 1: Project pill + Task title -->
-									<div class="task-row">
-										{#if sessionTask}
-											<TaskIdBadge
-												task={sessionTask}
+									{#if session.type === 'server'}
+										<!-- Server session display -->
+										<div class="server-row">
+											<ServerSessionBadge
+												sessionName={session.name}
+												project={session.project}
+												status={session.attached ? 'running' : 'stopped'}
+												created={session.created}
 												size="xs"
 												variant="projectPill"
-												showType={true}
-												{statusDotColor}
+												onAction={async (actionId) => {
+													if (actionId === 'stop') {
+														await killSession(session.name);
+													} else if (actionId === 'restart') {
+														await killSession(session.name);
+													}
+												}}
+												onClick={() => toggleExpanded(session.name)}
 											/>
-											<span class="task-title" title={sessionTask.title}>
-												{sessionTask.title || sessionTask.id}
-											</span>
+										</div>
+										<div class="server-name">
+											<span class="session-name">{session.name}</span>
+										</div>
+									{:else}
+										<!-- Agent session display -->
+										<!-- Row 1: Project pill + Task title -->
+										<div class="task-row">
+											{#if sessionTask}
+												<TaskIdBadge
+													task={sessionTask}
+													size="xs"
+													variant="projectPill"
+													showType={true}
+													{statusDotColor}
+												/>
+												<span class="task-title" title={sessionTask.title}>
+													{sessionTask.title || sessionTask.id}
+												</span>
+											{/if}
+										</div>
+										<!-- Row 2: Task description (truncated) -->
+										{#if sessionTask?.description}
+											<div class="task-description">
+												{sessionTask.description}
+											</div>
 										{/if}
-									</div>
-									<!-- Row 2: Task description (truncated) -->
-									{#if sessionTask?.description}
-										<div class="task-description">
-											{sessionTask.description}
+										<!-- Row 3: Avatar + Agent name -->
+										<div class="agent-row">
+											{#if session.type === 'agent' && sessionAgentName}
+												<AgentAvatar name={sessionAgentName} size={20} />
+											{/if}
+											<span class="session-name">{sessionAgentName || session.name}</span>
 										</div>
 									{/if}
-									<!-- Row 3: Avatar + Agent name -->
-									<div class="agent-row">
-										{#if session.type === 'agent' && sessionAgentName}
-											<AgentAvatar name={sessionAgentName} size={20} />
-										{/if}
-										<span class="session-name">{sessionAgentName || session.name}</span>
-									</div>
 								</td>
 								<td class="td-type">
 									<span class="type-badge" style="background: {typeBadge.bg}; color: {typeBadge.text};">
@@ -1068,6 +1096,19 @@
 		align-items: center;
 		gap: 0.375rem;
 		margin-top: 0.375rem;
+	}
+
+	.server-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.server-name {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		margin-top: 0.25rem;
 	}
 
 	.task-title {
