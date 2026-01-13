@@ -112,6 +112,10 @@
 
 <svelte:head>
 	<title>Kanban | JAT IDE</title>
+	<meta name="description" content="Agent kanban board. Sessions organized by activity state: starting, working, needs input, review, completed." />
+	<meta property="og:title" content="Kanban | JAT IDE" />
+	<meta property="og:description" content="Agent kanban board. Sessions organized by activity state: starting, working, needs input, review, completed." />
+	<meta property="og:image" content="/favicons/kanban.svg" />
 	<link rel="icon" href="/favicons/kanban.svg" />
 </svelte:head>
 

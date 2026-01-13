@@ -49,6 +49,11 @@
 
 <svelte:head>
 	<title>API Demo | JAT IDE</title>
+	<meta name="description" content="API demonstration page for testing JAT IDE endpoints. View agent data, reservations, and task statistics." />
+	<meta property="og:title" content="API Demo | JAT IDE" />
+	<meta property="og:description" content="API demonstration page for testing JAT IDE endpoints. View agent data, reservations, and task statistics." />
+	<meta property="og:image" content="/favicons/config.svg" />
+	<link rel="icon" href="/favicons/config.svg" />
 </svelte:head>
 
 <div class="min-h-screen bg-base-200">

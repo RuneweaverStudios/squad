@@ -238,7 +238,11 @@
 
 <svelte:head>
 	<title>Source Control | JAT IDE</title>
-	<link rel="icon" href="/favicons/git.svg" />
+	<meta name="description" content="Git source control view with staged/unstaged changes and side-by-side diff viewer." />
+	<meta property="og:title" content="Source Control | JAT IDE" />
+	<meta property="og:description" content="Git source control view with staged/unstaged changes and side-by-side diff viewer." />
+	<meta property="og:image" content="/favicons/source.svg" />
+	<link rel="icon" href="/favicons/source.svg" />
 </svelte:head>
 
 <div class="git-page" style="background: oklch(0.14 0.01 250);">

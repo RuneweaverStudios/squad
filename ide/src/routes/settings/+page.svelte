@@ -3,6 +3,15 @@
 	import SignalDebugWidget from '$lib/components/SignalDebugWidget.svelte';
 </script>
 
+<svelte:head>
+	<title>Settings | JAT IDE</title>
+	<meta name="description" content="Configure JAT IDE settings. Manage review rules and access debug tools." />
+	<meta property="og:title" content="Settings | JAT IDE" />
+	<meta property="og:description" content="Configure JAT IDE settings. Manage review rules and access debug tools." />
+	<meta property="og:image" content="/favicons/config.svg" />
+	<link rel="icon" href="/favicons/config.svg" />
+</svelte:head>
+
 <div class="p-6 max-w-4xl mx-auto">
 	<h1 class="text-2xl font-bold mb-6">Settings</h1>
 

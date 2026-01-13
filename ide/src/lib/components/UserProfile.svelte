@@ -376,7 +376,7 @@
 		</li>
 
 		<li>
-			<ThemeSelector compact={false} />
+			<ThemeSelector inline={true} />
 		</li>
 
 		<!-- Sound Settings -->

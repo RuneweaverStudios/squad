@@ -816,6 +816,10 @@
 
 <svelte:head>
 	<title>Servers | JAT IDE</title>
+	<meta name="description" content="Manage project development servers. Start, stop, and monitor server sessions across projects." />
+	<meta property="og:title" content="Servers | JAT IDE" />
+	<meta property="og:description" content="Manage project development servers. Start, stop, and monitor server sessions across projects." />
+	<meta property="og:image" content="/favicons/servers.svg" />
 	<link rel="icon" href="/favicons/servers.svg" />
 </svelte:head>
 

@@ -1459,6 +1459,10 @@
 
 <svelte:head>
 	<title>Work | JAT IDE</title>
+	<meta name="description" content="Multi-project agent sessions view. Monitor and interact with AI coding agents working across your projects." />
+	<meta property="og:title" content="Work | JAT IDE" />
+	<meta property="og:description" content="Multi-project agent sessions view. Monitor and interact with AI coding agents working across your projects." />
+	<meta property="og:image" content="/favicons/work.svg" />
 	<link rel="icon" href="/favicons/work.svg" />
 </svelte:head>
 

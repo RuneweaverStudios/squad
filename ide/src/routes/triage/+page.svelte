@@ -244,6 +244,10 @@
 
 <svelte:head>
 	<title>Triage | JAT IDE</title>
+	<meta name="description" content="Mission control for agent management. View agents needing attention, input requests, and review queues." />
+	<meta property="og:title" content="Triage | JAT IDE" />
+	<meta property="og:description" content="Mission control for agent management. View agents needing attention, input requests, and review queues." />
+	<meta property="og:image" content="/favicons/triage.svg" />
 	<link rel="icon" href="/favicons/triage.svg" />
 	<!-- Load distinctive fonts -->
 	<link rel="preconnect" href="https://fonts.googleapis.com" />

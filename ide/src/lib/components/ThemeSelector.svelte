@@ -4,13 +4,14 @@
 	 * Supports all 32 DaisyUI themes with localStorage persistence
 	 *
 	 * @param compact - If true, shows icon-only mode suitable for sidebar
+	 * @param inline - If true, renders theme list directly without dropdown wrapper (for use inside another dropdown)
 	 */
 
 	import { onMount } from 'svelte';
 	import { setTheme } from '$lib/utils/themeManager';
 
 	// Props
-	let { compact = false } = $props();
+	let { compact = false, inline = false } = $props();
 
 	// All DaisyUI themes with labels
 	const themes = [
@@ -89,98 +90,126 @@
 	}
 </script>
 
-<div class="dropdown dropdown-end">
-	<div
-		tabindex="0"
-		role="button"
-		class="flex items-center gap-2 cursor-pointer hover:bg-base-300 transition-colors px-2 py-1 rounded {compact
-			? 'is-drawer-close:tooltip is-drawer-close:tooltip-right'
-			: ''}"
-		aria-label="Change Theme"
-		title={compact ? currentThemeLabel : 'Change Theme'}
-		data-tip={compact ? currentThemeLabel : undefined}
-	>
-		<!-- Theme color preview blocks with animation -->
-		<div
-			data-theme={currentTheme}
-			class="bg-base-100 grid shrink-0 grid-cols-2 gap-0.5 rounded p-0.5 shadow-sm w-4 h-4 transition-transform duration-300 ease-out"
-			class:theme-spin={isAnimating}
-		>
-			<div class="bg-base-content size-1 rounded-full transition-all duration-300 theme-dot" class:theme-dot-animate={isAnimating} style="--dot-delay: 0ms"></div>
-			<div class="bg-primary size-1 rounded-full transition-all duration-300 theme-dot" class:theme-dot-animate={isAnimating} style="--dot-delay: 50ms"></div>
-			<div class="bg-secondary size-1 rounded-full transition-all duration-300 theme-dot" class:theme-dot-animate={isAnimating} style="--dot-delay: 100ms"></div>
-			<div class="bg-accent size-1 rounded-full transition-all duration-300 theme-dot" class:theme-dot-animate={isAnimating} style="--dot-delay: 150ms"></div>
+{#if inline}
+	<!-- Inline mode: render theme grid directly without dropdown wrapper -->
+	<div class="max-h-32 overflow-y-auto px-1">
+		<div class="grid grid-cols-4 gap-1">
+			{#each themes as theme}
+				<button
+					class="flex flex-col items-center gap-0.5 p-1 rounded transition-colors hover:bg-base-300 {currentTheme === theme.name ? 'bg-primary/20 ring-1 ring-primary/50' : ''}"
+					onclick={() => handleThemeChange(theme.name)}
+					title={theme.label}
+				>
+					<!-- Theme color preview -->
+					<div
+						data-theme={theme.name}
+						class="bg-base-100 grid shrink-0 grid-cols-2 gap-0.5 rounded p-0.5 shadow-sm w-5 h-5"
+					>
+						<div class="bg-base-content size-1.5 rounded-full"></div>
+						<div class="bg-primary size-1.5 rounded-full"></div>
+						<div class="bg-secondary size-1.5 rounded-full"></div>
+						<div class="bg-accent size-1.5 rounded-full"></div>
+					</div>
+					<span class="text-[9px] text-base-content/70 truncate w-full text-center">{theme.label}</span>
+				</button>
+			{/each}
 		</div>
-		{#if !compact}
-			<span class="text-sm font-medium transition-opacity duration-200" class:opacity-50={isAnimating}>{currentThemeLabel}</span>
-		{/if}
 	</div>
+{:else}
+	<!-- Dropdown mode: full dropdown with theme previews -->
+	<div class="dropdown dropdown-end">
+		<div
+			tabindex="0"
+			role="button"
+			class="flex items-center gap-2 cursor-pointer hover:bg-base-300 transition-colors px-2 py-1 rounded {compact
+				? 'is-drawer-close:tooltip is-drawer-close:tooltip-right'
+				: ''}"
+			aria-label="Change Theme"
+			title={compact ? currentThemeLabel : 'Change Theme'}
+			data-tip={compact ? currentThemeLabel : undefined}
+		>
+			<!-- Theme color preview blocks with animation -->
+			<div
+				data-theme={currentTheme}
+				class="bg-base-100 grid shrink-0 grid-cols-2 gap-0.5 rounded p-0.5 shadow-sm w-4 h-4 transition-transform duration-300 ease-out"
+				class:theme-spin={isAnimating}
+			>
+				<div class="bg-base-content size-1 rounded-full transition-all duration-300 theme-dot" class:theme-dot-animate={isAnimating} style="--dot-delay: 0ms"></div>
+				<div class="bg-primary size-1 rounded-full transition-all duration-300 theme-dot" class:theme-dot-animate={isAnimating} style="--dot-delay: 50ms"></div>
+				<div class="bg-secondary size-1 rounded-full transition-all duration-300 theme-dot" class:theme-dot-animate={isAnimating} style="--dot-delay: 100ms"></div>
+				<div class="bg-accent size-1 rounded-full transition-all duration-300 theme-dot" class:theme-dot-animate={isAnimating} style="--dot-delay: 150ms"></div>
+			</div>
+			{#if !compact}
+				<span class="text-sm font-medium transition-opacity duration-200" class:opacity-50={isAnimating}>{currentThemeLabel}</span>
+			{/if}
+		</div>
 
-	<div
-		class="dropdown-content bg-base-200 text-base-content rounded-box
+		<div
+			class="dropdown-content bg-base-200 text-base-content rounded-box
     top-px max-h-[calc(50vh-6.5rem)] overflow-y-auto border border-white/5
     shadow-2xl outline-1 outline-black/5 mb-2"
-	>
-		<ul class="menu w-56">
-			<li class="menu-title text-xs">Theme</li>
+		>
+			<ul class="menu w-56">
+				<li class="menu-title text-xs">Theme</li>
 
-			{#each themes as theme, index}
-				<li class="fade-in fade-in-delay-{Math.min(index, 12)}">
-					<button
-						class="gap-3 px-2"
-						onclick={() => handleThemeChange(theme.name)}
-						class:active={currentTheme === theme.name}
-					>
-						<!-- Theme color preview -->
-						<div
-							data-theme={theme.name}
-							class="bg-base-100 grid shrink-0 grid-cols-2 gap-0.5
-              rounded-md p-1 shadow-sm"
+				{#each themes as theme, index}
+					<li class="fade-in fade-in-delay-{Math.min(index, 12)}">
+						<button
+							class="gap-3 px-2"
+							onclick={() => handleThemeChange(theme.name)}
+							class:active={currentTheme === theme.name}
 						>
-							<div class="bg-base-content size-1 rounded-full"></div>
-							<div class="bg-primary size-1 rounded-full"></div>
-							<div class="bg-secondary size-1 rounded-full"></div>
-							<div class="bg-accent size-1 rounded-full"></div>
-						</div>
-
-						<div class="w-32 truncate">{theme.label}</div>
-
-						<!-- Checkmark for active theme -->
-						{#if currentTheme === theme.name}
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								width="16"
-								height="16"
-								viewBox="0 0 24 24"
-								fill="currentColor"
-								class="h-3 w-3 shrink-0"
+							<!-- Theme color preview -->
+							<div
+								data-theme={theme.name}
+								class="bg-base-100 grid shrink-0 grid-cols-2 gap-0.5
+              rounded-md p-1 shadow-sm"
 							>
-								<path
-									d="M20.285 2l-11.285 11.567-5.286-5.011-3.714 3.716
+								<div class="bg-base-content size-1 rounded-full"></div>
+								<div class="bg-primary size-1 rounded-full"></div>
+								<div class="bg-secondary size-1 rounded-full"></div>
+								<div class="bg-accent size-1 rounded-full"></div>
+							</div>
+
+							<div class="w-32 truncate">{theme.label}</div>
+
+							<!-- Checkmark for active theme -->
+							{#if currentTheme === theme.name}
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									width="16"
+									height="16"
+									viewBox="0 0 24 24"
+									fill="currentColor"
+									class="h-3 w-3 shrink-0"
+								>
+									<path
+										d="M20.285 2l-11.285 11.567-5.286-5.011-3.714 3.716
                 9 8.728 15-15.285z"
-								></path>
-							</svg>
-						{:else}
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								width="16"
-								height="16"
-								viewBox="0 0 24 24"
-								fill="currentColor"
-								class="invisible h-3 w-3 shrink-0"
-							>
-								<path
-									d="M20.285 2l-11.285 11.567-5.286-5.011-3.714 3.716
+									></path>
+								</svg>
+							{:else}
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									width="16"
+									height="16"
+									viewBox="0 0 24 24"
+									fill="currentColor"
+									class="invisible h-3 w-3 shrink-0"
+								>
+									<path
+										d="M20.285 2l-11.285 11.567-5.286-5.011-3.714 3.716
                 9 8.728 15-15.285z"
-								></path>
-							</svg>
-						{/if}
-					</button>
-				</li>
-			{/each}
-		</ul>
+									></path>
+								</svg>
+							{/if}
+						</button>
+					</li>
+				{/each}
+			</ul>
+		</div>
 	</div>
-</div>
+{/if}
 
 <style>
 	/* Theme toggle animation - spin and scale the preview grid */

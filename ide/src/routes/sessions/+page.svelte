@@ -506,6 +506,10 @@
 
 <svelte:head>
 	<title>Sessions | JAT IDE</title>
+	<meta name="description" content="View all tmux sessions including agents, servers, and other sessions. Attach, kill, or expand sessions." />
+	<meta property="og:title" content="Sessions | JAT IDE" />
+	<meta property="og:description" content="View all tmux sessions including agents, servers, and other sessions. Attach, kill, or expand sessions." />
+	<meta property="og:image" content="/favicons/tmux.svg" />
 	<link rel="icon" href="/favicons/tmux.svg" />
 </svelte:head>
 
@@ -614,6 +618,7 @@
 												task={sessionTask}
 												size="xs"
 												variant="projectPill"
+												showType={true}
 												{statusDotColor}
 											/>
 											<span class="task-title" title={sessionTask.title}>

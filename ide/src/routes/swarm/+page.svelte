@@ -111,6 +111,10 @@
 
 <svelte:head>
 	<title>Swarm | JAT IDE</title>
+	<meta name="description" content="Agent swarm orchestration panel. Configure spawn settings, manage active sessions, and launch coordinated attacks." />
+	<meta property="og:title" content="Swarm | JAT IDE" />
+	<meta property="og:description" content="Agent swarm orchestration panel. Configure spawn settings, manage active sessions, and launch coordinated attacks." />
+	<meta property="og:image" content="/favicons/swarm.svg" />
 	<link rel="icon" href="/favicons/swarm.svg" />
 </svelte:head>
 

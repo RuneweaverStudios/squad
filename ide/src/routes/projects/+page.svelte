@@ -202,6 +202,10 @@
 
 <svelte:head>
 	<title>Projects | JAT IDE</title>
+	<meta name="description" content="Project management and configuration. View task counts, server status, and manage project settings." />
+	<meta property="og:title" content="Projects | JAT IDE" />
+	<meta property="og:description" content="Project management and configuration. View task counts, server status, and manage project settings." />
+	<meta property="og:image" content="/favicons/projects.svg" />
 	<link rel="icon" href="/favicons/projects.svg" />
 </svelte:head>
 

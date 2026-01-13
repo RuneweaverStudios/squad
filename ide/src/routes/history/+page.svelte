@@ -11,14 +11,14 @@
 	 * - Streak statistics and milestones
 	 */
 
-	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
-	import StreakCalendar from '$lib/components/StreakCalendar.svelte';
-	import AnimatedDigits from '$lib/components/AnimatedDigits.svelte';
-	import TaskDetailDrawer from '$lib/components/TaskDetailDrawer.svelte';
-	import { HistorySkeleton } from '$lib/components/skeleton';
-	import { getProjectColor, initProjectColors } from '$lib/utils/projectColors';
+	import { onMount } from "svelte";
+	import { page } from "$app/stores";
+	import { goto } from "$app/navigation";
+	import StreakCalendar from "$lib/components/StreakCalendar.svelte";
+	import AnimatedDigits from "$lib/components/AnimatedDigits.svelte";
+	import TaskDetailDrawer from "$lib/components/TaskDetailDrawer.svelte";
+	import { HistorySkeleton } from "$lib/components/skeleton";
+	import { getProjectColor, initProjectColors } from "$lib/utils/projectColors";
 
 	interface CompletedTask {
 		id: string;
@@ -37,8 +37,8 @@
 	let error = $state<string | null>(null);
 
 	// Filters
-	let searchQuery = $state('');
-	let selectedProject = $state('All Projects');
+	let searchQuery = $state("");
+	let selectedProject = $state("All Projects");
 
 	// Task detail drawer
 	let selectedTaskId = $state<string | null>(null);
@@ -46,8 +46,8 @@
 
 	// Sync selectedProject from URL params
 	$effect(() => {
-		const projectParam = $page.url.searchParams.get('project');
-		selectedProject = projectParam || 'All Projects';
+		const projectParam = $page.url.searchParams.get("project");
+		selectedProject = projectParam || "All Projects";
 	});
 
 	// Fetch completed tasks on mount
@@ -60,12 +60,12 @@
 		loading = true;
 		error = null;
 		try {
-			const response = await fetch('/api/tasks?status=closed');
-			if (!response.ok) throw new Error('Failed to fetch tasks');
+			const response = await fetch("/api/tasks?status=closed");
+			if (!response.ok) throw new Error("Failed to fetch tasks");
 			const data = await response.json();
 			tasks = data.tasks || [];
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Unknown error';
+			error = e instanceof Error ? e.message : "Unknown error";
 		} finally {
 			loading = false;
 		}
@@ -75,30 +75,34 @@
 	const projects = $derived.by(() => {
 		const projectSet = new Set<string>();
 		for (const task of tasks) {
-			const project = task.project || task.id.split('-')[0];
+			const project = task.project || task.id.split("-")[0];
 			if (project) projectSet.add(project);
 		}
-		return ['All Projects', ...Array.from(projectSet).sort()];
+		return ["All Projects", ...Array.from(projectSet).sort()];
 	});
 
 	// Handle project selection change - update URL
 	function handleProjectChange(project: string) {
 		selectedProject = project;
 		const url = new URL(window.location.href);
-		if (project === 'All Projects') {
-			url.searchParams.delete('project');
+		if (project === "All Projects") {
+			url.searchParams.delete("project");
 		} else {
-			url.searchParams.set('project', project);
+			url.searchParams.set("project", project);
 		}
-		goto(url.toString(), { replaceState: true, noScroll: true, keepFocus: true });
+		goto(url.toString(), {
+			replaceState: true,
+			noScroll: true,
+			keepFocus: true,
+		});
 	}
 
 	// Filtered tasks
 	const filteredTasks = $derived.by(() => {
 		return tasks.filter((task) => {
 			// Project filter
-			if (selectedProject !== 'All Projects') {
-				const taskProject = task.project || task.id.split('-')[0];
+			if (selectedProject !== "All Projects") {
+				const taskProject = task.project || task.id.split("-")[0];
 				if (taskProject !== selectedProject) return false;
 			}
 
@@ -122,7 +126,7 @@
 				todayCount: 0,
 				streak: 0,
 				bestStreak: 0,
-				avgPerDay: 0
+				avgPerDay: 0,
 			};
 
 		const today = new Date();
@@ -133,8 +137,8 @@
 
 		for (const task of filteredTasks) {
 			const dateStr = task.closed_at
-				? new Date(task.closed_at).toISOString().split('T')[0]
-				: new Date(task.updated_at).toISOString().split('T')[0];
+				? new Date(task.closed_at).toISOString().split("T")[0]
+				: new Date(task.updated_at).toISOString().split("T")[0];
 
 			if (!tasksByDate.has(dateStr)) {
 				tasksByDate.set(dateStr, []);
@@ -143,7 +147,7 @@
 		}
 
 		// Today's count
-		const todayStr = today.toISOString().split('T')[0];
+		const todayStr = today.toISOString().split("T")[0];
 		const todayCount = tasksByDate.get(todayStr)?.length || 0;
 
 		// Calculate current streak
@@ -151,7 +155,7 @@
 		const checkDate = new Date(today);
 
 		for (let i = 0; i < 365; i++) {
-			const dateStr = checkDate.toISOString().split('T')[0];
+			const dateStr = checkDate.toISOString().split("T")[0];
 			if (tasksByDate.has(dateStr)) {
 				streak++;
 			} else if (i > 0) {
@@ -169,7 +173,8 @@
 		for (const dateStr of sortedDates) {
 			const date = new Date(dateStr);
 			if (prevDate) {
-				const diff = (date.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24);
+				const diff =
+					(date.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24);
 				if (diff === 1) {
 					currentStreak++;
 				} else {
@@ -198,7 +203,7 @@
 			todayCount,
 			streak,
 			bestStreak,
-			avgPerDay
+			avgPerDay,
 		};
 	});
 
@@ -215,8 +220,8 @@
 
 		for (const task of filteredTasks) {
 			const dateStr = task.closed_at
-				? new Date(task.closed_at).toISOString().split('T')[0]
-				: new Date(task.updated_at).toISOString().split('T')[0];
+				? new Date(task.closed_at).toISOString().split("T")[0]
+				: new Date(task.updated_at).toISOString().split("T")[0];
 
 			if (!groups.has(dateStr)) {
 				const date = new Date(dateStr);
@@ -224,19 +229,24 @@
 					date: dateStr,
 					displayDate: formatDisplayDate(date),
 					tasks: [],
-					agents: new Map()
+					agents: new Map(),
 				});
 			}
 
 			const group = groups.get(dateStr)!;
 			group.tasks.push(task);
 			if (task.assignee) {
-				group.agents.set(task.assignee, (group.agents.get(task.assignee) || 0) + 1);
+				group.agents.set(
+					task.assignee,
+					(group.agents.get(task.assignee) || 0) + 1,
+				);
 			}
 		}
 
 		// Sort by date descending and return all days (not limited to 30)
-		return Array.from(groups.values()).sort((a, b) => b.date.localeCompare(a.date));
+		return Array.from(groups.values()).sort((a, b) =>
+			b.date.localeCompare(a.date),
+		);
 	});
 
 	function formatDisplayDate(date: Date): string {
@@ -248,21 +258,21 @@
 		const dateOnly = new Date(date);
 		dateOnly.setHours(0, 0, 0, 0);
 
-		if (dateOnly.getTime() === today.getTime()) return 'Today';
-		if (dateOnly.getTime() === yesterday.getTime()) return 'Yesterday';
+		if (dateOnly.getTime() === today.getTime()) return "Today";
+		if (dateOnly.getTime() === yesterday.getTime()) return "Yesterday";
 
-		return date.toLocaleDateString('en-US', {
-			weekday: 'short',
-			month: 'short',
-			day: 'numeric',
-			year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
+		return date.toLocaleDateString("en-US", {
+			weekday: "short",
+			month: "short",
+			day: "numeric",
+			year: date.getFullYear() !== today.getFullYear() ? "numeric" : undefined,
 		});
 	}
 
 	function formatTime(dateStr: string): string {
-		return new Date(dateStr).toLocaleTimeString('en-US', {
-			hour: 'numeric',
-			minute: '2-digit'
+		return new Date(dateStr).toLocaleTimeString("en-US", {
+			hour: "numeric",
+			minute: "2-digit",
 		});
 	}
 
@@ -270,13 +280,13 @@
 	function getPriorityClass(priority: number | undefined): string {
 		switch (priority) {
 			case 0:
-				return 'priority-p0'; // P0 - Critical
+				return "priority-p0"; // P0 - Critical
 			case 1:
-				return 'priority-p1'; // P1 - High
+				return "priority-p1"; // P1 - High
 			case 2:
-				return 'priority-p2'; // P2 - Medium
+				return "priority-p2"; // P2 - Medium
 			default:
-				return 'priority-default'; // P3+ - Low
+				return "priority-default"; // P3+ - Low
 		}
 	}
 
@@ -298,17 +308,17 @@
 
 		try {
 			const response = await fetch(`/api/sessions/${task.assignee}/resume`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' }
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
 			});
 
 			if (!response.ok) {
 				const data = await response.json();
-				console.error('Failed to resume session:', data.message);
+				console.error("Failed to resume session:", data.message);
 				// Could add a toast notification here
 			}
 		} catch (error) {
-			console.error('Error resuming session:', error);
+			console.error("Error resuming session:", error);
 		} finally {
 			resumingTasks.delete(task.id);
 			resumingTasks = new Set(resumingTasks);
@@ -318,6 +328,10 @@
 
 <svelte:head>
 	<title>Task History | JAT IDE</title>
+	<meta name="description" content="View completed task history with streak calendar and productivity metrics." />
+	<meta property="og:title" content="Task History | JAT IDE" />
+	<meta property="og:description" content="View completed task history with streak calendar and productivity metrics." />
+	<meta property="og:image" content="/favicons/history.svg" />
 	<link rel="icon" href="/favicons/history.svg" />
 </svelte:head>
 
@@ -327,17 +341,27 @@
 		{#if loading}
 			<HistorySkeleton dayGroups={5} tasksPerGroup={4} />
 		{:else if error}
-			<div class="error-state flex flex-col items-center justify-center py-20 gap-3">
+			<div
+				class="error-state flex flex-col items-center justify-center py-20 gap-3"
+			>
 				<p class="text-error">{error}</p>
-				<button class="btn btn-sm btn-outline" onclick={fetchTasks}>Retry</button>
+				<button class="btn btn-sm btn-outline" onclick={fetchTasks}
+					>Retry</button
+				>
 			</div>
 		{:else}
 			<!-- Stats Row - Stats + Graph (title on lg+) -->
-			<div class="grid grid-cols-[auto_1fr] lg:grid-cols-[auto_auto_1fr] gap-3 items-stretch mb-6">
+			<div
+				class="grid grid-cols-[auto_1fr] lg:grid-cols-[auto_auto_1fr] gap-3 items-stretch mb-6"
+			>
 				<!-- Left: Title (lg+ only) -->
 				<div class="mr-10 hidden lg:flex flex-col justify-center pr-2">
-					<h1 class="text-xl font-semibold text-base-content font-mono">Task History</h1>
-					<p class="text-sm text-base-content/60">{stats.totalCompleted} completed</p>
+					<h1 class="text-xl font-semibold text-base-content font-mono">
+						Task History
+					</h1>
+					<p class="text-sm text-base-content/60">
+						{stats.totalCompleted} completed
+					</p>
 				</div>
 
 				<!-- Stats cluster -->
@@ -399,31 +423,46 @@
 						bind:value={searchQuery}
 					/>
 					<div class="dropdown dropdown-end">
-						<div
-							tabindex="0"
-							role="button"
-							class="filter-trigger"
-						>
-							{#if selectedProject !== 'All Projects'}
+						<div tabindex="0" role="button" class="filter-trigger">
+							{#if selectedProject !== "All Projects"}
 								<span
 									class="project-dot"
 									style="background: {getProjectColor(selectedProject + '-x')}"
 								></span>
 							{/if}
 							<span>{selectedProject}</span>
-							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5 opacity-50">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke-width="1.5"
+								stroke="currentColor"
+								class="w-3.5 h-3.5 opacity-50"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+								/>
 							</svg>
 						</div>
-						<ul tabindex="0" class="dropdown-content menu rounded-box z-50 min-w-44 w-max p-1 shadow-lg bg-base-200 border border-base-300 max-h-60 overflow-y-auto overflow-x-hidden">
+						<ul
+							tabindex="0"
+							class="dropdown-content rounded-box z-50 min-w-44 w-max p-1 shadow-lg bg-base-200 border border-base-300 max-h-72 overflow-y-auto overflow-x-hidden"
+						>
 							{#each projects as project}
 								<li>
 									<button
 										type="button"
-										class="filter-option {selectedProject === project ? 'active' : ''}"
-										onclick={() => { handleProjectChange(project); document.activeElement?.blur(); }}
+										class="filter-option {selectedProject === project
+											? 'active'
+											: ''}"
+										onclick={() => {
+											handleProjectChange(project);
+											document.activeElement?.blur();
+										}}
 									>
-										{#if project !== 'All Projects'}
+										{#if project !== "All Projects"}
 											<span
 												class="project-dot"
 												style="background: {getProjectColor(project + '-x')}"
@@ -435,11 +474,14 @@
 							{/each}
 						</ul>
 					</div>
-					{#if searchQuery || selectedProject !== 'All Projects'}
+					{#if searchQuery || selectedProject !== "All Projects"}
 						<button
 							type="button"
 							class="btn btn-ghost btn-xs text-base-content/60 hover:text-base-content"
-							onclick={() => { searchQuery = ''; handleProjectChange('All Projects'); }}
+							onclick={() => {
+								searchQuery = "";
+								handleProjectChange("All Projects");
+							}}
 						>
 							Clear filters
 						</button>
@@ -452,13 +494,20 @@
 							<div class="day-header">
 								<span class="day-date">{day.displayDate}</span>
 								<span class="day-count"
-									>{day.tasks.length} task{day.tasks.length !== 1 ? 's' : ''}</span
+									>{day.tasks.length} task{day.tasks.length !== 1
+										? "s"
+										: ""}</span
 								>
 							</div>
 							<div class="day-tasks">
 								{#each day.tasks as task}
-									<button class="task-item group" onclick={() => handleTaskClick(task.id)}>
-										<span class="task-priority {getPriorityClass(task.priority)}"></span>
+									<button
+										class="task-item group"
+										onclick={() => handleTaskClick(task.id)}
+									>
+										<span
+											class="task-priority {getPriorityClass(task.priority)}"
+										></span>
 										<div class="task-info">
 											<span class="task-title">{task.title}</span>
 											<span class="task-meta">
@@ -480,10 +529,22 @@
 													disabled={resumingTasks.has(task.id)}
 												>
 													{#if resumingTasks.has(task.id)}
-														<span class="loading loading-spinner loading-xs"></span>
+														<span class="loading loading-spinner loading-xs"
+														></span>
 													{:else}
-														<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-															<path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
+														<svg
+															xmlns="http://www.w3.org/2000/svg"
+															fill="none"
+															viewBox="0 0 24 24"
+															stroke-width="1.5"
+															stroke="currentColor"
+															class="w-4 h-4"
+														>
+															<path
+																stroke-linecap="round"
+																stroke-linejoin="round"
+																d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
+															/>
 														</svg>
 													{/if}
 												</button>
@@ -530,7 +591,7 @@
 							</svg>
 							<p>No completed tasks found</p>
 							<p class="empty-hint">
-								{#if searchQuery || selectedProject !== 'All Projects'}
+								{#if searchQuery || selectedProject !== "All Projects"}
 									Try adjusting your filters
 								{:else}
 									Tasks will appear here when marked complete
@@ -592,7 +653,9 @@
 	}
 
 	.streak-fire {
-		filter: drop-shadow(0 0 6px color-mix(in oklch, var(--color-warning) 60%, transparent));
+		filter: drop-shadow(
+			0 0 6px color-mix(in oklch, var(--color-warning) 60%, transparent)
+		);
 	}
 
 	.stat-content {
@@ -857,7 +920,10 @@
 		color: var(--color-success);
 		cursor: pointer;
 		opacity: 0;
-		transition: opacity 0.15s ease, background 0.15s ease, transform 0.15s ease;
+		transition:
+			opacity 0.15s ease,
+			background 0.15s ease,
+			transform 0.15s ease;
 		flex-shrink: 0;
 	}
 

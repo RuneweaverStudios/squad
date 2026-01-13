@@ -893,10 +893,6 @@
 
 <svelte:window onkeydown={handleGlobalKeydown} />
 
-<svelte:head>
-	<link rel="icon" href="/favicons/work.svg" />
-</svelte:head>
-
 <!-- Drawer Structure -->
 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 <div class="drawer lg:drawer-open" onclick={handleFirstInteraction}>

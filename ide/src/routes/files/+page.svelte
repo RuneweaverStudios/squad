@@ -788,6 +788,10 @@
 
 <svelte:head>
 	<title>Files | JAT IDE</title>
+	<meta name="description" content="Project file browser with syntax-highlighted editor. Browse, edit, and manage project files." />
+	<meta property="og:title" content="Files | JAT IDE" />
+	<meta property="og:description" content="Project file browser with syntax-highlighted editor. Browse, edit, and manage project files." />
+	<meta property="og:image" content="/favicons/files.svg" />
 	<link rel="icon" href="/favicons/files.svg" />
 </svelte:head>
 
