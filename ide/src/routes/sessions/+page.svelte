@@ -769,7 +769,7 @@
 								? 'oklch(0.70 0.20 190)' // Cyan for recovering
 								: 'oklch(0.55 0.05 250)' // Grey for idle/unknown
 							}
-							{@const derivedProject = session.project || (session.type !== 'server' && session.name.includes('-') ? session.name.split('-')[0] : null)}
+							{@const derivedProject = agentProjects.get(sessionAgentName) || session.project || null}
 							{@const rowProjectColor = sessionTask?.id
 								? getProjectColor(sessionTask.id)
 								: derivedProject
