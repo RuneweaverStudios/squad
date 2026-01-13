@@ -545,6 +545,9 @@
 	let otherInputValue = $state("");
 	// Suppress question fetching after answering (prevents race condition)
 	let suppressQuestionFetch = $state(false);
+	// Error state for failed message sends (timeout, network error)
+	// When set, shows error banner and preserves input text for retry
+	let sendInputError = $state<string | null>(null);
 
 	// API-based signal data (from jat-signal action command)
 	// When agent runs jat-signal action '{"title":"...","items":[...]}', this data is
@@ -3767,6 +3770,9 @@
 			}
 
 			if (message) {
+				// Clear any previous error
+				sendInputError = null;
+
 				// When live streaming is enabled, ALWAYS clear the line first as a
 				// defensive measure against stale terminal state (from previous
 				// sessions, crashes, or race conditions)
@@ -3776,7 +3782,14 @@
 				}
 				// Send the complete message and submit
 				// Note: "text" type already includes Enter in the API, so we don't need to send it separately
-				await onSendInput(message, "text");
+				const sendResult = await onSendInput(message, "text");
+
+				// Check if send failed (timeout, network error, etc.)
+				if (sendResult === false) {
+					// Keep the input text so user can retry
+					sendInputError = "Message failed to send. Your text has been preserved - please try again.";
+					return; // Don't clear input
+				}
 			}
 
 			// Capture text for exit animation before clearing
@@ -6427,6 +6440,29 @@
 							Agent-suggested tasks from recent output. Review and create as
 							needed.
 						</div>
+					</div>
+				{/if}
+
+				<!-- Error banner for failed message sends -->
+				{#if sendInputError}
+					<div
+						class="flex items-center gap-2 px-3 py-2 mb-2 text-xs rounded"
+						style="background: oklch(0.35 0.12 25 / 0.2); border: 1px solid oklch(0.55 0.15 25 / 0.4); color: oklch(0.85 0.10 25);"
+					>
+						<svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+						</svg>
+						<span class="flex-1">{sendInputError}</span>
+						<button
+							class="btn btn-xs btn-ghost"
+							style="color: oklch(0.80 0.10 25);"
+							onclick={() => sendInputError = null}
+							title="Dismiss"
+						>
+							<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+							</svg>
+						</button>
 					</div>
 				{/if}
 

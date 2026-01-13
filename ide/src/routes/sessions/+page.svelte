@@ -63,10 +63,11 @@
 	}
 	let agentTasks = $state<Map<string, AgentTask>>(new Map());
 
-	// Agent to session info mapping (tokens, cost, etc. from /api/work)
+	// Agent to session info mapping (tokens, cost, activity state, etc. from /api/work)
 	interface AgentSessionInfo {
 		tokens: number;
 		cost: number;
+		activityState?: string; // 'working' | 'idle' | 'needs-input' | 'ready-for-review' | 'completing' | 'completed'
 	}
 	let agentSessionInfo = $state<Map<string, AgentSessionInfo>>(new Map());
 
@@ -129,10 +130,11 @@
 			for (const session of data.sessions || []) {
 				if (!session.agentName) continue;
 
-				// Store session info (tokens, cost)
+				// Store session info (tokens, cost, activity state)
 				sessionInfoMap.set(session.agentName, {
 					tokens: session.tokens || 0,
-					cost: session.cost || 0
+					cost: session.cost || 0,
+					activityState: session.sessionState || undefined
 				});
 
 				// Get project from current task ID, or fall back to lastCompletedTask
@@ -411,7 +413,7 @@
 			const response = await fetch(`/api/work/${encodeURIComponent(expandedSession)}/input`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ text, type })
+				body: JSON.stringify({ input: text, type })
 			});
 			// Refresh output after sending
 			setTimeout(() => fetchExpandedOutput(expandedSession!), 100);
@@ -598,11 +600,17 @@
 							{@const isExpanded = expandedSession === session.name}
 							{@const sessionAgentName = getAgentName(session.name)}
 							{@const sessionTask = agentTasks.get(sessionAgentName)}
-							{@const statusDotColor = sessionTask?.status === 'in_progress'
-								? 'oklch(0.75 0.15 85)'
-								: sessionTask?.status === 'closed'
-								? 'oklch(0.65 0.18 145)'
-								: 'oklch(0.50 0.02 250)'
+							{@const sessionInfo = agentSessionInfo.get(sessionAgentName)}
+							{@const activityState = sessionInfo?.activityState}
+							{@const statusDotColor = activityState === 'working'
+								? 'oklch(0.70 0.18 220)' // Blue for working
+								: activityState === 'needs-input'
+								? 'oklch(0.70 0.18 300)' // Purple for needs input
+								: activityState === 'ready-for-review'
+								? 'oklch(0.70 0.18 180)' // Cyan for review
+								: activityState === 'completing' || activityState === 'completed'
+								? 'oklch(0.65 0.18 145)' // Green for completing/completed
+								: 'oklch(0.50 0.02 250)' // Grey for idle/unknown
 							}
 							<tr
 								class="session-row"
@@ -615,11 +623,12 @@
 								<td class="td-name">
 									{#if session.type === 'server'}
 										<!-- Server session display -->
-										<div class="server-row">
+										<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+										<div class="server-row" onclick={(e) => e.stopPropagation()}>
 											<ServerSessionBadge
 												sessionName={session.name}
 												project={session.project}
-												status={session.attached ? 'running' : 'stopped'}
+												status="running"
 												created={session.created}
 												size="xs"
 												variant="projectPill"
@@ -630,7 +639,6 @@
 														await killSession(session.name);
 													}
 												}}
-												onClick={() => toggleExpanded(session.name)}
 											/>
 										</div>
 										<div class="server-name">
@@ -749,7 +757,7 @@
 										<div class="expanded-session-wrapper">
 											<div class="expanded-session-card" style="height: {expandedHeight}px;">
 												<SessionCard
-													mode="agent"
+													mode={session.type === 'server' ? 'server' : 'agent'}
 													sessionName={session.name}
 													agentName={expandedAgentName}
 													task={expandedTask ? {
@@ -776,7 +784,7 @@
 														fetch(`/api/work/${encodeURIComponent(session.name)}/input`, {
 															method: 'POST',
 															headers: { 'Content-Type': 'application/json' },
-															body: JSON.stringify({ text: 'C-c', type: 'key' })
+															body: JSON.stringify({ type: 'ctrl-c' })
 														});
 													}}
 													onAttachTerminal={() => attachSession(session.name)}
@@ -1118,7 +1126,6 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-		max-width: 350px;
 	}
 
 	.task-description {
@@ -1128,7 +1135,6 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-		max-width: 400px;
 	}
 
 	/* Type badge */
