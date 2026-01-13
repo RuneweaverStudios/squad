@@ -7,6 +7,7 @@
 import { json } from '@sveltejs/kit';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { readFileSync, existsSync } from 'fs';
 import {
 	DEFAULT_MODEL,
 	DANGEROUSLY_SKIP_PERMISSIONS,
@@ -17,6 +18,36 @@ import { CLAUDE_READY_PATTERNS, SHELL_PROMPT_PATTERNS } from '$lib/server/shellP
 import { stripAnsi } from '$lib/utils/ansiToHtml.js';
 
 const execAsync = promisify(exec);
+
+/**
+ * Read project from signal file for a session
+ * @param {string} sessionName - tmux session name
+ * @returns {string|null} Project name or null if not found
+ */
+function getProjectFromSignal(sessionName) {
+	const signalFile = `/tmp/jat-signal-tmux-${sessionName}.json`;
+	try {
+		if (!existsSync(signalFile)) {
+			return null;
+		}
+		const content = readFileSync(signalFile, 'utf-8');
+		const signal = JSON.parse(content);
+
+		// Try direct project field (from startingSignal)
+		if (signal.project) {
+			return signal.project;
+		}
+
+		// Try extracting from taskId (e.g., "steelbridge-abc" -> "steelbridge")
+		if (signal.taskId && signal.taskId.includes('-')) {
+			return signal.taskId.split('-')[0];
+		}
+
+		return null;
+	} catch {
+		return null;
+	}
+}
 
 /**
  * GET /api/sessions
@@ -41,11 +72,14 @@ export async function GET({ url }) {
 				.filter(line => line.length > 0)
 				.map(line => {
 					const [name, created, attached, windows] = line.split(':');
+					// Try to get project from signal file
+					const project = getProjectFromSignal(name);
 					return {
 						name,
 						created: new Date(parseInt(created, 10) * 1000).toISOString(),
 						attached: parseInt(attached, 10) > 0,
-						windows: parseInt(windows, 10) || 1
+						windows: parseInt(windows, 10) || 1,
+						project
 					};
 				})
 				.filter(session => {
