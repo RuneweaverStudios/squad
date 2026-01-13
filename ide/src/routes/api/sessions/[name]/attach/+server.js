@@ -12,7 +12,9 @@
 import { json } from '@sveltejs/kit';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, readdirSync } from 'fs';
+import { join } from 'path';
+import { homedir } from 'os';
 
 const execAsync = promisify(exec);
 
@@ -74,6 +76,75 @@ async function findParentSession(candidates) {
 }
 
 /**
+ * Find the project for a session by looking up agent files across projects
+ * @param {string} agentName - Agent name to look up
+ * @returns {Promise<string | null>} Project name or null
+ */
+async function findProjectForAgent(agentName) {
+	const codeDir = join(homedir(), 'code');
+	if (!existsSync(codeDir)) return null;
+
+	try {
+		const projects = readdirSync(codeDir, { withFileTypes: true })
+			.filter(d => d.isDirectory() && !d.name.startsWith('.'))
+			.map(d => d.name);
+
+		for (const project of projects) {
+			const sessionsDir = join(codeDir, project, '.claude', 'sessions');
+			const claudeDir = join(codeDir, project, '.claude');
+
+			// Check sessions directory
+			if (existsSync(sessionsDir)) {
+				const files = readdirSync(sessionsDir)
+					.filter(f => f.startsWith('agent-') && f.endsWith('.txt'));
+				for (const file of files) {
+					const content = readFileSync(join(sessionsDir, file), 'utf-8').trim();
+					if (content === agentName) {
+						return project;
+					}
+				}
+			}
+
+			// Check legacy location
+			if (existsSync(claudeDir)) {
+				const files = readdirSync(claudeDir)
+					.filter(f => f.startsWith('agent-') && f.endsWith('.txt'));
+				for (const file of files) {
+					const content = readFileSync(join(claudeDir, file), 'utf-8').trim();
+					if (content === agentName) {
+						return project;
+					}
+				}
+			}
+		}
+	} catch {
+		// Ignore errors
+	}
+
+	return null;
+}
+
+/**
+ * Apply Hyprland border colors for a session
+ * @param {string} sessionName - tmux session name
+ * @param {string} projectName - Project name
+ */
+async function applyHyprlandColors(sessionName, projectName) {
+	try {
+		const response = await globalThis.fetch(
+			`http://localhost:${process.env.PORT || 3333}/api/sessions/${sessionName}/hyprland-color?project=${projectName}`,
+			{ method: 'POST' }
+		);
+		if (response.ok) {
+			const result = await response.json();
+			console.log(`[attach] Hyprland colors applied: ${result.windowsUpdated || 0} windows`);
+		}
+	} catch {
+		// Silent - Hyprland coloring is optional
+	}
+}
+
+/**
  * POST /api/sessions/[name]/attach
  * Attach to an existing tmux session by creating a window in the parent session
  */
@@ -131,6 +202,14 @@ export async function POST({ params }) {
 			try {
 				await execAsync(`tmux new-window -t "${parentSession}" -n "${windowName}" "bash -c '${attachCommand}'"`);
 
+				// Apply Hyprland colors (best-effort, delay to allow window to open)
+				setTimeout(async () => {
+					const projectName = await findProjectForAgent(agentName);
+					if (projectName) {
+						await applyHyprlandColors(sessionName, projectName);
+					}
+				}, 1000);
+
 				return json({
 					success: true,
 					agentName,
@@ -149,7 +228,10 @@ export async function POST({ params }) {
 
 		// Fallback: spawn new terminal window if no parent session found
 		const attachCommand = `tmux attach-session -t "${sessionName}"`;
-		const windowTitle = `JAT: ${agentName}`;
+		// Find project for this agent to use project-specific title
+		const foundProject = await findProjectForAgent(agentName);
+		const displayName = foundProject ? foundProject.toUpperCase() : 'JAT';
+		const windowTitle = `${displayName}: ${sessionName}`;
 
 		let child;
 		switch (terminal) {
@@ -185,6 +267,14 @@ export async function POST({ params }) {
 		}
 
 		child.unref();
+
+		// Apply Hyprland colors (best-effort, delay to allow terminal to open)
+		setTimeout(async () => {
+			const projectName = await findProjectForAgent(agentName);
+			if (projectName) {
+				await applyHyprlandColors(sessionName, projectName);
+			}
+		}, 1500);
 
 		return json({
 			success: true,

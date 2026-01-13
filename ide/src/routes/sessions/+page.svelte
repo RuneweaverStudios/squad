@@ -825,6 +825,10 @@
 												<span class="task-title" title={sessionTask.title}>
 													{sessionTask.title || sessionTask.id}
 												</span>
+											{:else}
+												<!-- No task - show agent name and session info -->
+												<span class="session-name-pill">{session.name}</span>
+												<span class="no-task-label">No active task</span>
 											{/if}
 										</div>
 										<!-- Row 2: Task description (truncated) -->
@@ -1294,7 +1298,7 @@
 
 	/* Column widths - give narrow columns fixed widths so SESSION expands */
 	.th-status, .td-status { width: 90px; }
-	.th-actions, .td-actions { width: 220px; }
+	.th-actions, .td-actions { width: 205px; }
 
 	/* Session name */
 	.td-name {
@@ -1310,6 +1314,22 @@
 		font-size: 0.75rem;
 		font-weight: 500;
 		color: oklch(0.65 0.02 250);
+	}
+
+	.session-name-pill {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: oklch(0.75 0.10 250);
+		background: oklch(0.25 0.02 250);
+		padding: 0.125rem 0.5rem;
+		border-radius: 4px;
+		font-family: ui-monospace, monospace;
+	}
+
+	.no-task-label {
+		font-size: 0.75rem;
+		color: oklch(0.50 0.02 250);
+		font-style: italic;
 	}
 
 	.task-row {
@@ -1374,9 +1394,6 @@
 		font-size: 0.7rem;
 		font-weight: 500;
 		color: oklch(0.75 0.02 250);
-		max-width: 120px;
-		overflow: hidden;
-		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
 

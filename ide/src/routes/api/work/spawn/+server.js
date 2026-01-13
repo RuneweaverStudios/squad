@@ -383,18 +383,23 @@ export async function POST({ request }) {
 					const { spawn } = await import('child_process');
 					let child;
 
+					// Use project name in title format like "JAT: Claude" for Hyprland color matching
+					// The CLI uses this pattern and apply_border_color matches on "{PROJECT}:" prefix
+					const displayName = projectName ? projectName.toUpperCase() : 'JAT';
+					const windowTitle = `${displayName}: ${sessionName}`;
+
 					if (terminalPath.includes('alacritty')) {
-						child = spawn('alacritty', ['--title', `tmux: ${sessionName}`, '-e', 'tmux', 'attach-session', '-t', sessionName], {
+						child = spawn('alacritty', ['--title', windowTitle, '-e', 'tmux', 'attach-session', '-t', sessionName], {
 							detached: true,
 							stdio: 'ignore'
 						});
 					} else if (terminalPath.includes('kitty')) {
-						child = spawn('kitty', ['--title', `tmux: ${sessionName}`, 'tmux', 'attach-session', '-t', sessionName], {
+						child = spawn('kitty', ['--title', windowTitle, 'tmux', 'attach-session', '-t', sessionName], {
 							detached: true,
 							stdio: 'ignore'
 						});
 					} else if (terminalPath.includes('gnome-terminal')) {
-						child = spawn('gnome-terminal', ['--title', `tmux: ${sessionName}`, '--', 'tmux', 'attach-session', '-t', sessionName], {
+						child = spawn('gnome-terminal', ['--title', windowTitle, '--', 'tmux', 'attach-session', '-t', sessionName], {
 							detached: true,
 							stdio: 'ignore'
 						});
@@ -404,7 +409,7 @@ export async function POST({ request }) {
 							stdio: 'ignore'
 						});
 					} else {
-						child = spawn('xterm', ['-title', `tmux: ${sessionName}`, '-e', 'tmux', 'attach-session', '-t', sessionName], {
+						child = spawn('xterm', ['-title', windowTitle, '-e', 'tmux', 'attach-session', '-t', sessionName], {
 							detached: true,
 							stdio: 'ignore'
 						});
@@ -416,6 +421,33 @@ export async function POST({ request }) {
 				// Non-fatal - session is created, terminal just didn't open
 				console.error('Failed to attach terminal:', err);
 			}
+		}
+
+		// Step 4d: Apply Hyprland border colors for the project
+		// This colors the terminal window based on project config
+		// Do this after terminal is opened (attach mode) or immediately (non-attach mode)
+		// Best-effort - don't fail spawn if coloring fails
+		try {
+			const colorProjectName = projectName || (taskId ? taskId.split('-')[0] : null);
+			if (colorProjectName) {
+				// Small delay to allow terminal window to be created
+				setTimeout(async () => {
+					try {
+						const colorResponse = await globalThis.fetch(
+							`http://localhost:${process.env.PORT || 3333}/api/sessions/${sessionName}/hyprland-color?project=${colorProjectName}`,
+							{ method: 'POST' }
+						);
+						if (colorResponse.ok) {
+							const colorResult = await colorResponse.json();
+							console.log(`[spawn] Hyprland colors applied: ${colorResult.windowsUpdated || 0} windows`);
+						}
+					} catch (err) {
+						// Silent - Hyprland coloring is optional
+					}
+				}, 1000);
+			}
+		} catch {
+			// Silent - Hyprland coloring is optional
 		}
 
 		// Step 5: Get full task data from Beads (if taskId provided)
