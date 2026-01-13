@@ -150,6 +150,8 @@
 	interface Props {
 		/** Mode: 'agent' for work sessions, 'server' for dev server sessions, 'compact' for kanban cards */
 		mode?: "agent" | "server" | "compact";
+		/** Headerless mode: hides agent header and task section (for embedding in tables that already show this info) */
+		headerless?: boolean;
 		sessionName: string;
 		agentName?: string; // Required for agent mode
 		task?: Task | null; // Agent mode only
@@ -278,6 +280,7 @@
 
 	let {
 		mode = "agent",
+		headerless = false,
 		sessionName,
 		agentName = "",
 		task = null,
@@ -4311,6 +4314,7 @@
 		"
 		data-agent-name={agentName}
 	>
+		{#if !headerless}
 		<!-- Header: Agent identity + Stats + Status (single row) -->
 		<div class="flex items-center justify-between gap-2 mb-2">
 			<!-- Left: Avatar + Agent name -->
@@ -4457,7 +4461,9 @@
 				{/if}
 			</div>
 		</div>
+		{/if}
 
+		{#if !headerless}
 		<!-- Task Section -->
 		{#if displayTask}
 			<div class="flex flex-col gap-1">
@@ -4550,6 +4556,7 @@
 		{:else}
 			<!-- No task state -->
 			<div class="text-sm text-base-content/50 italic">No active task</div>
+		{/if}
 		{/if}
 
 		<!-- Star celebration overlay -->
@@ -4780,10 +4787,11 @@
 			</div>
 		{/if}
 
-		{#if isAgentMode}
-			<!-- Task Content Section (Task-First Layout) -->
-			<!-- Shown above agent bar because task is primary focus -->
-			<div
+		{#if !headerless}
+			{#if isAgentMode}
+				<!-- Task Content Section (Task-First Layout) -->
+				<!-- Shown above agent bar because task is primary focus -->
+				<div
 				class="pl-3 pr-3 pt-2 flex-shrink-0 flex-grow-0"
 				style="border-bottom: 1px solid oklch(0.30 0.02 250);"
 				onmouseenter={handleTaskMouseEnter}
@@ -5287,6 +5295,7 @@
 					/>
 				</div>
 			</div>
+			{/if}
 		{/if}
 
 		<!-- Output Section -->

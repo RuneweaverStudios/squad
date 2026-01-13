@@ -12,6 +12,8 @@
 
 	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
+	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
 	import { getProjectColor, initProjectColors } from '$lib/utils/projectColors';
 	import SessionCard from '$lib/components/work/SessionCard.svelte';
 	import HorizontalResizeHandle from '$lib/components/HorizontalResizeHandle.svelte';
@@ -19,6 +21,9 @@
 	import AgentAvatar from '$lib/components/AgentAvatar.svelte';
 	import ServerStatusBadge from '$lib/components/work/ServerStatusBadge.svelte';
 	import ServerSessionBadge from '$lib/components/ServerSessionBadge.svelte';
+	import SessionsTabs from '$lib/components/sessions/SessionsTabs.svelte';
+	import AnimatedDigits from '$lib/components/AnimatedDigits.svelte';
+	import StatusActionBadge from '$lib/components/work/StatusActionBadge.svelte';
 
 	interface TmuxSession {
 		name: string;
@@ -37,6 +42,9 @@
 	let actionLoading = $state<string | null>(null);
 	let copiedCmd = $state<string | null>(null);
 	let attachMessage = $state<{ session: string; message: string; method: string } | null>(null);
+
+	// Tab filter state - synced with URL
+	let activeTab = $state('all');
 
 	// Expanded session state (inline SessionCard)
 	let expandedSession = $state<string | null>(null);
@@ -279,6 +287,29 @@
 		return `${seconds}s`;
 	}
 
+	// Format elapsed time for AnimatedDigits display
+	// Returns object with hours, minutes, seconds as zero-padded strings
+	function getElapsedFormatted(createdISO: string): { hours: string; minutes: string; seconds: string; showHours: boolean } | null {
+		if (!createdISO) return null;
+		const created = new Date(createdISO).getTime();
+		const now = Date.now();
+		const elapsedMs = now - created;
+
+		if (elapsedMs < 0) return { hours: '00', minutes: '00', seconds: '00', showHours: false };
+
+		const totalSeconds = Math.floor(elapsedMs / 1000);
+		const hours = Math.floor(totalSeconds / 3600);
+		const minutes = Math.floor((totalSeconds % 3600) / 60);
+		const seconds = totalSeconds % 60;
+
+		return {
+			hours: hours.toString().padStart(2, '0'),
+			minutes: minutes.toString().padStart(2, '0'),
+			seconds: seconds.toString().padStart(2, '0'),
+			showHours: hours > 0
+		};
+	}
+
 	// Get type badge styling
 	function getTypeBadge(type: TmuxSession['type']) {
 		switch (type) {
@@ -410,10 +441,28 @@
 	async function sendExpandedInput(text: string, type: 'text' | 'key' | 'raw' = 'text'): Promise<boolean> {
 		if (!expandedSession) return false;
 		try {
+			// Special key handling: when type is 'key', the text contains the key name
+			// (e.g., 'backspace', 'ctrl-c', 'enter'), which should become the API type
+			let apiType: string = type;
+			let apiInput: string = text;
+
+			if (type === 'key') {
+				const specialKeys = ['ctrl-c', 'ctrl-d', 'ctrl-u', 'ctrl-l', 'enter', 'escape', 'up', 'down', 'left', 'right', 'tab', 'delete', 'backspace', 'space'];
+				if (specialKeys.includes(text)) {
+					// The key name becomes the type, input is empty
+					apiType = text;
+					apiInput = '';
+				} else {
+					// Unknown key - send as raw text
+					apiType = 'raw';
+					apiInput = text;
+				}
+			}
+
 			const response = await fetch(`/api/work/${encodeURIComponent(expandedSession)}/input`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ input: text, type })
+				body: JSON.stringify({ input: apiInput, type: apiType })
 			});
 			// Refresh output after sending
 			setTimeout(() => fetchExpandedOutput(expandedSession!), 100);
@@ -434,6 +483,30 @@
 
 	// Tick for elapsed time updates
 	let tick = $state(0);
+
+	// Handle tab change - update URL
+	function handleTabChange(tabId: string) {
+		activeTab = tabId;
+		const url = new URL(window.location.href);
+		if (tabId === 'all') {
+			url.searchParams.delete('tab');
+		} else {
+			url.searchParams.set('tab', tabId);
+		}
+		goto(url.pathname + url.search, { replaceState: true, noScroll: true });
+	}
+
+	// Sync activeTab from URL on mount
+	$effect(() => {
+		if (browser) {
+			const tabParam = $page.url.searchParams.get('tab');
+			if (tabParam && ['agents', 'servers', 'terminal'].includes(tabParam)) {
+				activeTab = tabParam;
+			} else {
+				activeTab = 'all';
+			}
+		}
+	});
 
 	onMount(() => {
 		initProjectColors();
@@ -506,6 +579,17 @@
 		}
 		return counts;
 	});
+
+	// Filter sessions based on active tab
+	const filteredSessions = $derived(
+		sortedSessions.filter(session => {
+			if (activeTab === 'all') return true;
+			if (activeTab === 'agents') return session.type === 'agent';
+			if (activeTab === 'servers') return session.type === 'server';
+			if (activeTab === 'terminal') return session.type === 'other' || session.type === 'ide';
+			return true;
+		})
+	);
 </script>
 
 <svelte:head>
@@ -529,22 +613,12 @@
 			</h1>
 		</div>
 
-		<!-- Session counts -->
-		<div class="counts-row">
-			{#if sessionCounts().total > 0}
-				<span class="count-badge" style="background: oklch(0.65 0.15 200 / 0.2); color: oklch(0.75 0.15 200);">
-					{sessionCounts().agent} agent{sessionCounts().agent !== 1 ? 's' : ''}
-				</span>
-				<span class="count-badge" style="background: oklch(0.65 0.15 145 / 0.2); color: oklch(0.75 0.15 145);">
-					{sessionCounts().server} server{sessionCounts().server !== 1 ? 's' : ''}
-				</span>
-				{#if sessionCounts().other > 0}
-					<span class="count-badge" style="background: oklch(0.50 0.02 250 / 0.2); color: oklch(0.65 0.02 250);">
-						{sessionCounts().other} other
-					</span>
-				{/if}
-			{/if}
-		</div>
+		<!-- Session type tabs -->
+		<SessionsTabs
+			{activeTab}
+			counts={sessionCounts()}
+			onTabChange={handleTabChange}
+		/>
 	</div>
 
 	<!-- Content -->
@@ -588,14 +662,12 @@
 					<thead>
 						<tr>
 							<th class="th-name">Session</th>
-							<th class="th-type">Type</th>
 							<th class="th-status">Status</th>
-							<th class="th-uptime">Uptime</th>
-							<th class="th-actions">Actions</th>
+							<th class="th-actions">Agent</th>
 						</tr>
 					</thead>
 					<tbody>
-						{#each sortedSessions as session (session.name)}
+						{#each filteredSessions as session (session.name)}
 							{@const typeBadge = getTypeBadge(session.type)}
 							{@const isExpanded = expandedSession === session.name}
 							{@const sessionAgentName = getAgentName(session.name)}
@@ -620,6 +692,7 @@
 								? 'oklch(0.70 0.20 190)' // Cyan for recovering
 								: 'oklch(0.55 0.05 250)' // Grey for idle/unknown
 							}
+							{@const elapsed = getElapsedFormatted(session.created)}
 							<tr
 								class="session-row"
 								class:attached={session.attached}
@@ -675,19 +748,7 @@
 												{sessionTask.description}
 											</div>
 										{/if}
-										<!-- Row 3: Avatar + Agent name -->
-										<div class="agent-row">
-											{#if session.type === 'agent' && sessionAgentName}
-												<AgentAvatar name={sessionAgentName} size={20} />
-											{/if}
-											<span class="session-name">{sessionAgentName || session.name}</span>
-										</div>
 									{/if}
-								</td>
-								<td class="td-type">
-									<span class="type-badge" style="background: {typeBadge.bg}; color: {typeBadge.text};">
-										{typeBadge.label}
-									</span>
 								</td>
 								<td class="td-status">
 									{#if session.attached}
@@ -702,57 +763,69 @@
 										</span>
 									{/if}
 								</td>
-								<td class="td-uptime">
-									{void tick}{formatElapsed(session.created)}
-								</td>
 								<td class="td-actions" onclick={(e) => e.stopPropagation()}>
-									<div class="action-buttons">
-										<!-- External attach button (opens terminal) -->
-										<button
-											class="action-btn attach"
-											onclick={() => attachSession(session.name)}
-											disabled={actionLoading === session.name}
-											title="Open in terminal"
-										>
-											{#if actionLoading === session.name}
-												<span class="loading loading-spinner loading-xs"></span>
-											{:else}
-												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="action-icon">
-													<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-												</svg>
+									{#if session.type === 'agent'}
+										<!-- Stacked: Agent name, StatusActionBadge, Timer -->
+										<div class="agent-actions-stack">
+											<!-- Agent name with avatar -->
+											<div class="agent-info">
+												<AgentAvatar name={sessionAgentName} size={18} />
+												<span class="agent-name">{sessionAgentName}</span>
+											</div>
+											<!-- Status action badge -->
+											<StatusActionBadge
+												sessionState="idle"
+												sessionName={session.name}
+												onAction={async (actionId) => {
+													if (actionId === 'attach') {
+														await attachSession(session.name);
+													} else if (actionId === 'kill') {
+														await killSession(session.name);
+													}
+												}}
+											/>
+											<!-- Timer -->
+											{#if elapsed}
+												<span class="agent-timer font-mono text-[10px] opacity-60 inline-flex items-baseline">
+													{#if elapsed.showHours}
+														<AnimatedDigits value={elapsed.hours} class="text-[10px]" />
+														<span class="opacity-60">:</span>
+													{/if}
+													<AnimatedDigits value={elapsed.minutes} class="text-[10px]" />
+													<span class="opacity-60">:</span>
+													<AnimatedDigits value={elapsed.seconds} class="text-[10px]" />
+												</span>
 											{/if}
-										</button>
-
-										<!-- Copy command button -->
-										<button
-											class="action-btn copy"
-											class:copied={copiedCmd === session.name}
-											onclick={() => copyAttachCmd(session.name)}
-											title="Copy attach command"
-										>
-											{#if copiedCmd === session.name}
-												<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="action-icon">
-													<path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
-												</svg>
-											{:else}
+										</div>
+									{:else}
+										<!-- Non-agent sessions: simple buttons -->
+										<div class="action-buttons">
+											<button
+												class="action-btn attach"
+												onclick={() => attachSession(session.name)}
+												disabled={actionLoading === session.name}
+												title="Open in terminal"
+											>
+												{#if actionLoading === session.name}
+													<span class="loading loading-spinner loading-xs"></span>
+												{:else}
+													<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="action-icon">
+														<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+													</svg>
+												{/if}
+											</button>
+											<button
+												class="action-btn kill"
+												onclick={() => killSession(session.name)}
+												disabled={actionLoading === session.name}
+												title="Kill session"
+											>
 												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="action-icon">
-													<path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+													<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
 												</svg>
-											{/if}
-										</button>
-
-										<!-- Kill button -->
-										<button
-											class="action-btn kill"
-											onclick={() => killSession(session.name)}
-											disabled={actionLoading === session.name}
-											title="Kill session"
-										>
-											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="action-icon">
-												<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-											</svg>
-										</button>
-									</div>
+											</button>
+										</div>
+									{/if}
 								</td>
 							</tr>
 							<!-- Expanded SessionCard row -->
@@ -761,13 +834,14 @@
 								{@const expandedTask = agentTasks.get(expandedAgentName)}
 								{@const expandedSessionInfo = agentSessionInfo.get(expandedAgentName)}
 								<tr class="expanded-row">
-									<td colspan="5" class="expanded-content">
+									<td colspan="3" class="expanded-content">
 										<div class="expanded-session-wrapper">
 											<div class="expanded-session-card" style="height: {expandedHeight}px;">
 												<SessionCard
 													mode={session.type === 'server' ? 'server' : 'agent'}
 													sessionName={session.name}
 													agentName={expandedAgentName}
+													headerless={true}
 													task={expandedTask ? {
 														id: expandedTask.id,
 														title: expandedTask.title,
@@ -914,19 +988,6 @@
 		font-family: ui-monospace, monospace;
 	}
 
-	.counts-row {
-		display: flex;
-		gap: 0.5rem;
-		align-items: center;
-	}
-
-	.count-badge {
-		font-size: 0.75rem;
-		font-family: ui-monospace, monospace;
-		padding: 0.25rem 0.75rem;
-		border-radius: 9999px;
-	}
-
 	/* Content */
 	.tmux-content {
 		max-width: 1200px;
@@ -1030,7 +1091,7 @@
 		background: oklch(0.16 0.01 250);
 		border: 1px solid oklch(0.25 0.02 250);
 		border-radius: 8px;
-		overflow: hidden;
+		/* Note: overflow: hidden removed to allow dropdowns to escape the table bounds */
 	}
 
 	.sessions-table {
@@ -1089,10 +1150,8 @@
 	}
 
 	/* Column widths - give narrow columns fixed widths so SESSION expands */
-	.th-type, .td-type { width: 80px; }
-	.th-status, .td-status { width: 100px; }
-	.th-uptime, .td-uptime { width: 80px; }
-	.th-actions, .td-actions { width: 120px; }
+	.th-status, .td-status { width: 90px; }
+	.th-actions, .td-actions { width: 140px; }
 
 	/* Session name */
 	.td-name {
@@ -1100,6 +1159,8 @@
 		flex-direction: column;
 		align-items: flex-start;
 		gap: 0.125rem;
+		min-width: 0; /* Allow column to shrink below content width */
+		max-width: 100%;
 	}
 
 	.session-name {
@@ -1112,19 +1173,16 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-	}
-
-	.agent-row {
-		display: flex;
-		align-items: center;
-		gap: 0.375rem;
-		margin-top: 0.375rem;
+		width: 100%;
+		min-width: 0; /* Allow flex children to shrink */
 	}
 
 	.server-row {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
+		width: 100%;
+		min-width: 0; /* Allow flex children to shrink */
 	}
 
 	.server-name {
@@ -1141,6 +1199,8 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+		flex: 1;
+		min-width: 0; /* Allow truncation */
 	}
 
 	.task-description {
@@ -1150,16 +1210,36 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+		width: 100%;
+		max-width: 100%;
 	}
 
-	/* Type badge */
-	.type-badge {
-		font-size: 0.65rem;
-		font-weight: 600;
-		padding: 0.2rem 0.5rem;
-		border-radius: 4px;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
+	/* Agent actions stack (in Actions column) */
+	.agent-actions-stack {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.25rem;
+	}
+
+	.agent-info {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+	}
+
+	.agent-name {
+		font-size: 0.7rem;
+		font-weight: 500;
+		color: oklch(0.70 0.02 250);
+		max-width: 90px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.agent-timer {
+		margin-top: 0.125rem;
 	}
 
 	/* Status */
@@ -1226,18 +1306,6 @@
 		background: oklch(0.65 0.15 200 / 0.2);
 		border-color: oklch(0.65 0.15 200 / 0.4);
 		color: oklch(0.75 0.15 200);
-	}
-
-	.action-btn.copy:hover:not(:disabled) {
-		background: oklch(0.65 0.15 280 / 0.2);
-		border-color: oklch(0.65 0.15 280 / 0.4);
-		color: oklch(0.75 0.15 280);
-	}
-
-	.action-btn.copy.copied {
-		background: oklch(0.65 0.15 145 / 0.2);
-		border-color: oklch(0.65 0.15 145 / 0.4);
-		color: oklch(0.75 0.15 145);
 	}
 
 	.action-btn.kill:hover:not(:disabled) {
