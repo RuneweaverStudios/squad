@@ -24,6 +24,7 @@
 	import SessionsTabs from '$lib/components/sessions/SessionsTabs.svelte';
 	import AnimatedDigits from '$lib/components/AnimatedDigits.svelte';
 	import StatusActionBadge from '$lib/components/work/StatusActionBadge.svelte';
+	import SortDropdown from '$lib/components/SortDropdown.svelte';
 
 	interface TmuxSession {
 		name: string;
@@ -78,6 +79,32 @@
 		activityState?: string; // 'working' | 'idle' | 'needs-input' | 'ready-for-review' | 'completing' | 'completed'
 	}
 	let agentSessionInfo = $state<Map<string, AgentSessionInfo>>(new Map());
+
+	// Sort configuration for sessions
+	type SortOption = 'state' | 'project' | 'created';
+	let sortBy = $state<SortOption>('state');
+	let sortDir = $state<'asc' | 'desc'>('asc');
+
+	// State priority for sorting (lower = more urgent/higher priority)
+	const STATE_PRIORITY: Record<string, number> = {
+		'ready-for-review': 0,   // Most urgent - needs human review
+		'needs-input': 1,        // Waiting for user input
+		'working': 2,            // Actively working
+		'completing': 3,         // Running completion
+		'starting': 4,           // Agent starting up
+		'recovering': 5,         // Automation recovery
+		'compacting': 6,         // Context compaction
+		'completed': 7,          // Task done
+		'auto-proceeding': 8,    // Spawning next
+		'idle': 9                // Lowest priority
+	};
+
+	// Sort options for dropdown
+	const SORT_OPTIONS = [
+		{ value: 'state', label: 'State', icon: '🎯', defaultDir: 'asc' as const },
+		{ value: 'project', label: 'Project', icon: '📁', defaultDir: 'asc' as const },
+		{ value: 'created', label: 'Created', icon: '⏱️', defaultDir: 'desc' as const }
+	];
 
 	// Project order (from /api/projects, sorted by last activity)
 	let projectOrder = $state<string[]>([]);
@@ -508,6 +535,12 @@
 		}
 	});
 
+	// Handle sort change from dropdown
+	function handleSortChange(value: string, dir: 'asc' | 'desc') {
+		sortBy = value as SortOption;
+		sortDir = dir;
+	}
+
 	onMount(() => {
 		initProjectColors();
 		fetchAllData();
@@ -527,32 +560,59 @@
 		}
 	});
 
-	// Sort sessions: by project first (using same order as ActionPill), then by activity
+	// Helper function to get state priority for a session
+	function getSessionStatePriority(session: TmuxSession): number {
+		if (session.type !== 'agent') return 99; // Non-agent sessions go last
+		const agentName = getAgentName(session.name);
+		const state = agentSessionInfo.get(agentName)?.activityState || 'idle';
+		return STATE_PRIORITY[state] ?? 99;
+	}
+
+	// Sort sessions based on current sort configuration
 	const sortedSessions = $derived(
 		[...sessions].sort((a, b) => {
-			// First by project (using projectOrder from API, unknown projects go last)
-			const projA = a.project || '';
-			const projB = b.project || '';
-			if (projA !== projB) {
-				const indexA = projA ? projectOrder.indexOf(projA) : -1;
-				const indexB = projB ? projectOrder.indexOf(projB) : -1;
-				// If both are in projectOrder, use that order
-				// If one is not found (-1), it goes after known projects
-				// If neither is found, fall back to alphabetical
-				const orderA = indexA === -1 ? (projA ? 9999 : 99999) : indexA;
-				const orderB = indexB === -1 ? (projB ? 9999 : 99999) : indexB;
-				if (orderA !== orderB) {
-					return orderA - orderB;
+			const multiplier = sortDir === 'asc' ? 1 : -1;
+
+			if (sortBy === 'state') {
+				// Sort by state priority (most urgent first)
+				const stateA = getSessionStatePriority(a);
+				const stateB = getSessionStatePriority(b);
+				if (stateA !== stateB) {
+					return (stateA - stateB) * multiplier;
 				}
-				// Both unknown, sort alphabetically
-				if (indexA === -1 && indexB === -1) {
-					return projA.localeCompare(projB);
-				}
+				// Secondary sort by created time (most recent first)
+				const createdA = new Date(a.created).getTime();
+				const createdB = new Date(b.created).getTime();
+				return (createdB - createdA);
 			}
-			// Then by activity (most recently created first)
+
+			if (sortBy === 'project') {
+				// Sort by project (using projectOrder from API, unknown projects go last)
+				const projA = a.project || '';
+				const projB = b.project || '';
+				if (projA !== projB) {
+					const indexA = projA ? projectOrder.indexOf(projA) : -1;
+					const indexB = projB ? projectOrder.indexOf(projB) : -1;
+					const orderA = indexA === -1 ? (projA ? 9999 : 99999) : indexA;
+					const orderB = indexB === -1 ? (projB ? 9999 : 99999) : indexB;
+					if (orderA !== orderB) {
+						return (orderA - orderB) * multiplier;
+					}
+					// Both unknown, sort alphabetically
+					if (indexA === -1 && indexB === -1) {
+						return projA.localeCompare(projB) * multiplier;
+					}
+				}
+				// Secondary sort by created time
+				const createdA = new Date(a.created).getTime();
+				const createdB = new Date(b.created).getTime();
+				return (createdB - createdA);
+			}
+
+			// Default: sort by created time
 			const createdA = new Date(a.created).getTime();
 			const createdB = new Date(b.created).getTime();
-			return createdB - createdA;
+			return (createdB - createdA) * multiplier;
 		})
 	);
 
@@ -613,12 +673,21 @@
 			</h1>
 		</div>
 
-		<!-- Session type tabs -->
-		<SessionsTabs
-			{activeTab}
-			counts={sessionCounts()}
-			onTabChange={handleTabChange}
-		/>
+		<!-- Session type tabs + Sort control -->
+		<div class="header-controls">
+			<SessionsTabs
+				{activeTab}
+				counts={sessionCounts()}
+				onTabChange={handleTabChange}
+			/>
+			<SortDropdown
+				options={SORT_OPTIONS}
+				{sortBy}
+				{sortDir}
+				onSortChange={handleSortChange}
+				size="xs"
+			/>
+		</div>
 	</div>
 
 	<!-- Content -->
@@ -803,17 +872,45 @@
 														window.location.href = `/tasks?task=${sessionTask.id}`;
 													} else if (actionId === 'complete') {
 														// Send /jat:complete command to session
-														await fetch(`/api/work/${encodeURIComponent(session.name)}/input`, {
+														// Claude Code slash commands need: Ctrl+U clear, text, extra Enter
+														const sessionId = encodeURIComponent(session.name);
+														await fetch(`/api/work/${sessionId}/input`, {
+															method: 'POST',
+															headers: { 'Content-Type': 'application/json' },
+															body: JSON.stringify({ type: 'ctrl-u' })
+														});
+														await new Promise(r => setTimeout(r, 50));
+														await fetch(`/api/work/${sessionId}/input`, {
 															method: 'POST',
 															headers: { 'Content-Type': 'application/json' },
 															body: JSON.stringify({ input: '/jat:complete', type: 'text' })
 														});
+														await new Promise(r => setTimeout(r, 100));
+														await fetch(`/api/work/${sessionId}/input`, {
+															method: 'POST',
+															headers: { 'Content-Type': 'application/json' },
+															body: JSON.stringify({ type: 'enter' })
+														});
 													} else if (actionId === 'complete-kill') {
 														// Send /jat:complete --kill command to session
-														await fetch(`/api/work/${encodeURIComponent(session.name)}/input`, {
+														// Claude Code slash commands need: Ctrl+U clear, text, extra Enter
+														const sessionId = encodeURIComponent(session.name);
+														await fetch(`/api/work/${sessionId}/input`, {
+															method: 'POST',
+															headers: { 'Content-Type': 'application/json' },
+															body: JSON.stringify({ type: 'ctrl-u' })
+														});
+														await new Promise(r => setTimeout(r, 50));
+														await fetch(`/api/work/${sessionId}/input`, {
 															method: 'POST',
 															headers: { 'Content-Type': 'application/json' },
 															body: JSON.stringify({ input: '/jat:complete --kill', type: 'text' })
+														});
+														await new Promise(r => setTimeout(r, 100));
+														await fetch(`/api/work/${sessionId}/input`, {
+															method: 'POST',
+															headers: { 'Content-Type': 'application/json' },
+															body: JSON.stringify({ type: 'enter' })
 														});
 													} else if (actionId === 'interrupt') {
 														// Send Ctrl+C to session
@@ -1027,6 +1124,12 @@
 		color: oklch(0.55 0.02 250);
 		margin: 0;
 		font-family: ui-monospace, monospace;
+	}
+
+	.header-controls {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
 	}
 
 	/* Content */
