@@ -49,6 +49,7 @@
 
 	// Expanded session state (inline SessionCard)
 	let expandedSession = $state<string | null>(null);
+	let collapsingSession = $state<string | null>(null); // For slide-up animation
 	let expandedOutput = $state<string>('');
 	let outputPollInterval: ReturnType<typeof setInterval> | null = null;
 	let expandedHeight = $state(800); // Default height in pixels
@@ -57,6 +58,10 @@
 	// Tmux pane width tracking (in columns)
 	let tmuxWidth = $state(160); // Default 160 columns
 	const PIXELS_PER_COLUMN = 8.5; // Approximate pixels per monospace character
+
+	// Task detail panel state (inline, not drawer overlay)
+	let expandedTaskId = $state<string | null>(null);
+	let taskDetailOpen = $state(false);
 
 	// Agent to project mapping (from current task)
 	let agentProjects = $state<Map<string, string>>(new Map());
@@ -419,13 +424,18 @@
 	// Toggle session expansion (works for any session)
 	function toggleExpanded(sessionName: string) {
 		if (expandedSession === sessionName) {
-			// Collapse
-			expandedSession = null;
-			expandedOutput = '';
+			// Collapse with animation
+			collapsingSession = sessionName;
 			if (outputPollInterval) {
 				clearInterval(outputPollInterval);
 				outputPollInterval = null;
 			}
+			// After animation completes, remove the element
+			setTimeout(() => {
+				expandedSession = null;
+				expandedOutput = '';
+				collapsingSession = null;
+			}, 200); // Match animation duration
 		} else {
 			// Expand
 			expandInline(sessionName);
@@ -683,8 +693,12 @@
 			</h1>
 		</div>
 
-		<!-- Session type tabs + Sort control -->
-		<div class="header-controls">
+	</div>
+
+	<!-- Content -->
+	<div class="tmux-content">
+		<!-- Session type tabs + Sort control (above table) -->
+		<div class="table-controls">
 			<SessionsTabs
 				{activeTab}
 				counts={sessionCounts()}
@@ -698,10 +712,7 @@
 				size="xs"
 			/>
 		</div>
-	</div>
 
-	<!-- Content -->
-	<div class="tmux-content">
 		{#if loading && sessions.length === 0}
 			<!-- Loading skeleton -->
 			<div class="loading-skeleton">
@@ -748,6 +759,7 @@
 						{#each filteredSessions as session (session.name)}
 							{@const typeBadge = getTypeBadge(session.type)}
 							{@const isExpanded = expandedSession === session.name}
+							{@const isCollapsing = collapsingSession === session.name}
 							{@const sessionAgentName = getAgentName(session.name)}
 							{@const sessionTask = agentTasks.get(sessionAgentName)}
 							{@const sessionInfo = agentSessionInfo.get(sessionAgentName)}
@@ -979,55 +991,122 @@
 								{@const expandedTask = agentTasks.get(expandedAgentName)}
 								{@const expandedSessionInfo = agentSessionInfo.get(expandedAgentName)}
 								<tr class="expanded-row">
-									<td colspan="3" class="expanded-content">
-										<div class="expanded-session-wrapper">
-											<div class="expanded-session-card" style="height: {expandedHeight}px;">
-												<SessionCard
-													mode={session.type === 'server' ? 'server' : 'agent'}
-													sessionName={session.name}
-													agentName={expandedAgentName}
-													headerless={true}
-													task={expandedTask ? {
-														id: expandedTask.id,
-														title: expandedTask.title,
-														status: expandedTask.status,
-														priority: expandedTask.priority,
-														issue_type: expandedTask.issue_type,
-														description: expandedTask.description
-													} : null}
-													output={expandedOutput}
-													tokens={expandedSessionInfo?.tokens ?? 0}
-													cost={expandedSessionInfo?.cost ?? 0}
-													startTime={session.created ? new Date(session.created) : null}
-													created={session.created}
-													attached={session.attached}
-													onSendInput={(text, type) => sendExpandedInput(text, type)}
-													onKillSession={() => {
-														expandedSession = null;
-														killSession(session.name);
-													}}
-													onInterrupt={() => {
-														// Send Ctrl+C to session
-														fetch(`/api/work/${encodeURIComponent(session.name)}/input`, {
-															method: 'POST',
-															headers: { 'Content-Type': 'application/json' },
-															body: JSON.stringify({ type: 'ctrl-c' })
-														});
-													}}
-													onAttachTerminal={() => attachSession(session.name)}
-													onTaskClick={(taskId) => {
-														// Navigate to tasks page with task selected
-														window.location.href = `/tasks?task=${taskId}`;
-													}}
+									<td colspan="2" class="expanded-content">
+										<div class="expanded-session-wrapper" class:with-task-panel={expandedTask && taskDetailOpen && expandedTaskId === expandedTask.id}>
+											<!-- SessionCard section -->
+											<div class="session-card-section">
+												<div class="expanded-session-card" class:collapsing={isCollapsing} style="height: {expandedHeight}px;">
+													<SessionCard
+														mode={session.type === 'server' ? 'server' : 'agent'}
+														sessionName={session.name}
+														agentName={expandedAgentName}
+														headerless={true}
+														task={expandedTask ? {
+															id: expandedTask.id,
+															title: expandedTask.title,
+															status: expandedTask.status,
+															priority: expandedTask.priority,
+															issue_type: expandedTask.issue_type,
+															description: expandedTask.description
+														} : null}
+														output={expandedOutput}
+														tokens={expandedSessionInfo?.tokens ?? 0}
+														cost={expandedSessionInfo?.cost ?? 0}
+														startTime={session.created ? new Date(session.created) : null}
+														created={session.created}
+														attached={session.attached}
+														onSendInput={(text, type) => sendExpandedInput(text, type)}
+														onKillSession={() => {
+															expandedSession = null;
+															killSession(session.name);
+														}}
+														onInterrupt={() => {
+															// Send Ctrl+C to session
+															fetch(`/api/work/${encodeURIComponent(session.name)}/input`, {
+																method: 'POST',
+																headers: { 'Content-Type': 'application/json' },
+																body: JSON.stringify({ type: 'ctrl-c' })
+															});
+														}}
+														onAttachTerminal={() => attachSession(session.name)}
+														onTaskClick={(taskId) => {
+															// Toggle inline task detail panel
+															if (expandedTaskId === taskId && taskDetailOpen) {
+																taskDetailOpen = false;
+																expandedTaskId = null;
+															} else {
+																expandedTaskId = taskId;
+																taskDetailOpen = true;
+															}
+														}}
+													/>
+												</div>
+												<!-- Horizontal resize handle for tmux width -->
+												<HorizontalResizeHandle
+													onResize={handleHorizontalResize}
+													onResizeEnd={handleHorizontalResizeEnd}
 												/>
+												<!-- Width indicator -->
+												<div class="width-indicator">{tmuxWidth} cols</div>
 											</div>
-											<!-- Horizontal resize handle for tmux width -->
-											<HorizontalResizeHandle
-												onResize={handleHorizontalResize}
-												onResizeEnd={handleHorizontalResizeEnd}
-											/>
-											<!-- Width indicator -->
-											<div class="width-indicator">{tmuxWidth} cols</div>
+
+											<!-- Inline Task Detail Panel -->
+											{#if expandedTask && taskDetailOpen && expandedTaskId === expandedTask.id}
+												<div class="task-detail-panel" style="height: {expandedHeight}px;">
+													<div class="task-panel-header">
+														<h3 class="task-panel-title">Task Details</h3>
+														<button
+															class="task-panel-close"
+															onclick={() => { taskDetailOpen = false; expandedTaskId = null; }}
+															title="Close panel"
+														>
+															<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+																<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+															</svg>
+														</button>
+													</div>
+													<div class="task-panel-content">
+														<!-- Task ID and badges row -->
+														<div class="task-panel-badges">
+															<TaskIdBadge
+																task={{
+																	id: expandedTask.id,
+																	status: expandedTask.status,
+																	issue_type: expandedTask.issue_type,
+																	priority: expandedTask.priority
+																}}
+																size="sm"
+																variant="projectPill"
+																showType={true}
+															/>
+														</div>
+
+														<!-- Title -->
+														<h4 class="task-panel-task-title">{expandedTask.title || 'Untitled'}</h4>
+
+														<!-- Description -->
+														{#if expandedTask.description}
+															<div class="task-panel-section">
+																<span class="task-panel-label">Description</span>
+																<p class="task-panel-description">{expandedTask.description}</p>
+															</div>
+														{/if}
+
+														<!-- View full details link -->
+														<div class="task-panel-actions">
+															<a
+																href="/tasks?task={expandedTask.id}"
+																class="task-panel-link"
+															>
+																<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+																	<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+																</svg>
+																View full details
+															</a>
+														</div>
+													</div>
+												</div>
+											{/if}
 										</div>
 										<!-- Vertical resize divider for height -->
 										<div
@@ -1133,10 +1212,13 @@
 		font-family: ui-monospace, monospace;
 	}
 
-	.header-controls {
+	/* Table controls (tabs + sort) above the session table */
+	.table-controls {
 		display: flex;
 		align-items: center;
+		justify-content: space-between;
 		gap: 1rem;
+		margin-bottom: 0.75rem;
 	}
 
 	/* Content */
@@ -1243,6 +1325,8 @@
 		border: 1px solid oklch(0.25 0.02 250);
 		border-radius: 8px;
 		/* Note: overflow: hidden removed to allow dropdowns to escape the table bounds */
+		/* Use overflow-x: clip to contain expanded content width without cutting off dropdowns */
+		overflow-x: clip;
 	}
 
 	.sessions-table {
@@ -1300,8 +1384,8 @@
 		color: oklch(0.75 0.02 250);
 	}
 
-	/* Column widths - give narrow columns fixed widths so SESSION expands */
-	.th-actions, .td-actions { width: 205px; }
+	/* Column widths - fixed second column, first column gets remainder */
+	.th-actions, .td-actions { width: 205px; min-width: 205px; max-width: 205px; }
 
 	/* Session name */
 	.td-name {
@@ -1659,10 +1743,156 @@
 		}
 	}
 
+	@keyframes expand-slide-up {
+		from {
+			opacity: 1;
+			max-height: 600px;
+			transform: translateY(0);
+		}
+		to {
+			opacity: 0;
+			max-height: 0;
+			transform: translateY(-10px);
+		}
+	}
+
+	.expanded-session-card.collapsing {
+		animation: expand-slide-up 0.2s ease-out forwards;
+	}
+
 	/* Wrapper for expanded session with horizontal resize */
 	.expanded-session-wrapper {
 		position: relative;
 		padding: 1rem;
+		display: flex;
+		gap: 1rem;
+	}
+
+	/* SessionCard takes all space when no task panel */
+	.session-card-section {
+		position: relative;
+		flex: 1;
+		min-width: 0;
+	}
+
+	/* When task panel is showing, SessionCard gets 60% and panel gets 40% */
+	.expanded-session-wrapper.with-task-panel .session-card-section {
+		flex: 0 0 60%;
+	}
+
+	/* Task detail panel (inline) */
+	.task-detail-panel {
+		flex: 0 0 40%;
+		min-width: 300px;
+		max-width: 500px;
+		overflow-y: auto;
+		border-radius: 8px;
+		border: 1px solid oklch(0.28 0.02 250);
+		background: oklch(0.16 0.01 250);
+		display: flex;
+		flex-direction: column;
+	}
+
+	.task-panel-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0.75rem 1rem;
+		border-bottom: 1px solid oklch(0.25 0.02 250);
+		background: oklch(0.18 0.01 250);
+		border-radius: 8px 8px 0 0;
+	}
+
+	.task-panel-title {
+		font-size: 0.85rem;
+		font-weight: 600;
+		color: oklch(0.80 0.02 250);
+		margin: 0;
+	}
+
+	.task-panel-close {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 24px;
+		height: 24px;
+		padding: 0;
+		background: transparent;
+		border: none;
+		border-radius: 4px;
+		color: oklch(0.55 0.02 250);
+		cursor: pointer;
+		transition: all 0.15s;
+	}
+
+	.task-panel-close:hover {
+		background: oklch(0.25 0.02 250);
+		color: oklch(0.80 0.02 250);
+	}
+
+	.task-panel-content {
+		flex: 1;
+		overflow-y: auto;
+		padding: 1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.875rem;
+	}
+
+	.task-panel-badges {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+	}
+
+	.task-panel-task-title {
+		font-size: 1rem;
+		font-weight: 600;
+		color: oklch(0.90 0.02 250);
+		margin: 0;
+		line-height: 1.4;
+	}
+
+	.task-panel-section {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.task-panel-label {
+		font-size: 0.7rem;
+		font-weight: 600;
+		color: oklch(0.55 0.02 250);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.task-panel-description {
+		font-size: 0.8rem;
+		color: oklch(0.70 0.02 250);
+		margin: 0;
+		line-height: 1.5;
+		white-space: pre-wrap;
+	}
+
+	.task-panel-actions {
+		margin-top: auto;
+		padding-top: 0.75rem;
+		border-top: 1px solid oklch(0.22 0.02 250);
+	}
+
+	.task-panel-link {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+		font-size: 0.8rem;
+		color: oklch(0.70 0.15 200);
+		text-decoration: none;
+		transition: color 0.15s;
+	}
+
+	.task-panel-link:hover {
+		color: oklch(0.80 0.18 200);
 	}
 
 	/* Override SessionCard styles when embedded in table */
@@ -1673,11 +1903,11 @@
 		width: 100%;
 	}
 
-	/* Width indicator */
-	.width-indicator {
+	/* Width indicator - positioned within session-card-section */
+	.session-card-section .width-indicator {
 		position: absolute;
 		top: 0.5rem;
-		right: 1.5rem;
+		right: 0.5rem;
 		font-size: 0.7rem;
 		font-family: ui-monospace, monospace;
 		color: oklch(0.55 0.02 250);

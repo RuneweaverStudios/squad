@@ -104,9 +104,45 @@ async function getProjectsWithColors() {
 }
 
 /**
- * Apply border colors for all projects using windowrulev2
- * This uses hyprctl keyword windowrulev2 to set per-window border colors
- * based on window title prefix matching.
+ * Apply border color to a specific window by address
+ * Uses hyprctl dispatch setprop with activebordercolor and inactivebordercolor
+ * @param {string} address - Window address (e.g., "0x55cdbdaa9820")
+ * @param {string} activeColor - Active border color in rgb(rrggbb) format
+ * @param {string} inactiveColor - Inactive border color in rgb(rrggbb) format
+ */
+async function applyBorderColorToWindow(address, activeColor, inactiveColor) {
+	const results = { active: false, inactive: false };
+
+	if (activeColor) {
+		try {
+			await execAsync(
+				`hyprctl dispatch setprop "address:${address}" activebordercolor "${activeColor}"`,
+				{ timeout: 2000 }
+			);
+			results.active = true;
+		} catch {
+			// Ignore errors
+		}
+	}
+
+	if (inactiveColor) {
+		try {
+			await execAsync(
+				`hyprctl dispatch setprop "address:${address}" inactivebordercolor "${inactiveColor}"`,
+				{ timeout: 2000 }
+			);
+			results.inactive = true;
+		} catch {
+			// Ignore errors
+		}
+	}
+
+	return results;
+}
+
+/**
+ * Apply border colors to all windows matching project prefixes
+ * Uses hyprctl dispatch setprop for each matching window
  */
 export async function POST() {
 	// Check if Hyprland is available
@@ -128,58 +164,71 @@ export async function POST() {
 		});
 	}
 
+	// Get all Hyprland windows
+	const clients = await getHyprlandClients();
+	if (clients.length === 0) {
+		return json({
+			success: false,
+			message: 'No Hyprland windows found'
+		});
+	}
+
 	const results = [];
 
-	// For each project, add a windowrulev2 for its title prefix
+	// Build a map of title prefixes to colors
+	const prefixColorMap = new Map();
 	for (const project of projects) {
-		// Create rules for both displayName and uppercase name prefixes
+		// Match both displayName and uppercase name
 		const prefixes = [
-			project.displayName,
-			project.name.toUpperCase()
+			project.displayName + ':',
+			project.name.toUpperCase() + ':'
 		];
 
-		// Remove duplicates
-		const uniquePrefixes = [...new Set(prefixes)];
+		for (const prefix of prefixes) {
+			prefixColorMap.set(prefix, {
+				activeColor: project.activeColor,
+				inactiveColor: project.inactiveColor,
+				projectName: project.name
+			});
+		}
+	}
 
-		for (const prefix of uniquePrefixes) {
-			try {
-				// Build the bordercolor rule
-				// Format: bordercolor <active> [inactive],title:^(PREFIX:)
-				let colorSpec = project.activeColor;
-				if (project.inactiveColor) {
-					colorSpec += ` ${project.inactiveColor}`;
-				}
+	// Apply colors to matching windows
+	for (const client of clients) {
+		if (!client.title || !client.address) continue;
 
-				// Use windowrulev2 to set border color for windows with this title prefix
-				// The regex ^(PREFIX:) matches titles starting with "PREFIX:"
-				const rule = `bordercolor ${colorSpec},title:^(${prefix}:)`;
-				await execAsync(
-					`hyprctl keyword windowrulev2 '${rule}'`,
-					{ timeout: 2000 }
+		// Check if title starts with any known prefix
+		for (const [prefix, colors] of prefixColorMap.entries()) {
+			if (client.title.startsWith(prefix)) {
+				const result = await applyBorderColorToWindow(
+					client.address,
+					colors.activeColor,
+					colors.inactiveColor
 				);
 
 				results.push({
-					project: project.name,
+					window: client.title,
+					address: client.address,
+					project: colors.projectName,
 					prefix,
-					rule,
-					success: true
+					activeApplied: result.active,
+					inactiveApplied: result.inactive,
+					success: result.active || result.inactive
 				});
-			} catch (err) {
-				results.push({
-					project: project.name,
-					prefix,
-					success: false,
-					error: err instanceof Error ? err.message : String(err)
-				});
+
+				break; // Only apply first matching prefix
 			}
 		}
 	}
 
+	const successCount = results.filter(r => r.success).length;
+
 	return json({
 		success: true,
-		message: `Applied ${results.filter(r => r.success).length} window rules`,
-		rulesApplied: results.filter(r => r.success).length,
+		message: `Applied colors to ${successCount} window(s)`,
+		windowsUpdated: successCount,
 		projectsWithColors: projects.length,
+		totalWindows: clients.length,
 		results
 	});
 }
