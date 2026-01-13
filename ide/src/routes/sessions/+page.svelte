@@ -882,6 +882,7 @@
 												sessionState={activityState || 'idle'}
 												{elapsed}
 												sessionName={session.name}
+												alignRight={true}
 												onAction={async (actionId) => {
 													if (actionId === 'attach') {
 														await attachSession(session.name);
