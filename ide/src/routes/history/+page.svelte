@@ -19,6 +19,7 @@
 	import TaskDetailDrawer from "$lib/components/TaskDetailDrawer.svelte";
 	import { HistorySkeleton } from "$lib/components/skeleton";
 	import { getProjectColor, initProjectColors } from "$lib/utils/projectColors";
+	import ProjectSelector from "$lib/components/ProjectSelector.svelte";
 
 	interface CompletedTask {
 		id: string;
@@ -31,8 +32,14 @@
 		project?: string;
 	}
 
+	interface Project {
+		name: string;
+		activeColor?: string;
+	}
+
 	// State
 	let tasks = $state<CompletedTask[]>([]);
+	let projects = $state<Project[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 
@@ -50,11 +57,24 @@
 		selectedProject = projectParam || "All Projects";
 	});
 
-	// Fetch completed tasks on mount
+	// Fetch data on mount
 	onMount(() => {
 		initProjectColors();
+		fetchProjects();
 		fetchTasks();
 	});
+
+	async function fetchProjects() {
+		try {
+			// Include stats=true to get projects sorted by last activity (most recent first)
+			const response = await fetch("/api/projects?visible=true&stats=true");
+			if (!response.ok) throw new Error("Failed to fetch projects");
+			const data = await response.json();
+			projects = data.projects || [];
+		} catch (e) {
+			console.error("Failed to fetch projects:", e);
+		}
+	}
 
 	async function fetchTasks() {
 		loading = true;
@@ -71,15 +91,13 @@
 		}
 	}
 
-	// Get unique projects from tasks
-	const projects = $derived.by(() => {
-		const projectSet = new Set<string>();
-		for (const task of tasks) {
-			const project = task.project || task.id.split("-")[0];
-			if (project) projectSet.add(project);
-		}
-		return ["All Projects", ...Array.from(projectSet).sort()];
-	});
+	// Project names for ProjectSelector (sorted by recent activity from API)
+	const projectNames = $derived(["All Projects", ...projects.map(p => p.name)]);
+
+	// Project colors map for ProjectSelector
+	const projectColorsMap = $derived(
+		new Map(projects.map(p => [p.name, p.activeColor || "oklch(0.60 0.15 145)"]))
+	);
 
 	// Handle project selection change - update URL
 	function handleProjectChange(project: string) {
@@ -422,57 +440,15 @@
 						class="industrial-input w-48"
 						bind:value={searchQuery}
 					/>
-					<div class="dropdown dropdown-end">
-						<div tabindex="0" role="button" class="filter-trigger">
-							{#if selectedProject !== "All Projects"}
-								<span
-									class="project-dot"
-									style="background: {getProjectColor(selectedProject + '-x')}"
-								></span>
-							{/if}
-							<span>{selectedProject}</span>
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke-width="1.5"
-								stroke="currentColor"
-								class="w-3.5 h-3.5 opacity-50"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-								/>
-							</svg>
-						</div>
-						<ul
-							tabindex="0"
-							class="dropdown-content rounded-box z-50 min-w-44 w-max p-1 shadow-lg bg-base-200 border border-base-300 max-h-72 overflow-y-auto overflow-x-hidden"
-						>
-							{#each projects as project}
-								<li>
-									<button
-										type="button"
-										class="filter-option {selectedProject === project
-											? 'active'
-											: ''}"
-										onclick={() => {
-											handleProjectChange(project);
-											document.activeElement?.blur();
-										}}
-									>
-										{#if project !== "All Projects"}
-											<span
-												class="project-dot"
-												style="background: {getProjectColor(project + '-x')}"
-											></span>
-										{/if}
-										<span class="flex-1">{project}</span>
-									</button>
-								</li>
-							{/each}
-						</ul>
+					<div class="w-48">
+						<ProjectSelector
+							projects={projectNames}
+							{selectedProject}
+							onProjectChange={handleProjectChange}
+							showColors={true}
+							projectColors={projectColorsMap}
+							compact={true}
+						/>
 					</div>
 					{#if searchQuery || selectedProject !== "All Projects"}
 						<button
@@ -682,64 +658,6 @@
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
 		margin-top: 2px;
-	}
-
-	/* Filter Trigger Button */
-	.filter-trigger {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.375rem 0.75rem;
-		background: var(--color-base-200);
-		border: 1px solid var(--color-base-300);
-		border-radius: 0.375rem;
-		font-size: 0.75rem;
-		font-family: ui-monospace, monospace;
-		color: var(--color-base-content);
-		cursor: pointer;
-		transition: all 0.15s ease;
-	}
-
-	.filter-trigger:hover {
-		border-color: oklch(from var(--color-base-content) l c h / 30%);
-	}
-
-	/* Project Color Dot */
-	.project-dot {
-		width: 8px;
-		height: 8px;
-		border-radius: 50%;
-		flex-shrink: 0;
-	}
-
-	/* Filter Option in Dropdown */
-	.filter-option {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		width: 100%;
-		padding: 0.5rem 0.75rem;
-		font-size: 0.75rem;
-		font-family: ui-monospace, monospace;
-		color: var(--color-base-content);
-		opacity: 0.7;
-		background: transparent;
-		border: none;
-		border-left: 2px solid transparent;
-		cursor: pointer;
-		transition: all 0.15s ease;
-	}
-
-	.filter-option:hover {
-		opacity: 1;
-		background: var(--color-base-300);
-	}
-
-	.filter-option.active {
-		opacity: 1;
-		background: oklch(from var(--color-primary) l c h / 15%);
-		border-left-color: var(--color-primary);
-		color: var(--color-primary);
 	}
 
 	/* Daily Section */

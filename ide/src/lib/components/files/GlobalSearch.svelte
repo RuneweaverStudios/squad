@@ -13,6 +13,7 @@
 	 */
 
 	import { onMount, tick } from 'svelte';
+	import ProjectSelector from '$lib/components/ProjectSelector.svelte';
 
 	interface SearchResult {
 		file: string;
@@ -41,6 +42,11 @@
 	$effect(() => {
 		selectedProject = project;
 	});
+
+	// Convert projectColors Record to Map for ProjectSelector
+	const projectColorsMap = $derived(
+		new Map(Object.entries(projectColors))
+	);
 
 	// State
 	let searchQuery = $state('');
@@ -306,45 +312,16 @@
 			<!-- Project Selector Row -->
 			<div class="project-row">
 				<span class="project-label">Searching in:</span>
-				{#if availableProjects.length > 1}
-					<div class="dropdown dropdown-bottom">
-						<button class="project-selector" tabindex="0">
-							<span
-								class="w-2 h-2 rounded-full flex-shrink-0"
-								style="background: {projectColors[selectedProject] || 'oklch(0.60 0.15 145)'};"
-							></span>
-							<span class="project-name">{selectedProject}</span>
-							<svg class="dropdown-arrow" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-							</svg>
-						</button>
-						<ul tabindex="-1" class="dropdown-content bg-base-200 rounded-box shadow-xl border border-base-300 max-h-48 overflow-y-auto z-50 p-1 min-w-40">
-							{#each availableProjects as proj}
-								<li>
-									<button
-										class="flex items-center gap-2 w-full px-3 py-1.5 rounded-md hover:bg-base-300 transition-colors text-left text-sm"
-										class:bg-base-300={selectedProject === proj}
-										onclick={() => { handleProjectChange(proj); }}
-									>
-										<span
-											class="w-2 h-2 rounded-full flex-shrink-0"
-											style="background: {projectColors[proj] || 'oklch(0.60 0.15 145)'};"
-										></span>
-										{proj}
-									</button>
-								</li>
-							{/each}
-						</ul>
-					</div>
-				{:else}
-					<span class="project-name-static">
-						<span
-							class="w-2 h-2 rounded-full flex-shrink-0 inline-block mr-1.5"
-							style="background: {projectColors[selectedProject] || 'oklch(0.60 0.15 145)'};"
-						></span>
+				<div class="project-selector-wrapper">
+					<ProjectSelector
+						projects={availableProjects}
 						{selectedProject}
-					</span>
-				{/if}
+						onProjectChange={handleProjectChange}
+						showColors={true}
+						projectColors={projectColorsMap}
+						compact={true}
+					/>
+				</div>
 			</div>
 
 			<!-- Search Input -->
@@ -521,41 +498,8 @@
 		color: oklch(0.55 0.02 250);
 	}
 
-	.project-selector {
-		display: flex;
-		align-items: center;
-		gap: 0.375rem;
-		padding: 0.25rem 0.5rem;
-		background: oklch(0.22 0.02 250);
-		border: 1px solid oklch(0.30 0.02 250);
-		border-radius: 0.375rem;
-		cursor: pointer;
-		transition: all 0.15s ease;
-	}
-
-	.project-selector:hover {
-		background: oklch(0.25 0.02 250);
-		border-color: oklch(0.35 0.02 250);
-	}
-
-	.project-name {
-		font-size: 0.8125rem;
-		font-weight: 600;
-		color: oklch(0.85 0.02 250);
-		font-family: ui-monospace, monospace;
-	}
-
-	.project-name-static {
-		font-size: 0.8125rem;
-		font-weight: 600;
-		color: oklch(0.85 0.02 250);
-		font-family: ui-monospace, monospace;
-	}
-
-	.dropdown-arrow {
-		width: 0.75rem;
-		height: 0.75rem;
-		color: oklch(0.50 0.02 250);
+	.project-selector-wrapper {
+		min-width: 140px;
 	}
 
 	.search-container {
