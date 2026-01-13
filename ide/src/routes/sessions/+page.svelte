@@ -740,7 +740,6 @@
 					<thead>
 						<tr>
 							<th class="th-name">Session</th>
-							<th class="th-status">Status</th>
 							<th class="th-actions">Agent</th>
 						</tr>
 					</thead>
@@ -839,27 +838,21 @@
 										{/if}
 									{/if}
 								</td>
-								<td class="td-status">
-									{#if session.attached}
-										<span class="status-attached">
-											<span class="status-dot attached"></span>
-											attached
-										</span>
-									{:else}
-										<span class="status-detached">
-											<span class="status-dot"></span>
-											detached
-										</span>
-									{/if}
-								</td>
-								<td class="td-actions" onclick={(e) => e.stopPropagation()}>
+									<td class="td-actions" onclick={(e) => e.stopPropagation()}>
 									{#if session.type === 'agent'}
 										<!-- Two-row layout: Agent info row, then StatusActionBadge with timer -->
 										<div class="agent-column">
-											<!-- Row 1: Avatar + Name -->
+											<!-- Row 1: Avatar + Name + Attached indicator -->
 											<div class="agent-info-row">
 												<AgentAvatar name={sessionAgentName} size={16} />
 												<span class="agent-name">{sessionAgentName}</span>
+												{#if session.attached}
+													<span class="attached-indicator" title="Terminal attached">
+														<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="attached-icon">
+															<path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+														</svg>
+													</span>
+												{/if}
 											</div>
 											<!-- Row 2: Status action badge with elapsed time -->
 											<StatusActionBadge
@@ -1297,7 +1290,6 @@
 	}
 
 	/* Column widths - give narrow columns fixed widths so SESSION expands */
-	.th-status, .td-status { width: 90px; }
 	.th-actions, .td-actions { width: 205px; }
 
 	/* Session name */
@@ -1397,33 +1389,18 @@
 		white-space: nowrap;
 	}
 
-	/* Status */
-	.status-attached,
-	.status-detached {
+	/* Attached indicator */
+	.attached-indicator {
 		display: flex;
 		align-items: center;
-		gap: 0.375rem;
-		font-size: 0.8rem;
+		margin-left: 0.25rem;
 	}
 
-	.status-attached {
-		color: oklch(0.70 0.15 145);
-	}
-
-	.status-detached {
-		color: oklch(0.55 0.02 250);
-	}
-
-	.status-dot {
-		width: 6px;
-		height: 6px;
-		border-radius: 50%;
-		background: oklch(0.45 0.02 250);
-	}
-
-	.status-dot.attached {
-		background: oklch(0.65 0.18 145);
-		box-shadow: 0 0 6px oklch(0.65 0.18 145 / 0.6);
+	.attached-icon {
+		width: 12px;
+		height: 12px;
+		color: oklch(0.70 0.18 145);
+		filter: drop-shadow(0 0 3px oklch(0.65 0.18 145 / 0.6));
 	}
 
 	/* Actions */
