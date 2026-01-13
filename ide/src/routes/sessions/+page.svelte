@@ -825,8 +825,17 @@
 													{sessionTask.title || sessionTask.id}
 												</span>
 											{:else}
-												<!-- No task - show agent name and session info -->
-												<span class="session-name-pill">{session.name}</span>
+												<!-- No task - show project badge if known, otherwise session name -->
+												{#if session.project}
+													<span
+														class="project-badge"
+														style="background: {rowProjectColor ? `color-mix(in oklch, ${rowProjectColor} 25%, transparent)` : 'oklch(0.25 0.02 250)'}; border-color: {rowProjectColor || 'oklch(0.35 0.02 250)'}; color: {rowProjectColor || 'oklch(0.75 0.02 250)'};"
+													>
+														{session.project}
+													</span>
+												{:else}
+													<span class="session-name-pill">{session.name}</span>
+												{/if}
 												<span class="no-task-label">No active task</span>
 											{/if}
 										</div>
@@ -1315,6 +1324,17 @@
 		background: oklch(0.25 0.02 250);
 		padding: 0.125rem 0.5rem;
 		border-radius: 4px;
+		font-family: ui-monospace, monospace;
+	}
+
+	.project-badge {
+		font-size: 0.7rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+		padding: 0.125rem 0.5rem;
+		border-radius: 4px;
+		border: 1px solid;
 		font-family: ui-monospace, monospace;
 	}
 
