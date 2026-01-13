@@ -603,14 +603,22 @@
 							{@const sessionInfo = agentSessionInfo.get(sessionAgentName)}
 							{@const activityState = sessionInfo?.activityState}
 							{@const statusDotColor = activityState === 'working'
-								? 'oklch(0.70 0.18 220)' // Blue for working
+								? 'oklch(0.70 0.18 250)' // Indigo/blue for working
+								: activityState === 'compacting'
+								? 'oklch(0.65 0.15 280)' // Purple for compacting
 								: activityState === 'needs-input'
-								? 'oklch(0.70 0.18 300)' // Purple for needs input
+								? 'oklch(0.75 0.20 45)' // Orange for needs input
 								: activityState === 'ready-for-review'
-								? 'oklch(0.70 0.18 180)' // Cyan for review
-								: activityState === 'completing' || activityState === 'completed'
-								? 'oklch(0.65 0.18 145)' // Green for completing/completed
-								: 'oklch(0.50 0.02 250)' // Grey for idle/unknown
+								? 'oklch(0.70 0.20 85)' // Amber/yellow for review
+								: activityState === 'completing'
+								? 'oklch(0.65 0.15 175)' // Teal for completing
+								: activityState === 'completed'
+								? 'oklch(0.70 0.20 145)' // Green for completed
+								: activityState === 'starting'
+								? 'oklch(0.75 0.15 200)' // Blue for starting
+								: activityState === 'recovering'
+								? 'oklch(0.70 0.20 190)' // Cyan for recovering
+								: 'oklch(0.55 0.05 250)' // Grey for idle/unknown
 							}
 							<tr
 								class="session-row"
@@ -1029,6 +1037,7 @@
 		width: 100%;
 		border-collapse: collapse;
 		font-family: ui-monospace, monospace;
+		table-layout: fixed;
 	}
 
 	.sessions-table thead {
@@ -1078,6 +1087,12 @@
 		font-size: 0.85rem;
 		color: oklch(0.75 0.02 250);
 	}
+
+	/* Column widths - give narrow columns fixed widths so SESSION expands */
+	.th-type, .td-type { width: 80px; }
+	.th-status, .td-status { width: 100px; }
+	.th-uptime, .td-uptime { width: 80px; }
+	.th-actions, .td-actions { width: 120px; }
 
 	/* Session name */
 	.td-name {
