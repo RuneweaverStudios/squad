@@ -175,15 +175,16 @@
 	let sortDir = $state<SessionSortDirection>('asc');
 
 	// State priority for sorting (lower = more urgent/higher priority)
+	// Principle: States requiring user attention/action come first
 	const STATE_PRIORITY: Record<string, number> = {
 		'ready-for-review': 0,   // Most urgent - needs human review
 		'needs-input': 1,        // Waiting for user input
-		'working': 2,            // Actively working
-		'completing': 3,         // Running completion
-		'starting': 4,           // Agent starting up
-		'recovering': 5,         // Automation recovery
-		'compacting': 6,         // Context compaction
-		'completed': 7,          // Task done
+		'completed': 2,          // User must review completion screen and close it
+		'working': 3,            // Actively working (no user action needed)
+		'completing': 4,         // Running completion
+		'starting': 5,           // Agent starting up
+		'recovering': 6,         // Automation recovery
+		'compacting': 7,         // Context compaction
 		'auto-proceeding': 8,    // Spawning next
 		'idle': 9                // Lowest priority
 	};
