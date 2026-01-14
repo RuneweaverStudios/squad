@@ -73,6 +73,12 @@
 	let discardSlideProgress = $state(0);
 	let isSliding = $state(false);
 
+	// Discard all state
+	let isDiscardingAll = $state(false);
+	let pendingDiscardAll = $state(false);
+	let discardAllSlideProgress = $state(0);
+	let isDiscardAllSliding = $state(false);
+
 	// Derived counts (exclude staged files from changes count)
 	const stagedCount = $derived(stagedFiles.length);
 	const changesCount = $derived(
@@ -396,6 +402,88 @@
 			newSet.delete(filePath);
 			discardingFiles = newSet;
 			pendingDiscardFile = null;
+		}
+	}
+
+	/**
+	 * Start discard all confirmation
+	 */
+	function startDiscardAllConfirm() {
+		pendingDiscardAll = true;
+		discardAllSlideProgress = 0;
+		isDiscardAllSliding = false;
+	}
+
+	/**
+	 * Cancel discard all confirmation
+	 */
+	function cancelDiscardAll() {
+		pendingDiscardAll = false;
+		discardAllSlideProgress = 0;
+		isDiscardAllSliding = false;
+	}
+
+	/**
+	 * Handle slide progress for discard all confirmation
+	 */
+	function handleDiscardAllSlideMove(e: MouseEvent | TouchEvent, containerWidth: number) {
+		if (!isDiscardAllSliding || !pendingDiscardAll) return;
+
+		const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+		const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+		const x = clientX - rect.left;
+		const progress = Math.max(0, Math.min(100, (x / containerWidth) * 100));
+		discardAllSlideProgress = progress;
+	}
+
+	/**
+	 * Handle slide end for discard all - check if threshold reached
+	 */
+	function handleDiscardAllSlideEnd() {
+		if (discardAllSlideProgress >= 80 && pendingDiscardAll) {
+			// Threshold reached - discard all files
+			discardAll();
+		}
+		// Reset slide state
+		discardAllSlideProgress = 0;
+		isDiscardAllSliding = false;
+		pendingDiscardAll = false;
+	}
+
+	/**
+	 * Discard all unstaged changes
+	 */
+	async function discardAll() {
+		if (isDiscardingAll) return;
+
+		// Collect all changed files (exclude staged ones)
+		const allChanges = [
+			...modifiedFiles.filter(f => !stagedFiles.includes(f)),
+			...deletedFiles.filter(f => !stagedFiles.includes(f))
+		];
+
+		if (allChanges.length === 0) return;
+
+		isDiscardingAll = true;
+		try {
+			const response = await fetch('/api/files/git/discard', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ project, paths: allChanges })
+			});
+
+			if (!response.ok) {
+				const data = await response.json();
+				throw new Error(data.message || 'Failed to discard changes');
+			}
+
+			await fetchStatus();
+			showToast(`Discarded ${allChanges.length} file(s)`);
+		} catch (err) {
+			showToast(err instanceof Error ? err.message : 'Failed to discard changes', 'error');
+		} finally {
+			isDiscardingAll = false;
+			pendingDiscardAll = false;
 		}
 	}
 
@@ -922,8 +1010,66 @@
 								</svg>
 							{/if}
 						</button>
+						{@const discardableCount = modifiedFiles.filter(f => !stagedFiles.includes(f)).length + deletedFiles.filter(f => !stagedFiles.includes(f)).length}
+						{#if discardableCount > 0 && !pendingDiscardAll}
+							<button
+								class="discard-all-btn"
+								onclick={(e) => { e.stopPropagation(); startDiscardAllConfirm(); }}
+								disabled={isDiscardingAll}
+								title="Discard all changes"
+							>
+								{#if isDiscardingAll}
+									<span class="loading loading-spinner loading-xs"></span>
+								{:else}
+									<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+										<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+										<path d="M3 3v5h5" />
+									</svg>
+								{/if}
+							</button>
+						{/if}
 					{/if}
 				</button>
+
+				{#if pendingDiscardAll}
+					<div class="discard-all-container">
+						<div class="discard-all-header">
+							<span class="discard-all-label">⚠️ Discard all changes?</span>
+							<button class="discard-all-cancel-btn" onclick={cancelDiscardAll} title="Cancel">
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<line x1="18" y1="6" x2="6" y2="18" />
+									<line x1="6" y1="6" x2="18" y2="18" />
+								</svg>
+							</button>
+						</div>
+						<div
+							class="discard-all-slide-container"
+							role="slider"
+							tabindex="0"
+							aria-label="Slide to discard all changes"
+							aria-valuenow={discardAllSlideProgress}
+							onmousedown={() => isDiscardAllSliding = true}
+							onmouseup={handleDiscardAllSlideEnd}
+							onmouseleave={() => { if (isDiscardAllSliding) handleDiscardAllSlideEnd(); }}
+							onmousemove={(e) => handleDiscardAllSlideMove(e, (e.currentTarget as HTMLElement).offsetWidth)}
+							ontouchstart={() => isDiscardAllSliding = true}
+							ontouchend={handleDiscardAllSlideEnd}
+							ontouchmove={(e) => handleDiscardAllSlideMove(e, (e.currentTarget as HTMLElement).offsetWidth)}
+						>
+							<div class="discard-all-slide-track">
+								<div class="discard-all-slide-fill" style="width: {discardAllSlideProgress}%"></div>
+								<div class="discard-all-slide-thumb" style="left: {Math.max(4, discardAllSlideProgress)}%">
+									<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+										<polyline points="9 18 15 12 9 6" />
+									</svg>
+								</div>
+								<span class="discard-all-slide-text">
+									{discardAllSlideProgress >= 80 ? 'Release to discard' : 'Slide to discard all'}
+								</span>
+							</div>
+						</div>
+					</div>
+				{/if}
 
 				{#if !changesCollapsed}
 					<div class="file-list">
@@ -2121,6 +2267,152 @@
 	.stage-all-btn svg {
 		width: 12px;
 		height: 12px;
+	}
+
+	.discard-all-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 20px;
+		height: 20px;
+		padding: 0;
+		background: transparent;
+		border: 1px solid oklch(0.35 0.08 30);
+		border-radius: 0.25rem;
+		color: oklch(0.55 0.12 30);
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.discard-all-btn:hover:not(:disabled) {
+		background: oklch(0.55 0.15 30 / 0.2);
+		border-color: oklch(0.55 0.15 30);
+		color: oklch(0.70 0.15 30);
+	}
+
+	.discard-all-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.discard-all-btn svg {
+		width: 12px;
+		height: 12px;
+	}
+
+	/* Discard All Confirmation Bar */
+	.discard-all-container {
+		margin: 0.5rem 0;
+		padding: 0.5rem;
+		background: oklch(0.18 0.03 30 / 0.3);
+		border: 1px solid oklch(0.40 0.10 30 / 0.5);
+		border-radius: 0.5rem;
+	}
+
+	.discard-all-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 0.5rem;
+	}
+
+	.discard-all-label {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: oklch(0.75 0.15 30);
+	}
+
+	.discard-all-cancel-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 20px;
+		height: 20px;
+		padding: 0;
+		background: oklch(0.25 0.02 250);
+		border: 1px solid oklch(0.35 0.02 250);
+		border-radius: 0.25rem;
+		cursor: pointer;
+		transition: all 0.15s ease;
+		color: oklch(0.60 0.02 250);
+	}
+
+	.discard-all-cancel-btn:hover {
+		background: oklch(0.30 0.02 250);
+		border-color: oklch(0.45 0.02 250);
+		color: oklch(0.80 0.02 250);
+	}
+
+	.discard-all-cancel-btn svg {
+		width: 12px;
+		height: 12px;
+	}
+
+	.discard-all-slide-container {
+		height: 28px;
+		cursor: grab;
+		user-select: none;
+		touch-action: none;
+	}
+
+	.discard-all-slide-container:active {
+		cursor: grabbing;
+	}
+
+	.discard-all-slide-track {
+		position: relative;
+		width: 100%;
+		height: 100%;
+		background: oklch(0.20 0.04 30);
+		border-radius: 14px;
+		border: 1px solid oklch(0.40 0.10 30);
+		overflow: hidden;
+	}
+
+	.discard-all-slide-fill {
+		position: absolute;
+		top: 0;
+		left: 0;
+		height: 100%;
+		background: linear-gradient(90deg, oklch(0.50 0.15 30), oklch(0.60 0.18 30));
+		border-radius: 14px 0 0 14px;
+		transition: width 0.05s ease-out;
+	}
+
+	.discard-all-slide-thumb {
+		position: absolute;
+		top: 50%;
+		transform: translate(-50%, -50%);
+		width: 24px;
+		height: 24px;
+		background: oklch(0.95 0.02 250);
+		border: 2px solid oklch(0.60 0.15 30);
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		box-shadow: 0 2px 4px oklch(0 0 0 / 0.3);
+		transition: left 0.05s ease-out;
+	}
+
+	.discard-all-slide-thumb svg {
+		width: 14px;
+		height: 14px;
+		color: oklch(0.40 0.02 250);
+	}
+
+	.discard-all-slide-text {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		font-size: 0.6875rem;
+		font-weight: 600;
+		color: oklch(0.80 0.02 250);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		pointer-events: none;
+		white-space: nowrap;
 	}
 
 	/* File List */
