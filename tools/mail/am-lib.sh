@@ -41,32 +41,6 @@ SQL
     echo "$project_id"
 }
 
-# Generate random adjective+noun agent name
-am_generate_name() {
-    local adjectives=(
-        "Swift" "Bright" "Bold" "Calm" "Clear" "Deep"
-        "Fair" "Free" "Grand" "Great" "High" "Just"
-        "Kind" "Light" "Long" "New" "Pure" "Quick"
-        "Rare" "Rich" "Sharp" "Short" "Soft" "Strong"
-        "Sure" "True" "Warm" "Wide" "Wild" "Wise"
-        "Blue" "Green" "Red" "Gold" "Silver" "Crystal"
-        "Dark" "Pale" "Bright" "Faint" "Dim" "Dull"
-    )
-
-    local nouns=(
-        "Lake" "River" "Mountain" "Valley" "Forest" "Ocean"
-        "Storm" "Wind" "Cloud" "Star" "Moon" "Sun"
-        "Stone" "Rock" "Peak" "Ridge" "Cliff" "Cave"
-        "Field" "Meadow" "Grove" "Hill" "Coast" "Bay"
-        "Falls" "Stream" "Brook" "Pond" "Isle" "Shore"
-        "Canyon" "Desert" "Prairie" "Tundra" "Marsh" "Reef"
-    )
-
-    local adj="${adjectives[$RANDOM % ${#adjectives[@]}]}"
-    local noun="${nouns[$RANDOM % ${#nouns[@]}]}"
-    echo "${adj}${noun}"
-}
-
 # Get agent by name in project
 # Returns: JSON with agent details
 am_get_agent() {

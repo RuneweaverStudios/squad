@@ -17,7 +17,7 @@ JSON_OUTPUT=false
 
 show_help() {
     cat <<EOF
-Usage: am-register [options]
+Usage: am-register --name NAME [options]
 
 Register or resume an agent identity in Agent Mail.
 
@@ -25,8 +25,11 @@ IMPORTANT: Agent names are globally unique across all projects.
 If an agent name already exists, this command will resume that agent
 (updating last_active timestamp) instead of creating a duplicate.
 
+NOTE: IDE-spawned agents are pre-registered by the spawn API.
+This command is for manual/CLI use only.
+
 Options:
-  --name NAME         Agent name (adjective+noun, omit to auto-generate)
+  --name NAME         Agent name (required, e.g., BlueLake)
   --program PROGRAM   Program name (default: claude-code)
   --model MODEL       Model name (default: sonnet-4.5)
   --task TASK         Task description (default: "")
@@ -35,10 +38,9 @@ Options:
   --help, -h          Show this help
 
 Examples:
-  am-register
   am-register --name BlueLake
-  am-register --program cursor --model gpt-4 --task "Bug fixes"
-  am-register --json
+  am-register --name FairBay --program cursor --model gpt-4 --task "Bug fixes"
+  am-register --name GoldDusk --json
 
 Database: $AGENT_MAIL_DB
 EOF
@@ -80,20 +82,13 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Require --name flag
+if [[ -z "$NAME" ]]; then
+    am_error "Missing required --name flag. Agent names must be provided explicitly.\n\nFor IDE-spawned agents, the name is pre-registered by the spawn API.\nFor manual/CLI use, provide a name: am-register --name YourAgentName"
+fi
+
 # Get or create project
 PROJECT_ID=$(am_get_project "$AGENT_MAIL_DB" "$PROJECT")
-
-# Generate name if not provided
-if [[ -z "$NAME" ]]; then
-    # Try to find an unused name (check globally, not per-project)
-    for attempt in {1..10}; do
-        NAME=$(am_generate_name)
-        existing=$(sqlite3 "$AGENT_MAIL_DB" "SELECT COUNT(*) FROM agents WHERE name = '$NAME';")
-        if [[ "$existing" == "0" ]]; then
-            break
-        fi
-    done
-fi
 
 # Check if agent already exists (globally across all projects)
 AGENT_ID=$(sqlite3 "$AGENT_MAIL_DB" "SELECT id FROM agents WHERE name = '$NAME';")
