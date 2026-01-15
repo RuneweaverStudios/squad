@@ -3,6 +3,7 @@
 	import { TASK_STATUS_VISUALS, STATUS_ICONS, getIssueTypeVisual } from '$lib/config/statusColors';
 	import { isHumanTask } from '$lib/utils/badgeHelpers';
 	import WorkingAgentBadge from '$lib/components/WorkingAgentBadge.svelte';
+	import AgentAvatar from '$lib/components/AgentAvatar.svelte';
 
 	/** Dependency task info */
 	interface DepTask {
@@ -58,11 +59,13 @@
 		showUnblocksCount?: boolean;
 		/** Optional status dot color (oklch string) - shows a colored dot before the ID representing agent state */
 		statusDotColor?: string;
-		/** Display variant: 'default' (normal badge) | 'projectPill' (outline pill with project prefix only) */
-		variant?: 'default' | 'projectPill';
+		/** Display variant: 'default' (normal badge) | 'projectPill' (outline pill with project prefix only) | 'agentPill' (avatar with status ring + task ID) */
+		variant?: 'default' | 'projectPill' | 'agentPill';
+		/** Agent name for agentPill variant - displays avatar with status ring */
+		agentName?: string;
 	}
 
-	let { task, size = 'sm', showStatus = true, showType = true, showCopyIcon = false, showAssignee = false, minimal = false, color, onOpenTask, onAgentClick, dropdownAlign = 'start', copyOnly = false, blockedBy = [], blocks = [], showDependencies = false, showDepGraph = true, showUnblocksCount = false, statusDotColor, variant = 'default' }: Props = $props();
+	let { task, size = 'sm', showStatus = true, showType = true, showCopyIcon = false, showAssignee = false, minimal = false, color, onOpenTask, onAgentClick, dropdownAlign = 'start', copyOnly = false, blockedBy = [], blocks = [], showDependencies = false, showDepGraph = true, showUnblocksCount = false, statusDotColor, variant = 'default', agentName }: Props = $props();
 
 	// Extract project prefix from task ID (e.g., "jat-abc" -> "jat")
 	const projectPrefix = $derived(task.id.split('-')[0] || task.id);
@@ -216,6 +219,51 @@
 			style="background: {dotColor};"
 		></span>
 		<!-- Full task ID -->
+		<span>{task.id}</span>
+		{#if showType && task.issue_type}
+			<span class="opacity-80">{typeVisual.icon}</span>
+		{/if}
+		{#if copied}
+			<svg class="{iconSizes[size]} text-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+			</svg>
+		{/if}
+	</button>
+{:else if variant === 'agentPill'}
+	<!-- Agent pill mode: avatar with status ring + task ID - more compact single-row display -->
+	{@const ringColor = statusDotColor || 'oklch(0.50 0.02 250)'}
+	{@const avatarSize = size === 'xs' ? 20 : size === 'sm' ? 24 : 28}
+	<button
+		class="inline-flex items-center gap-2 font-mono rounded-full cursor-pointer
+			   hover:opacity-90 transition-all {size === 'xs' ? 'text-xs pr-2 pl-0.5 py-0.5' : size === 'sm' ? 'text-sm pr-2.5 pl-0.5 py-0.5' : 'text-base pr-3 pl-1 py-1'}"
+		style="
+			background: color-mix(in oklch, {projectColor} 12%, transparent);
+			border: 1px solid color-mix(in oklch, {projectColor} 30%, transparent);
+			color: {projectColor};
+		"
+		onclick={copyId}
+		title="Click to copy task ID"
+	>
+		<!-- Avatar with status ring -->
+		<div
+			class="rounded-full shrink-0 flex items-center justify-center"
+			style="
+				padding: 2px;
+				background: {ringColor};
+				box-shadow: 0 0 6px {ringColor};
+			"
+		>
+			{#if agentName}
+				<AgentAvatar name={agentName} size={avatarSize - 4} />
+			{:else}
+				<!-- Fallback dot if no agent -->
+				<div
+					class="rounded-full"
+					style="width: {avatarSize - 4}px; height: {avatarSize - 4}px; background: oklch(0.25 0.02 250);"
+				></div>
+			{/if}
+		</div>
+		<!-- Task ID -->
 		<span>{task.id}</span>
 		{#if showType && task.issue_type}
 			<span class="opacity-80">{typeVisual.icon}</span>

@@ -1110,48 +1110,51 @@
 											<span class="session-name">{session.name}</span>
 										</div>
 									{:else}
-										<!-- Agent session: TaskIdBadge on top, Agent below -->
+										<!-- Agent session: TaskIdBadge with avatar and status ring -->
 										<div class="task-cell-content">
 											{#if sessionTask}
-												<TaskIdBadge
-													task={sessionTask}
-													size="xs"
-													variant="projectPill"
-													showType={true}
-													{statusDotColor}
-												/>
+												<div class="agent-badge-row">
+													<TaskIdBadge
+														task={sessionTask}
+														size="sm"
+														variant="agentPill"
+														agentName={sessionAgentName}
+														showType={true}
+														{statusDotColor}
+													/>
+													{#if session.resumed}
+														<span class="resumed-badge" title="Resumed from previous session">
+															<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="resumed-icon">
+																<path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+															</svg>
+														</span>
+													{/if}
+													{#if session.attached}
+														<span class="attached-indicator" title="Terminal attached">
+															<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="attached-icon">
+																<path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+															</svg>
+														</span>
+													{/if}
+												</div>
 											{:else}
 												<!-- No task - show project badge if known, otherwise session name -->
-												{#if derivedProject}
-													<span
-														class="project-badge"
-														style="background: {rowProjectColor ? `color-mix(in oklch, ${rowProjectColor} 25%, transparent)` : 'oklch(0.25 0.02 250)'}; border-color: {rowProjectColor || 'oklch(0.35 0.02 250)'}; color: {rowProjectColor || 'oklch(0.75 0.02 250)'};"
-													>
-														{derivedProject}
-													</span>
-												{:else}
-													<span class="session-name-pill">{session.name}</span>
-												{/if}
+												<div class="agent-badge-row">
+													{#if derivedProject}
+														<span
+															class="project-badge"
+															style="background: {rowProjectColor ? `color-mix(in oklch, ${rowProjectColor} 25%, transparent)` : 'oklch(0.25 0.02 250)'}; border-color: {rowProjectColor || 'oklch(0.35 0.02 250)'}; color: {rowProjectColor || 'oklch(0.75 0.02 250)'};"
+														>
+															{derivedProject}
+														</span>
+													{:else}
+														<span class="session-name-pill">{session.name}</span>
+													{/if}
+													<!-- Still show agent avatar when no task -->
+													<AgentAvatar name={sessionAgentName} size={20} />
+													<span class="agent-name-inline">{sessionAgentName}</span>
+												</div>
 											{/if}
-											<!-- Agent info row below badge -->
-											<div class="agent-info-row mt-1">
-												<AgentAvatar name={sessionAgentName} size={20} />
-												<span class="agent-name">{sessionAgentName}</span>
-												{#if session.resumed}
-													<span class="resumed-badge" title="Resumed from previous session">
-														<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="resumed-icon">
-															<path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-														</svg>
-													</span>
-												{/if}
-												{#if session.attached}
-													<span class="attached-indicator" title="Terminal attached">
-														<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="attached-icon">
-															<path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
-														</svg>
-													</span>
-												{/if}
-											</div>
 										</div>
 									{/if}
 								</td>
@@ -1367,7 +1370,7 @@
 											<!-- Inline Task Detail Panel -->
 											{#if expandedTask && taskDetailOpen && expandedTaskId === expandedTask.id}
 												<div class="task-detail-panel" style="height: {expandedHeight}px;">
-													<div class="task-panel-header">
+													<!-- <div class="task-panel-header">
 														<h3 class="task-panel-title">Task Details</h3>
 														<button
 															class="task-panel-close"
@@ -1378,7 +1381,7 @@
 																<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
 															</svg>
 														</button>
-													</div>
+													</div> -->
 													<div class="task-panel-content">
 														<!-- Loading state -->
 														{#if taskDetailsLoading}
@@ -1387,7 +1390,7 @@
 																<span>Loading task details...</span>
 															</div>
 														{:else}
-															<!-- Task ID and badges row -->
+															<!-- Task ID and badges row
 															<div class="task-panel-badges">
 																<TaskIdBadge
 																	task={{
@@ -1400,10 +1403,10 @@
 																	variant="projectPill"
 																	showType={true}
 																/>
-															</div>
+															</div> -->
 
 															<!-- Title -->
-															<h4 class="task-panel-task-title">{expandedTask.title || 'Untitled'}</h4>
+															<!-- <h4 class="task-panel-task-title">{expandedTask.title || 'Untitled'}</h4> -->
 
 															<!-- Description -->
 															{#if expandedTask.description}
@@ -2012,12 +2015,13 @@
 		font-style: italic;
 	}
 
-	/* Status column (Column 3) - right aligned */
+	/* Status column (Column 3) - right aligned, stacked vertically */
 	.status-cell-content {
 		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		justify-content: flex-end;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 0.375rem;
+		justify-content: center;
 	}
 
 	/* Expand/Collapse button */
@@ -2129,10 +2133,23 @@
 		gap: 0.375rem;
 	}
 
+	.agent-badge-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
 	.agent-name {
 		font-size: 1rem;
 		font-weight: 700;
 		color: oklch(0.75 0.02 250);
+		white-space: nowrap;
+	}
+
+	.agent-name-inline {
+		font-size: 0.8125rem;
+		font-weight: 500;
+		color: oklch(0.70 0.02 250);
 		white-space: nowrap;
 	}
 
