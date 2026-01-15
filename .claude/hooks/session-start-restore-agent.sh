@@ -38,7 +38,9 @@ if [[ -f "$AGENT_FILE" ]]; then
     AGENT_NAME=$(cat "$AGENT_FILE" | tr -d '\n')
 fi
 
-# Check if we have a saved agent identity to restore (window-specific)
+# Check if we have a saved agent identity to restore
+# Priority 1: WINDOWID-based file (for compaction recovery)
+# Priority 2: Tmux session name based file (for IDE-spawned agents)
 if [[ -z "$AGENT_NAME" ]] && [[ -f "$PERSISTENT_AGENT_FILE" ]]; then
     AGENT_NAME=$(cat "$PERSISTENT_AGENT_FILE" | tr -d '\n')
 
@@ -56,6 +58,27 @@ if [[ -z "$AGENT_NAME" ]] && [[ -f "$PERSISTENT_AGENT_FILE" ]]; then
 
         # Log for debugging
         echo "[SessionStart] Restored agent: $AGENT_NAME for session $SESSION_ID (WINDOWID=$WINDOW_KEY)" >> "$CLAUDE_DIR/.agent-activity.log"
+    fi
+fi
+
+# Priority 2: Check for IDE-spawned agent identity (tmux session name based)
+# The IDE writes .claude/sessions/.tmux-agent-{tmuxSessionName} before spawning
+if [[ -z "$AGENT_NAME" ]]; then
+    # Get tmux session name (e.g., "jat-SwiftRiver")
+    TMUX_SESSION=$(tmux display-message -p '#S' 2>/dev/null || echo "")
+    if [[ -n "$TMUX_SESSION" ]]; then
+        TMUX_AGENT_FILE="$CLAUDE_DIR/sessions/.tmux-agent-${TMUX_SESSION}"
+        if [[ -f "$TMUX_AGENT_FILE" ]]; then
+            AGENT_NAME=$(cat "$TMUX_AGENT_FILE" | tr -d '\n')
+
+            if [[ -n "$AGENT_NAME" ]]; then
+                # Write the session ID-based agent file
+                echo "$AGENT_NAME" > "$AGENT_FILE"
+
+                # Log for debugging
+                echo "[SessionStart] Restored agent from tmux: $AGENT_NAME for session $SESSION_ID (tmux=$TMUX_SESSION)" >> "$CLAUDE_DIR/.agent-activity.log"
+            fi
+        fi
     fi
 fi
 

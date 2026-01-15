@@ -18,7 +18,8 @@
 import { json } from '@sveltejs/kit';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { existsSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import Database from 'better-sqlite3';
 import {
 	DEFAULT_MODEL,
 	AGENT_MAIL_URL,
@@ -28,6 +29,159 @@ import { getTaskById } from '$lib/server/beads.js';
 import { getProjectPath, getJatDefaults } from '$lib/server/projectPaths.js';
 import { CLAUDE_READY_PATTERNS, SHELL_PROMPT_PATTERNS, isYoloWarningDialog } from '$lib/server/shellPatterns.js';
 import { stripAnsi } from '$lib/utils/ansiToHtml.js';
+
+const DB_PATH = process.env.AGENT_MAIL_DB || `${process.env.HOME}/.agent-mail.db`;
+
+// Name components - nature/geography themed words
+// 72 adjectives × 72 nouns = 5,184 unique combinations
+const ADJECTIVES = [
+	// Temperature/Texture (16)
+	'Swift', 'Calm', 'Warm', 'Cool', 'Soft', 'Hard', 'Smooth', 'Rough',
+	'Sharp', 'Dense', 'Thin', 'Thick', 'Crisp', 'Mild', 'Brisk', 'Gentle',
+	// Light/Color (16)
+	'Bright', 'Dark', 'Light', 'Pale', 'Vivid', 'Muted', 'Stark', 'Dim',
+	'Gold', 'Silver', 'Azure', 'Amber', 'Russet', 'Ivory', 'Jade', 'Coral',
+	// Size/Scale (16)
+	'Grand', 'Great', 'Vast', 'Wide', 'Broad', 'Deep', 'High', 'Tall',
+	'Long', 'Far', 'Near', 'Open', 'Steep', 'Sheer', 'Flat', 'Round',
+	// Quality/Character (16)
+	'Bold', 'Keen', 'Wise', 'Fair', 'True', 'Pure', 'Free', 'Wild',
+	'Clear', 'Fresh', 'Fine', 'Good', 'Rich', 'Full', 'Whole', 'Prime',
+	// Weather/Time (8)
+	'Sunny', 'Misty', 'Windy', 'Rainy', 'Early', 'Late', 'First', 'Last'
+];
+
+const NOUNS = [
+	// Water Bodies (16)
+	'River', 'Ocean', 'Lake', 'Stream', 'Creek', 'Brook', 'Pond', 'Falls',
+	'Bay', 'Cove', 'Gulf', 'Inlet', 'Fjord', 'Strait', 'Marsh', 'Spring',
+	// Land Features (16)
+	'Mountain', 'Valley', 'Canyon', 'Gorge', 'Ravine', 'Basin', 'Plateau', 'Mesa',
+	'Hill', 'Ridge', 'Cliff', 'Bluff', 'Ledge', 'Shelf', 'Slope', 'Terrace',
+	// Vegetation (16)
+	'Forest', 'Woods', 'Grove', 'Glade', 'Thicket', 'Copse', 'Orchard', 'Garden',
+	'Prairie', 'Meadow', 'Field', 'Plain', 'Heath', 'Moor', 'Steppe', 'Savanna',
+	// Coastal (8)
+	'Shore', 'Coast', 'Beach', 'Dune', 'Cape', 'Point', 'Isle', 'Reef',
+	// Atmospheric (8)
+	'Cloud', 'Storm', 'Wind', 'Mist', 'Frost', 'Dawn', 'Dusk', 'Horizon',
+	// Geological (8)
+	'Stone', 'Rock', 'Boulder', 'Pebble', 'Sand', 'Clay', 'Slate', 'Granite'
+];
+
+/**
+ * Get existing agent names from database for collision checking
+ * @returns {Set<string>} Set of existing agent names (lowercase)
+ */
+function getExistingAgentNames() {
+	try {
+		const db = new Database(DB_PATH, { readonly: true });
+		const agents = /** @type {{ name: string }[]} */ (
+			db.prepare('SELECT name FROM agents').all()
+		);
+		db.close();
+		return new Set(agents.map(a => a.name.toLowerCase()));
+	} catch {
+		return new Set();
+	}
+}
+
+/**
+ * Generate a unique agent name
+ * @param {Set<string>} existingNames - Set of existing agent names (lowercase)
+ * @param {number} maxAttempts - Maximum generation attempts
+ * @returns {string} A unique agent name
+ */
+function generateUniqueName(existingNames, maxAttempts = 100) {
+	for (let attempt = 0; attempt < maxAttempts; attempt++) {
+		const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+		const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
+		const name = adj + noun;
+
+		if (!existingNames.has(name.toLowerCase())) {
+			return name;
+		}
+	}
+
+	// Fallback: append random suffix
+	const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+	const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
+	const suffix = Math.floor(Math.random() * 1000);
+	return `${adj}${noun}${suffix}`;
+}
+
+/**
+ * Get or create project in Agent Mail database
+ * @param {import('better-sqlite3').Database} db - Database connection
+ * @param {string} projectPath - Full project path
+ * @returns {number} Project ID
+ */
+function getOrCreateProject(db, projectPath) {
+	// Use project name as slug (last segment of path)
+	const slug = projectPath.split('/').filter(Boolean).pop() || 'unknown';
+
+	// Check if project exists
+	const existing = /** @type {{ id: number } | undefined} */ (
+		db.prepare('SELECT id FROM projects WHERE human_key = ?').get(projectPath)
+	);
+	if (existing) {
+		return existing.id;
+	}
+
+	// Create project
+	const result = db.prepare(
+		'INSERT INTO projects (slug, human_key) VALUES (?, ?)'
+	).run(slug, projectPath);
+
+	return /** @type {number} */ (result.lastInsertRowid);
+}
+
+/**
+ * Register agent in Agent Mail database
+ * @param {string} agentName - Agent name
+ * @param {string} projectPath - Project path
+ * @param {string} model - Model name (e.g., "opus", "sonnet")
+ * @returns {{ success: boolean, agentId?: number, error?: string }}
+ */
+function registerAgentInDb(agentName, projectPath, model) {
+	try {
+		const db = new Database(DB_PATH);
+
+		try {
+			const projectId = getOrCreateProject(db, projectPath);
+
+			// Check if agent already exists for this project
+			const existing = /** @type {{ id: number } | undefined} */ (
+				db.prepare(
+					'SELECT id FROM agents WHERE project_id = ? AND name = ?'
+				).get(projectId, agentName)
+			);
+
+			if (existing) {
+				// Update last_active_ts for existing agent
+				db.prepare(
+					"UPDATE agents SET last_active_ts = datetime('now'), model = ? WHERE id = ?"
+				).run(model, existing.id);
+				return { success: true, agentId: existing.id };
+			}
+
+			// Insert new agent
+			const result = db.prepare(`
+				INSERT INTO agents (project_id, name, program, model, task_description)
+				VALUES (?, ?, 'claude-code', ?, '')
+			`).run(projectId, agentName, model);
+
+			return { success: true, agentId: /** @type {number} */ (result.lastInsertRowid) };
+		} finally {
+			db.close();
+		}
+	} catch (error) {
+		return {
+			success: false,
+			error: error instanceof Error ? error.message : String(error)
+		};
+	}
+}
 
 const execAsync = promisify(exec);
 
@@ -102,28 +256,20 @@ export async function POST({ request }) {
 		// Get JAT config defaults (used for skip_permissions, timeout, etc.)
 		const jatDefaults = await getJatDefaults();
 
-		// Step 1: Generate new agent name via am-register
-		let agentName;
-		try {
-			const registerResult = await execAsync(`am-register --json`, {
-				cwd: projectPath,
-				timeout: 10000
-			});
-			// am-register --json returns an array with the registered agent
-			const registerData = JSON.parse(registerResult.stdout.trim());
-			const agentRecord = Array.isArray(registerData) ? registerData[0] : registerData;
-			agentName = agentRecord?.name;
+		// Step 1: Generate unique agent name and register in Agent Mail database
+		const existingNames = getExistingAgentNames();
+		const agentName = generateUniqueName(existingNames);
 
-			if (!agentName) {
-				throw new Error('am-register did not return agent name');
-			}
-		} catch (err) {
-			console.error('Failed to register agent:', err);
+		// Register agent in Agent Mail SQLite database
+		const registerResult = registerAgentInDb(agentName, projectPath, model);
+		if (!registerResult.success) {
+			console.error('Failed to register agent:', registerResult.error);
 			return json({
 				error: 'Failed to register agent',
-				message: err instanceof Error ? err.message : String(err)
+				message: registerResult.error
 			}, { status: 500 });
 		}
+		console.log(`[spawn] Registered agent ${agentName} in Agent Mail database (id: ${registerResult.agentId})`)
 
 		// Step 2: Assign task to new agent in Beads (if taskId provided)
 		if (taskId) {
@@ -157,6 +303,23 @@ export async function POST({ request }) {
 
 		// Step 3: Create tmux session with Claude Code
 		const sessionName = `jat-${agentName}`;
+
+		// Step 3a: Write agent identity file for session-start hook to restore
+		// The hook (session-start-restore-agent.sh) uses this to set up .claude/sessions/agent-{sessionId}.txt
+		// We use tmux session name as the key since that's known before Claude starts
+		try {
+			const sessionsDir = `${projectPath}/.claude/sessions`;
+			mkdirSync(sessionsDir, { recursive: true });
+
+			// Write a file that maps tmux session name to agent name
+			// The hook can look this up using: tmux display-message -p '#S' to get session name
+			const tmuxAgentFile = `${sessionsDir}/.tmux-agent-${sessionName}`;
+			writeFileSync(tmuxAgentFile, agentName, 'utf-8');
+			console.log(`[spawn] Wrote agent identity file: ${tmuxAgentFile}`);
+		} catch (err) {
+			// Non-fatal - hook will still work through other mechanisms
+			console.warn('[spawn] Failed to write agent identity file:', err);
+		}
 
 		// Default tmux dimensions for proper terminal output width
 		// 80 columns is the standard terminal width that Claude Code expects

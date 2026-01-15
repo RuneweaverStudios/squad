@@ -113,7 +113,23 @@ Choose based on the spec:
 
 ### For Multi-Task Features: Create Epic + Children
 
+**⚠️ CRITICAL: Always use `--parent` flag when creating child tasks!**
+
 When breaking down a feature into multiple related tasks, create a parent epic first, then add child tasks with hierarchical IDs:
+
+```
+❌ WRONG - Creates standalone tasks with random IDs:
+   bd create "Epic: Auth" --type epic           → jat-kvtrr
+   bd create "Setup config" --type task         → jat-j2pwt  (NOT a child!)
+   bd create "Add login" --type task            → jat-sud88  (NOT a child!)
+   bd dep add jat-kvtrr jat-j2pwt               (manual wiring, no grouping)
+
+✅ CORRECT - Creates hierarchical child IDs:
+   bd create "Epic: Auth" --type epic           → jat-kvtrr
+   bd create "Setup config" --parent jat-kvtrr  → jat-kvtrr.1  (child!)
+   bd create "Add login" --parent jat-kvtrr     → jat-kvtrr.2  (child!)
+   (dependencies auto-wired to epic)
+```
 
 **Step 5A: Create the Epic**
 ```bash
@@ -329,14 +345,15 @@ bd close jat-auth --reason "Epic container - work via child tasks jat-auth.1 thr
 
 ## Best Practices
 
-1. **Use epics for multi-task features** - Create epic first, then children with `--parent`
-2. **Always close epics after creating children** - Epics are containers, not workable tasks
-3. **Right-size tasks** - 2-8 hours, not too big or small
-4. **Set dependencies correctly** - enables parallel work
-5. **Prioritize thoughtfully** - P0 = foundation, P1 = core, P2 = nice-to-have
-6. **Write clear descriptions** - acceptance criteria included
-7. **Ask if unclear** - don't guess on ambiguous requirements
-8. **Front-load foundation** - so agents can parallelize sooner
+1. **⚠️ ALWAYS use `--parent` for child tasks** - This is the #1 mistake! Without `--parent`, you get random IDs instead of hierarchical ones (jat-abc.1, jat-abc.2)
+2. **Use epics for multi-task features** - Create epic first, then children with `--parent`
+3. **Always close epics after creating children** - Epics are containers, not workable tasks
+4. **Right-size tasks** - 2-8 hours, not too big or small
+5. **Set dependencies correctly** - enables parallel work
+6. **Prioritize thoughtfully** - P0 = foundation, P1 = core, P2 = nice-to-have
+7. **Write clear descriptions** - acceptance criteria included
+8. **Ask if unclear** - don't guess on ambiguous requirements
+9. **Front-load foundation** - so agents can parallelize sooner
 
 ### When to Use Epics vs Standalone Tasks
 

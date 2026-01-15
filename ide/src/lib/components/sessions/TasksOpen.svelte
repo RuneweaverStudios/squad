@@ -9,6 +9,13 @@
 	import TaskIdBadge from '$lib/components/TaskIdBadge.svelte';
 	import { getProjectColor } from '$lib/utils/projectColors';
 
+	interface Dependency {
+		id: string;
+		title?: string;
+		status: string;
+		priority?: number;
+	}
+
 	interface Task {
 		id: string;
 		title: string;
@@ -19,6 +26,7 @@
 		assignee?: string;
 		labels?: string[];
 		created_at?: string;
+		depends_on?: Dependency[];
 	}
 
 	let {
@@ -57,6 +65,38 @@
 		const projectPrefix = taskIdOrProject.split('-')[0].toLowerCase();
 		return projectColors[projectPrefix] || getProjectColor(taskIdOrProject);
 	}
+
+	function hasUnresolvedBlockers(task: Task): boolean {
+		if (!task.depends_on || task.depends_on.length === 0) return false;
+		return task.depends_on.some(dep => dep.status !== 'closed');
+	}
+
+	function getBlockingReason(task: Task): string {
+		if (!task.depends_on) return '';
+		const unresolvedDeps = task.depends_on.filter(dep => dep.status !== 'closed');
+		if (unresolvedDeps.length === 0) return '';
+		if (unresolvedDeps.length === 1) {
+			return `Blocked by ${unresolvedDeps[0].id}`;
+		}
+		return `Blocked by ${unresolvedDeps.length} dependencies`;
+	}
+
+	// Pre-computed map: task.id → tasks that depend on it (for "Blocks" indicator)
+	// Maps a task ID to all tasks that have it in their depends_on
+	const blockedByMap = $derived.by(() => {
+		const map = new Map<string, Task[]>();
+		for (const task of tasks) {
+			if (task.status === 'closed') continue; // Only track open blockers
+			if (!task.depends_on) continue;
+			for (const dep of task.depends_on) {
+				if (!map.has(dep.id)) {
+					map.set(dep.id, []);
+				}
+				map.get(dep.id)!.push(task);
+			}
+		}
+		return map;
+	});
 </script>
 
 <section class="open-tasks-section">
@@ -96,8 +136,12 @@
 				<tbody>
 					{#each sortedOpenTasks as task (task.id)}
 						{@const projectColor = getProjectColorReactive(task.id)}
+						{@const isBlocked = hasUnresolvedBlockers(task)}
+						{@const blockReason = isBlocked ? getBlockingReason(task) : ''}
+						{@const unresolvedBlockers = task.depends_on?.filter(d => d.status !== 'closed') || []}
+						{@const blockedTasks = blockedByMap.get(task.id) || []}
 						<tr
-							class="task-row"
+							class="task-row {isBlocked ? 'opacity-70' : ''}"
 							style={projectColor ? `border-left: 3px solid ${projectColor};` : ''}
 							onclick={() => handleRowClick(task.id)}
 						>
@@ -107,6 +151,10 @@
 									size="xs"
 									variant="projectPill"
 									showType={true}
+									blockedBy={unresolvedBlockers}
+									blocks={blockedTasks}
+									showDependencies={true}
+									onOpenTask={handleRowClick}
 								/>
 							</td>
 							<td class="td-title">
@@ -123,8 +171,8 @@
 								<button
 									class="btn btn-xs btn-ghost hover:btn-primary rocket-btn {spawningTaskId === task.id ? 'rocket-launching' : ''}"
 									onclick={(e) => { e.stopPropagation(); onSpawnTask(task); }}
-									disabled={spawningTaskId === task.id}
-									title="Launch agent"
+									disabled={spawningTaskId === task.id || isBlocked}
+									title={isBlocked ? blockReason : 'Launch agent'}
 								>
 									<div class="relative w-5 h-5 flex items-center justify-center overflow-visible">
 										<!-- Debris/particles -->
