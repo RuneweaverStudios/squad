@@ -421,7 +421,7 @@
 							{:else}
 								<button
 									type="button"
-									class="task-panel-description-display"
+									class="task-panel-description-display" class:draggable-field={task.description}
 									onclick={() => descriptionEditing = true}
 									draggable={task.description ? "true" : "false"}
 									ondragstart={(e) => {
@@ -438,7 +438,7 @@
 									title={task.description ? "Click to edit, drag to SessionCard to paste" : "Click to add description"}
 								>
 									{#if task.description}
-										{task.description}
+										<span class="drag-handle" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg></span>{task.description}
 									{:else}
 										<span class="text-base-content/40 italic">Click to add description...</span>
 									{/if}

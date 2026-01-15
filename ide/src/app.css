@@ -743,6 +743,29 @@
 	animation: attach-flash 0.3s ease-out forwards;
 }
 
+/* Input text flash - uses --anim-info (cyan) for text content drops */
+@keyframes input-text-flash {
+	0% {
+		border-color: var(--anim-info);
+		box-shadow: 0 0 10px 3px color-mix(in oklch, var(--anim-info) 60%, transparent);
+		background-color: color-mix(in oklch, var(--anim-info) 15%, oklch(0.22 0.02 250));
+	}
+	50% {
+		border-color: var(--anim-info-bright);
+		box-shadow: 0 0 15px 4px color-mix(in oklch, var(--anim-info) 40%, transparent);
+		background-color: color-mix(in oklch, var(--anim-info) 10%, oklch(0.22 0.02 250));
+	}
+	100% {
+		border-color: oklch(0.30 0.02 250);
+		box-shadow: none;
+		background-color: oklch(0.22 0.02 250);
+	}
+}
+
+.input-text-flash {
+	animation: input-text-flash 0.4s ease-out forwards;
+}
+
 /* Rocket Launch Animation */
 .rocket-btn {
 	position: relative;

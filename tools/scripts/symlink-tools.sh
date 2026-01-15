@@ -176,6 +176,32 @@ else
 fi
 
 echo ""
+echo -e "${BLUE}Setting up get-current-session-id...${NC}"
+echo ""
+
+# Symlink get-current-session-id (session ID lookup utility)
+SESSION_ID_SOURCE="$PROJECT_ROOT/tools/scripts/get-current-session-id"
+SESSION_ID_TARGET="$HOME/.local/bin/get-current-session-id"
+
+if [ -f "$SESSION_ID_SOURCE" ]; then
+    if [ -L "$SESSION_ID_TARGET" ]; then
+        CURRENT_TARGET=$(readlink "$SESSION_ID_TARGET")
+        if [ "$CURRENT_TARGET" = "$SESSION_ID_SOURCE" ]; then
+            echo -e "  ${GREEN}✓${NC} get-current-session-id (already linked)"
+        else
+            echo -e "  ${YELLOW}↻${NC} get-current-session-id (updating link)"
+            rm "$SESSION_ID_TARGET"
+            ln -s "$SESSION_ID_SOURCE" "$SESSION_ID_TARGET"
+        fi
+    else
+        echo -e "  ${GREEN}+${NC} get-current-session-id (linked)"
+        ln -s "$SESSION_ID_SOURCE" "$SESSION_ID_TARGET"
+    fi
+else
+    echo -e "  ${YELLOW}⚠${NC} get-current-session-id not found at $SESSION_ID_SOURCE"
+fi
+
+echo ""
 echo -e "${BLUE}Setting up jat-uninstall...${NC}"
 echo ""
 

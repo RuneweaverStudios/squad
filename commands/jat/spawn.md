@@ -33,7 +33,7 @@ Use the agent name and task ID from your arguments:
 jat-signal starting '{"agentName":"WindyRiver","sessionId":"...","taskId":"jat-abc123","project":"jat","model":"claude-opus-4-5-20251101","gitBranch":"master","gitStatus":"clean","tools":[],"uncommittedFiles":[]}'
 ```
 
-Get session ID with: `~/code/jat/tools/scripts/get-current-session-id`
+Get session ID with: `get-current-session-id` (or check `/tmp/claude-session-*.txt`)
 
 ### 2. Read Task & Plan
 

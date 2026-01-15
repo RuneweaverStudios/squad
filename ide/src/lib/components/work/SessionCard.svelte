@@ -1546,6 +1546,7 @@
 	let submitFlash = $state(false); // Brief flash when command is submitted
 	let voiceFlash = $state(false); // Brief flash when voice recording starts/stops
 	let attachFlash = $state(false); // Brief flash when image is attached
+	let inputTextFlash = $state(false); // Brief flash when text is dropped into input
 	let arrowFlash = $state(false); // Brief flash when arrow key navigates
 	let exitingText = $state<string | null>(null); // Text being animated out on submit
 
@@ -4164,6 +4165,9 @@
 					} else {
 						inputText = textInfo.content;
 					}
+					// Trigger visual flash feedback
+					inputTextFlash = true;
+					setTimeout(() => { inputTextFlash = false; }, 400);
 					// Focus the input for immediate editing
 					setTimeout(() => {
 						const textarea = document.querySelector(`[data-session-input="true"][data-session-name="${sessionName}"]`) as HTMLTextAreaElement;
@@ -6876,7 +6880,7 @@
 							class="textarea textarea-xs w-full font-mono pr-6 resize-none overflow-hidden leading-tight {liveStreamEnabled &&
 							inputText
 								? 'ring-1 ring-info/50'
-								: ''} {escapeFlash ? 'escape-flash' : ''} {pasteFlash ? 'paste-flash' : ''} {tabFlash ? 'tab-flash' : ''} {copyFlash ? 'copy-flash' : ''} {submitFlash ? 'submit-flash' : ''} {voiceFlash ? 'voice-flash' : ''} {attachFlash ? 'attach-flash' : ''} {arrowFlash ? 'arrow-flash' : ''}"
+								: ''} {escapeFlash ? 'escape-flash' : ''} {pasteFlash ? 'paste-flash' : ''} {tabFlash ? 'tab-flash' : ''} {copyFlash ? 'copy-flash' : ''} {submitFlash ? 'submit-flash' : ''} {voiceFlash ? 'voice-flash' : ''} {attachFlash ? 'attach-flash' : ''} {inputTextFlash ? 'input-text-flash' : ''} {arrowFlash ? 'arrow-flash' : ''}"
 							style="background: oklch(0.22 0.02 250); border: 1px solid oklch(0.30 0.02 250); color: oklch(0.80 0.02 250); min-height: 24px; max-height: 96px;"
 							disabled={sendingInput || !onSendInput}
 							data-session-input="true"
