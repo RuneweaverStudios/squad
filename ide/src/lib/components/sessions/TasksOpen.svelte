@@ -6,8 +6,11 @@
 	 * Used on /tasks2 page below the active sessions section.
 	 */
 
+	import { untrack, onMount } from 'svelte';
 	import TaskIdBadge from '$lib/components/TaskIdBadge.svelte';
 	import { getProjectColor } from '$lib/utils/projectColors';
+
+	const STORAGE_KEY = 'jat-open-tasks-project-filter';
 
 	interface Dependency {
 		id: string;
@@ -53,10 +56,99 @@
 		onTaskClick(taskId);
 	}
 
-	// Derived: open tasks sorted by priority
+	// State for project filter
+	let selectedProject = $state<string | null>(null);
+
+	// Load persisted filter on mount
+	onMount(() => {
+		const saved = localStorage.getItem(STORAGE_KEY);
+		if (saved) {
+			selectedProject = saved;
+		}
+	});
+
+	// Persist filter changes
+	$effect(() => {
+		if (selectedProject === null) {
+			localStorage.removeItem(STORAGE_KEY);
+		} else {
+			localStorage.setItem(STORAGE_KEY, selectedProject);
+		}
+	});
+
+	// Track task IDs for animations
+	let previousTaskIds = $state<Set<string>>(new Set());
+	let newTaskIds = $state<string[]>([]);
+	let exitingTaskIds = $state<string[]>([]);
+
+	// Effect to detect new tasks entering the list
+	$effect(() => {
+		const currentIds = new Set(tasks.filter(t => t.status === 'open').map(t => t.id));
+
+		// Use untrack to read previousTaskIds without creating a dependency
+		// This prevents infinite loops when we write to previousTaskIds
+		const prevIds = untrack(() => previousTaskIds);
+
+		// Skip on initial load
+		if (prevIds.size === 0) {
+			previousTaskIds = currentIds;
+			return;
+		}
+
+		// Find new tasks (in current but not in previous)
+		const newIds: string[] = [];
+		for (const id of currentIds) {
+			if (!prevIds.has(id)) {
+				newIds.push(id);
+			}
+		}
+
+		if (newIds.length > 0) {
+			newTaskIds = newIds;
+			// Clear animation class after animation completes (0.5s)
+			setTimeout(() => {
+				newTaskIds = [];
+			}, 600);
+		}
+
+		previousTaskIds = currentIds;
+	});
+
+	// Track exiting tasks (when spawning starts)
+	$effect(() => {
+		// Use untrack to read exitingTaskIds without creating a dependency
+		const exitingIds = untrack(() => exitingTaskIds);
+		if (spawningTaskId && !exitingIds.includes(spawningTaskId)) {
+			exitingTaskIds = [...exitingIds, spawningTaskId];
+			// Clear after animation completes (0.5s)
+			setTimeout(() => {
+				exitingTaskIds = exitingTaskIds.filter(id => id !== spawningTaskId);
+			}, 600);
+		}
+	});
+
+	// Extract project from task ID (prefix before first hyphen)
+	function getProjectFromTaskId(taskId: string): string {
+		const match = taskId.match(/^([a-zA-Z0-9_-]+?)-/);
+		return match ? match[1].toLowerCase() : 'unknown';
+	}
+
+	// Get unique projects from all tasks
+	const uniqueProjects = $derived(() => {
+		const projects = new Set<string>();
+		for (const task of tasks) {
+			if (task.status === 'open') {
+				projects.add(getProjectFromTaskId(task.id));
+			}
+		}
+		return Array.from(projects).sort();
+	});
+
+	// Derived: open tasks sorted by priority, filtered by project
 	const sortedOpenTasks = $derived(
 		tasks
 			.filter(t => t.status === 'open')
+			.filter(t => selectedProject === null || getProjectFromTaskId(t.id) === selectedProject)
 			.sort((a, b) => a.priority - b.priority)
 	);
 
@@ -103,6 +195,31 @@
 	<div class="section-header">
 		<h2>Open Tasks</h2>
 		<span class="task-count">{sortedOpenTasks.length}</span>
+
+		{#if uniqueProjects().length > 1}
+			<div class="project-filter">
+				{#each uniqueProjects() as project}
+					{@const color = projectColors[project] || getProjectColor(project) || 'oklch(0.65 0.15 250)'}
+					<button
+						type="button"
+						class="project-filter-btn {selectedProject === project ? 'active' : ''}"
+						style="--project-color: {color};"
+						onclick={() => selectedProject = selectedProject === project ? null : project}
+					>
+						{project}
+					</button>
+				{/each}
+				{#if selectedProject !== null}
+					<button
+						type="button"
+						class="project-filter-btn all-btn"
+						onclick={() => selectedProject = null}
+					>
+						All
+					</button>
+				{/if}
+			</div>
+		{/if}
 	</div>
 
 	{#if loading && tasks.length === 0}
@@ -140,8 +257,10 @@
 						{@const blockReason = isBlocked ? getBlockingReason(task) : ''}
 						{@const unresolvedBlockers = task.depends_on?.filter(d => d.status !== 'closed') || []}
 						{@const blockedTasks = blockedByMap.get(task.id) || []}
+						{@const isNewTask = newTaskIds.includes(task.id)}
+						{@const isExiting = exitingTaskIds.includes(task.id)}
 						<tr
-							class="task-row {isBlocked ? 'opacity-70' : ''}"
+							class="task-row {isBlocked ? 'opacity-70' : ''} {isNewTask ? 'animate-scale-in-center' : ''} {isExiting ? 'animate-scale-out-center' : ''}"
 							style={projectColor ? `border-left: 3px solid ${projectColor};` : ''}
 							onclick={() => handleRowClick(task.id)}
 						>
@@ -253,6 +372,43 @@
 		background: oklch(0.25 0.02 250);
 		border-radius: 9999px;
 		color: oklch(0.70 0.02 250);
+	}
+
+	/* Project filter */
+	.project-filter {
+		margin-left: auto;
+		display: flex;
+		gap: 0.375rem;
+	}
+
+	.project-filter-btn {
+		font-size: 0.6875rem;
+		font-weight: 500;
+		font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+		text-transform: lowercase;
+		padding: 0.25rem 0.5rem;
+		border-radius: 0.375rem;
+		cursor: pointer;
+		transition: all 0.15s ease;
+		/* Use CSS custom property for project color */
+		background: color-mix(in oklch, var(--project-color) 15%, transparent);
+		border: 1px solid color-mix(in oklch, var(--project-color) 35%, transparent);
+		color: var(--project-color);
+	}
+
+	.project-filter-btn:hover {
+		background: color-mix(in oklch, var(--project-color) 25%, transparent);
+		border-color: color-mix(in oklch, var(--project-color) 50%, transparent);
+	}
+
+	.project-filter-btn.active {
+		background: color-mix(in oklch, var(--project-color) 30%, transparent);
+		border-color: color-mix(in oklch, var(--project-color) 60%, transparent);
+		box-shadow: 0 0 8px color-mix(in oklch, var(--project-color) 30%, transparent);
+	}
+
+	.project-filter-btn.all-btn {
+		--project-color: oklch(0.70 0.02 250);
 	}
 
 	/* Loading skeleton */

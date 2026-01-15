@@ -240,7 +240,7 @@ function detectSessionState(output, task, lastCompletedTask, sessionName) {
 	}
 
 	// Fall back to marker parsing for legacy support
-	return detectSessionStateFromOutput(output, task, lastCompletedTask);
+	return detectSessionStateFromOutput(output, task, lastCompletedTask, sessionName);
 }
 
 /**
@@ -249,9 +249,10 @@ function detectSessionState(output, task, lastCompletedTask, sessionName) {
  * @param {string} output - Terminal output
  * @param {Task|null} task - Current task
  * @param {Task|null} lastCompletedTask - Last completed task
+ * @param {string} [sessionName] - tmux session name (for timeline check)
  * @returns {string} Session state
  */
-function detectSessionStateFromOutput(output, task, lastCompletedTask) {
+function detectSessionStateFromOutput(output, task, lastCompletedTask, sessionName) {
 	// Strip ANSI escape codes before pattern matching (they can appear mid-marker)
 	/** @param {string} str */
 	const stripAnsi = (str) => str.replace(/\x1b\[[0-9;]*m/g, '');
@@ -307,10 +308,14 @@ function detectSessionStateFromOutput(output, task, lastCompletedTask) {
 			return sorted[0].state;
 		}
 
-		// No markers found - agent has task but hasn't shown activity yet
-		// Default to 'starting' since if agent were truly working, it would have:
-		// 1. Emitted a signal (caught by readSignalState above), or
-		// 2. Produced output markers (caught by the positions check above)
+		// No markers found and no fresh signal - distinguish new vs stale agents
+		// Check if agent has EVER emitted a signal (timeline file exists)
+		const timelineFile = `/tmp/jat-timeline-${sessionName}.jsonl`;
+		if (sessionName && existsSync(timelineFile)) {
+			// Timeline exists = agent emitted signals before, but current signal is stale
+			return 'idle';
+		}
+		// No timeline = agent has never emitted signals = still starting up
 		return 'starting';
 	}
 

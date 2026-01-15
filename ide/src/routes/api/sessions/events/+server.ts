@@ -706,7 +706,16 @@ function detectSessionStateFromOutput(output: string, task: Task | null): string
 			return sorted[0].state;
 		}
 
-		return 'working';
+		// No markers found and no fresh signal - distinguish new vs stale agents
+		// Check if agent has EVER emitted a signal (timeline file exists)
+		// Note: sessionName not available in this fallback function, so use output length heuristic
+		// This is a secondary fallback anyway - primary state comes from signal files
+		if (recentOutput.length < 2000) {
+			// Minimal output - agent is likely just starting
+			return 'starting';
+		}
+		// Substantial output but no fresh signal - agent is stale/idle
+		return 'idle';
 	}
 
 	// No task - check for completion markers
