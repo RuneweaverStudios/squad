@@ -301,7 +301,7 @@
 		try {
 			const [taskRes, attachmentsRes, historyRes, signalsRes] = await Promise.all([
 				fetch(`/api/tasks/${taskId}`),
-				fetch(`/api/tasks/${taskId}/images`),
+				fetch(`/api/tasks/${taskId}/image`),
 				fetch(`/api/tasks/${taskId}/history`),
 				fetch(`/api/tasks/${taskId}/signals`)
 			]);
@@ -336,7 +336,7 @@
 					id: img.id || img.path,
 					path: img.path,
 					filename: img.filename || img.path.split('/').pop(),
-					url: `/api/tasks/${taskId}/images/${encodeURIComponent(img.path.split('/').pop())}`
+					url: `/api/work/image/${encodeURIComponent(img.path)}`
 				})),
 				timeline: mergedTimeline,
 				timelineCounts: {
@@ -404,8 +404,10 @@
 	// Remove attachment from task
 	async function handleRemoveAttachment(taskId: string, attachmentId: string) {
 		try {
-			const response = await fetch(`/api/tasks/${taskId}/image/${encodeURIComponent(attachmentId)}`, {
-				method: 'DELETE'
+			const response = await fetch(`/api/tasks/${taskId}/image`, {
+				method: 'DELETE',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ id: attachmentId })
 			});
 
 			if (!response.ok) {
