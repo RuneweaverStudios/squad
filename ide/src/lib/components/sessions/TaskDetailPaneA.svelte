@@ -62,7 +62,9 @@
 		loading = false,
 		height = 300,
 		onViewTask,
-		onSaveNotes
+		onSaveNotes,
+		onAddLabel,
+		onRemoveLabel
 	}: {
 		task: AgentTask;
 		details: ExtendedTaskDetails | null;
@@ -70,6 +72,8 @@
 		height?: number;
 		onViewTask?: (taskId: string) => void;
 		onSaveNotes?: (taskId: string, notes: string) => Promise<void>;
+		onAddLabel?: (taskId: string, label: string) => Promise<void>;
+		onRemoveLabel?: (taskId: string, label: string) => Promise<void>;
 	} = $props();
 
 	// Status colors for badges
@@ -90,6 +94,11 @@
 
 	// Attachments expanded
 	let attachmentsExpanded = $state(false);
+
+	// Label management state
+	let showLabelInput = $state(false);
+	let newLabelValue = $state('');
+	let labelSaving = $state(false);
 
 	// Initialize notes value when details change
 	$effect(() => {
@@ -115,6 +124,52 @@
 		} finally {
 			notesSaving = false;
 			notesEditing = false;
+		}
+	}
+
+	async function addLabel() {
+		const label = newLabelValue.trim();
+		if (!label || !task?.id || labelSaving) return;
+
+		// Don't add if already exists
+		if (details?.labels?.includes(label)) {
+			newLabelValue = '';
+			showLabelInput = false;
+			return;
+		}
+
+		labelSaving = true;
+		try {
+			if (onAddLabel) {
+				await onAddLabel(task.id, label);
+			}
+			newLabelValue = '';
+			showLabelInput = false;
+		} finally {
+			labelSaving = false;
+		}
+	}
+
+	async function removeLabel(label: string) {
+		if (!task?.id || labelSaving) return;
+
+		labelSaving = true;
+		try {
+			if (onRemoveLabel) {
+				await onRemoveLabel(task.id, label);
+			}
+		} finally {
+			labelSaving = false;
+		}
+	}
+
+	function handleLabelKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			addLabel();
+		} else if (e.key === 'Escape') {
+			newLabelValue = '';
+			showLabelInput = false;
 		}
 	}
 
@@ -188,100 +243,156 @@
 			<!-- Tab content -->
 			<div class="tab-content">
 				{#if activeTab === 'details'}
-					<!-- Description -->
-					{#if task.description}
-						<div class="task-panel-section">
-							<span class="task-panel-label">Description</span>
-							<p class="task-panel-description">{task.description}</p>
-						</div>
-					{/if}
+					<!-- Details tab: Description at top, Notes fills middle, Labels pinned at bottom -->
+					<div class="details-layout">
+						<!-- Top section: Description -->
+						{#if task.description}
+							<div class="task-panel-section description-section">
+								<span class="task-panel-label">Description</span>
+								<p class="task-panel-description">{task.description}</p>
+							</div>
+						{/if}
 
-					<!-- Notes -->
-					<div class="task-panel-section">
-						<div class="section-header">
-							<span class="task-panel-label">Notes</span>
-							{#if !notesEditing && details?.notes}
-								<button class="edit-btn" onclick={() => notesEditing = true}>
-									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3 h-3">
-										<path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-									</svg>
+						<!-- Middle section: Notes (flex-grow to fill space) -->
+						<div class="task-panel-section notes-section">
+							<div class="section-header">
+								<span class="task-panel-label">Notes</span>
+								{#if !notesEditing && details?.notes}
+									<button class="edit-btn" onclick={() => notesEditing = true} title="Edit notes">
+										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3 h-3">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+										</svg>
+									</button>
+								{/if}
+							</div>
+							{#if notesEditing}
+								<textarea
+									class="task-panel-notes-input notes-fill"
+									bind:value={notesValue}
+									onblur={saveNotes}
+									placeholder="Add notes..."
+									disabled={notesSaving}
+								></textarea>
+								{#if notesSaving}
+									<span class="task-panel-notes-saving">Saving...</span>
+								{/if}
+							{:else}
+								<button
+									type="button"
+									class="task-panel-notes-display notes-fill"
+									onclick={() => notesEditing = true}
+								>
+									{#if details?.notes}
+										{details.notes}
+									{:else}
+										<span class="text-base-content/40 italic">Click to add notes...</span>
+									{/if}
 								</button>
 							{/if}
 						</div>
-						{#if notesEditing}
-							<textarea
-								class="task-panel-notes-input"
-								bind:value={notesValue}
-								onblur={saveNotes}
-								placeholder="Add notes..."
-								rows="3"
-								disabled={notesSaving}
-							></textarea>
-							{#if notesSaving}
-								<span class="task-panel-notes-saving">Saving...</span>
-							{/if}
-						{:else}
-							<button
-								type="button"
-								class="task-panel-notes-display"
-								onclick={() => notesEditing = true}
-							>
-								{#if details?.notes}
-									{details.notes}
-								{:else}
-									<span class="text-base-content/40 italic">Click to add notes...</span>
-								{/if}
-							</button>
-						{/if}
-					</div>
 
-					<!-- Labels -->
-					{#if details?.labels && details.labels.length > 0}
-						<div class="task-panel-section">
-							<span class="task-panel-label">Labels</span>
+						<!-- Bottom section: Labels (pinned to bottom) -->
+						<div class="task-panel-section labels-section">
+							<div class="section-header">
+								<span class="task-panel-label">Labels</span>
+								<button
+									class="add-label-btn"
+									onclick={() => showLabelInput = !showLabelInput}
+									title="Add label"
+								>
+									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+									</svg>
+								</button>
+							</div>
 							<div class="task-panel-labels">
-								{#each details.labels as label}
-									<span class="badge badge-outline badge-sm">{label}</span>
-								{/each}
+								{#if details?.labels && details.labels.length > 0}
+									{#each details.labels as label}
+										<span class="label-badge">
+											{label}
+											<button
+												class="label-remove-btn"
+												onclick={() => removeLabel(label)}
+												title="Remove label"
+												disabled={labelSaving}
+											>
+												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-2.5 h-2.5">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+												</svg>
+											</button>
+										</span>
+									{/each}
+								{/if}
+								{#if showLabelInput}
+									<div class="label-input-wrapper">
+										<input
+											type="text"
+											class="label-input"
+											placeholder="New label..."
+											bind:value={newLabelValue}
+											onkeydown={handleLabelKeydown}
+											onblur={() => { if (!newLabelValue.trim()) showLabelInput = false; }}
+											disabled={labelSaving}
+										/>
+										{#if newLabelValue.trim()}
+											<button
+												class="label-add-confirm"
+												onclick={addLabel}
+												disabled={labelSaving}
+												title="Add"
+											>
+												{#if labelSaving}
+													<span class="loading loading-spinner loading-xs"></span>
+												{:else}
+													<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3">
+														<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+													</svg>
+												{/if}
+											</button>
+										{/if}
+									</div>
+								{/if}
+								{#if (!details?.labels || details.labels.length === 0) && !showLabelInput}
+									<span class="no-labels-hint">No labels</span>
+								{/if}
 							</div>
 						</div>
-					{/if}
 
-					<!-- Attachments (collapsible) -->
-					{#if details?.attachments && details.attachments.length > 0}
-						<div class="task-panel-section">
-							<button class="section-toggle" onclick={() => attachmentsExpanded = !attachmentsExpanded}>
-								<span class="task-panel-label">
-									Attachments
-									<span class="badge badge-xs ml-1">{details.attachments.length}</span>
-								</span>
-								<span class="toggle-icon" class:expanded={attachmentsExpanded}>
-									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3">
-										<path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-									</svg>
-								</span>
-							</button>
-							{#if attachmentsExpanded}
-								<div class="task-panel-attachments">
-									{#each details.attachments as attachment}
-										<a
-											href={attachment.url}
-											target="_blank"
-											rel="noopener noreferrer"
-											class="task-panel-attachment"
-											title={attachment.filename}
-										>
-											<img
-												src={attachment.url}
-												alt={attachment.filename}
-												class="task-panel-attachment-img"
-											/>
-										</a>
-									{/each}
-								</div>
-							{/if}
-						</div>
-					{/if}
+						<!-- Attachments (collapsible, below labels) -->
+						{#if details?.attachments && details.attachments.length > 0}
+							<div class="task-panel-section attachments-section">
+								<button class="section-toggle" onclick={() => attachmentsExpanded = !attachmentsExpanded}>
+									<span class="task-panel-label">
+										Attachments
+										<span class="badge badge-xs ml-1">{details.attachments.length}</span>
+									</span>
+									<span class="toggle-icon" class:expanded={attachmentsExpanded}>
+										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+										</svg>
+									</button>
+								{#if attachmentsExpanded}
+									<div class="task-panel-attachments">
+										{#each details.attachments as attachment}
+											<a
+												href={attachment.url}
+												target="_blank"
+												rel="noopener noreferrer"
+												class="task-panel-attachment"
+												title={attachment.filename}
+											>
+												<img
+													src={attachment.url}
+													alt={attachment.filename}
+													class="task-panel-attachment-img"
+												/>
+											</a>
+										{/each}
+									</div>
+								{/if}
+							</div>
+						{/if}
+					</div>
 
 				{:else if activeTab === 'activity'}
 					<!-- Activity Timeline -->
@@ -483,6 +594,36 @@
 		padding-top: 0.5rem;
 	}
 
+	/* Details tab layout - Description at top, Notes fills middle, Labels at bottom */
+	.details-layout {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		gap: 0.75rem;
+	}
+
+	.description-section {
+		flex-shrink: 0;
+	}
+
+	.notes-section {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.labels-section {
+		flex-shrink: 0;
+		margin-top: auto;
+		padding-top: 0.5rem;
+		border-top: 1px solid oklch(0.22 0.02 250);
+	}
+
+	.attachments-section {
+		flex-shrink: 0;
+	}
+
 	.empty-tab {
 		display: flex;
 		align-items: center;
@@ -567,7 +708,7 @@
 		border-radius: 0.375rem;
 		padding: 0.5rem 0.625rem;
 		line-height: 1.5;
-		resize: vertical;
+		resize: none;
 		min-height: 6rem;
 		font-family: inherit;
 		transition: border-color 0.15s, box-shadow 0.15s;
@@ -602,10 +743,36 @@
 		background: oklch(0.16 0.01 250);
 	}
 
+	/* Notes fill available space */
+	.notes-fill {
+		flex: 1;
+		min-height: 4rem;
+	}
+
 	.task-panel-notes-saving {
 		font-size: 0.7rem;
 		color: oklch(0.55 0.02 250);
 		font-style: italic;
+	}
+
+	/* Add label button */
+	.add-label-btn {
+		padding: 0.125rem;
+		background: transparent;
+		border: 1px dashed oklch(0.30 0.02 250);
+		color: oklch(0.50 0.02 250);
+		cursor: pointer;
+		border-radius: 4px;
+		transition: all 0.15s;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.add-label-btn:hover {
+		background: oklch(0.20 0.02 250);
+		border-color: oklch(0.40 0.02 250);
+		color: oklch(0.70 0.02 250);
 	}
 
 	/* Labels */
@@ -613,6 +780,110 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.375rem;
+		align-items: center;
+	}
+
+	/* Label badge with remove button */
+	.label-badge {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25rem;
+		padding: 0.125rem 0.5rem;
+		font-size: 0.75rem;
+		background: oklch(0.20 0.02 250);
+		border: 1px solid oklch(0.30 0.02 250);
+		border-radius: 4px;
+		color: oklch(0.75 0.02 250);
+		transition: all 0.15s;
+	}
+
+	.label-badge:hover {
+		border-color: oklch(0.40 0.02 250);
+	}
+
+	.label-remove-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0.125rem;
+		background: transparent;
+		border: none;
+		color: oklch(0.45 0.02 250);
+		cursor: pointer;
+		border-radius: 2px;
+		opacity: 0;
+		transition: all 0.15s;
+		margin-left: 0.125rem;
+		margin-right: -0.25rem;
+	}
+
+	.label-badge:hover .label-remove-btn {
+		opacity: 1;
+	}
+
+	.label-remove-btn:hover {
+		background: oklch(0.55 0.15 30 / 0.3);
+		color: oklch(0.70 0.15 30);
+	}
+
+	.label-remove-btn:disabled {
+		cursor: not-allowed;
+		opacity: 0.5;
+	}
+
+	/* Label input */
+	.label-input-wrapper {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25rem;
+	}
+
+	.label-input {
+		width: 100px;
+		padding: 0.125rem 0.375rem;
+		font-size: 0.75rem;
+		background: oklch(0.16 0.01 250);
+		border: 1px solid oklch(0.35 0.02 250);
+		border-radius: 4px;
+		color: oklch(0.85 0.02 250);
+		outline: none;
+		transition: border-color 0.15s;
+	}
+
+	.label-input:focus {
+		border-color: oklch(0.55 0.15 200);
+	}
+
+	.label-input::placeholder {
+		color: oklch(0.45 0.02 250);
+	}
+
+	.label-add-confirm {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0.25rem;
+		background: oklch(0.55 0.15 145 / 0.2);
+		border: none;
+		color: oklch(0.70 0.15 145);
+		cursor: pointer;
+		border-radius: 4px;
+		transition: all 0.15s;
+	}
+
+	.label-add-confirm:hover {
+		background: oklch(0.55 0.15 145 / 0.3);
+	}
+
+	.label-add-confirm:disabled {
+		cursor: not-allowed;
+		opacity: 0.5;
+	}
+
+	.no-labels-hint {
+		font-size: 0.75rem;
+		color: oklch(0.45 0.02 250);
+		font-style: italic;
 	}
 
 	/* Attachments */
