@@ -111,6 +111,12 @@
 		stacked?: boolean;
 		/** Apply entrance animation to text (tracking-in-expand) */
 		animate?: boolean;
+		/** Whether auto-complete is enabled (toggle state) */
+		autoCompleteEnabled?: boolean;
+		/** Callback when auto-complete toggle is clicked */
+		onAutoCompleteToggle?: () => void;
+		/** Reason from review rules (e.g., "P3 task") for tooltip */
+		reviewReason?: string | null;
 	}
 
 	let {
@@ -138,6 +144,9 @@
 		class: className = "",
 		stacked = false,
 		animate = false,
+		autoCompleteEnabled = false,
+		onAutoCompleteToggle,
+		reviewReason = null,
 	}: Props = $props();
 
 	// Dropdown state
@@ -896,6 +905,49 @@
 					</li>
 				{/each}
 			</ul>
+
+			<!-- Auto-complete toggle -->
+			{#if onAutoCompleteToggle && task}
+				<div class="border-t commands-divider px-3 py-2">
+					<button
+						type="button"
+						onclick={() => onAutoCompleteToggle?.()}
+						class="w-full flex items-center justify-between text-xs"
+					>
+						<div class="flex items-center gap-2">
+							{#if autoCompleteEnabled}
+								<svg class="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+								</svg>
+							{:else}
+								<svg class="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+									<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+								</svg>
+							{/if}
+							<div class="flex flex-col items-start">
+								<span class="font-semibold {autoCompleteEnabled ? 'text-emerald-300' : 'text-amber-300'}">
+									{autoCompleteEnabled ? 'Auto-complete' : 'Manual review'}
+								</span>
+								{#if reviewReason}
+									<span class="text-[10px] opacity-60">{reviewReason}</span>
+								{/if}
+							</div>
+						</div>
+						<div
+							class="w-8 h-4 rounded-full transition-colors relative {autoCompleteEnabled
+								? 'bg-emerald-500/30'
+								: 'bg-amber-500/30'}"
+						>
+							<div
+								class="absolute top-0.5 w-3 h-3 rounded-full transition-all {autoCompleteEnabled
+									? 'left-4 bg-emerald-400'
+									: 'left-0.5 bg-amber-400'}"
+							></div>
+						</div>
+					</button>
+				</div>
+			{/if}
 
 			<!-- Epic section (collapsible) - Add task to epic -->
 			{#if showEpic}
