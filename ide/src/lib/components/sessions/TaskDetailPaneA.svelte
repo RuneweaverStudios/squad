@@ -489,7 +489,7 @@
 							{:else}
 								<button
 									type="button"
-									class="task-panel-notes-display notes-fill"
+									class="task-panel-notes-display notes-fill" class:draggable-field={details?.notes}
 									onclick={() => notesEditing = true}
 									draggable={details?.notes ? "true" : "false"}
 									ondragstart={(e) => {
@@ -506,7 +506,7 @@
 									title={details?.notes ? "Click to edit, drag to SessionCard to paste" : "Click to add notes..."}
 								>
 									{#if details?.notes}
-										{details.notes}
+										<span class="drag-handle" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg></span>{details.notes}
 									{:else}
 										<span class="text-base-content/40 italic">Click to add notes...</span>
 									{/if}
@@ -550,7 +550,7 @@
 										{#each details.attachments as attachment}
 											<div class="attachment-thumbnail-wrapper">
 												<div
-													class="attachment-thumbnail"
+													class="attachment-thumbnail draggable-field"
 													title={`${attachment.filename} (click to open, drag to SessionCard to attach)`}
 													role="button"
 													tabindex="0"
@@ -585,6 +585,7 @@
 														class="attachment-thumbnail-img"
 														draggable="false"
 													/>
+																			<span class="drag-handle" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg></span>
 												</div>
 												<button
 													class="attachment-remove-btn"
@@ -1394,6 +1395,45 @@
 	.attachment-remove-btn:hover {
 		background: oklch(0.60 0.18 30);
 		transform: scale(1.1);
+	}
+
+	/* Drag handle for draggable fields */
+	.drag-handle {
+		position: absolute;
+		top: 4px;
+		right: 4px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 2px;
+		background: oklch(0.25 0.02 250 / 0.9);
+		border-radius: 3px;
+		color: oklch(0.50 0.02 250);
+		opacity: 0;
+		transition: all 0.15s;
+		pointer-events: none;
+	}
+
+	.draggable-field {
+		position: relative;
+		cursor: grab;
+	}
+
+	.draggable-field:hover .drag-handle {
+		opacity: 1;
+		color: oklch(0.70 0.12 200);
+	}
+
+	.draggable-field:active {
+		cursor: grabbing;
+	}
+
+	/* Thumbnail-specific drag handle positioning */
+	.attachment-thumbnail .drag-handle {
+		top: 2px;
+		right: 2px;
+		padding: 1px;
+		background: oklch(0.15 0.02 250 / 0.85);
 	}
 
 	.attachment-add-btn {

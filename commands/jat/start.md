@@ -65,14 +65,14 @@ PRE_REG_FILE=".claude/sessions/.tmux-agent-${TMUX_SESSION}"
 if [[ -f "$PRE_REG_FILE" ]]; then
     AGENT_NAME=$(cat "$PRE_REG_FILE")
     echo "✓ Using pre-registered agent: $AGENT_NAME"
-    # Skip to Step 2D - registration and tmux naming already done
+    # Skip Steps 2C and 2D - registration, tmux naming, and session file already done
 fi
 ```
 
 If the pre-registration file exists:
 - Use that agent name
-- Skip Step 2C entirely (no am-register needed)
-- tmux session is already named correctly
+- Skip Steps 2C and 2D entirely (registration, tmux naming, and session file all done by spawn API + hook)
+- Proceed directly to Step 3
 
 #### 2C: Register Agent (Manual/CLI Only)
 
@@ -85,8 +85,9 @@ tmux rename-session "jat-${AGENT_NAME}"
 
 #### 2D: Write Session File
 
-**Always needed** - maps Claude session ID to agent name for hooks:
+**Only needed for Manual/CLI** - the SessionStart hook automatically writes this for IDE-spawned agents (by reading the `.tmux-agent-{session}` file).
 
+For manual/CLI sessions only:
 ```bash
 mkdir -p .claude/sessions
 # Use Write tool: Write(.claude/sessions/agent-{session_id}.txt, "AgentName")

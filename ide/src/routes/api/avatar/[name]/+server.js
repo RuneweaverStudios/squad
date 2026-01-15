@@ -16,8 +16,11 @@ import { promisify } from 'util';
 import { env } from '$env/dynamic/private';
 
 const execAsync = promisify(exec);
-const AVATARS_DIR = '/home/jw/code/jat/avatars';
-const AVATAR_GENERATE_SCRIPT = '/home/jw/code/jat/tools/media/avatar-generate';
+
+// Derive paths from IDE location (IDE runs from {project}/ide)
+const PROJECT_ROOT = process.cwd().replace(/\/ide$/, '');
+const AVATARS_DIR = `${PROJECT_ROOT}/avatars`;
+const AVATAR_GENERATE_SCRIPT = `${PROJECT_ROOT}/tools/media/avatar-generate`;
 
 // Track in-flight generation requests to prevent duplicates
 const generatingAvatars = new Set();

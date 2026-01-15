@@ -294,10 +294,11 @@ function getDefaultProjectRoot(): string {
 	// The parent of /ide is the project root
 	if (typeof window !== 'undefined' && window.location) {
 		// We're in browser context - the API should provide the actual root
-		// For now, use a common default that can be overridden
-		return '/home/jw/code/jat';
+		// Return empty string; callers should provide projectRoot explicitly
+		return '';
 	}
-	return process.cwd();
+	// Server-side: derive from IDE location (IDE runs from {project}/ide)
+	return process.cwd().replace(/\/ide$/, '');
 }
 
 /**
