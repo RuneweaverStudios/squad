@@ -2106,7 +2106,7 @@
 	}
 
 	.task-title {
-		font-size: 0.8rem;
+		font-size: 1rem;
 		font-weight: 500;
 		color: oklch(0.80 0.02 250);
 		overflow: hidden;

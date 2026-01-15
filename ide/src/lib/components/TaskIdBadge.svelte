@@ -203,7 +203,7 @@
 	<!-- Project pill mode: outline pill with status dot and task ID -->
 	{@const dotColor = statusDotColor || 'oklch(0.50 0.02 250)'}
 	<button
-		class="inline-flex items-center gap-1.5 font-mono rounded-full cursor-pointer
+		class="inline-flex items-center gap-1.5 font-mono rounded-full cursor-pointer whitespace-nowrap
 			   hover:opacity-90 transition-all {size === 'xs' ? 'text-xs px-2 py-0.5' : size === 'sm' ? 'text-sm px-2.5 py-0.5' : 'text-base px-3 py-1'}"
 		style="
 			background: color-mix(in oklch, {projectColor} 15%, transparent);
@@ -234,7 +234,7 @@
 	{@const ringColor = statusDotColor || 'oklch(0.50 0.02 250)'}
 	{@const avatarSize = size === 'xs' ? 20 : size === 'sm' ? 24 : 28}
 	<button
-		class="inline-flex items-center gap-2 font-mono rounded-full cursor-pointer
+		class="inline-flex items-center gap-2 font-mono rounded-full cursor-pointer whitespace-nowrap
 			   hover:opacity-90 transition-all {size === 'xs' ? 'text-xs pr-2 pl-0.5 py-0.5' : size === 'sm' ? 'text-sm pr-2.5 pl-0.5 py-0.5' : 'text-base pr-3 pl-1 py-1'}"
 		style="
 			background: color-mix(in oklch, {projectColor} 12%, transparent);

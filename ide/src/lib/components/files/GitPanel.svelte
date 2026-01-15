@@ -539,7 +539,10 @@
 	const canPull = $derived(behind > 0 && !isPulling);
 
 	async function fetchStatus() {
-		if (!project) return;
+		if (!project) {
+			isLoading = false;
+			return;
+		}
 
 		try {
 			const response = await fetch(`/api/files/git/status?project=${encodeURIComponent(project)}`);
@@ -794,6 +797,10 @@
 
 			fetchStatus();
 			fetchTimeline();
+		} else {
+			// No project selected - ensure loading states are cleared
+			isLoading = false;
+			isLoadingTimeline = false;
 		}
 	});
 </script>

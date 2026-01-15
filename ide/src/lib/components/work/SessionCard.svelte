@@ -4664,6 +4664,7 @@
 				? '0 0 20px oklch(0.60 0.15 220 / 0.6), inset 0 1px 0 oklch(1 0 0 / 0.05), 0 2px 8px oklch(0 0 0 / 0.1)'
 				: 'inset 0 1px 0 oklch(1 0 0 / 0.05), 0 2px 8px oklch(0 0 0 / 0.1)'};
 			width: {effectiveWidth ?? DEFAULT_CARD_WIDTH}px;
+			min-width: {MIN_CARD_WIDTH}px;
 			flex-shrink: 0;
 			scroll-margin-top: 6rem;
 		"

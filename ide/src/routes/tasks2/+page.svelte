@@ -147,16 +147,28 @@
 		return projectColors[projectPrefix] || getProjectColor(taskIdOrProject);
 	}
 
-	function getElapsedFormatted(created: string): string {
+	// Format elapsed time for AnimatedDigits display
+	// Returns object with hours, minutes, seconds as zero-padded strings
+	function getElapsedFormatted(createdISO: string | undefined): { hours: string; minutes: string; seconds: string; showHours: boolean } | null {
+		if (!createdISO) return null;
+		const created = new Date(createdISO).getTime();
+		if (isNaN(created)) return null;
 		const now = Date.now();
-		const start = new Date(created).getTime();
-		const diffMs = now - start;
-		const diffMins = Math.floor(diffMs / 60000);
-		if (diffMins < 60) return `${diffMins}m`;
-		const diffHours = Math.floor(diffMins / 60);
-		if (diffHours < 24) return `${diffHours}h ${diffMins % 60}m`;
-		const diffDays = Math.floor(diffHours / 24);
-		return `${diffDays}d ${diffHours % 24}h`;
+		const elapsedMs = now - created;
+
+		if (elapsedMs < 0) return { hours: '00', minutes: '00', seconds: '00', showHours: false };
+
+		const totalSeconds = Math.floor(elapsedMs / 1000);
+		const hours = Math.floor(totalSeconds / 3600);
+		const minutes = Math.floor((totalSeconds % 3600) / 60);
+		const seconds = totalSeconds % 60;
+
+		return {
+			hours: hours.toString().padStart(2, '0'),
+			minutes: minutes.toString().padStart(2, '0'),
+			seconds: seconds.toString().padStart(2, '0'),
+			showHours: hours > 0
+		};
 	}
 
 	function getSessionStatePriority(session: TmuxSession): number {
