@@ -170,6 +170,72 @@ else
     echo -e "  ${YELLOW}⚠ jat-signal hook not found: $JAT_SIGNAL_HOOK${NC}"
 fi
 
+# Copy session-start hook to global directory
+SESSION_START_HOOK="$JAT_DIR/.claude/hooks/session-start-agent-identity.sh"
+if [ -f "$SESSION_START_HOOK" ]; then
+    cp "$SESSION_START_HOOK" "$GLOBAL_HOOKS_DIR/session-start-agent-identity.sh"
+    chmod +x "$GLOBAL_HOOKS_DIR/session-start-agent-identity.sh"
+    echo -e "  ${GREEN}✓ Installed session-start-agent-identity.sh to ~/.claude/hooks/${NC}"
+else
+    echo -e "  ${YELLOW}⚠ session-start hook not found: $SESSION_START_HOOK${NC}"
+fi
+
+echo ""
+
+# ============================================================================
+# STEP 2b: Configure global hooks in settings.local.json
+# ============================================================================
+
+echo -e "${BLUE}Step 2b: Configuring global hooks in settings.local.json...${NC}"
+
+SETTINGS_LOCAL="$HOME/.claude/settings.local.json"
+
+# Create settings.local.json if it doesn't exist
+if [ ! -f "$SETTINGS_LOCAL" ]; then
+    echo '{}' > "$SETTINGS_LOCAL"
+fi
+
+# Check if SessionStart hook is already configured
+if grep -q '"SessionStart"' "$SETTINGS_LOCAL" 2>/dev/null; then
+    echo -e "  ${GREEN}✓${NC} SessionStart hook already configured"
+else
+    # Add SessionStart and PostToolUse hooks to settings.local.json
+    TEMP_SETTINGS=$(mktemp)
+    if jq '. * {
+        "hooks": ((.hooks // {}) * {
+            "SessionStart": [
+                {
+                    "matcher": ".*",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": "~/.claude/hooks/session-start-agent-identity.sh",
+                            "statusMessage": "Setting up agent identity..."
+                        }
+                    ]
+                }
+            ],
+            "PostToolUse": [
+                {
+                    "matcher": "Bash",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": "~/.claude/hooks/post-bash-jat-signal.sh"
+                        }
+                    ]
+                }
+            ]
+        })
+    }' "$SETTINGS_LOCAL" > "$TEMP_SETTINGS" 2>/dev/null; then
+        mv "$TEMP_SETTINGS" "$SETTINGS_LOCAL"
+        echo -e "  ${GREEN}✓ Added SessionStart and PostToolUse hooks to settings.local.json${NC}"
+    else
+        echo -e "  ${YELLOW}⚠ Failed to update settings.local.json${NC}"
+        rm -f "$TEMP_SETTINGS"
+    fi
+fi
+
 echo ""
 
 # ============================================================================
@@ -325,8 +391,9 @@ echo -e "${GREEN}=========================================${NC}"
 echo ""
 echo "  Global statusline: ~/.claude/statusline.sh"
 echo "  Global hooks:"
-echo "    - ~/.claude/hooks/post-bash-agent-state-refresh.sh"
-echo "    - ~/.claude/hooks/post-bash-jat-signal.sh"
+echo "    - ~/.claude/hooks/session-start-agent-identity.sh (SessionStart)"
+echo "    - ~/.claude/hooks/post-bash-agent-state-refresh.sh (PostToolUse)"
+echo "    - ~/.claude/hooks/post-bash-jat-signal.sh (PostToolUse)"
 echo ""
 echo "  Total repos found: $REPOS_FOUND"
 echo "  Settings.json configured: $SETTINGS_CONFIGURED"
