@@ -2,6 +2,12 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 import { webSocketPlugin } from './src/lib/server/websocket/vitePlugin';
 import { execSync } from 'child_process';
+import { readFileSync, existsSync } from 'fs';
+import { dirname, resolve } from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Get git commit info at build time
 function getGitCommitSha(): string {
@@ -29,6 +35,23 @@ const buildDate = new Date().toLocaleDateString('en-US', {
 	year: 'numeric'
 });
 
+// HTTPS configuration for dev:https mode
+// Certificates are generated via: npm run certs:generate
+function getHttpsConfig(): { key: Buffer; cert: Buffer } | undefined {
+	const certPath = resolve(__dirname, 'certs', 'localhost.pem');
+	const keyPath = resolve(__dirname, 'certs', 'localhost-key.pem');
+
+	if (existsSync(certPath) && existsSync(keyPath)) {
+		return {
+			key: readFileSync(keyPath),
+			cert: readFileSync(certPath)
+		};
+	}
+
+	// Certificates not found - will use Vite's auto-generated certs if --https is passed
+	return undefined;
+}
+
 export default defineConfig({
 	define: {
 		__BUILD_COMMIT_SHA__: JSON.stringify(commitSha),
@@ -40,6 +63,7 @@ export default defineConfig({
 	server: {
 		port: 3333,
 		strictPort: true,
-		host: '127.0.0.1'
+		host: '127.0.0.1',
+		https: getHttpsConfig()
 	}
 });
