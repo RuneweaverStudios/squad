@@ -902,7 +902,7 @@
 						{@const expandedAgentName = getAgentName(session.name)}
 						{@const expandedTask = agentTasks.get(expandedAgentName)}
 						{@const expandedSessionInfo = agentSessionInfo.get(expandedAgentName)}
-						<tr class="expanded-row {isExiting ? 'animate-slide-out-bck-center' : ''}" style={isExiting ? 'pointer-events: none;' : ''}>
+						<tr class="expanded-row {isExiting ? 'animate-slide-out-bck-top' : ''}" style={isExiting ? 'pointer-events: none;' : ''}>
 							<td colspan="3" class="expanded-content">
 								<div
 									class="expanded-session-wrapper"

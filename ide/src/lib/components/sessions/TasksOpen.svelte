@@ -188,6 +188,12 @@
 		const currentTasks = untrack(() => tasks);
 		const prevFilterExiting = untrack(() => filterExitingTaskIds);
 
+		// Skip filter animations when embedded (no header means no filter UI)
+		if (!showHeader) {
+			previousSelectedProject = currentFilter;
+			return;
+		}
+
 		// Skip on initial load (undefined means not initialized yet)
 		if (prevFilter === undefined) {
 			previousSelectedProject = currentFilter;
@@ -257,7 +263,8 @@
 			const task = tasks.find(t => t.id === id && t.status === 'open') || previousTaskObjects.get(id);
 			if (task) {
 				const taskProject = getProjectFromTaskId(task.id);
-				const matchesFilter = selectedProject === null || taskProject === selectedProject;
+				// Only apply project filter when header is shown (filter UI is visible)
+				const matchesFilter = !showHeader || selectedProject === null || taskProject === selectedProject;
 				const isFilterExiting = filterExitingTaskIds.has(id);
 
 				// Include task if it matches filter OR if it's animating out due to filter change
@@ -297,11 +304,11 @@
 		return Array.from(projects).sort();
 	});
 
-	// Derived: open tasks sorted by priority, filtered by project
+	// Derived: open tasks sorted by priority, filtered by project (only when header is shown)
 	const sortedOpenTasks = $derived(
 		tasks
 			.filter(t => t.status === 'open')
-			.filter(t => selectedProject === null || getProjectFromTaskId(t.id) === selectedProject)
+			.filter(t => !showHeader || selectedProject === null || getProjectFromTaskId(t.id) === selectedProject)
 			.sort((a, b) => a.priority - b.priority)
 	);
 

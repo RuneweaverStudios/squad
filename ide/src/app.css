@@ -1284,14 +1284,14 @@
 	animation: slide-out-bck-center 0.5s cubic-bezier(0.550, 0.085, 0.680, 0.530) both;
 }
 
-/* Slide out back and up - for session row exit (splits from expanded content) */
+/* Slide out back and up - for expanded row exit */
 @keyframes slide-out-bck-top {
 	0% {
 		transform: translateZ(0) translateY(0);
 		opacity: 1;
 	}
 	100% {
-		transform: translateZ(-500px) translateY(-200px);
+		transform: translateZ(-1100px) translateY(-1000px);
 		opacity: 0;
 	}
 }

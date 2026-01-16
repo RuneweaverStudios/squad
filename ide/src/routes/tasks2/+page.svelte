@@ -12,6 +12,7 @@
 	import SortDropdown from '$lib/components/SortDropdown.svelte';
 	import TasksActive from '$lib/components/sessions/TasksActive.svelte';
 	import TasksOpen from '$lib/components/sessions/TasksOpen.svelte';
+	import TaskIdBadge from '$lib/components/TaskIdBadge.svelte';
 	import { fetchAndGetProjectColors } from '$lib/utils/projectColors';
 	import { openTaskDetailDrawer } from '$lib/stores/drawerStore';
 	import {
@@ -740,8 +741,8 @@
 									{@const epic = epicId ? getEpicTask(epicId) : null}
 									{@const isExpanded = isEpicExpanded(project, epicId)}
 
-									{#if epicId}
-										<!-- Epic Group -->
+									{#if epicId && epicSessions.length > 0}
+										<!-- Epic Group - only show if there are active sessions -->
 										<div class="epic-group">
 											<button
 												class="epic-header"
@@ -763,9 +764,9 @@
 														d="M19 9l-7 7-7-7"
 													/>
 												</svg>
-												<span class="epic-badge">EPIC</span>
-												<span class="epic-title">{epic?.title || epicId}</span>
-												<span class="epic-count">{epicSessions.length}</span>
+												<TaskIdBadge task={epic || { id: epicId, status: 'open', issue_type: 'epic' }} size="sm" />
+												<span class="epic-title">{epic?.title || 'Untitled Epic'}</span>
+												<span class="epic-count">{epicSessions.length} active</span>
 											</button>
 
 											{#if isExpanded}
@@ -783,8 +784,8 @@
 												</div>
 											{/if}
 										</div>
-									{:else}
-										<!-- Standalone Sessions (no epic) -->
+									{:else if epicSessions.length > 0}
+										<!-- Standalone Sessions (no epic) - only render if there are sessions -->
 										<div class="standalone-group">
 											<TasksActive
 												sessions={epicSessions}
@@ -832,8 +833,8 @@
 									{@const epic = epicId ? getEpicTask(epicId) : null}
 									{@const isExpanded = isEpicExpanded(project, epicId)}
 
-									{#if epicId}
-										<!-- Epic Group -->
+									{#if epicId && epicTasks.length > 0}
+										<!-- Epic Group - only show if there are open child tasks -->
 										<div class="epic-group">
 											<button
 												class="epic-header"
@@ -855,9 +856,9 @@
 														d="M19 9l-7 7-7-7"
 													/>
 												</svg>
-												<span class="epic-badge">EPIC</span>
-												<span class="epic-title">{epic?.title || epicId}</span>
-												<span class="epic-count">{epicTasks.length}</span>
+												<TaskIdBadge task={epic || { id: epicId, status: 'open', issue_type: 'epic' }} size="sm" />
+												<span class="epic-title">{epic?.title || 'Untitled Epic'}</span>
+												<span class="epic-count">{epicTasks.length} open</span>
 											</button>
 
 											{#if isExpanded}
