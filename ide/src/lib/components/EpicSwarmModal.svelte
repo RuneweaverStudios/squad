@@ -43,6 +43,7 @@
 		DEFAULT_EPIC_SWARM_SETTINGS,
 		type EpicSwarmSettings
 	} from '$lib/utils/epicSwarmSettings';
+	import { extractParentId } from '$lib/utils/projectUtils';
 
 	// Props - epicId is optional, can be selected in modal
 	interface Props {
@@ -217,8 +218,33 @@
 			const data = await response.json();
 			const tasks = data.tasks || [];
 
-			// Filter to epics only (include selected epic even if closed, so user can see what they clicked)
-			const epics = tasks.filter((t: any) => t.issue_type === 'epic' && (t.status !== 'closed' || t.id === selectedEpicId));
+			// Filter to actual epics (include selected epic even if closed, so user can see what they clicked)
+			const actualEpics = tasks.filter((t: any) => t.issue_type === 'epic' && (t.status !== 'closed' || t.id === selectedEpicId));
+
+			// Also detect "virtual epics" from hierarchical task IDs (e.g., steelbridge-b2y.1 -> steelbridge-b2y)
+			// These are tasks that have children based on ID naming convention but no explicit epic task
+			const virtualEpicIds = new Set<string>();
+			const actualEpicIds = new Set(actualEpics.map((e: any) => e.id));
+
+			for (const task of tasks) {
+				const parentId = extractParentId(task.id);
+				if (parentId && !actualEpicIds.has(parentId)) {
+					// This task has a parent ID that isn't an actual epic - it's a virtual epic
+					virtualEpicIds.add(parentId);
+				}
+			}
+
+			// Create virtual epic entries (we'll fetch their children info below)
+			const virtualEpics = Array.from(virtualEpicIds).map(id => ({
+				id,
+				title: `Virtual Epic: ${id}`,
+				issue_type: 'epic' as const,
+				status: 'open' as const,
+				isVirtual: true
+			}));
+
+			// Combine actual and virtual epics
+			const epics = [...actualEpics, ...virtualEpics];
 
 			// Fetch children summaries in PARALLEL (not sequentially) for faster loading
 			const childPromises = epics.map(async (epic: any) => {

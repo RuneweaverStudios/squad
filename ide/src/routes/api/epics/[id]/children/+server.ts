@@ -51,28 +51,32 @@ export const GET: RequestHandler = async ({ params }) => {
 	}
 
 	try {
+		// Get all tasks first (needed for both epic lookup and child detection)
+		const allTasks = getTasks();
+
 		// Get the epic details using beads.js library (much faster than bd CLI)
 		const epic = getTaskById(epicId);
-
-		if (!epic) {
-			return json({ error: `Epic '${epicId}' not found` }, { status: 404 });
-		}
-
-		if (epic.issue_type !== 'epic') {
-			return json({ error: `Task '${epicId}' is not an epic (type: ${epic.issue_type})` }, { status: 400 });
-		}
-
-		// Get all tasks to find children
-		const allTasks = getTasks();
 
 		// Method 1: Find children by hierarchical ID pattern (e.g., jat-cptest.1, jat-cptest.2)
 		const childPattern = new RegExp(`^${epicId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.\\d+$`);
 		const hierarchicalChildren = allTasks.filter((t: { id: string }) => childPattern.test(t.id));
 
+		// Check if this is a "virtual epic" - no actual epic task exists, but there are
+		// child tasks with hierarchical IDs matching the pattern
+		const isVirtualEpic = !epic && hierarchicalChildren.length > 0;
+
+		if (!epic && !isVirtualEpic) {
+			return json({ error: `Epic '${epicId}' not found` }, { status: 404 });
+		}
+
+		if (epic && epic.issue_type !== 'epic' && hierarchicalChildren.length === 0) {
+			return json({ error: `Task '${epicId}' is not an epic (type: ${epic.issue_type})` }, { status: 400 });
+		}
+
 		// Method 2: Find children via dependency from epic's "depends_on" list
 		// Epic depends on children (epic is blocked until children complete)
 		const dependencyChildIds = new Set<string>();
-		if (epic.depends_on && Array.isArray(epic.depends_on)) {
+		if (epic?.depends_on && Array.isArray(epic.depends_on)) {
 			for (const dep of epic.depends_on) {
 				if (dep.id) {
 					dependencyChildIds.add(dep.id);
@@ -93,11 +97,20 @@ export const GET: RequestHandler = async ({ params }) => {
 		// Since getTasks() already includes depends_on for each task, we have all the dependency info we need
 		const childrenFromTasks = allTasks.filter((t: { id: string }) => childIdSet.has(t.id));
 
+		// For virtual epics, derive title from the epic ID and calculate status from children
+		const epicTitle = epic?.title || `Virtual Epic: ${epicId}`;
+		// Virtual epic status: 'open' if any children are not closed, else 'closed'
+		const deriveVirtualEpicStatus = (children: Array<{ status: string }>) => {
+			if (children.length === 0) return 'open';
+			return children.every(c => c.status === 'closed') ? 'closed' : 'open';
+		};
+
 		if (childrenFromTasks.length === 0) {
 			return json({
 				epicId,
-				epicTitle: epic.title,
-				epicStatus: epic.status,
+				epicTitle,
+				epicStatus: epic?.status || 'open',
+				isVirtualEpic: !epic,
 				children: [],
 				summary: {
 					total: 0,
@@ -107,7 +120,7 @@ export const GET: RequestHandler = async ({ params }) => {
 					blocked: 0,
 					ready: 0
 				}
-			} satisfies EpicChildrenResponse);
+			} satisfies EpicChildrenResponse & { isVirtualEpic: boolean });
 		}
 
 		// Build a set of child IDs for quick lookup
@@ -171,13 +184,17 @@ export const GET: RequestHandler = async ({ params }) => {
 			ready: children.filter(c => !c.isBlocked && c.status !== 'closed' && c.status !== 'in_progress').length
 		};
 
+		// Calculate epic status for virtual epics based on children
+		const epicStatus = epic?.status || deriveVirtualEpicStatus(children);
+
 		return json({
 			epicId,
-			epicTitle: epic.title,
-			epicStatus: epic.status,
+			epicTitle,
+			epicStatus,
+			isVirtualEpic: !epic,
 			children,
 			summary
-		} satisfies EpicChildrenResponse);
+		} satisfies EpicChildrenResponse & { isVirtualEpic: boolean });
 
 	} catch (err) {
 		const error = err as Error;
