@@ -39,6 +39,7 @@
 		error = null,
 		spawningTaskId = null,
 		projectColors = {},
+		showHeader = true,
 		onSpawnTask = () => {},
 		onRetry = () => {},
 		onTaskClick = () => {}
@@ -48,6 +49,7 @@
 		error: string | null;
 		spawningTaskId: string | null;
 		projectColors: Record<string, string>;
+		showHeader?: boolean;
 		onSpawnTask: (task: Task) => void;
 		onRetry: () => void;
 		onTaskClick: (taskId: string) => void;
@@ -342,40 +344,42 @@
 	});
 </script>
 
-<section class="open-tasks-section">
-	<div class="section-header">
-		<h2>Open Tasks</h2>
-		<span class="task-count">{sortedOpenTasks.length}</span>
+<section class="open-tasks-section" class:no-header={!showHeader}>
+	{#if showHeader}
+		<div class="section-header">
+			<h2>Open Tasks</h2>
+			<span class="task-count">{sortedOpenTasks.length}</span>
 
-		{#if uniqueProjects().length > 1}
-			<div class="project-filter">
-				{#each uniqueProjects() as project}
-					{@const color = projectColors[project] || getProjectColor(project) || 'oklch(0.65 0.15 250)'}
-					{#if selectedProject === null || selectedProject === project}
+			{#if uniqueProjects().length > 1}
+				<div class="project-filter">
+					{#each uniqueProjects() as project}
+						{@const color = projectColors[project] || getProjectColor(project) || 'oklch(0.65 0.15 250)'}
+						{#if selectedProject === null || selectedProject === project}
+							<button
+								type="button"
+								class="project-filter-btn {selectedProject === project ? 'active' : ''}"
+								style="--project-color: {color};"
+								onclick={() => selectedProject = selectedProject === project ? null : project}
+								transition:fade={{ duration: 200 }}
+							>
+								{project}
+							</button>
+						{/if}
+					{/each}
+					{#if selectedProject !== null}
 						<button
 							type="button"
-							class="project-filter-btn {selectedProject === project ? 'active' : ''}"
-							style="--project-color: {color};"
-							onclick={() => selectedProject = selectedProject === project ? null : project}
+							class="project-filter-btn all-btn"
+							onclick={() => selectedProject = null}
 							transition:fade={{ duration: 200 }}
 						>
-							{project}
+							All
 						</button>
 					{/if}
-				{/each}
-				{#if selectedProject !== null}
-					<button
-						type="button"
-						class="project-filter-btn all-btn"
-						onclick={() => selectedProject = null}
-						transition:fade={{ duration: 200 }}
-					>
-						All
-					</button>
-				{/if}
-			</div>
-		{/if}
-	</div>
+				</div>
+			{/if}
+		</div>
+	{/if}
 
 	{#if loading && tasks.length === 0}
 		<div class="loading-skeleton">
@@ -502,6 +506,12 @@
 		background: oklch(0.18 0.01 250);
 		border-radius: 0.75rem;
 		border: 1px solid oklch(0.25 0.02 250);
+	}
+
+	.open-tasks-section.no-header {
+		background: transparent;
+		border: none;
+		border-radius: 0;
 	}
 
 	.section-header {

@@ -688,7 +688,7 @@
 					}
 					{@const elapsed = getElapsedFormatted(session.created)}
 					<tr
-						class="session-row {isNew ? 'animate-slide-in-fwd-center' : ''} {isExiting ? 'animate-slide-out-bck-top' : ''}"
+						class="session-row {isNew ? 'animate-slide-in-fwd-center' : ''} {isExiting ? 'animate-slide-out-bck-center' : ''}"
 						class:attached={session.attached}
 						class:expanded={isExpanded}
 						class:expandable={!isExiting}
@@ -902,7 +902,7 @@
 						{@const expandedAgentName = getAgentName(session.name)}
 						{@const expandedTask = agentTasks.get(expandedAgentName)}
 						{@const expandedSessionInfo = agentSessionInfo.get(expandedAgentName)}
-						<tr class="expanded-row {isExiting ? 'animate-slide-out-bck-bottom' : ''}" style={isExiting ? 'pointer-events: none;' : ''}>
+						<tr class="expanded-row {isExiting ? 'animate-slide-out-bck-center' : ''}" style={isExiting ? 'pointer-events: none;' : ''}>
 							<td colspan="3" class="expanded-content">
 								<div
 									class="expanded-session-wrapper"
