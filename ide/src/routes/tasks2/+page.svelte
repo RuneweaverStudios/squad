@@ -14,6 +14,7 @@
 	import TasksActive from '$lib/components/sessions/TasksActive.svelte';
 	import TasksOpen from '$lib/components/sessions/TasksOpen.svelte';
 	import TaskIdBadge from '$lib/components/TaskIdBadge.svelte';
+	import WorkingAgentBadge from '$lib/components/WorkingAgentBadge.svelte';
 	import { fetchAndGetProjectColors } from '$lib/utils/projectColors';
 	import { openTaskDetailDrawer } from '$lib/stores/drawerStore';
 	import {
@@ -307,8 +308,9 @@
 		saveCollapseState();
 	}
 
-	function toggleEpicCollapse(project: string, epicId: string | null) {
-		const key = epicId ?? 'standalone';
+	function toggleEpicCollapse(project: string, epicId: string | null, subsection: 'sessions' | 'tasks' = 'tasks') {
+		// Each subsection (sessions/tasks) has independent expand state
+		const key = epicId ? `${subsection}-${epicId}` : `${subsection}-standalone`;
 		const expanded = expandedEpicsByProject.get(project) ?? new Set<string>();
 
 		if (expanded.has(key)) {
@@ -323,8 +325,9 @@
 		expandedEpicsByProject = new Map(expandedEpicsByProject);
 	}
 
-	function isEpicExpanded(project: string, epicId: string | null): boolean {
-		const key = epicId ?? 'standalone';
+	function isEpicExpanded(project: string, epicId: string | null, subsection: 'sessions' | 'tasks' = 'tasks'): boolean {
+		// Each subsection (sessions/tasks) has independent expand state
+		const key = epicId ? `${subsection}-${epicId}` : `${subsection}-standalone`;
 		const expanded = expandedEpicsByProject.get(project);
 		return expanded?.has(key) ?? false;
 	}
@@ -758,14 +761,14 @@
 								})}
 								{#each sortedSessionEntries as [epicId, epicSessions] (epicId ?? 'standalone')}
 									{@const epic = epicId ? getEpicTask(epicId) : null}
-									{@const isExpanded = isEpicExpanded(project, epicId)}
+									{@const isExpanded = isEpicExpanded(project, epicId, 'sessions')}
 
 									{#if epicId && epicSessions.length > 0}
 										<!-- Epic Group - only show if there are active sessions -->
 										<div class="epic-group">
 											<button
 												class="epic-header"
-												onclick={() => toggleEpicCollapse(project, epicId)}
+												onclick={() => toggleEpicCollapse(project, epicId, 'sessions')}
 												aria-expanded={isExpanded}
 											>
 												<svg
@@ -785,6 +788,11 @@
 												</svg>
 												<TaskIdBadge task={epic || { id: epicId, status: 'open', issue_type: 'epic' }} size="sm" />
 												<span class="epic-title">{epic?.title || 'Untitled Epic'}</span>
+												<div class="epic-agents">
+													{#each epicSessions as session}
+														<WorkingAgentBadge name={getAgentName(session.name)} size={18} variant="avatar" isWorking={true} />
+													{/each}
+												</div>
 												<span class="epic-count">{epicSessions.length} active</span>
 											</button>
 
@@ -805,11 +813,11 @@
 										</div>
 									{:else if epicSessions.length > 0}
 										<!-- Standalone Sessions (no epic) - collapsible group like epics -->
-										{@const isStandaloneExpanded = isEpicExpanded(project, null)}
+										{@const isStandaloneExpanded = isEpicExpanded(project, null, 'sessions')}
 										<div class="epic-group standalone">
 											<button
 												class="epic-header"
-												onclick={() => toggleEpicCollapse(project, null)}
+												onclick={() => toggleEpicCollapse(project, null, 'sessions')}
 												aria-expanded={isStandaloneExpanded}
 											>
 												<svg
@@ -829,6 +837,11 @@
 												</svg>
 												<span class="standalone-icon">📋</span>
 												<span class="epic-title">Standalone Sessions</span>
+												<div class="epic-agents">
+													{#each epicSessions as session}
+														<WorkingAgentBadge name={getAgentName(session.name)} size={18} variant="avatar" isWorking={true} />
+													{/each}
+												</div>
 												<span class="epic-count">{epicSessions.length} active</span>
 											</button>
 
@@ -1232,6 +1245,14 @@
 		border-radius: 9999px;
 		background: oklch(0.25 0.02 250);
 		color: oklch(0.7 0.02 250);
+	}
+
+	.epic-agents {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		margin-left: auto;
+		margin-right: 0.5rem;
 	}
 
 	.epic-content {

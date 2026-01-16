@@ -697,7 +697,7 @@
 					style="--project-color: {projectColor}"
 					onclick={() => selectProject(project)}
 				>
-					<span class="project-tab-name">{project.toUpperCase()}</span>
+					<span class="project-tab-name mt-1">{project.toUpperCase()}</span>
 					{#if projectAgentSessions.length > 0}
 						<div class="project-tab-agents mt-2.5">
 							{#each projectAgentSessions as session}
@@ -706,10 +706,10 @@
 						</div>
 					{/if}
 					<div class="project-tab-counts mt-1.5">
-						{#if sessionCount > 0}
+						<!-- {#if sessionCount > 0}
 							<span class="tab-count sessions">{sessionCount} active</span>
-						{/if}
-						{#if taskCount > 0}
+						{/if} -->
+						{#if taskCount > 0 && sessionCount === 0}
 							<span class="tab-count tasks">{taskCount} open</span>
 						{/if}
 					</div>
@@ -1072,6 +1072,10 @@
 		background: oklch(0.16 0.01 250);
 		border-radius: 0.75rem;
 		border: 1px solid oklch(0.25 0.02 250);
+		/* Sticky positioning so tabs stay visible when scrolling */
+		position: sticky;
+		top: 0;
+		z-index: 30;
 	}
 
 	.project-tab {
@@ -1291,6 +1295,34 @@
 
 	.epic-content {
 		border-top: 1px solid oklch(0.23 0.02 250);
+	}
+
+	/* Override TasksActive table styles when inside accordion to reduce visual prominence */
+	.epic-content :global(.sessions-table-wrapper) {
+		background: transparent;
+		border: none;
+		border-radius: 0;
+	}
+
+	.epic-content :global(.sessions-table thead) {
+		display: none; /* Hide header row - parent accordion header is the context */
+	}
+
+	.epic-content :global(.sessions-table tbody tr) {
+		border-bottom: 1px solid oklch(0.20 0.02 250 / 0.5);
+	}
+
+	.epic-content :global(.sessions-table tbody tr:last-child) {
+		border-bottom: none;
+	}
+
+	.epic-content :global(.sessions-table td) {
+		padding: 0.5rem 0.75rem;
+		font-size: 0.8rem;
+	}
+
+	.epic-content :global(.sessions-table tbody tr:hover) {
+		background: oklch(0.18 0.01 250);
 	}
 
 	/* Standalone Group (collapsible, same structure as epic) */

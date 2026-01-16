@@ -185,6 +185,9 @@
 
 	// Human task indicator - shown with warm orange styling
 	const isHuman = $derived(isHumanTask(task));
+
+	// Closed/completed task indicator
+	const isClosed = $derived(task.status === 'closed');
 </script>
 
 {#if minimal}
@@ -194,7 +197,12 @@
 		onclick={copyId}
 		title="Click to copy task ID"
 	>
-		<span class="{size === 'xs' ? 'text-xs' : size === 'sm' ? 'text-sm' : 'text-base'} {animate ? 'tracking-in-expand' : ''}" style="color: {projectColor}{animate ? '; animation-delay: 100ms;' : ''}">{task.id}</span>
+		{#if isClosed}
+			<svg class="{iconSizes[size]} text-success shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+			</svg>
+		{/if}
+		<span class="{size === 'xs' ? 'text-xs' : size === 'sm' ? 'text-sm' : 'text-base'} {animate ? 'tracking-in-expand' : ''} {isClosed ? 'line-through opacity-60' : ''}" style="color: {projectColor}{animate ? '; animation-delay: 100ms;' : ''}">{task.id}</span>
 		{#if copied}
 			<svg class="{iconSizes[size]} text-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
@@ -203,25 +211,32 @@
 	</button>
 {:else if variant === 'projectPill'}
 	<!-- Project pill mode: outline pill with status dot and task ID -->
-	{@const dotColor = statusDotColor || 'oklch(0.50 0.02 250)'}
+	{@const dotColor = isClosed ? 'oklch(0.65 0.20 145)' : (statusDotColor || 'oklch(0.50 0.02 250)')}
 	<button
 		class="inline-flex items-center gap-1.5 font-mono rounded-full cursor-pointer whitespace-nowrap
 			   hover:opacity-90 transition-all {size === 'xs' ? 'text-xs px-2 py-0.5' : size === 'sm' ? 'text-sm px-2.5 py-0.5' : 'text-base px-3 py-1'}"
 		style="
-			background: color-mix(in oklch, {projectColor} 15%, transparent);
-			border: 1px solid color-mix(in oklch, {projectColor} 40%, transparent);
-			color: {projectColor};
+			background: color-mix(in oklch, {isClosed ? 'oklch(0.65 0.20 145)' : projectColor} 15%, transparent);
+			border: 1px solid color-mix(in oklch, {isClosed ? 'oklch(0.65 0.20 145)' : projectColor} 40%, transparent);
+			color: {isClosed ? 'oklch(0.65 0.20 145)' : projectColor};
 		"
 		onclick={copyId}
 		title="Click to copy task ID"
 	>
-		<!-- Status dot (uses status color, not project color) -->
-		<span
-			class="rounded-full shrink-0 {size === 'xs' ? 'w-2 h-2' : size === 'sm' ? 'w-2.5 h-2.5' : 'w-3 h-3'}"
-			style="background: {dotColor};"
-		></span>
+		{#if isClosed}
+			<!-- Checkmark for closed tasks -->
+			<svg class="{iconSizes[size]} shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+			</svg>
+		{:else}
+			<!-- Status dot (uses status color, not project color) -->
+			<span
+				class="rounded-full shrink-0 {size === 'xs' ? 'w-2 h-2' : size === 'sm' ? 'w-2.5 h-2.5' : 'w-3 h-3'}"
+				style="background: {dotColor};"
+			></span>
+		{/if}
 		<!-- Full task ID -->
-		<span class={animate ? 'tracking-in-expand' : ''} style={animate ? 'animation-delay: 100ms;' : ''}>{task.id}</span>
+		<span class="{animate ? 'tracking-in-expand' : ''} {isClosed ? 'line-through opacity-70' : ''}" style={animate ? 'animation-delay: 100ms;' : ''}>{task.id}</span>
 		{#if showType && task.issue_type}
 			<span class="opacity-80">{typeVisual.icon}</span>
 		{/if}
@@ -233,40 +248,58 @@
 	</button>
 {:else if variant === 'agentPill'}
 	<!-- Agent pill mode: avatar with status ring + task ID - more compact single-row display -->
-	{@const ringColor = statusDotColor || 'oklch(0.50 0.02 250)'}
+	{@const ringColor = isClosed ? 'oklch(0.65 0.20 145)' : (statusDotColor || 'oklch(0.50 0.02 250)')}
 	{@const avatarSize = size === 'xs' ? 20 : size === 'sm' ? 24 : 28}
+	{@const badgeColor = isClosed ? 'oklch(0.65 0.20 145)' : projectColor}
 	<button
 		class="inline-flex items-center gap-2 font-mono rounded-full cursor-pointer whitespace-nowrap
 			   hover:opacity-90 transition-all {size === 'xs' ? 'text-xs pr-2 pl-0.5 py-0.5' : size === 'sm' ? 'text-sm pr-2.5 pl-0.5 py-0.5' : 'text-base pr-3 pl-1 py-1'}"
 		style="
-			background: color-mix(in oklch, {projectColor} 12%, transparent);
-			border: 1px solid color-mix(in oklch, {projectColor} 30%, transparent);
-			color: {projectColor};
+			background: color-mix(in oklch, {badgeColor} 12%, transparent);
+			border: 1px solid color-mix(in oklch, {badgeColor} 30%, transparent);
+			color: {badgeColor};
 		"
 		onclick={copyId}
 		title="Click to copy task ID"
 	>
-		<!-- Avatar with status ring -->
-		<div
-			class="rounded-full shrink-0 flex items-center justify-center"
-			style="
-				padding: 2px;
-				background: {ringColor};
-				box-shadow: 0 0 6px {ringColor};
-			"
-		>
-			{#if agentName}
-				<AgentAvatar name={agentName} size={avatarSize - 4} />
-			{:else}
-				<!-- Fallback dot if no agent -->
-				<div
-					class="rounded-full"
-					style="width: {avatarSize - 4}px; height: {avatarSize - 4}px; background: oklch(0.25 0.02 250);"
-				></div>
-			{/if}
-		</div>
+		{#if isClosed}
+			<!-- Checkmark circle for closed tasks (replaces avatar) -->
+			<div
+				class="rounded-full shrink-0 flex items-center justify-center"
+				style="
+					width: {avatarSize}px;
+					height: {avatarSize}px;
+					background: oklch(0.65 0.20 145 / 0.2);
+					border: 2px solid oklch(0.65 0.20 145);
+				"
+			>
+				<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+				</svg>
+			</div>
+		{:else}
+			<!-- Avatar with status ring -->
+			<div
+				class="rounded-full shrink-0 flex items-center justify-center"
+				style="
+					padding: 2px;
+					background: {ringColor};
+					box-shadow: 0 0 6px {ringColor};
+				"
+			>
+				{#if agentName}
+					<AgentAvatar name={agentName} size={avatarSize - 4} />
+				{:else}
+					<!-- Fallback dot if no agent -->
+					<div
+						class="rounded-full"
+						style="width: {avatarSize - 4}px; height: {avatarSize - 4}px; background: oklch(0.25 0.02 250);"
+					></div>
+				{/if}
+			</div>
+		{/if}
 		<!-- Task ID -->
-		<span class={animate ? 'tracking-in-expand' : ''} style={animate ? 'animation-delay: 100ms;' : ''}>{task.id}</span>
+		<span class="{animate ? 'tracking-in-expand' : ''} {isClosed ? 'line-through opacity-70' : ''}" style={animate ? 'animation-delay: 100ms;' : ''}>{task.id}</span>
 		{#if showType && task.issue_type}
 			<span class="opacity-80">{typeVisual.icon}</span>
 		{/if}
@@ -306,15 +339,20 @@
 		<!-- Main badge -->
 		<button
 			class="inline-flex items-center font-mono rounded cursor-pointer
-				   bg-base-100 hover:bg-base-200 transition-colors group border border-base-300 {sizeClasses[size]}"
+				   bg-base-100 hover:bg-base-200 transition-colors group border {isClosed ? 'border-success/40' : 'border-base-300'} {sizeClasses[size]}"
 			onclick={copyId}
 			title="Click to copy task ID"
 		>
-			{#if showType && task.issue_type}
+			{#if isClosed}
+				<!-- Checkmark for closed tasks -->
+				<svg class="{iconSizes[size]} text-success shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+				</svg>
+			{:else if showType && task.issue_type}
 				<span class={size === 'xs' ? 'text-xs' : size === 'sm' ? 'text-sm' : 'text-base'}>{typeVisual.icon}</span>
 			{/if}
 
-			{#if isHuman}
+			{#if isHuman && !isClosed}
 				<span
 					class={size === 'xs' ? 'text-xs' : size === 'sm' ? 'text-sm' : 'text-base'}
 					title="Human action required"
@@ -322,9 +360,9 @@
 				>🧑</span>
 			{/if}
 
-			<span class={animate ? 'tracking-in-expand' : ''} style="color: {projectColor}{animate ? '; animation-delay: 100ms;' : ''}">{task.id}</span>
+			<span class="{animate ? 'tracking-in-expand' : ''} {isClosed ? 'line-through opacity-60' : ''}" style="color: {isClosed ? 'oklch(0.65 0.20 145)' : projectColor}{animate ? '; animation-delay: 100ms;' : ''}">{task.id}</span>
 
-			{#if showUnblocksCount && activeBlocks.length > 0}
+			{#if showUnblocksCount && activeBlocks.length > 0 && !isClosed}
 				<span
 					class="inline-flex items-center gap-0.5 text-xs font-mono px-1 py-0.5 rounded"
 					style="color: oklch(0.75 0.15 200); background: oklch(0.75 0.15 200 / 0.15);"
@@ -337,7 +375,7 @@
 				</span>
 			{/if}
 
-			{#if showStatus && !shouldShowAssignee}
+			{#if showStatus && !shouldShowAssignee && !isClosed}
 				<svg
 					class="{iconSizes[size]} {statusVisual.text} {statusVisual.animation || ''} shrink-0"
 					viewBox="0 0 24 24"
@@ -425,14 +463,18 @@
 		<div class="dropdown dropdown-hover {dropdownAlign === 'end' ? 'dropdown-left' : 'dropdown-right'}" onmouseenter={fetchDepGraph}>
 			<button
 				class="inline-flex items-center font-mono rounded cursor-pointer
-					   bg-base-100 hover:bg-base-200 transition-colors group border border-base-300 {sizeClasses[size]}"
+					   bg-base-100 hover:bg-base-200 transition-colors group border {isClosed ? 'border-success/40' : 'border-base-300'} {sizeClasses[size]}"
 				onclick={handleBadgeClick}
 			>
-				{#if showType && task.issue_type}
+				{#if isClosed}
+					<svg class="{iconSizes[size]} shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: oklch(0.65 0.20 145);">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+					</svg>
+				{:else if showType && task.issue_type}
 					<span class={size === 'xs' ? 'text-xs' : size === 'sm' ? 'text-sm' : 'text-base'}>{typeVisual.icon}</span>
 				{/if}
 
-				{#if isHuman}
+				{#if isHuman && !isClosed}
 					<span
 						class={size === 'xs' ? 'text-xs' : size === 'sm' ? 'text-sm' : 'text-base'}
 						title="Human action required"
@@ -440,9 +482,9 @@
 					>🧑</span>
 				{/if}
 
-				<span class={animate ? 'tracking-in-expand' : ''} style="color: {projectColor}{animate ? '; animation-delay: 100ms;' : ''}">{task.id}</span>
+				<span class="{animate ? 'tracking-in-expand' : ''} {isClosed ? 'line-through opacity-60' : ''}" style="color: {isClosed ? 'oklch(0.65 0.20 145)' : projectColor}{animate ? '; animation-delay: 100ms;' : ''}">{task.id}</span>
 
-				{#if showUnblocksCount && activeBlocks.length > 0}
+				{#if showUnblocksCount && activeBlocks.length > 0 && !isClosed}
 					<span
 						class="inline-flex items-center gap-0.5 text-xs font-mono px-1 py-0.5 rounded"
 						style="color: oklch(0.75 0.15 200); background: oklch(0.75 0.15 200 / 0.15);"
@@ -455,8 +497,8 @@
 					</span>
 				{/if}
 
-				{#if showStatus && !shouldShowAssignee}
-					<!-- Show status icon in badge only when not showing assignee (assignee row has its own gear) -->
+				{#if showStatus && !shouldShowAssignee && !isClosed}
+					<!-- Show status icon in badge only when not showing assignee (assignee row has its own gear) and not closed -->
 					<svg
 						class="{iconSizes[size]} {statusVisual.text} {statusVisual.animation || ''} shrink-0"
 						viewBox="0 0 24 24"

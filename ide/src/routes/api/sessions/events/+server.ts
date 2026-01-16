@@ -344,7 +344,8 @@ function readCompletionBundle(sessionName: string): CompletionBundle | null {
 			return {
 				taskId: data.taskId || '',
 				agentName: data.agentName || '',
-				summary: Array.isArray(data.summary) ? data.summary : [],
+				// Normalize summary: string -> [string], array -> array, missing -> []
+			summary: Array.isArray(data.summary) ? data.summary : (typeof data.summary === 'string' ? [data.summary] : []),
 				quality: data.quality || { tests: 'none', build: 'clean' },
 				humanActions: Array.isArray(data.humanActions) ? data.humanActions : undefined,
 				suggestedTasks: Array.isArray(data.suggestedTasks) ? data.suggestedTasks.map((t: Partial<SuggestedTask>) => ({

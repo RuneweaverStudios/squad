@@ -849,8 +849,14 @@
 
 		// For review events, show first summary item or reviewFocus
 		if (signalType === 'review' && event.data) {
-			if (event.data.summary && Array.isArray(event.data.summary) && event.data.summary.length > 0) {
-				return truncate(event.data.summary[0] as string);
+			// Handle summary as string or array
+			if (event.data.summary) {
+				if (typeof event.data.summary === 'string') {
+					return truncate(event.data.summary);
+				}
+				if (Array.isArray(event.data.summary) && event.data.summary.length > 0) {
+					return truncate(event.data.summary[0] as string);
+				}
 			}
 			if (event.data.reviewFocus && Array.isArray(event.data.reviewFocus) && event.data.reviewFocus.length > 0) {
 				return truncate(event.data.reviewFocus[0] as string);
@@ -1428,15 +1434,18 @@
 									{#if event.data.approach}
 										<div class="text-base-content/60">{event.data.approach}</div>
 									{/if}
-									{#if Array.isArray(event.data.summary)}
+									{#if event.data.summary}
+									{@const summaryArray = Array.isArray(event.data.summary) ? event.data.summary : (typeof event.data.summary === 'string' ? [event.data.summary] : [])}
+									{#if summaryArray.length > 0}
 										<ul class="list-disc list-inside text-base-content/60 space-y-0.5">
-											{#each event.data.summary.slice(0, 3) as item}
+											{#each summaryArray.slice(0, 3) as item}
 												<li>{item}</li>
 											{/each}
-											{#if event.data.summary.length > 3}
-												<li class="opacity-60">+{event.data.summary.length - 3} more...</li>
+											{#if summaryArray.length > 3}
+												<li class="opacity-60">+{summaryArray.length - 3} more...</li>
 											{/if}
 										</ul>
+									{/if}
 									{/if}
 									{#if event.data.outcome}
 										<div class="text-success">Outcome: {event.data.outcome}</div>
