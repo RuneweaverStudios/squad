@@ -22,35 +22,55 @@ import {
 	createMigration,
 	isSupabaseCliInstalled
 } from '$lib/utils/supabase';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join, basename } from 'path';
 
-/**
- * Get project path from config
- */
-function getProjectPath(projectName: string): string | null {
+interface ProjectPaths {
+	projectPath: string | null;
+	serverPath: string | null;
+}
+
+function getProjectPaths(projectName: string): ProjectPaths {
 	const configPath = join(process.env.HOME || '~', '.config', 'jat', 'projects.json');
 
 	if (!existsSync(configPath)) {
 		const defaultPath = join(process.env.HOME || '~', 'code', projectName);
-		return existsSync(defaultPath) ? defaultPath : null;
+		return {
+			projectPath: existsSync(defaultPath) ? defaultPath : null,
+			serverPath: null
+		};
 	}
 
 	try {
-		const configContent = require('fs').readFileSync(configPath, 'utf-8');
+		const configContent = readFileSync(configPath, 'utf-8');
 		const config = JSON.parse(configContent);
 		const projectConfig = config.projects?.[projectName];
 
+		let projectPath: string | null = null;
+		let serverPath: string | null = null;
+
 		if (projectConfig?.path) {
 			const resolvedPath = projectConfig.path.replace(/^~/, process.env.HOME || '');
-			return existsSync(resolvedPath) ? resolvedPath : null;
+			projectPath = existsSync(resolvedPath) ? resolvedPath : null;
 		}
 
-		const defaultPath = join(process.env.HOME || '~', 'code', projectName);
-		return existsSync(defaultPath) ? defaultPath : null;
+		if (projectConfig?.server_path) {
+			const resolvedServerPath = projectConfig.server_path.replace(/^~/, process.env.HOME || '');
+			serverPath = existsSync(resolvedServerPath) ? resolvedServerPath : null;
+		}
+
+		if (!projectPath) {
+			const defaultPath = join(process.env.HOME || '~', 'code', projectName);
+			projectPath = existsSync(defaultPath) ? defaultPath : null;
+		}
+
+		return { projectPath, serverPath };
 	} catch {
 		const defaultPath = join(process.env.HOME || '~', 'code', projectName);
-		return existsSync(defaultPath) ? defaultPath : null;
+		return {
+			projectPath: existsSync(defaultPath) ? defaultPath : null,
+			serverPath: null
+		};
 	}
 }
 
@@ -85,14 +105,23 @@ export const POST: RequestHandler = async ({ url, request }) => {
 		return json({ error: 'Supabase CLI is not installed' }, { status: 503 });
 	}
 
-	// Get project path
-	const projectPath = getProjectPath(projectName);
+	// Get project paths
+	const { projectPath, serverPath } = getProjectPaths(projectName);
 	if (!projectPath) {
 		return json({ error: `Project not found: ${projectName}` }, { status: 404 });
 	}
 
-	// Check Supabase configuration
-	const config = await detectSupabaseConfig(projectPath);
+	// Check Supabase configuration - check both project root and server_path
+	let config = await detectSupabaseConfig(projectPath);
+	let effectivePath = projectPath;
+
+	if (!config.hasSupabase && serverPath && serverPath !== projectPath) {
+		const serverConfig = await detectSupabaseConfig(serverPath);
+		if (serverConfig.hasSupabase) {
+			config = serverConfig;
+			effectivePath = serverPath;
+		}
+	}
 
 	if (!config.hasSupabase) {
 		return json({
@@ -100,16 +129,16 @@ export const POST: RequestHandler = async ({ url, request }) => {
 		}, { status: 400 });
 	}
 
-	// Create the migration
+	// Create the migration (use effectivePath for monorepos)
 	try {
-		const migrationPath = await createMigration(projectPath, migrationName);
+		const migrationPath = await createMigration(effectivePath, migrationName);
 
 		return json({
 			success: true,
 			filename: basename(migrationPath),
 			path: migrationPath,
 			// Return relative path for display
-			relativePath: migrationPath.replace(projectPath + '/', '')
+			relativePath: migrationPath.replace(effectivePath + '/', '')
 		});
 	} catch (error) {
 		return json({
