@@ -236,7 +236,8 @@ export async function loadProjects(): Promise<void> {
 	state.projectsError = null;
 
 	try {
-		const response = await fetch(PROJECTS_API);
+		// Fetch with stats=true to get hasBeads, hasClaudeMd, etc.
+		const response = await fetch(`${PROJECTS_API}?stats=true`);
 		if (!response.ok) {
 			throw new Error(`Failed to load projects: ${response.statusText}`);
 		}
@@ -254,7 +255,15 @@ export async function loadProjects(): Promise<void> {
 				inactive: p.inactiveColor
 			},
 			database_url: p.databaseUrl,
-			hidden: p.hidden
+			hidden: p.hidden,
+			stats: p.stats ? {
+				hasBeads: p.stats.hasBeads,
+				hasClaudeMd: p.stats.hasClaudeMd,
+				agentCount: p.stats.agentCount,
+				taskCount: p.stats.taskCount,
+				openTaskCount: p.stats.openTaskCount,
+				serverRunning: p.stats.serverRunning
+			} : undefined
 		}));
 		state.initialized = true;
 	} catch (error) {
@@ -280,6 +289,8 @@ export async function saveProject(project: ProjectConfig): Promise<boolean> {
 				project: projectKey,
 				description: project.description,
 				port: project.port,
+				server_path: project.server_path,
+				database_url: project.database_url,
 				active_color: project.colors?.active,
 				inactive_color: project.colors?.inactive
 			})

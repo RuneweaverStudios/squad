@@ -139,6 +139,24 @@ export interface ProjectColors {
  * };
  * ```
  */
+/**
+ * Project stats computed by the API.
+ */
+export interface ProjectStats {
+	/** Whether the project has a .beads/ directory initialized */
+	hasBeads: boolean;
+	/** Whether the project has a CLAUDE.md or AGENTS.md file */
+	hasClaudeMd: boolean;
+	/** Number of active agents working on this project */
+	agentCount: number;
+	/** Total number of tasks */
+	taskCount: number;
+	/** Number of open tasks */
+	openTaskCount: number;
+	/** Whether the dev server is currently running */
+	serverRunning: boolean;
+}
+
 export interface ProjectConfig {
 	/** Display name for the project (e.g., "JAT", "Chimaro") */
 	name: string;
@@ -156,6 +174,8 @@ export interface ProjectConfig {
 	database_url?: string;
 	/** Whether to hide this project from default views (optional) */
 	hidden?: boolean;
+	/** Project stats (optional, only when fetched with ?stats=true) */
+	stats?: ProjectStats;
 }
 
 // =============================================================================

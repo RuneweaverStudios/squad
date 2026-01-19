@@ -10,8 +10,7 @@
  *   /files    - Files (project file browser)
  *   /source   - Source Control (git changes, diff viewer)
  *   /servers  - Servers (project server sessions)
- *   /config   - Config (JAT configuration files editor)
- *   /projects - Projects (project configuration & management)
+ *   /config   - Config (JAT configuration, includes Projects tab)
  *
  * VIEWS (alternative visualizations):
  *   /sessions - Sessions (all tmux sessions: agents, servers, other)
@@ -99,13 +98,6 @@ export const unifiedNavConfig: UnifiedNavConfig = {
 			label: 'Config',
 			href: '/config',
 			icon: 'settings',
-			category: 'main'
-		},
-		{
-			id: 'projects',
-			label: 'Projects',
-			href: '/projects',
-			icon: 'projects',
 			category: 'main'
 		},
 		// VIEWS: Alternative visualizations

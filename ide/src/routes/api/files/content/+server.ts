@@ -289,34 +289,71 @@ function isBinaryContent(buffer: Buffer): boolean {
 }
 
 /**
+ * Expand tilde in path to home directory
+ */
+function expandTilde(path: string): string {
+	if (path.startsWith('~/')) {
+		return join(homedir(), path.slice(2));
+	}
+	if (path === '~') {
+		return homedir();
+	}
+	return path;
+}
+
+/**
  * GET /api/files/content - Read file content
+ *
+ * Supports two modes:
+ * 1. Project-relative: ?project=name&path=relative/path
+ * 2. Absolute path: ?path=/absolute/path or ?path=~/path (no project param)
  */
 export const GET: RequestHandler = async ({ url }) => {
 	try {
 		const projectName = url.searchParams.get('project');
 		const filePath = url.searchParams.get('path');
 
-		if (!projectName) {
-			return json({ error: 'Project name is required' }, { status: 400 });
-		}
-
 		if (!filePath) {
 			return json({ error: 'File path is required' }, { status: 400 });
 		}
 
-		// Get project path
-		const projectPath = await getProjectPath(projectName);
-		if (!projectPath) {
-			return json({ error: `Project '${projectName}' not found` }, { status: 404 });
-		}
+		let resolvedPath: string;
 
-		// Validate and resolve path
-		const validation = validatePath(projectPath, filePath);
-		if (!validation.valid) {
-			return json({ error: validation.error }, { status: 403 });
-		}
+		// If path is absolute (starts with / or ~), allow direct access without project
+		if (filePath.startsWith('/') || filePath.startsWith('~')) {
+			resolvedPath = expandTilde(filePath);
+			resolvedPath = normalize(resolvedPath);
 
-		const resolvedPath = validation.resolved!;
+			// Security: Block path traversal attempts
+			if (filePath.includes('..')) {
+				return json({ error: 'Path traversal not allowed' }, { status: 403 });
+			}
+
+			// Security: Block sensitive system files
+			const sensitiveSystemPaths = ['/etc/passwd', '/etc/shadow', '/etc/sudoers'];
+			if (sensitiveSystemPaths.some(p => resolvedPath.startsWith(p))) {
+				return json({ error: 'Access to system files not allowed' }, { status: 403 });
+			}
+		} else {
+			// Project-relative path mode
+			if (!projectName) {
+				return json({ error: 'Project name is required for relative paths' }, { status: 400 });
+			}
+
+			// Get project path
+			const projectPath = await getProjectPath(projectName);
+			if (!projectPath) {
+				return json({ error: `Project '${projectName}' not found` }, { status: 404 });
+			}
+
+			// Validate and resolve path
+			const validation = validatePath(projectPath, filePath);
+			if (!validation.valid) {
+				return json({ error: validation.error }, { status: 403 });
+			}
+
+			resolvedPath = validation.resolved!;
+		}
 
 		// Check if file exists
 		if (!existsSync(resolvedPath)) {
@@ -633,27 +670,47 @@ export const PUT: RequestHandler = async ({ url, request }) => {
 		const projectName = url.searchParams.get('project');
 		const filePath = url.searchParams.get('path');
 
-		if (!projectName) {
-			return json({ error: 'Project name is required' }, { status: 400 });
-		}
-
 		if (!filePath) {
 			return json({ error: 'File path is required' }, { status: 400 });
 		}
 
-		// Get project path
-		const projectPath = await getProjectPath(projectName);
-		if (!projectPath) {
-			return json({ error: `Project '${projectName}' not found` }, { status: 404 });
-		}
+		let resolvedPath: string;
 
-		// Validate and resolve path
-		const validation = validatePath(projectPath, filePath);
-		if (!validation.valid) {
-			return json({ error: validation.error }, { status: 403 });
-		}
+		// If path is absolute (starts with / or ~), allow direct access without project
+		if (filePath.startsWith('/') || filePath.startsWith('~')) {
+			resolvedPath = expandTilde(filePath);
+			resolvedPath = normalize(resolvedPath);
 
-		const resolvedPath = validation.resolved!;
+			// Security: Block path traversal attempts
+			if (filePath.includes('..')) {
+				return json({ error: 'Path traversal not allowed' }, { status: 403 });
+			}
+
+			// Security: Block sensitive system files
+			const sensitiveSystemPaths = ['/etc/', '/usr/', '/bin/', '/sbin/', '/var/', '/root/'];
+			if (sensitiveSystemPaths.some(p => resolvedPath.startsWith(p))) {
+				return json({ error: 'Cannot write to system directories' }, { status: 403 });
+			}
+		} else {
+			// Project-relative path mode
+			if (!projectName) {
+				return json({ error: 'Project name is required for relative paths' }, { status: 400 });
+			}
+
+			// Get project path
+			const projectPath = await getProjectPath(projectName);
+			if (!projectPath) {
+				return json({ error: `Project '${projectName}' not found` }, { status: 404 });
+			}
+
+			// Validate and resolve path
+			const validation = validatePath(projectPath, filePath);
+			if (!validation.valid) {
+				return json({ error: validation.error }, { status: 403 });
+			}
+
+			resolvedPath = validation.resolved!;
+		}
 
 		// Check if file is sensitive
 		if (isSensitiveFile(resolvedPath)) {

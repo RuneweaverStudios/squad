@@ -19,6 +19,7 @@
 	} from '$lib/types/config';
 	import { validateHooksConfig, type ValidationResult } from '$lib/utils/editorValidation';
 	import HookTester from './HookTester.svelte';
+	import ScriptEditorDrawer from './ScriptEditorDrawer.svelte';
 	import { successToast, errorToast } from '$lib/stores/toasts.svelte';
 
 	// Validation result type for command paths
@@ -87,6 +88,10 @@
 	let editingEntry = $state<{ eventType: HookEventType; entryIndex: number } | null>(null);
 	let showTester = $state(false);
 	let selectedTestEventType = $state<HookEventType>('PostToolUse');
+
+	// Script editor drawer state
+	let scriptEditorOpen = $state(false);
+	let scriptEditorPath = $state('');
 
 	// Inline validation errors per field
 	let matcherErrors = $state<Map<string, string>>(new Map());  // key: `${eventType}-${entryIndex}`
@@ -192,6 +197,31 @@
 	function clearSearch() {
 		searchQuery = '';
 		searchInput?.focus();
+	}
+
+	// Open script editor drawer for a file
+	function openScriptEditor(path: string) {
+		// Resolve relative paths to absolute paths for the API
+		if (path.startsWith('./') || path.startsWith('../')) {
+			// For relative paths, we need to resolve them
+			// The hooks are typically relative to the project root
+			scriptEditorPath = path;
+		} else {
+			scriptEditorPath = path;
+		}
+		scriptEditorOpen = true;
+	}
+
+	// Handle script editor close
+	function handleScriptEditorClose() {
+		scriptEditorOpen = false;
+		scriptEditorPath = '';
+	}
+
+	// Handle script save (could trigger re-validation)
+	function handleScriptSave(path: string, content: string) {
+		// Optionally refresh validation for any commands using this path
+		successToast('Script saved');
 	}
 
 	// Initialize hooks from API
@@ -918,6 +948,18 @@
 																		)}
 																	placeholder="./.claude/hooks/my-hook.sh"
 																/>
+																{#if hook.command && (hook.command.startsWith('./') || hook.command.startsWith('/') || hook.command.startsWith('~/') || hook.command.startsWith('../')) && commandValidation?.type !== 'error'}
+																	<button
+																		type="button"
+																		class="edit-script-btn"
+																		onclick={() => openScriptEditor(hook.command)}
+																		title="Edit script file"
+																	>
+																		<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+																			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+																		</svg>
+																	</button>
+																{/if}
 																{#if commandValidation?.isValidating}
 																	<span class="validation-spinner"></span>
 																{/if}
@@ -1070,6 +1112,14 @@
 		</div>
 	{/if}
 </div>
+
+<!-- Script Editor Drawer -->
+<ScriptEditorDrawer
+	bind:isOpen={scriptEditorOpen}
+	filePath={scriptEditorPath}
+	onClose={handleScriptEditorClose}
+	onSave={handleScriptSave}
+/>
 
 <style>
 	.hooks-editor {
@@ -1710,6 +1760,34 @@
 		border-top-color: oklch(0.65 0.15 200);
 		border-radius: 50%;
 		animation: spin 0.8s linear infinite;
+	}
+
+	/* Edit script button */
+	.edit-script-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 28px;
+		height: 28px;
+		margin-left: 0.5rem;
+		padding: 0;
+		background: oklch(0.22 0.02 250);
+		border: 1px solid oklch(0.30 0.02 250);
+		border-radius: 4px;
+		color: oklch(0.65 0.02 250);
+		cursor: pointer;
+		transition: all 0.15s ease;
+		flex-shrink: 0;
+	}
+
+	.edit-script-btn:hover {
+		background: oklch(0.28 0.02 250);
+		border-color: oklch(0.45 0.15 200);
+		color: oklch(0.80 0.15 200);
+	}
+
+	.edit-script-btn:active {
+		transform: scale(0.95);
 	}
 
 	/* Unified feedback for errors and warnings */

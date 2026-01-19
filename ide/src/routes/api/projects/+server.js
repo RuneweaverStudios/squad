@@ -611,7 +611,7 @@ function validateProjectKey(key) {
 
 /**
  * PATCH /api/projects - Update project fields
- * Body: { project: string, description?: string, port?: number | null, active_color?: string, inactive_color?: string }
+ * Body: { project: string, description?: string, port?: number | null, server_path?: string, database_url?: string, active_color?: string, inactive_color?: string }
  *
  * Colors should be in "rgb(rrggbb)" format for consistency with JAT config.
  * Example: "rgb(5588ff)" for blue, "rgb(00d4aa)" for teal
@@ -619,7 +619,7 @@ function validateProjectKey(key) {
 export async function PATCH({ request }) {
 	try {
 		const body = await request.json();
-		const { project, description, port, active_color, inactive_color } = body;
+		const { project, description, port, server_path, database_url, active_color, inactive_color } = body;
 
 		if (!project) {
 			return json({ error: 'Project name required' }, { status: 400 });
@@ -636,6 +636,20 @@ export async function PATCH({ request }) {
 		}
 		if (port !== undefined) {
 			jatConfig.projects[project].port = port;
+		}
+		if (server_path !== undefined) {
+			if (server_path) {
+				jatConfig.projects[project].server_path = server_path;
+			} else {
+				delete jatConfig.projects[project].server_path;
+			}
+		}
+		if (database_url !== undefined) {
+			if (database_url) {
+				jatConfig.projects[project].database_url = database_url;
+			} else {
+				delete jatConfig.projects[project].database_url;
+			}
 		}
 		if (active_color !== undefined) {
 			jatConfig.projects[project].active_color = active_color || null;
@@ -657,6 +671,8 @@ export async function PATCH({ request }) {
 			project,
 			description: jatConfig.projects[project].description,
 			port: jatConfig.projects[project].port,
+			server_path: jatConfig.projects[project].server_path,
+			database_url: jatConfig.projects[project].database_url,
 			active_color: jatConfig.projects[project].active_color,
 			inactive_color: jatConfig.projects[project].inactive_color
 		});

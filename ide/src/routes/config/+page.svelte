@@ -197,6 +197,8 @@
 						project: key,
 						description: config.description,
 						port: config.port,
+						server_path: config.server_path,
+						database_url: config.database_url,
 						active_color: config.colors?.active,
 						inactive_color: config.colors?.inactive
 					})

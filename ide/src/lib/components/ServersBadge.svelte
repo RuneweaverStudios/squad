@@ -66,6 +66,7 @@
 		displayName: string;
 		port: number;
 		path: string;
+		serverPath: string | null;
 	}
 
 	// State
@@ -122,16 +123,17 @@
 			if (!response.ok) return;
 
 			const data = await response.json();
-			// Filter to projects that have a port configured
-			// Note: API returns { name: "jat", displayName: "JAT", ... }
+			// Filter to projects that have a port OR serverPath configured
+			// Note: API returns { name: "jat", displayName: "JAT", serverPath: "...", ... }
 			// where 'name' is the project key used for matching with serverSessions
 			projectsWithPorts = (data.projects || [])
-				.filter((p: any) => p.port)
+				.filter((p: any) => p.port || p.serverPath)
 				.map((p: any) => ({
 					key: p.name, // 'name' is the actual key (e.g., "jat", "chimaro")
 					displayName: p.displayName || p.name.toUpperCase(),
-					port: p.port,
+					port: p.port || 5173, // Default to Vite's default port
 					path: p.path,
+					serverPath: p.serverPath || null,
 				}));
 		} catch (e) {
 			console.error("Failed to fetch projects:", e);
@@ -385,7 +387,7 @@
 						class="px-3 py-4 text-xs text-center"
 						style="color: oklch(0.55 0.02 250);"
 					>
-						No projects with ports configured
+						No projects with servers configured
 					</div>
 				{:else}
 					{#each sortedProjects as project}
@@ -419,6 +421,15 @@
 									>
 										:{project.port}
 									</span>
+									{#if project.serverPath}
+										<span
+											class="text-[10px] font-mono"
+											style="color: oklch(0.60 0.10 200);"
+											title={project.serverPath}
+										>
+											{project.serverPath.split('/').pop()}
+										</span>
+									{/if}
 								</div>
 							</div>
 

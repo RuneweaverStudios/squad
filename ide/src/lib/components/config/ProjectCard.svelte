@@ -131,6 +131,34 @@
 
 	<!-- Badges row -->
 	<div class="badges-row">
+		<!-- Status badges (hasBeads, hasClaudeMd) -->
+		{#if project.stats}
+			<span class="badge beads-badge" class:has-beads={project.stats.hasBeads} title={project.stats.hasBeads ? 'Beads initialized' : 'No .beads/ directory'}>
+				{#if project.stats.hasBeads}
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="badge-icon">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+					</svg>
+				{:else}
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="badge-icon">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+					</svg>
+				{/if}
+				Beads
+			</span>
+			<span class="badge claude-md-badge" class:has-claude-md={project.stats.hasClaudeMd} title={project.stats.hasClaudeMd ? 'Has CLAUDE.md or AGENTS.md' : 'No CLAUDE.md found'}>
+				{#if project.stats.hasClaudeMd}
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="badge-icon">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+					</svg>
+				{:else}
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="badge-icon">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+					</svg>
+				{/if}
+				CLAUDE.md
+			</span>
+		{/if}
+
 		{#if project.port}
 			<span class="badge port-badge">
 				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="badge-icon">
@@ -326,6 +354,27 @@
 	.server-path-badge {
 		color: oklch(0.80 0.10 55);
 		background: oklch(0.25 0.06 55);
+	}
+
+	/* Status badges (Beads, CLAUDE.md) */
+	.beads-badge {
+		color: oklch(0.70 0.10 50);
+		background: oklch(0.25 0.06 50);
+	}
+
+	.beads-badge.has-beads {
+		color: oklch(0.80 0.12 145);
+		background: oklch(0.25 0.06 145);
+	}
+
+	.claude-md-badge {
+		color: oklch(0.70 0.10 30);
+		background: oklch(0.25 0.06 30);
+	}
+
+	.claude-md-badge.has-claude-md {
+		color: oklch(0.80 0.12 145);
+		background: oklch(0.25 0.06 145);
 	}
 
 	/* Description */
