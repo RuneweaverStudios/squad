@@ -713,20 +713,68 @@
 	<!-- Loading State -->
 	{#if sessionsLoading && tasksLoading && sessions.length === 0 && openTasks.length === 0}
 		<div class="loading-container">
-			<div class="loading-skeleton">
+			<!-- Project Tabs Skeleton -->
+			<div class="project-tabs-skeleton">
 				{#each [1, 2, 3] as _}
-					<div class="skeleton-project">
-						<div class="skeleton h-6 w-40 rounded mb-3"></div>
-						<div class="skeleton-rows">
-							{#each [1, 2] as __}
-								<div class="skeleton-row">
-									<div class="skeleton h-5 w-32 rounded"></div>
-									<div class="skeleton h-4 w-20 rounded"></div>
-								</div>
-							{/each}
+					<div class="skeleton-tab">
+						<div class="skeleton h-4 w-16 rounded mb-2"></div>
+						<div class="flex gap-1">
+							<div class="skeleton h-5 w-5 rounded-full"></div>
+							<div class="skeleton h-5 w-5 rounded-full"></div>
 						</div>
 					</div>
 				{/each}
+			</div>
+
+			<!-- Active Tasks Section Skeleton -->
+			<div class="section-skeleton">
+				<div class="skeleton-section-header">
+					<div class="skeleton h-4 w-4 rounded"></div>
+					<div class="skeleton h-5 w-28 rounded"></div>
+					<div class="skeleton h-5 w-6 rounded-full"></div>
+				</div>
+				<div class="skeleton-subsection">
+					<div class="skeleton-subsection-header">
+						<div class="skeleton h-4 w-32 rounded"></div>
+						<div class="flex gap-1 ml-2">
+							<div class="skeleton h-5 w-5 rounded-full"></div>
+						</div>
+					</div>
+					<div class="skeleton-task-rows">
+						{#each [1, 2] as __}
+							<div class="skeleton-task-row">
+								<div class="skeleton h-5 w-16 rounded"></div>
+								<div class="skeleton h-6 w-6 rounded-full"></div>
+								<div class="flex-1 flex flex-col gap-1">
+									<div class="skeleton h-4 w-48 rounded"></div>
+									<div class="skeleton h-3 w-72 rounded"></div>
+								</div>
+								<div class="skeleton h-5 w-16 rounded-full"></div>
+							</div>
+						{/each}
+					</div>
+				</div>
+			</div>
+
+			<!-- Open Tasks Section Skeleton -->
+			<div class="section-skeleton">
+				<div class="skeleton-section-header">
+					<div class="skeleton h-4 w-4 rounded"></div>
+					<div class="skeleton h-5 w-24 rounded"></div>
+					<div class="skeleton h-5 w-6 rounded-full"></div>
+				</div>
+				<div class="skeleton-task-rows">
+					{#each [1, 2, 3] as __}
+						<div class="skeleton-task-row">
+							<div class="skeleton h-5 w-16 rounded"></div>
+							<div class="flex-1 flex flex-col gap-1">
+								<div class="skeleton h-4 w-40 rounded"></div>
+								<div class="skeleton h-3 w-64 rounded"></div>
+							</div>
+							<div class="skeleton h-7 w-7 rounded-full"></div>
+						</div>
+					{/each}
+				</div>
 			</div>
 		</div>
 	{:else if sessionsError && tasksError}
