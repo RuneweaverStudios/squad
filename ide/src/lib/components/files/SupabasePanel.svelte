@@ -77,6 +77,7 @@
 	// Section collapse state
 	let diffCollapsed = $state(false);
 	let migrationsCollapsed = $state(false);
+	let showSyncHelp = $state(false);
 
 	// Toast state
 	let toastMessage = $state<string | null>(null);
@@ -85,9 +86,15 @@
 	function showToast(message: string, type: 'success' | 'error' = 'success') {
 		toastMessage = message;
 		toastType = type;
+		// Log to console so user can see full message and copy it
+		if (type === 'error') {
+			console.error('[Supabase]', message);
+		} else {
+			console.log('[Supabase]', message);
+		}
 		setTimeout(() => {
 			toastMessage = null;
-		}, 3000);
+		}, 4000);
 	}
 
 	/**
@@ -537,7 +544,7 @@
 						<button
 							class="btn btn-sm btn-primary flex-1"
 							onclick={pushMigrations}
-							disabled={isPushing || status.stats.unpushed === 0}
+							disabled={isPushing || (status.stats.unpushed === 0 && !includeSeed)}
 						>
 							{#if isPushing}
 								<span class="loading loading-spinner loading-xs"></span>
@@ -546,17 +553,44 @@
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
 								</svg>
 							{/if}
-							Push
+							{status.stats.unpushed === 0 && includeSeed ? 'Seed Only' : 'Push'}
 						</button>
 					</div>
-					<label class="include-seed-label">
-						<input
-							type="checkbox"
-							class="checkbox checkbox-xs checkbox-primary"
-							bind:checked={includeSeed}
-						/>
-						<span>Include seed data (seed.sql)</span>
-					</label>
+					<div class="include-seed-row">
+						<div class="include-seed-row-inner">
+							<label class="include-seed-label">
+								<input
+									type="checkbox"
+									class="checkbox checkbox-xs checkbox-primary"
+									bind:checked={includeSeed}
+								/>
+								<span>Include seed data</span>
+							</label>
+							<button
+								type="button"
+								class="info-btn"
+								onclick={() => showSyncHelp = !showSyncHelp}
+								title="How sync works"
+							>
+								<svg class="info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+								</svg>
+							</button>
+						</div>
+						{#if showSyncHelp}
+							<div class="sync-help">
+								<div class="sync-help-section">
+									<strong>Pull</strong> — Downloads remote schema changes as a migration file.
+								</div>
+								<div class="sync-help-section">
+									<strong>Push</strong> — Applies local migrations to remote. Only unpushed migrations run.
+								</div>
+								<div class="sync-help-section">
+									<strong>Seed data</strong> — (Push only) Runs <code>seed.sql</code> after migrations. Check this when you need to insert initial or configuration data.
+								</div>
+							</div>
+						{/if}
+					</div>
 				</div>
 			</div>
 		{/if}
@@ -989,11 +1023,23 @@
 		height: 1rem;
 	}
 
+	.include-seed-row {
+		display: flex;
+		flex-direction: column;
+		gap: 0.375rem;
+		margin-top: 0.5rem;
+	}
+
+	.include-seed-row-inner {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
 	.include-seed-label {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		margin-top: 0.5rem;
 		font-size: 0.75rem;
 		color: oklch(0.60 0.02 250);
 		cursor: pointer;
@@ -1006,6 +1052,77 @@
 
 	.include-seed-label span {
 		line-height: 1;
+	}
+
+	/* Info Button */
+	.info-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0.125rem;
+		border: none;
+		background: transparent;
+		cursor: pointer;
+		border-radius: 0.25rem;
+		transition: all 0.15s ease;
+	}
+
+	.info-btn:hover {
+		background: oklch(0.25 0.02 250);
+	}
+
+	.info-icon {
+		width: 0.875rem;
+		height: 0.875rem;
+		color: oklch(0.50 0.02 250);
+		transition: color 0.15s ease;
+	}
+
+	.info-btn:hover .info-icon {
+		color: oklch(0.70 0.15 200);
+	}
+
+	/* Sync Help Panel */
+	.sync-help {
+		padding: 0.5rem;
+		background: oklch(0.14 0.01 250);
+		border: 1px solid oklch(0.24 0.02 250);
+		border-radius: 0.375rem;
+		font-size: 0.6875rem;
+		line-height: 1.4;
+		color: oklch(0.65 0.02 250);
+	}
+
+	.sync-help-section {
+		margin-bottom: 0.375rem;
+	}
+
+	.sync-help-section:last-of-type {
+		margin-bottom: 0.5rem;
+	}
+
+	.sync-help-section strong {
+		color: oklch(0.80 0.02 250);
+	}
+
+	.sync-help-section code,
+	.sync-help-tip code {
+		background: oklch(0.20 0.01 250);
+		padding: 0.0625rem 0.25rem;
+		border-radius: 0.1875rem;
+		font-family: monospace;
+		font-size: 0.625rem;
+		color: oklch(0.72 0.12 200);
+	}
+
+	.sync-help-tip {
+		padding-top: 0.375rem;
+		border-top: 1px solid oklch(0.22 0.02 250);
+		color: oklch(0.58 0.02 250);
+	}
+
+	.sync-help-tip strong {
+		color: oklch(0.68 0.10 85);
 	}
 
 	/* Migrations List */
@@ -1201,18 +1318,20 @@
 	.toast-container {
 		position: absolute;
 		bottom: 1rem;
-		left: 50%;
-		transform: translateX(-50%);
+		left: 0.5rem;
+		right: 0.5rem;
 		z-index: 100;
 	}
 
 	.toast {
-		padding: 0.5rem 1rem;
+		padding: 0.5rem 0.75rem;
 		border-radius: 0.375rem;
-		font-size: 0.75rem;
+		font-size: 0.6875rem;
 		font-weight: 500;
 		box-shadow: 0 4px 12px oklch(0 0 0 / 0.3);
 		animation: toast-in 0.2s ease-out;
+		word-break: break-word;
+		line-height: 1.4;
 	}
 
 	.toast-success {
