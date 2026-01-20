@@ -430,6 +430,7 @@ export type SessionState =
 	| 'completed'
 	| 'auto-proceeding'
 	| 'recovering'
+	| 'paused'
 	| 'idle';
 
 export interface SessionStateVisual {
@@ -636,6 +637,21 @@ export const SESSION_STATE_VISUALS: Record<string, SessionStateVisual> = {
 		// Rocket/launch icon (same as starting)
 		icon: 'M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z'
 	},
+	paused: {
+		label: '⏸ PAUSED',
+		shortLabel: '⏸ Paused',
+		iconType: 'circle',
+		description: 'Session paused - can be resumed',
+		// StatusActionBadge colors - purple/violet for paused state
+		bgColor: 'oklch(0.50 0.15 300 / 0.25)',
+		textColor: 'oklch(0.80 0.15 300)',
+		borderColor: 'oklch(0.50 0.15 300 / 0.4)',
+		// SessionCard accent colors
+		accent: 'oklch(0.65 0.18 300)',
+		bgTint: 'oklch(0.65 0.18 300 / 0.08)',
+		glow: 'oklch(0.65 0.18 300 / 0.3)',
+		icon: 'M14.25 9v6m-4.5 0V9M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+	},
 	idle: {
 		label: '💤 IDLE',
 		shortLabel: '💤 Idle',
@@ -726,6 +742,13 @@ export const SESSION_STATE_ACTIONS: Record<string, SessionStateAction[]> = {
 			description: 'Complete task and self-destruct session'
 		},
 		{
+			id: 'pause',
+			label: 'Pause Session',
+			icon: 'M14.25 9v6m-4.5 0V9M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+			variant: 'default',
+			description: 'Save progress and close (resumable later)'
+		},
+		{
 			id: 'attach',
 			label: 'Attach Terminal',
 			icon: 'M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z',
@@ -772,6 +795,13 @@ export const SESSION_STATE_ACTIONS: Record<string, SessionStateAction[]> = {
 			description: 'Send Esc key to cancel prompt'
 		},
 		{
+			id: 'pause',
+			label: 'Pause Session',
+			icon: 'M14.25 9v6m-4.5 0V9M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+			variant: 'default',
+			description: 'Save progress and close (resumable later)'
+		},
+		{
 			id: 'kill',
 			label: 'Kill Session',
 			icon: 'M6 18L18 6M6 6l12 12',
@@ -786,6 +816,13 @@ export const SESSION_STATE_ACTIONS: Record<string, SessionStateAction[]> = {
 			icon: 'M9 12.75L11.25 15 15 9.75m0 0l3 3m-3-3v7.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
 			variant: 'warning',
 			description: 'Complete task and self-destruct session'
+		},
+		{
+			id: 'pause',
+			label: 'Pause Session',
+			icon: 'M14.25 9v6m-4.5 0V9M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+			variant: 'default',
+			description: 'Save progress and close (resumable later)'
 		},
 		{
 			id: 'interrupt',
@@ -846,6 +883,22 @@ export const SESSION_STATE_ACTIONS: Record<string, SessionStateAction[]> = {
 			icon: 'M6 18L18 6M6 6l12 12',
 			variant: 'error',
 			description: 'Terminate tmux session'
+		}
+	],
+	paused: [
+		{
+			id: 'resume',
+			label: 'Resume Session',
+			icon: 'M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z',
+			variant: 'success',
+			description: 'Resume paused session'
+		},
+		{
+			id: 'view-task',
+			label: 'View Task',
+			icon: 'M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
+			variant: 'default',
+			description: 'Open task details'
 		}
 	],
 	idle: [

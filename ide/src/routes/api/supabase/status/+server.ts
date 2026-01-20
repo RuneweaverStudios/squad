@@ -25,7 +25,7 @@ import {
 	type MigrationStatus
 } from '$lib/utils/supabase';
 import { existsSync, readdirSync, readFileSync } from 'fs';
-import { join, resolve } from 'path';
+import { join, resolve, dirname } from 'path';
 
 /**
  * Result of getProjectPaths - includes both project root and server path
@@ -117,6 +117,37 @@ function getLocalMigrationFiles(projectPath: string): Map<string, { name: string
 	}
 
 	return result;
+}
+
+/**
+ * Read database password from project .env files
+ * Checks common env var names: SUPABASE_DB_PASSWORD, DATABASE_PASSWORD, POSTGRES_PASSWORD
+ */
+function getPasswordFromEnv(projectPath: string, serverPath?: string): string | null {
+	const envVarNames = ['SUPABASE_DB_PASSWORD', 'DATABASE_PASSWORD', 'POSTGRES_PASSWORD'];
+
+	// Check paths in order: server_path first (for monorepos), then project root
+	const pathsToCheck = [serverPath, projectPath].filter(Boolean) as string[];
+
+	for (const basePath of pathsToCheck) {
+		const envPath = join(basePath, '.env');
+		if (!existsSync(envPath)) continue;
+
+		try {
+			const envContent = readFileSync(envPath, 'utf-8');
+			for (const varName of envVarNames) {
+				const match = envContent.match(new RegExp(`^${varName}=(.+)$`, 'm'));
+				if (match) {
+					// Remove surrounding quotes if present
+					return match[1].replace(/^["']|["']$/g, '').trim();
+				}
+			}
+		} catch {
+			continue;
+		}
+	}
+
+	return null;
 }
 
 export const GET: RequestHandler = async ({ url }) => {
@@ -235,6 +266,10 @@ export const GET: RequestHandler = async ({ url }) => {
 	const localOnlyCount = migrations.filter((m) => m.status === 'local-only').length;
 	const remoteOnlyCount = migrations.filter((m) => m.status === 'remote-only').length;
 
+	// Check if .env has database password (for SQL executor UI)
+	const serverPathForEnv = config.supabasePath ? dirname(config.supabasePath) : undefined;
+	const hasEnvPassword = !!getPasswordFromEnv(projectPath, serverPathForEnv);
+
 	return json({
 		hasSupabase: config.hasSupabase,
 		isLinked: config.isLinked,
@@ -245,6 +280,7 @@ export const GET: RequestHandler = async ({ url }) => {
 		serverPath,
 		effectivePath,
 		supabasePath: config.supabasePath,
+		hasEnvPassword,
 		migrations,
 		migrationsError,
 		stats: {

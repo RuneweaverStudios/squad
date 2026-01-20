@@ -1,8 +1,8 @@
 <script lang="ts">
 	/**
-	 * RecoveryWidget - Crash recovery UI for TopBar
+	 * RecoveryWidget - Paused/Crashed sessions recovery UI for TopBar
 	 *
-	 * Shows when there are recoverable sessions (crashed agents that can be resumed).
+	 * Shows when there are paused sessions (agents that can be resumed).
 	 * Displays a badge with count, dropdown with session list, and batch recovery action.
 	 *
 	 * Detection criteria:
@@ -251,7 +251,7 @@
 			class="recovery-badge"
 			class:recovering
 			disabled={recovering}
-			title="Recoverable sessions from crash"
+			title="Paused sessions"
 		>
 			<!-- Warning/Recovery icon -->
 			<svg
@@ -301,9 +301,9 @@
 							<line x1="12" y1="9" x2="12" y2="13" />
 							<line x1="12" y1="17" x2="12.01" y2="17" />
 						</svg>
-						Crashed Sessions
+						Paused Sessions
 					</span>
-					<span class="recovery-subtitle">{sessions.length} recoverable</span>
+					<span class="recovery-subtitle">{sessions.length} paused</span>
 				</div>
 
 				<!-- Project Tabs (only show if multiple projects) -->
@@ -379,7 +379,7 @@
 							<path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
 							<path d="M8 16H3v5" />
 						</svg>
-						{selectedTab === 'all' ? `Recover All (${sessions.length})` : `Recover ${selectedTab} (${filteredSessions.length})`}
+						{selectedTab === 'all' ? `Resume All (${sessions.length})` : `Resume ${selectedTab} (${filteredSessions.length})`}
 					</button>
 				</div>
 			</div>

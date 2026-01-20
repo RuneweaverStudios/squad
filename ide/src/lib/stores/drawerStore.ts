@@ -272,3 +272,15 @@ export function setActiveAgentSessionsCount(count: number) {
 export function getActiveAgentSessionsCount(): number {
 	return get(activeAgentSessionsCount);
 }
+
+// File changes count store (for Files sidebar badge)
+// Indicates number of detected file tree changes that need refresh
+export const fileChangesCount = writable(0);
+
+export function setFileChangesCount(count: number) {
+	fileChangesCount.set(count);
+}
+
+export function getFileChangesCount(): number {
+	return get(fileChangesCount);
+}

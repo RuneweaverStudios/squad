@@ -32,6 +32,7 @@
 		projectRef?: string;
 		cliInstalled: boolean;
 		cliVersion: string | null;
+		hasEnvPassword?: boolean;
 		migrations: MigrationStatus[];
 		stats: {
 			total: number;
@@ -76,12 +77,17 @@
 
 	// Section collapse state
 	let diffCollapsed = $state(false);
+	let newMigrationCollapsed = $state(false);
+	let syncCollapsed = $state(false);
 	let migrationsCollapsed = $state(false);
 	let showSyncHelp = $state(false);
 	let sqlCollapsed = $state(false);
 
 	// SQL execution state
 	let sqlQuery = $state('');
+	let sqlPassword = $state(''); // Database password (session-only, not persisted)
+	let showSqlHelp = $state(false);
+	let showPasswordOverride = $state(false);
 	let isExecutingSql = $state(false);
 	let sqlResult = $state<{
 		success: boolean;
@@ -92,6 +98,45 @@
 		message?: string;
 	} | null>(null);
 	let sqlError = $state<string | null>(null);
+
+	// Query history state
+	interface QueryHistoryEntry {
+		id: string;
+		query: string;
+		timestamp: string;
+		success: boolean;
+		rowCount?: number;
+		command?: string;
+		error?: string;
+		rows?: Record<string, unknown>[];
+		message?: string;
+	}
+	let queryHistory = $state<QueryHistoryEntry[]>([]);
+	let historyCollapsed = $state(true);
+	let expandedHistoryId = $state<string | null>(null);
+
+	// Load history from localStorage on mount
+	$effect(() => {
+		if (project) {
+			const stored = localStorage.getItem(`sql-history-${project}`);
+			if (stored) {
+				try {
+					queryHistory = JSON.parse(stored);
+				} catch {
+					queryHistory = [];
+				}
+			}
+		}
+	});
+
+	// Save history to localStorage when it changes
+	function saveHistory() {
+		if (project) {
+			// Keep only last 50 entries
+			const toSave = queryHistory.slice(0, 50);
+			localStorage.setItem(`sql-history-${project}`, JSON.stringify(toSave));
+		}
+	}
 
 	// Toast state
 	let toastMessage = $state<string | null>(null);
@@ -400,28 +445,109 @@
 		sqlError = null;
 		sqlResult = null;
 
+		const queryText = sqlQuery.trim();
+
 		try {
 			const response = await fetch(`/api/supabase/query?project=${encodeURIComponent(project)}`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ sql: sqlQuery.trim() })
+				body: JSON.stringify({
+					sql: queryText,
+					password: sqlPassword || undefined
+				})
 			});
 
 			const data = await response.json();
 
 			if (!response.ok || !data.success) {
-				sqlError = data.error || 'Query failed';
+				const errorMsg = data.error || 'Query failed';
+				// Detect auth errors and provide helpful message
+				if (errorMsg.includes('password authentication failed') || errorMsg.includes('FATAL:  password')) {
+					sqlError = 'Authentication failed. Enter your database password above (Supabase → Project Settings → Database).';
+				} else {
+					sqlError = errorMsg;
+				}
 				sqlResult = null;
+
+				// Add failed query to history
+				addToHistory(queryText, false, undefined, undefined, errorMsg);
 			} else {
 				sqlResult = data;
 				if (data.command !== 'SELECT') {
 					showToast(`${data.command}: ${data.rowCount} row(s) affected`);
 				}
+
+				// Add successful query to history
+				addToHistory(queryText, true, data.rowCount, data.command, undefined, data.rows, data.message);
 			}
 		} catch (err) {
-			sqlError = err instanceof Error ? err.message : 'Failed to execute query';
+			const errorMsg = err instanceof Error ? err.message : 'Failed to execute query';
+			sqlError = errorMsg;
+			addToHistory(queryText, false, undefined, undefined, errorMsg);
 		} finally {
 			isExecutingSql = false;
+		}
+	}
+
+	/**
+	 * Add a query to history
+	 */
+	function addToHistory(
+		query: string,
+		success: boolean,
+		rowCount?: number,
+		command?: string,
+		error?: string,
+		rows?: Record<string, unknown>[],
+		message?: string
+	) {
+		const entry: QueryHistoryEntry = {
+			id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+			query,
+			timestamp: new Date().toISOString(),
+			success,
+			rowCount,
+			command,
+			error,
+			rows,
+			message
+		};
+		queryHistory = [entry, ...queryHistory];
+		saveHistory();
+	}
+
+	/**
+	 * Load a query from history into the editor
+	 */
+	function loadFromHistory(entry: QueryHistoryEntry) {
+		sqlQuery = entry.query;
+	}
+
+	/**
+	 * Toggle expanded state of a history entry
+	 */
+	function toggleHistoryExpand(id: string) {
+		expandedHistoryId = expandedHistoryId === id ? null : id;
+	}
+
+	/**
+	 * Clear all query history
+	 */
+	function clearHistory() {
+		queryHistory = [];
+		if (project) {
+			localStorage.removeItem(`sql-history-${project}`);
+		}
+	}
+
+	/**
+	 * Handle keyboard shortcuts in SQL textarea
+	 */
+	function handleSqlKeydown(event: KeyboardEvent) {
+		// Ctrl+Enter or Cmd+Enter to run query
+		if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+			event.preventDefault();
+			executeSql();
 		}
 	}
 
@@ -567,42 +693,57 @@
 
 		<!-- New Migration -->
 		<div class="section">
-			<div class="section-header static">
+			<!-- svelte-ignore a11y_click_events_have_key_events -->
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div class="section-header" onclick={() => newMigrationCollapsed = !newMigrationCollapsed}>
+				<svg class="chevron" class:collapsed={newMigrationCollapsed} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+				</svg>
 				<span class="section-title">New Migration</span>
 			</div>
-			<div class="section-content">
-				<form class="new-migration-form" onsubmit={(e) => { e.preventDefault(); createMigration(); }}>
-					<input
-						type="text"
-						class="input input-sm input-bordered flex-1"
-						placeholder="migration_name"
-						bind:value={newMigrationName}
-						disabled={isCreatingMigration}
-					/>
-					<button
-						type="submit"
-						class="btn btn-sm btn-primary"
-						disabled={!newMigrationName.trim() || isCreatingMigration}
-					>
-						{#if isCreatingMigration}
-							<span class="loading loading-spinner loading-xs"></span>
-						{:else}
-							Create
-						{/if}
-					</button>
-				</form>
-			</div>
+
+			{#if !newMigrationCollapsed}
+				<div class="section-content">
+					<form class="new-migration-form" onsubmit={(e) => { e.preventDefault(); createMigration(); }}>
+						<input
+							type="text"
+							class="input input-sm input-bordered flex-1"
+							placeholder="migration_name"
+							bind:value={newMigrationName}
+							disabled={isCreatingMigration}
+						/>
+						<button
+							type="submit"
+							class="btn btn-sm btn-primary"
+							disabled={!newMigrationName.trim() || isCreatingMigration}
+						>
+							{#if isCreatingMigration}
+								<span class="loading loading-spinner loading-xs"></span>
+							{:else}
+								Create
+							{/if}
+						</button>
+					</form>
+				</div>
+			{/if}
 		</div>
 
 		<!-- Push/Pull Actions -->
 		{#if status.isLinked}
 			<div class="section">
-				<div class="section-header static">
+				<!-- svelte-ignore a11y_click_events_have_key_events -->
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="section-header" onclick={() => syncCollapsed = !syncCollapsed}>
+					<svg class="chevron" class:collapsed={syncCollapsed} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+					</svg>
 					<span class="section-title">Sync</span>
 					{#if status.stats.unpushed > 0}
 						<span class="section-badge badge-info">{status.stats.unpushed} unpushed</span>
 					{/if}
 				</div>
+
+				{#if !syncCollapsed}
 				<div class="section-content">
 					<div class="sync-actions">
 						<button
@@ -670,6 +811,7 @@
 						{/if}
 					</div>
 				</div>
+				{/if}
 			</div>
 
 			<!-- Run SQL Section -->
@@ -691,12 +833,67 @@
 						<form class="sql-form" onsubmit={(e) => { e.preventDefault(); executeSql(); }}>
 							<textarea
 								class="sql-input"
-								placeholder="SELECT * FROM public.event_types LIMIT 10"
+								placeholder="SELECT * FROM public.event_types LIMIT 10 (Ctrl+Enter to run)"
 								bind:value={sqlQuery}
 								disabled={isExecutingSql}
 								rows="4"
 								spellcheck="false"
+								onkeydown={handleSqlKeydown}
 							></textarea>
+							<div class="sql-auth-row">
+								<button
+									type="button"
+									class="info-btn"
+									onclick={() => showSqlHelp = !showSqlHelp}
+									title="Database authentication"
+								>
+									<svg class="info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+									</svg>
+								</button>
+								<span class="sql-auth-label">Authentication</span>
+								{#if sqlPassword}
+									<span class="sql-auth-status sql-auth-override">Using override</span>
+								{:else if status?.hasEnvPassword}
+									<span class="sql-auth-status sql-auth-found">
+										<svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+										</svg>
+										From .env
+									</span>
+								{:else}
+									<span class="sql-auth-status sql-auth-missing">Not configured</span>
+								{/if}
+							</div>
+							{#if showSqlHelp}
+								<div class="sql-help">
+									<div class="sql-help-section">
+										<strong>Automatic</strong> — Add <code>SUPABASE_DB_PASSWORD=xxx</code> to your <code>.env</code> file and queries will authenticate automatically.
+									</div>
+									<div class="sql-help-section">
+										<strong>Manual override</strong> —
+										<button
+											type="button"
+											class="sql-help-link"
+											onclick={() => { showPasswordOverride = !showPasswordOverride; }}
+										>
+											{showPasswordOverride ? 'Hide' : 'Show'} password field
+										</button>
+									</div>
+									<div class="sql-help-section sql-help-hint">
+										Find your password in Supabase → Project Settings → Database
+									</div>
+								</div>
+							{/if}
+							{#if showPasswordOverride}
+								<input
+									type="password"
+									class="sql-password-input"
+									placeholder="Database password (overrides .env)"
+									bind:value={sqlPassword}
+									disabled={isExecutingSql}
+								/>
+							{/if}
 							<div class="sql-actions">
 								<button
 									type="button"
@@ -763,6 +960,110 @@
 									{sqlResult.message || `${sqlResult.command}: ${sqlResult.rowCount} row(s) affected`}
 								</div>
 							{/if}
+						{/if}
+
+						<!-- Query History -->
+						{#if queryHistory.length > 0}
+							<div class="sql-history">
+								<!-- svelte-ignore a11y_click_events_have_key_events -->
+								<!-- svelte-ignore a11y_no_static_element_interactions -->
+								<div class="sql-history-header" onclick={() => historyCollapsed = !historyCollapsed}>
+									<svg class="chevron-sm" class:collapsed={historyCollapsed} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+									</svg>
+									<span class="sql-history-title">History</span>
+									<span class="sql-history-count">{queryHistory.length}</span>
+									<button
+										type="button"
+										class="sql-history-clear"
+										onclick={(e) => { e.stopPropagation(); clearHistory(); }}
+										title="Clear history"
+									>
+										<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+										</svg>
+									</button>
+								</div>
+								{#if !historyCollapsed}
+									<div class="sql-history-list">
+										{#each queryHistory as entry (entry.id)}
+											<div class="sql-history-item" class:error={!entry.success}>
+												<!-- svelte-ignore a11y_click_events_have_key_events -->
+												<!-- svelte-ignore a11y_no_static_element_interactions -->
+												<div class="sql-history-item-header" onclick={() => toggleHistoryExpand(entry.id)}>
+													<span class="sql-history-status" class:success={entry.success} class:error={!entry.success}>
+														{#if entry.success}
+															<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+																<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+															</svg>
+														{:else}
+															<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+																<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+															</svg>
+														{/if}
+													</span>
+													<span class="sql-history-query">{entry.query.length > 60 ? entry.query.slice(0, 60) + '...' : entry.query}</span>
+													<span class="sql-history-meta">
+														{#if entry.success && entry.rowCount !== undefined}
+															{entry.rowCount} row{entry.rowCount === 1 ? '' : 's'}
+														{/if}
+														<span class="sql-history-time">{new Date(entry.timestamp).toLocaleTimeString()}</span>
+													</span>
+													<button
+														type="button"
+														class="sql-history-load"
+														onclick={(e) => { e.stopPropagation(); loadFromHistory(entry); }}
+														title="Load query"
+													>
+														<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+															<path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+														</svg>
+													</button>
+												</div>
+												{#if expandedHistoryId === entry.id}
+													<div class="sql-history-detail">
+														<pre class="sql-history-full-query">{entry.query}</pre>
+														{#if entry.error}
+															<div class="sql-history-error">{entry.error}</div>
+														{:else if entry.rows && entry.rows.length > 0}
+															{@const columns = Object.keys(entry.rows[0])}
+															<div class="sql-table-container sql-history-results">
+																<table class="sql-table">
+																	<thead>
+																		<tr>
+																			{#each columns as col}
+																				<th>{col}</th>
+																			{/each}
+																		</tr>
+																	</thead>
+																	<tbody>
+																		{#each entry.rows.slice(0, 10) as row}
+																			<tr>
+																				{#each columns as col}
+																					<td title={formatSqlValue(row[col])}>{formatSqlValue(row[col])}</td>
+																				{/each}
+																			</tr>
+																		{/each}
+																	</tbody>
+																</table>
+																{#if entry.rows.length > 10}
+																	<div class="sql-history-truncated">Showing 10 of {entry.rows.length} rows</div>
+																{/if}
+															</div>
+														{:else if entry.message}
+															<div class="sql-history-message">{entry.message}</div>
+														{:else if entry.command !== 'SELECT'}
+															<div class="sql-history-message">{entry.command}: {entry.rowCount} row(s) affected</div>
+														{:else}
+															<div class="sql-history-message">No rows returned</div>
+														{/if}
+													</div>
+												{/if}
+											</div>
+										{/each}
+									</div>
+								{/if}
+							</div>
 						{/if}
 					</div>
 				{/if}
@@ -1564,6 +1865,124 @@
 		color: oklch(0.45 0.02 250);
 	}
 
+	.sql-auth-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.sql-auth-label {
+		font-size: 0.6875rem;
+		color: oklch(0.60 0.02 250);
+	}
+
+	.sql-auth-status {
+		font-size: 0.625rem;
+		color: oklch(0.50 0.02 250);
+		padding: 0.125rem 0.375rem;
+		background: oklch(0.18 0.01 250);
+		border-radius: 0.25rem;
+	}
+
+	.sql-auth-override {
+		color: oklch(0.70 0.12 200);
+		background: oklch(0.25 0.08 200 / 0.3);
+	}
+
+	.sql-auth-found {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25rem;
+		color: oklch(0.70 0.15 145);
+		background: oklch(0.25 0.10 145 / 0.3);
+	}
+
+	.sql-auth-found .check-icon {
+		width: 0.75rem;
+		height: 0.75rem;
+	}
+
+	.sql-auth-missing {
+		color: oklch(0.55 0.08 45);
+		background: oklch(0.25 0.05 45 / 0.3);
+	}
+
+	.sql-help {
+		margin-top: 0.375rem;
+		padding: 0.5rem 0.625rem;
+		background: oklch(0.16 0.01 250);
+		border-radius: 0.375rem;
+		border: 1px solid oklch(0.22 0.02 250);
+	}
+
+	.sql-help-section {
+		font-size: 0.6875rem;
+		color: oklch(0.70 0.02 250);
+		margin-bottom: 0.375rem;
+	}
+
+	.sql-help-section:last-child {
+		margin-bottom: 0;
+	}
+
+	.sql-help-section strong {
+		color: oklch(0.80 0.02 250);
+	}
+
+	.sql-help-section code {
+		font-family: 'JetBrains Mono', 'Fira Code', monospace;
+		font-size: 0.625rem;
+		background: oklch(0.20 0.01 250);
+		padding: 0.125rem 0.25rem;
+		border-radius: 0.25rem;
+		color: oklch(0.75 0.10 200);
+	}
+
+	.sql-help-link {
+		background: none;
+		border: none;
+		padding: 0;
+		color: oklch(0.70 0.15 200);
+		font-size: 0.6875rem;
+		cursor: pointer;
+		text-decoration: underline;
+	}
+
+	.sql-help-link:hover {
+		color: oklch(0.80 0.15 200);
+	}
+
+	.sql-help-hint {
+		font-size: 0.625rem;
+		color: oklch(0.50 0.02 250);
+		font-style: italic;
+	}
+
+	.sql-password-input {
+		width: 100%;
+		margin-top: 0.375rem;
+		padding: 0.375rem 0.5rem;
+		font-size: 0.75rem;
+		background: oklch(0.12 0.01 250);
+		border: 1px solid oklch(0.25 0.02 250);
+		border-radius: 0.375rem;
+		color: oklch(0.90 0.02 250);
+	}
+
+	.sql-password-input:focus {
+		outline: none;
+		border-color: oklch(0.55 0.15 250);
+	}
+
+	.sql-password-input:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	.sql-password-input::placeholder {
+		color: oklch(0.45 0.02 250);
+	}
+
 	.sql-actions {
 		display: flex;
 		justify-content: flex-end;
@@ -1665,5 +2084,229 @@
 		color: oklch(0.75 0.12 145);
 		font-size: 0.75rem;
 		font-family: 'JetBrains Mono', 'Fira Code', monospace;
+	}
+
+	/* SQL History */
+	.sql-history {
+		margin-top: 0.75rem;
+		border: 1px solid oklch(0.22 0.02 250);
+		border-radius: 0.375rem;
+		overflow: hidden;
+	}
+
+	.sql-history-header {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.375rem 0.5rem;
+		background: oklch(0.14 0.01 250);
+		cursor: pointer;
+		user-select: none;
+	}
+
+	.sql-history-header:hover {
+		background: oklch(0.16 0.01 250);
+	}
+
+	.chevron-sm {
+		width: 0.875rem;
+		height: 0.875rem;
+		color: oklch(0.50 0.02 250);
+		transition: transform 0.15s ease;
+		flex-shrink: 0;
+	}
+
+	.chevron-sm.collapsed {
+		transform: rotate(-90deg);
+	}
+
+	.sql-history-title {
+		font-size: 0.6875rem;
+		font-weight: 600;
+		color: oklch(0.60 0.02 250);
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+	}
+
+	.sql-history-count {
+		font-size: 0.625rem;
+		padding: 0.0625rem 0.375rem;
+		background: oklch(0.22 0.02 250);
+		border-radius: 0.25rem;
+		color: oklch(0.55 0.02 250);
+	}
+
+	.sql-history-clear {
+		margin-left: auto;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0.25rem;
+		background: transparent;
+		border: none;
+		border-radius: 0.25rem;
+		cursor: pointer;
+		color: oklch(0.45 0.02 250);
+		transition: all 0.15s ease;
+	}
+
+	.sql-history-clear:hover {
+		background: oklch(0.50 0.12 25 / 0.2);
+		color: oklch(0.65 0.15 25);
+	}
+
+	.sql-history-clear svg {
+		width: 0.875rem;
+		height: 0.875rem;
+	}
+
+	.sql-history-list {
+		max-height: 300px;
+		overflow-y: auto;
+	}
+
+	.sql-history-item {
+		border-top: 1px solid oklch(0.20 0.01 250);
+	}
+
+	.sql-history-item:first-child {
+		border-top: none;
+	}
+
+	.sql-history-item-header {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.375rem 0.5rem;
+		cursor: pointer;
+		transition: background 0.15s ease;
+	}
+
+	.sql-history-item-header:hover {
+		background: oklch(0.16 0.01 250);
+	}
+
+	.sql-history-status {
+		flex-shrink: 0;
+		width: 1rem;
+		height: 1rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.sql-history-status svg {
+		width: 0.75rem;
+		height: 0.75rem;
+	}
+
+	.sql-history-status.success {
+		color: oklch(0.65 0.15 145);
+	}
+
+	.sql-history-status.error {
+		color: oklch(0.65 0.15 25);
+	}
+
+	.sql-history-query {
+		flex: 1;
+		font-family: 'JetBrains Mono', 'Fira Code', monospace;
+		font-size: 0.6875rem;
+		color: oklch(0.75 0.02 250);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		min-width: 0;
+	}
+
+	.sql-history-meta {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 0.625rem;
+		color: oklch(0.50 0.02 250);
+		flex-shrink: 0;
+	}
+
+	.sql-history-time {
+		color: oklch(0.45 0.02 250);
+	}
+
+	.sql-history-load {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0.25rem;
+		background: transparent;
+		border: none;
+		border-radius: 0.25rem;
+		cursor: pointer;
+		color: oklch(0.50 0.02 250);
+		transition: all 0.15s ease;
+		opacity: 0;
+	}
+
+	.sql-history-item-header:hover .sql-history-load {
+		opacity: 1;
+	}
+
+	.sql-history-load:hover {
+		background: oklch(0.55 0.12 200 / 0.2);
+		color: oklch(0.70 0.15 200);
+	}
+
+	.sql-history-load svg {
+		width: 0.875rem;
+		height: 0.875rem;
+	}
+
+	.sql-history-detail {
+		padding: 0.5rem;
+		background: oklch(0.12 0.01 250);
+		border-top: 1px solid oklch(0.20 0.01 250);
+	}
+
+	.sql-history-full-query {
+		margin: 0 0 0.5rem;
+		padding: 0.5rem;
+		background: oklch(0.10 0.01 250);
+		border-radius: 0.25rem;
+		font-family: 'JetBrains Mono', 'Fira Code', monospace;
+		font-size: 0.6875rem;
+		color: oklch(0.80 0.02 250);
+		white-space: pre-wrap;
+		word-break: break-word;
+		max-height: 100px;
+		overflow-y: auto;
+	}
+
+	.sql-history-error {
+		padding: 0.375rem 0.5rem;
+		background: oklch(0.25 0.08 25 / 0.3);
+		border-radius: 0.25rem;
+		color: oklch(0.70 0.12 25);
+		font-size: 0.6875rem;
+		font-family: 'JetBrains Mono', 'Fira Code', monospace;
+	}
+
+	.sql-history-results {
+		max-height: 150px;
+	}
+
+	.sql-history-truncated {
+		padding: 0.25rem 0.5rem;
+		background: oklch(0.14 0.01 250);
+		border-top: 1px solid oklch(0.20 0.01 250);
+		font-size: 0.625rem;
+		color: oklch(0.50 0.02 250);
+		text-align: center;
+	}
+
+	.sql-history-message {
+		padding: 0.375rem 0.5rem;
+		background: oklch(0.14 0.01 250);
+		border-radius: 0.25rem;
+		color: oklch(0.60 0.02 250);
+		font-size: 0.6875rem;
 	}
 </style>

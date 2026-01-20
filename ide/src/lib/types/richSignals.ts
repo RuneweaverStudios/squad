@@ -550,6 +550,44 @@ export interface CompactingSignal {
 }
 
 // =============================================================================
+// PAUSED SIGNAL
+// =============================================================================
+
+/**
+ * Paused signal emitted when a session is deliberately paused.
+ *
+ * Allows tracking of paused sessions in history/timeline.
+ *
+ * @example
+ * ```bash
+ * jat-signal paused '{
+ *   "taskId": "jat-abc",
+ *   "taskTitle": "Add authentication",
+ *   "reason": "Waiting for design review",
+ *   "resumable": true
+ * }'
+ * ```
+ */
+export interface PausedSignal {
+	type: 'paused';
+
+	/** Task ID that was being worked on */
+	taskId: string;
+	/** Task title */
+	taskTitle?: string;
+	/** Agent name */
+	agentName?: string;
+	/** Reason for pausing (optional) */
+	reason?: string;
+	/** Whether the session can be resumed */
+	resumable: boolean;
+	/** Session ID for resumption */
+	sessionId?: string;
+	/** Project name */
+	project?: string;
+}
+
+// =============================================================================
 // UNION TYPE
 // =============================================================================
 
@@ -581,7 +619,8 @@ export type RichSignal =
 	| CompletedSignal
 	| IdleSignal
 	| StartingSignal
-	| CompactingSignal;
+	| CompactingSignal
+	| PausedSignal;
 
 /**
  * Type guard to check if a signal is a specific type.
@@ -616,6 +655,10 @@ export function isStartingSignal(signal: RichSignal): signal is StartingSignal {
 
 export function isCompactingSignal(signal: RichSignal): signal is CompactingSignal {
 	return signal.type === 'compacting';
+}
+
+export function isPausedSignal(signal: RichSignal): signal is PausedSignal {
+	return signal.type === 'paused';
 }
 
 /**

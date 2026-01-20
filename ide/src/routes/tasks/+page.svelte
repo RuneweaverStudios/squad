@@ -13,6 +13,7 @@
 	import { slide } from 'svelte/transition';
 	import SortDropdown from '$lib/components/SortDropdown.svelte';
 	import TasksActive from '$lib/components/sessions/TasksActive.svelte';
+	import TasksPaused from '$lib/components/sessions/TasksPaused.svelte';
 	import TasksOpen from '$lib/components/sessions/TasksOpen.svelte';
 	import TaskIdBadge from '$lib/components/TaskIdBadge.svelte';
 	import WorkingAgentBadge from '$lib/components/WorkingAgentBadge.svelte';
@@ -81,14 +82,25 @@
 	// Project colors
 	let projectColors = $state<Record<string, string>>({});
 
+	// Recoverable sessions state
+	interface RecoverableSession {
+		agentName: string;
+		sessionId: string;
+		taskId: string;
+		taskTitle: string;
+		taskPriority: number;
+		project: string;
+	}
+	let recoverableSessions = $state<RecoverableSession[]>([]);
+
 	// Spawn loading state
 	let spawningTaskId = $state<string | null>(null);
 
 	// Selected project tab (instead of collapsed projects)
 	let selectedProject = $state<string | null>(null);
 
-	// Subsection collapse state per project (sessions/tasks)
-	type SubsectionType = 'sessions' | 'tasks';
+	// Subsection collapse state per project (sessions/paused/tasks)
+	type SubsectionType = 'sessions' | 'paused' | 'tasks';
 	let collapsedSubsections = $state<Map<string, Set<SubsectionType>>>(new Map());
 
 	// Epic collapse state (independent: each group can be expanded/collapsed separately)
@@ -523,12 +535,34 @@
 		}
 	}
 
+	async function fetchRecoverableSessions() {
+		try {
+			const response = await fetch('/api/recovery');
+			if (!response.ok) return;
+			const data = await response.json();
+			recoverableSessions = data.sessions || [];
+		} catch {
+			// Silent fail
+		}
+	}
+
+	// Get recoverable session count for a project
+	function getProjectRecoverableCount(project: string): number {
+		return recoverableSessions.filter(s => s.project.toLowerCase() === project.toLowerCase()).length;
+	}
+
+	// Get paused sessions for a project
+	function getProjectPausedSessions(project: string): RecoverableSession[] {
+		return recoverableSessions.filter(s => s.project.toLowerCase() === project.toLowerCase());
+	}
+
 	async function fetchAllData() {
 		await Promise.all([
 			fetchProjectOrder(),
 			fetchAgentProjects(),
 			fetchProjectColors(),
-			fetchAllTasks()
+			fetchAllTasks(),
+			fetchRecoverableSessions()
 		]);
 		await Promise.all([fetchSessions(), fetchOpenTasks()]);
 	}
@@ -563,6 +597,24 @@
 			}
 		} catch (err) {
 			console.error('Failed to attach session:', err);
+		}
+	}
+
+	async function resumeSession(agentName: string, sessionId: string) {
+		try {
+			const response = await fetch(`/api/sessions/${encodeURIComponent(agentName)}/resume`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ session_id: sessionId })
+			});
+			if (!response.ok) {
+				const data = await response.json();
+				throw new Error(data.error || 'Failed to resume session');
+			}
+			// Refresh data after resume
+			await fetchAllData();
+		} catch (err) {
+			console.error('Failed to resume session:', err);
 		}
 	}
 
@@ -613,26 +665,35 @@
 
 		const projectSessions = sessionsByProject().get(project) || [];
 		const projectTasks = tasksByProject().get(project) || [];
+		const projectPausedSessions = getProjectPausedSessions(project);
 		const hasActiveSessions = projectSessions.length > 0;
+		const hasPausedSessions = projectPausedSessions.length > 0;
 		const hasOpenTasks = projectTasks.filter(t => t.status === 'open' && t.issue_type !== 'epic').length > 0;
 
 		// Only apply default subsection collapse logic if this project doesn't have saved state
 		// This preserves user's manual collapse/expand choices
 		if (!collapsedSubsections.has(project)) {
 			// Auto-expand appropriate subsection based on what's available
-			// If project has active sessions, expand Active Tasks (collapse Open Tasks)
-			// Otherwise if it has open tasks, expand Open Tasks
+			// Priority: Active > Paused > Open for default expansion
+			// Paused section is ALWAYS expanded if there are paused sessions
 			const projectSubsections = new Set<SubsectionType>();
 
 			if (hasActiveSessions) {
 				// Expand Active Tasks (sessions not in collapsed set)
 				// Collapse Open Tasks to focus on active work
 				projectSubsections.add('tasks');
+				// Keep paused expanded if there are paused sessions
+				if (!hasPausedSessions) {
+					projectSubsections.add('paused');
+				}
+			} else if (hasPausedSessions) {
+				// No active sessions but have paused - expand paused, collapse open
+				projectSubsections.add('tasks');
 			} else if (hasOpenTasks) {
-				// No active sessions, so expand Open Tasks (tasks not in collapsed set)
-				// Active Tasks section won't even render if there are no sessions
+				// No active or paused sessions, so expand Open Tasks
+				projectSubsections.add('paused');
 			}
-			// If neither has content, both sections simply won't render
+			// If nothing has content, sections simply won't render
 
 			collapsedSubsections.set(project, projectSubsections);
 			collapsedSubsections = new Map(collapsedSubsections);
@@ -794,6 +855,7 @@
 				{@const isActive = selectedProject === project}
 				{@const sessionCount = getProjectSessionCount(project)}
 				{@const taskCount = getProjectTaskCount(project)}
+				{@const recoverableCount = getProjectRecoverableCount(project)}
 				{@const projectAgentSessions = sessionsByProject().get(project) || []}
 				<button
 					class="project-tab"
@@ -813,6 +875,9 @@
 						<!-- {#if sessionCount > 0}
 							<span class="tab-count sessions">{sessionCount} active</span>
 						{/if} -->
+						{#if recoverableCount > 0}
+							<span class="tab-count paused" title="{recoverableCount} paused session{recoverableCount !== 1 ? 's' : ''}">{recoverableCount} paused</span>
+						{/if}
 						{#if taskCount > 0 && sessionCount === 0}
 							<span class="tab-count tasks">{taskCount} open</span>
 						{/if}
@@ -825,6 +890,7 @@
 		{#if selectedProject}
 			{@const projectSessions = sessionsByProject().get(selectedProject) || []}
 			{@const projectTasks = tasksByProject().get(selectedProject) || []}
+			{@const projectPausedSessions = getProjectPausedSessions(selectedProject)}
 			{@const sessionsByEpic = getSessionsByEpic(projectSessions)}
 			{@const tasksByEpic = getTasksByEpic(projectTasks)}
 			{@const projectColor = projectColors[selectedProject] || 'oklch(0.70 0.15 200)'}
@@ -971,6 +1037,42 @@
 								</div>
 							{/if}
 						{/each}
+						{/if}
+					</div>
+				{/if}
+
+				<!-- Paused Sessions Section -->
+				{#if projectPausedSessions.length > 0}
+					<div class="subsection">
+						<button
+							class="subsection-header"
+							onclick={() => toggleSubsectionCollapse(selectedProject!, 'paused')}
+							aria-expanded={!isSubsectionCollapsed(selectedProject!, 'paused')}
+						>
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke-width="2"
+								stroke="currentColor"
+								class="subsection-collapse-icon"
+								class:collapsed={isSubsectionCollapsed(selectedProject!, 'paused')}
+							>
+								<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+							</svg>
+							<span>Paused Sessions</span>
+							<span class="subsection-count">{projectPausedSessions.length}</span>
+						</button>
+
+						{#if !isSubsectionCollapsed(selectedProject!, 'paused')}
+							<div class="paused-content" transition:slide={{ duration: 200 }}>
+								<TasksPaused
+									sessions={projectPausedSessions}
+									{projectColors}
+									onResumeSession={resumeSession}
+									onViewTask={(taskId) => openTaskDetailDrawer(taskId)}
+								/>
+							</div>
 						{/if}
 					</div>
 				{/if}
@@ -1288,6 +1390,12 @@
 	.tab-count.tasks {
 		background: oklch(0.55 0.15 200 / 0.2);
 		color: oklch(0.75 0.15 200);
+	}
+
+	.tab-count.paused {
+		background: oklch(0.55 0.18 55 / 0.25);
+		color: oklch(0.80 0.15 55);
+		border: 1px solid oklch(0.55 0.18 55 / 0.4);
 	}
 
 	/* Project Content Area */

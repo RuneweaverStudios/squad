@@ -121,7 +121,18 @@
 	let hasTreeChanges = $state(false);
 	// Map of folder path → fingerprint (empty string '' for root)
 	let knownFingerprints = $state<Map<string, string>>(new Map());
+	// Map of folder path → entries (for detailed change comparison)
+	let knownEntries = $state<Map<string, DirectoryEntry[]>>(new Map());
 	let treeChangePollingInterval: ReturnType<typeof setInterval> | null = null;
+
+	// Detected changes (what specifically changed)
+	interface DetectedChange {
+		path: string;
+		name: string;
+		type: 'file' | 'folder';
+		changeType: 'added' | 'removed' | 'modified';
+	}
+	let detectedChanges = $state<DetectedChange[]>([]);
 
 	/**
 	 * Fetch git status for the project and build a path → status map
@@ -204,42 +215,108 @@
 	}
 
 	/**
+	 * Compare old and new entries to find what changed
+	 */
+	function computeEntryChanges(oldEntries: DirectoryEntry[], newEntries: DirectoryEntry[]): DetectedChange[] {
+		const changes: DetectedChange[] = [];
+		const oldByPath = new Map(oldEntries.map(e => [e.path, e]));
+		const newByPath = new Map(newEntries.map(e => [e.path, e]));
+
+		// Find added entries (in new but not old)
+		for (const [path, entry] of newByPath) {
+			if (!oldByPath.has(path)) {
+				changes.push({
+					path: entry.path,
+					name: entry.name,
+					type: entry.type === 'folder' ? 'folder' : 'file',
+					changeType: 'added'
+				});
+			}
+		}
+
+		// Find removed entries (in old but not new)
+		for (const [path, entry] of oldByPath) {
+			if (!newByPath.has(path)) {
+				changes.push({
+					path: entry.path,
+					name: entry.name,
+					type: entry.type === 'folder' ? 'folder' : 'file',
+					changeType: 'removed'
+				});
+			}
+		}
+
+		// Find modified entries (same path but different mtime)
+		for (const [path, newEntry] of newByPath) {
+			const oldEntry = oldByPath.get(path);
+			if (oldEntry && oldEntry.modified !== newEntry.modified) {
+				changes.push({
+					path: newEntry.path,
+					name: newEntry.name,
+					type: newEntry.type === 'folder' ? 'folder' : 'file',
+					changeType: 'modified'
+				});
+			}
+		}
+
+		return changes;
+	}
+
+	/**
 	 * Check if the file tree has changed on disk
-	 * Compares root and all expanded directories against their known fingerprints
+	 * Compares root and all expanded directories against their known entries
 	 */
 	async function checkForTreeChanges() {
 		if (!project || isLoadingRoot) return;
 
 		try {
+			const allChanges: DetectedChange[] = [];
+
 			// Check root directory
 			const freshRootEntries = await fetchDirectory('');
 			const freshRootFingerprint = generateFingerprint(freshRootEntries);
 			const knownRootFingerprint = knownFingerprints.get('');
+			const knownRootEntries = knownEntries.get('');
 
-			// Only compare if we have a known fingerprint (skip first check)
-			if (knownRootFingerprint && freshRootFingerprint !== knownRootFingerprint) {
-				hasTreeChanges = true;
-				return; // No need to check more - we already know there are changes
+			// Only compare if we have known data (skip first check)
+			if (knownRootFingerprint && freshRootFingerprint !== knownRootFingerprint && knownRootEntries) {
+				const rootChanges = computeEntryChanges(knownRootEntries, freshRootEntries);
+				allChanges.push(...rootChanges);
 			}
 
 			// Check all expanded subdirectories
 			for (const folderPath of expandedFolders) {
 				const knownFingerprint = knownFingerprints.get(folderPath);
-				if (!knownFingerprint) continue; // Skip if no known fingerprint yet
+				const knownFolderEntries = knownEntries.get(folderPath);
+				if (!knownFingerprint || !knownFolderEntries) continue;
 
 				try {
 					const freshEntries = await fetchDirectory(folderPath);
 					const freshFingerprint = generateFingerprint(freshEntries);
 
 					if (freshFingerprint !== knownFingerprint) {
-						hasTreeChanges = true;
-						return; // No need to check more
+						const folderChanges = computeEntryChanges(knownFolderEntries, freshEntries);
+						allChanges.push(...folderChanges);
 					}
 				} catch {
-					// Folder may have been deleted - that's a change
-					hasTreeChanges = true;
-					return;
+					// Folder may have been deleted - mark all its entries as removed
+					for (const entry of knownFolderEntries) {
+						allChanges.push({
+							path: entry.path,
+							name: entry.name,
+							type: entry.type === 'folder' ? 'folder' : 'file',
+							changeType: 'removed'
+						});
+					}
 				}
+			}
+
+			// Update state if we found changes
+			if (allChanges.length > 0) {
+				// Deduplicate by path (in case same file appears in multiple checks)
+				const uniqueChanges = Array.from(new Map(allChanges.map(c => [c.path, c])).values());
+				detectedChanges = uniqueChanges;
+				hasTreeChanges = true;
 			}
 		} catch (err) {
 			// Silently ignore errors during polling
@@ -274,27 +351,32 @@
 	 */
 	async function handleTreeUpdate() {
 		hasTreeChanges = false;
+		detectedChanges = [];
 		await loadRoot();
 
-		// Refresh all expanded subdirectories and update their fingerprints
+		// Refresh all expanded subdirectories and update their fingerprints/entries
 		const newLoaded = new Map(loadedFolders);
 		const newFingerprints = new Map(knownFingerprints);
+		const newKnownEntries = new Map(knownEntries);
 
 		for (const folderPath of expandedFolders) {
 			try {
 				const entries = await fetchDirectory(folderPath);
 				newLoaded.set(folderPath, entries);
 				newFingerprints.set(folderPath, generateFingerprint(entries));
+				newKnownEntries.set(folderPath, entries);
 			} catch (err) {
 				// If folder no longer exists, remove from maps
 				console.debug(`[FileTree] Failed to refresh ${folderPath}:`, err);
 				newLoaded.delete(folderPath);
 				newFingerprints.delete(folderPath);
+				newKnownEntries.delete(folderPath);
 			}
 		}
 
 		loadedFolders = newLoaded;
 		knownFingerprints = newFingerprints;
+		knownEntries = newKnownEntries;
 
 		// Also refresh git status
 		await fetchGitStatus();
@@ -324,9 +406,9 @@
 		};
 	});
 
-	// Sync hasTreeChanges to the global store for sidebar badge
+	// Sync detected changes count to the global store for sidebar badge
 	$effect(() => {
-		setFileChangesCount(hasTreeChanges ? 1 : 0);
+		setFileChangesCount(detectedChanges.length);
 	});
 
 	// Rename modal state
@@ -388,11 +470,15 @@
 
 		try {
 			rootEntries = await fetchDirectory('');
-			// Update fingerprint for change detection (root = '' key)
+			// Update fingerprint and entries for change detection (root = '' key)
 			const newFingerprints = new Map(knownFingerprints);
 			newFingerprints.set('', generateFingerprint(rootEntries));
 			knownFingerprints = newFingerprints;
+			const newKnownEntries = new Map(knownEntries);
+			newKnownEntries.set('', rootEntries);
+			knownEntries = newKnownEntries;
 			hasTreeChanges = false;
+			detectedChanges = [];
 		} catch (err) {
 			rootError = err instanceof Error ? err.message : 'Failed to load directory';
 			console.error('[FileTree] Failed to load root:', err);
@@ -475,10 +561,13 @@
 					const newLoaded = new Map(loadedFolders);
 					newLoaded.set(path, entries);
 					loadedFolders = newLoaded;
-					// Store fingerprint for change detection
+					// Store fingerprint and entries for change detection
 					const newFingerprints = new Map(knownFingerprints);
 					newFingerprints.set(path, generateFingerprint(entries));
 					knownFingerprints = newFingerprints;
+					const newKnownEntries = new Map(knownEntries);
+					newKnownEntries.set(path, entries);
+					knownEntries = newKnownEntries;
 				} catch (err) {
 					console.error(`[FileTree] Failed to load folder ${path}:`, err);
 					// Remove from expanded on error
@@ -1016,19 +1105,59 @@
 		<!-- Tree Changes Indicator -->
 		{#if hasTreeChanges}
 			<div class="tree-changes-bar">
-				<span class="tree-changes-text">Files changed on disk</span>
-				<button
-					class="tree-update-btn"
-					onclick={handleTreeUpdate}
-					title="Refresh file tree"
-				>
-					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="update-icon">
-						<path d="M23 4v6h-6" />
-						<path d="M1 20v-6h6" />
-						<path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
-					</svg>
-					Update
-				</button>
+				<div class="tree-changes-header">
+					<span class="tree-changes-text">
+						{detectedChanges.length} file{detectedChanges.length === 1 ? '' : 's'} changed
+					</span>
+					<button
+						class="tree-update-btn"
+						onclick={handleTreeUpdate}
+						title="Refresh file tree"
+					>
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="update-icon">
+							<path d="M23 4v6h-6" />
+							<path d="M1 20v-6h6" />
+							<path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+						</svg>
+						Update
+					</button>
+				</div>
+				{#if detectedChanges.length > 0}
+					<div class="tree-changes-list">
+						{#each detectedChanges as change}
+							<button
+								class="tree-change-item"
+								class:change-added={change.changeType === 'added'}
+								class:change-removed={change.changeType === 'removed'}
+								class:change-modified={change.changeType === 'modified'}
+								onclick={() => {
+									if (change.changeType !== 'removed' && change.type === 'file') {
+										onFileSelect(change.path);
+									}
+								}}
+								disabled={change.changeType === 'removed' || change.type === 'folder'}
+								title={change.changeType === 'removed' ? 'File was deleted' : change.type === 'folder' ? 'Folder' : 'Click to open'}
+							>
+								<span class="change-indicator">
+									{#if change.changeType === 'added'}+{:else if change.changeType === 'removed'}−{:else}~{/if}
+								</span>
+								<span class="change-icon">
+									{#if change.type === 'folder'}
+										<svg viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5">
+											<path d="M19.5 21a3 3 0 003-3v-4.5a3 3 0 00-3-3h-15a3 3 0 00-3 3V18a3 3 0 003 3h15zM1.5 10.146V6a3 3 0 013-3h5.379a2.25 2.25 0 011.59.659l2.122 2.121c.14.141.331.22.53.22H19.5a3 3 0 013 3v1.146A4.483 4.483 0 0019.5 9h-15a4.483 4.483 0 00-3 1.146z" />
+										</svg>
+									{:else}
+										<svg viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5">
+											<path d="M5.625 1.5c-1.036 0-1.875.84-1.875 1.875v17.25c0 1.035.84 1.875 1.875 1.875h12.75c1.035 0 1.875-.84 1.875-1.875V7.875L14.25 1.5H5.625z" />
+											<path d="M14.25 1.5v5.25c0 .621.504 1.125 1.125 1.125h5.25" />
+										</svg>
+									{/if}
+								</span>
+								<span class="change-name">{change.name}</span>
+							</button>
+						{/each}
+					</div>
+				{/if}
 			</div>
 		{/if}
 
@@ -1375,20 +1504,123 @@
 	/* Tree Changes Bar */
 	.tree-changes-bar {
 		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.5rem;
+		flex-direction: column;
+		gap: 0.375rem;
 		padding: 0.375rem 0.5rem;
 		margin-top: 0.375rem;
-		background: linear-gradient(90deg, oklch(0.65 0.15 200 / 0.15) 0%, oklch(0.16 0.02 250) 100%);
+		background: linear-gradient(180deg, oklch(0.65 0.15 200 / 0.12) 0%, oklch(0.16 0.02 250) 100%);
 		border: 1px solid oklch(0.65 0.15 200 / 0.3);
 		border-radius: 0.25rem;
 		font-size: 0.75rem;
 	}
 
+	.tree-changes-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+	}
+
 	.tree-changes-text {
 		color: oklch(0.75 0.12 200);
 		font-weight: 500;
+	}
+
+	.tree-changes-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.125rem;
+		max-height: 150px;
+		overflow-y: auto;
+		padding-right: 0.25rem;
+	}
+
+	.tree-change-item {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		padding: 0.25rem 0.375rem;
+		background: oklch(0.18 0.02 250);
+		border: 1px solid oklch(0.25 0.02 250);
+		border-radius: 0.25rem;
+		cursor: pointer;
+		text-align: left;
+		transition: all 0.15s ease;
+	}
+
+	.tree-change-item:hover:not(:disabled) {
+		background: oklch(0.22 0.02 250);
+		border-color: oklch(0.35 0.02 250);
+	}
+
+	.tree-change-item:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	.change-indicator {
+		font-family: monospace;
+		font-weight: 700;
+		font-size: 0.8125rem;
+		width: 1rem;
+		text-align: center;
+	}
+
+	.change-added .change-indicator {
+		color: oklch(0.70 0.18 145);
+	}
+
+	.change-removed .change-indicator {
+		color: oklch(0.70 0.18 25);
+	}
+
+	.change-modified .change-indicator {
+		color: oklch(0.75 0.15 85);
+	}
+
+	.change-icon {
+		display: flex;
+		align-items: center;
+		opacity: 0.6;
+	}
+
+	.change-icon svg {
+		width: 14px;
+		height: 14px;
+	}
+
+	.change-added .change-icon {
+		color: oklch(0.60 0.15 145);
+	}
+
+	.change-removed .change-icon {
+		color: oklch(0.60 0.15 25);
+	}
+
+	.change-modified .change-icon {
+		color: oklch(0.65 0.12 85);
+	}
+
+	.change-name {
+		flex: 1;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		color: oklch(0.70 0.02 250);
+		font-size: 0.6875rem;
+	}
+
+	.change-added .change-name {
+		color: oklch(0.75 0.12 145);
+	}
+
+	.change-removed .change-name {
+		color: oklch(0.65 0.12 25);
+		text-decoration: line-through;
+	}
+
+	.change-modified .change-name {
+		color: oklch(0.80 0.10 85);
 	}
 
 	.tree-update-btn {

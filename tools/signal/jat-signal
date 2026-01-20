@@ -10,6 +10,7 @@
 #   jat-signal completing '{"taskId":"jat-abc","currentStep":"committing"}'
 #   jat-signal starting '{"agentName":"...","project":"..."}'
 #   jat-signal compacting '{"reason":"...","contextSizeBefore":180000}'
+#   jat-signal paused '{"taskId":"...","taskTitle":"...","resumable":true}'
 #   jat-signal question '{"question":"...","questionType":"choice","options":[...]}'
 #
 # Usage (Completion Signal - bundles everything):
@@ -54,6 +55,7 @@ show_usage() {
     echo "  completing '{...}'    - Running completion steps"
     echo "  starting '{...}'      - Session initializing"
     echo "  compacting '{...}'    - Summarizing context"
+    echo "  paused '{...}'        - Session paused (resumable)"
     echo "  question '{...}'      - Structured question for IDE"
     echo ""
     echo "Completion Signal (USE jat-complete-bundle TO GENERATE):"
@@ -82,6 +84,7 @@ show_usage() {
     echo "  completing:  taskId, currentStep"
     echo "  starting:    agentName"
     echo "  compacting:  reason, contextSizeBefore"
+    echo "  paused:      taskId, resumable"
     echo "  question:    question, questionType"
     echo "  complete:    (use jat-complete-bundle, do not construct manually)"
 }
@@ -334,6 +337,23 @@ case "$SIGNAL_TYPE" in
         CONTEXT_BEFORE=$(echo "$SIGNAL_DATA" | jq -r '.contextSizeBefore // 0')
         echo "Signal: compacting (reason: ${REASON}, context: ${CONTEXT_BEFORE})"
         echo "[JAT-SIGNAL:compacting] $SIGNAL_DATA"
+        ;;
+
+    paused)
+        require_json "paused" "$SIGNAL_DATA"
+        # Compact JSON to single line for hook parsing
+        SIGNAL_DATA=$(echo "$SIGNAL_DATA" | jq -c .)
+        validate_payload "paused" "$SIGNAL_DATA"
+        TASK_ID=$(echo "$SIGNAL_DATA" | jq -r '.taskId // ""')
+        TASK_TITLE=$(echo "$SIGNAL_DATA" | jq -r '.taskTitle // ""')
+        RESUMABLE=$(echo "$SIGNAL_DATA" | jq -r '.resumable // true')
+        AGENT_NAME=$(echo "$SIGNAL_DATA" | jq -r '.agentName // ""')
+        OUTPUT="Signal: paused (task: ${TASK_ID}"
+        [[ -n "$TASK_TITLE" ]] && OUTPUT="$OUTPUT - ${TASK_TITLE}"
+        [[ -n "$AGENT_NAME" ]] && OUTPUT="$OUTPUT, agent: ${AGENT_NAME}"
+        OUTPUT="$OUTPUT, resumable: ${RESUMABLE})"
+        echo "$OUTPUT"
+        echo "[JAT-SIGNAL:paused] $SIGNAL_DATA"
         ;;
 
     question)

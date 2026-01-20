@@ -718,6 +718,12 @@
 			bg: 'oklch(0.20 0.01 250)',
 			text: 'oklch(0.65 0.02 250)',
 			border: 'oklch(0.30 0.02 250)'
+		},
+		paused: {
+			icon: '⏸',
+			bg: 'oklch(0.22 0.08 300)',
+			text: 'oklch(0.80 0.15 300)',
+			border: 'oklch(0.40 0.10 300)'
 		}
 	};
 
@@ -915,6 +921,20 @@
 			if (taskId) parts.push(`→ ${taskId}`);
 			if (title) parts.push(` ${title}`);
 			return truncate(parts.join(' '));
+		}
+
+		// For paused events, show reason or task title
+		if (signalType === 'paused' && event.data) {
+			if (event.data.reason) {
+				return truncate(event.data.reason as string);
+			}
+			if (event.data.taskTitle) {
+				return truncate(event.data.taskTitle as string);
+			}
+			const taskId = event.data.taskId || event.task_id || '';
+			if (taskId) {
+				return `Paused ${taskId}`;
+			}
 		}
 
 		// Fallback to uppercase label with task ID
@@ -2357,6 +2377,33 @@
 											<div class="text-[10px]" style="color: oklch(0.60 0.02 250);">
 												Agent is summarizing conversation to free up context space.
 											</div>
+										</div>
+									{:else if event.state === 'paused' || event.type === 'paused'}
+										<!-- Paused state -->
+										<div class="space-y-2">
+											<div class="flex items-center gap-2 text-xs" style="color: oklch(0.80 0.15 300);">
+												<span>⏸</span>
+												<span class="font-medium">Session Paused</span>
+											</div>
+											{#if event.data?.reason}
+												<div class="text-xs" style="color: oklch(0.70 0.10 300);">
+													{event.data.reason}
+												</div>
+											{/if}
+											{#if event.data?.taskTitle}
+												<div class="text-[10px]" style="color: oklch(0.60 0.02 250);">
+													Task: {event.data.taskTitle}
+												</div>
+											{:else if event.task_id}
+												<div class="text-[10px]" style="color: oklch(0.60 0.02 250);">
+													Task: <span class="font-mono">{event.task_id}</span>
+												</div>
+											{/if}
+											{#if event.data?.resumable !== false}
+												<div class="text-[10px]" style="color: oklch(0.50 0.02 250);">
+													This session can be resumed from the Paused section.
+												</div>
+											{/if}
 										</div>
 									{:else if (event.state === 'completing' || event.type === 'completing') && hasRichSignalData(event)}
 										<!-- Rich Completing Signal Card -->
