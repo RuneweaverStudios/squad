@@ -78,6 +78,20 @@
 	let diffCollapsed = $state(false);
 	let migrationsCollapsed = $state(false);
 	let showSyncHelp = $state(false);
+	let sqlCollapsed = $state(false);
+
+	// SQL execution state
+	let sqlQuery = $state('');
+	let isExecutingSql = $state(false);
+	let sqlResult = $state<{
+		success: boolean;
+		rows?: Record<string, unknown>[];
+		rowCount?: number;
+		command?: string;
+		error?: string;
+		message?: string;
+	} | null>(null);
+	let sqlError = $state<string | null>(null);
 
 	// Toast state
 	let toastMessage = $state<string | null>(null);
@@ -99,8 +113,13 @@
 
 	/**
 	 * Format version timestamp as readable date
+	 * Note: Supabase CLI has inconsistent timezone handling:
+	 *   - `supabase db pull` uses UTC timestamps
+	 *   - `supabase migration new` uses local timestamps
+	 * We display the raw timestamp from the filename without timezone conversion,
+	 * as we can't reliably determine which timezone was used.
 	 */
-	function formatVersion(version: string): string {
+	function formatVersion(version: string, migrationName?: string): string {
 		// Version is typically: 20241114184005 (YYYYMMDDHHmmss)
 		if (version.length === 14) {
 			const year = version.slice(0, 4);
@@ -108,7 +127,13 @@
 			const day = version.slice(6, 8);
 			const hour = version.slice(8, 10);
 			const minute = version.slice(10, 12);
-			return `${year}-${month}-${day} ${hour}:${minute}`;
+			const formatted = `${year}-${month}-${day} ${hour}:${minute}`;
+
+			// Add timezone hint for remote_schema migrations (created by db pull, uses UTC)
+			if (migrationName === 'remote_schema') {
+				return `${formatted} (UTC)`;
+			}
+			return formatted;
 		}
 		return version;
 	}
@@ -365,6 +390,59 @@
 		}
 	}
 
+	/**
+	 * Execute SQL query against the linked database
+	 */
+	async function executeSql() {
+		if (!sqlQuery.trim()) return;
+
+		isExecutingSql = true;
+		sqlError = null;
+		sqlResult = null;
+
+		try {
+			const response = await fetch(`/api/supabase/query?project=${encodeURIComponent(project)}`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ sql: sqlQuery.trim() })
+			});
+
+			const data = await response.json();
+
+			if (!response.ok || !data.success) {
+				sqlError = data.error || 'Query failed';
+				sqlResult = null;
+			} else {
+				sqlResult = data;
+				if (data.command !== 'SELECT') {
+					showToast(`${data.command}: ${data.rowCount} row(s) affected`);
+				}
+			}
+		} catch (err) {
+			sqlError = err instanceof Error ? err.message : 'Failed to execute query';
+		} finally {
+			isExecutingSql = false;
+		}
+	}
+
+	/**
+	 * Clear SQL query and results
+	 */
+	function clearSql() {
+		sqlQuery = '';
+		sqlResult = null;
+		sqlError = null;
+	}
+
+	/**
+	 * Format a value for display in the results table
+	 */
+	function formatSqlValue(value: unknown): string {
+		if (value === null) return 'NULL';
+		if (typeof value === 'object') return JSON.stringify(value);
+		return String(value);
+	}
+
 	// Fetch status on mount and when project changes
 	$effect(() => {
 		if (project) {
@@ -593,6 +671,102 @@
 					</div>
 				</div>
 			</div>
+
+			<!-- Run SQL Section -->
+			<div class="section">
+				<!-- svelte-ignore a11y_click_events_have_key_events -->
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="section-header" onclick={() => sqlCollapsed = !sqlCollapsed}>
+					<svg class="chevron" class:collapsed={sqlCollapsed} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+					</svg>
+					<span class="section-title">Run SQL</span>
+					{#if sqlResult?.rowCount !== undefined}
+						<span class="section-badge badge-info">{sqlResult.rowCount} row{sqlResult.rowCount === 1 ? '' : 's'}</span>
+					{/if}
+				</div>
+
+				{#if !sqlCollapsed}
+					<div class="section-content">
+						<form class="sql-form" onsubmit={(e) => { e.preventDefault(); executeSql(); }}>
+							<textarea
+								class="sql-input"
+								placeholder="SELECT * FROM public.event_types LIMIT 10"
+								bind:value={sqlQuery}
+								disabled={isExecutingSql}
+								rows="4"
+								spellcheck="false"
+							></textarea>
+							<div class="sql-actions">
+								<button
+									type="button"
+									class="btn btn-xs btn-ghost"
+									onclick={clearSql}
+									disabled={isExecutingSql || (!sqlQuery && !sqlResult && !sqlError)}
+								>
+									Clear
+								</button>
+								<button
+									type="submit"
+									class="btn btn-xs btn-primary"
+									disabled={!sqlQuery.trim() || isExecutingSql}
+								>
+									{#if isExecutingSql}
+										<span class="loading loading-spinner loading-xs"></span>
+									{:else}
+										<svg class="action-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+										</svg>
+										Run
+									{/if}
+								</button>
+							</div>
+						</form>
+
+						{#if sqlError}
+							<div class="sql-error">{sqlError}</div>
+						{/if}
+
+						{#if sqlResult}
+							{#if sqlResult.command === 'SELECT' && sqlResult.rows && sqlResult.rows.length > 0}
+								{@const columns = Object.keys(sqlResult.rows[0])}
+								<div class="sql-results">
+									<div class="sql-results-header">
+										<span>{sqlResult.rowCount} row{sqlResult.rowCount === 1 ? '' : 's'}</span>
+									</div>
+									<div class="sql-table-container">
+										<table class="sql-table">
+											<thead>
+												<tr>
+													{#each columns as col}
+														<th>{col}</th>
+													{/each}
+												</tr>
+											</thead>
+											<tbody>
+												{#each sqlResult.rows as row}
+													<tr>
+														{#each columns as col}
+															<td title={formatSqlValue(row[col])}>{formatSqlValue(row[col])}</td>
+														{/each}
+													</tr>
+												{/each}
+											</tbody>
+										</table>
+									</div>
+								</div>
+							{:else if sqlResult.command === 'SELECT'}
+								<div class="sql-empty">No rows returned</div>
+							{:else}
+								<div class="sql-success">
+									{sqlResult.message || `${sqlResult.command}: ${sqlResult.rowCount} row(s) affected`}
+								</div>
+							{/if}
+						{/if}
+					</div>
+				{/if}
+			</div>
 		{/if}
 
 		<!-- Migrations Timeline -->
@@ -637,7 +811,7 @@
 										<span class="migration-name" title={migration.filename}>
 											{migration.name || migration.filename}
 										</span>
-										<span class="migration-version">{formatVersion(migration.version)}</span>
+										<span class="migration-version">{formatVersion(migration.version, migration.name)}</span>
 									</div>
 									{#if isLocalOnly}
 										<button
@@ -1353,5 +1527,143 @@
 			opacity: 1;
 			transform: translateY(0);
 		}
+	}
+
+	/* SQL Executor Section */
+	.sql-form {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.sql-input {
+		width: 100%;
+		padding: 0.5rem;
+		font-family: 'JetBrains Mono', 'Fira Code', monospace;
+		font-size: 0.75rem;
+		line-height: 1.4;
+		background: oklch(0.12 0.01 250);
+		border: 1px solid oklch(0.25 0.02 250);
+		border-radius: 0.375rem;
+		color: oklch(0.90 0.02 250);
+		resize: vertical;
+		min-height: 4rem;
+	}
+
+	.sql-input:focus {
+		outline: none;
+		border-color: oklch(0.55 0.15 250);
+	}
+
+	.sql-input:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	.sql-input::placeholder {
+		color: oklch(0.45 0.02 250);
+	}
+
+	.sql-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.5rem;
+	}
+
+	.action-icon-sm {
+		width: 0.875rem;
+		height: 0.875rem;
+	}
+
+	.sql-error {
+		margin-top: 0.5rem;
+		padding: 0.5rem 0.75rem;
+		background: oklch(0.25 0.08 25 / 0.3);
+		border: 1px solid oklch(0.50 0.15 25 / 0.5);
+		border-radius: 0.375rem;
+		color: oklch(0.75 0.12 25);
+		font-size: 0.75rem;
+		font-family: 'JetBrains Mono', 'Fira Code', monospace;
+		white-space: pre-wrap;
+		word-break: break-word;
+	}
+
+	.sql-results {
+		margin-top: 0.5rem;
+		border: 1px solid oklch(0.25 0.02 250);
+		border-radius: 0.375rem;
+		overflow: hidden;
+	}
+
+	.sql-results-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 0.375rem 0.5rem;
+		background: oklch(0.16 0.01 250);
+		border-bottom: 1px solid oklch(0.25 0.02 250);
+		font-size: 0.6875rem;
+		color: oklch(0.60 0.02 250);
+	}
+
+	.sql-table-container {
+		max-height: 300px;
+		overflow: auto;
+	}
+
+	.sql-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 0.6875rem;
+		font-family: 'JetBrains Mono', 'Fira Code', monospace;
+	}
+
+	.sql-table th,
+	.sql-table td {
+		padding: 0.375rem 0.5rem;
+		text-align: left;
+		border-bottom: 1px solid oklch(0.20 0.01 250);
+		max-width: 200px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.sql-table th {
+		background: oklch(0.14 0.01 250);
+		color: oklch(0.70 0.02 250);
+		font-weight: 600;
+		position: sticky;
+		top: 0;
+		z-index: 1;
+	}
+
+	.sql-table td {
+		color: oklch(0.80 0.02 250);
+	}
+
+	.sql-table tbody tr:hover {
+		background: oklch(0.16 0.01 250);
+	}
+
+	.sql-empty {
+		margin-top: 0.5rem;
+		padding: 0.75rem;
+		text-align: center;
+		font-size: 0.75rem;
+		color: oklch(0.55 0.02 250);
+		background: oklch(0.14 0.01 250);
+		border-radius: 0.375rem;
+	}
+
+	.sql-success {
+		margin-top: 0.5rem;
+		padding: 0.5rem 0.75rem;
+		background: oklch(0.25 0.08 145 / 0.3);
+		border: 1px solid oklch(0.50 0.15 145 / 0.5);
+		border-radius: 0.375rem;
+		color: oklch(0.75 0.12 145);
+		font-size: 0.75rem;
+		font-family: 'JetBrains Mono', 'Fira Code', monospace;
 	}
 </style>
