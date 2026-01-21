@@ -599,7 +599,8 @@ Add a `defaults` section to `~/.config/jat/projects.json` for global configurati
     "claude_flags": "--dangerously-skip-permissions",
     "model": "opus",
     "agent_stagger": 15,
-    "claude_startup_timeout": 20
+    "claude_startup_timeout": 20,
+    "file_watcher_ignored_dirs": [".git", "node_modules", ".svelte-kit", "dist"]
   },
   "projects": { ... }
 }
@@ -612,6 +613,7 @@ Add a `defaults` section to `~/.config/jat/projects.json` for global configurati
 - `model` - Default Claude model: "opus", "sonnet", "haiku" (default: "opus")
 - `agent_stagger` - Seconds between agent spawns in batch mode (default: 15)
 - `claude_startup_timeout` - Seconds to wait for Claude TUI to start (default: 20, increase for slower systems)
+- `file_watcher_ignored_dirs` - Directories to ignore when detecting file tree changes. Changes in these directories won't trigger the "changes detected" badge in the sidebar. (default: `.git`, `node_modules`, `.svelte-kit`, `.next`, `.nuxt`, `.vite`, `.cache`, `dist`, `build`, `.turbo`, `.parcel-cache`, `__pycache__`, `.pytest_cache`, `target`, `vendor`)
 
 ## macOS and zsh Compatibility
 
