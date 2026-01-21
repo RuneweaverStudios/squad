@@ -212,7 +212,7 @@
 	<!-- Content -->
 	<div class="content">
 		<header>
-			<span class="badge">>>> ENTERING THE MATRIX <<<</span>
+			<span class="badge">&gt;&gt;&gt; ENTERING THE MATRIX &lt;&lt;&lt;</span>
 			<h1>
 				<span class="the">THE</span>
 				<span class="alien">ALIEN</span>
