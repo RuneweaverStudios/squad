@@ -196,8 +196,10 @@
 		onStopServer?: () => Promise<void>;
 		onRestartServer?: () => Promise<void>;
 		onStartServer?: () => Promise<void>;
-		/** Called when user presses Ctrl+Enter (submit and collapse) */
+		/** Called when user presses Ctrl+Enter (submit and go to next session) */
 		onCtrlEnterSubmit?: () => void;
+		/** Called when user presses Ctrl+Shift+Enter (submit and go to previous session) */
+		onCtrlShiftEnterSubmit?: () => void;
 		// Shared
 		class?: string;
 		/** Whether this work card is currently highlighted (e.g., from clicking avatar elsewhere) */
@@ -325,6 +327,7 @@
 		onRestartServer,
 		onStartServer,
 		onCtrlEnterSubmit,
+		onCtrlShiftEnterSubmit,
 		// Shared
 		class: className = "",
 		isHighlighted = false,
@@ -4064,8 +4067,30 @@
 
 	// Handle keyboard shortcuts in input
 	function handleInputKeydown(e: KeyboardEvent) {
-		if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
-			// Ctrl+Enter (or Cmd+Enter on Mac): submit AND collapse sessions panel
+		if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+			// Ctrl+Shift+Enter: submit AND go to PREVIOUS session
+			e.preventDefault();
+			const hasText = inputText.trim().length > 0;
+			const hasFiles = attachedFiles.length > 0;
+
+			const sendPromise = (!hasText && !hasFiles && onSendInput)
+				? onSendInput("enter", "key")
+				: sendTextInput();
+
+			Promise.resolve(sendPromise).then(() => {
+				submitFlash = true;
+				setTimeout(() => {
+					submitFlash = false;
+				}, 300);
+
+				if (onCtrlShiftEnterSubmit) {
+					setTimeout(() => {
+						onCtrlShiftEnterSubmit();
+					}, 1400);
+				}
+			});
+		} else if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+			// Ctrl+Enter (or Cmd+Enter on Mac): submit AND go to NEXT session
 			e.preventDefault();
 			const hasText = inputText.trim().length > 0;
 			const hasFiles = attachedFiles.length > 0;

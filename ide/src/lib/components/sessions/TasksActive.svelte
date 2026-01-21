@@ -135,6 +135,9 @@
 	// Action loading state
 	let actionLoading = $state<string | null>(null);
 
+	// "All done" flash state - shown when no more sessions to navigate to
+	let allDoneFlash = $state(false);
+
 	// Animation state tracking - maintains order so exiting sessions stay in position
 	let previousSessionObjects = $state<Map<string, TmuxSession>>(new Map());
 	let sessionOrder = $state<string[]>([]); // Tracks order for position preservation
@@ -706,6 +709,17 @@
 	</div>
 {:else}
 	<div class="sessions-table-wrapper">
+		<!-- "All done" flash overlay -->
+		{#if allDoneFlash}
+			<div class="all-done-overlay">
+				<div class="all-done-content">
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="all-done-icon">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+					</svg>
+					<span class="all-done-text">All caught up!</span>
+				</div>
+			</div>
+		{/if}
 		<table class="sessions-table">
 			<thead>
 				<tr>
@@ -999,16 +1013,59 @@
 														// Find and expand the next session in the list
 														const sessions = orderedSessions();
 														const currentIndex = sessions.findIndex(s => s.session.name === session.name);
+														let foundNext = false;
 														if (currentIndex >= 0) {
 															// Look for the next non-exiting session
 															for (let i = currentIndex + 1; i < sessions.length; i++) {
 																if (!sessions[i].isExiting) {
 																	expandInline(sessions[i].session.name);
+																	foundNext = true;
 																	break;
 																}
 															}
 														}
-														// If no next session found, just stay collapsed (you're done!)
+														// If no next session found, show "all done" flash
+														if (!foundNext) {
+															allDoneFlash = true;
+															setTimeout(() => {
+																allDoneFlash = false;
+															}, 2000);
+														}
+													}, 200);
+												}}
+												onCtrlShiftEnterSubmit={() => {
+													// Collapse and go to PREVIOUS session
+													collapsingSession = session.name;
+													if (outputPollInterval) {
+														clearInterval(outputPollInterval);
+														outputPollInterval = null;
+													}
+													setTimeout(() => {
+														expandedSession = null;
+														expandedOutput = '';
+														collapsingSession = null;
+
+														// Find and expand the previous session in the list
+														const sessions = orderedSessions();
+														const currentIndex = sessions.findIndex(s => s.session.name === session.name);
+														let foundPrev = false;
+														if (currentIndex > 0) {
+															// Look for the previous non-exiting session
+															for (let i = currentIndex - 1; i >= 0; i--) {
+																if (!sessions[i].isExiting) {
+																	expandInline(sessions[i].session.name);
+																	foundPrev = true;
+																	break;
+																}
+															}
+														}
+														// If no previous session found, show "all done" flash
+														if (!foundPrev) {
+															allDoneFlash = true;
+															setTimeout(() => {
+																allDoneFlash = false;
+															}, 2000);
+														}
 													}, 200);
 												}}
 											/>
@@ -1098,8 +1155,63 @@
 		margin: 0;
 	}
 
+	/* "All done" flash overlay */
+	.all-done-overlay {
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: oklch(0.70 0.20 145 / 0.15);
+		border-radius: 8px;
+		z-index: 10;
+		animation: all-done-fade 2s ease-out forwards;
+		pointer-events: none;
+	}
+
+	.all-done-content {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 1rem 2rem;
+		background: oklch(0.20 0.02 145);
+		border: 2px solid oklch(0.55 0.18 145);
+		border-radius: 12px;
+		box-shadow: 0 0 30px oklch(0.55 0.18 145 / 0.4);
+		animation: all-done-pop 0.3s ease-out;
+	}
+
+	.all-done-icon {
+		width: 32px;
+		height: 32px;
+		color: oklch(0.75 0.20 145);
+	}
+
+	.all-done-text {
+		font-size: 1.25rem;
+		font-weight: 600;
+		color: oklch(0.85 0.15 145);
+		letter-spacing: 0.02em;
+	}
+
+	@keyframes all-done-fade {
+		0% { opacity: 1; }
+		70% { opacity: 1; }
+		100% { opacity: 0; }
+	}
+
+	@keyframes all-done-pop {
+		0% { transform: scale(0.8); opacity: 0; }
+		50% { transform: scale(1.05); }
+		100% { transform: scale(1); opacity: 1; }
+	}
+
 	/* Sessions table */
 	.sessions-table-wrapper {
+		position: relative;
 		background: oklch(0.16 0.01 250);
 		border: 1px solid oklch(0.25 0.02 250);
 		border-radius: 8px;

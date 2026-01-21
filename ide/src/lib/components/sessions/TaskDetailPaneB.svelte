@@ -919,7 +919,7 @@
 	.description-section {
 		flex-shrink: 0;
 		min-width: 0; /* Allow section to shrink below content size */
-		overflow: hidden;
+		overflow: visible;
 	}
 
 	/* Notes layout for Notes tab */
@@ -1147,7 +1147,7 @@
 		transition: border-color 0.15s, box-shadow 0.15s;
 		field-sizing: content;
 		min-height: calc(4 * 1.5em + 1rem);
-		max-height: 200px;
+		max-height: 350px !important;
 		overflow-y: auto;
 	}
 
@@ -1170,6 +1170,8 @@
 		line-height: 1.5;
 		cursor: pointer;
 		min-height: calc(2 * 1.5em + 1rem);
+		max-height: 350px !important;
+		overflow-y: auto;
 		white-space: pre-wrap;
 		word-break: break-word; /* Prevent long words from causing overflow */
 		transition: border-color 0.15s, background-color 0.15s;
