@@ -1007,7 +1007,7 @@
 
 				<!-- Active Sessions Section -->
 				{#if projectSessions.length > 0}
-					<div class="subsection subsection-active">
+					<div class="subsection bg-base-100">
 						<button
 							class="subsection-header"
 							onclick={() =>
@@ -1726,13 +1726,6 @@
 	.subsection {
 		padding: 0.75rem 0;
 		border-bottom: 1px solid oklch(0.22 0.02 250);
-		/* Create stacking context for proper z-index layering */
-		position: relative;
-	}
-
-	/* Active Tasks subsection needs higher z-index so expanded content stays above other sections */
-	.subsection-active {
-		z-index: 10;
 	}
 
 	.subsection:last-child {
@@ -1879,10 +1872,6 @@
 
 	.epic-content {
 		border-top: 1px solid oklch(0.23 0.02 250);
-		/* Ensure expanded SessionCard content stays above other page sections */
-		position: relative;
-		z-index: 20;
-		background: oklch(0.16 0.01 250);
 	}
 
 	/* Override TasksActive table styles when inside accordion to reduce visual prominence */

@@ -1560,9 +1560,6 @@
 	.session-row.expanded {
 		background: oklch(0.65 0.15 200 / 0.12);
 		border-bottom: none;
-		/* Ensure expanded header row stays above other rows when scrolling */
-		position: relative;
-		z-index: 6;
 	}
 
 	.session-row.expanded:hover {
@@ -1573,9 +1570,6 @@
 	.expanded-row {
 		background: oklch(0.12 0.01 250);
 		border-bottom: 1px solid oklch(0.22 0.02 250);
-		/* Ensure expanded content stays above other rows when scrolling */
-		position: relative;
-		z-index: 5;
 	}
 
 	.expanded-row:hover {
@@ -1585,15 +1579,11 @@
 	.expanded-content {
 		padding: 0 !important;
 		border-top: 1px solid oklch(0.25 0.02 250);
-		position: relative;
-		z-index: 10;
 	}
 
 	.expanded-session-card {
 		overflow-y: auto;
 		width: 100%;
-		position: relative;
-		z-index: 10;
 	}
 
 	@keyframes expand-slide-down {
@@ -1625,7 +1615,6 @@
 	/* Wrapper for expanded session with horizontal resize */
 	.expanded-session-wrapper {
 		position: relative;
-		z-index: 10;
 		padding: 1rem;
 		display: flex;
 		gap: 1rem;
@@ -1639,7 +1628,6 @@
 	/* SessionCard takes all space when no task panel */
 	.session-card-section {
 		position: relative;
-		z-index: 10;
 		flex: 1;
 		min-width: 0;
 	}
