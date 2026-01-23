@@ -639,6 +639,12 @@
 				activeFilePath = openFiles.length > 0 ? openFiles[0].path : null;
 			}
 		}
+		// Remove from starred if starred
+		if (starredFiles.has(path)) {
+			starredFiles.delete(path);
+			starredFiles = new Set(starredFiles);
+			saveStarredFilesToStorage();
+		}
 	}
 
 	// Handle file rename from tree
@@ -655,6 +661,13 @@
 			if (activeFilePath === oldPath) {
 				activeFilePath = newPath;
 			}
+		}
+		// Update starred path if the file was starred
+		if (starredFiles.has(oldPath)) {
+			starredFiles.delete(oldPath);
+			starredFiles.add(newPath);
+			starredFiles = new Set(starredFiles);
+			saveStarredFilesToStorage();
 		}
 	}
 
@@ -680,6 +693,56 @@
 	// localStorage key for persisting open files per project
 	function getStorageKey(project: string): string {
 		return `jat-files-open-${project}`;
+	}
+
+	// localStorage key for persisting starred files per project
+	function getStarredStorageKey(project: string): string {
+		return `jat-files-starred-${project}`;
+	}
+
+	// Starred files state
+	let starredFiles = $state<Set<string>>(new Set());
+
+	// Load starred files from localStorage
+	function loadStarredFilesFromStorage() {
+		if (!selectedProject || typeof window === 'undefined') return;
+
+		const key = getStarredStorageKey(selectedProject);
+		const stored = localStorage.getItem(key);
+		if (stored) {
+			try {
+				const paths = JSON.parse(stored);
+				starredFiles = new Set(paths);
+			} catch (err) {
+				console.error('[Files] Failed to load starred files:', err);
+				starredFiles = new Set();
+			}
+		} else {
+			starredFiles = new Set();
+		}
+	}
+
+	// Save starred files to localStorage
+	function saveStarredFilesToStorage() {
+		if (!selectedProject || typeof window === 'undefined') return;
+
+		const key = getStarredStorageKey(selectedProject);
+		if (starredFiles.size === 0) {
+			localStorage.removeItem(key);
+		} else {
+			localStorage.setItem(key, JSON.stringify([...starredFiles]));
+		}
+	}
+
+	// Toggle star status for a file
+	function handleToggleStar(path: string) {
+		if (starredFiles.has(path)) {
+			starredFiles.delete(path);
+		} else {
+			starredFiles.add(path);
+		}
+		starredFiles = new Set(starredFiles); // Trigger reactivity
+		saveStarredFilesToStorage();
 	}
 
 	// Track which projects have been restored to prevent double-loading
@@ -923,6 +986,8 @@
 	// Load persisted files after project is selected and start polling
 	$effect(() => {
 		if (selectedProject && projects.length > 0 && !isLoading) {
+			// Load starred files immediately (sync operation)
+			loadStarredFilesFromStorage();
 			// Small delay to ensure project is fully loaded
 			setTimeout(() => loadOpenFilesFromStorage(), 100);
 			// Start git status polling for tab badges
@@ -1058,6 +1123,8 @@
 								onFileCreate={handleFileCreate}
 								onError={handleTreeError}
 								onSuccess={handleTreeSuccess}
+								{starredFiles}
+								onToggleStar={handleToggleStar}
 							/>
 						{/if}
 					</div>

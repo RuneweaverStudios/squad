@@ -49,6 +49,8 @@
 		onFileCreate?: (path: string, type: 'file' | 'folder') => void;
 		onError?: (message: string) => void;
 		onSuccess?: (message: string) => void;
+		starredFiles?: Set<string>;
+		onToggleStar?: (path: string) => void;
 	}
 
 	let {
@@ -59,8 +61,13 @@
 		onFileRename,
 		onFileCreate,
 		onError,
-		onSuccess
+		onSuccess,
+		starredFiles = new Set(),
+		onToggleStar
 	}: Props = $props();
+
+	// Starred section collapsed state
+	let starredCollapsed = $state(false);
 
 	/**
 	 * Get a user-friendly error message for file tree operations
@@ -1105,6 +1112,62 @@
 <svelte:window onkeydown={handleKeyDown} onclick={handleGlobalClick} />
 
 <div class="file-tree">
+	<!-- Starred Files Section -->
+	{#if starredFiles.size > 0}
+		<div class="starred-section">
+			<button
+				class="starred-header"
+				onclick={() => starredCollapsed = !starredCollapsed}
+				title={starredCollapsed ? 'Expand starred files' : 'Collapse starred files'}
+			>
+				<svg
+					class="starred-chevron"
+					class:collapsed={starredCollapsed}
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+				>
+					<path d="M6 9l6 6 6-6" />
+				</svg>
+				<svg class="starred-icon" viewBox="0 0 24 24" fill="currentColor">
+					<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+				</svg>
+				<span class="starred-title">Starred</span>
+				<span class="starred-count">{starredFiles.size}</span>
+			</button>
+			{#if !starredCollapsed}
+				<div class="starred-list">
+					{#each [...starredFiles] as filePath}
+						{@const fileName = filePath.split('/').pop() || filePath}
+						<button
+							class="starred-item"
+							class:active={selectedPath === filePath}
+							onclick={() => onFileSelect(filePath)}
+							title={filePath}
+						>
+							<svg class="starred-item-icon" viewBox="0 0 24 24" fill="currentColor">
+								<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+							</svg>
+							<span class="starred-item-name">{fileName}</span>
+							{#if onToggleStar}
+								<button
+									class="starred-item-remove"
+									onclick={(e) => { e.stopPropagation(); onToggleStar(filePath); }}
+									title="Unstar file"
+								>
+									<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+										<path d="M18 6L6 18M6 6l12 12" />
+									</svg>
+								</button>
+							{/if}
+						</button>
+					{/each}
+				</div>
+			{/if}
+		</div>
+	{/if}
+
 	<!-- Search/Filter Input -->
 	<div class="filter-container">
 		<div class="filter-row">
@@ -1401,6 +1464,18 @@
 			</svg>
 			<span>Rename</span>
 		</button>
+		{#if contextMenu.entry.type === 'file' && onToggleStar}
+			<button
+				class="context-menu-item"
+				class:context-menu-item-starred={starredFiles.has(contextMenu.entry.path)}
+				onclick={() => { onToggleStar(contextMenu!.entry.path); closeContextMenu(); }}
+			>
+				<svg viewBox="0 0 24 24" fill={starredFiles.has(contextMenu.entry.path) ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="2">
+					<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+				</svg>
+				<span>{starredFiles.has(contextMenu.entry.path) ? 'Unstar' : 'Star'}</span>
+			</button>
+		{/if}
 		<button class="context-menu-item context-menu-item-danger" onclick={() => { openDeleteModal(contextMenu!.entry.path); closeContextMenu(); }}>
 			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 				<path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
@@ -1470,6 +1545,140 @@
 		flex-direction: column;
 		height: 100%;
 		overflow: hidden;
+	}
+
+	/* Starred Files Section */
+	.starred-section {
+		flex-shrink: 0;
+		border-bottom: 1px solid oklch(0.22 0.02 250);
+		background: oklch(0.14 0.02 250);
+	}
+
+	.starred-header {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		width: 100%;
+		padding: 0.5rem;
+		background: none;
+		border: none;
+		color: oklch(0.75 0.12 85);
+		cursor: pointer;
+		font-size: 0.75rem;
+		font-weight: 500;
+		text-align: left;
+		transition: background-color 0.15s;
+	}
+
+	.starred-header:hover {
+		background: oklch(0.18 0.02 250);
+	}
+
+	.starred-chevron {
+		width: 14px;
+		height: 14px;
+		transition: transform 0.15s;
+		color: oklch(0.55 0.02 250);
+	}
+
+	.starred-chevron.collapsed {
+		transform: rotate(-90deg);
+	}
+
+	.starred-icon {
+		width: 14px;
+		height: 14px;
+		color: oklch(0.75 0.15 85);
+	}
+
+	.starred-title {
+		flex: 1;
+	}
+
+	.starred-count {
+		padding: 0.125rem 0.375rem;
+		background: oklch(0.75 0.12 85 / 0.15);
+		border-radius: 9999px;
+		font-size: 0.625rem;
+		color: oklch(0.75 0.12 85);
+	}
+
+	.starred-list {
+		padding: 0.25rem 0.5rem 0.5rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.125rem;
+	}
+
+	.starred-item {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		width: 100%;
+		padding: 0.375rem 0.5rem;
+		background: oklch(0.16 0.02 250);
+		border: 1px solid oklch(0.22 0.02 250);
+		border-radius: 0.25rem;
+		color: oklch(0.80 0.02 250);
+		cursor: pointer;
+		font-size: 0.75rem;
+		text-align: left;
+		transition: all 0.15s;
+	}
+
+	.starred-item:hover {
+		background: oklch(0.20 0.02 250);
+		border-color: oklch(0.30 0.02 250);
+	}
+
+	.starred-item.active {
+		background: oklch(0.75 0.12 85 / 0.12);
+		border-color: oklch(0.75 0.12 85 / 0.3);
+		color: oklch(0.85 0.08 85);
+	}
+
+	.starred-item-icon {
+		width: 12px;
+		height: 12px;
+		color: oklch(0.75 0.15 85);
+		flex-shrink: 0;
+	}
+
+	.starred-item-name {
+		flex: 1;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.starred-item-remove {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 16px;
+		height: 16px;
+		padding: 0;
+		background: none;
+		border: none;
+		border-radius: 0.25rem;
+		color: oklch(0.50 0.02 250);
+		cursor: pointer;
+		opacity: 0;
+		transition: all 0.15s;
+	}
+
+	.starred-item:hover .starred-item-remove {
+		opacity: 1;
+	}
+
+	.starred-item-remove:hover {
+		background: oklch(0.65 0.15 30 / 0.2);
+		color: oklch(0.70 0.15 30);
+	}
+
+	.starred-item-remove svg {
+		width: 12px;
+		height: 12px;
 	}
 
 	/* Filter Input */
@@ -2129,6 +2338,23 @@
 
 	.context-menu-item-danger:hover svg {
 		color: oklch(0.70 0.18 30);
+	}
+
+	.context-menu-item-starred {
+		color: oklch(0.75 0.12 85);
+	}
+
+	.context-menu-item-starred svg {
+		color: oklch(0.75 0.15 85);
+	}
+
+	.context-menu-item-starred:hover {
+		background: oklch(0.75 0.12 85 / 0.2);
+		color: oklch(0.80 0.15 85);
+	}
+
+	.context-menu-item-starred:hover svg {
+		color: oklch(0.80 0.18 85);
 	}
 
 	.context-menu-divider {
