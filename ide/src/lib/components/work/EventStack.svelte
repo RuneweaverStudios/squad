@@ -1508,7 +1508,7 @@
 			<!-- Height expands when cards are expanded (expandedEventIdx !== null) -->
 			<!-- Use calc to subtract approximate header/input heights from viewport -->
 			<div
-				class="absolute bottom-0 left-0 right-0 overflow-y-auto rounded-lg z-50"
+				class="absolute bottom-0 left-0 right-0 overflow-y-auto rounded-lg z-5"
 				style="background: oklch(0.18 0.01 250); border: 1px solid oklch(0.30 0.02 250); box-shadow: 0 -4px 20px oklch(0 0 0 / 0.5); max-height: {expandedEventIdx !== null ? 'calc(100vh - 12rem)' : '32rem'};"
 				transition:slide={{ duration: 200, easing: cubicOut }}
 			>

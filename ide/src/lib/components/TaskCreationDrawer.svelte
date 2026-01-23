@@ -545,7 +545,15 @@
 			}
 		} catch (err: any) {
 			console.error('Error fetching suggestions:', err);
-			suggestionError = err.message || 'Failed to get AI suggestions';
+			// Provide more helpful error messages for common failures
+			if (err.message === 'fetch failed' || err.name === 'TypeError') {
+				// Network error - likely server not running or connection refused
+				suggestionError = 'Unable to connect to suggestion service. Is the IDE server running?';
+			} else if (err.message?.includes('ANTHROPIC_API_KEY')) {
+				suggestionError = 'API key not configured. Add it in Settings > API Keys.';
+			} else {
+				suggestionError = err.message || 'Failed to get AI suggestions';
+			}
 		} finally {
 			isLoadingSuggestions = false;
 		}

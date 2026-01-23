@@ -48,6 +48,7 @@
 	import ToolsList from '$lib/components/config/ToolsList.svelte';
 	import ToolsEditor from '$lib/components/config/ToolsEditor.svelte';
 	import CommitMessageSettingsEditor from '$lib/components/config/CommitMessageSettingsEditor.svelte';
+	import CredentialsEditor from '$lib/components/config/CredentialsEditor.svelte';
 	import type { SlashCommand, ProjectConfig, HooksConfig } from '$lib/types/config';
 	import { successToast, errorToast } from '$lib/stores/toasts.svelte';
 
@@ -100,7 +101,7 @@
 	let selectedTool = $state<ToolFile | null>(null);
 
 	// Valid tabs for URL sync
-	const validTabs = ['commands', 'tools', 'projects', 'swarm', 'defaults', 'mcp', 'hooks', 'claude', 'docs', 'templates', 'actions', 'shortcuts', 'commit'];
+	const validTabs = ['commands', 'tools', 'projects', 'swarm', 'defaults', 'credentials', 'mcp', 'hooks', 'claude', 'docs', 'templates', 'actions', 'shortcuts', 'commit'];
 
 	// Sync activeTab from URL query parameter
 	$effect(() => {
@@ -388,6 +389,16 @@
 						transition:fade={{ duration: 150 }}
 					>
 						<DefaultsEditor />
+					</div>
+				{:else if activeTab === 'credentials'}
+					<!-- Credentials Tab -->
+					<div
+						role="tabpanel"
+						id="credentials-panel"
+						aria-labelledby="credentials-tab"
+						transition:fade={{ duration: 150 }}
+					>
+						<CredentialsEditor />
 					</div>
 				{:else if activeTab === 'mcp'}
 					<!-- MCP Tab -->

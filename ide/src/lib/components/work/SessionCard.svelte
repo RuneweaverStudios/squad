@@ -5103,7 +5103,7 @@
 		{/if}
 		<!-- Status accent bar - left edge (color reflects session state) -->
 		<div
-			class="absolute left-0 top-0 bottom-0 w-1 z-10"
+			class="absolute left-0 top-0 bottom-0 w-1"
 			style="
 			background: {sessionState === 'needs-input'
 				? 'oklch(0.70 0.20 45)' /* Orange for needs input - urgent attention */
@@ -5136,7 +5136,7 @@
 		<!-- Project color accent bar - top edge (shows project identity) -->
 		{#if projectColor}
 			<div
-				class="absolute left-0 right-0 top-0 h-1 z-10"
+				class="absolute left-0 right-0 top-0 h-1"
 				style="
 					background: {projectColor};
 					box-shadow: 0 0 8px color-mix(in oklch, {projectColor} 50%, transparent);

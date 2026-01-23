@@ -19,10 +19,15 @@
 
 import { json } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
+import { getApiKeyWithFallback } from '$lib/utils/credentials';
 
-// Get API key from environment
+// Get API key with fallback chain:
+// 1. ~/.config/jat/credentials.json (preferred)
+// 2. Environment variables (legacy)
 function getApiKey() {
-	return env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
+	return getApiKeyWithFallback('anthropic', 'ANTHROPIC_API_KEY') ||
+		env.ANTHROPIC_API_KEY ||
+		process.env.ANTHROPIC_API_KEY;
 }
 
 /**
@@ -215,12 +220,26 @@ export async function POST({ request }) {
 	} catch (err) {
 		const error = /** @type {Error} */ (err);
 		console.error('Error in task suggest API:', error);
+
+		// Provide more helpful error messages for common failures
+		let message = error.message || 'Internal server error';
+		let status = 500;
+
+		if (error.message === 'fetch failed' || error.name === 'TypeError') {
+			// Network error reaching Anthropic API
+			message = 'Unable to connect to Claude API. Check your network connection.';
+			status = 503;
+		} else if (error.message?.includes('ENOTFOUND') || error.message?.includes('ECONNREFUSED')) {
+			message = 'Cannot reach Claude API. Check your network connection.';
+			status = 503;
+		}
+
 		return json(
 			{
 				error: true,
-				message: error.message || 'Internal server error'
+				message
 			},
-			{ status: 500 }
+			{ status }
 		);
 	}
 }

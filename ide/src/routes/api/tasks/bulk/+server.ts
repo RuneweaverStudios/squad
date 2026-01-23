@@ -69,6 +69,47 @@ interface BulkCreateResponse {
 const VALID_TYPES = ['task', 'bug', 'feature', 'epic', 'chore'];
 
 /**
+ * Normalize priority value to a number 0-4.
+ * Accepts:
+ * - Numbers: 0, 1, 2, 3, 4
+ * - Strings: "0", "1", "2", "3", "4"
+ * - P-prefixed strings: "P0", "P1", "P2", "P3", "P4" (case-insensitive)
+ *
+ * @returns number or null if invalid
+ */
+function normalizePriority(value: unknown): number | null {
+	if (value === undefined || value === null) {
+		return null; // Will use default
+	}
+
+	// Already a number
+	if (typeof value === 'number') {
+		if (value >= 0 && value <= 4) {
+			return value;
+		}
+		return null;
+	}
+
+	// String processing
+	if (typeof value === 'string') {
+		const str = value.trim().toUpperCase();
+
+		// Handle P-prefixed format (P0, P1, P2, P3, P4)
+		if (str.match(/^P[0-4]$/)) {
+			return parseInt(str.substring(1), 10);
+		}
+
+		// Handle plain numeric string
+		const num = parseInt(str, 10);
+		if (!isNaN(num) && num >= 0 && num <= 4) {
+			return num;
+		}
+	}
+
+	return null;
+}
+
+/**
  * Type aliases to normalize common alternative names to valid types
  */
 const TYPE_ALIASES: Record<string, string> = {
@@ -126,15 +167,17 @@ function validateTask(task: unknown, index: number): { valid: boolean; error?: s
 		};
 	}
 
-	// Priority must be valid if provided
+	// Priority must be valid if provided (normalize P-prefixed strings like "P3" to 3)
 	if (t.priority !== undefined && t.priority !== null) {
-		const priority = Number(t.priority);
-		if (isNaN(priority) || priority < 0 || priority > 4) {
+		const normalizedPriority = normalizePriority(t.priority);
+		if (normalizedPriority === null) {
 			return {
 				valid: false,
-				error: `Task at index ${index} has invalid priority "${t.priority}". Must be 0-4`
+				error: `Task at index ${index} has invalid priority "${t.priority}". Must be 0-4 or P0-P4`
 			};
 		}
+		// Store the normalized value back for createTask to use
+		(t as Record<string, unknown>).priority = normalizedPriority;
 	}
 
 	return { valid: true };
