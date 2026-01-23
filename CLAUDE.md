@@ -300,14 +300,18 @@ After adding a project, you can start working:
 
 ## IDE AI Features (Optional)
 
-To enable AI-powered features in the IDE, add your Anthropic API key:
+To enable AI-powered features in the IDE, configure your Anthropic API key via Settings (recommended) or .env file.
 
+**Option 1: Settings UI (Recommended)**
+1. Open IDE at `http://localhost:3333`
+2. Go to Settings → API Keys tab
+3. Add your Anthropic API key
+4. Key is stored securely in `~/.config/jat/credentials.json`
+
+**Option 2: Environment file**
 ```bash
-# Copy the example env file
 cp ~/code/jat/ide/.env.example ~/code/jat/ide/.env
-
-# Edit and add your API key
-# Get key from: https://console.anthropic.com/settings/keys
+# Edit and add: ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 **Features enabled with API key:**
@@ -316,6 +320,91 @@ cp ~/code/jat/ide/.env.example ~/code/jat/ide/.env
 - **Avatar Generation** - AI-generated agent avatars
 
 Without the API key, the IDE works fully but these AI features are disabled.
+
+## Credentials & Secrets Management
+
+JAT provides a secure credential storage system for API keys and per-project secrets.
+
+### Storage Location
+
+All credentials stored in `~/.config/jat/credentials.json` with `0600` permissions (user read/write only).
+
+### API Keys (Global)
+
+Configure API keys via **Settings → API Keys** tab:
+
+| Provider | Used For | Env Var |
+|----------|----------|---------|
+| Anthropic | Task suggestions, AI features | `ANTHROPIC_API_KEY` |
+| Google | Gemini image generation | `GEMINI_API_KEY` |
+| OpenAI | Future Codex integration | `OPENAI_API_KEY` |
+
+### Custom API Keys
+
+Add your own API keys for custom services:
+
+1. Go to **Settings → API Keys → Custom Keys**
+2. Click "Add Custom Key"
+3. Provide: Name, API key value, environment variable name, optional description
+
+**Access in scripts/hooks:**
+```bash
+# Get a secret value
+jat-secret stripe              # Outputs: sk_live_xxx...
+
+# Get the env var name
+jat-secret --env stripe        # Outputs: STRIPE_API_KEY
+
+# List all keys
+jat-secret --list
+
+# Load all keys as environment variables
+eval $(jat-secret --export)
+
+# Use in scripts
+MY_KEY=$(jat-secret my-service)
+```
+
+### Per-Project Secrets
+
+Configure project-specific credentials via **Settings → Project Secrets** tab:
+
+| Secret Type | Description | Env Var |
+|-------------|-------------|---------|
+| `supabase_url` | Supabase project URL | `SUPABASE_URL` |
+| `supabase_anon_key` | Public anonymous key | `SUPABASE_ANON_KEY` |
+| `supabase_service_role_key` | Server-side key | `SUPABASE_SERVICE_ROLE_KEY` |
+| `supabase_db_password` | Database password for SQL | `SUPABASE_DB_PASSWORD` |
+| `database_url` | PostgreSQL connection string | `DATABASE_URL` |
+
+**Fallback chain:** The system checks credentials in this order:
+1. `~/.config/jat/credentials.json` (Settings UI)
+2. Environment variables
+3. `.env` files in project directory
+
+### Data Structure
+
+```json
+{
+  "apiKeys": {
+    "anthropic": { "key": "sk-ant-...", "addedAt": "..." },
+    "google": { "key": "AIza...", "addedAt": "..." }
+  },
+  "customApiKeys": {
+    "stripe": {
+      "value": "sk_live_...",
+      "envVar": "STRIPE_API_KEY",
+      "description": "Payment processing",
+      "addedAt": "..."
+    }
+  },
+  "projectSecrets": {
+    "my-project": {
+      "supabase_db_password": { "value": "...", "addedAt": "..." }
+    }
+  }
+}
+```
 
 ## Tmux Requirement (Critical)
 

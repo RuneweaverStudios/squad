@@ -2746,6 +2746,106 @@ const userTemplates = allTemplates.filter(t => t.isUserTemplate);
 
 - jat-4e31: Add custom user templates (completed)
 
+## Credentials & API Keys Settings
+
+### Overview
+
+The **CredentialsEditor** component (`src/lib/components/config/CredentialsEditor.svelte`) manages API keys and custom secrets through a user-friendly interface.
+
+**Location:** Settings page (`/config`) → API Keys tab
+
+### Features
+
+**Built-in API Key Providers:**
+
+| Provider | Description | Used By |
+|----------|-------------|---------|
+| Anthropic | Claude API | Task suggestions, AI features |
+| Google | Gemini API | Image generation, avatars |
+| OpenAI | OpenAI API | Future Codex integration |
+
+Each provider shows:
+- Masked key value (`sk-ant-...7x4k`)
+- Added date and last verified date
+- Verify/Edit/Delete actions
+
+**Custom API Keys:**
+
+Users can add their own API keys for custom services:
+- Custom name (e.g., "stripe")
+- Custom environment variable name (e.g., `STRIPE_API_KEY`)
+- Optional description
+- Masked display of value
+
+### API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/config/credentials` | Get all credentials (masked) |
+| `PUT` | `/api/config/credentials` | Set/update built-in API key |
+| `DELETE` | `/api/config/credentials?provider=X` | Delete built-in API key |
+| `POST` | `/api/config/credentials` | Verify existing key |
+| `GET` | `/api/config/credentials/custom` | Get custom keys (masked) |
+| `PUT` | `/api/config/credentials/custom` | Set/update custom key |
+| `DELETE` | `/api/config/credentials/custom?name=X` | Delete custom key |
+
+### Security
+
+- Keys stored in `~/.config/jat/credentials.json` with 0600 permissions
+- Full keys never sent to browser (only masked versions)
+- Verification available for built-in providers
+
+### Utility Functions
+
+**File:** `src/lib/utils/credentials.ts`
+
+```typescript
+// Built-in API keys
+getApiKey(provider: string): string | undefined
+setApiKey(provider: string, key: string): void
+deleteApiKey(provider: string): void
+getApiKeyWithFallback(provider: string, envVar: string): string | undefined
+
+// Custom API keys
+getCustomApiKey(name: string): string | undefined
+setCustomApiKey(name: string, value: string, envVar: string, description?: string): void
+deleteCustomApiKey(name: string): void
+getCustomApiKeys(): { [name: string]: MaskedCustomKey }
+
+// Project secrets
+getProjectSecret(projectKey: string, secretKey: string): string | undefined
+setProjectSecret(projectKey: string, secretKey: string, value: string): void
+getProjectSecretWithFallback(projectKey: string, secretKey: string): string | undefined
+```
+
+### Bash Tool: jat-secret
+
+Access credentials from shell scripts and hooks:
+
+```bash
+jat-secret stripe              # Get value
+jat-secret --env stripe        # Get env var name (STRIPE_API_KEY)
+jat-secret --list              # List all keys
+jat-secret --export            # Output export statements
+eval $(jat-secret --export)    # Load all as env vars
+```
+
+### Files
+
+**Components:**
+- `src/lib/components/config/CredentialsEditor.svelte` - Main UI component
+
+**API:**
+- `src/routes/api/config/credentials/+server.ts` - Built-in keys endpoint
+- `src/routes/api/config/credentials/custom/+server.ts` - Custom keys endpoint
+- `src/routes/api/config/credentials/[project]/+server.ts` - Project secrets endpoint
+
+**Utilities:**
+- `src/lib/utils/credentials.ts` - CRUD operations, masking, validation
+
+**Storage:**
+- `~/.config/jat/credentials.json` - Secure credential storage
+
 ## Autopilot Settings
 
 ### Overview

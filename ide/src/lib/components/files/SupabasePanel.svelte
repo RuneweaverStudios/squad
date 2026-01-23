@@ -32,7 +32,7 @@
 		projectRef?: string;
 		cliInstalled: boolean;
 		cliVersion: string | null;
-		hasEnvPassword?: boolean;
+		hasPassword?: boolean; // From credentials.json or .env
 		migrations: MigrationStatus[];
 		stats: {
 			total: number;
@@ -854,12 +854,12 @@
 								<span class="sql-auth-label">Authentication</span>
 								{#if sqlPassword}
 									<span class="sql-auth-status sql-auth-override">Using override</span>
-								{:else if status?.hasEnvPassword}
+								{:else if status?.hasPassword}
 									<span class="sql-auth-status sql-auth-found">
 										<svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
 											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
 										</svg>
-										From .env
+										Configured
 									</span>
 								{:else}
 									<span class="sql-auth-status sql-auth-missing">Not configured</span>
@@ -868,7 +868,7 @@
 							{#if showSqlHelp}
 								<div class="sql-help">
 									<div class="sql-help-section">
-										<strong>Automatic</strong> — Add <code>SUPABASE_DB_PASSWORD=xxx</code> to your <code>.env</code> file and queries will authenticate automatically.
+										<strong>Automatic</strong> — Configure via <a href="/config?tab=secrets" class="sql-help-link">Settings → Project Secrets</a>, or add <code>SUPABASE_DB_PASSWORD=xxx</code> to your <code>.env</code> file.
 									</div>
 									<div class="sql-help-section">
 										<strong>Manual override</strong> —

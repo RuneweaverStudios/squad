@@ -32,6 +32,7 @@ import { existsSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { getProjectSecretWithFallback } from '$lib/utils/credentials';
 
 const execAsync = promisify(exec);
 
@@ -104,10 +105,20 @@ function findSupabasePath(projectPath: string): string | null {
 }
 
 /**
- * Read database password from project .env files
- * Checks common env var names: SUPABASE_DB_PASSWORD, DATABASE_PASSWORD, POSTGRES_PASSWORD
+ * Get database password from credentials or .env files
+ *
+ * Fallback chain:
+ * 1. ~/.config/jat/credentials.json (supabase_db_password)
+ * 2. Project .env files (SUPABASE_DB_PASSWORD, DATABASE_PASSWORD, POSTGRES_PASSWORD)
  */
-function getPasswordFromEnv(projectPath: string, serverPath?: string): string | null {
+function getDatabasePassword(projectName: string, projectPath: string, serverPath?: string): string | null {
+	// First try the credentials system
+	const credPassword = getProjectSecretWithFallback(projectName, 'supabase_db_password');
+	if (credPassword) {
+		return credPassword;
+	}
+
+	// Fall back to .env files
 	const envVarNames = ['SUPABASE_DB_PASSWORD', 'DATABASE_PASSWORD', 'POSTGRES_PASSWORD'];
 
 	// Check paths in order: server_path first (for monorepos), then project root
@@ -255,9 +266,9 @@ export const POST: RequestHandler = async ({ url, request }) => {
 		);
 	}
 
-	// Get password: prefer request body, fall back to .env file
+	// Get password: prefer request body, fall back to credentials or .env file
 	const serverPath = dirname(supabasePath); // e.g., /home/jw/code/marduk/marketing
-	const effectivePassword = password || getPasswordFromEnv(projectPath, serverPath);
+	const effectivePassword = password || getDatabasePassword(projectName, projectPath, serverPath);
 
 	// Get pooler URL (with password)
 	const poolerUrl = getPoolerUrl(supabasePath, effectivePassword);

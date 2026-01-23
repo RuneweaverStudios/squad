@@ -24,6 +24,7 @@ import {
 	getSupabaseCliVersion,
 	type MigrationStatus
 } from '$lib/utils/supabase';
+import { getProjectSecretWithFallback } from '$lib/utils/credentials';
 import { existsSync, readdirSync, readFileSync } from 'fs';
 import { join, resolve, dirname } from 'path';
 
@@ -120,10 +121,20 @@ function getLocalMigrationFiles(projectPath: string): Map<string, { name: string
 }
 
 /**
- * Read database password from project .env files
- * Checks common env var names: SUPABASE_DB_PASSWORD, DATABASE_PASSWORD, POSTGRES_PASSWORD
+ * Get database password from credentials or .env files
+ *
+ * Fallback chain:
+ * 1. ~/.config/jat/credentials.json (supabase_db_password)
+ * 2. Project .env files (SUPABASE_DB_PASSWORD, DATABASE_PASSWORD, POSTGRES_PASSWORD)
  */
-function getPasswordFromEnv(projectPath: string, serverPath?: string): string | null {
+function getDatabasePassword(projectName: string, projectPath: string, serverPath?: string): string | null {
+	// First try the credentials system
+	const credPassword = getProjectSecretWithFallback(projectName, 'supabase_db_password');
+	if (credPassword) {
+		return credPassword;
+	}
+
+	// Fall back to .env files
 	const envVarNames = ['SUPABASE_DB_PASSWORD', 'DATABASE_PASSWORD', 'POSTGRES_PASSWORD'];
 
 	// Check paths in order: server_path first (for monorepos), then project root
@@ -266,9 +277,9 @@ export const GET: RequestHandler = async ({ url }) => {
 	const localOnlyCount = migrations.filter((m) => m.status === 'local-only').length;
 	const remoteOnlyCount = migrations.filter((m) => m.status === 'remote-only').length;
 
-	// Check if .env has database password (for SQL executor UI)
+	// Check if database password is available (credentials or .env)
 	const serverPathForEnv = config.supabasePath ? dirname(config.supabasePath) : undefined;
-	const hasEnvPassword = !!getPasswordFromEnv(projectPath, serverPathForEnv);
+	const hasPassword = !!getDatabasePassword(projectName, projectPath, serverPathForEnv);
 
 	return json({
 		hasSupabase: config.hasSupabase,
@@ -280,7 +291,7 @@ export const GET: RequestHandler = async ({ url }) => {
 		serverPath,
 		effectivePath,
 		supabasePath: config.supabasePath,
-		hasEnvPassword,
+		hasPassword,
 		migrations,
 		migrationsError,
 		stats: {

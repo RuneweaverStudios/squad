@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Task Summary tab in task detail pane showing completion report, suggested tasks, and cross-agent intel
 - Add/Add & Start buttons for creating follow-up tasks directly from Summary tab
+- **Settings UI for API Keys** - Configure Anthropic, Google, OpenAI keys via IDE instead of editing .bashrc
+- **Per-project secrets** - Store Supabase credentials, database passwords per project
+- **Custom API keys** - Define your own API keys with custom env var names for hooks/scripts
+- **`jat-secret` bash tool** - Retrieve secrets in scripts: `jat-secret stripe`, `eval $(jat-secret --export)`
+- Supabase panel integration with credentials system (checks credentials.json before .env)
 - Initial public release of JAT
 - Beads Task IDE (SvelteKit 5)
 - Agent Mail coordination system
@@ -31,7 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved theme system with 32 DaisyUI themes
 
 ### Security
-- API keys properly handled via .env
+- **Secure credential storage** - API keys stored in `~/.config/jat/credentials.json` with 0600 permissions
+- Credentials fallback chain: credentials.json → environment variables → .env files
 - Path traversal protection in file operations
 - Sensitive file patterns blocked
 

@@ -41,6 +41,40 @@ export interface CodingAgentConfig {
 	[key: string]: string | undefined;
 }
 
+// Per-project secrets (database URLs, service keys, etc.)
+export interface ProjectSecretEntry {
+	value: string;
+	addedAt: string;
+	description?: string;
+}
+
+export interface ProjectSecrets {
+	// Supabase
+	supabase_url?: ProjectSecretEntry;
+	supabase_anon_key?: ProjectSecretEntry;
+	supabase_service_role_key?: ProjectSecretEntry;
+	// Database
+	database_url?: ProjectSecretEntry;
+	// Generic key-value for other services
+	[key: string]: ProjectSecretEntry | undefined;
+}
+
+export interface MaskedProjectSecrets {
+	supabase_url?: { masked: string; addedAt: string; isSet: boolean };
+	supabase_anon_key?: { masked: string; addedAt: string; isSet: boolean };
+	supabase_service_role_key?: { masked: string; addedAt: string; isSet: boolean };
+	database_url?: { masked: string; addedAt: string; isSet: boolean };
+	[key: string]: { masked: string; addedAt: string; isSet: boolean } | undefined;
+}
+
+// Custom user-defined API key
+export interface CustomApiKey {
+	value: string;
+	envVar: string;
+	description?: string;
+	addedAt: string;
+}
+
 export interface Credentials {
 	apiKeys: {
 		anthropic?: ApiKeyEntry;
@@ -48,12 +82,20 @@ export interface Credentials {
 		openai?: ApiKeyEntry;
 		[key: string]: ApiKeyEntry | undefined;
 	};
+	// User-defined custom API keys
+	customApiKeys?: {
+		[name: string]: CustomApiKey;
+	};
 	codingAgents?: {
 		default?: string;
 		installed?: string[];
 		configs?: {
 			[agent: string]: CodingAgentConfig;
 		};
+	};
+	// Per-project secrets
+	projectSecrets?: {
+		[projectKey: string]: ProjectSecrets;
 	};
 }
 
@@ -65,6 +107,9 @@ export interface MaskedCredentials {
 		[key: string]: MaskedApiKeyEntry | undefined;
 	};
 	codingAgents?: Credentials['codingAgents'];
+	projectSecrets?: {
+		[projectKey: string]: MaskedProjectSecrets;
+	};
 }
 
 // Provider metadata
@@ -170,6 +215,33 @@ export function maskApiKey(key: string): string {
 }
 
 /**
+ * Mask a secret value for display
+ * For URLs: show protocol and host, mask the rest
+ * For keys: show first 8 and last 4 chars
+ */
+export function maskSecret(value: string): string {
+	if (!value || value.length < 8) {
+		return '****';
+	}
+
+	// Check if it's a URL (database URL, Supabase URL, etc.)
+	try {
+		const url = new URL(value);
+		// Mask password in URL if present
+		if (url.password) {
+			return `${url.protocol}//${url.username}:****@${url.host}${url.pathname ? '/...' : ''}`;
+		}
+		// Show host for URLs without auth
+		return `${url.protocol}//${url.host}${url.pathname ? '/...' : ''}`;
+	} catch {
+		// Not a URL, mask like a key
+		const prefix = value.slice(0, 8);
+		const suffix = value.slice(-4);
+		return `${prefix}...${suffix}`;
+	}
+}
+
+/**
  * Get credentials with masked API keys (safe to send to browser)
  */
 export function getMaskedCredentials(): MaskedCredentials {
@@ -200,9 +272,27 @@ export function getMaskedCredentials(): MaskedCredentials {
 		}
 	}
 
+	// Mask project secrets
+	const maskedProjectSecrets: MaskedCredentials['projectSecrets'] = {};
+	if (creds.projectSecrets) {
+		for (const [projectKey, secrets] of Object.entries(creds.projectSecrets)) {
+			maskedProjectSecrets[projectKey] = {};
+			for (const [secretKey, entry] of Object.entries(secrets)) {
+				if (entry) {
+					maskedProjectSecrets[projectKey][secretKey] = {
+						masked: maskSecret(entry.value),
+						addedAt: entry.addedAt,
+						isSet: true
+					};
+				}
+			}
+		}
+	}
+
 	return {
 		apiKeys: maskedApiKeys,
-		codingAgents: creds.codingAgents
+		codingAgents: creds.codingAgents,
+		projectSecrets: maskedProjectSecrets
 	};
 }
 
@@ -421,4 +511,361 @@ export function validateKeyFormat(provider: string, key: string): { valid: boole
 	}
 
 	return { valid: true };
+}
+
+// ============================================================================
+// Custom API Keys Management
+// ============================================================================
+
+/**
+ * Get all custom API keys (masked for browser)
+ */
+export function getCustomApiKeys(): {
+	[name: string]: { masked: string; envVar: string; description?: string; addedAt: string; isSet: boolean };
+} {
+	const creds = getCredentials();
+	const result: {
+		[name: string]: { masked: string; envVar: string; description?: string; addedAt: string; isSet: boolean };
+	} = {};
+
+	if (creds.customApiKeys) {
+		for (const [name, entry] of Object.entries(creds.customApiKeys)) {
+			result[name] = {
+				masked: maskApiKey(entry.value),
+				envVar: entry.envVar,
+				description: entry.description,
+				addedAt: entry.addedAt,
+				isSet: true
+			};
+		}
+	}
+
+	return result;
+}
+
+/**
+ * Get a custom API key value (full, unmasked - server-side only)
+ */
+export function getCustomApiKey(name: string): string | undefined {
+	const creds = getCredentials();
+	return creds.customApiKeys?.[name]?.value;
+}
+
+/**
+ * Get custom API key metadata
+ */
+export function getCustomApiKeyMeta(
+	name: string
+): { envVar: string; description?: string } | undefined {
+	const creds = getCredentials();
+	const entry = creds.customApiKeys?.[name];
+	if (!entry) return undefined;
+	return { envVar: entry.envVar, description: entry.description };
+}
+
+/**
+ * Set a custom API key
+ */
+export function setCustomApiKey(
+	name: string,
+	value: string,
+	envVar: string,
+	description?: string
+): void {
+	const creds = getCredentials();
+
+	if (!creds.customApiKeys) {
+		creds.customApiKeys = {};
+	}
+
+	creds.customApiKeys[name] = {
+		value: value.trim(),
+		envVar: envVar.trim(),
+		description: description?.trim(),
+		addedAt: new Date().toISOString()
+	};
+
+	saveCredentials(creds);
+}
+
+/**
+ * Delete a custom API key
+ */
+export function deleteCustomApiKey(name: string): void {
+	const creds = getCredentials();
+
+	if (creds.customApiKeys?.[name]) {
+		delete creds.customApiKeys[name];
+
+		// Clean up empty object
+		if (Object.keys(creds.customApiKeys).length === 0) {
+			delete creds.customApiKeys;
+		}
+
+		saveCredentials(creds);
+	}
+}
+
+/**
+ * Get all custom API keys as environment variables (for shell scripts)
+ * Returns a string of export statements
+ */
+export function getCustomApiKeysAsExports(): string {
+	const creds = getCredentials();
+	const exports: string[] = [];
+
+	if (creds.customApiKeys) {
+		for (const [, entry] of Object.entries(creds.customApiKeys)) {
+			// Escape single quotes in value
+			const escapedValue = entry.value.replace(/'/g, "'\\''");
+			exports.push(`export ${entry.envVar}='${escapedValue}'`);
+		}
+	}
+
+	return exports.join('\n');
+}
+
+/**
+ * Validate custom API key name (for creating new keys)
+ */
+export function validateCustomKeyName(name: string): { valid: boolean; error?: string } {
+	if (!name || name.trim().length === 0) {
+		return { valid: false, error: 'Name is required' };
+	}
+
+	const trimmed = name.trim();
+
+	// Check length
+	if (trimmed.length < 2) {
+		return { valid: false, error: 'Name must be at least 2 characters' };
+	}
+
+	if (trimmed.length > 64) {
+		return { valid: false, error: 'Name must be 64 characters or less' };
+	}
+
+	// Check format (alphanumeric, hyphens, underscores)
+	if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(trimmed)) {
+		return { valid: false, error: 'Name must start with a letter and contain only letters, numbers, hyphens, and underscores' };
+	}
+
+	// Check for reserved names (built-in providers)
+	const reserved = ['anthropic', 'google', 'openai'];
+	if (reserved.includes(trimmed.toLowerCase())) {
+		return { valid: false, error: 'This name is reserved for built-in providers' };
+	}
+
+	return { valid: true };
+}
+
+/**
+ * Validate environment variable name
+ */
+export function validateEnvVarName(name: string): { valid: boolean; error?: string } {
+	if (!name || name.trim().length === 0) {
+		return { valid: false, error: 'Environment variable name is required' };
+	}
+
+	const trimmed = name.trim();
+
+	// Check format (uppercase, underscores, must start with letter)
+	if (!/^[A-Z][A-Z0-9_]*$/.test(trimmed)) {
+		return { valid: false, error: 'Must be uppercase with underscores only, starting with a letter (e.g., MY_API_KEY)' };
+	}
+
+	// Check length
+	if (trimmed.length < 2) {
+		return { valid: false, error: 'Must be at least 2 characters' };
+	}
+
+	if (trimmed.length > 128) {
+		return { valid: false, error: 'Must be 128 characters or less' };
+	}
+
+	return { valid: true };
+}
+
+// ============================================================================
+// Project Secrets Management
+// ============================================================================
+
+/**
+ * Project secret type metadata
+ */
+export interface ProjectSecretType {
+	id: string;
+	name: string;
+	description: string;
+	placeholder: string;
+	isUrl?: boolean;
+	envVarName?: string; // For fallback
+}
+
+export const PROJECT_SECRET_TYPES: ProjectSecretType[] = [
+	{
+		id: 'supabase_url',
+		name: 'Supabase URL',
+		description: 'Your Supabase project URL',
+		placeholder: 'https://xxxxx.supabase.co',
+		isUrl: true,
+		envVarName: 'SUPABASE_URL'
+	},
+	{
+		id: 'supabase_anon_key',
+		name: 'Supabase Anon Key',
+		description: 'Public anonymous key (safe for client-side)',
+		placeholder: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+		envVarName: 'SUPABASE_ANON_KEY'
+	},
+	{
+		id: 'supabase_service_role_key',
+		name: 'Supabase Service Role Key',
+		description: 'Server-side key with full access (keep secret!)',
+		placeholder: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+		envVarName: 'SUPABASE_SERVICE_ROLE_KEY'
+	},
+	{
+		id: 'supabase_db_password',
+		name: 'Supabase DB Password',
+		description: 'Database password for SQL queries (from Supabase dashboard)',
+		placeholder: 'your-database-password',
+		envVarName: 'SUPABASE_DB_PASSWORD'
+	},
+	{
+		id: 'database_url',
+		name: 'Database URL',
+		description: 'PostgreSQL connection string',
+		placeholder: 'postgresql://user:password@host:5432/database',
+		isUrl: true,
+		envVarName: 'DATABASE_URL'
+	}
+];
+
+/**
+ * Get all secrets for a project (full, unmasked - server-side only)
+ */
+export function getProjectSecrets(projectKey: string): ProjectSecrets | undefined {
+	const creds = getCredentials();
+	return creds.projectSecrets?.[projectKey];
+}
+
+/**
+ * Get a specific project secret (full, unmasked - server-side only)
+ */
+export function getProjectSecret(projectKey: string, secretKey: string): string | undefined {
+	const creds = getCredentials();
+	return creds.projectSecrets?.[projectKey]?.[secretKey]?.value;
+}
+
+/**
+ * Get project secret with fallback to environment variable
+ */
+export function getProjectSecretWithFallback(
+	projectKey: string,
+	secretKey: string
+): string | undefined {
+	// First try credentials.json
+	const credSecret = getProjectSecret(projectKey, secretKey);
+	if (credSecret) {
+		return credSecret;
+	}
+
+	// Fall back to environment variable
+	const secretType = PROJECT_SECRET_TYPES.find((t) => t.id === secretKey);
+	if (secretType?.envVarName) {
+		return process.env[secretType.envVarName];
+	}
+
+	return undefined;
+}
+
+/**
+ * Set a project secret
+ */
+export function setProjectSecret(
+	projectKey: string,
+	secretKey: string,
+	value: string,
+	description?: string
+): void {
+	const creds = getCredentials();
+
+	if (!creds.projectSecrets) {
+		creds.projectSecrets = {};
+	}
+
+	if (!creds.projectSecrets[projectKey]) {
+		creds.projectSecrets[projectKey] = {};
+	}
+
+	creds.projectSecrets[projectKey][secretKey] = {
+		value: value.trim(),
+		addedAt: new Date().toISOString(),
+		description
+	};
+
+	saveCredentials(creds);
+}
+
+/**
+ * Delete a project secret
+ */
+export function deleteProjectSecret(projectKey: string, secretKey: string): void {
+	const creds = getCredentials();
+
+	if (creds.projectSecrets?.[projectKey]) {
+		delete creds.projectSecrets[projectKey][secretKey];
+
+		// Clean up empty project entries
+		if (Object.keys(creds.projectSecrets[projectKey]).length === 0) {
+			delete creds.projectSecrets[projectKey];
+		}
+
+		saveCredentials(creds);
+	}
+}
+
+/**
+ * Delete all secrets for a project
+ */
+export function deleteAllProjectSecrets(projectKey: string): void {
+	const creds = getCredentials();
+
+	if (creds.projectSecrets?.[projectKey]) {
+		delete creds.projectSecrets[projectKey];
+		saveCredentials(creds);
+	}
+}
+
+/**
+ * Get masked secrets for a specific project (safe for browser)
+ */
+export function getMaskedProjectSecrets(projectKey: string): MaskedProjectSecrets {
+	const creds = getCredentials();
+	const secrets = creds.projectSecrets?.[projectKey] || {};
+	const masked: MaskedProjectSecrets = {};
+
+	// Add existing secrets
+	for (const [key, entry] of Object.entries(secrets)) {
+		if (entry) {
+			masked[key] = {
+				masked: maskSecret(entry.value),
+				addedAt: entry.addedAt,
+				isSet: true
+			};
+		}
+	}
+
+	// Add placeholders for known secret types that aren't set
+	for (const secretType of PROJECT_SECRET_TYPES) {
+		if (!masked[secretType.id]) {
+			masked[secretType.id] = {
+				masked: '',
+				addedAt: '',
+				isSet: false
+			};
+		}
+	}
+
+	return masked;
 }

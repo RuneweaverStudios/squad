@@ -6,7 +6,7 @@
 
 ```
 tools/
-├── core/         # Database, monitoring, Beads review (16 tools)
+├── core/         # Database, monitoring, credentials, Beads review (17 tools)
 ├── mail/         # Agent Mail coordination (14 tools)
 ├── browser/      # Browser automation via CDP (12 tools)
 ├── media/        # Image generation with Gemini (7 tools)
@@ -43,10 +43,11 @@ am-send "Subject" "Body" --from Me --to @active --importance high --thread task-
 
 ### Core Tools (tools/core/)
 
-Database, monitoring, and Beads review tools.
+Database, monitoring, credentials, and Beads review tools.
 
 | Tool | Purpose |
 |------|---------|
+| `jat-secret` | Retrieve secrets from credentials store |
 | `db-query` | Run SQL, returns JSON |
 | `db-sessions` | List database connections |
 | `db-schema` | Show table structure |
@@ -60,6 +61,14 @@ Database, monitoring, and Beads review tools.
 | `backup-beads.sh` | Backup Beads database |
 | `rollback-beads.sh` | Rollback Beads to backup |
 | `beads-migrate-prefix.sh` | Migrate task ID prefixes |
+
+**jat-secret usage:**
+```bash
+jat-secret <name>       # Get secret value
+jat-secret --list       # List all secrets
+jat-secret --export     # Output export statements
+jat-secret --env <name> # Get env var name for a key
+```
 
 ---
 

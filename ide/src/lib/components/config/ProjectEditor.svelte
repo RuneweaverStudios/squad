@@ -3,6 +3,7 @@
 	import type { ProjectConfig } from '$lib/types/config';
 	import { saveProject } from '$lib/stores/configStore.svelte';
 	import { successToast, errorToast } from '$lib/stores/toasts.svelte';
+	import ProjectSecretsEditor from './ProjectSecretsEditor.svelte';
 
 	interface Props {
 		isOpen: boolean;
@@ -453,19 +454,19 @@
 					</label>
 				</div>
 
-				<!-- Database URL -->
-				<div class="form-control">
-					<label class="label" for="project-database-url">
-						<span class="label-text">Database URL</span>
-					</label>
-					<input
-						id="project-database-url"
-						type="text"
-						class="input input-bordered w-full font-mono text-sm"
-						placeholder="postgresql://localhost:5432/mydb"
-						bind:value={databaseUrl}
-					/>
-				</div>
+				<!-- Project Secrets (only for existing projects) -->
+				{#if !isNewProject && key}
+					<ProjectSecretsEditor projectKey={key} />
+				{:else}
+					<div class="mt-4 p-3 rounded-lg" style="background: oklch(0.18 0.02 250 / 0.5);">
+						<p class="text-xs" style="color: oklch(0.55 0.02 250);">
+							<svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+							</svg>
+							Save the project first to configure secrets (database URLs, API keys, etc.)
+						</p>
+					</div>
+				{/if}
 			</div>
 
 			<!-- Display Colors Section -->

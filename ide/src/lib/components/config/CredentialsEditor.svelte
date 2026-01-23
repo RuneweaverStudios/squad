@@ -40,6 +40,14 @@
 		};
 	}
 
+	interface CustomApiKey {
+		masked: string;
+		envVar: string;
+		description?: string;
+		addedAt: string;
+		isSet: boolean;
+	}
+
 	// State
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
@@ -61,10 +69,33 @@
 	// Verification state (for re-verify button)
 	let verifyingProvider = $state<string | null>(null);
 
+	// Custom API keys state
+	let customKeys = $state<{ [name: string]: CustomApiKey }>({});
+	let showCustomKeyModal = $state(false);
+	let editingCustomKey = $state<string | null>(null);
+	let customKeyForm = $state({ name: '', value: '', envVar: '', description: '' });
+	let customKeyError = $state<string | null>(null);
+	let isSavingCustomKey = $state(false);
+	let deletingCustomKey = $state<string | null>(null);
+	let isDeletingCustomKey = $state(false);
+
 	// Fetch credentials on mount
 	onMount(() => {
 		fetchCredentials();
+		fetchCustomKeys();
 	});
+
+	async function fetchCustomKeys() {
+		try {
+			const response = await fetch('/api/config/credentials/custom');
+			if (response.ok) {
+				const data = await response.json();
+				customKeys = data.customKeys || {};
+			}
+		} catch (err) {
+			console.error('Error fetching custom keys:', err);
+		}
+	}
 
 	async function fetchCredentials() {
 		isLoading = true;
@@ -199,6 +230,115 @@
 		} finally {
 			verifyingProvider = null;
 		}
+	}
+
+	// Custom API key functions
+	function openCustomKeyModal(keyName: string | null = null) {
+		editingCustomKey = keyName;
+		if (keyName && customKeys[keyName]) {
+			customKeyForm = {
+				name: keyName,
+				value: '', // Don't show existing value
+				envVar: customKeys[keyName].envVar,
+				description: customKeys[keyName].description || ''
+			};
+		} else {
+			customKeyForm = { name: '', value: '', envVar: '', description: '' };
+		}
+		customKeyError = null;
+		showCustomKeyModal = true;
+	}
+
+	function closeCustomKeyModal() {
+		showCustomKeyModal = false;
+		editingCustomKey = null;
+		customKeyForm = { name: '', value: '', envVar: '', description: '' };
+		customKeyError = null;
+	}
+
+	async function saveCustomKey() {
+		if (!customKeyForm.name.trim()) {
+			customKeyError = 'Name is required';
+			return;
+		}
+		if (!customKeyForm.value.trim() && !editingCustomKey) {
+			customKeyError = 'API key value is required';
+			return;
+		}
+		if (!customKeyForm.envVar.trim()) {
+			customKeyError = 'Environment variable name is required';
+			return;
+		}
+
+		isSavingCustomKey = true;
+		customKeyError = null;
+
+		try {
+			const response = await fetch('/api/config/credentials/custom', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					name: customKeyForm.name.trim(),
+					value: customKeyForm.value.trim() || (editingCustomKey ? undefined : ''),
+					envVar: customKeyForm.envVar.trim(),
+					description: customKeyForm.description.trim() || undefined
+				})
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				customKeyError = data.error || 'Failed to save custom key';
+				return;
+			}
+
+			customKeys = data.customKeys || {};
+			closeCustomKeyModal();
+		} catch (err) {
+			customKeyError = (err as Error).message;
+		} finally {
+			isSavingCustomKey = false;
+		}
+	}
+
+	function openDeleteCustomKeyConfirm(keyName: string) {
+		deletingCustomKey = keyName;
+	}
+
+	function closeDeleteCustomKeyConfirm() {
+		deletingCustomKey = null;
+	}
+
+	async function deleteCustomKey() {
+		if (!deletingCustomKey) return;
+
+		isDeletingCustomKey = true;
+
+		try {
+			const response = await fetch(
+				`/api/config/credentials/custom?name=${encodeURIComponent(deletingCustomKey)}`,
+				{ method: 'DELETE' }
+			);
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				error = data.error || 'Failed to delete custom key';
+				return;
+			}
+
+			customKeys = data.customKeys || {};
+			closeDeleteCustomKeyConfirm();
+		} catch (err) {
+			error = (err as Error).message;
+		} finally {
+			isDeletingCustomKey = false;
+		}
+	}
+
+	// Auto-generate env var name from key name
+	function suggestEnvVar(name: string): string {
+		return name.trim().toUpperCase().replace(/[^A-Z0-9]/g, '_') + '_API_KEY';
 	}
 
 	function formatDate(isoString: string): string {
@@ -350,6 +490,82 @@
 				</div>
 			{/each}
 		</div>
+
+		<!-- Custom API Keys Section -->
+		<div class="custom-keys-section">
+			<div class="section-divider">
+				<h3>Custom Keys</h3>
+				<p class="section-description">
+					Add your own API keys for custom services. Access via <code>jat-secret &lt;name&gt;</code> or env vars.
+				</p>
+			</div>
+
+			{#if Object.keys(customKeys).length > 0}
+				<div class="custom-keys-list">
+					{#each Object.entries(customKeys) as [keyName, keyData]}
+						<div class="custom-key-card">
+							<div class="custom-key-header">
+								<div class="custom-key-info">
+									<h4 class="custom-key-name">{keyName}</h4>
+									<code class="custom-key-env">${keyData.envVar}</code>
+								</div>
+								<span class="status-badge configured">Configured</span>
+							</div>
+
+							{#if keyData.description}
+								<p class="custom-key-description">{keyData.description}</p>
+							{/if}
+
+							<div class="key-details">
+								<div class="key-row">
+									<span class="key-label">Value:</span>
+									<code class="key-value">{keyData.masked}</code>
+								</div>
+								{#if keyData.addedAt}
+									<div class="key-row">
+										<span class="key-label">Added:</span>
+										<span class="key-date">{formatDate(keyData.addedAt)}</span>
+									</div>
+								{/if}
+							</div>
+
+							<div class="provider-actions">
+								<button
+									class="btn btn-sm btn-ghost"
+									onclick={() => openCustomKeyModal(keyName)}
+								>
+									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="icon">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+									</svg>
+									Edit
+								</button>
+								<button
+									class="btn btn-sm btn-ghost btn-error"
+									onclick={() => openDeleteCustomKeyConfirm(keyName)}
+								>
+									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="icon">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+									</svg>
+									Delete
+								</button>
+							</div>
+						</div>
+					{/each}
+				</div>
+			{:else}
+				<p class="no-custom-keys">No custom keys configured yet.</p>
+			{/if}
+
+			<button
+				class="btn btn-sm btn-outline add-custom-key-btn"
+				onclick={() => openCustomKeyModal(null)}
+			>
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="icon">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+				</svg>
+				Add Custom Key
+			</button>
+		</div>
 	{/if}
 </div>
 
@@ -442,6 +658,131 @@
 					disabled={isDeleting}
 				>
 					{#if isDeleting}
+						<span class="loading-spinner small"></span>
+						Deleting...
+					{:else}
+						Delete
+					{/if}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Custom Key Edit Modal -->
+{#if showCustomKeyModal}
+	{@const isEditing = editingCustomKey !== null}
+	<div class="modal-overlay" onclick={closeCustomKeyModal} transition:fade={{ duration: 150 }}>
+		<div class="modal-content" onclick={(e) => e.stopPropagation()}>
+			<div class="modal-header">
+				<h3>{isEditing ? 'Edit' : 'Add'} Custom API Key</h3>
+				<button class="btn btn-ghost btn-sm btn-circle" onclick={closeCustomKeyModal}>
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="icon">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+					</svg>
+				</button>
+			</div>
+
+			<div class="modal-body">
+				<div class="form-group">
+					<label for="custom-key-name">Name</label>
+					<input
+						type="text"
+						id="custom-key-name"
+						class="input input-bordered w-full"
+						placeholder="my-service"
+						bind:value={customKeyForm.name}
+						disabled={isEditing}
+						oninput={() => {
+							if (!isEditing && customKeyForm.name && !customKeyForm.envVar) {
+								customKeyForm.envVar = suggestEnvVar(customKeyForm.name);
+							}
+						}}
+					/>
+					<p class="form-hint">Used with <code>jat-secret {customKeyForm.name || 'name'}</code></p>
+				</div>
+
+				<div class="form-group">
+					<label for="custom-key-value">API Key Value</label>
+					<input
+						type="password"
+						id="custom-key-value"
+						class="input input-bordered w-full"
+						placeholder={isEditing ? '(leave blank to keep current)' : 'your-secret-key'}
+						bind:value={customKeyForm.value}
+					/>
+				</div>
+
+				<div class="form-group">
+					<label for="custom-key-env">Environment Variable</label>
+					<input
+						type="text"
+						id="custom-key-env"
+						class="input input-bordered w-full"
+						placeholder="MY_SERVICE_API_KEY"
+						bind:value={customKeyForm.envVar}
+					/>
+					<p class="form-hint">Must be uppercase with underscores (e.g., STRIPE_API_KEY)</p>
+				</div>
+
+				<div class="form-group">
+					<label for="custom-key-description">Description (optional)</label>
+					<input
+						type="text"
+						id="custom-key-description"
+						class="input input-bordered w-full"
+						placeholder="API key for my service"
+						bind:value={customKeyForm.description}
+					/>
+				</div>
+
+				{#if customKeyError}
+					<div class="error-message">{customKeyError}</div>
+				{/if}
+			</div>
+
+			<div class="modal-footer">
+				<button class="btn btn-ghost" onclick={closeCustomKeyModal}>Cancel</button>
+				<button
+					class="btn btn-primary"
+					onclick={saveCustomKey}
+					disabled={isSavingCustomKey || !customKeyForm.name.trim() || !customKeyForm.envVar.trim() || (!isEditing && !customKeyForm.value.trim())}
+				>
+					{#if isSavingCustomKey}
+						<span class="loading-spinner small"></span>
+						Saving...
+					{:else}
+						Save
+					{/if}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Delete Custom Key Confirmation Modal -->
+{#if deletingCustomKey}
+	<div class="modal-overlay" onclick={closeDeleteCustomKeyConfirm} transition:fade={{ duration: 150 }}>
+		<div class="modal-content modal-sm" onclick={(e) => e.stopPropagation()}>
+			<div class="modal-header">
+				<h3>Delete Custom Key</h3>
+			</div>
+
+			<div class="modal-body">
+				<p>
+					Are you sure you want to delete the <strong>{deletingCustomKey}</strong> custom key?
+					Any scripts or hooks using this key will stop working.
+				</p>
+			</div>
+
+			<div class="modal-footer">
+				<button class="btn btn-ghost" onclick={closeDeleteCustomKeyConfirm}>Cancel</button>
+				<button
+					class="btn btn-error"
+					onclick={deleteCustomKey}
+					disabled={isDeletingCustomKey}
+				>
+					{#if isDeletingCustomKey}
 						<span class="loading-spinner small"></span>
 						Deleting...
 					{:else}
@@ -832,5 +1173,98 @@
 		gap: 0.5rem;
 		padding: 1rem 1.25rem;
 		border-top: 1px solid oklch(0.25 0.02 250);
+	}
+
+	/* Custom Keys Section */
+	.custom-keys-section {
+		margin-top: 2rem;
+		padding-top: 1.5rem;
+		border-top: 1px solid oklch(0.25 0.02 250);
+	}
+
+	.section-divider {
+		margin-bottom: 1rem;
+	}
+
+	.section-divider h3 {
+		font-size: 1rem;
+		font-weight: 600;
+		color: oklch(0.85 0.02 250);
+		margin: 0 0 0.375rem 0;
+	}
+
+	.custom-keys-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		margin-bottom: 1rem;
+	}
+
+	.custom-key-card {
+		background: oklch(0.16 0.02 250);
+		border: 1px solid oklch(0.30 0.08 280);
+		border-radius: 10px;
+		padding: 0.875rem;
+	}
+
+	.custom-key-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-start;
+		margin-bottom: 0.5rem;
+	}
+
+	.custom-key-info {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+	}
+
+	.custom-key-name {
+		font-size: 0.9375rem;
+		font-weight: 600;
+		color: oklch(0.90 0.02 250);
+		margin: 0;
+	}
+
+	.custom-key-env {
+		font-size: 0.75rem;
+		font-family: ui-monospace, monospace;
+		background: oklch(0.22 0.04 280);
+		color: oklch(0.75 0.10 280);
+		padding: 0.125rem 0.375rem;
+		border-radius: 4px;
+	}
+
+	.custom-key-description {
+		font-size: 0.8125rem;
+		color: oklch(0.60 0.02 250);
+		margin: 0 0 0.5rem 0;
+	}
+
+	.no-custom-keys {
+		font-size: 0.875rem;
+		color: oklch(0.55 0.02 250);
+		text-align: center;
+		padding: 1.5rem;
+		background: oklch(0.14 0.01 250);
+		border-radius: 8px;
+		margin-bottom: 1rem;
+	}
+
+	.add-custom-key-btn {
+		width: 100%;
+	}
+
+	.btn-outline {
+		background: transparent;
+		border: 1px dashed oklch(0.35 0.02 250);
+		color: oklch(0.65 0.02 250);
+	}
+
+	.btn-outline:hover:not(:disabled) {
+		border-color: oklch(0.50 0.10 200);
+		color: oklch(0.75 0.10 200);
+		background: oklch(0.18 0.02 250);
 	}
 </style>

@@ -196,7 +196,7 @@ Beads-powered git-backed issue tracking (on `/work` and `/kanban`):
 | `/files` | Monaco editor, file tree, full git integration |
 | `/kanban` | Kanban board view for tasks |
 | `/servers` | Dev server controls (npm start/stop) |
-| `/config` | Automation rules, templates, shortcuts |
+| `/config` | API keys, project secrets, automation rules, shortcuts |
 | `/automation` | Pattern matching, error recovery, auto-proceed |
 
 ---
@@ -286,10 +286,34 @@ JAT isn't trying to replace your editor—it's the control tower for your agent 
 }
 ```
 
+`~/.config/jat/credentials.json` (secure API keys):
+
+```json
+{
+  "apiKeys": {
+    "anthropic": { "key": "sk-ant-..." },
+    "google": { "key": "..." },
+    "openai": { "key": "sk-..." }
+  },
+  "customApiKeys": {
+    "stripe": { "value": "sk_live_...", "envVar": "STRIPE_API_KEY" }
+  },
+  "projectSecrets": {
+    "myapp": { "database_password": "..." }
+  }
+}
+```
+
+Manage keys at `/config?tab=apikeys` or use `jat-secret` in scripts:
+```bash
+jat-secret stripe              # Get value
+eval $(jat-secret --export)    # Load all as env vars
+```
+
 IDE settings at `/config`:
+- API keys and custom secrets
+- Per-project credentials (Supabase, databases)
 - Max concurrent sessions
-- Default Claude model
-- Spawn stagger timing
 - Automation rules
 - Keyboard shortcuts
 
