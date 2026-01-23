@@ -154,14 +154,6 @@
 	}
 
 	/**
-	 * Truncate a string to a maximum length with ellipsis
-	 */
-	function truncate(str: string, maxLen: number): string {
-		if (str.length <= maxLen) return str;
-		return str.slice(0, maxLen - 1) + '…';
-	}
-
-	/**
 	 * Get status indicator for a file
 	 */
 	function getStatusIndicator(
@@ -1553,7 +1545,7 @@
 											{/if}
 											<span class="commit-time">{formatTimeAgo(commit.date)}</span>
 										</div>
-										<div class="commit-message">{truncate(firstLine, 50)}</div>
+										<div class="commit-message">{firstLine}</div>
 										<div class="commit-author">{commit.author_name}</div>
 									</div>
 								</button>
