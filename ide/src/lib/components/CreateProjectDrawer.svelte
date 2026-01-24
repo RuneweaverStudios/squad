@@ -57,9 +57,11 @@
 	let isSubmitting = $state(false);
 	let submitError = $state<string | null>(null);
 	let successMessage = $state<string | null>(null);
+	let createdProjectKey = $state<string | null>(null);
+	let creationSteps = $state<string[]>([]);
 
 	// Validation state
-	let validationStatus = $state<'idle' | 'checking' | 'valid' | 'invalid' | 'already-initialized' | 'needs-git'>('idle');
+	let validationStatus = $state<'idle' | 'checking' | 'valid' | 'invalid' | 'already-initialized' | 'needs-git' | 'will-create'>('idle');
 	let validationMessage = $state<string | null>(null);
 	let selectedDirectory = $state<DirectoryInfo | null>(null);
 
@@ -257,6 +259,20 @@
 			const data = await response.json();
 
 			if (!response.ok || data.error) {
+				// Check if this is a non-existent path under the home directory
+				// If so, we can auto-create it
+				const homeDir = data.homeDir || '';
+				const isUnderHome = trimmedPath.startsWith('~/') ||
+					trimmedPath.startsWith(homeDir + '/') ||
+					(homeDir && trimmedPath.startsWith(homeDir));
+
+				if (isUnderHome && (data.message?.includes('not found') || data.error?.includes('not found') || response.status === 404)) {
+					validationStatus = 'will-create';
+					validationMessage = 'Will create directory, initialize git, and set up Beads';
+					selectedDirectory = null;
+					return;
+				}
+
 				validationStatus = 'invalid';
 				validationMessage = data.error || data.message || 'Path not found';
 				selectedDirectory = null;
@@ -354,6 +370,8 @@
 
 			// Success!
 			successMessage = data.message || `Successfully added ${data.project?.name}`;
+			createdProjectKey = data.project?.name?.toLowerCase() || null;
+			creationSteps = data.steps || [];
 			playSuccessChime();
 
 			// Invalidate all data to refresh project lists across the app
@@ -367,11 +385,7 @@
 				onProjectCreated();
 			}
 
-			// Close drawer after short delay
-			setTimeout(() => {
-				resetForm();
-				closeProjectDrawer();
-			}, 1500);
+			// Don't auto-close - let user choose to configure or close
 		} catch (error) {
 			submitError = error instanceof Error ? error.message : 'Failed to add project';
 			playErrorSound();
@@ -391,6 +405,8 @@
 		selectedDirectory = null;
 		submitError = null;
 		successMessage = null;
+		createdProjectKey = null;
+		creationSteps = [];
 		directoryError = null;
 		// Reset new folder state
 		showNewFolderInput = false;
@@ -412,6 +428,7 @@
 	function getStatusColor(status: typeof validationStatus): string {
 		switch (status) {
 			case 'valid':
+			case 'will-create':
 				return 'oklch(0.70 0.18 145)'; // Green
 			case 'invalid':
 			case 'already-initialized':
@@ -457,13 +474,24 @@
 					class="absolute left-0 top-0 bottom-0 w-1"
 					style="background: linear-gradient(180deg, oklch(0.70 0.18 145) 0%, oklch(0.70 0.18 145 / 0.3) 100%);"
 				></div>
-				<div>
-					<h2 id="drawer-title" class="text-xl font-bold font-mono uppercase tracking-wider" style="color: oklch(0.85 0.02 250);">
-						Add Project
-					</h2>
-					<p class="text-sm mt-1" style="color: oklch(0.55 0.02 250);">
-						Initialize a git repository with Beads
-					</p>
+				<div class="flex items-center gap-3">
+					<!-- Folder-plus icon -->
+					<div
+						class="w-10 h-10 rounded-lg flex items-center justify-center"
+						style="background: linear-gradient(135deg, oklch(0.35 0.12 145) 0%, oklch(0.28 0.10 145) 100%); border: 1px solid oklch(0.45 0.15 145 / 0.5);"
+					>
+						<svg class="w-5 h-5" style="color: oklch(0.90 0.05 145);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+						</svg>
+					</div>
+					<div>
+						<h2 id="drawer-title" class="text-xl font-bold font-mono uppercase tracking-wider" style="color: oklch(0.85 0.02 250);">
+							Add Project
+						</h2>
+						<p class="text-sm mt-1" style="color: oklch(0.55 0.02 250);">
+							Initialize a git repository with Beads
+						</p>
+					</div>
 				</div>
 				<button
 					class="btn btn-sm btn-circle btn-ghost"
@@ -549,6 +577,33 @@
 									<p class="text-xs mt-2" style="color: oklch(0.55 0.02 250);">
 										This will run <code class="px-1 py-0.5 rounded" style="background: oklch(0.22 0.01 250);">git init</code> in the selected folder.
 									</p>
+								</div>
+							{/if}
+
+							<!-- Show what will happen when creating new project -->
+							{#if validationStatus === 'will-create'}
+								<div class="mt-3 space-y-1">
+									<p class="text-xs font-semibold" style="color: oklch(0.70 0.18 145);">
+										On submit, we will:
+									</p>
+									<ul class="text-xs space-y-0.5" style="color: oklch(0.60 0.02 250);">
+										<li class="flex items-center gap-1.5">
+											<span style="color: oklch(0.70 0.18 145);">1.</span>
+											Create directory at {pathInput}
+										</li>
+										<li class="flex items-center gap-1.5">
+											<span style="color: oklch(0.70 0.18 145);">2.</span>
+											Initialize git repository
+										</li>
+										<li class="flex items-center gap-1.5">
+											<span style="color: oklch(0.70 0.18 145);">3.</span>
+											Set up Beads task management
+										</li>
+										<li class="flex items-center gap-1.5">
+											<span style="color: oklch(0.70 0.18 145);">4.</span>
+											Add to JAT configuration
+										</li>
+									</ul>
 								</div>
 							{/if}
 						{/if}
@@ -693,26 +748,32 @@
 						</div>
 					{/if}
 
-					<!-- Info about requirements -->
+					<!-- Info about unified onboarding -->
 					<div
 						class="rounded-lg p-4"
 						style="background: oklch(0.20 0.05 240 / 0.15); border: 1px solid oklch(0.40 0.10 240 / 0.3);"
 					>
 						<h4 class="text-xs font-semibold font-mono uppercase tracking-wider mb-2" style="color: oklch(0.70 0.15 240);">
-							Requirements
+							Unified Onboarding
 						</h4>
 						<ul class="space-y-1 text-sm" style="color: oklch(0.65 0.02 250);">
 							<li class="flex items-center gap-2">
 								<svg class="w-4 h-4 flex-shrink-0" style="color: oklch(0.70 0.18 145);" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
 								</svg>
-								<span>Must be a git repository</span>
+								<span>New paths under <code class="px-1 py-0.5 rounded" style="background: oklch(0.22 0.01 250);">~/</code> are auto-created</span>
 							</li>
 							<li class="flex items-center gap-2">
 								<svg class="w-4 h-4 flex-shrink-0" style="color: oklch(0.70 0.18 145);" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
 								</svg>
-								<span>Not already initialized with Beads</span>
+								<span>Git initialized automatically if needed</span>
+							</li>
+							<li class="flex items-center gap-2">
+								<svg class="w-4 h-4 flex-shrink-0" style="color: oklch(0.70 0.18 145);" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+								</svg>
+								<span>Beads task management set up for you</span>
 							</li>
 						</ul>
 					</div>
@@ -743,23 +804,68 @@
 					<!-- Success Message -->
 					{#if successMessage}
 						<div
-							class="alert font-mono text-sm"
-							style="background: oklch(0.35 0.15 150); border: 1px solid oklch(0.50 0.18 150); color: oklch(0.95 0.02 250);"
+							class="rounded-lg p-4 space-y-4"
+							style="background: oklch(0.20 0.08 150 / 0.2); border: 1px solid oklch(0.45 0.12 150 / 0.4);"
 						>
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								class="stroke-current shrink-0 h-6 w-6"
-								fill="none"
-								viewBox="0 0 24 24"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-								/>
-							</svg>
-							<span>{successMessage}</span>
+							<!-- Success header -->
+							<div class="flex items-center gap-3">
+								<div
+									class="w-10 h-10 rounded-full flex items-center justify-center"
+									style="background: oklch(0.40 0.15 150); color: oklch(0.95 0.02 250);"
+								>
+									<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+									</svg>
+								</div>
+								<div>
+									<p class="font-semibold" style="color: oklch(0.85 0.08 150);">Project Created!</p>
+									<p class="text-sm" style="color: oklch(0.65 0.04 150);">{successMessage}</p>
+								</div>
+							</div>
+
+							<!-- Steps taken -->
+							{#if creationSteps.length > 0}
+								<div class="space-y-1">
+									<p class="text-xs font-semibold uppercase tracking-wider" style="color: oklch(0.55 0.02 250);">
+										Steps completed:
+									</p>
+									<ul class="text-sm space-y-0.5" style="color: oklch(0.70 0.02 250);">
+										{#each creationSteps as step}
+											<li class="flex items-center gap-2">
+												<svg class="w-3 h-3 flex-shrink-0" style="color: oklch(0.70 0.18 145);" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+												</svg>
+												<span>{step}</span>
+											</li>
+										{/each}
+									</ul>
+								</div>
+							{/if}
+
+							<!-- Action buttons -->
+							<div class="flex items-center gap-3 pt-2">
+								{#if createdProjectKey}
+									<a
+										href="/config?tab=projects&edit={encodeURIComponent(createdProjectKey)}"
+										class="btn btn-sm"
+										style="background: oklch(0.30 0.10 240); border: 1px solid oklch(0.45 0.12 240); color: oklch(0.90 0.02 250);"
+										onclick={() => { resetForm(); closeProjectDrawer(); }}
+									>
+										<svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+										</svg>
+										Configure Settings
+									</a>
+								{/if}
+								<button
+									type="button"
+									class="btn btn-sm btn-ghost"
+									onclick={() => { resetForm(); closeProjectDrawer(); }}
+								>
+									Done
+								</button>
+							</div>
 						</div>
 					{/if}
 				</div>
@@ -786,7 +892,7 @@
 						type="submit"
 						class="btn btn-primary font-mono"
 						onclick={handleSubmit}
-						disabled={isSubmitting || validationStatus === 'checking' || validationStatus === 'invalid' || validationStatus === 'already-initialized' || validationStatus === 'needs-git'}
+						disabled={isSubmitting || validationStatus === 'checking' || validationStatus === 'invalid' || validationStatus === 'already-initialized' || validationStatus === 'needs-git' || validationStatus === 'idle'}
 					>
 						{#if isSubmitting}
 							<span class="loading loading-spinner loading-sm"></span>
