@@ -55,7 +55,7 @@ source ~/.bashrc
 jat
 ```
 
-Open http://localhost:3333 → **Add a project** (click "Add Project" on `/tasks` or go to `/config` → Projects) → Create a task → Spawn an agent → Supervise
+Open http://localhost:3333 → Add a project → Create a task → Spawn an agent → Supervise
 
 **Alternative (developers):**
 ```bash

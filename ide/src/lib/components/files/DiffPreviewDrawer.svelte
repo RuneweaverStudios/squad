@@ -148,9 +148,13 @@
 		if (!isOpen) {
 			error = null;
 			monacoReady = false;
-			// Dispose editor when closing
+			// Dispose editor when closing - let Monaco handle model cleanup internally
 			if (diffEditor) {
-				diffEditor.dispose();
+				try {
+					diffEditor.dispose();
+				} catch {
+					// Ignore errors during disposal
+				}
 				diffEditor = null;
 			}
 		} else {
@@ -357,14 +361,13 @@
 	onDestroy(() => {
 		themeObserver?.disconnect();
 		resizeObserver?.disconnect();
-		// Dispose models before editor to prevent orphaned models
+		// Dispose the diff editor - let Monaco handle model cleanup internally
 		if (diffEditor) {
-			const model = diffEditor.getModel();
-			if (model) {
-				model.original?.dispose();
-				model.modified?.dispose();
+			try {
+				diffEditor.dispose();
+			} catch {
+				// Ignore errors during disposal (component may be unmounting rapidly)
 			}
-			diffEditor.dispose();
 		}
 		diffEditor = null;
 		monaco = null;

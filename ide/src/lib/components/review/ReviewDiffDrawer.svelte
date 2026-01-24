@@ -137,8 +137,13 @@
 			selectedFileIndex = 0;
 			showRequestChangesInput = false;
 			feedbackText = '';
+			// Dispose editor when closing - let Monaco handle model cleanup internally
 			if (diffEditor) {
-				diffEditor.dispose();
+				try {
+					diffEditor.dispose();
+				} catch {
+					// Ignore errors during disposal
+				}
 				diffEditor = null;
 			}
 		} else {
@@ -410,13 +415,13 @@
 	onDestroy(() => {
 		themeObserver?.disconnect();
 		resizeObserver?.disconnect();
+		// Dispose the diff editor - let Monaco handle model cleanup internally
 		if (diffEditor) {
-			const model = diffEditor.getModel();
-			if (model) {
-				model.original?.dispose();
-				model.modified?.dispose();
+			try {
+				diffEditor.dispose();
+			} catch {
+				// Ignore errors during disposal (component may be unmounting rapidly)
 			}
-			diffEditor.dispose();
 		}
 		diffEditor = null;
 		monaco = null;

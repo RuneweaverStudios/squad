@@ -345,14 +345,17 @@
 	onDestroy(() => {
 		themeObserver?.disconnect();
 		resizeObserver?.disconnect();
-		// Dispose models before editor to prevent orphaned models
+		// Dispose the diff editor - let Monaco handle model cleanup internally
+		// Note: We don't manually dispose models or call setModel(null) because:
+		// 1. DiffEditorWidget internally fires events during disposal
+		// 2. Manually disposing models first causes "TextModel got disposed before DiffEditorWidget model got reset"
+		// 3. Monaco's editor.dispose() properly cleans up its own model references
 		if (diffEditor) {
-			const model = diffEditor.getModel();
-			if (model) {
-				model.original?.dispose();
-				model.modified?.dispose();
+			try {
+				diffEditor.dispose();
+			} catch {
+				// Ignore errors during disposal (component may be unmounting rapidly)
 			}
-			diffEditor.dispose();
 		}
 		diffEditor = null;
 		editorInitialized = false;
