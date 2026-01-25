@@ -10,11 +10,11 @@
  *   /source   - Source Control (git changes, diff viewer)
  *   /servers  - Servers (project server sessions)
  *   /config   - Config (JAT configuration, includes Projects tab)
+ *   /history  - History (completed task history with streak calendar)
  *
  * VIEWS (alternative visualizations):
  *   /dash     - Dash (multi-project sessions view with terminal output)
  *   /sessions - Sessions (all tmux sessions: agents, servers, other)
- *   /history  - History (completed task history with streak calendar)
  *   /graph    - Dependency visualization
  *   /timeline - Historical view
  *   /kanban   - Agent kanban (sessions grouped by activity state)
@@ -85,6 +85,13 @@ export const unifiedNavConfig: UnifiedNavConfig = {
 			icon: 'settings',
 			category: 'main'
 		},
+		{
+			id: 'history',
+			label: 'History',
+			href: '/history',
+			icon: 'history',
+			category: 'main'
+		},
 		// VIEWS: Alternative visualizations
 		{
 			id: 'dash',
@@ -98,13 +105,6 @@ export const unifiedNavConfig: UnifiedNavConfig = {
 			label: 'Sessions',
 			href: '/sessions',
 			icon: 'tmux',
-			category: 'views'
-		},
-		{
-			id: 'history',
-			label: 'History',
-			href: '/history',
-			icon: 'history',
 			category: 'views'
 		},
 		{
