@@ -43,8 +43,7 @@ export const GET: RequestHandler = async ({ url }) => {
 			success: true,
 			programs,
 			defaults: config.defaults,
-			routingRulesCount: config.routingRules.length,
-			migrated: !!config.migratedAt
+			routingRulesCount: config.routingRules.length
 		};
 
 		// Include status if requested

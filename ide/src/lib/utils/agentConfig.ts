@@ -7,7 +7,6 @@
  * This module provides:
  * - CRUD operations for agent programs
  * - Routing rules management
- * - Migration from legacy projects.json config
  * - Validation utilities
  *
  * @see shared/agent-programs.md for architecture documentation
@@ -32,7 +31,6 @@ import { createDefaultAgentConfig, isValidAgentId, getAgentModel } from '$lib/ty
 
 const CONFIG_DIR = join(homedir(), '.config', 'jat');
 const AGENTS_CONFIG_FILE = join(CONFIG_DIR, 'agents.json');
-const PROJECTS_CONFIG_FILE = join(CONFIG_DIR, 'projects.json');
 const CREDENTIALS_FILE = join(CONFIG_DIR, 'credentials.json');
 
 // =============================================================================
@@ -60,12 +58,6 @@ export function getAgentConfig(): AgentConfigFile {
 	ensureConfigDir();
 
 	if (!existsSync(AGENTS_CONFIG_FILE)) {
-		// Check if we need to migrate from legacy config
-		const migratedConfig = migrateFromLegacyConfig();
-		if (migratedConfig) {
-			saveAgentConfig(migratedConfig);
-			return migratedConfig;
-		}
 		return createDefaultAgentConfig();
 	}
 
@@ -388,71 +380,6 @@ export function getAgentStatus(agent: AgentProgram): AgentStatus {
 export function getAllAgentStatuses(): AgentStatus[] {
 	const programs = getAllAgentPrograms();
 	return programs.map(getAgentStatus);
-}
-
-// =============================================================================
-// MIGRATION FROM LEGACY CONFIG
-// =============================================================================
-
-/**
- * Read legacy projects.json config for migration.
- */
-function getLegacyConfig(): Record<string, unknown> | null {
-	if (!existsSync(PROJECTS_CONFIG_FILE)) {
-		return null;
-	}
-
-	try {
-		const content = readFileSync(PROJECTS_CONFIG_FILE, 'utf-8');
-		return JSON.parse(content);
-	} catch {
-		return null;
-	}
-}
-
-/**
- * Migrate from legacy projects.json to new agents.json format.
- * Returns migrated config or null if nothing to migrate.
- */
-export function migrateFromLegacyConfig(): AgentConfigFile | null {
-	const legacy = getLegacyConfig();
-	if (!legacy) {
-		return null;
-	}
-
-	const defaults = (legacy.defaults as Record<string, unknown>) ?? {};
-
-	// Create base config
-	const config = createDefaultAgentConfig();
-
-	// Apply legacy settings to Claude Code agent
-	const claudeAgent = config.programs['claude-code'];
-	if (claudeAgent) {
-		// Model mapping
-		const modelMap: Record<string, string> = {
-			opus: 'opus',
-			sonnet: 'sonnet',
-			haiku: 'haiku'
-		};
-
-		const legacyModel = defaults.model as string | undefined;
-		if (legacyModel && modelMap[legacyModel]) {
-			claudeAgent.defaultModel = modelMap[legacyModel];
-			config.defaults.fallbackModel = modelMap[legacyModel];
-		}
-
-		// Flags
-		const legacyFlags = defaults.claude_flags as string | undefined;
-		if (legacyFlags) {
-			// Parse flags string into array
-			claudeAgent.flags = legacyFlags.split(/\s+/).filter(Boolean);
-		}
-	}
-
-	// Mark as migrated
-	config.migratedAt = new Date().toISOString();
-
-	return config;
 }
 
 // =============================================================================

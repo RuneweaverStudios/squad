@@ -306,8 +306,7 @@ export interface AgentRoutingRule {
  *   "defaults": {
  *     "fallbackAgent": "claude-code",
  *     "fallbackModel": "sonnet"
- *   },
- *   "migratedAt": "2026-01-25T12:00:00.000Z"
+ *   }
  * }
  * ```
  */
@@ -328,9 +327,6 @@ export interface AgentConfigFile {
 		/** Model to use for fallback agent */
 		fallbackModel: string;
 	};
-
-	/** When config was migrated from legacy format (if applicable) */
-	migratedAt?: string;
 
 	/** When config was last modified */
 	updatedAt?: string;
@@ -395,9 +391,6 @@ export interface AgentConfigSummary {
 
 	/** Number of routing rules */
 	routingRulesCount: number;
-
-	/** Whether config has been migrated from legacy format */
-	migrated: boolean;
 }
 
 // =============================================================================
@@ -507,6 +500,28 @@ export const AGENT_PRESETS: AgentProgramPreset[] = [
 			flags: ['--no-auto-commits'],
 			startupPattern: '{command} --model {model} {flags}',
 			taskInjection: 'stdin'
+		}
+	},
+	{
+		id: 'opencode',
+		name: 'OpenCode',
+		description: 'OpenCode - Terminal-based AI coding assistant',
+		config: {
+			id: 'opencode',
+			name: 'OpenCode',
+			command: 'opencode',
+			models: [
+				{ id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', shortName: 'sonnet', costTier: 'medium' },
+				{ id: 'claude-opus-4-5-20251101', name: 'Claude Opus 4.5', shortName: 'opus', costTier: 'high' },
+				{ id: 'gpt-4o', name: 'GPT-4o', shortName: 'gpt4o', costTier: 'high' },
+				{ id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', shortName: 'flash', costTier: 'low' }
+			],
+			defaultModel: 'sonnet',
+			authType: 'api_key',
+			apiKeyProvider: 'anthropic',
+			apiKeyEnvVar: 'ANTHROPIC_API_KEY',
+			flags: [],
+			taskInjection: 'prompt'
 		}
 	}
 ];

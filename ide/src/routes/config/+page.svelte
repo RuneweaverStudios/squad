@@ -50,6 +50,7 @@
 	import CommitMessageSettingsEditor from '$lib/components/config/CommitMessageSettingsEditor.svelte';
 	import CredentialsEditor from '$lib/components/config/CredentialsEditor.svelte';
 	import LlmProviderEditor from '$lib/components/config/LlmProviderEditor.svelte';
+	import AgentProgramsEditor from '$lib/components/config/AgentProgramsEditor.svelte';
 	import type { SlashCommand, ProjectConfig, HooksConfig } from '$lib/types/config';
 	import { successToast, errorToast } from '$lib/stores/toasts.svelte';
 
@@ -102,7 +103,7 @@
 	let selectedTool = $state<ToolFile | null>(null);
 
 	// Valid tabs for URL sync
-	const validTabs = ['commands', 'tools', 'projects', 'swarm', 'defaults', 'credentials', 'llm', 'mcp', 'hooks', 'claude', 'docs', 'templates', 'actions', 'shortcuts', 'commit'];
+	const validTabs = ['commands', 'tools', 'projects', 'swarm', 'defaults', 'credentials', 'llm', 'agents', 'mcp', 'hooks', 'claude', 'docs', 'templates', 'actions', 'shortcuts', 'commit'];
 
 	// Sync activeTab from URL query parameter
 	$effect(() => {
@@ -497,6 +498,16 @@
 						transition:fade={{ duration: 150 }}
 					>
 						<LlmProviderEditor />
+					</div>
+				{:else if activeTab === 'agents'}
+					<!-- Agents Tab -->
+					<div
+						role="tabpanel"
+						id="agents-panel"
+						aria-labelledby="agents-tab"
+						transition:fade={{ duration: 150 }}
+					>
+						<AgentProgramsEditor />
 					</div>
 				{:else if activeTab === 'mcp'}
 					<!-- MCP Tab -->

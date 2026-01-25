@@ -24,6 +24,7 @@ JAT supports multiple AI coding assistants through a configurable agent program 
 │  • OpenAI Codex CLI (codex)                                                 │
 │  • Google Gemini (gemini)                                                   │
 │  • Aider (aider)                                                            │
+│  • OpenCode (opencode) - https://opencode.ai                                │
 │  • Any CLI-based AI coding tool                                             │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
