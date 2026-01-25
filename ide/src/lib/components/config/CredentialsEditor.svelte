@@ -1,15 +1,22 @@
 <script lang="ts">
 	/**
-	 * CredentialsEditor Component
+	 * CredentialsEditor Component (Secret Vault)
 	 *
-	 * Manages API keys and service credentials through a user-friendly interface.
-	 * Keys are stored in ~/.config/jat/credentials.json and displayed masked.
+	 * A general-purpose secret vault for managing API keys and credentials.
+	 * Keys are stored securely in ~/.config/jat/credentials.json and displayed masked.
+	 *
+	 * Sections:
+	 * - Provider Keys: Built-in AI provider API keys (Anthropic, Google, OpenAI)
+	 *   with "Used by" indicators showing which IDE features depend on each key
+	 * - Custom Secrets: User-defined keys for external services
+	 *   accessible via `jat-secret <name>` or environment variables
 	 *
 	 * Features:
 	 * - Add/edit/delete API keys
 	 * - Verify keys work with provider
 	 * - Masked display (sk-ant-...7x4k)
 	 * - Provider documentation links
+	 * - "Used by" badges for all configured keys
 	 */
 
 	import { onMount } from 'svelte';
@@ -363,11 +370,17 @@
 
 <div class="credentials-editor">
 	<div class="section-header">
-		<h2>API Keys</h2>
+		<h2>Secret Vault</h2>
 		<p class="section-description">
-			Configure API keys for AI services. Keys are stored securely in
+			Securely store API keys and credentials. All secrets are encrypted at rest in
 			<code>~/.config/jat/credentials.json</code>
 		</p>
+	</div>
+
+	<!-- Provider Keys Section Header -->
+	<div class="section-subheader">
+		<h3>Provider Keys</h3>
+		<p class="section-subdescription">API keys for AI providers used by IDE features</p>
 	</div>
 
 	{#if isLoading}
@@ -396,6 +409,16 @@
 							{:else}
 								<span class="status-badge not-configured">Not configured</span>
 							{/if}
+						</div>
+					</div>
+
+					<!-- Always show Used by indicator -->
+					<div class="used-by">
+						<span class="used-by-label">Used by:</span>
+						<div class="used-by-badges">
+							{#each provider.usedBy as feature}
+								<span class="used-by-badge">{feature}</span>
+							{/each}
 						</div>
 					</div>
 
@@ -459,11 +482,6 @@
 							</button>
 						</div>
 					{:else}
-						<div class="used-by">
-							<span class="used-by-label">Used by:</span>
-							<span class="used-by-list">{provider.usedBy.join(', ')}</span>
-						</div>
-
 						<div class="provider-actions">
 							<button
 								class="btn btn-sm btn-primary"
@@ -493,10 +511,10 @@
 
 		<!-- Custom API Keys Section -->
 		<div class="custom-keys-section">
-			<div class="section-divider">
-				<h3>Custom Keys</h3>
-				<p class="section-description">
-					Add your own API keys for custom services. Access via <code>jat-secret &lt;name&gt;</code> or env vars.
+			<div class="section-subheader">
+				<h3>Custom Secrets</h3>
+				<p class="section-subdescription">
+					Store additional API keys and credentials. Access via <code>jat-secret &lt;name&gt;</code> or environment variables.
 				</p>
 			</div>
 
@@ -823,6 +841,45 @@
 		font-size: 0.8rem;
 	}
 
+	.section-subheader {
+		margin-bottom: 1rem;
+		padding-bottom: 0.75rem;
+		border-bottom: 1px solid oklch(0.22 0.02 250);
+	}
+
+	.section-subheader h3 {
+		font-size: 1rem;
+		font-weight: 600;
+		color: oklch(0.85 0.02 250);
+		margin: 0 0 0.25rem 0;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.section-subheader h3::before {
+		content: '';
+		display: inline-block;
+		width: 3px;
+		height: 1rem;
+		background: oklch(0.55 0.15 200);
+		border-radius: 2px;
+	}
+
+	.section-subdescription {
+		font-size: 0.8125rem;
+		color: oklch(0.55 0.02 250);
+		margin: 0;
+		padding-left: 0.875rem;
+	}
+
+	.section-subdescription code {
+		background: oklch(0.20 0.02 250);
+		padding: 0.125rem 0.375rem;
+		border-radius: 4px;
+		font-size: 0.75rem;
+	}
+
 	.loading {
 		display: flex;
 		align-items: center;
@@ -965,16 +1022,34 @@
 	}
 
 	.used-by {
-		font-size: 0.8125rem;
+		display: flex;
+		align-items: flex-start;
+		gap: 0.5rem;
 		margin-bottom: 0.75rem;
 	}
 
 	.used-by-label {
-		color: oklch(0.55 0.02 250);
+		font-size: 0.75rem;
+		color: oklch(0.50 0.02 250);
+		font-weight: 500;
+		flex-shrink: 0;
+		padding-top: 0.125rem;
 	}
 
-	.used-by-list {
-		color: oklch(0.70 0.02 250);
+	.used-by-badges {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.375rem;
+	}
+
+	.used-by-badge {
+		font-size: 0.7rem;
+		padding: 0.125rem 0.5rem;
+		background: oklch(0.22 0.04 200);
+		color: oklch(0.75 0.08 200);
+		border-radius: 9999px;
+		font-weight: 500;
+		white-space: nowrap;
 	}
 
 	.provider-actions {
@@ -1177,20 +1252,9 @@
 
 	/* Custom Keys Section */
 	.custom-keys-section {
-		margin-top: 2rem;
+		margin-top: 2.5rem;
 		padding-top: 1.5rem;
-		border-top: 1px solid oklch(0.25 0.02 250);
-	}
-
-	.section-divider {
-		margin-bottom: 1rem;
-	}
-
-	.section-divider h3 {
-		font-size: 1rem;
-		font-weight: 600;
-		color: oklch(0.85 0.02 250);
-		margin: 0 0 0.375rem 0;
+		border-top: 2px solid oklch(0.22 0.02 250);
 	}
 
 	.custom-keys-list {

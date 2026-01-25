@@ -368,3 +368,31 @@ export const COMMIT_MESSAGE_DEFAULTS = {
 	/** Custom instructions to append to the prompt */
 	custom_instructions: ''
 } as const;
+
+// =============================================================================
+// LLM PROVIDER CONFIGURATION
+// =============================================================================
+
+/**
+ * LLM provider mode for IDE features (task suggestions, summaries, commit messages)
+ */
+export type LlmProviderMode =
+	| 'auto'    // Use API key if available, fall back to CLI
+	| 'api'     // Use API key only (fail if not available)
+	| 'cli';    // Use Claude CLI only (fail if not available)
+
+/**
+ * Default configuration for LLM provider
+ */
+export const LLM_PROVIDER_DEFAULTS = {
+	/** Provider mode: auto, api, or cli */
+	mode: 'auto' as LlmProviderMode,
+	/** Default model for API calls (used when mode is 'api' or 'auto') */
+	api_model: 'claude-3-5-haiku-20241022' as const,
+	/** Default model for CLI calls (used when mode is 'cli' or 'auto' fallback) */
+	cli_model: 'haiku' as 'haiku' | 'sonnet' | 'opus',
+	/** Timeout in milliseconds for CLI calls */
+	cli_timeout_ms: 30000,
+	/** Whether to show provider status in UI (which provider is being used) */
+	show_provider_status: true
+} as const;
