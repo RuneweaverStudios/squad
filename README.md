@@ -383,9 +383,9 @@ Open a PR against `master`. All contributions are licensed under MIT.
 - **[@joewinke](https://github.com/joewinke)** — Creator
 - **Agent Mail** — Agent Comms [Dicklesworthstone/mcp_agent_mail](https://github.com/Dicklesworthstone/mcp_agent_mail)
 - **Beads** — Task management ([steveyegge/beads](https://github.com/steveyegge/beads))
-- **Mario Zechner** — [What if you don't need MCP?](https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/)
-- **Andrej Karpathy** - [Some Powerful Alien Tool](https://x.com/karpathy/status/2004607146781278521?s=20)
-- **DHH** - [Omarchy](https://omarchy.org/)
+- **Mario Zechner** — Think different about Agents [What if you don't need MCP?](https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/)
+- **Andrej Karpathy** - Naming the Problem [Some Powerful Alien Tool](https://x.com/karpathy/status/2004607146781278521?s=20)
+- **DHH** - Developer-centric OS [Omarchy](https://omarchy.org/)
 - **Tmux** - Terminal Multiplexer by ([Nicholas Marriott](https://github.com/tmux/tmux))
 - **Monaco** — Code editor engine ([Microsoft](https://github.com/microsoft/monaco-editor))
 - **SvelteKit** — IDE framework ([Rich Harris](https://github.com/Rich-Harris))
