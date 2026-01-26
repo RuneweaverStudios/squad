@@ -1208,6 +1208,42 @@
 														}
 													}, 200);
 												}}
+												onActionComplete={() => {
+													// Collapse session after status action completes
+													// (same pattern as onCtrlEnterSubmit)
+													collapsingSession = session.name;
+													if (outputPollInterval) {
+														clearInterval(outputPollInterval);
+														outputPollInterval = null;
+													}
+													setTimeout(() => {
+														expandedSession = null;
+														expandedOutput = '';
+														collapsingSession = null;
+
+														// Find and expand the next session in the list
+														const sessions = orderedSessions();
+														const currentIndex = sessions.findIndex(s => s.session.name === session.name);
+														let foundNext = false;
+														if (currentIndex >= 0) {
+															// Look for the next non-exiting session
+															for (let i = currentIndex + 1; i < sessions.length; i++) {
+																if (!sessions[i].isExiting) {
+																	expandInline(sessions[i].session.name);
+																	foundNext = true;
+																	break;
+																}
+															}
+														}
+														// If no next session found, show "all done" flash
+														if (!foundNext) {
+															allDoneFlash = true;
+															setTimeout(() => {
+																allDoneFlash = false;
+															}, 2000);
+														}
+													}, 200);
+												}}
 											/>
 										</div>
 									</div>

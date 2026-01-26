@@ -200,6 +200,8 @@
 		onCtrlEnterSubmit?: () => void;
 		/** Called when user presses Ctrl+Shift+Enter (submit and go to previous session) */
 		onCtrlShiftEnterSubmit?: () => void;
+		/** Called when a status action completes (e.g., complete, cleanup) to trigger UI collapse */
+		onActionComplete?: () => void;
 		// Shared
 		class?: string;
 		/** Whether this work card is currently highlighted (e.g., from clicking avatar elsewhere) */
@@ -328,6 +330,7 @@
 		onStartServer,
 		onCtrlEnterSubmit,
 		onCtrlShiftEnterSubmit,
+		onActionComplete,
 		// Shared
 		class: className = "",
 		isHighlighted = false,
@@ -3594,6 +3597,10 @@
 			case "cleanup":
 				// Close tmux session and dismiss from UI
 				await onKillSession?.();
+				// Trigger collapse after delay (matches Ctrl+Enter pattern)
+				if (onActionComplete) {
+					setTimeout(() => onActionComplete(), 300);
+				}
 				break;
 
 			case "view-task":
@@ -3659,6 +3666,10 @@
 					}
 				}
 				await sendWorkflowCommand("/jat:complete");
+				// Trigger collapse after delay (matches Ctrl+Enter pattern)
+				if (onActionComplete) {
+					setTimeout(() => onActionComplete(), 1400);
+				}
 				break;
 
 			case "complete-kill":
@@ -3694,6 +3705,10 @@
 				// Track intent so sessionEvents knows to auto-kill when signal arrives
 				setPendingAutoKill(sessionName, true);
 				await sendWorkflowCommand("/jat:complete --kill");
+				// Trigger collapse after delay (matches Ctrl+Enter pattern)
+				if (onActionComplete) {
+					setTimeout(() => onActionComplete(), 1400);
+				}
 				break;
 
 			case "escape":
@@ -3714,6 +3729,10 @@
 			case "kill":
 				// Kill tmux session
 				await onKillSession?.();
+				// Trigger collapse after delay (matches Ctrl+Enter pattern)
+				if (onActionComplete) {
+					setTimeout(() => onActionComplete(), 300);
+				}
 				break;
 
 			case "close-kill":
@@ -3738,6 +3757,10 @@
 					}
 					// Kill session regardless of close result
 					await onKillSession?.();
+					// Trigger collapse after delay (matches Ctrl+Enter pattern)
+					if (onActionComplete) {
+						setTimeout(() => onActionComplete(), 300);
+					}
 				}
 				break;
 
