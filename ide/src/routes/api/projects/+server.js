@@ -132,6 +132,84 @@ async function scanBeadsProjects() {
 }
 
 /**
+ * Check if a directory is a git repository
+ * @param {string} dirPath
+ * @returns {Promise<boolean>}
+ */
+async function isGitRepo(dirPath) {
+	try {
+		await execAsync('git rev-parse --git-dir', { cwd: dirPath, timeout: 5000 });
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Check if beads is initialized in a directory
+ * @param {string} dirPath
+ * @returns {boolean}
+ */
+function hasBeadsInit(dirPath) {
+	return existsSync(join(dirPath, '.beads'));
+}
+
+/**
+ * Initialize beads in a project directory
+ * Returns { success, steps, error? }
+ * @param {string} projectPath
+ * @returns {Promise<{ success: boolean, steps: string[], error?: string }>}
+ */
+async function initializeBeads(projectPath) {
+	const steps = [];
+
+	// Initialize git if not a git repo
+	const isGit = await isGitRepo(projectPath);
+	if (!isGit) {
+		try {
+			await execAsync('git init', { cwd: projectPath, timeout: 10000 });
+			steps.push('Initialized git repository');
+
+			// Create a basic .gitignore if it doesn't exist
+			const gitignorePath = join(projectPath, '.gitignore');
+			if (!existsSync(gitignorePath)) {
+				const { writeFileSync } = await import('fs');
+				writeFileSync(gitignorePath, 'node_modules/\n.env\n.DS_Store\n*.log\n');
+				steps.push('Created .gitignore');
+			}
+		} catch (gitError) {
+			return {
+				success: false,
+				steps,
+				error: `Failed to initialize git: ${gitError instanceof Error ? gitError.message : 'Unknown error'}`
+			};
+		}
+	}
+
+	// Check if beads is already initialized
+	if (hasBeadsInit(projectPath)) {
+		steps.push('Beads already initialized');
+		return { success: true, steps };
+	}
+
+	// Run bd init
+	try {
+		await execAsync('bd init --quiet', {
+			cwd: projectPath,
+			timeout: 30000
+		});
+		steps.push('Initialized Beads task management');
+		return { success: true, steps };
+	} catch (initError) {
+		return {
+			success: false,
+			steps,
+			error: `Failed to initialize Beads: ${initError instanceof Error ? initError.message : 'Unknown error'}`
+		};
+	}
+}
+
+/**
  * Get task counts for a project from Beads
  * @param {string} projectPath
  */
@@ -750,6 +828,16 @@ export async function POST({ request }) {
 				}
 			}
 
+			// Initialize beads (and git if needed) in the directory
+			const beadsResult = await initializeBeads(resolvedPath);
+			if (!beadsResult.success) {
+				return json({
+					error: beadsResult.error || 'Failed to initialize Beads',
+					path: resolvedPath,
+					steps: beadsResult.steps
+				}, { status: 500 });
+			}
+
 			// Read current config
 			let jatConfig = await readJatConfig();
 			if (!jatConfig) {
@@ -798,7 +886,9 @@ export async function POST({ request }) {
 				project: {
 					key,
 					...jatConfig.projects[key]
-				}
+				},
+				steps: [...beadsResult.steps, 'Added to JAT configuration'],
+				message: `Successfully created project: ${key}`
 			});
 		}
 

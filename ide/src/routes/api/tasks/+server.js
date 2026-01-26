@@ -192,6 +192,11 @@ export async function POST({ request }) {
 			command += ` --description ${shellEscape(description)}`;
 		}
 
+		// Add notes if provided
+		if (body.notes && typeof body.notes === 'string' && body.notes.trim()) {
+			command += ` --notes ${shellEscape(body.notes.trim())}`;
+		}
+
 		// Add labels if provided
 		if (body.labels && Array.isArray(body.labels) && body.labels.length > 0) {
 			const sanitizedLabels = body.labels

@@ -141,6 +141,7 @@
 	interface FormData {
 		title: string;
 		description: string;
+		notes: string;
 		priority: number;
 		type: string;
 		project: string;
@@ -150,6 +151,7 @@
 	let formData = $state<FormData>({
 		title: '',
 		description: '',
+		notes: '',
 		priority: 1,
 		type: 'task',
 		project: '',
@@ -851,6 +853,7 @@
 			const requestBody = {
 				title: formData.title.trim(),
 				description: formData.description.trim() || undefined,
+				notes: formData.notes.trim() || undefined,
 				priority: formData.priority,
 				type: formData.type,
 				project: formData.project.trim() || undefined,
@@ -908,14 +911,16 @@
 				try {
 					// Spawn an agent for the newly created task via /api/work/spawn
 					// This endpoint properly registers the agent, assigns the task, and starts Claude
-					// Note: The spawn API will infer project from task ID prefix (e.g., jomarchy-abc → ~/code/jomarchy)
-					console.log('[TaskCreationDrawer] Spawning agent for task:', taskId);
+					// Pass project explicitly since the task was just created and may not be discoverable
+					// by project prefix alone (e.g., new projects not yet in JAT config)
+					console.log('[TaskCreationDrawer] Spawning agent for task:', taskId, 'in project:', formData.project);
 
 					const spawnResponse = await fetch('/api/work/spawn', {
 						method: 'POST',
 						headers: { 'Content-Type': 'application/json' },
 						body: JSON.stringify({
-							taskId: taskId
+							taskId: taskId,
+							project: formData.project || undefined
 						})
 					});
 
@@ -982,6 +987,7 @@
 		formData = {
 			title: '',
 			description: '',
+			notes: '',
 			priority: 1,
 			type: 'task',
 			project: '',
@@ -1434,6 +1440,31 @@
 							</div>
 						</div>
 					{/if}
+
+					<!-- Notes (Optional - Personal notes not submitted to AI) - Industrial -->
+					<div class="form-control">
+						<label class="label" for="task-notes">
+							<span class="label-text text-xs font-semibold font-mono uppercase tracking-wider text-base-content/70">Notes</span>
+							<span class="label-text-alt text-base-content/50 flex items-center gap-1">
+								<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+								</svg>
+								Not sent to AI
+							</span>
+						</label>
+						<textarea
+							id="task-notes"
+							placeholder={formDisabled ? "Select a project first..." : "Personal notes, reference links, etc. (not included in AI context)"}
+							class="textarea w-full h-24 font-mono bg-base-200 border-base-content/30 text-base-content {formDisabled ? 'opacity-50' : ''}"
+							bind:value={formData.notes}
+							disabled={formDisabled || isSubmitting}
+						></textarea>
+						<label class="label">
+							<span class="label-text-alt text-base-content/50">
+								For your own reference only - agents won't see this field
+							</span>
+						</label>
+					</div>
 
 					<!-- AI Suggestion Reasoning - Show when suggestions applied -->
 					{#if suggestionReasoning}
