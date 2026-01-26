@@ -251,13 +251,6 @@
 	}
 </script>
 
-<!-- DEBUG: Show Alt key state visually -->
-{#if altKeyHeld}
-	<div class="fixed top-2 left-1/2 -translate-x-1/2 z-[9999] bg-info text-info-content px-4 py-2 rounded-lg shadow-lg font-bold animate-pulse">
-		ALT KEY HELD - Click spawn button now!
-	</div>
-{/if}
-
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="relative flex items-center justify-center" style="min-width: 28px; min-height: 28px;">
 	{#if actionMode === 'spawn'}

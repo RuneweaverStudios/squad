@@ -62,6 +62,10 @@
 	let selectedModel = $state<string | null>(null);
 	let useAutoSelection = $state(true);
 
+	// Dropdown visibility state
+	let showAgentDropdown = $state(false);
+	let showModelDropdown = $state(false);
+
 	// Derived: currently selected agent object
 	const selectedAgent = $derived(
 		selectedAgentId ? programs.find((p) => p.id === selectedAgentId) : null
@@ -180,6 +184,21 @@
 	// Get display name for model
 	function getModelDisplayName(model: AgentModel): string {
 		return `${model.name}${model.costTier ? ` (${model.costTier})` : ''}`;
+	}
+
+	// Select agent from dropdown
+	function selectAgent(program: AgentProgram) {
+		selectedAgentId = program.id;
+		useAutoSelection = false;
+		selectedModel = program.defaultModel ?? null;
+		showAgentDropdown = false;
+	}
+
+	// Select model from dropdown
+	function selectModel(model: AgentModel) {
+		selectedModel = model.shortName;
+		useAutoSelection = false;
+		showModelDropdown = false;
 	}
 </script>
 
@@ -327,52 +346,151 @@
 				</div>
 			{/if}
 
-			<!-- Agent selection -->
+			<!-- Agent selection - Custom dropdown -->
 			<div class="form-control mb-3">
-				<label class="label py-1" for="agent-selector-program">
+				<label class="label py-1">
 					<span class="label-text text-xs font-medium">Agent Program</span>
 				</label>
-				<div class="flex items-center gap-2">
-					{#if selectedAgentId}
-						<ProviderLogo agentId={selectedAgentId} size={20} />
-					{/if}
-					<select
-						id="agent-selector-program"
-						class="select select-sm select-bordered flex-1"
-						value={selectedAgentId ?? ''}
-						onchange={handleAgentChange}
+				<div class="relative">
+					<button
+						type="button"
+						class="w-full flex items-center gap-3 p-2.5 rounded-lg border transition-all duration-200 hover:border-primary/50"
+						style="background: oklch(0.22 0.02 250); border-color: oklch(0.35 0.03 250);"
+						onclick={() => (showAgentDropdown = !showAgentDropdown)}
 					>
-						{#each programs as program}
-							{@const status = getAgentStatus(program.id)}
-							<option value={program.id} disabled={!status?.available}>
-								{program.name}
-								{#if !status?.available}
-									- {status?.statusMessage ?? 'unavailable'}
-								{/if}
-							</option>
-						{/each}
-					</select>
+						{#if selectedAgent}
+							{@const agentStatus = getAgentStatus(selectedAgent.id)}
+							<div class="w-8 h-8 rounded-full flex items-center justify-center" style="background: oklch(0.30 0.04 250);">
+								<ProviderLogo agentId={selectedAgent.id} apiKeyProvider={selectedAgent.apiKeyProvider} size={20} />
+							</div>
+							<div class="flex-1 min-w-0 text-left">
+								<div class="font-medium text-sm">{selectedAgent.name}</div>
+								<div class="text-xs" style="color: {agentStatus?.available ? 'oklch(0.70 0.15 145)' : 'oklch(0.65 0.12 30)'};">
+									{agentStatus?.available ? 'Ready' : agentStatus?.statusMessage ?? 'Unavailable'}
+								</div>
+							</div>
+						{:else}
+							<div class="flex-1 text-left text-sm" style="color: oklch(0.60 0.02 250);">Select agent...</div>
+						{/if}
+						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+							class="w-4 h-4 transition-transform duration-200" class:rotate-180={showAgentDropdown} style="color: oklch(0.60 0.02 250);">
+							<path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+						</svg>
+					</button>
+
+					{#if showAgentDropdown}
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
+						<!-- svelte-ignore a11y_click_events_have_key_events -->
+						<div class="fixed inset-0 z-40" onclick={() => (showAgentDropdown = false)}></div>
+						<div class="absolute z-50 mt-1 w-full rounded-lg border shadow-xl overflow-hidden"
+							style="background: oklch(0.20 0.02 250); border-color: oklch(0.35 0.03 250);">
+							{#each programs as program}
+								{@const status = getAgentStatus(program.id)}
+								{@const isSelected = selectedAgentId === program.id}
+								<button
+									type="button"
+									class="w-full flex items-center gap-3 p-2.5 transition-colors duration-150 hover:bg-base-300"
+									style={isSelected ? 'background: oklch(0.55 0.15 240 / 0.1);' : ''}
+									class:opacity-50={!status?.available}
+									disabled={!status?.available}
+									onclick={() => selectAgent(program)}
+								>
+									<div class="w-8 h-8 rounded-full flex items-center justify-center" style="background: oklch(0.28 0.04 250);">
+										<ProviderLogo agentId={program.id} apiKeyProvider={program.apiKeyProvider} size={20} />
+									</div>
+									<div class="flex-1 min-w-0 text-left">
+										<div class="font-medium text-sm">{program.name}</div>
+										<div class="text-xs" style="color: {status?.available ? 'oklch(0.65 0.10 145)' : 'oklch(0.60 0.10 30)'};">
+											{status?.available ? 'Ready' : status?.statusMessage ?? 'Unavailable'}
+										</div>
+									</div>
+									{#if isSelected}
+										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+											class="w-4 h-4" style="color: oklch(0.75 0.15 145);">
+											<path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+										</svg>
+									{/if}
+								</button>
+							{/each}
+						</div>
+					{/if}
 				</div>
 			</div>
 
-			<!-- Model selection -->
+			<!-- Model selection - Custom dropdown -->
 			<div class="form-control mb-4">
-				<label class="label py-1" for="agent-selector-model">
+				<label class="label py-1">
 					<span class="label-text text-xs font-medium">Model</span>
 				</label>
-				<select
-					id="agent-selector-model"
-					class="select select-sm select-bordered"
-					value={selectedModel ?? ''}
-					onchange={handleModelChange}
-					disabled={!selectedAgent}
-				>
-					{#each availableModels as model}
-						<option value={model.shortName}>
-							{getModelDisplayName(model)}
-						</option>
-					{/each}
-				</select>
+				<div class="relative">
+					<button
+						type="button"
+						class="w-full flex items-center gap-3 p-2.5 rounded-lg border transition-all duration-200"
+						class:opacity-50={!selectedAgent}
+						style="background: {selectedAgent ? 'oklch(0.22 0.02 250)' : 'oklch(0.18 0.01 250)'}; border-color: oklch(0.35 0.03 250);"
+						disabled={!selectedAgent}
+						onclick={() => selectedAgent && (showModelDropdown = !showModelDropdown)}
+					>
+						{#if selectedModel && selectedAgent}
+							{@const currentModel = availableModels.find(m => m.shortName === selectedModel)}
+							<div class="w-8 h-8 rounded-full flex items-center justify-center" style="background: oklch(0.30 0.04 250);">
+								<span class="text-xs font-bold" style="color: oklch(0.80 0.10 250);">
+									{selectedModel?.slice(0, 2).toUpperCase()}
+								</span>
+							</div>
+							<div class="flex-1 min-w-0 text-left">
+								<div class="font-medium text-sm">{currentModel?.name ?? selectedModel}</div>
+								<div class="text-xs" style="color: oklch(0.60 0.02 250);">
+									{currentModel?.costTier ? `Cost: ${currentModel.costTier}` : 'Model'}
+								</div>
+							</div>
+						{:else}
+							<div class="flex-1 text-left text-sm" style="color: oklch(0.60 0.02 250);">
+								{selectedAgent ? 'Select model...' : 'Select agent first'}
+							</div>
+						{/if}
+						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+							class="w-4 h-4 transition-transform duration-200" class:rotate-180={showModelDropdown} style="color: oklch(0.60 0.02 250);">
+							<path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+						</svg>
+					</button>
+
+					{#if showModelDropdown && selectedAgent}
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
+						<!-- svelte-ignore a11y_click_events_have_key_events -->
+						<div class="fixed inset-0 z-40" onclick={() => (showModelDropdown = false)}></div>
+						<div class="absolute z-50 mt-1 w-full rounded-lg border shadow-xl overflow-hidden"
+							style="background: oklch(0.20 0.02 250); border-color: oklch(0.35 0.03 250);">
+							{#each availableModels as model}
+								{@const isSelected = selectedModel === model.shortName}
+								<button
+									type="button"
+									class="w-full flex items-center gap-3 p-2.5 transition-colors duration-150 hover:bg-base-300"
+									style={isSelected ? 'background: oklch(0.55 0.15 240 / 0.1);' : ''}
+									onclick={() => selectModel(model)}
+								>
+									<div class="w-8 h-8 rounded-full flex items-center justify-center" style="background: oklch(0.28 0.04 250);">
+										<span class="text-xs font-bold" style="color: oklch(0.80 0.10 250);">
+											{model.shortName?.slice(0, 2).toUpperCase()}
+										</span>
+									</div>
+									<div class="flex-1 min-w-0 text-left">
+										<div class="font-medium text-sm">{model.name}</div>
+										<div class="text-xs" style="color: oklch(0.60 0.02 250);">
+											{model.costTier ? `Cost tier: ${model.costTier}` : 'Standard'}
+										</div>
+									</div>
+									{#if isSelected}
+										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+											class="w-4 h-4" style="color: oklch(0.75 0.15 145);">
+											<path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+										</svg>
+									{/if}
+								</button>
+							{/each}
+						</div>
+					{/if}
+				</div>
 			</div>
 
 			<!-- Override indicator -->

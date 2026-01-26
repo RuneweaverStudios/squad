@@ -43,6 +43,9 @@
 	let newProgramForm = $state<Partial<AgentProgram>>({});
 	let addError = $state<string | null>(null);
 	let isAdding = $state(false);
+	let showAdvancedOptions = $state(false);
+	let newFormFlags = $state<string[]>([]);
+	let newFormNewFlag = $state('');
 
 	// Delete confirmation state
 	let deletingProgram = $state<string | null>(null);
@@ -164,6 +167,9 @@
 		selectedPreset = null;
 		newProgramForm = {};
 		addError = null;
+		showAdvancedOptions = false;
+		newFormFlags = [];
+		newFormNewFlag = '';
 	}
 
 	function selectPreset(presetId: string) {
@@ -175,6 +181,8 @@
 				enabled: true,
 				isDefault: false
 			};
+			// Initialize flags from preset
+			newFormFlags = preset.config.flags ? [...preset.config.flags] : [];
 		}
 	}
 
@@ -192,10 +200,16 @@
 				? `/api/config/agents?preset=${encodeURIComponent(selectedPreset)}`
 				: '/api/config/agents';
 
+			// Include flags from advanced options
+			const formData = {
+				...newProgramForm,
+				flags: newFormFlags.length > 0 ? newFormFlags : newProgramForm.flags
+			};
+
 			const response = await fetch(url, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(newProgramForm)
+				body: JSON.stringify(formData)
 			});
 
 			const data = await response.json();
@@ -437,6 +451,17 @@
 	function removeFlag(index: number) {
 		if (!editForm.flags) return;
 		editForm.flags = editForm.flags.filter((_, i) => i !== index);
+	}
+
+	// Flag management for add form
+	function addNewFormFlag() {
+		if (!newFormNewFlag.trim()) return;
+		newFormFlags = [...newFormFlags, newFormNewFlag.trim()];
+		newFormNewFlag = '';
+	}
+
+	function removeNewFormFlag(index: number) {
+		newFormFlags = newFormFlags.filter((_, i) => i !== index);
 	}
 </script>
 
@@ -952,11 +977,126 @@
 								</select>
 							</div>
 						{/if}
+
+						<!-- Advanced Options (collapsible) -->
+						<div class="advanced-options-section">
+							<button
+								type="button"
+								class="btn btn-ghost btn-sm w-full justify-between advanced-toggle"
+								onclick={() => showAdvancedOptions = !showAdvancedOptions}
+							>
+								<span class="flex items-center gap-2">
+									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="icon-sm">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z" />
+										<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+									</svg>
+									Advanced Options
+								</span>
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke-width="1.5"
+									stroke="currentColor"
+									class="icon-sm transition-transform {showAdvancedOptions ? 'rotate-180' : ''}"
+								>
+									<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+								</svg>
+							</button>
+
+							{#if showAdvancedOptions}
+								<div class="advanced-options-content" transition:slide={{ duration: 200 }}>
+									<!-- CLI Flags -->
+									<div class="form-group">
+										<label for="new-flags">CLI Flags</label>
+										<p class="hint">Additional command-line flags passed to the agent CLI</p>
+										<div class="flags-list">
+											{#each newFormFlags as flag, index}
+												<span class="badge badge-outline gap-1">
+													{flag}
+													<button
+														type="button"
+														class="btn btn-ghost btn-xs btn-circle"
+														onclick={() => {
+															newFormFlags = newFormFlags.filter((_, i) => i !== index);
+														}}
+													>
+														<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="icon-xs">
+															<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+														</svg>
+													</button>
+												</span>
+											{/each}
+										</div>
+										<div class="flex gap-2">
+											<input
+												type="text"
+												id="new-flags"
+												class="input input-bordered input-sm flex-1"
+												placeholder="--flag-name"
+												bind:value={newFormNewFlag}
+												onkeydown={(e) => {
+													if (e.key === 'Enter') {
+														e.preventDefault();
+														addNewFormFlag();
+													}
+												}}
+											/>
+											<button
+												type="button"
+												class="btn btn-sm btn-outline"
+												onclick={addNewFormFlag}
+												disabled={!newFormNewFlag.trim()}
+											>
+												Add
+											</button>
+										</div>
+									</div>
+
+									<!-- Instructions File -->
+									<div class="form-group">
+										<label for="new-instructions">Instructions File</label>
+										<p class="hint">Path to a file containing additional system instructions</p>
+										<input
+											type="text"
+											id="new-instructions"
+											class="input input-bordered input-sm w-full"
+											placeholder="~/.config/jat/agent-instructions.md"
+											bind:value={newProgramForm.instructionsFile}
+										/>
+									</div>
+
+									<!-- Task Injection Method -->
+									<div class="form-group">
+										<label for="new-task-injection">Task Injection Method</label>
+										<p class="hint">How the task prompt is passed to the agent</p>
+										<select
+											id="new-task-injection"
+											class="select select-bordered select-sm w-full"
+											bind:value={newProgramForm.taskInjection}
+										>
+											<option value="">Default (prompt flag)</option>
+											<option value="stdin">stdin</option>
+											<option value="prompt">prompt flag</option>
+											<option value="argument">command argument</option>
+										</select>
+									</div>
+
+									<!-- Info note -->
+									<div class="info-note">
+										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="icon-sm">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+										</svg>
+										<span>Full configuration options (startup pattern, models, auth settings) available after adding via Settings &gt; Agents.</span>
+									</div>
+								</div>
+							{/if}
+						</div>
 					</div>
 
 					<button
 						class="btn btn-ghost btn-sm back-btn"
-						onclick={() => { selectedPreset = null; newProgramForm = {}; }}
+						onclick={() => { selectedPreset = null; newProgramForm = {}; showAdvancedOptions = false; newFormFlags = []; newFormNewFlag = ''; }}
 					>
 						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="icon-sm">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
@@ -1667,5 +1807,76 @@
 
 	.back-btn {
 		margin-top: 1rem;
+	}
+
+	/* Advanced Options Section */
+	.advanced-options-section {
+		margin-top: 1.25rem;
+		padding-top: 1rem;
+		border-top: 1px solid oklch(0.22 0.02 250);
+	}
+
+	.advanced-toggle {
+		color: oklch(0.65 0.02 250);
+		font-size: 0.8125rem;
+	}
+
+	.advanced-toggle:hover {
+		color: oklch(0.80 0.02 250);
+		background: oklch(0.18 0.02 250);
+	}
+
+	.advanced-options-content {
+		padding: 1rem 0;
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	.advanced-options-content .form-group {
+		margin-bottom: 0;
+	}
+
+	.advanced-options-content .hint {
+		font-size: 0.75rem;
+		color: oklch(0.55 0.02 250);
+		margin: 0 0 0.5rem 0;
+	}
+
+	.flags-list {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.375rem;
+		margin-bottom: 0.5rem;
+		min-height: 1.5rem;
+	}
+
+	.flags-list .badge {
+		padding: 0.25rem 0.5rem;
+		font-size: 0.75rem;
+	}
+
+	.flags-list .btn-circle {
+		padding: 0;
+		min-height: unset;
+		height: auto;
+		width: auto;
+	}
+
+	.info-note {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.5rem;
+		padding: 0.75rem;
+		background: oklch(0.18 0.03 200 / 0.15);
+		border: 1px solid oklch(0.35 0.08 200 / 0.3);
+		border-radius: 8px;
+		font-size: 0.8125rem;
+		color: oklch(0.70 0.05 200);
+	}
+
+	.info-note svg {
+		flex-shrink: 0;
+		margin-top: 0.125rem;
 	}
 </style>
