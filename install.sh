@@ -14,6 +14,56 @@ RED='\033[0;31m'
 BOLD='\033[1m'
 NC='\033[0m'
 
+# Helper function for safe user input
+# Handles piped execution (curl | bash) by reading from /dev/tty
+# Falls back to non-interactive defaults when TTY unavailable
+prompt_user() {
+    local prompt="$1"
+    local default="$2"
+    local varname="$3"
+
+    echo -n "$prompt"
+
+    # Check if /dev/tty is available for interactive input
+    if [ -t 0 ] || [ -e /dev/tty ]; then
+        read -r response </dev/tty 2>/dev/null || response="$default"
+    else
+        # Non-interactive mode (e.g., Docker build, CI)
+        echo ""
+        echo -e "${YELLOW}  (non-interactive mode - using default: ${default:-empty})${NC}"
+        response="$default"
+    fi
+
+    eval "$varname=\"\$response\""
+}
+
+# Helper function for yes/no prompts
+# Returns 0 for yes, 1 for no
+# default: "y" means empty response = yes, "n" means empty response = no
+prompt_yes_no() {
+    local prompt="$1"
+    local default="$2"  # "y" or "n"
+    local response
+
+    prompt_user "$prompt" "" "response"
+
+    # Empty response uses default
+    if [ -z "$response" ]; then
+        [ "$default" = "y" ] || [ "$default" = "Y" ]
+        return $?
+    fi
+
+    # Check for explicit yes/no
+    case "$response" in
+        [yY]|[yY][eE][sS])
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 # Check if running as root
 if [ "$EUID" -eq 0 ]; then
     echo -e "${RED}ERROR: Do not run this script as root${NC}"
@@ -40,7 +90,7 @@ if [ -n "$MISSING_DEPS" ]; then
     echo -e "${YELLOW}⚠  Missing required dependencies:${NC}$MISSING_DEPS"
     echo ""
 
-    # Detect package manager
+    # Detect package manager and build install command
     PKG_MANAGER=""
     INSTALL_CMD=""
 
@@ -49,42 +99,107 @@ if [ -n "$MISSING_DEPS" ]; then
         INSTALL_CMD="sudo pacman -S --noconfirm$MISSING_DEPS"
     elif command -v apt &> /dev/null; then
         PKG_MANAGER="apt"
-        INSTALL_CMD="sudo apt install -y$MISSING_DEPS"
+        # Update package lists first for fresh systems
+        INSTALL_CMD="sudo apt update && sudo apt install -y$MISSING_DEPS"
     elif command -v dnf &> /dev/null; then
         PKG_MANAGER="dnf"
         INSTALL_CMD="sudo dnf install -y$MISSING_DEPS"
+    elif command -v yum &> /dev/null; then
+        PKG_MANAGER="yum"
+        INSTALL_CMD="sudo yum install -y$MISSING_DEPS"
+    elif command -v zypper &> /dev/null; then
+        PKG_MANAGER="zypper"
+        INSTALL_CMD="sudo zypper install -y$MISSING_DEPS"
     elif command -v brew &> /dev/null; then
         PKG_MANAGER="brew"
         INSTALL_CMD="brew install$MISSING_DEPS"
+    elif command -v apk &> /dev/null; then
+        PKG_MANAGER="apk"
+        INSTALL_CMD="sudo apk add$MISSING_DEPS"
     fi
 
     if [ -n "$PKG_MANAGER" ]; then
-        echo -e "${BLUE}Would you like to install them now with $PKG_MANAGER? [Y/n]${NC}"
-        read -r response </dev/tty
+        echo -e "Detected package manager: ${BOLD}$PKG_MANAGER${NC}"
+        echo -e "Command: ${BLUE}$INSTALL_CMD${NC}"
+        echo ""
 
-        if [[ "$response" =~ ^([yY][eE][sS]|[yY]| *)$ ]]; then
+        if prompt_yes_no "${BLUE}Would you like to install them now? [Y/n]${NC} " "y"; then
+            echo ""
             echo -e "${BLUE}Installing dependencies...${NC}"
-            if $INSTALL_CMD; then
+            echo ""
+
+            # Run installation with visible output
+            if eval "$INSTALL_CMD"; then
+                echo ""
                 echo -e "${GREEN}✓ Dependencies installed successfully${NC}"
                 echo ""
+
+                # Verify installation
+                STILL_MISSING=""
+                for dep in $MISSING_DEPS; do
+                    if ! command -v "$dep" &> /dev/null; then
+                        STILL_MISSING="$STILL_MISSING $dep"
+                    fi
+                done
+
+                if [ -n "$STILL_MISSING" ]; then
+                    echo -e "${YELLOW}⚠  Some dependencies may not be in PATH:${NC}$STILL_MISSING"
+                    echo "  You may need to open a new terminal or run: source ~/.bashrc"
+                    echo ""
+                fi
             else
+                echo ""
                 echo -e "${RED}ERROR: Failed to install dependencies${NC}"
-                echo "Please install manually and re-run this script"
+                echo ""
+                echo "Possible causes:"
+                echo "  • Network issues - check your internet connection"
+                echo "  • Permission denied - ensure you can run sudo"
+                echo "  • Package not found - the package may have a different name"
+                echo ""
+                echo "Try installing manually:"
+                echo "  $INSTALL_CMD"
+                echo ""
+                echo "Then re-run this script."
                 exit 1
             fi
         else
-            echo -e "${RED}Installation cancelled. Please install dependencies manually:${NC}"
+            echo ""
+            echo -e "${YELLOW}Installation skipped.${NC}"
+            echo ""
+            echo "JAT requires these dependencies to function properly."
+            echo "Install them manually with:"
+            echo ""
             echo "  $INSTALL_CMD"
+            echo ""
+            echo "Then re-run this script."
             exit 1
         fi
     else
-        echo -e "${RED}ERROR: Could not detect package manager${NC}"
+        echo -e "${RED}ERROR: Could not detect a supported package manager${NC}"
         echo ""
-        echo "Install dependencies manually:"
-        echo "  # Arch/Manjaro: sudo pacman -S$MISSING_DEPS"
-        echo "  # Debian/Ubuntu: sudo apt install$MISSING_DEPS"
-        echo "  # Fedora: sudo dnf install$MISSING_DEPS"
-        echo "  # macOS: brew install$MISSING_DEPS"
+        echo "JAT supports: pacman, apt, dnf, yum, zypper, brew, apk"
+        echo ""
+        echo "Install dependencies manually using your package manager:"
+        echo ""
+        echo "  # Arch/Manjaro"
+        echo "  sudo pacman -S$MISSING_DEPS"
+        echo ""
+        echo "  # Debian/Ubuntu"
+        echo "  sudo apt install$MISSING_DEPS"
+        echo ""
+        echo "  # Fedora"
+        echo "  sudo dnf install$MISSING_DEPS"
+        echo ""
+        echo "  # openSUSE"
+        echo "  sudo zypper install$MISSING_DEPS"
+        echo ""
+        echo "  # macOS"
+        echo "  brew install$MISSING_DEPS"
+        echo ""
+        echo "  # Alpine"
+        echo "  apk add$MISSING_DEPS"
+        echo ""
+        echo "Then re-run this script."
         exit 1
     fi
 fi
@@ -146,7 +261,13 @@ echo ""
 echo "This will save 32,000+ tokens vs MCP servers!"
 echo ""
 echo -e "${YELLOW}Press ENTER to continue or Ctrl+C to cancel${NC}"
-read </dev/tty
+
+# Wait for user acknowledgment (non-blocking in non-interactive mode)
+if [ -t 0 ] || [ -e /dev/tty ]; then
+    read </dev/tty 2>/dev/null || true
+else
+    echo -e "${BLUE}  (non-interactive mode - continuing automatically)${NC}"
+fi
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -239,14 +360,12 @@ echo "Optional tech stack tools available:"
 echo "  • SvelteKit + Supabase (11 tools: component-deps, route-list, error-log, etc.)"
 echo ""
 
-if command -v gum &> /dev/null; then
+if command -v gum &> /dev/null && [ -t 0 ]; then
     SELECTED_STACKS=$(gum choose --no-limit \
         "SvelteKit + Supabase" \
         "Skip - No additional stacks")
 else
-    echo -n "Install SvelteKit + Supabase tools? [y/N] "
-    read -r response </dev/tty
-    if [[ "$response" =~ ^[Yy]$ ]]; then
+    if prompt_yes_no "Install SvelteKit + Supabase tools? [y/N] " "n"; then
         SELECTED_STACKS="SvelteKit"
     fi
 fi
@@ -271,14 +390,12 @@ INSTALL_WHISPER="no"
 echo "Voice-to-Text enables speech input in the IDE."
 echo "Requires: ~2GB disk, cmake, g++, ffmpeg"
 echo ""
-if command -v gum &> /dev/null; then
+if command -v gum &> /dev/null && [ -t 0 ]; then
     if gum confirm "Install Voice-to-Text (whisper.cpp)?"; then
         INSTALL_WHISPER="yes"
     fi
 else
-    echo -n "Install Voice-to-Text (whisper.cpp)? [y/N] "
-    read -r response </dev/tty
-    if [[ "$response" =~ ^[Yy]$ ]]; then
+    if prompt_yes_no "Install Voice-to-Text (whisper.cpp)? [y/N] " "n"; then
         INSTALL_WHISPER="yes"
     fi
 fi
@@ -349,9 +466,7 @@ echo "The IDE will guide you through adding your first project."
 echo ""
 echo "Documentation: https://github.com/joewinke/jat"
 echo ""
-echo -e -n "${BOLD}Launch JAT now? [Y/n]${NC} "
-read -r response </dev/tty
-if [[ ! "$response" =~ ^[Nn]$ ]]; then
+if prompt_yes_no "${BOLD}Launch JAT now? [Y/n]${NC} " "y"; then
     echo ""
     exec "$HOME/.local/bin/jat"
 fi

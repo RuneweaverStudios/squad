@@ -17,6 +17,26 @@ RED='\033[0;31m'
 BOLD='\033[1m'
 NC='\033[0m'
 
+# Helper function for safe user input
+# Handles piped execution (curl | bash) by reading from /dev/tty
+prompt_choice() {
+    local prompt="$1"
+    local default="$2"
+    local varname="$3"
+
+    echo -n "$prompt"
+
+    if [ -t 0 ] || [ -e /dev/tty ]; then
+        read -r response </dev/tty 2>/dev/null || response="$default"
+    else
+        echo ""
+        echo -e "${YELLOW}  (non-interactive mode - using default: $default)${NC}"
+        response="$default"
+    fi
+
+    eval "$varname=\"\${response:-\$default}\""
+}
+
 echo ""
 echo -e "${BOLD}JAT — The World's First Agentic IDE${NC}"
 echo ""
@@ -40,20 +60,46 @@ if [ -d "$INSTALL_DIR" ]; then
     echo "  2) Fresh install (removes existing)"
     echo "  3) Cancel"
     echo ""
-    echo -n "Choose [1-3] (default: 1): "
-    read -r choice </dev/tty
 
-    case "${choice:-1}" in
+    prompt_choice "Choose [1-3] (default: 1): " "1" "choice"
+
+    case "$choice" in
         1)
             echo ""
             echo -e "${BLUE}Updating JAT...${NC}"
             cd "$INSTALL_DIR"
-            git pull --ff-only || {
-                echo -e "${YELLOW}⚠ Fast-forward pull failed. You may have local changes.${NC}"
-                echo "  Resolve manually: cd $INSTALL_DIR && git status"
+
+            # Check for local changes first
+            if ! git diff-index --quiet HEAD -- 2>/dev/null; then
+                echo -e "${YELLOW}⚠ Local changes detected. Stashing...${NC}"
+                git stash push -m "jat-bootstrap-autostash" || true
+                STASHED=1
+            fi
+
+            if git pull --ff-only; then
+                echo -e "${GREEN}✓ Updated to latest version${NC}"
+
+                # Restore stashed changes if any
+                if [ "${STASHED:-0}" = "1" ]; then
+                    echo -e "${BLUE}Restoring stashed changes...${NC}"
+                    git stash pop || {
+                        echo -e "${YELLOW}⚠ Could not restore stashed changes automatically.${NC}"
+                        echo "  Your changes are saved in git stash. Run: git stash pop"
+                    }
+                fi
+            else
+                echo -e "${YELLOW}⚠ Fast-forward pull failed.${NC}"
+                echo ""
+                echo "This can happen when:"
+                echo "  • You have unpushed local commits"
+                echo "  • Remote history was rewritten"
+                echo ""
+                echo "To resolve manually:"
+                echo "  cd $INSTALL_DIR"
+                echo "  git status"
+                echo "  git pull --rebase  # or: git reset --hard origin/master"
                 exit 1
-            }
-            echo -e "${GREEN}✓ Updated to latest version${NC}"
+            fi
             ;;
         2)
             echo ""
@@ -67,7 +113,8 @@ if [ -d "$INSTALL_DIR" ]; then
             exit 0
             ;;
         *)
-            echo "Invalid choice"
+            echo -e "${RED}Invalid choice: $choice${NC}"
+            echo "Please enter 1, 2, or 3"
             exit 1
             ;;
     esac
