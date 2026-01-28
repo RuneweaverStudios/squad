@@ -1,7 +1,7 @@
 <script lang="ts">
 	/**
 	 * AgentAvatar Component
-	 * Displays agent avatar (SVG) or fallback initials
+	 * Displays agent avatar (SVG) or fallback initials with optional status ring
 	 *
 	 * Features:
 	 * - Fetches SVG from /api/avatar/{name}
@@ -10,19 +10,45 @@
 	 * - Uses oklch color space for theme consistency
 	 * - Handles loading, success, and error states
 	 * - Properly reactive to name prop changes
+	 * - Optional status ring with customizable color and glow
 	 */
+	import { getSessionStateVisual } from '$lib/config/statusColors';
+	import { getSessionByAgent } from '$lib/stores/workSessions.svelte';
 
 	interface Props {
 		name: string;
 		size?: number;
 		class?: string;
+		/** Show status ring around avatar */
+		showRing?: boolean;
+		/** Ring color (oklch string) - overrides sessionState color */
+		ringColor?: string;
+		/** Session state for ring color (e.g., 'working', 'completed') - uses SESSION_STATE_VISUALS.accent */
+		sessionState?: string;
+		/** Show glow effect around ring */
+		showGlow?: boolean;
 	}
 
 	let {
 		name,
 		size = 32,
-		class: className = ''
+		class: className = '',
+		showRing = false,
+		ringColor,
+		sessionState,
+		showGlow = false
 	}: Props = $props();
+
+	// Compute effective ring color from props, session state, or store lookup
+	const effectiveRingColor = $derived.by(() => {
+		if (!showRing) return null;
+		if (ringColor) return ringColor;
+		if (sessionState) return getSessionStateVisual(sessionState).accent;
+		// Look up from global store if not provided
+		const session = getSessionByAgent(name);
+		if (session?._sseState) return getSessionStateVisual(session._sseState).accent;
+		return 'oklch(0.70 0.18 250)'; // Default blue
+	});
 
 	let loadState: 'loading' | 'success' | 'error' = $state('loading');
 	let svgContent: string | null = $state(null);
@@ -145,41 +171,76 @@
 	});
 </script>
 
-<div
-	class="inline-flex items-center justify-center rounded-full overflow-hidden flex-shrink-0 {className}"
-	style="width: {size}px; height: {size}px; perspective: 200px;"
->
-	{#if loadState === 'loading'}
-		<!-- Loading skeleton -->
+{#if showRing && effectiveRingColor}
+	<!-- Avatar with status ring -->
+	<div
+		class="inline-flex items-center justify-center rounded-full flex-shrink-0 {className}"
+		style="
+			width: {size + 4}px;
+			height: {size + 4}px;
+			padding: 2px;
+			background: {effectiveRingColor};
+			{showGlow ? `box-shadow: 0 0 8px ${effectiveRingColor};` : ''}
+		"
+		title={name}
+	>
 		<div
-			class="w-full h-full animate-pulse"
-			style="background: oklch(0.30 0.02 250);"
-		></div>
-	{:else if loadState === 'success' && svgContent}
-		<!-- SVG avatar with flip-in animation -->
-		<div
-			class="w-full h-full avatar-flip-in"
-			style="background: oklch(0.15 0.01 250);"
+			class="inline-flex items-center justify-center rounded-full overflow-hidden"
+			style="width: {size}px; height: {size}px; perspective: 200px;"
 		>
-			{@html svgContent}
+			{#if loadState === 'loading'}
+				<div class="w-full h-full animate-pulse" style="background: oklch(0.30 0.02 250);"></div>
+			{:else if loadState === 'success' && svgContent}
+				<div class="w-full h-full avatar-flip-in" style="background: oklch(0.15 0.01 250);">
+					{@html svgContent}
+				</div>
+			{:else}
+				<div class="w-full h-full flex items-center justify-center avatar-flip-in" style="background: oklch(0.25 0.02 250);">
+					<svg viewBox="0 0 24 24" fill="currentColor" class="text-base-content/50" style="width: {size * 0.65}px; height: {size * 0.65}px;">
+						<path fill-rule="evenodd" d="M18.685 19.097A9.723 9.723 0 0021.75 12c0-5.385-4.365-9.75-9.75-9.75S2.25 6.615 2.25 12a9.723 9.723 0 003.065 7.097A9.716 9.716 0 0012 21.75a9.716 9.716 0 006.685-2.653zm-12.54-1.285A7.486 7.486 0 0112 15a7.486 7.486 0 015.855 2.812A8.224 8.224 0 0112 20.25a8.224 8.224 0 01-5.855-2.438zM15.75 9a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" clip-rule="evenodd" />
+					</svg>
+				</div>
+			{/if}
 		</div>
-	{:else}
-		<!-- Fallback: generic avatar icon with flip-in animation -->
-		<div
-			class="w-full h-full flex items-center justify-center avatar-flip-in"
-			style="background: oklch(0.25 0.02 250);"
-		>
-			<svg
-				viewBox="0 0 24 24"
-				fill="currentColor"
-				class="text-base-content/50"
-				style="width: {size * 0.65}px; height: {size * 0.65}px;"
+	</div>
+{:else}
+	<!-- Avatar without ring (original behavior) -->
+	<div
+		class="inline-flex items-center justify-center rounded-full overflow-hidden flex-shrink-0 {className}"
+		style="width: {size}px; height: {size}px; perspective: 200px;"
+	>
+		{#if loadState === 'loading'}
+			<!-- Loading skeleton -->
+			<div
+				class="w-full h-full animate-pulse"
+				style="background: oklch(0.30 0.02 250);"
+			></div>
+		{:else if loadState === 'success' && svgContent}
+			<!-- SVG avatar with flip-in animation -->
+			<div
+				class="w-full h-full avatar-flip-in"
+				style="background: oklch(0.15 0.01 250);"
 			>
-				<path fill-rule="evenodd" d="M18.685 19.097A9.723 9.723 0 0021.75 12c0-5.385-4.365-9.75-9.75-9.75S2.25 6.615 2.25 12a9.723 9.723 0 003.065 7.097A9.716 9.716 0 0012 21.75a9.716 9.716 0 006.685-2.653zm-12.54-1.285A7.486 7.486 0 0112 15a7.486 7.486 0 015.855 2.812A8.224 8.224 0 0112 20.25a8.224 8.224 0 01-5.855-2.438zM15.75 9a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" clip-rule="evenodd" />
-			</svg>
-		</div>
-	{/if}
-</div>
+				{@html svgContent}
+			</div>
+		{:else}
+			<!-- Fallback: generic avatar icon with flip-in animation -->
+			<div
+				class="w-full h-full flex items-center justify-center avatar-flip-in"
+				style="background: oklch(0.25 0.02 250);"
+			>
+				<svg
+					viewBox="0 0 24 24"
+					fill="currentColor"
+					class="text-base-content/50"
+					style="width: {size * 0.65}px; height: {size * 0.65}px;"
+				>
+					<path fill-rule="evenodd" d="M18.685 19.097A9.723 9.723 0 0021.75 12c0-5.385-4.365-9.75-9.75-9.75S2.25 6.615 2.25 12a9.723 9.723 0 003.065 7.097A9.716 9.716 0 0012 21.75a9.716 9.716 0 006.685-2.653zm-12.54-1.285A7.486 7.486 0 0112 15a7.486 7.486 0 015.855 2.812A8.224 8.224 0 0112 20.25a8.224 8.224 0 01-5.855-2.438zM15.75 9a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" clip-rule="evenodd" />
+				</svg>
+			</div>
+		{/if}
+	</div>
+{/if}
 
 <style>
 	/* Ensure SVG scales to fill container */

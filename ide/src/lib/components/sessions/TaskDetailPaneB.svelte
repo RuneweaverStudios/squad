@@ -567,7 +567,7 @@
 						<div class="details-header-row">
 							{#if details?.assignee}
 								<span class="details-assignee">
-									<AgentAvatar name={details.assignee} size={16} />
+									<AgentAvatar name={details.assignee} size={16} showRing={true} />
 									<span class="assignee-name">{details.assignee}</span>
 								</span>
 							{/if}
@@ -1002,7 +1002,7 @@
 								<div class="report-header-meta">
 									{#if summaryData.agent}
 										<span class="report-agent">
-											<AgentAvatar name={summaryData.agent} size={16} />
+											<AgentAvatar name={summaryData.agent} size={16} showRing={true} />
 											<span>{summaryData.agent}</span>
 										</span>
 									{/if}

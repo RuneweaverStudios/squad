@@ -10,6 +10,8 @@
 	 */
 	import { onMount, onDestroy } from 'svelte';
 	import AgentAvatar from '$lib/components/AgentAvatar.svelte';
+	import { getSessionStateVisual } from '$lib/config/statusColors';
+	import { getSessionByAgent } from '$lib/stores/workSessions.svelte';
 
 	interface Props {
 		/** Agent name */
@@ -18,6 +20,8 @@
 		size?: number;
 		/** Whether agent is currently working (shows ring) */
 		isWorking?: boolean;
+		/** Session state for ring color (e.g., 'working', 'ready-for-review') - uses SESSION_STATE_VISUALS colors */
+		sessionState?: string;
 		/** Start time for the working timer (ISO string or timestamp) */
 		startTime?: string | number | null;
 		/** Display variant: 'avatar' | 'name' | 'timer' */
@@ -32,11 +36,27 @@
 		name,
 		size = 20,
 		isWorking = true,
+		sessionState,
 		startTime = null,
 		variant = 'timer',
 		onClick,
 		class: className = ''
 	}: Props = $props();
+
+	// Effective session state for ring color
+	// Priority: 1) explicit sessionState prop, 2) lookup from workSessionsState store, 3) fallback to 'working'
+	const effectiveState = $derived.by(() => {
+		if (sessionState) return sessionState;
+		// Look up from global store if not provided
+		const session = getSessionByAgent(name);
+		return session?._sseState || 'working';
+	});
+
+	// Get the ring color from SESSION_STATE_VISUALS
+	const ringColor = $derived.by(() => {
+		if (!isWorking) return null;
+		return getSessionStateVisual(effectiveState).accent;
+	});
 
 	function handleClick(event: MouseEvent) {
 		if (onClick) {
@@ -92,16 +112,11 @@
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
-		class="avatar {isWorking ? 'online' : ''} {onClick ? 'cursor-pointer hover:scale-110 transition-transform' : ''} {className}"
+		class="{onClick ? 'cursor-pointer hover:scale-110 transition-transform' : ''} {className}"
 		title={tooltipText}
 		onclick={handleClick}
 	>
-		<div
-			class="rounded-full {isWorking ? 'ring-2 ring-info ring-offset-base-100 ring-offset-1' : ''}"
-			style="width: {size}px; height: {size}px;"
-		>
-			<AgentAvatar {name} {size} />
-		</div>
+		<AgentAvatar {name} {size} showRing={isWorking} sessionState={effectiveState} />
 	</div>
 {:else}
 	<!-- Avatar + name (+ timer if variant === 'timer') -->
@@ -111,15 +126,8 @@
 		class="inline-flex items-center gap-1.5 {onClick ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''} {className}"
 		onclick={handleClick}
 	>
-		<div class="avatar {isWorking ? 'online' : ''}" title={name}>
-			<div
-				class="rounded-full {isWorking ? 'ring-2 ring-info ring-offset-base-100 ring-offset-1' : ''}"
-				style="width: {size}px; height: {size}px;"
-			>
-				<AgentAvatar {name} {size} />
-			</div>
-		</div>
-		<span class="font-medium text-xs text-info">{name}</span>
+		<AgentAvatar {name} {size} showRing={isWorking} sessionState={effectiveState} />
+		<span class="font-medium text-xs" style={ringColor ? `color: ${ringColor};` : 'color: oklch(0.70 0.18 250);'}>{name}</span>
 		{#if variant === 'timer' && workingDuration}
 			<span class="countdown font-mono text-xs tabular-nums text-info/70" title="Working for {workingDuration.display}">
 				{#if workingDuration.hours > 0}
