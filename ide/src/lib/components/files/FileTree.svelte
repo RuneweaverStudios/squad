@@ -13,6 +13,7 @@
 
 	import { onMount, tick } from 'svelte';
 	import FileTreeNode from './FileTreeNode.svelte';
+	import FilePathPicker from './FilePathPicker.svelte';
 	import type { GitFileStatus } from './types';
 	import { setFileChangesCount } from '$lib/stores/drawerStore';
 	import { JAT_DEFAULTS } from '$lib/config/constants';
@@ -42,6 +43,8 @@
 
 	interface Props {
 		project: string;
+		/** Project root path (absolute), passed from parent. Used for display truncation in FilePathPicker. */
+		projectPath?: string;
 		selectedPath?: string | null;
 		onFileSelect: (path: string) => void;
 		onFileDelete?: (path: string) => void;
@@ -55,6 +58,7 @@
 
 	let {
 		project,
+		projectPath = '',
 		selectedPath = null,
 		onFileSelect,
 		onFileDelete,
@@ -472,7 +476,8 @@
 	let createName = $state('');
 	let createError = $state<string | null>(null);
 	let isCreating = $state(false);
-	let createNameInputRef = $state<HTMLInputElement | null>(null);
+
+	// projectPath is now a prop passed from parent (fetched from API, not from filesystem)
 
 	// Context menu state
 	let contextMenu = $state<{ x: number; y: number; entry: DirectoryEntry } | null>(null);
@@ -866,14 +871,11 @@
 	}
 
 	// Open create modal
-	async function openCreateModal(type: 'file' | 'folder', parentPath: string) {
+	function openCreateModal(type: 'file' | 'folder', parentPath: string) {
 		createModal = { parentPath, type };
 		createName = '';
 		createError = null;
 		closeContextMenu();
-		// Focus the input after the modal renders
-		await tick();
-		createNameInputRef?.focus();
 	}
 
 	// Close create modal
@@ -884,29 +886,29 @@
 		isCreating = false;
 	}
 
-	// Perform create
-	async function performCreate() {
-		if (!createModal || !createName.trim()) return;
+	// Perform create - accepts fullPath and filename from FilePathPicker
+	async function performCreate(fullPath?: string, filename?: string) {
+		if (!createModal) return;
 
-		const name = createName.trim();
+		// Use provided filename or fall back to createName state
+		const name = filename?.trim() || createName.trim();
+		if (!name) return;
+
 		const type = createModal.type;
 
-		// Validate name
-		if (name.includes('/') || name.includes('\\')) {
-			createError = 'Name cannot contain / or \\';
-			return;
-		}
+		// Get just the last segment of the name for validation (after all /)
+		const lastSegment = name.split('/').pop() || name;
 
-		// Check for invalid characters
-		if (/[<>:"|?*\x00-\x1F]/.test(name)) {
+		// Check for invalid characters in the final filename
+		if (/[<>:"|?*\x00-\x1F]/.test(lastSegment)) {
 			createError = 'Name contains invalid characters';
 			return;
 		}
 
 		// Check for reserved names (Windows compatibility)
 		const reservedNames = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'];
-		if (reservedNames.includes(name.toUpperCase().split('.')[0])) {
-			createError = `"${name}" is a reserved name`;
+		if (reservedNames.includes(lastSegment.toUpperCase().split('.')[0])) {
+			createError = `"${lastSegment}" is a reserved name`;
 			return;
 		}
 
@@ -927,7 +929,7 @@
 
 			if (!response.ok) {
 				const data = await response.json();
-				const errorMsg = getOperationErrorMessage(data.error || '', response.status, 'create', name);
+				const errorMsg = getOperationErrorMessage(data.error || '', response.status, 'create', lastSegment);
 				createError = errorMsg;
 				return;
 			}
@@ -941,28 +943,53 @@
 
 			// Success notification
 			if (onSuccess) {
-				onSuccess(`Created ${type === 'folder' ? 'folder' : 'file'} "${name}"`);
+				onSuccess(`Created ${type === 'folder' ? 'folder' : 'file'} "${lastSegment}"`);
 			}
 
-			// Refresh the parent folder
-			const parentPath = createModal.parentPath;
+			// Refresh the parent folder - use the actual parent from result.path
+			const actualParentPath = result.path.includes('/')
+				? result.path.substring(0, result.path.lastIndexOf('/'))
+				: '';
 
-			if (parentPath) {
+			if (actualParentPath) {
 				// Reload parent folder
-				const entries = await fetchDirectory(parentPath);
+				const entries = await fetchDirectory(actualParentPath);
 				const newLoaded = new Map(loadedFolders);
-				newLoaded.set(parentPath, entries);
+				newLoaded.set(actualParentPath, entries);
 				loadedFolders = newLoaded;
 
 				// Expand the parent folder if not already
-				if (!expandedFolders.has(parentPath)) {
+				if (!expandedFolders.has(actualParentPath)) {
 					const newExpanded = new Set(expandedFolders);
-					newExpanded.add(parentPath);
+					newExpanded.add(actualParentPath);
 					expandedFolders = newExpanded;
 				}
 			} else {
 				// Reload root
 				await loadRoot();
+			}
+
+			// Also refresh intermediate directories if subdirs were created
+			if (name.includes('/')) {
+				const nameParts = name.split('/');
+				let currentPath = createModal.parentPath;
+				for (let i = 0; i < nameParts.length - 1; i++) {
+					currentPath = currentPath ? `${currentPath}/${nameParts[i]}` : nameParts[i];
+					if (!loadedFolders.has(currentPath)) {
+						try {
+							const entries = await fetchDirectory(currentPath);
+							const newLoaded = new Map(loadedFolders);
+							newLoaded.set(currentPath, entries);
+							loadedFolders = newLoaded;
+							// Also expand it
+							const newExpanded = new Set(expandedFolders);
+							newExpanded.add(currentPath);
+							expandedFolders = newExpanded;
+						} catch {
+							// Ignore errors loading intermediate directories
+						}
+					}
+				}
 			}
 
 			// Select the new file/folder
@@ -1533,11 +1560,11 @@
 	</div>
 {/if}
 
-<!-- Create Modal -->
+<!-- Create Modal with FilePathPicker -->
 {#if createModal}
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div class="modal-overlay" onclick={closeCreateModal}>
-		<div class="modal-dialog" onclick={(e) => e.stopPropagation()}>
+		<div class="modal-dialog modal-dialog-picker" onclick={(e) => e.stopPropagation()}>
 			<div class="modal-header">
 				<h3 class="modal-title">New {createModal.type === 'folder' ? 'Folder' : 'File'}</h3>
 				<button class="modal-close" onclick={closeCreateModal} aria-label="Close">
@@ -1546,42 +1573,20 @@
 					</svg>
 				</button>
 			</div>
-			<div class="modal-body">
-				<label class="modal-label">
-					<span>Name</span>
-					<input
-						type="text"
-						class="modal-input"
-						bind:value={createName}
-						bind:this={createNameInputRef}
-						onkeydown={(e) => {
-							if (e.key === 'Enter') performCreate();
-							if (e.key === 'Escape') closeCreateModal();
-						}}
-						placeholder={createModal.type === 'folder' ? 'folder-name' : 'filename.ts'}
-					/>
-				</label>
-				{#if createModal.parentPath}
-					<div class="modal-path">
-						<span class="path-label">In:</span>
-						<span class="path-value">{createModal.parentPath}/</span>
-					</div>
-				{/if}
-				{#if createError}
-					<div class="modal-error">{createError}</div>
-				{/if}
-			</div>
-			<div class="modal-footer">
-				<button class="modal-btn modal-btn-ghost" onclick={closeCreateModal}>
-					Cancel
-				</button>
-				<button
-					class="modal-btn modal-btn-primary"
-					onclick={performCreate}
-					disabled={isCreating || !createName.trim()}
-				>
-					{isCreating ? 'Creating...' : 'Create'}
-				</button>
+			<div class="modal-body modal-body-picker">
+				<FilePathPicker
+					basePath={createModal.parentPath ? `${projectPath}/${createModal.parentPath}` : projectPath}
+					{projectPath}
+					{project}
+					bind:filename={createName}
+					type={createModal.type}
+					placeholder={createModal.type === 'folder' ? 'folder-name or path/to/folder' : 'filename.ts or path/to/file.ts'}
+					confirmText={isCreating ? 'Creating...' : 'Create'}
+					confirmDisabled={isCreating}
+					error={createError || ''}
+					onConfirm={performCreate}
+					onCancel={closeCreateModal}
+				/>
 			</div>
 		</div>
 	</div>
@@ -2440,5 +2445,22 @@
 	.path-value {
 		color: oklch(0.70 0.02 250);
 		font-family: ui-monospace, monospace;
+	}
+
+	/* FilePathPicker modal adjustments */
+	.modal-dialog-picker {
+		min-width: 380px;
+		max-width: 450px;
+	}
+
+	.modal-body-picker {
+		margin-bottom: 0;
+	}
+
+	/* Override FilePathPicker container in modal context */
+	.modal-body-picker :global(.file-path-picker) {
+		background: transparent;
+		border: none;
+		padding: 0;
 	}
 </style>

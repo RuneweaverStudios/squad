@@ -1118,6 +1118,7 @@
 							<FileTree
 								bind:this={fileTreeRef}
 								project={selectedProject}
+								projectPath={selectedProjectPath}
 								selectedPath={activeFilePath}
 								onFileSelect={handleFileSelect}
 								onFileDelete={handleFileDelete}
