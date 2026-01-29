@@ -28,9 +28,6 @@ JAT is the complete, self-contained environment for agentic development. Task ma
 ![JAT IDE](./assets/ide-screenshot.png)
 *The JAT IDE: agent sessions, task management, and code editor unified*
 
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=joewinke/jat&type=timeline&legend=top-left)](https://www.star-history.com/#joewinke/jat&type=timeline&legend=top-left)
 ---
 
 ## The Paradigm Shift
@@ -406,10 +403,15 @@ Open a PR against `master`. All contributions are licensed under MIT.
 
 ## License
 
-MIT
+MIT - This is my gift to all the great's who haved gifted so much to all of us. If you use this software, use it to make something you give back to open-source.
 
 ---
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=joewinke/jat&type=timeline&legend=top-left)](https://www.star-history.com/#joewinke/jat&type=timeline&legend=top-left)
+
+---
 **JAT: Supervise the swarm. Ship continuously.**
 
 [Install](#quick-start) | [Docs](./QUICKSTART.md) | [Discord](https://discord.gg/AFJf93p7Bx) | [Issues](https://github.com/joewinke/jat/issues)
