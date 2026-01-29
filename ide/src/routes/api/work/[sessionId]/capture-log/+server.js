@@ -1,24 +1,27 @@
 /**
  * Capture Session Log API
- * POST /api/work/[sessionId]/capture-log - Capture and save session transcript
+ * POST /api/work/[sessionId]/capture-log - Capture and append to unified session log
  *
  * Path params:
  * - sessionId: tmux session name (e.g., "jat-WisePrairie")
  *
  * Body (optional):
- * - taskId: Override task ID for filename (otherwise detected from session)
+ * - taskId: Task ID for context (used in log metadata)
+ * - reason: Why capture was triggered (default: "completed")
  *
  * Behavior:
  * 1. Capture full tmux pane content
- * 2. Determine task ID from agent's task or session output
- * 3. Save to .beads/logs/session-{taskId}-{timestamp}.log
- * 4. Return log file path
+ * 2. Append to unified session log: .beads/logs/session-{sessionId}.log
+ * 3. Return log file path
+ *
+ * The unified log accumulates all session history across compactions,
+ * pauses, completions, and manual captures.
  */
 
 import { json } from '@sveltejs/kit';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, appendFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import { getTasks } from '$lib/server/beads.js';
@@ -38,7 +41,7 @@ export async function POST({ params, request }) {
 		}
 
 		// Parse optional body
-		/** @type {{ taskId?: string }} */
+		/** @type {{ taskId?: string, reason?: string }} */
 		let body = {};
 		try {
 			body = await request.json();
@@ -48,9 +51,14 @@ export async function POST({ params, request }) {
 
 		const projectPath = process.cwd().replace('/ide', '');
 		const logsDir = path.join(projectPath, '.beads', 'logs');
+		const reason = body.reason || 'completed';
 
 		// Extract agent name from session name (jat-AgentName -> AgentName)
 		const agentName = sessionId.replace(/^jat-/, '');
+
+		// Unified log file path
+		const filename = `session-${sessionId}.log`;
+		const filepath = path.join(logsDir, filename);
 
 		// Step 1: Check if session exists
 		try {
@@ -92,7 +100,7 @@ export async function POST({ params, request }) {
 			}, { status: 400 });
 		}
 
-		// Step 3: Determine task ID
+		// Step 3: Determine task ID (for metadata, not filename)
 		let taskId = body.taskId || null;
 
 		if (!taskId) {
@@ -118,52 +126,46 @@ export async function POST({ params, request }) {
 		}
 
 		if (!taskId) {
-			// Try to extract task ID from session content
-			// Look for patterns like [JAT:WORKING task=xxx] or "Task: xxx"
-			const taskPatterns = [
-				/\[JAT:WORKING task=([^\]]+)\]/,
-				/\[JAT:COMPLETED\].*?([a-z]+-[a-z0-9]+)/i,
-				/Task[:\s]+([a-z]+-[a-z0-9]+)/i,
-				/Starting work:?\s*([a-z]+-[a-z0-9]+)/i
-			];
-
-			for (const pattern of taskPatterns) {
-				const match = sessionContent.match(pattern);
-				if (match && match[1]) {
-					taskId = match[1];
-					break;
-				}
-			}
-		}
-
-		// Default task ID if still not found
-		if (!taskId) {
 			taskId = 'unknown';
 		}
-
-		// Step 4: Generate filename and save
-		const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-		const filename = `session-${sessionId}-${taskId}-${timestamp}.log`;
-		const filepath = path.join(logsDir, filename);
 
 		// Ensure logs directory exists
 		if (!existsSync(logsDir)) {
 			await mkdir(logsDir, { recursive: true });
 		}
 
-		// Build log content with metadata header
-		const logHeader = `# Session Log
-# Session: ${sessionId}
+		const timestamp = new Date().toISOString();
+
+		// Determine separator based on reason
+		const separators = {
+			compacted: '📦 CONTEXT COMPACTED',
+			paused: '⏸️ SESSION PAUSED',
+			killed: '💀 SESSION KILLED',
+			completed: '✅ TASK COMPLETED'
+		};
+		const label = separators[reason] || '📝 LOG CAPTURED';
+
+		const separator = `
+════════════════════════════════════════════════════════════════════════════════
+${label} at ${timestamp}
+════════════════════════════════════════════════════════════════════════════════
+`;
+
+		// If log file doesn't exist, add header
+		if (!existsSync(filepath)) {
+			const header = `# Session Log: ${sessionId}
 # Agent: ${agentName}
 # Task: ${taskId}
-# Captured: ${new Date().toISOString()}
-# Lines: ${sessionContent.split('\n').length}
-${'='.repeat(80)}
+# Created: ${timestamp}
+# This file accumulates session history across compactions, pauses, and completions.
+================================================================================
 
 `;
-		const fullContent = logHeader + sessionContent;
+			await writeFile(filepath, header, 'utf-8');
+		}
 
-		await writeFile(filepath, fullContent, 'utf-8');
+		// Append scrollback with separator
+		await appendFile(filepath, sessionContent + separator, 'utf-8');
 
 		// Get file size
 		const { size } = await import('fs').then(fs =>
@@ -179,8 +181,9 @@ ${'='.repeat(80)}
 			filepath,
 			size,
 			lines: sessionContent.split('\n').length,
-			message: `Session log saved to ${filename}`,
-			timestamp: new Date().toISOString()
+			reason,
+			message: `Session log appended to ${filename}`,
+			timestamp
 		});
 
 	} catch (error) {

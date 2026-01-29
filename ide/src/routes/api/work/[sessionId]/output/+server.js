@@ -24,44 +24,31 @@ import path from 'path';
 const execAsync = promisify(exec);
 
 /**
- * Find the most recent pre-compaction scrollback file for a session
+ * Read the unified session log file for a session
+ * This log accumulates history across compactions, pauses, and completions.
  * @param {string} sessionId - tmux session name (e.g., "jat-WisePrairie")
- * @returns {Promise<{content: string, filename: string, capturedAt: string} | null>}
+ * @returns {Promise<{content: string, filename: string, modifiedAt: string} | null>}
  */
-async function findPreCompactScrollback(sessionId) {
+async function readSessionLog(sessionId) {
 	const projectPath = process.cwd().replace('/ide', '');
 	const logsDir = path.join(projectPath, '.beads', 'logs');
+	const logFile = path.join(logsDir, `session-${sessionId}.log`);
 
-	if (!existsSync(logsDir)) {
+	if (!existsSync(logFile)) {
 		return null;
 	}
 
 	try {
-		const files = await readdir(logsDir);
-		// Find files matching scrollback-pre-compact-{sessionId}-*.log
-		const prefix = `scrollback-pre-compact-${sessionId}-`;
-		const matchingFiles = files
-			.filter(f => f.startsWith(prefix) && f.endsWith('.log'))
-			.sort()
-			.reverse(); // Most recent first (filenames include timestamp)
-
-		if (matchingFiles.length === 0) {
-			return null;
-		}
-
-		// Get the most recent one
-		const filename = matchingFiles[0];
-		const filepath = path.join(logsDir, filename);
-		const content = await readFile(filepath, 'utf-8');
-		const fileStat = await stat(filepath);
+		const content = await readFile(logFile, 'utf-8');
+		const fileStat = await stat(logFile);
 
 		return {
 			content,
-			filename,
-			capturedAt: fileStat.mtime.toISOString()
+			filename: `session-${sessionId}.log`,
+			modifiedAt: fileStat.mtime.toISOString()
 		};
 	} catch (err) {
-		console.error('Error finding pre-compact scrollback:', err);
+		console.error('Error reading session log:', err);
 		return null;
 	}
 }
@@ -107,27 +94,23 @@ export async function GET({ params, url }) {
 			// Return empty output instead of error
 		}
 
-		// Check for pre-compaction scrollback if enabled
-		// This preserves terminal history that would otherwise be lost after compaction
-		let preCompactScrollback = null;
+		// Check for unified session log if enabled
+		// This log accumulates history across compactions, pauses, and completions
+		let sessionLog = null;
 		if (includePreCompact) {
-			preCompactScrollback = await findPreCompactScrollback(sessionId);
+			sessionLog = await readSessionLog(sessionId);
 		}
 
-		// If current output is minimal (likely just cleared) and we have pre-compact history,
-		// prepend it to give the user context of what happened before compaction
+		// If we have a session log, prepend it to the current output
+		// The log already contains separators for each capture event
 		let combinedOutput = output;
-		let hasPreCompactHistory = false;
+		let hasSessionHistory = false;
 
-		if (preCompactScrollback && lineCount < 50) {
-			// Terminal was likely cleared by compaction - prepend the saved history
-			// Add a visual separator so users know where compaction happened
-			const separator = '\n\n' + '─'.repeat(80) + '\n' +
-				'📦 CONTEXT COMPACTED - History above was saved before compaction\n' +
-				'─'.repeat(80) + '\n\n';
-
-			combinedOutput = preCompactScrollback.content + separator + output;
-			hasPreCompactHistory = true;
+		if (sessionLog) {
+			// Always prepend the session log - it contains the full history
+			// The current tmux output shows only what happened after the last capture
+			combinedOutput = sessionLog.content + output;
+			hasSessionHistory = true;
 		}
 
 		return json({
@@ -136,10 +119,10 @@ export async function GET({ params, url }) {
 			output: combinedOutput,
 			lineCount: combinedOutput.split('\n').length,
 			lines,
-			hasPreCompactHistory,
-			preCompactInfo: preCompactScrollback ? {
-				filename: preCompactScrollback.filename,
-				capturedAt: preCompactScrollback.capturedAt
+			hasSessionHistory,
+			sessionLogInfo: sessionLog ? {
+				filename: sessionLog.filename,
+				modifiedAt: sessionLog.modifiedAt
 			} : null,
 			timestamp: new Date().toISOString()
 		});

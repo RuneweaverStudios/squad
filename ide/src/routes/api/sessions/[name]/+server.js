@@ -7,9 +7,84 @@
 import { json } from '@sveltejs/kit';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { appendFile, mkdir, access, readFile, writeFile } from 'fs/promises';
+import { existsSync } from 'fs';
+import path from 'path';
 import { getTasks } from '$lib/server/beads.js';
 
 const execAsync = promisify(exec);
+
+/**
+ * Capture session scrollback and append to unified session log
+ * @param {string} sessionName - tmux session name
+ * @param {string} reason - compacted | paused | killed | completed
+ */
+async function captureSessionLog(sessionName, reason) {
+	const projectPath = process.cwd().replace('/ide', '');
+	const logsDir = path.join(projectPath, '.beads', 'logs');
+	const logFile = path.join(logsDir, `session-${sessionName}.log`);
+
+	// Ensure logs directory exists
+	if (!existsSync(logsDir)) {
+		await mkdir(logsDir, { recursive: true });
+	}
+
+	// Check if session exists
+	try {
+		await execAsync(`tmux has-session -t "${sessionName}" 2>/dev/null`);
+	} catch {
+		return null; // Session doesn't exist
+	}
+
+	// Capture scrollback
+	let scrollback = '';
+	try {
+		const { stdout } = await execAsync(
+			`tmux capture-pane -t "${sessionName}" -p -S - -E -`,
+			{ maxBuffer: 10 * 1024 * 1024 }
+		);
+		scrollback = stdout;
+	} catch {
+		return null;
+	}
+
+	if (!scrollback.trim()) {
+		return null;
+	}
+
+	const timestamp = new Date().toISOString();
+
+	// Determine separator based on reason
+	const separators = {
+		compacted: '📦 CONTEXT COMPACTED',
+		paused: '⏸️ SESSION PAUSED',
+		killed: '💀 SESSION KILLED',
+		completed: '✅ TASK COMPLETED'
+	};
+	const label = separators[reason] || '📝 LOG CAPTURED';
+
+	const separator = `
+════════════════════════════════════════════════════════════════════════════════
+${label} at ${timestamp}
+════════════════════════════════════════════════════════════════════════════════
+`;
+
+	// If log file doesn't exist, add header
+	if (!existsSync(logFile)) {
+		const header = `# Session Log: ${sessionName}
+# Created: ${timestamp}
+# This file accumulates session history across compactions, pauses, and completions.
+================================================================================
+
+`;
+		await writeFile(logFile, header, 'utf-8');
+	}
+
+	// Append scrollback with separator
+	await appendFile(logFile, scrollback + separator, 'utf-8');
+
+	return logFile;
+}
 
 /**
  * Session name prefix for JAT agent sessions
@@ -133,6 +208,16 @@ export async function DELETE({ params }) {
 			}, { status: 400 });
 		}
 
+		// IMPORTANT: Capture scrollback BEFORE killing the session
+		// This preserves the session history in the unified log
+		let logCaptured = null;
+		try {
+			logCaptured = await captureSessionLog(sessionName, 'killed');
+		} catch (err) {
+			console.error('Failed to capture session log before kill:', err);
+			// Non-fatal - continue with kill
+		}
+
 		// Kill the tmux session (with jat- prefix)
 		const killCommand = `tmux kill-session -t "${sessionName}" 2>&1`;
 		let sessionKilled = false;
@@ -196,6 +281,8 @@ export async function DELETE({ params }) {
 			sessionKilled,
 			taskReleased,
 			releasedTaskId,
+			logCaptured: logCaptured ? true : false,
+			logFile: logCaptured || null,
 			message: taskReleased
 				? `Session killed and task ${releasedTaskId} released`
 				: `Session for ${agentName} killed successfully`,

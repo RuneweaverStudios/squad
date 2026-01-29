@@ -29,38 +29,38 @@ fi
 # ============================================================================
 # CAPTURE TERMINAL SCROLLBACK BEFORE COMPACTION
 # This preserves the pre-compaction terminal history that would otherwise be lost
+# Uses unified session log: .beads/logs/session-{sessionName}.log
 # ============================================================================
 if [[ -n "$TMUX_SESSION" ]]; then
-    # Ensure logs directory exists
-    mkdir -p "$BEADS_LOGS_DIR" 2>/dev/null
+    # Use the unified capture script
+    CAPTURE_SCRIPT="$HOME/.local/bin/capture-session-log.sh"
+    if [[ -x "$CAPTURE_SCRIPT" ]]; then
+        PROJECT_DIR="$PROJECT_DIR" "$CAPTURE_SCRIPT" "$TMUX_SESSION" "compacted" 2>/dev/null || true
+        echo "[PreCompact] Captured scrollback for $TMUX_SESSION (compacted)" >> "$CLAUDE_DIR/.agent-activity.log"
+    else
+        # Fallback: inline capture if script not found
+        mkdir -p "$BEADS_LOGS_DIR" 2>/dev/null
+        LOG_FILE="$BEADS_LOGS_DIR/session-${TMUX_SESSION}.log"
+        TIMESTAMP=$(date -Iseconds)
 
-    # Generate timestamp for filename
-    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        SCROLLBACK=$(tmux capture-pane -t "$TMUX_SESSION" -p -S - -E - 2>/dev/null || true)
+        if [[ -n "$SCROLLBACK" ]]; then
+            # Add header if new file
+            if [[ ! -f "$LOG_FILE" ]]; then
+                echo "# Session Log: $TMUX_SESSION" > "$LOG_FILE"
+                echo "# Created: $TIMESTAMP" >> "$LOG_FILE"
+                echo "================================================================================" >> "$LOG_FILE"
+                echo "" >> "$LOG_FILE"
+            fi
+            # Append scrollback with separator
+            echo "$SCROLLBACK" >> "$LOG_FILE"
+            echo "" >> "$LOG_FILE"
+            echo "════════════════════════════════════════════════════════════════════════════════" >> "$LOG_FILE"
+            echo "📦 CONTEXT COMPACTED at $TIMESTAMP" >> "$LOG_FILE"
+            echo "════════════════════════════════════════════════════════════════════════════════" >> "$LOG_FILE"
+            echo "" >> "$LOG_FILE"
 
-    # Capture full scrollback from tmux
-    # -p: print to stdout, -S -: start from beginning of scrollback, -E -: end at bottom
-    SCROLLBACK_FILE="$BEADS_LOGS_DIR/scrollback-pre-compact-${TMUX_SESSION}-${TIMESTAMP}.log"
-
-    if tmux capture-pane -t "$TMUX_SESSION" -p -S - -E - > "$SCROLLBACK_FILE" 2>/dev/null; then
-        # Only keep the file if it has content
-        if [[ -s "$SCROLLBACK_FILE" ]]; then
-            # Add header with metadata
-            TEMP_FILE=$(mktemp)
-            cat > "$TEMP_FILE" << HEADER
-# Pre-Compaction Scrollback Capture
-# Session: $TMUX_SESSION
-# Captured: $(date -Iseconds)
-# Reason: Context compaction about to clear terminal history
-================================================================================
-
-HEADER
-            cat "$SCROLLBACK_FILE" >> "$TEMP_FILE"
-            mv "$TEMP_FILE" "$SCROLLBACK_FILE"
-
-            echo "[PreCompact] Saved scrollback to: $SCROLLBACK_FILE" >> "$CLAUDE_DIR/.agent-activity.log"
-        else
-            # Remove empty file
-            rm -f "$SCROLLBACK_FILE" 2>/dev/null
+            echo "[PreCompact] Captured scrollback to: $LOG_FILE" >> "$CLAUDE_DIR/.agent-activity.log"
         fi
     fi
 fi

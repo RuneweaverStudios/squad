@@ -17,9 +17,79 @@
  */
 
 import { json } from '@sveltejs/kit';
-import { writeFileSync, appendFileSync, existsSync, readFileSync } from 'fs';
+import { writeFileSync, appendFileSync, existsSync, readFileSync, mkdirSync } from 'fs';
 import { execSync } from 'child_process';
+import path from 'path';
 import type { RequestHandler } from './$types';
+
+/**
+ * Capture session scrollback and append to unified session log
+ */
+function captureSessionLog(sessionName: string, reason: string): string | null {
+	const projectPath = process.cwd().replace('/ide', '');
+	const logsDir = path.join(projectPath, '.beads', 'logs');
+	const logFile = path.join(logsDir, `session-${sessionName}.log`);
+
+	// Ensure logs directory exists
+	if (!existsSync(logsDir)) {
+		mkdirSync(logsDir, { recursive: true });
+	}
+
+	// Check if session exists
+	try {
+		execSync(`tmux has-session -t "${sessionName}" 2>/dev/null`, { encoding: 'utf-8' });
+	} catch {
+		return null; // Session doesn't exist
+	}
+
+	// Capture scrollback
+	let scrollback = '';
+	try {
+		scrollback = execSync(
+			`tmux capture-pane -t "${sessionName}" -p -S - -E -`,
+			{ encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 }
+		);
+	} catch {
+		return null;
+	}
+
+	if (!scrollback.trim()) {
+		return null;
+	}
+
+	const timestamp = new Date().toISOString();
+
+	// Determine separator based on reason
+	const separators: Record<string, string> = {
+		compacted: '📦 CONTEXT COMPACTED',
+		paused: '⏸️ SESSION PAUSED',
+		killed: '💀 SESSION KILLED',
+		completed: '✅ TASK COMPLETED'
+	};
+	const label = separators[reason] || '📝 LOG CAPTURED';
+
+	const separator = `
+════════════════════════════════════════════════════════════════════════════════
+${label} at ${timestamp}
+════════════════════════════════════════════════════════════════════════════════
+`;
+
+	// If log file doesn't exist, add header
+	if (!existsSync(logFile)) {
+		const header = `# Session Log: ${sessionName}
+# Created: ${timestamp}
+# This file accumulates session history across compactions, pauses, and completions.
+================================================================================
+
+`;
+		writeFileSync(logFile, header, 'utf-8');
+	}
+
+	// Append scrollback with separator
+	appendFileSync(logFile, scrollback + separator, 'utf-8');
+
+	return logFile;
+}
 
 interface PauseRequest {
 	taskId: string;
@@ -93,7 +163,16 @@ export const POST: RequestHandler = async ({ params, request }) => {
 		};
 		appendFileSync(timelineFile, JSON.stringify(timelineEvent) + '\n');
 
-		// 3. Optionally kill the tmux session
+		// 3. Capture scrollback BEFORE killing the session
+		let logCaptured: string | null = null;
+		try {
+			logCaptured = captureSessionLog(tmuxSession, 'paused');
+		} catch (err) {
+			console.error('Failed to capture session log before pause:', err);
+			// Non-fatal - continue with pause
+		}
+
+		// 4. Optionally kill the tmux session
 		let sessionKilled = false;
 		if (killSession) {
 			try {
@@ -115,6 +194,8 @@ export const POST: RequestHandler = async ({ params, request }) => {
 			paused: true,
 			resumable: true,
 			sessionKilled,
+			logCaptured: logCaptured ? true : false,
+			logFile: logCaptured,
 			signalFile,
 			timelineFile,
 			timestamp
