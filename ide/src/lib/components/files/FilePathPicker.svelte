@@ -80,7 +80,10 @@
 
 	// Validate the path when filename changes
 	async function validateFilePath() {
-		if (!validatePath || !filename.trim() || !project) {
+		const currentFilename = filename;
+		const currentProject = project;
+
+		if (!validatePath || !currentFilename.trim() || !currentProject) {
 			validationStatus = 'idle';
 			validationMessage = null;
 			return;
@@ -91,10 +94,11 @@
 
 		try {
 			const pathToCheck = fullPath();
-			const response = await fetch(
-				`/api/files/validate?path=${encodeURIComponent(pathToCheck)}&project=${encodeURIComponent(project)}&type=${type}`,
-				{ signal: AbortSignal.timeout(5000) }
-			);
+			const url = `/api/files/validate?path=${encodeURIComponent(pathToCheck)}&project=${encodeURIComponent(currentProject)}&type=${type}`;
+			const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+
+			// Check if filename changed while we were fetching
+			if (filename !== currentFilename) return;
 
 			if (!response.ok) {
 				const data = await response.json();
@@ -111,7 +115,7 @@
 				validationMessage = type === 'folder'
 					? 'Folder already exists'
 					: 'File exists - will overwrite';
-			} else if (data.parentExists === false) {
+			} else if (!data.parentExists) {
 				// Parent directory doesn't exist - will be created
 				validationStatus = 'warning';
 				validationMessage = `Will create: ${data.newDirs || 'new directories'}`;
@@ -132,6 +136,10 @@
 	// Debounced validation
 	function triggerValidation() {
 		clearTimeout(validationTimeout);
+		// Show checking state immediately if we're going to validate
+		if (validatePath && filename.trim() && project) {
+			validationStatus = 'checking';
+		}
 		validationTimeout = setTimeout(validateFilePath, 400);
 	}
 

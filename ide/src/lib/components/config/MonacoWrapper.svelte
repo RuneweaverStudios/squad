@@ -259,6 +259,15 @@
 		editor?.layout();
 	}
 
+	// Expose undo/redo
+	export function undo() {
+		editor?.trigger('button', 'undo', null);
+	}
+
+	export function redo() {
+		editor?.trigger('button', 'redo', null);
+	}
+
 	// Expose getSelection method to get selected text
 	export function getSelection(): string {
 		if (!editor) return '';
@@ -267,6 +276,52 @@
 		const model = editor.getModel();
 		if (!model) return '';
 		return model.getValueInRange(selection);
+	}
+
+	// Replace a substring in the editor content (preserves undo stack)
+	export function replaceText(searchText: string, replacement: string): boolean {
+		if (!editor || !monaco) return false;
+		const model = editor.getModel();
+		if (!model) return false;
+
+		const fullText = model.getValue();
+		const index = fullText.indexOf(searchText);
+		if (index === -1) return false;
+
+		// Convert string offset to Monaco position
+		const startPos = model.getPositionAt(index);
+		const endPos = model.getPositionAt(index + searchText.length);
+		const range = new monaco.Range(startPos.lineNumber, startPos.column, endPos.lineNumber, endPos.column);
+
+		editor.executeEdits('replaceText', [{
+			range,
+			text: replacement,
+			forceMoveMarkers: true
+		}]);
+
+		return true;
+	}
+
+	// Insert text after a substring in the editor content (preserves undo stack)
+	export function insertAfter(searchText: string, textToInsert: string): boolean {
+		if (!editor || !monaco) return false;
+		const model = editor.getModel();
+		if (!model) return false;
+
+		const fullText = model.getValue();
+		const index = fullText.indexOf(searchText);
+		if (index === -1) return false;
+
+		const insertPos = model.getPositionAt(index + searchText.length);
+		const range = new monaco.Range(insertPos.lineNumber, insertPos.column, insertPos.lineNumber, insertPos.column);
+
+		editor.executeEdits('insertAfter', [{
+			range,
+			text: '\n' + textToInsert,
+			forceMoveMarkers: true
+		}]);
+
+		return true;
 	}
 
 	// Delete the current selection (replaces selected text with empty string)

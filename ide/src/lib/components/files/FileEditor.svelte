@@ -97,8 +97,16 @@
 		}
 	}
 
-	// Monaco ref for focus/layout/scrollToLine
-	let monacoRef: { focus: () => void; layout: () => void; scrollToLine: (line: number) => void } | undefined = $state(undefined);
+	// Monaco ref
+	let monacoRef: {
+		focus: () => void;
+		layout: () => void;
+		scrollToLine: (line: number) => void;
+		undo: () => void;
+		redo: () => void;
+		replaceText: (search: string, replacement: string) => boolean;
+		insertAfter: (search: string, text: string) => boolean;
+	} | undefined = $state(undefined);
 
 	// Confirmation dialog state
 	let confirmClose = $state<{ path: string; filename: string } | null>(null);
@@ -120,27 +128,28 @@
 	}
 
 	function handleLLMReplace(newText: string) {
-		// Replace the selected text in the editor
-		// MonacoWrapper doesn't expose executeEdits, so we update the content
+		// Replace via Monaco executeEdits (preserves undo stack)
+		if (monacoRef?.replaceText(llmSelectedText, newText)) return;
+		// Fallback: direct content mutation if Monaco not available
 		if (activeFile && activeFilePath) {
 			const content = activeFile.content;
-			const selection = llmSelectedText;
-			const index = content.indexOf(selection);
+			const index = content.indexOf(llmSelectedText);
 			if (index !== -1) {
-				const newContent = content.slice(0, index) + newText + content.slice(index + selection.length);
+				const newContent = content.slice(0, index) + newText + content.slice(index + llmSelectedText.length);
 				handleContentChange(newContent);
 			}
 		}
 	}
 
 	function handleLLMInsert(newText: string) {
-		// Insert after the selected text
+		// Insert via Monaco executeEdits (preserves undo stack)
+		if (monacoRef?.insertAfter(llmSelectedText, newText)) return;
+		// Fallback: direct content mutation if Monaco not available
 		if (activeFile && activeFilePath) {
 			const content = activeFile.content;
-			const selection = llmSelectedText;
-			const index = content.indexOf(selection);
+			const index = content.indexOf(llmSelectedText);
 			if (index !== -1) {
-				const insertPoint = index + selection.length;
+				const insertPoint = index + llmSelectedText.length;
 				const newContent = content.slice(0, insertPoint) + '\n' + newText + content.slice(insertPoint);
 				handleContentChange(newContent);
 			}
@@ -444,6 +453,27 @@
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
 				</svg>
 			</button>
+			<!-- Undo/Redo Buttons (only for text files with Monaco) -->
+			{#if activeFile && !activeFile.isMedia}
+				<button
+					class="header-btn"
+					onclick={() => monacoRef?.undo()}
+					title="Undo (Ctrl+Z)"
+				>
+					<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+					</svg>
+				</button>
+				<button
+					class="header-btn"
+					onclick={() => monacoRef?.redo()}
+					title="Redo (Ctrl+Shift+Z)"
+				>
+					<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l6-6m0 0l-6-6m6 6H9a6 6 0 000 12h3" />
+					</svg>
+				</button>
+			{/if}
 			<!-- Save Button -->
 			<button
 				class="save-btn"
@@ -794,6 +824,29 @@
 	.help-btn:hover {
 		background: oklch(0.22 0.02 250);
 		color: oklch(0.70 0.02 250);
+	}
+
+	.header-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0 0.375rem;
+		background: oklch(0.18 0.01 250);
+		border: none;
+		border-left: 1px solid oklch(0.22 0.02 250);
+		color: oklch(0.45 0.02 250);
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.header-btn:hover:not(:disabled) {
+		background: oklch(0.22 0.02 250);
+		color: oklch(0.70 0.02 250);
+	}
+
+	.header-btn:disabled {
+		cursor: not-allowed;
+		opacity: 0.35;
 	}
 
 	.save-btn {

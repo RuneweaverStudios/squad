@@ -57,7 +57,6 @@
 	let textareaRef = $state<HTMLTextAreaElement | null>(null);
 	let showFilenameInput = $state(false);
 	let filename = $state('llm-result.md');
-	let isStartingSession = $state(false);
 
 	// Focus textarea when modal opens
 	$effect(() => {
@@ -141,77 +140,9 @@
 		const finalFilename = fname || filename;
 		if (result && onSaveToFile && finalFilename.trim()) {
 			onSaveToFile(finalFilename.trim(), result);
-			successToast(`Saved to ${finalFilename.trim()}`);
+			successToast(`Opened ${finalFilename.trim()} — save to write to disk`);
 			showFilenameInput = false;
 			handleClose();
-		}
-	}
-
-	async function handleStartSession() {
-		if (!result) return;
-
-		isStartingSession = true;
-
-		try {
-			// Build context for the planning session
-			const sessionContext = `# Context
-
-## Original Text
-\`\`\`
-${selectedText}
-\`\`\`
-
-## Instructions Given
-${instructions}
-
-## LLM Result
-${result}
-
----
-
-Continue this conversation. The user wants to discuss or refine this transformation.`;
-
-			// Spawn a planning session (no task)
-			const response = await fetch('/api/work/spawn', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					model: 'sonnet',
-					attach: true,
-					project: project || undefined
-				})
-			});
-
-			if (!response.ok) {
-				const error = await response.json();
-				throw new Error(error.error || 'Failed to start session');
-			}
-
-			const data = await response.json();
-
-			// Send the context to the session via tmux
-			if (data.session?.sessionName) {
-				// Wait for session to be ready, then send context
-				setTimeout(async () => {
-					try {
-						await fetch(`/api/sessions/${encodeURIComponent(data.session.sessionName)}/input`, {
-							method: 'POST',
-							headers: { 'Content-Type': 'application/json' },
-							body: JSON.stringify({ input: sessionContext })
-						});
-					} catch (err) {
-						console.warn('[LLMTransformModal] Failed to send context to session:', err);
-					}
-				}, 3000); // Wait 3 seconds for Claude to start
-			}
-
-			successToast(`Started session ${data.session?.agentName || 'new agent'}`);
-			handleClose();
-		} catch (err) {
-			console.error('[LLMTransformModal] Error starting session:', err);
-			errorToast(err instanceof Error ? err.message : 'Failed to start session');
-		} finally {
-			isStartingSession = false;
 		}
 	}
 
@@ -362,22 +293,6 @@ Continue this conversation. The user wants to discuss or refine this transformat
 								Save File
 							</button>
 						{/if}
-						<button
-							type="button"
-							class="btn btn-sm btn-secondary"
-							onclick={handleStartSession}
-							disabled={isStartingSession}
-							title="Start a Claude session to continue this conversation"
-						>
-							{#if isStartingSession}
-								<span class="loading loading-spinner loading-xs"></span>
-							{:else}
-								<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" />
-								</svg>
-							{/if}
-							Start Session
-						</button>
 						{#if onInsert}
 							<button type="button" class="btn btn-sm btn-info" onclick={handleInsert} title="Insert result after selection">
 								<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
