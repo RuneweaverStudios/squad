@@ -11,17 +11,21 @@
 	 * Features:
 	 * - Shows current directory context ("In: /path/to/dir/")
 	 * - Filename input with validation
-	 * - Optional directory picker (expand tree to select)
+	 * - Real-time path validation (checks if dirs exist, warns on overwrite)
 	 * - File type icon preview
 	 */
 
 	import { fade } from 'svelte/transition';
+
+	type ValidationStatus = 'idle' | 'checking' | 'valid' | 'warning' | 'error';
 
 	interface Props {
 		/** Current directory path (where file will be created) */
 		basePath: string;
 		/** Project root path for display truncation */
 		projectPath?: string;
+		/** Project name for API calls */
+		project?: string;
 		/** Initial filename value */
 		filename?: string;
 		/** Type of item being created */
@@ -30,6 +34,8 @@
 		placeholder?: string;
 		/** Whether the input should be focused on mount */
 		autofocus?: boolean;
+		/** Whether to validate the path as user types */
+		validatePath?: boolean;
 		/** Callback when filename changes */
 		onFilenameChange?: (filename: string) => void;
 		/** Callback when confirmed (Enter or button) */
@@ -49,10 +55,12 @@
 	let {
 		basePath = '',
 		projectPath = '',
+		project = '',
 		filename = $bindable(''),
 		type = 'file',
 		placeholder = 'filename.ext',
 		autofocus = true,
+		validatePath = true,
 		onFilenameChange,
 		onConfirm,
 		onCancel,
@@ -63,9 +71,72 @@
 	}: Props = $props();
 
 	let inputRef = $state<HTMLInputElement | null>(null);
+	let hasInitialized = $state(false);
+
+	// Validation state
+	let validationStatus = $state<ValidationStatus>('idle');
+	let validationMessage = $state<string | null>(null);
+	let validationTimeout: ReturnType<typeof setTimeout>;
+
+	// Validate the path when filename changes
+	async function validateFilePath() {
+		if (!validatePath || !filename.trim() || !project) {
+			validationStatus = 'idle';
+			validationMessage = null;
+			return;
+		}
+
+		validationStatus = 'checking';
+		validationMessage = null;
+
+		try {
+			const pathToCheck = fullPath();
+			const response = await fetch(
+				`/api/files/validate?path=${encodeURIComponent(pathToCheck)}&project=${encodeURIComponent(project)}&type=${type}`,
+				{ signal: AbortSignal.timeout(5000) }
+			);
+
+			if (!response.ok) {
+				const data = await response.json();
+				validationStatus = 'error';
+				validationMessage = data.error || 'Invalid path';
+				return;
+			}
+
+			const data = await response.json();
+
+			if (data.exists) {
+				// File/folder already exists
+				validationStatus = 'warning';
+				validationMessage = type === 'folder'
+					? 'Folder already exists'
+					: 'File exists - will overwrite';
+			} else if (data.parentExists === false) {
+				// Parent directory doesn't exist - will be created
+				validationStatus = 'warning';
+				validationMessage = `Will create: ${data.newDirs || 'new directories'}`;
+			} else {
+				validationStatus = 'valid';
+				validationMessage = null;
+			}
+		} catch (err) {
+			if (err instanceof Error && err.name === 'AbortError') {
+				validationStatus = 'idle';
+			} else {
+				console.error('[FilePathPicker] Validation error:', err);
+				validationStatus = 'idle'; // Don't block on validation errors
+			}
+		}
+	}
+
+	// Debounced validation
+	function triggerValidation() {
+		clearTimeout(validationTimeout);
+		validationTimeout = setTimeout(validateFilePath, 400);
+	}
 
 	// Compute display path (truncated from project root)
-	const displayPath = $derived(() => {
+	const displayBasePath = $derived(() => {
 		if (!basePath) return '/';
 		if (projectPath && basePath.startsWith(projectPath)) {
 			const relative = basePath.slice(projectPath.length);
@@ -80,10 +151,30 @@
 		return base + filename;
 	});
 
-	// Compute file extension for icon
+	// Compute display full path (shows what will be created, truncated from project root)
+	const displayFullPath = $derived(() => {
+		const full = fullPath();
+		if (projectPath && full.startsWith(projectPath)) {
+			const relative = full.slice(projectPath.length);
+			return relative.startsWith('/') ? relative : '/' + relative;
+		}
+		return full;
+	});
+
+	// Check if filename includes subdirectories
+	const hasSubdirs = $derived(() => filename.includes('/'));
+
+	// Get just the filename part (after last /)
+	const justFilename = $derived(() => {
+		const parts = filename.split('/');
+		return parts[parts.length - 1] || '';
+	});
+
+	// Compute file extension for icon (from the actual filename, not path)
 	const extension = $derived(() => {
 		if (type === 'folder') return 'folder';
-		const parts = filename.split('.');
+		const fname = justFilename();
+		const parts = fname.split('.');
 		return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : '';
 	});
 
@@ -98,13 +189,15 @@
 		}
 	}
 
-	// Focus input on mount
+	// Focus input on mount (only once)
 	$effect(() => {
-		if (autofocus && inputRef) {
+		if (autofocus && inputRef && !hasInitialized) {
+			hasInitialized = true;
 			inputRef.focus();
 			// Select filename without extension for easier renaming
-			if (filename && type === 'file') {
-				const dotIndex = filename.lastIndexOf('.');
+			const currentFilename = filename;
+			if (currentFilename && type === 'file') {
+				const dotIndex = currentFilename.lastIndexOf('.');
 				if (dotIndex > 0) {
 					inputRef.setSelectionRange(0, dotIndex);
 				} else {
@@ -114,9 +207,12 @@
 		}
 	});
 
-	// Notify parent of filename changes
+	// Notify parent of filename changes and trigger validation
 	$effect(() => {
-		onFilenameChange?.(filename);
+		if (hasInitialized) {
+			onFilenameChange?.(filename);
+			triggerValidation();
+		}
 	});
 
 	// Get icon color based on extension
@@ -140,12 +236,19 @@
 </script>
 
 <div class="file-path-picker" transition:fade={{ duration: 100 }}>
-	<!-- Path context -->
+	<!-- Path context - shows full path preview when typing subdirs -->
 	<div class="path-context">
-		<span class="path-label">In:</span>
-		<span class="path-value" title={basePath}>
-			{displayPath() || '/'}
-		</span>
+		{#if hasSubdirs() || filename}
+			<span class="path-label">Path:</span>
+			<span class="path-value path-preview" title={fullPath()}>
+				{displayFullPath() || '/'}
+			</span>
+		{:else}
+			<span class="path-label">In:</span>
+			<span class="path-value" title={basePath}>
+				{displayBasePath() || '/'}
+			</span>
+		{/if}
 	</div>
 
 	<!-- Input row -->
@@ -171,11 +274,48 @@
 			onkeydown={handleKeydown}
 			{placeholder}
 			class="filename-input"
-			class:has-error={!!error}
+			class:has-error={!!error || validationStatus === 'error'}
+			class:has-warning={validationStatus === 'warning'}
+			class:has-valid={validationStatus === 'valid'}
 		/>
+
+		<!-- Validation status indicator -->
+		{#if validationStatus === 'checking'}
+			<div class="validation-indicator checking" title="Validating path...">
+				<svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<circle cx="12" cy="12" r="10" stroke-opacity="0.25" />
+					<path d="M12 2a10 10 0 0 1 10 10" />
+				</svg>
+			</div>
+		{:else if validationStatus === 'valid'}
+			<div class="validation-indicator valid" title="Path is valid" transition:fade={{ duration: 100 }}>
+				<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+				</svg>
+			</div>
+		{:else if validationStatus === 'warning'}
+			<div class="validation-indicator warning" title={validationMessage || 'Warning'} transition:fade={{ duration: 100 }}>
+				<svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+					<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+				</svg>
+			</div>
+		{:else if validationStatus === 'error'}
+			<div class="validation-indicator error" title={validationMessage || 'Error'} transition:fade={{ duration: 100 }}>
+				<svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+					<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+				</svg>
+			</div>
+		{/if}
 	</div>
 
-	<!-- Error message -->
+	<!-- Validation message -->
+	{#if validationMessage && (validationStatus === 'warning' || validationStatus === 'error')}
+		<div class="validation-message {validationStatus}" transition:fade={{ duration: 100 }}>
+			{validationMessage}
+		</div>
+	{/if}
+
+	<!-- Error message (from parent) -->
 	{#if error}
 		<div class="error-message" transition:fade={{ duration: 100 }}>
 			{error}
@@ -233,6 +373,10 @@
 		max-width: 280px;
 	}
 
+	.path-preview {
+		color: oklch(0.75 0.12 145);
+	}
+
 	.input-row {
 		display: flex;
 		align-items: center;
@@ -268,8 +412,56 @@
 		border-color: oklch(0.60 0.18 25);
 	}
 
+	.filename-input.has-warning {
+		border-color: oklch(0.70 0.15 85);
+	}
+
+	.filename-input.has-valid {
+		border-color: oklch(0.60 0.15 145);
+	}
+
 	.filename-input::placeholder {
 		color: oklch(0.45 0.02 250);
+	}
+
+	/* Validation indicator */
+	.validation-indicator {
+		flex-shrink: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.25rem;
+		height: 1.25rem;
+	}
+
+	.validation-indicator.checking {
+		color: oklch(0.65 0.12 220);
+	}
+
+	.validation-indicator.valid {
+		color: oklch(0.65 0.18 145);
+	}
+
+	.validation-indicator.warning {
+		color: oklch(0.75 0.15 85);
+	}
+
+	.validation-indicator.error {
+		color: oklch(0.65 0.18 25);
+	}
+
+	/* Validation message */
+	.validation-message {
+		font-size: 0.75rem;
+		padding: 0.25rem 0;
+	}
+
+	.validation-message.warning {
+		color: oklch(0.75 0.12 85);
+	}
+
+	.validation-message.error {
+		color: oklch(0.70 0.15 25);
 	}
 
 	.error-message {

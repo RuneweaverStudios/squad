@@ -321,9 +321,10 @@ Continue this conversation. The user wants to discuss or refine this transformat
 						<FilePathPicker
 							{basePath}
 							{projectPath}
+							{project}
 							bind:filename
 							type="file"
-							placeholder="llm-result.md"
+							placeholder="filename.md or path/to/file.md"
 							confirmText="Save"
 							onConfirm={handleSaveToFile}
 							onCancel={() => showFilenameInput = false}
