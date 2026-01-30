@@ -195,8 +195,8 @@ export const ANIMATIONS = {
 // =============================================================================
 
 export const JAT_DEFAULTS = {
-	/** Terminal emulator for new sessions */
-	terminal: 'alacritty',
+	/** Terminal emulator for new sessions. 'auto' detects platform default. */
+	terminal: 'auto',
 	/** Code editor command */
 	editor: 'code',
 	/** Path to JAT tools directory */

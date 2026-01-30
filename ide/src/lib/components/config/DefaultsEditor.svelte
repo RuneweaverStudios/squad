@@ -41,7 +41,7 @@
 	let configPath = $state('');
 
 	// Form values
-	let terminal = $state('alacritty');
+	let terminal = $state('auto');
 	let editor = $state('code');
 	let toolsPath = $state('~/.local/bin');
 	let claudeFlags = $state('--dangerously-skip-permissions');
@@ -176,7 +176,7 @@
 			}
 
 			const defaults = data.defaults;
-			terminal = defaults.terminal || 'alacritty';
+			terminal = defaults.terminal || 'auto';
 			editor = defaults.editor || 'code';
 			toolsPath = defaults.tools_path || '~/.local/bin';
 			claudeFlags = defaults.claude_flags || '--dangerously-skip-permissions';
@@ -714,7 +714,7 @@
 						id="terminal"
 						class="form-input"
 						bind:value={terminal}
-						placeholder="alacritty"
+						placeholder="auto (detects platform default)"
 					/>
 				</div>
 

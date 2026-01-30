@@ -36,10 +36,16 @@ function getTerminal(): string {
 	if (existsSync(configPath)) {
 		try {
 			const config = JSON.parse(readFileSync(configPath, 'utf-8'));
-			return config.defaults?.terminal || 'alacritty';
+			const terminal = config.defaults?.terminal;
+			if (terminal && terminal !== 'auto') return terminal;
 		} catch {
 			// Use default
 		}
+	}
+	// Platform-aware default
+	if (process.platform === 'darwin') {
+		if (existsSync('/Applications/Ghostty.app')) return 'ghostty';
+		return existsSync('/Applications/iTerm.app') ? 'iterm2' : 'apple-terminal';
 	}
 	return 'alacritty';
 }
@@ -146,41 +152,63 @@ export async function POST({ request }) {
 		if (attachMethod === 'none') {
 			// Spawn new terminal
 			const attachCommand = `tmux attach-session -t "${sessionName}"`;
+			const windowTitle = `Supabase Link: ${project}`;
 
 			let child;
 			switch (terminal) {
+				case 'apple-terminal':
+					child = spawn('osascript', ['-e', `
+						tell application "Terminal"
+							do script "bash -c '${attachCommand}'"
+							set custom title of front window to "${windowTitle}"
+							activate
+						end tell
+					`], { detached: true, stdio: 'ignore' });
+					break;
+				case 'iterm2':
+					child = spawn('osascript', ['-e', `
+						tell application "iTerm"
+							create window with default profile command "bash -c '${attachCommand}'"
+							tell current session of current window
+								set name to "${windowTitle}"
+							end tell
+						end tell
+					`], { detached: true, stdio: 'ignore' });
+					break;
+				case 'ghostty':
+					if (process.platform === 'darwin') {
+						child = spawn('ghostty', ['+new-window', '-e', 'bash', '-c', attachCommand], {
+							detached: true, stdio: 'ignore'
+						});
+					} else {
+						child = spawn('ghostty', ['--title=' + windowTitle, '-e', 'bash', '-c', attachCommand], {
+							detached: true, stdio: 'ignore'
+						});
+					}
+					break;
 				case 'alacritty':
 					child = spawn(
 						'alacritty',
-						['-T', `Supabase Link: ${project}`, '-e', 'bash', '-c', attachCommand],
-						{
-							detached: true,
-							stdio: 'ignore'
-						}
+						['-T', windowTitle, '-e', 'bash', '-c', attachCommand],
+						{ detached: true, stdio: 'ignore' }
 					);
 					break;
 				case 'kitty':
 					child = spawn(
 						'kitty',
-						['--title', `Supabase Link: ${project}`, 'bash', '-c', attachCommand],
-						{
-							detached: true,
-							stdio: 'ignore'
-						}
+						['--title', windowTitle, 'bash', '-c', attachCommand],
+						{ detached: true, stdio: 'ignore' }
 					);
 					break;
 				case 'gnome-terminal':
 					child = spawn(
 						'gnome-terminal',
-						['--title', `Supabase Link: ${project}`, '--', 'bash', '-c', attachCommand],
-						{
-							detached: true,
-							stdio: 'ignore'
-						}
+						['--title', windowTitle, '--', 'bash', '-c', attachCommand],
+						{ detached: true, stdio: 'ignore' }
 					);
 					break;
 				default:
-					child = spawn('xterm', ['-T', `Supabase Link: ${project}`, '-e', 'bash', '-c', attachCommand], {
+					child = spawn('xterm', ['-T', windowTitle, '-e', 'bash', '-c', attachCommand], {
 						detached: true,
 						stdio: 'ignore'
 					});

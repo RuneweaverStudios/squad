@@ -946,47 +946,82 @@ export async function POST({ request }) {
 		// Step 4b: If attach requested, open terminal window
 		if (attach) {
 			try {
-				// Find available terminal
-				const { stdout: whichResult } = await execAsync('which alacritty kitty gnome-terminal konsole xterm 2>/dev/null | head -1 || true');
-				const terminalPath = whichResult.trim();
+				const { spawn } = await import('child_process');
+				const isMacOS = process.platform === 'darwin';
+				const displayName = projectName ? projectName.toUpperCase() : 'JAT';
+				const windowTitle = `${displayName}: ${sessionName}`;
+				const attachCmd = `tmux attach-session -t "${sessionName}"`;
 
-				if (terminalPath) {
-					const { spawn } = await import('child_process');
-					let child;
-
-					// Use project name in title format like "JAT: Claude" for Hyprland color matching
-					// The CLI uses this pattern and apply_border_color matches on "{PROJECT}:" prefix
-					const displayName = projectName ? projectName.toUpperCase() : 'JAT';
-					const windowTitle = `${displayName}: ${sessionName}`;
-
-					if (terminalPath.includes('alacritty')) {
-						child = spawn('alacritty', ['--title', windowTitle, '-e', 'tmux', 'attach-session', '-t', sessionName], {
-							detached: true,
-							stdio: 'ignore'
+				if (isMacOS) {
+					// macOS: use osascript to open Terminal.app, iTerm2, or Ghostty
+					const { existsSync } = await import('fs');
+					if (existsSync('/Applications/Ghostty.app')) {
+						const child = spawn('ghostty', ['+new-window', '-e', 'bash', '-c', attachCmd], {
+							detached: true, stdio: 'ignore'
 						});
-					} else if (terminalPath.includes('kitty')) {
-						child = spawn('kitty', ['--title', windowTitle, 'tmux', 'attach-session', '-t', sessionName], {
-							detached: true,
-							stdio: 'ignore'
-						});
-					} else if (terminalPath.includes('gnome-terminal')) {
-						child = spawn('gnome-terminal', ['--title', windowTitle, '--', 'tmux', 'attach-session', '-t', sessionName], {
-							detached: true,
-							stdio: 'ignore'
-						});
-					} else if (terminalPath.includes('konsole')) {
-						child = spawn('konsole', ['--new-tab', '-e', 'tmux', 'attach-session', '-t', sessionName], {
-							detached: true,
-							stdio: 'ignore'
-						});
+						child.unref();
+					} else if (existsSync('/Applications/iTerm.app')) {
+						const child = spawn('osascript', ['-e', `
+							tell application "iTerm"
+								create window with default profile command "bash -c '${attachCmd}'"
+								tell current session of current window
+									set name to "${windowTitle}"
+								end tell
+							end tell
+						`], { detached: true, stdio: 'ignore' });
+						child.unref();
 					} else {
-						child = spawn('xterm', ['-title', windowTitle, '-e', 'tmux', 'attach-session', '-t', sessionName], {
-							detached: true,
-							stdio: 'ignore'
-						});
+						const child = spawn('osascript', ['-e', `
+							tell application "Terminal"
+								do script "bash -c '${attachCmd}'"
+								set custom title of front window to "${windowTitle}"
+								activate
+							end tell
+						`], { detached: true, stdio: 'ignore' });
+						child.unref();
 					}
+				} else {
+					// Linux: find available terminal emulator
+					const { stdout: whichResult } = await execAsync('which ghostty alacritty kitty gnome-terminal konsole xterm 2>/dev/null | head -1 || true');
+					const terminalPath = whichResult.trim();
 
-					child.unref();
+					if (terminalPath) {
+						let child;
+
+						if (terminalPath.includes('ghostty')) {
+							child = spawn('ghostty', ['--title=' + windowTitle, '-e', 'bash', '-c', `tmux attach-session -t "${sessionName}"`], {
+								detached: true,
+								stdio: 'ignore'
+							});
+						} else if (terminalPath.includes('alacritty')) {
+							child = spawn('alacritty', ['--title', windowTitle, '-e', 'tmux', 'attach-session', '-t', sessionName], {
+								detached: true,
+								stdio: 'ignore'
+							});
+						} else if (terminalPath.includes('kitty')) {
+							child = spawn('kitty', ['--title', windowTitle, 'tmux', 'attach-session', '-t', sessionName], {
+								detached: true,
+								stdio: 'ignore'
+							});
+						} else if (terminalPath.includes('gnome-terminal')) {
+							child = spawn('gnome-terminal', ['--title', windowTitle, '--', 'tmux', 'attach-session', '-t', sessionName], {
+								detached: true,
+								stdio: 'ignore'
+							});
+						} else if (terminalPath.includes('konsole')) {
+							child = spawn('konsole', ['--new-tab', '-e', 'tmux', 'attach-session', '-t', sessionName], {
+								detached: true,
+								stdio: 'ignore'
+							});
+						} else {
+							child = spawn('xterm', ['-title', windowTitle, '-e', 'tmux', 'attach-session', '-t', sessionName], {
+								detached: true,
+								stdio: 'ignore'
+							});
+						}
+
+						child.unref();
+					}
 				}
 			} catch (err) {
 				// Non-fatal - session is created, terminal just didn't open

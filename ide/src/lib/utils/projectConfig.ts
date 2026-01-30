@@ -228,7 +228,7 @@ function getFullConfig(): FullProjectConfig {
 		return {
 			projects: new Map(),
 			defaults: {
-				terminal: 'alacritty',
+				terminal: 'auto',
 				editor: 'code',
 				toolsPath: '~/.local/bin',
 				claudeFlags: ''
@@ -244,7 +244,7 @@ function getFullConfig(): FullProjectConfig {
 
 	// Process defaults
 	const defaults = {
-		terminal: raw.defaults?.terminal ?? 'alacritty',
+		terminal: raw.defaults?.terminal ?? 'auto',
 		editor: raw.defaults?.editor ?? 'code',
 		toolsPath: raw.defaults?.tools_path ?? '~/.local/bin',
 		claudeFlags: raw.defaults?.claude_flags ?? ''

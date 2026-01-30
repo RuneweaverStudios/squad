@@ -210,35 +210,88 @@ export async function POST({ params }) {
 		const displayName = projectName ? projectName.toUpperCase() : 'JAT';
 		const windowTitle = `${displayName}: ${sessionId}`;
 
-		// Try to find which terminal is available
-		const { stdout: whichResult } = await execAsync('which alacritty kitty gnome-terminal konsole xterm 2>/dev/null | head -1 || true');
-		const terminalPath = whichResult.trim();
+		// Get terminal from config or detect platform default
+		let terminal = 'auto';
+		const configPath = `${process.env.HOME}/.config/jat/projects.json`;
+		try {
+			const { existsSync, readFileSync } = await import('fs');
+			if (existsSync(configPath)) {
+				const config = JSON.parse(readFileSync(configPath, 'utf-8'));
+				terminal = config.defaults?.terminal || 'auto';
+			}
+		} catch { /* use auto */ }
 
-		if (!terminalPath) {
+		const isMacOS = process.platform === 'darwin';
+		if (terminal === 'auto') {
+			if (isMacOS) {
+				const { existsSync } = await import('fs');
+				if (existsSync('/Applications/Ghostty.app')) terminal = 'ghostty';
+				else terminal = existsSync('/Applications/iTerm.app') ? 'iterm2' : 'apple-terminal';
+			} else {
+				const { stdout: whichResult } = await execAsync('which ghostty alacritty kitty gnome-terminal konsole xterm 2>/dev/null | head -1 || true');
+				const found = whichResult.trim();
+				if (found.includes('ghostty')) terminal = 'ghostty';
+				else if (found.includes('alacritty')) terminal = 'alacritty';
+				else if (found.includes('kitty')) terminal = 'kitty';
+				else if (found.includes('gnome-terminal')) terminal = 'gnome-terminal';
+				else if (found.includes('konsole')) terminal = 'konsole';
+				else terminal = 'xterm';
+			}
+		}
+
+		if (!isMacOS && terminal === 'auto') {
 			return json({ error: 'No terminal emulator found' }, { status: 500 });
 		}
 
 		// Capture window addresses before spawning terminal for color application
 		const windowsBefore = await getHyprlandWindowAddresses();
+		const attachCmd = `tmux attach-session -t "${sessionId}"`;
 
 		// Determine which terminal and build the command
 		let child;
-		if (terminalPath.includes('alacritty')) {
+		if (terminal === 'apple-terminal') {
+			child = spawn('osascript', ['-e', `
+				tell application "Terminal"
+					do script "bash -c '${attachCmd}'"
+					set custom title of front window to "${windowTitle}"
+					activate
+				end tell
+			`], { detached: true, stdio: 'ignore' });
+		} else if (terminal === 'iterm2') {
+			child = spawn('osascript', ['-e', `
+				tell application "iTerm"
+					create window with default profile command "bash -c '${attachCmd}'"
+					tell current session of current window
+						set name to "${windowTitle}"
+					end tell
+				end tell
+			`], { detached: true, stdio: 'ignore' });
+		} else if (terminal === 'ghostty') {
+			if (process.platform === 'darwin') {
+				child = spawn('ghostty', ['+new-window', '-e', 'bash', '-c', attachCmd], {
+					detached: true, stdio: 'ignore'
+				});
+			} else {
+				child = spawn('ghostty', ['--title=' + windowTitle, '-e', 'bash', '-c', attachCmd], {
+					detached: true, stdio: 'ignore'
+				});
+			}
+		} else if (terminal === 'alacritty') {
 			child = spawn('alacritty', ['-T', windowTitle, '-e', 'tmux', 'attach-session', '-t', sessionId], {
 				detached: true,
 				stdio: 'ignore'
 			});
-		} else if (terminalPath.includes('kitty')) {
+		} else if (terminal === 'kitty') {
 			child = spawn('kitty', ['--title', windowTitle, 'tmux', 'attach-session', '-t', sessionId], {
 				detached: true,
 				stdio: 'ignore'
 			});
-		} else if (terminalPath.includes('gnome-terminal')) {
+		} else if (terminal === 'gnome-terminal') {
 			child = spawn('gnome-terminal', ['--title', windowTitle, '--', 'tmux', 'attach-session', '-t', sessionId], {
 				detached: true,
 				stdio: 'ignore'
 			});
-		} else if (terminalPath.includes('konsole')) {
+		} else if (terminal === 'konsole') {
 			child = spawn('konsole', ['-p', `tabtitle=${windowTitle}`, '-e', 'tmux', 'attach-session', '-t', sessionId], {
 				detached: true,
 				stdio: 'ignore'
@@ -263,7 +316,7 @@ export async function POST({ params }) {
 		return json({
 			success: true,
 			session: sessionId,
-			terminal: terminalPath,
+			terminal,
 			windowTitle,
 			project: projectName
 		});

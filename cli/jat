@@ -51,8 +51,122 @@ BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
 
-# Default terminal (can be overridden in config)
-TERMINAL="${JAT_TERMINAL:-alacritty}"
+# Detect platform
+IS_MACOS=false
+[[ "$(uname)" == "Darwin" ]] && IS_MACOS=true
+
+# Default terminal (can be overridden by env var, config file, or platform default)
+detect_default_terminal() {
+    # 1. Environment variable override
+    if [[ -n "${JAT_TERMINAL:-}" ]]; then
+        echo "$JAT_TERMINAL"
+        return
+    fi
+
+    # 2. Config file override (if config exists; "auto" means detect)
+    if [[ -f "$CONFIG_FILE" ]]; then
+        local config_terminal
+        config_terminal=$(jq -r '.defaults.terminal // empty' "$CONFIG_FILE" 2>/dev/null)
+        if [[ -n "$config_terminal" ]] && [[ "$config_terminal" != "auto" ]]; then
+            echo "$config_terminal"
+            return
+        fi
+    fi
+
+    # 3. Platform-aware default
+    if [[ "$IS_MACOS" == "true" ]]; then
+        # macOS: prefer Ghostty > iTerm2 > Terminal.app
+        if [[ -d "/Applications/Ghostty.app" ]]; then
+            echo "ghostty"
+        elif [[ -d "/Applications/iTerm.app" ]]; then
+            echo "iterm2"
+        else
+            echo "apple-terminal"
+        fi
+    else
+        # Linux: prefer ghostty > alacritty > kitty > gnome-terminal > xterm
+        if command -v ghostty &>/dev/null; then
+            echo "ghostty"
+        elif command -v alacritty &>/dev/null; then
+            echo "alacritty"
+        elif command -v kitty &>/dev/null; then
+            echo "kitty"
+        elif command -v gnome-terminal &>/dev/null; then
+            echo "gnome-terminal"
+        elif command -v konsole &>/dev/null; then
+            echo "konsole"
+        else
+            echo "xterm"
+        fi
+    fi
+}
+
+TERMINAL="$(detect_default_terminal)"
+
+# Cross-platform: kill process listening on a TCP port
+kill_port_process() {
+    local port="$1"
+    if [[ "$IS_MACOS" == "true" ]]; then
+        # macOS: lsof to find PID, then kill
+        lsof -ti ":${port}" 2>/dev/null | xargs kill -9 2>/dev/null || true
+    else
+        # Linux: fuser can kill by port directly
+        fuser -k "${port}/tcp" 2>/dev/null || true
+    fi
+}
+
+# Cross-platform: launch a terminal window running a command
+# Usage: launch_terminal_window "Window Title" "command to run"
+launch_terminal_window() {
+    local title="$1"
+    local cmd="$2"
+
+    case "$TERMINAL" in
+        ghostty)
+            if [[ "$IS_MACOS" == "true" ]]; then
+                # macOS: Ghostty CLI only supports +action; use +new-window for running instance
+                ghostty +new-window -e bash -c "$cmd" &
+            else
+                # Linux: ghostty -e works directly
+                ghostty --title="$title" -e bash -c "$cmd" &
+            fi
+            ;;
+        apple-terminal)
+            osascript -e "
+                tell application \"Terminal\"
+                    do script \"$cmd\"
+                    set custom title of front window to \"$title\"
+                    activate
+                end tell
+            " &
+            ;;
+        iterm2)
+            osascript -e "
+                tell application \"iTerm\"
+                    create window with default profile command \"$cmd\"
+                    tell current session of current window
+                        set name to \"$title\"
+                    end tell
+                end tell
+            " &
+            ;;
+        kitty)
+            kitty --title "$title" bash -c "$cmd" &
+            ;;
+        gnome-terminal)
+            gnome-terminal --title "$title" -- bash -c "$cmd" &
+            ;;
+        konsole)
+            konsole --new-tab -e bash -c "$cmd" &
+            ;;
+        xterm)
+            xterm -title "$title" -e bash -c "$cmd" &
+            ;;
+        alacritty|*)
+            alacritty -T "$title" -e bash -c "$cmd" &
+            ;;
+    esac
+}
 
 #------------------------------------------------------------------------------
 # Config Management
@@ -69,7 +183,7 @@ ensure_config() {
 {
   "projects": {},
   "defaults": {
-    "terminal": "alacritty",
+    "terminal": "auto",
     "editor": "code",
     "tools_path": "~/.local/bin",
     "claude_flags": "--dangerously-skip-permissions"
@@ -459,19 +573,15 @@ launch_claude() {
         # This allows IDE to track the session via tmux
         # Use -x 120 to ensure ANSI boxes don't wrap (default is 80 columns)
         # Capture scrollback buffer on exit (not pipe-pane which logs every redraw)
-        $TERMINAL -T "$window_title" -e bash -c "
+        launch_terminal_window "$window_title" "
             cd '$path'
             tmux new-session -d -s '$session_name' -x 120 -y 40 -c '$path'
-            # Set large scrollback buffer to capture full session history
             tmux set-option -t '$session_name' history-limit 50000
-            # Wait for shell to initialize before sending keys
-            # Without this delay, the shell may not be ready and keys are lost
             sleep 0.3
             tmux send-keys -t '$session_name' '$env_vars claude $claude_flags \"$initial_prompt\"' Enter
             tmux attach-session -t '$session_name'
-            # After detach/exit, capture the scrollback buffer to log file
             tmux capture-pane -t '$session_name' -p -S -50000 > \"$log_file\" 2>/dev/null || true
-        " &
+        "
 
         # Stagger launches so each agent sees previous agents' reservations
         if [[ $i -lt $count ]]; then
@@ -493,7 +603,7 @@ launch_npm() {
     fi
 
     echo -e "${DIM}  → Dev Server :$port${NC}"
-    $TERMINAL -T "$name: Dev Server :$port" -e bash -c "cd '$path' && npm run dev -- --port $port; exec bash" &
+    launch_terminal_window "$name: Dev Server :$port" "cd '$path' && npm run dev -- --port $port; exec bash"
 }
 
 launch_browser() {
@@ -546,7 +656,7 @@ launch_ide() {
     fi
 
     # Also kill any orphaned process on the port (tmux kill-session can leave orphans)
-    fuser -k "$ide_port/tcp" 2>/dev/null || true
+    kill_port_process "$ide_port"
 
     echo -e "${DIM}  → IDE ${ide_protocol}://localhost:$ide_port${NC}"
 
@@ -555,14 +665,13 @@ launch_ide() {
 
     # Launch IDE dev server inside a tmux session
     # This allows the attach feature to work with tmux windows
-    $TERMINAL -T "$name: IDE :$ide_port" -e bash -c "
+    launch_terminal_window "$name: IDE :$ide_port" "
         cd '$ide_path'
         tmux new-session -d -s '$session_name' -x 120 -y 40 -c '$ide_path'
-        # Wait for shell to initialize
         sleep 0.3
         tmux send-keys -t '$session_name' 'npm run dev -- --port $ide_port' Enter
         tmux attach-session -t '$session_name'
-    " &
+    "
 
     # Open browser after delay for server to start
     (
@@ -1968,14 +2077,14 @@ resume_session() {
 EOF
 
     # Launch terminal with tmux session containing resumed Claude
-    $TERMINAL -T "$window_title" -e bash -c "
+    launch_terminal_window "$window_title" "
         cd '$project_path'
         tmux new-session -d -s '$session_name' -x 120 -y 40 -c '$project_path'
         tmux set-option -t '$session_name' history-limit 50000
         sleep 0.3
         tmux send-keys -t '$session_name' '$env_vars claude $claude_flags -r \"$full_session_id\"' Enter
         tmux attach-session -t '$session_name'
-    " &
+    "
 
     echo ""
     echo -e "${GREEN}✓ Session resume launched${NC}"

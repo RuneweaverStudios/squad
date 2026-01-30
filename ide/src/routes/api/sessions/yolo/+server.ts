@@ -45,13 +45,55 @@ export async function POST() {
 		}
 
 		// Find available terminal and open attached to the session
-		const terminal = jatDefaults.terminal || 'alacritty';
+		let terminal = jatDefaults.terminal || 'auto';
 		const windowTitle = `JAT: Accept YOLO Warning`;
+		const attachCmd = `tmux attach-session -t "${sessionName}"`;
+
+		// Resolve 'auto' to platform default
+		if (terminal === 'auto') {
+			if (process.platform === 'darwin') {
+				const { existsSync } = await import('fs');
+				if (existsSync('/Applications/Ghostty.app')) {
+					terminal = 'ghostty';
+				} else {
+					terminal = existsSync('/Applications/iTerm.app') ? 'iterm2' : 'apple-terminal';
+				}
+			} else {
+				terminal = 'alacritty';  // Will be detected below
+			}
+		}
 
 		try {
 			let child;
 
-			if (terminal.includes('alacritty')) {
+			if (terminal === 'apple-terminal') {
+				child = spawn('osascript', ['-e', `
+					tell application "Terminal"
+						do script "bash -c '${attachCmd}'"
+						set custom title of front window to "${windowTitle}"
+						activate
+					end tell
+				`], { detached: true, stdio: 'ignore' });
+			} else if (terminal === 'iterm2') {
+				child = spawn('osascript', ['-e', `
+					tell application "iTerm"
+						create window with default profile command "bash -c '${attachCmd}'"
+						tell current session of current window
+							set name to "${windowTitle}"
+						end tell
+					end tell
+				`], { detached: true, stdio: 'ignore' });
+			} else if (terminal === 'ghostty' || terminal.includes('ghostty')) {
+				if (process.platform === 'darwin') {
+					child = spawn('ghostty', ['+new-window', '-e', 'bash', '-c', `tmux attach-session -t "${sessionName}"`], {
+						detached: true, stdio: 'ignore'
+					});
+				} else {
+					child = spawn('ghostty', ['--title=' + windowTitle, '-e', 'bash', '-c', `tmux attach-session -t "${sessionName}"`], {
+						detached: true, stdio: 'ignore'
+					});
+				}
+			} else if (terminal.includes('alacritty')) {
 				child = spawn('alacritty', ['--title', windowTitle, '-e', 'tmux', 'attach-session', '-t', sessionName], {
 					detached: true,
 					stdio: 'ignore'

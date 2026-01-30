@@ -152,7 +152,7 @@ export async function getJatDefaults() {
 	// NOTE: skip_permissions defaults to false for safety - user must explicitly enable
 	// after they've manually accepted the YOLO warning once
 	const defaults = {
-		terminal: 'alacritty',
+		terminal: 'auto',
 		editor: 'code',
 		tools_path: '~/.local/bin',
 		claude_flags: '',

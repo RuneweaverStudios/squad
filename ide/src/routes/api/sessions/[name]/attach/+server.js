@@ -370,16 +370,28 @@ export async function POST({ params }) {
 		}
 
 		// Get config
-		let terminal = 'alacritty';
+		let terminal = 'auto';
 		let parentSessionConfig = null;
 		const configPath = `${process.env.HOME}/.config/jat/projects.json`;
 		if (existsSync(configPath)) {
 			try {
 				const config = JSON.parse(readFileSync(configPath, 'utf-8'));
-				terminal = config.defaults?.terminal || 'alacritty';
+				terminal = config.defaults?.terminal || 'auto';
 				parentSessionConfig = config.defaults?.parent_session || null;
 			} catch (e) {
 				// Use defaults
+			}
+		}
+		// Resolve 'auto' to platform default
+		if (terminal === 'auto') {
+			if (process.platform === 'darwin') {
+				if (existsSync('/Applications/Ghostty.app')) {
+					terminal = 'ghostty';
+				} else {
+					terminal = existsSync('/Applications/iTerm.app') ? 'iterm2' : 'apple-terminal';
+				}
+			} else {
+				terminal = 'alacritty';
 			}
 		}
 
@@ -435,6 +447,36 @@ export async function POST({ params }) {
 
 		let child;
 		switch (terminal) {
+			case 'apple-terminal':
+				child = spawn('osascript', ['-e', `
+					tell application "Terminal"
+						do script "bash -c '${attachCommand}'"
+						set custom title of front window to "${windowTitle}"
+						activate
+					end tell
+				`], { detached: true, stdio: 'ignore' });
+				break;
+			case 'iterm2':
+				child = spawn('osascript', ['-e', `
+					tell application "iTerm"
+						create window with default profile command "bash -c '${attachCommand}'"
+						tell current session of current window
+							set name to "${windowTitle}"
+						end tell
+					end tell
+				`], { detached: true, stdio: 'ignore' });
+				break;
+			case 'ghostty':
+				if (process.platform === 'darwin') {
+					child = spawn('ghostty', ['+new-window', '-e', 'bash', '-c', attachCommand], {
+						detached: true, stdio: 'ignore'
+					});
+				} else {
+					child = spawn('ghostty', ['--title=' + windowTitle, '-e', 'bash', '-c', attachCommand], {
+						detached: true, stdio: 'ignore'
+					});
+				}
+				break;
 			case 'alacritty':
 				child = spawn('alacritty', ['-T', windowTitle, '-e', 'bash', '-c', attachCommand], {
 					detached: true,

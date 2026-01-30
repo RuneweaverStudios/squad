@@ -395,14 +395,26 @@ export async function POST({ params, request }) {
 		}
 
 		// Get terminal emulator from config or use defaults
-		let terminal = 'alacritty';
+		let terminal = 'auto';
 		const configPath = `${process.env.HOME}/.config/jat/projects.json`;
 		if (existsSync(configPath)) {
 			try {
 				const config = JSON.parse(readFileSync(configPath, 'utf-8'));
-				terminal = config.defaults?.terminal || 'alacritty';
+				terminal = config.defaults?.terminal || 'auto';
 			} catch (e) {
 				// Use default
+			}
+		}
+		// Resolve 'auto' to platform default
+		if (terminal === 'auto') {
+			if (process.platform === 'darwin') {
+				if (existsSync('/Applications/Ghostty.app')) {
+					terminal = 'ghostty';
+				} else {
+					terminal = existsSync('/Applications/iTerm.app') ? 'iterm2' : 'apple-terminal';
+				}
+			} else {
+				terminal = 'alacritty';
 			}
 		}
 
@@ -452,6 +464,32 @@ export async function POST({ params, request }) {
 		const attachCommand = tmuxAttachCmd;
 		let child;
 		switch (terminal) {
+			case 'apple-terminal':
+				child = spawn('osascript', ['-e', `
+					tell application "Terminal"
+						do script "bash -c '${attachCommand}'"
+						activate
+					end tell
+				`], { detached: true, stdio: 'ignore' });
+				break;
+			case 'iterm2':
+				child = spawn('osascript', ['-e', `
+					tell application "iTerm"
+						create window with default profile command "bash -c '${attachCommand}'"
+					end tell
+				`], { detached: true, stdio: 'ignore' });
+				break;
+			case 'ghostty':
+				if (process.platform === 'darwin') {
+					child = spawn('ghostty', ['+new-window', '-e', 'bash', '-c', attachCommand], {
+						detached: true, stdio: 'ignore'
+					});
+				} else {
+					child = spawn('ghostty', ['-e', 'bash', '-c', attachCommand], {
+						detached: true, stdio: 'ignore'
+					});
+				}
+				break;
 			case 'alacritty':
 				child = spawn('alacritty', ['-e', 'bash', '-c', attachCommand], {
 					detached: true,
