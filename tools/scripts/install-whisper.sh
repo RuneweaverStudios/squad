@@ -38,7 +38,7 @@ echo ""
 echo -e "${YELLOW}This is OPTIONAL - skip if you don't need voice input${NC}"
 echo ""
 echo -e "Press ENTER to continue or Ctrl+C to skip"
-read
+read </dev/tty
 
 # Check for required build tools
 echo ""

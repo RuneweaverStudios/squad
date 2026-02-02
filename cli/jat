@@ -10,28 +10,48 @@ CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/jat"
 CONFIG_FILE="$CONFIG_DIR/projects.json"
 
 # JAT source directory (detect where jat is installed)
-# Priority: JAT_INSTALL_DIR env > XDG standard > ~/code/jat > follow symlink
+# Priority: JAT_INSTALL_DIR env > follow symlink > XDG standard > ~/code/jat
 detect_jat_source_dir() {
+    # 1. Explicit env var takes highest priority
     if [[ -n "$JAT_INSTALL_DIR" ]] && [[ -d "$JAT_INSTALL_DIR/.git" ]]; then
         echo "$JAT_INSTALL_DIR"
-    elif [[ -d "${XDG_DATA_HOME:-$HOME/.local/share}/jat/.git" ]]; then
+        return
+    fi
+
+    # 2. Follow the symlink from this script to find source (most accurate)
+    local script_path
+    if [[ -L "${BASH_SOURCE[0]}" ]]; then
+        # macOS readlink doesn't have -f, use a loop
+        script_path="${BASH_SOURCE[0]}"
+        while [[ -L "$script_path" ]]; do
+            local link_target
+            link_target=$(readlink "$script_path")
+            if [[ "$link_target" == /* ]]; then
+                script_path="$link_target"
+            else
+                script_path="$(dirname "$script_path")/$link_target"
+            fi
+        done
+    else
+        script_path="${BASH_SOURCE[0]}"
+    fi
+
+    if [[ -n "$script_path" ]]; then
+        # Script is at PROJECT_ROOT/cli/jat, so go up two levels
+        local project_root
+        project_root=$(cd "$(dirname "$script_path")/.." && pwd)
+        if [[ -d "$project_root/.git" ]]; then
+            echo "$project_root"
+            return
+        fi
+    fi
+
+    # 3. Fallback to known locations
+    if [[ -d "${XDG_DATA_HOME:-$HOME/.local/share}/jat/.git" ]]; then
         echo "${XDG_DATA_HOME:-$HOME/.local/share}/jat"
     elif [[ -d "$HOME/code/jat/.git" ]]; then
         echo "$HOME/code/jat"
     else
-        # Follow the symlink from this script to find source
-        local script_path
-        script_path=$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "")
-        if [[ -n "$script_path" ]]; then
-            # Script is at PROJECT_ROOT/cli/jat, so go up two levels
-            local project_root
-            project_root=$(dirname "$(dirname "$script_path")")
-            if [[ -d "$project_root/.git" ]]; then
-                echo "$project_root"
-                return
-            fi
-        fi
-        # Fallback
         echo "$HOME/.local/share/jat"
     fi
 }

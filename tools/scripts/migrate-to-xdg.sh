@@ -64,7 +64,7 @@ if [ -d "$OLD_DIR" ] && [ -d "$NEW_DIR" ]; then
     echo ""
     if [ "$AUTO_YES" = false ]; then
         echo -n "Continue? [y/N] "
-        read -r response
+        read -r response </dev/tty
         if [[ ! "$response" =~ ^[Yy]$ ]]; then
             echo "Aborted."
             exit 1
@@ -86,7 +86,7 @@ if [ -d "$OLD_DIR" ] && [ ! -d "$NEW_DIR" ]; then
     echo ""
     if [ "$AUTO_YES" = false ]; then
         echo -n "Continue? [y/N] "
-        read -r response
+        read -r response </dev/tty
         if [[ ! "$response" =~ ^[Yy]$ ]]; then
             echo "Aborted."
             exit 1

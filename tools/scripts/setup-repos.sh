@@ -79,7 +79,7 @@ echo "  • Git hooks for agent coordination"
 echo "  • .gitignore patterns"
 echo ""
 echo -e "${BLUE}Would you like to auto-setup all existing projects? [y/N]${NC} "
-read -r response
+read -r response </dev/tty
 
 if [[ ! "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
     echo ""
