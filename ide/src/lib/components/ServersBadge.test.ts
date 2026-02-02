@@ -103,13 +103,10 @@ function resetMocks() {
  * Simulates the spawn API call that ServersBadge.handleSpawnSession makes
  */
 async function simulateSpawnSession(projectKey: string) {
-	const project = MOCK_PROJECTS_WITH_PORTS.find((p) => p.key === projectKey);
-	const projectPath = project?.path || `/home/jw/code/${projectKey}`;
-
 	const response = await fetch('/api/work/spawn', {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ attach: true, project: projectPath })
+		body: JSON.stringify({ attach: true, project: projectKey })
 	});
 
 	return response.json();
@@ -168,7 +165,7 @@ function groupSessionsByProject(
 describe('ServersBadge Spawn API Call', () => {
 	beforeEach(resetMocks);
 
-	it('should call spawn API with correct project path', async () => {
+	it('should call spawn API with correct project key', async () => {
 		mockFetch.mockResolvedValue({
 			ok: true,
 			json: () => Promise.resolve(MOCK_SPAWN_RESPONSE_JAT)
@@ -182,12 +179,12 @@ describe('ServersBadge Spawn API Call', () => {
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				attach: true,
-				project: '/home/jw/code/jat'
+				project: 'jat'
 			})
 		});
 	});
 
-	it('should use project path from projects list when available', async () => {
+	it('should pass project key for known projects', async () => {
 		mockFetch.mockResolvedValue({
 			ok: true,
 			json: () => Promise.resolve(MOCK_SPAWN_RESPONSE_CHIMARO)
@@ -196,10 +193,10 @@ describe('ServersBadge Spawn API Call', () => {
 		await simulateSpawnSession('chimaro');
 
 		const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
-		expect(callBody.project).toBe('/home/jw/code/chimaro');
+		expect(callBody.project).toBe('chimaro');
 	});
 
-	it('should construct fallback path for unknown projects', async () => {
+	it('should pass through unknown project keys', async () => {
 		mockFetch.mockResolvedValue({
 			ok: true,
 			json: () =>
@@ -211,7 +208,7 @@ describe('ServersBadge Spawn API Call', () => {
 		await simulateSpawnSession('unknown-project');
 
 		const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
-		expect(callBody.project).toBe('/home/jw/code/unknown-project');
+		expect(callBody.project).toBe('unknown-project');
 	});
 
 	it('should return session with project field set', async () => {
