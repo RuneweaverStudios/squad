@@ -292,13 +292,8 @@ export function isAuthConfigured(agent: AgentProgram): boolean {
 			return true;
 
 		case 'subscription':
-			// For subscription auth, check if the CLI is configured
-			// Claude Code uses ~/.claude/.credentials.json
-			if (agent.command === 'claude') {
-				const claudeCredsFile = join(homedir(), '.claude', '.credentials.json');
-				return existsSync(claudeCredsFile);
-			}
-			// For other subscription-based CLIs, assume configured if command exists
+			// For subscription auth, the CLI handles its own authentication
+			// (e.g., `claude auth`, `codex login`). Just check the command exists.
 			return isCommandAvailable(agent.command);
 
 		case 'api_key':
