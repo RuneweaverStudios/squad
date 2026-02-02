@@ -1047,11 +1047,11 @@
 		</div>
 
 		<!-- Quick Add Bar -->
-		<TaskQuickAdd
+		<!-- <TaskQuickAdd
 			selectedProject={selectedProject}
 			onTaskCreated={() => fetchAllData()}
 			onOpenWorkspace={() => goto('/tasks/create')}
-		/>
+		/> -->
 
 		<!-- Selected Project Content -->
 		{#if selectedProject}

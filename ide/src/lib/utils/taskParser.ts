@@ -2,7 +2,7 @@
  * Task Parser — Core parsing engine for multi-mode task creation
  *
  * Supports: shorthand single-line, YAML, JSON, markdown lists, plain text
- * Used by: TaskQuickAdd, CreatePaste tab, /api/tasks/parse endpoint, jat-bulk CLI
+ * Used by: CreatePaste tab, /api/tasks/parse endpoint, jat-bulk CLI
  */
 import yaml from 'js-yaml';
 
