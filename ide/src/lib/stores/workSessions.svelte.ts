@@ -831,6 +831,8 @@ let activityFailureCount = 0;
 let activityBackoffUntil = 0;
 const ACTIVITY_MAX_BACKOFF_MS = 30000; // Max 30 second backoff
 const ACTIVITY_BASE_BACKOFF_MS = 1000; // Start with 1 second backoff
+let activityFetchInFlight = false; // Prevent concurrent requests
+let activityAbortController: AbortController | null = null;
 
 /**
  * Fetch activity state for all active sessions and update the store
@@ -848,19 +850,33 @@ export async function fetchActivityStates(): Promise<void> {
 		return;
 	}
 
+	// Prevent concurrent requests from piling up
+	if (activityFetchInFlight) return;
+	activityFetchInFlight = true;
+
 	const startTime = Date.now();
 	debugUnthrottled('ACTIVITY_FETCH_START', { sessionCount: sessions.length });
+
+	// Abort any lingering previous request
+	activityAbortController?.abort();
+	activityAbortController = new AbortController();
+	const signal = activityAbortController.signal;
 
 	try {
 		// Build comma-separated list of session names for the batch endpoint
 		const sessionNames = sessions.map(s => s.sessionName).join(',');
-		const response = await globalThis.fetch(`/api/sessions/activity?sessions=${encodeURIComponent(sessionNames)}`);
+		const response = await globalThis.fetch(
+			`/api/sessions/activity?sessions=${encodeURIComponent(sessionNames)}`,
+			{ signal }
+		);
 
 		if (!response.ok) {
 			throw new Error(`Activity fetch failed: ${response.status}`);
 		}
 
-		const data = await response.json();
+		// Use text() + JSON.parse() to handle Content-Length mismatches gracefully
+		const text = await response.text();
+		const data = JSON.parse(text);
 
 		// Success - reset failure count
 		activityFailureCount = 0;
@@ -915,17 +931,29 @@ export async function fetchActivityStates(): Promise<void> {
 		const duration = Date.now() - startTime;
 		debugUnthrottled('ACTIVITY_FETCH_DONE', { sessionCount: sessions.length, duration, hasChanges });
 	} catch (err) {
+		// Silently ignore aborted requests (expected when a new fetch supersedes)
+		if (signal.aborted) return;
+
+		const errMsg = err instanceof Error ? err.message : String(err);
+		const isTransientNetworkError = errMsg.includes('Content-Length') ||
+			errMsg.includes('AbortError') ||
+			errMsg.includes('network') ||
+			errMsg.includes('Failed to fetch');
+
 		// Increment failure count and calculate backoff
 		activityFailureCount++;
 		const backoffMs = Math.min(ACTIVITY_BASE_BACKOFF_MS * Math.pow(2, activityFailureCount - 1), ACTIVITY_MAX_BACKOFF_MS);
 		activityBackoffUntil = Date.now() + backoffMs;
 		const duration = Date.now() - startTime;
-		debugUnthrottled('ACTIVITY_FETCH_ERROR', { sessionCount: sessions.length, duration, backoffMs, failureCount: activityFailureCount, error: err instanceof Error ? err.message : String(err) });
+		debugUnthrottled('ACTIVITY_FETCH_ERROR', { sessionCount: sessions.length, duration, backoffMs, failureCount: activityFailureCount, error: errMsg });
 
-		// Only log on first failure or after long backoff
-		if (activityFailureCount === 1 || activityFailureCount % 5 === 0) {
+		// Transient network errors (Content-Length mismatch, connection reset) are
+		// expected at high polling rates — log only via debug, not console.error.
+		if (!isTransientNetworkError && (activityFailureCount === 1 || activityFailureCount % 5 === 0)) {
 			console.error(`workSessions.fetchActivityStates error (backing off ${backoffMs / 1000}s):`, err);
 		}
+	} finally {
+		activityFetchInFlight = false;
 	}
 }
 
