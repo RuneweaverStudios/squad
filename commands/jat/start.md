@@ -32,43 +32,6 @@ argument-hint: [agent-name | task-id | agent-name task-id]
 
 ## Implementation Steps
 
-### STEP 0: Environment Checks (MUST run first, sequentially)
-
-**Run these checks SEQUENTIALLY (not in parallel) before anything else.**
-If any check fails, stop and show a clear error. Do NOT proceed to later steps.
-
-```bash
-# Check 1: Are we in tmux? (required for IDE tracking)
-tmux display-message -p '#S' 2>/dev/null || echo "NOT_IN_TMUX"
-```
-
-If NOT_IN_TMUX:
-```
-ERROR: Not running inside a tmux session.
-JAT agents must run inside tmux for IDE tracking.
-
-To fix, exit and restart with a launcher function:
-  jat-projectname    # e.g., jat-chimaro, jat-jat
-
-Or via jat CLI:
-  jat projectname 1 --claude
-```
-**Stop here if not in tmux.** Do not proceed to Step 1.
-
-```bash
-# Check 2: Get session ID (use --wait for fresh startups)
-get-current-session-id --wait
-```
-
-If this fails even with `--wait`, show:
-```
-ERROR: Could not find Claude Code session ID.
-The statusline may not have run yet. Try again in a few seconds.
-```
-**Stop here if session ID not found.** Do not proceed to Step 1.
-
----
-
 ### STEP 1: Parse Parameters
 
 Detect what was passed: task-id, agent-name, both, or none.
@@ -82,9 +45,14 @@ bd show "$PARAM" --json >/dev/null 2>&1 && PARAM_TYPE="task-id"
 
 ### STEP 2: Get/Create Agent
 
-**Session ID was already retrieved in Step 0.** Use that value for all subsequent steps.
+#### 2A: Get Session ID
+```bash
+get-current-session-id
+```
 
-#### 2A: Check for Pre-Registered Agent (IDE-Spawned)
+This automatically retries if the session file hasn't been created yet.
+
+#### 2B: Check for Pre-Registered Agent (IDE-Spawned)
 
 **IDE-spawned agents are already registered.** The spawn API:
 - Generates the agent name
@@ -99,16 +67,16 @@ PRE_REG_FILE=".claude/sessions/.tmux-agent-${TMUX_SESSION}"
 if [[ -f "$PRE_REG_FILE" ]]; then
     AGENT_NAME=$(cat "$PRE_REG_FILE")
     echo "✓ Using pre-registered agent: $AGENT_NAME"
-    # Skip Steps 2B and 2C - registration, tmux naming, and session file already done
+    # Skip Steps 2C and 2D - registration, tmux naming, and session file already done
 fi
 ```
 
 If the pre-registration file exists:
 - Use that agent name
-- Skip Steps 2B and 2C entirely (registration, tmux naming, and session file all done by spawn API + hook)
+- Skip Steps 2C and 2D entirely (registration, tmux naming, and session file all done by spawn API + hook)
 - Proceed directly to Step 3
 
-#### 2B: Register Agent (Manual/CLI Only)
+#### 2C: Register Agent (Manual/CLI Only)
 
 **Only needed if NOT spawned by IDE** (no pre-registration file found):
 
@@ -117,7 +85,7 @@ am-register --name "$AGENT_NAME" --program claude-code --model sonnet-4.5
 tmux rename-session "jat-${AGENT_NAME}"
 ```
 
-#### 2C: Write Session File
+#### 2D: Write Session File
 
 **Only needed for Manual/CLI** - the SessionStart hook automatically writes this for IDE-spawned agents (by reading the `.tmux-agent-{session}` file).
 

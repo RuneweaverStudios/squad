@@ -4,19 +4,13 @@
 # Strategy: Walk up process tree to find Claude Code parent, then read its session file
 # This provides true process isolation - each terminal gets its own session ID
 #
-# Usage: get-current-session-id [--wait]
-#   --wait  Retry up to 5 times (1s apart) if session file not found yet.
-#           Useful on fresh startup before the statusline has run.
+# Automatically retries up to 5 times (1s apart) if session file not found,
+# since the SessionStart hook may not have written it yet on fresh startup.
 #
 # Returns: session ID (UUID) on stdout
 # Exit code: 0 on success, 1 if no session file found
 
 set -e
-
-WAIT_MODE=false
-if [[ "${1:-}" == "--wait" ]]; then
-    WAIT_MODE=true
-fi
 
 # Function to find Claude Code parent process by walking up the tree
 find_claude_ppid() {
@@ -75,25 +69,17 @@ try_find_session() {
     [[ -n "$session_id" ]]
 }
 
-# Try to find session, with optional retry
+# Try to find session, retrying up to 5 times on failure
 session_id=""
-if try_find_session; then
-    echo "$session_id"
-    exit 0
-fi
-
-# If --wait mode, retry up to 5 times
-if [[ "$WAIT_MODE" == true ]]; then
-    for attempt in 1 2 3 4 5; do
-        sleep 1
-        if try_find_session; then
-            echo "$session_id"
-            exit 0
-        fi
-    done
-fi
+for attempt in 0 1 2 3 4; do
+    if try_find_session; then
+        echo "$session_id"
+        exit 0
+    fi
+    # Wait 1s between retries (skip wait on first attempt)
+    [[ $attempt -lt 4 ]] && sleep 1
+done
 
 echo "Error: No Claude Code session file found in /tmp" >&2
-echo "The statusline must run at least once to create the session file" >&2
-echo "Hint: Use --wait to retry automatically on fresh startup" >&2
+echo "The SessionStart hook or statusline must run first to create the session file" >&2
 exit 1

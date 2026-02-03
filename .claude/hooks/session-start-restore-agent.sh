@@ -8,6 +8,12 @@
 PROJECT_DIR="$(pwd)"
 CLAUDE_DIR="$PROJECT_DIR/.claude"
 
+# Check if running inside tmux - agents require tmux for IDE tracking
+IN_TMUX=true
+if [[ -z "${TMUX:-}" ]] && ! tmux display-message -p '#S' &>/dev/null; then
+    IN_TMUX=false
+fi
+
 # Use WINDOWID for persistence (matches pre-compact hook)
 # Falls back to PPID if WINDOWID not available
 WINDOW_KEY="${WINDOWID:-$PPID}"
@@ -146,4 +152,12 @@ if [[ -z "$TASK_ID" ]] && [[ -n "$AGENT_NAME" ]] && command -v bd &>/dev/null; t
 
         echo "[SessionStart] Fallback context from Beads: task=$TASK_ID" >> "$CLAUDE_DIR/.agent-activity.log"
     fi
+fi
+
+# Warn if not in tmux - agents need tmux for IDE tracking
+if [[ "$IN_TMUX" == false ]]; then
+    echo ""
+    echo "NOT IN TMUX SESSION - IDE cannot track this session."
+    echo "Exit and restart with: jat-projectname (e.g. jat-jat, jat-chimaro)"
+    echo "Or: jat projectname 1 --claude"
 fi
