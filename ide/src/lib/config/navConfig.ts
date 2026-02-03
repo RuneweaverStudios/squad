@@ -79,6 +79,13 @@ export const unifiedNavConfig: UnifiedNavConfig = {
 			category: 'main'
 		},
 		{
+			id: 'ingest',
+			label: 'Ingest',
+			href: '/ingest',
+			icon: 'ingest',
+			category: 'main'
+		},
+		{
 			id: 'config',
 			label: 'Config',
 			href: '/config',

@@ -233,6 +233,8 @@ export const JAT_DEFAULTS = {
 	 * When false, agents will NOT pass autonomous flags automatically.
 	 */
 	skip_permissions: false,
+	/** Auto-start ingest daemon when launching IDE */
+	ingest_autostart: false,
 	/**
 	 * Directories to ignore when detecting file tree changes.
 	 * Changes in these directories won't trigger the "changes detected" badge.

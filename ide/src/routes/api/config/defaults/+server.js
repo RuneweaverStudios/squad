@@ -99,7 +99,7 @@ export async function PUT({ request }) {
 		}
 
 		// Validate boolean fields
-		const booleanFields = ['auto_kill_enabled', 'auto_kill_p0', 'auto_kill_p1', 'auto_kill_p2', 'auto_kill_p3', 'auto_kill_p4', 'skip_permissions'];
+		const booleanFields = ['auto_kill_enabled', 'auto_kill_p0', 'auto_kill_p1', 'auto_kill_p2', 'auto_kill_p3', 'auto_kill_p4', 'skip_permissions', 'ingest_autostart'];
 		for (const field of booleanFields) {
 			if (field in newDefaults && typeof newDefaults[field] !== 'boolean') {
 				return json({

@@ -110,7 +110,11 @@ function shouldDisplayInline(contentType) {
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ params, url }) {
 	try {
-		const requestedPath = params.path;
+		// SvelteKit [...path] strips leading /, restore it for absolute paths
+		const rawPath = params.path;
+		const requestedPath = rawPath.startsWith('home/') || rawPath.startsWith('tmp/')
+			? '/' + rawPath
+			: rawPath;
 
 		// Determine actual file path - check persistent storage
 		// Location: ~/.local/share/jat/task-images/
@@ -131,7 +135,8 @@ export async function GET({ params, url }) {
 		// Security: Ensure path is within allowed directories
 		// Only allow persistent storage - no legacy temp directories
 		const allowedDirs = [
-			getPersistentUploadDir()
+			getPersistentUploadDir(),
+			join(homedir(), '.local', 'share', 'jat', 'ingest-files')
 		];
 
 		const isAllowed = allowedDirs.some((dir) => filePath.startsWith(dir));

@@ -150,6 +150,7 @@ function detectStatus(output, portRunning) {
 	// Check for ready patterns
 	const readyPatterns = [
 		/ready in/i,
+		/ready - polling/i,
 		/listening on/i,
 		/server running/i,
 		/local:/i,

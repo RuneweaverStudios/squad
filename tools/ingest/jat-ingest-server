@@ -1,0 +1,55 @@
+#!/bin/bash
+# jat-ingest-server: Start ingest daemon as a managed server (server-ingest tmux session)
+#
+# The IDE auto-discovers server-* tmux sessions on the /servers page,
+# giving us live output, stop/restart controls, and status detection for free.
+
+set -euo pipefail
+
+SESSION="server-ingest"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+DAEMON="$SCRIPT_DIR/jat-ingest"
+
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    echo "jat-ingest-server - Start ingest daemon as managed server"
+    echo ""
+    echo "USAGE:"
+    echo "    jat-ingest-server           Start server-ingest tmux session"
+    echo "    jat-ingest-server --stop    Stop the server"
+    echo "    jat-ingest-server --status  Check if running"
+    echo "    jat-ingest-server --help    Show this help"
+    exit 0
+fi
+
+if [[ "${1:-}" == "--stop" ]]; then
+    if tmux has-session -t "$SESSION" 2>/dev/null; then
+        tmux send-keys -t "$SESSION" C-c
+        sleep 1
+        tmux kill-session -t "$SESSION" 2>/dev/null || true
+        echo "Stopped $SESSION"
+    else
+        echo "$SESSION not running"
+    fi
+    exit 0
+fi
+
+if [[ "${1:-}" == "--status" ]]; then
+    if tmux has-session -t "$SESSION" 2>/dev/null; then
+        echo "running"
+    else
+        echo "stopped"
+    fi
+    exit 0
+fi
+
+# Start the daemon in a tmux session
+if tmux has-session -t "$SESSION" 2>/dev/null; then
+    echo "$SESSION already running"
+    echo "Use: jat-ingest-server --stop  to stop it first"
+    exit 0
+fi
+
+tmux new-session -d -s "$SESSION" "node $DAEMON; echo '[jat-ingest] exited'; sleep 5"
+echo "Started $SESSION"
+echo "View in IDE: /servers page"
+echo "Stop: jat-ingest-server --stop"

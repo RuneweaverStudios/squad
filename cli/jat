@@ -959,6 +959,20 @@ launch_project() {
         $do_ide && launch_ide "$name"
     fi
 
+    # Auto-start ingest daemon if configured
+    if jq -r '.defaults.ingest_autostart // false' "$CONFIG_FILE" 2>/dev/null | grep -q true; then
+        if ! tmux has-session -t server-ingest 2>/dev/null; then
+            local ingest_dir="$JAT_SOURCE_DIR/tools/ingest"
+            if [[ -d "$ingest_dir" ]]; then
+                echo -e "${DIM}  → Starting ingest daemon...${NC}"
+                tmux new-session -d -s "server-ingest" -x 80 -y 40 -c "$ingest_dir"
+                sleep 0.3
+                tmux send-keys -t "server-ingest" "node jat-ingest" Enter
+                echo -e "${GREEN}  ✓ Ingest daemon started${NC}"
+            fi
+        fi
+    fi
+
     # Apply Hyprland colors
     if [[ -n "$active_color" ]]; then
         (sleep 1.5 && apply_border_color "$name:" "$active_color" "$inactive_color") &

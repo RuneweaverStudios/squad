@@ -114,23 +114,57 @@ export async function POST({ params }) {
 		// Use detected port first, then config port as fallback
 		const port = detectedPort || configPort;
 
-		// Build the restart command with port if available
-		const portArg = port ? ` -- --port ${port}` : '';
-		const restartCommand = `npm run dev${portArg}`;
+		// Determine restart command and working directory
+		let restartCommand;
+		let workDir;
 
-		// Determine the correct working directory
-		// Use server_path if specified, otherwise check for ide subdirectory
-		let workDir = serverPath || projectPath;
-		if (!serverPath) {
-			try {
-				const { stdout: checkResult } = await execAsync(
-					`test -f "${projectPath}/ide/package.json" && echo "ide" || echo "root"`
-				);
-				if (checkResult.trim() === 'ide') {
-					workDir = `${projectPath}/ide`;
+		if (projectName === 'ingest') {
+			// Special handling for ingest daemon
+			restartCommand = 'node jat-ingest';
+			// Resolve the ingest directory directly from the jat-ingest symlink
+			workDir = await (async () => {
+				try {
+					const { stdout } = await execAsync('readlink -f "$(which jat-ingest)" 2>/dev/null');
+					const resolved = stdout.trim();
+					if (resolved) {
+						const { stdout: dirOut } = await execAsync(`dirname "${resolved}"`);
+						return dirOut.trim();
+					}
+				} catch { /* fall through */ }
+				const fallbacks = [
+					`${process.env.JAT_INSTALL_DIR || ''}/tools/ingest`,
+					`${process.env.HOME}/.local/share/jat/tools/ingest`,
+					`${process.env.HOME}/code/jat/tools/ingest`
+				];
+				for (const p of fallbacks) {
+					if (!p.startsWith('/tools')) {
+						try {
+							const { stdout } = await execAsync(`test -d "${p}" && echo "yes" || echo "no"`);
+							if (stdout.trim() === 'yes') return p;
+						} catch { /* continue */ }
+					}
 				}
-			} catch {
-				// Use projectPath as-is
+				return `${process.env.HOME}/code/jat/tools/ingest`;
+			})();
+		} else {
+			// Standard project: build the restart command with port if available
+			const portArg = port ? ` -- --port ${port}` : '';
+			restartCommand = `npm run dev${portArg}`;
+
+			// Determine the correct working directory
+			// Use server_path if specified, otherwise check for ide subdirectory
+			workDir = serverPath || projectPath;
+			if (!serverPath) {
+				try {
+					const { stdout: checkResult } = await execAsync(
+						`test -f "${projectPath}/ide/package.json" && echo "ide" || echo "root"`
+					);
+					if (checkResult.trim() === 'ide') {
+						workDir = `${projectPath}/ide`;
+					}
+				} catch {
+					// Use projectPath as-is
+				}
 			}
 		}
 

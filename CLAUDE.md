@@ -29,9 +29,10 @@ jat/
 │   ├── browser/         # Browser automation (11 tools)
 │   ├── media/           # Image generation tools (gemini-*, avatar-*)
 │   ├── signal/          # JAT signal tools (jat-signal, jat-signal-validate)
+│   ├── ingest/          # Feed ingest daemon (RSS, Slack, Telegram)
 │   └── scripts/         # Installation and setup scripts
 ├── commands/jat/        # JAT workflow commands (9 commands)
-├── ide/           # Beads Task IDE (SvelteKit app)
+├── ide/                 # Beads Task IDE (SvelteKit app)
 ├── shared/              # Shared documentation (imported by projects)
 └── install.sh           # Installation script
 ```

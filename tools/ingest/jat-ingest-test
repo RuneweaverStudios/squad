@@ -1,0 +1,194 @@
+#!/usr/bin/env node
+
+import { loadConfig, getSecret, configPath } from './lib/config.js';
+import { getDb, closeDb } from './lib/dedup.js';
+import * as logger from './lib/logger.js';
+import { RssAdapter } from './adapters/rss.js';
+import { TelegramAdapter } from './adapters/telegram.js';
+import { SlackAdapter } from './adapters/slack.js';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+
+const adapters = {
+  rss: new RssAdapter(),
+  telegram: new TelegramAdapter(),
+  slack: new SlackAdapter()
+};
+
+const args = process.argv.slice(2);
+
+if (args.includes('--help') || args.includes('-h')) {
+  console.log(`jat-ingest-test - Test ingestion sources without creating tasks
+
+USAGE:
+    jat-ingest-test --source <id>           Test a configured source
+    jat-ingest-test --type rss --url <url>  Test an RSS feed directly
+    jat-ingest-test --init                  Create sample config file
+    jat-ingest-test --validate              Validate config file
+    jat-ingest-test --help                  Show this help
+
+OPTIONS:
+    --source <id>    Source ID from feeds.json to test
+    --type <type>    Adapter type (rss, telegram, slack)
+    --url <url>      RSS feed URL for direct testing
+    --init           Create sample ~/.config/jat/feeds.json
+    --validate       Check config for errors`);
+  process.exit(0);
+}
+
+if (args.includes('--init')) {
+  initConfig();
+  process.exit(0);
+}
+
+if (args.includes('--validate')) {
+  validateConfig();
+  process.exit(0);
+}
+
+const sourceId = getArg('--source');
+const type = getArg('--type');
+const url = getArg('--url');
+
+if (type === 'rss' && url) {
+  await testDirectRss(url);
+} else if (sourceId) {
+  await testSource(sourceId);
+} else {
+  console.error('Specify --source <id> or --type rss --url <url>');
+  process.exit(1);
+}
+
+closeDb();
+
+async function testSource(id) {
+  const config = loadConfig();
+  const source = config.sources.find(s => s.id === id);
+  if (!source) {
+    console.error(`Source not found: ${id}`);
+    console.error('Available sources:', config.sources.map(s => s.id).join(', '));
+    process.exit(1);
+  }
+
+  const adapter = adapters[source.type];
+  if (!adapter) {
+    console.error(`No adapter for type: ${source.type}`);
+    process.exit(1);
+  }
+
+  console.log(`Testing source: ${source.id} (${source.type})`);
+  console.log('---');
+
+  const result = await adapter.test(source, getSecret);
+  console.log(`Status: ${result.ok ? 'OK' : 'FAILED'}`);
+  console.log(`Message: ${result.message}`);
+
+  if (result.sampleItems?.length > 0) {
+    console.log('\nSample items:');
+    for (const item of result.sampleItems) {
+      console.log(`  - [${item.id}] ${item.title}`);
+      if (item.timestamp) console.log(`    ${item.timestamp}`);
+    }
+  }
+
+  if (!result.ok) process.exit(1);
+}
+
+async function testDirectRss(feedUrl) {
+  console.log(`Testing RSS feed: ${feedUrl}`);
+  console.log('---');
+
+  const source = { id: '_test', type: 'rss', feedUrl, project: 'test' };
+  const adapter = adapters.rss;
+
+  const result = await adapter.test(source, getSecret);
+  console.log(`Status: ${result.ok ? 'OK' : 'FAILED'}`);
+  console.log(`Message: ${result.message}`);
+
+  if (result.sampleItems?.length > 0) {
+    console.log('\nSample items:');
+    for (const item of result.sampleItems) {
+      console.log(`  - ${item.title}`);
+      if (item.description) console.log(`    ${item.description.slice(0, 120)}...`);
+    }
+  }
+
+  if (!result.ok) process.exit(1);
+}
+
+function validateConfig() {
+  try {
+    const config = loadConfig();
+    console.log(`Config: ${configPath()}`);
+    console.log(`Sources: ${config.sources.length}`);
+    for (const src of config.sources) {
+      const adapter = adapters[src.type];
+      const v = adapter ? adapter.validate(src) : { valid: false, error: 'Unknown type' };
+      const status = v.valid ? 'OK' : `ERROR: ${v.error}`;
+      const enabled = src.enabled !== false ? '' : ' (disabled)';
+      console.log(`  ${src.id} [${src.type}] - ${status}${enabled}`);
+    }
+  } catch (err) {
+    console.error(`Config error: ${err.message}`);
+    process.exit(1);
+  }
+}
+
+function initConfig() {
+  const path = configPath();
+  const dir = dirname(path);
+  mkdirSync(dir, { recursive: true });
+
+  const sample = {
+    version: 1,
+    sources: [
+      {
+        id: 'example-rss',
+        type: 'rss',
+        enabled: false,
+        feedUrl: 'https://hnrss.org/newest?points=100',
+        project: 'jat',
+        pollInterval: 300,
+        taskDefaults: { type: 'task', priority: 3, labels: ['from-rss'] }
+      },
+      {
+        id: 'example-telegram',
+        type: 'telegram',
+        enabled: false,
+        secretName: 'telegram-bot',
+        chatId: '-1001234567890',
+        project: 'chimaro',
+        pollInterval: 30,
+        taskDefaults: { type: 'task', priority: 2, labels: ['from-telegram'] }
+      },
+      {
+        id: 'example-slack',
+        type: 'slack',
+        enabled: false,
+        secretName: 'slack',
+        channel: 'C0123ABCDEF',
+        project: 'chimaro',
+        pollInterval: 60,
+        taskDefaults: { type: 'task', priority: 2, labels: ['from-slack'] }
+      }
+    ]
+  };
+
+  try {
+    writeFileSync(path, JSON.stringify(sample, null, 2) + '\n', { flag: 'wx' });
+    console.log(`Created sample config: ${path}`);
+    console.log('Edit the file to configure your sources, then enable them.');
+  } catch (err) {
+    if (err.code === 'EEXIST') {
+      console.log(`Config already exists: ${path}`);
+    } else {
+      throw err;
+    }
+  }
+}
+
+function getArg(flag) {
+  const idx = args.indexOf(flag);
+  if (idx === -1) return null;
+  return args[idx + 1] || null;
+}

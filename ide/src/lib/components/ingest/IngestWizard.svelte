@@ -1,0 +1,1261 @@
+<script lang="ts">
+	/**
+	 * IngestWizard Component
+	 *
+	 * Multi-step drawer wizard for configuring an ingest source.
+	 * Steps vary by source type:
+	 *   RSS:      URL -> Project -> Options -> Review
+	 *   Slack:    Secret -> Channel -> Project -> Options -> Review
+	 *   Telegram: Secret -> Chat ID -> Project -> Options -> Review
+	 *   Custom:   Command -> Project -> Options -> Review
+	 */
+
+	import { fly, fade } from 'svelte/transition';
+	import { getProjects } from '$lib/stores/configStore.svelte';
+	import ProjectSelector from '$lib/components/ProjectSelector.svelte';
+
+	interface Props {
+		open: boolean;
+		sourceType: 'rss' | 'slack' | 'telegram' | 'custom' | null;
+		editSource?: any | null;
+		onClose: () => void;
+		onSave: (source: any) => void;
+	}
+
+	let { open, sourceType, editSource = null, onClose, onSave }: Props = $props();
+
+	// Wizard state
+	let step = $state(0);
+	let saving = $state(false);
+	let error = $state('');
+
+	// Form fields
+	let sourceId = $state('');
+	let enabled = $state(true);
+	let project = $state('');
+	let pollInterval = $state(60);
+	let taskType = $state('task');
+	let taskPriority = $state(2);
+	let taskLabels = $state('');
+
+	// RSS fields
+	let feedUrl = $state('');
+
+	// Slack fields
+	let slackSecretName = $state('slack');
+	let slackChannel = $state('');
+	let includeBots = $state(false);
+
+	// Slack channel detection
+	let detectingChannels = $state(false);
+	let detectedChannels = $state<Array<{ id: string; name: string; isPrivate: boolean; memberCount: number; topic: string; isMember: boolean }>>([]);
+	let channelDetectionError = $state('');
+
+	// Telegram fields
+	let telegramSecretName = $state('telegram-bot');
+	let telegramChatId = $state('');
+	let detectingChats = $state(false);
+	let detectedChats = $state<Array<{ id: number; title: string; type: string; username?: string }>>([]);
+	let detectionError = $state('');
+
+	// Custom fields
+	let customCommand = $state('');
+
+	// Token auth state (shared by Slack and Telegram)
+	let secretStatus = $state<'checking' | 'found' | 'missing' | 'saving' | 'error'>('checking');
+	let secretMasked = $state('');
+	let tokenInput = $state('');
+	let showTokenInput = $state(false);
+	let testResult = $state<{ success: boolean; info?: any; error?: string } | null>(null);
+	let testingConnection = $state(false);
+
+	// Derive projects list
+	const projects = $derived(getProjects());
+	const projectNames = $derived(projects.map(p => p.name?.toLowerCase() || p.path?.split('/').pop() || '').filter(Boolean));
+
+	// Steps per type
+	const stepConfigs: Record<string, string[]> = {
+		rss: ['Feed URL', 'Project', 'Options', 'Review'],
+		slack: ['Slack Token', 'Channel', 'Project', 'Options', 'Review'],
+		telegram: ['Bot Token', 'Chat', 'Project', 'Options', 'Review'],
+		custom: ['Command', 'Project', 'Options', 'Review']
+	};
+
+	const steps = $derived(sourceType ? stepConfigs[sourceType] || [] : []);
+	const totalSteps = $derived(steps.length);
+	const isLastStep = $derived(step === totalSteps - 1);
+	const nextDisabled = $derived(
+		saving ||
+		(sourceType === 'telegram' && step === 1 && !telegramChatId.trim()) ||
+		(sourceType === 'slack' && step === 1 && !slackChannel.trim())
+	);
+
+	// Check secret when on step 0 for Slack/Telegram
+	$effect(() => {
+		if (open && step === 0 && sourceType === 'slack' && slackSecretName.trim()) {
+			checkSecret(slackSecretName.trim());
+		}
+	});
+
+	$effect(() => {
+		if (open && step === 0 && sourceType === 'telegram' && telegramSecretName.trim()) {
+			checkSecret(telegramSecretName.trim());
+		}
+	});
+
+	// Reset form when source type changes
+	$effect(() => {
+		if (open && sourceType) {
+			step = 0;
+			error = '';
+			saving = false;
+			secretStatus = 'checking';
+			secretMasked = '';
+			tokenInput = '';
+			showTokenInput = false;
+			testResult = null;
+			testingConnection = false;
+			detectedChats = [];
+			detectionError = '';
+			detectingChats = false;
+			detectedChannels = [];
+			channelDetectionError = '';
+			detectingChannels = false;
+
+			if (editSource) {
+				populateFromEdit(editSource);
+			} else {
+				resetForm();
+			}
+		}
+	});
+
+	function resetForm() {
+		sourceId = '';
+		enabled = true;
+		project = projects.length > 0 ? projects[0].name?.toLowerCase() || '' : '';
+		pollInterval = sourceType === 'rss' ? 300 : sourceType === 'telegram' ? 30 : 60;
+		taskType = 'task';
+		taskPriority = 2;
+		taskLabels = sourceType ? `from-${sourceType}` : '';
+		feedUrl = '';
+		slackSecretName = 'slack';
+		slackChannel = '';
+		includeBots = false;
+		telegramSecretName = 'telegram-bot';
+		telegramChatId = '';
+		detectingChats = false;
+		detectedChats = [];
+		detectionError = '';
+		detectingChannels = false;
+		detectedChannels = [];
+		channelDetectionError = '';
+		customCommand = '';
+	}
+
+	function populateFromEdit(src: any) {
+		sourceId = src.id || '';
+		enabled = src.enabled !== false;
+		project = src.project || '';
+		pollInterval = src.pollInterval || 60;
+		taskType = src.taskDefaults?.type || 'task';
+		taskPriority = src.taskDefaults?.priority ?? 2;
+		taskLabels = (src.taskDefaults?.labels || []).join(', ');
+		feedUrl = src.feedUrl || '';
+		slackSecretName = src.secretName || 'slack';
+		slackChannel = src.channel || '';
+		includeBots = src.includeBots || false;
+		telegramSecretName = src.secretName || 'telegram-bot';
+		telegramChatId = src.chatId || '';
+		customCommand = src.command || '';
+	}
+
+	function generateId(): string {
+		if (sourceType === 'rss' && feedUrl) {
+			try {
+				const host = new URL(feedUrl).hostname.replace(/^www\./, '').split('.')[0];
+				return `rss-${host}`;
+			} catch {
+				/* ignore */
+			}
+		}
+		return `${sourceType}-${Date.now().toString(36).slice(-4)}`;
+	}
+
+	// --- Token auth helpers ---
+
+	async function checkSecret(name: string) {
+		secretStatus = 'checking';
+		secretMasked = '';
+		testResult = null;
+		try {
+			const res = await fetch('/api/config/credentials/custom');
+			const data = await res.json();
+			if (data.success && data.customKeys?.[name]?.isSet) {
+				secretStatus = 'found';
+				secretMasked = data.customKeys[name].masked;
+				showTokenInput = false;
+			} else {
+				secretStatus = 'missing';
+			}
+		} catch {
+			secretStatus = 'error';
+		}
+	}
+
+	async function saveToken(name: string, token: string, type: 'slack' | 'telegram') {
+		secretStatus = 'saving';
+		error = '';
+		const envVar = type === 'slack' ? 'SLACK_BOT_TOKEN' : 'TELEGRAM_BOT_TOKEN';
+		try {
+			const res = await fetch('/api/config/credentials/custom', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					name,
+					value: token,
+					envVar,
+					description: `${type} bot token for jat-ingest`
+				})
+			});
+			const data = await res.json();
+			if (data.success) {
+				secretStatus = 'found';
+				secretMasked = token.slice(0, 6) + '...' + token.slice(-4);
+				tokenInput = '';
+				showTokenInput = false;
+			} else {
+				secretStatus = 'missing';
+				error = data.error || 'Failed to save token';
+			}
+		} catch {
+			secretStatus = 'missing';
+			error = 'Failed to save token';
+		}
+	}
+
+	async function testConnection(type: 'slack' | 'telegram', secretName: string) {
+		testingConnection = true;
+		testResult = null;
+		try {
+			const res = await fetch('/api/config/feeds/verify', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ type, secretName })
+			});
+			testResult = await res.json();
+		} catch {
+			testResult = { success: false, error: 'Failed to connect to verification endpoint' };
+		}
+		testingConnection = false;
+	}
+
+	async function detectChats() {
+		detectingChats = true;
+		detectionError = '';
+		detectedChats = [];
+		try {
+			const res = await fetch('/api/config/feeds/verify', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ type: 'telegram-chats', secretName: telegramSecretName })
+			});
+			const data = await res.json();
+			if (data.success) {
+				if (data.chats.length === 0) {
+					detectionError = 'No chats found. Make sure the bot is added to a group and someone has sent a message.';
+				} else {
+					detectedChats = data.chats;
+				}
+			} else {
+				detectionError = data.error || 'Failed to detect chats';
+			}
+		} catch {
+			detectionError = 'Failed to connect to verification endpoint';
+		}
+		detectingChats = false;
+	}
+
+	async function detectChannels() {
+		detectingChannels = true;
+		channelDetectionError = '';
+		detectedChannels = [];
+		try {
+			const res = await fetch('/api/config/feeds/verify', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ type: 'slack-channels', secretName: slackSecretName })
+			});
+			const data = await res.json();
+			if (data.success) {
+				if (data.channels.length === 0) {
+					channelDetectionError = 'No channels found. Make sure the bot is added to channels.';
+				} else {
+					detectedChannels = data.channels;
+				}
+			} else {
+				channelDetectionError = data.error || 'Failed to list channels';
+			}
+		} catch {
+			channelDetectionError = 'Failed to connect to verification endpoint';
+		}
+		detectingChannels = false;
+	}
+
+	function handleSecretNameChange() {
+		secretStatus = 'checking';
+		secretMasked = '';
+		testResult = null;
+		showTokenInput = false;
+		const name = sourceType === 'slack' ? slackSecretName : telegramSecretName;
+		if (name.trim()) {
+			checkSecret(name.trim());
+		}
+	}
+
+	// --- Validation ---
+
+	function validateStep(): boolean {
+		error = '';
+
+		if (sourceType === 'rss') {
+			if (step === 0 && !feedUrl.trim()) {
+				error = 'Feed URL is required';
+				return false;
+			}
+			if (step === 0) {
+				try {
+					new URL(feedUrl);
+				} catch {
+					error = 'Invalid URL format';
+					return false;
+				}
+			}
+			if (step === 1 && !project.trim()) {
+				error = 'Select a project';
+				return false;
+			}
+		}
+
+		if (sourceType === 'slack') {
+			if (step === 0 && !slackSecretName.trim()) {
+				error = 'Secret name is required';
+				return false;
+			}
+			if (step === 0 && secretStatus !== 'found') {
+				error = 'Save a valid token before continuing';
+				return false;
+			}
+			if (step === 1 && !slackChannel.trim()) {
+				error = 'Channel ID is required';
+				return false;
+			}
+			if (step === 2 && !project.trim()) {
+				error = 'Select a project';
+				return false;
+			}
+		}
+
+		if (sourceType === 'telegram') {
+			if (step === 0 && !telegramSecretName.trim()) {
+				error = 'Secret name is required';
+				return false;
+			}
+			if (step === 0 && secretStatus !== 'found') {
+				error = 'Save a valid token before continuing';
+				return false;
+			}
+			if (step === 1 && !telegramChatId.trim()) {
+				error = 'Chat ID is required';
+				return false;
+			}
+			if (step === 2 && !project.trim()) {
+				error = 'Select a project';
+				return false;
+			}
+		}
+
+		if (sourceType === 'custom') {
+			if (step === 0 && !customCommand.trim()) {
+				error = 'Command is required';
+				return false;
+			}
+			if (step === 1 && !project.trim()) {
+				error = 'Select a project';
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	function next() {
+		if (!validateStep()) return;
+		if (isLastStep) {
+			save();
+		} else {
+			step++;
+		}
+	}
+
+	function back() {
+		if (step > 0) step--;
+	}
+
+	async function save() {
+		saving = true;
+		error = '';
+
+		const id = sourceId || generateId();
+		const labels = taskLabels
+			.split(',')
+			.map((l) => l.trim())
+			.filter(Boolean);
+
+		const base = {
+			id,
+			type: sourceType,
+			enabled,
+			project: project.trim(),
+			pollInterval,
+			taskDefaults: {
+				type: taskType,
+				priority: taskPriority,
+				labels
+			}
+		};
+
+		let source: any;
+		if (sourceType === 'rss') {
+			source = { ...base, feedUrl: feedUrl.trim() };
+		} else if (sourceType === 'slack') {
+			source = {
+				...base,
+				secretName: slackSecretName.trim(),
+				channel: slackChannel.trim(),
+				includeBots
+			};
+		} else if (sourceType === 'telegram') {
+			source = {
+				...base,
+				secretName: telegramSecretName.trim(),
+				chatId: telegramChatId.trim()
+			};
+		} else {
+			source = { ...base, command: customCommand.trim() };
+		}
+
+		try {
+			onSave(source);
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to save';
+			saving = false;
+		}
+	}
+
+	function handleKeydown(e: KeyboardEvent) {
+		if (!open) return;
+		if (e.key === 'Escape') onClose();
+		if (e.key === 'Enter' && !e.shiftKey) {
+			e.preventDefault();
+			next();
+		}
+	}
+
+	const typeLabels: Record<string, string> = {
+		rss: 'RSS Feed',
+		slack: 'Slack Channel',
+		telegram: 'Telegram Chat',
+		custom: 'Custom Source'
+	};
+</script>
+
+<svelte:window onkeydown={handleKeydown} />
+
+{#if open && sourceType}
+	<!-- Backdrop -->
+	<div
+		class="fixed inset-0 z-50 flex justify-end"
+		transition:fade={{ duration: 150 }}
+	>
+		<!-- Overlay -->
+		<button
+			class="absolute inset-0 cursor-default"
+			style="background: oklch(0.10 0.02 250 / 0.7); backdrop-filter: blur(2px);"
+			onclick={onClose}
+			tabindex="-1"
+		></button>
+
+		<!-- Drawer panel -->
+		<div
+			class="relative w-full max-w-lg h-full flex flex-col"
+			style="background: oklch(0.16 0.02 250); border-left: 1px solid oklch(0.28 0.02 250);"
+			transition:fly={{ x: 400, duration: 250 }}
+			onclick={(e) => e.stopPropagation()}
+		>
+			<!-- Header -->
+			<div
+				class="flex items-center justify-between px-5 py-4"
+				style="border-bottom: 1px solid oklch(0.25 0.02 250);"
+			>
+				<div>
+					<h2 class="font-mono text-sm font-semibold tracking-wide" style="color: oklch(0.85 0.02 250);">
+						{editSource ? 'Edit' : 'Add'} {typeLabels[sourceType] || 'Source'}
+					</h2>
+					<div class="flex items-center gap-2 mt-1">
+						{#each steps as s, i}
+							<div
+								class="h-1 rounded-full transition-all duration-200"
+								style="
+									width: {i <= step ? '24px' : '8px'};
+									background: {i < step ? 'oklch(0.70 0.18 145)' : i === step ? 'oklch(0.70 0.18 220)' : 'oklch(0.30 0.02 250)'};
+								"
+							></div>
+						{/each}
+						<span class="font-mono text-[10px] ml-1" style="color: oklch(0.50 0.02 250);">
+							{step + 1}/{totalSteps}
+						</span>
+					</div>
+				</div>
+				<button
+					class="btn btn-sm btn-ghost btn-circle"
+					onclick={onClose}
+					aria-label="Close"
+					style="color: oklch(0.55 0.02 250);"
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+						<path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+					</svg>
+				</button>
+			</div>
+
+			<!-- Content -->
+			<div class="flex-1 overflow-y-auto px-5 py-5">
+				{#if error}
+					<div
+						class="mb-4 px-3 py-2 rounded-lg font-mono text-xs"
+						style="background: oklch(0.25 0.08 25); color: oklch(0.80 0.15 25); border: 1px solid oklch(0.35 0.08 25);"
+					>
+						{error}
+					</div>
+				{/if}
+
+				<!-- RSS Steps -->
+				{#if sourceType === 'rss'}
+					{#if step === 0}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							<div>
+								<label class="font-mono text-xs font-semibold block mb-1.5" style="color: oklch(0.65 0.02 250);">Feed URL</label>
+								<input
+									type="url"
+									class="input input-bordered w-full font-mono text-sm"
+									placeholder="https://example.com/feed.xml"
+									bind:value={feedUrl}
+									autofocus
+								/>
+								<p class="font-mono text-[10px] mt-1.5" style="color: oklch(0.45 0.02 250);">
+									RSS 2.0, Atom, or Media RSS feed URL
+								</p>
+							</div>
+						</div>
+					{:else if step === 1}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render projectStep()}
+						</div>
+					{:else if step === 2}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render optionsStep()}
+						</div>
+					{:else if step === 3}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render reviewStep()}
+						</div>
+					{/if}
+				{/if}
+
+				<!-- Slack Steps -->
+				{#if sourceType === 'slack'}
+					{#if step === 0}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render tokenStep('slack', slackSecretName)}
+						</div>
+					{:else if step === 1}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							<!-- Detect channels button -->
+							<button
+								class="font-mono text-[11px] px-3 py-2 rounded-lg flex items-center gap-2 w-full justify-center cursor-pointer"
+								style="background: oklch(0.30 0.10 310); color: oklch(0.85 0.10 310); border: 1px solid oklch(0.40 0.10 310);"
+								onclick={detectChannels}
+								disabled={detectingChannels || secretStatus !== 'found'}
+							>
+								{#if detectingChannels}
+									<span class="loading loading-spinner loading-xs"></span>
+									Loading channels...
+								{:else}
+									<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+										<path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+										</svg>
+									Detect Channels
+								{/if}
+							</button>
+
+							<!-- Detection error -->
+							{#if channelDetectionError}
+								<div
+									class="px-3 py-2.5 rounded-lg"
+									style="background: oklch(0.22 0.06 25 / 0.3); border: 1px solid oklch(0.35 0.08 25);"
+								>
+									<p class="font-mono text-[11px]" style="color: oklch(0.75 0.12 25);">
+										{channelDetectionError}
+									</p>
+								</div>
+							{/if}
+
+							<!-- Detected channels -->
+							{#if detectedChannels.length > 0}
+								<div class="space-y-1.5">
+									<p class="font-mono text-[10px] font-semibold" style="color: oklch(0.55 0.02 250);">
+										{detectedChannels.length} channel{detectedChannels.length !== 1 ? 's' : ''} found — click to select
+									</p>
+									<div class="max-h-60 overflow-y-auto space-y-1.5 pr-1">
+										{#each detectedChannels as channel}
+											<button
+												class="w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 transition-all duration-100 cursor-pointer"
+												style="
+													background: {slackChannel === channel.id ? 'oklch(0.22 0.08 310 / 0.5)' : 'oklch(0.20 0.02 250 / 0.5)'};
+													border: 1px solid {slackChannel === channel.id ? 'oklch(0.45 0.12 310)' : 'oklch(0.28 0.02 250)'};
+												"
+												onclick={() => { slackChannel = channel.id; }}
+											>
+												<!-- Channel icon -->
+												<span class="text-sm shrink-0" style="color: oklch(0.60 0.08 310);">
+													{#if channel.isPrivate}
+														<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+															<path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd" />
+															</svg>
+													{:else}
+														<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+															<path fill-rule="evenodd" d="M9.493 2.852a.75.75 0 00-1.486.204L8.545 6H4.198a.75.75 0 000 1.5h4.172l-.62 4.5H3.4a.75.75 0 000 1.5h4.173l-.564 4.148a.75.75 0 001.486.204l.588-4.352h4.394l-.564 4.148a.75.75 0 001.486.204l.588-4.352h4.014a.75.75 0 000-1.5h-3.838l.62-4.5h4.168a.75.75 0 000-1.5h-3.993l.565-4.148a.75.75 0 00-1.487-.204L14.335 7.5H9.942l.564-4.148a.75.75 0 00-.013-.5zM9.766 8.998l-.62 4.5h4.394l.62-4.5H9.766z" clip-rule="evenodd" />
+															</svg>
+													{/if}
+												</span>
+												<div class="min-w-0 flex-1">
+													<p class="font-mono text-[11px] truncate" style="color: oklch(0.80 0.02 250);">
+														#{channel.name}
+													</p>
+													<p class="font-mono text-[9px] truncate" style="color: oklch(0.45 0.02 250);">
+														{channel.isPrivate ? 'private' : 'public'} · {channel.memberCount} members{channel.isMember ? '' : ' · not joined'}{channel.topic ? ` · ${channel.topic}` : ''}
+													</p>
+												</div>
+												<!-- Selected indicator -->
+												{#if slackChannel === channel.id}
+													<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 shrink-0" style="color: oklch(0.70 0.18 145);">
+														<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
+														</svg>
+												{/if}
+											</button>
+										{/each}
+									</div>
+								</div>
+							{/if}
+
+							<!-- Manual fallback -->
+							<details
+								class="rounded-lg"
+								style="background: oklch(0.18 0.02 250 / 0.5); border: 1px solid oklch(0.25 0.02 250);"
+							>
+								<summary class="cursor-pointer px-3 py-2 font-mono text-[10px] select-none" style="color: oklch(0.50 0.02 250);">
+									Enter Channel ID manually
+								</summary>
+								<div class="px-3 pb-3 pt-1">
+									<input
+										type="text"
+										class="input input-bordered w-full font-mono text-sm"
+										placeholder="C0123ABCDEF"
+										bind:value={slackChannel}
+									/>
+									<p class="font-mono text-[10px] mt-1.5" style="color: oklch(0.45 0.02 250);">
+										Right-click a channel &rarr; View channel details &rarr; copy the Channel ID at the bottom
+									</p>
+								</div>
+							</details>
+
+							<div>
+								<label class="flex items-center gap-2 cursor-pointer">
+									<input type="checkbox" class="checkbox checkbox-sm" bind:checked={includeBots} />
+									<span class="font-mono text-xs" style="color: oklch(0.65 0.02 250);">Include bot messages</span>
+								</label>
+							</div>
+						</div>
+					{:else if step === 2}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render projectStep()}
+						</div>
+					{:else if step === 3}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render optionsStep()}
+						</div>
+					{:else if step === 4}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render reviewStep()}
+						</div>
+					{/if}
+				{/if}
+
+				<!-- Telegram Steps -->
+				{#if sourceType === 'telegram'}
+					{#if step === 0}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render tokenStep('telegram', telegramSecretName)}
+						</div>
+					{:else if step === 1}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							<!-- Instructions -->
+							<details open
+								class="rounded-lg"
+								style="background: oklch(0.20 0.04 220 / 0.3); border: 1px solid oklch(0.30 0.04 220);"
+							>
+								<summary class="cursor-pointer px-3 py-2.5 font-mono text-[11px] font-semibold select-none" style="color: oklch(0.70 0.10 220);">
+									How to detect your chats
+								</summary>
+								<div class="px-3 pb-3">
+									<ol class="font-mono text-[10px] space-y-1.5 list-decimal list-inside" style="color: oklch(0.60 0.02 250);">
+										<li>Add your bot to the group or channel you want to monitor</li>
+										<li>Send at least one message in that group (so the bot sees it)</li>
+										<li>Click <strong style="color: oklch(0.75 0.02 250);">Detect Chats</strong> below</li>
+									</ol>
+								</div>
+							</details>
+
+							<!-- Detect button -->
+							<button
+								class="font-mono text-[11px] px-3 py-2 rounded-lg flex items-center gap-2 w-full justify-center"
+								style="background: oklch(0.30 0.10 220); color: oklch(0.85 0.10 220); border: 1px solid oklch(0.40 0.10 220);"
+								onclick={detectChats}
+								disabled={detectingChats || secretStatus !== 'found'}
+							>
+								{#if detectingChats}
+									<span class="loading loading-spinner loading-xs"></span>
+									Detecting chats...
+								{:else}
+									<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+										<path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+									</svg>
+									Detect Chats
+								{/if}
+							</button>
+
+							<!-- Detection error -->
+							{#if detectionError}
+								<div
+									class="px-3 py-2.5 rounded-lg"
+									style="background: oklch(0.22 0.06 25 / 0.3); border: 1px solid oklch(0.35 0.08 25);"
+								>
+									<p class="font-mono text-[11px]" style="color: oklch(0.75 0.12 25);">
+										{detectionError}
+									</p>
+								</div>
+							{/if}
+
+							<!-- Detected chat cards -->
+							{#if detectedChats.length > 0}
+								<div class="space-y-1.5">
+									<p class="font-mono text-[10px] font-semibold" style="color: oklch(0.55 0.02 250);">
+										{detectedChats.length} chat{detectedChats.length !== 1 ? 's' : ''} found — click to select
+									</p>
+									{#each detectedChats as chat}
+										<button
+											class="w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 transition-all duration-100"
+											style="
+												background: {String(telegramChatId) === String(chat.id) ? 'oklch(0.22 0.08 220 / 0.5)' : 'oklch(0.20 0.02 250 / 0.5)'};
+												border: 1px solid {String(telegramChatId) === String(chat.id) ? 'oklch(0.45 0.12 220)' : 'oklch(0.28 0.02 250)'};
+											"
+											onclick={() => { telegramChatId = String(chat.id); }}
+										>
+											<!-- Chat type icon -->
+											<span class="text-sm shrink-0" style="color: oklch(0.60 0.08 220);">
+												{#if chat.type === 'supergroup' || chat.type === 'group'}
+													<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+														<path d="M10 9a3 3 0 100-6 3 3 0 000 6zM6 8a2 2 0 11-4 0 2 2 0 014 0zM1.49 15.326a.78.78 0 01-.358-.442 3 3 0 014.308-3.516 6.484 6.484 0 00-1.905 3.959c-.023.222-.014.442.025.654a4.97 4.97 0 01-2.07-.655zM16.44 15.98a4.97 4.97 0 002.07-.654.78.78 0 00.357-.442 3 3 0 00-4.308-3.517 6.484 6.484 0 011.907 3.96 2.32 2.32 0 01-.026.654zM18 8a2 2 0 11-4 0 2 2 0 014 0zM5.304 16.19a.844.844 0 01-.277-.71 5 5 0 019.947 0 .843.843 0 01-.277.71A6.975 6.975 0 0110 18a6.974 6.974 0 01-4.696-1.81z" />
+													</svg>
+												{:else if chat.type === 'channel'}
+													<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+														<path fill-rule="evenodd" d="M3.43 2.524A41.29 41.29 0 0110 2c2.236 0 4.43.18 6.57.524 1.437.231 2.43 1.49 2.43 2.902v5.148c0 1.413-.993 2.67-2.43 2.902a41.202 41.202 0 01-5.183.501l-2.525 2.525a.75.75 0 01-1.28-.53v-2.2a41.453 41.453 0 01-1.862-.274C2.993 13.245 2 11.986 2 10.574V5.426c0-1.413.993-2.67 2.43-2.902z" clip-rule="evenodd" />
+													</svg>
+												{:else}
+													<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+														<path d="M10 8a3 3 0 100-6 3 3 0 000 6zM3.465 14.493a1.23 1.23 0 00.41 1.412A9.957 9.957 0 0010 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 00-13.074.003z" />
+													</svg>
+												{/if}
+											</span>
+											<div class="min-w-0 flex-1">
+												<p class="font-mono text-[11px] truncate" style="color: oklch(0.80 0.02 250);">
+													{chat.title}
+												</p>
+												<p class="font-mono text-[9px]" style="color: oklch(0.45 0.02 250);">
+													{chat.type}{chat.username ? ` · @${chat.username}` : ''} · ID: {chat.id}
+												</p>
+											</div>
+											<!-- Selected indicator -->
+											{#if String(telegramChatId) === String(chat.id)}
+												<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 shrink-0" style="color: oklch(0.70 0.18 145);">
+													<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
+												</svg>
+											{/if}
+										</button>
+									{/each}
+								</div>
+							{/if}
+
+							<!-- Manual fallback -->
+							<details
+								class="rounded-lg"
+								style="background: oklch(0.18 0.02 250 / 0.5); border: 1px solid oklch(0.25 0.02 250);"
+							>
+								<summary class="cursor-pointer px-3 py-2 font-mono text-[10px] select-none" style="color: oklch(0.50 0.02 250);">
+									Enter Chat ID manually
+								</summary>
+								<div class="px-3 pb-3 pt-1">
+									<input
+										type="text"
+										class="input input-bordered w-full font-mono text-sm"
+										placeholder="-1001234567890"
+										bind:value={telegramChatId}
+									/>
+									<p class="font-mono text-[10px] mt-1.5" style="color: oklch(0.45 0.02 250);">
+										Group/channel ID (starts with -100). Forward a message to @userinfobot to find it.
+									</p>
+								</div>
+							</details>
+						</div>
+					{:else if step === 2}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render projectStep()}
+						</div>
+					{:else if step === 3}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render optionsStep()}
+						</div>
+					{:else if step === 4}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render reviewStep()}
+						</div>
+					{/if}
+				{/if}
+
+				<!-- Custom Steps -->
+				{#if sourceType === 'custom'}
+					{#if step === 0}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							<div>
+								<label class="font-mono text-xs font-semibold block mb-1.5" style="color: oklch(0.65 0.02 250);">Command</label>
+								<textarea
+									class="textarea textarea-bordered w-full font-mono text-sm"
+									placeholder="curl -s https://api.example.com/items | jq '.[]'"
+									rows="3"
+									bind:value={customCommand}
+								></textarea>
+								<p class="font-mono text-[10px] mt-1.5" style="color: oklch(0.45 0.02 250);">
+									Shell command that outputs JSON items. Each item needs: id, title, description
+								</p>
+							</div>
+						</div>
+					{:else if step === 1}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render projectStep()}
+						</div>
+					{:else if step === 2}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render optionsStep()}
+						</div>
+					{:else if step === 3}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render reviewStep()}
+						</div>
+					{/if}
+				{/if}
+			</div>
+
+			<!-- Footer -->
+			<div
+				class="flex items-center justify-between px-5 py-4"
+				style="border-top: 1px solid oklch(0.25 0.02 250);"
+			>
+				<button
+					class="btn btn-sm btn-ghost font-mono text-xs"
+					onclick={step > 0 ? back : onClose}
+					style="color: oklch(0.60 0.02 250);"
+				>
+					{step > 0 ? 'Back' : 'Cancel'}
+				</button>
+				<button
+					class="btn btn-sm font-mono text-xs"
+					style="
+						background: {isLastStep ? 'oklch(0.45 0.15 145)' : 'oklch(0.35 0.10 220)'};
+						color: oklch(0.95 0.02 250);
+						border: 1px solid {isLastStep ? 'oklch(0.55 0.15 145)' : 'oklch(0.45 0.10 220)'};
+					"
+					onclick={next}
+					disabled={nextDisabled}
+				>
+					{#if saving}
+						<span class="loading loading-spinner loading-xs"></span>
+					{:else if isLastStep}
+						{editSource ? 'Save Changes' : 'Add Source'}
+					{:else}
+						Next
+					{/if}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Token step snippet (shared by Slack and Telegram) -->
+{#snippet tokenStep(type: 'slack' | 'telegram', secretName: string)}
+	<div>
+		<label class="font-mono text-xs font-semibold block mb-1.5" style="color: oklch(0.65 0.02 250);">Secret Name</label>
+		{#if type === 'slack'}
+			<input
+				type="text"
+				class="input input-bordered w-full font-mono text-sm"
+				placeholder="slack"
+				bind:value={slackSecretName}
+				oninput={handleSecretNameChange}
+				autofocus
+			/>
+		{:else}
+			<input
+				type="text"
+				class="input input-bordered w-full font-mono text-sm"
+				placeholder="telegram-bot"
+				bind:value={telegramSecretName}
+				oninput={handleSecretNameChange}
+				autofocus
+			/>
+		{/if}
+		<p class="font-mono text-[10px] mt-1.5" style="color: oklch(0.45 0.02 250);">
+			Name used in <code>jat-secret</code> to retrieve the token
+		</p>
+	</div>
+
+	<!-- Secret status -->
+	{#if secretStatus === 'checking'}
+		<div
+			class="flex items-center gap-2 px-3 py-2.5 rounded-lg"
+			style="background: oklch(0.20 0.02 250 / 0.5); border: 1px solid oklch(0.28 0.02 250);"
+		>
+			<span class="loading loading-spinner loading-xs" style="color: oklch(0.55 0.02 250);"></span>
+			<span class="font-mono text-[11px]" style="color: oklch(0.55 0.02 250);">Checking for token...</span>
+		</div>
+	{:else if secretStatus === 'found' && !showTokenInput}
+		<!-- Token found -->
+		<div
+			class="px-3 py-2.5 rounded-lg"
+			style="background: oklch(0.20 0.06 145 / 0.3); border: 1px solid oklch(0.35 0.10 145);"
+		>
+			<div class="flex items-center justify-between">
+				<div class="flex items-center gap-2">
+					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5" style="color: oklch(0.70 0.18 145);">
+						<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
+					</svg>
+					<span class="font-mono text-[11px]" style="color: oklch(0.75 0.12 145);">
+						Token found: <code style="color: oklch(0.65 0.02 250);">{secretMasked}</code>
+					</span>
+				</div>
+				<button
+					class="font-mono text-[10px] px-2 py-0.5 rounded"
+					style="color: oklch(0.60 0.02 250); background: oklch(0.22 0.02 250); border: 1px solid oklch(0.30 0.02 250);"
+					onclick={() => { showTokenInput = true; }}
+				>
+					Change
+				</button>
+			</div>
+		</div>
+
+		<!-- Test connection button and result -->
+		<div class="space-y-2">
+			<button
+				class="font-mono text-[11px] px-3 py-1.5 rounded-lg flex items-center gap-2"
+				style="background: oklch(0.22 0.04 220); color: oklch(0.75 0.10 220); border: 1px solid oklch(0.32 0.06 220);"
+				onclick={() => testConnection(type, secretName)}
+				disabled={testingConnection}
+			>
+				{#if testingConnection}
+					<span class="loading loading-spinner loading-xs"></span>
+					Testing...
+				{:else}
+					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+						<path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H4.28a.75.75 0 00-.75.75v3.955a.75.75 0 001.5 0v-2.134l.235.234a7 7 0 0011.712-3.138.75.75 0 00-1.449-.388zm1.7-5.69a.75.75 0 00-.987-.565 7 7 0 00-11.712 3.138.75.75 0 001.449.388 5.5 5.5 0 019.2-2.466l.313.311h-2.433a.75.75 0 000 1.5H15.8a.75.75 0 00.75-.75V3.778a.75.75 0 00-.538-.044z" clip-rule="evenodd" />
+					</svg>
+					Test Connection
+				{/if}
+			</button>
+
+			{#if testResult}
+				{#if testResult.success}
+					<div
+						class="px-3 py-2 rounded-lg"
+						style="background: oklch(0.20 0.06 145 / 0.2); border: 1px solid oklch(0.30 0.08 145);"
+					>
+						{#if type === 'slack'}
+							<p class="font-mono text-[11px]" style="color: oklch(0.75 0.10 145);">
+								Connected to workspace <strong style="color: oklch(0.85 0.02 250);">"{testResult.info.workspace}"</strong>
+							</p>
+							<p class="font-mono text-[10px] mt-0.5" style="color: oklch(0.60 0.06 145);">
+								Bot: @{testResult.info.botName}
+							</p>
+						{:else}
+							<p class="font-mono text-[11px]" style="color: oklch(0.75 0.10 145);">
+								Connected to bot <strong style="color: oklch(0.85 0.02 250);">"{testResult.info.botName}"</strong>
+							</p>
+							<p class="font-mono text-[10px] mt-0.5" style="color: oklch(0.60 0.06 145);">
+								@{testResult.info.botUsername}
+							</p>
+						{/if}
+					</div>
+				{:else}
+					<div
+						class="px-3 py-2 rounded-lg"
+						style="background: oklch(0.22 0.06 25 / 0.3); border: 1px solid oklch(0.35 0.08 25);"
+					>
+						<p class="font-mono text-[11px]" style="color: oklch(0.75 0.12 25);">
+							{testResult.error}
+						</p>
+					</div>
+				{/if}
+			{/if}
+		</div>
+	{:else if secretStatus === 'missing' || secretStatus === 'error' || showTokenInput}
+		<!-- Token missing or user clicked "Change" -->
+		<div
+			class="px-3 py-2.5 rounded-lg space-y-3"
+			style="background: oklch(0.20 0.04 60 / 0.2); border: 1px solid oklch(0.35 0.08 60);"
+		>
+			{#if !showTokenInput}
+				<div class="flex items-center gap-2">
+					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5" style="color: oklch(0.75 0.15 60);">
+						<path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+					</svg>
+					<span class="font-mono text-[11px]" style="color: oklch(0.75 0.12 60);">
+						No token found for "{secretName}"
+					</span>
+				</div>
+			{/if}
+
+			<div>
+				<label class="font-mono text-[10px] font-semibold block mb-1" style="color: oklch(0.60 0.02 250);">
+					{type === 'slack' ? 'Bot Token' : 'Bot Token'}
+				</label>
+				<input
+					type="password"
+					class="input input-bordered w-full font-mono text-sm"
+					placeholder={type === 'slack' ? 'xoxb-...' : '123456:ABC-DEF...'}
+					bind:value={tokenInput}
+				/>
+				<p class="font-mono text-[10px] mt-1" style="color: oklch(0.45 0.02 250);">
+					{#if type === 'slack'}
+						Create a Slack app &rarr; OAuth &amp; Permissions &rarr; Bot User OAuth Token
+					{:else}
+						Message @BotFather on Telegram &rarr; /newbot &rarr; copy the token
+					{/if}
+				</p>
+			</div>
+
+			<div class="flex gap-2">
+				<button
+					class="font-mono text-[11px] px-3 py-1.5 rounded-lg"
+					style="background: oklch(0.35 0.12 145); color: oklch(0.95 0.02 250); border: 1px solid oklch(0.45 0.12 145);"
+					onclick={() => {
+						if (tokenInput.trim()) {
+							saveToken(secretName, tokenInput.trim(), type);
+						}
+					}}
+					disabled={!tokenInput.trim() || secretStatus === 'saving'}
+				>
+					{#if secretStatus === 'saving'}
+						<span class="loading loading-spinner loading-xs"></span>
+					{:else}
+						Save Token
+					{/if}
+				</button>
+				{#if showTokenInput}
+					<button
+						class="font-mono text-[10px] px-2 py-1 rounded"
+						style="color: oklch(0.55 0.02 250);"
+						onclick={() => { showTokenInput = false; tokenInput = ''; }}
+					>
+						Cancel
+					</button>
+				{/if}
+			</div>
+		</div>
+	{/if}
+
+	<!-- Setup guide -->
+	{#if type === 'slack'}
+		<details
+			class="rounded-lg"
+			style="background: oklch(0.20 0.04 220 / 0.3); border: 1px solid oklch(0.30 0.04 220);"
+		>
+			<summary class="cursor-pointer px-3 py-2.5 font-mono text-[11px] font-semibold select-none" style="color: oklch(0.70 0.10 220);">
+				How to get a Slack Bot Token
+			</summary>
+			<div class="px-3 pb-3 space-y-2">
+				<ol class="font-mono text-[10px] space-y-1.5 list-decimal list-inside" style="color: oklch(0.60 0.02 250);">
+					<li>Go to <a href="https://api.slack.com/apps" target="_blank" rel="noopener" class="underline" style="color: oklch(0.70 0.12 220);">api.slack.com/apps</a> and create a new app (or select an existing one)</li>
+					<li>In the sidebar, click <strong style="color: oklch(0.75 0.02 250);">OAuth &amp; Permissions</strong></li>
+					<li>Scroll to <strong style="color: oklch(0.75 0.02 250);">Bot Token Scopes</strong> and add these scopes:
+						<div class="flex flex-wrap gap-1 mt-1 ml-4">
+							<code class="px-1.5 py-0.5 rounded text-[9px]" style="background: oklch(0.22 0.02 250); color: oklch(0.70 0.10 220);">channels:history</code>
+							<code class="px-1.5 py-0.5 rounded text-[9px]" style="background: oklch(0.22 0.02 250); color: oklch(0.70 0.10 220);">channels:read</code>
+							<code class="px-1.5 py-0.5 rounded text-[9px]" style="background: oklch(0.22 0.02 250); color: oklch(0.70 0.10 220);">groups:read</code>
+							<code class="px-1.5 py-0.5 rounded text-[9px]" style="background: oklch(0.22 0.02 250); color: oklch(0.70 0.10 220);">files:read</code>
+							<code class="px-1.5 py-0.5 rounded text-[9px]" style="background: oklch(0.22 0.02 250); color: oklch(0.70 0.10 220);">chat:write</code>
+						</div>
+					</li>
+					<li>Scroll back up and click <strong style="color: oklch(0.75 0.02 250);">Install to Workspace</strong> (or reinstall if updating scopes)</li>
+					<li>Copy the <strong style="color: oklch(0.75 0.02 250);">Bot User OAuth Token</strong> (starts with <code style="color: oklch(0.65 0.02 250);">xoxb-</code>)</li>
+				</ol>
+			</div>
+		</details>
+	{:else}
+		<details
+			class="rounded-lg"
+			style="background: oklch(0.20 0.04 220 / 0.3); border: 1px solid oklch(0.30 0.04 220);"
+		>
+			<summary class="cursor-pointer px-3 py-2.5 font-mono text-[11px] font-semibold select-none" style="color: oklch(0.70 0.10 220);">
+				How to get a Telegram Bot Token
+			</summary>
+			<div class="px-3 pb-3 space-y-2">
+				<ol class="font-mono text-[10px] space-y-1.5 list-decimal list-inside" style="color: oklch(0.60 0.02 250);">
+					<li>Open Telegram and message <a href="https://t.me/BotFather" target="_blank" rel="noopener" class="underline" style="color: oklch(0.70 0.12 220);">@BotFather</a></li>
+					<li>Send <code style="color: oklch(0.65 0.02 250);">/newbot</code> and follow the prompts to name your bot</li>
+					<li>Copy the <strong style="color: oklch(0.75 0.02 250);">HTTP API token</strong> (looks like <code style="color: oklch(0.65 0.02 250);">123456:ABC-DEF1234...</code>)</li>
+					<li>Add the bot to your group/channel and make sure it has permission to read messages</li>
+				</ol>
+			</div>
+		</details>
+	{/if}
+{/snippet}
+
+<!-- Shared step snippets -->
+{#snippet projectStep()}
+	<div>
+		<label class="font-mono text-xs font-semibold block mb-1.5" style="color: oklch(0.65 0.02 250);">Target Project</label>
+		<ProjectSelector
+			projects={projectNames}
+			selectedProject={project || projectNames[0] || ''}
+			onProjectChange={(p) => { project = p; }}
+			showColors={true}
+		/>
+		<p class="font-mono text-[10px] mt-1.5" style="color: oklch(0.45 0.02 250);">
+			Tasks will be created in this project's Beads database
+		</p>
+	</div>
+	<div>
+		<label class="font-mono text-xs font-semibold block mb-1.5" style="color: oklch(0.65 0.02 250);">Source ID</label>
+		<input
+			type="text"
+			class="input input-bordered w-full font-mono text-sm"
+			placeholder={generateId() || 'auto-generated'}
+			bind:value={sourceId}
+		/>
+		<p class="font-mono text-[10px] mt-1.5" style="color: oklch(0.45 0.02 250);">
+			Unique identifier. Leave blank to auto-generate.
+		</p>
+	</div>
+{/snippet}
+
+{#snippet optionsStep()}
+	<div>
+		<label class="font-mono text-xs font-semibold block mb-1.5" style="color: oklch(0.65 0.02 250);">Poll Interval (seconds)</label>
+		<input
+			type="number"
+			class="input input-bordered w-full font-mono text-sm"
+			min="10"
+			max="86400"
+			bind:value={pollInterval}
+		/>
+	</div>
+	<div>
+		<label class="font-mono text-xs font-semibold block mb-1.5" style="color: oklch(0.65 0.02 250);">Task Type</label>
+		<select class="select select-bordered w-full font-mono text-sm" bind:value={taskType}>
+			<option value="task">task</option>
+			<option value="bug">bug</option>
+			<option value="feature">feature</option>
+			<option value="chore">chore</option>
+		</select>
+	</div>
+	<div>
+		<label class="font-mono text-xs font-semibold block mb-1.5" style="color: oklch(0.65 0.02 250);">Priority</label>
+		<select class="select select-bordered w-full font-mono text-sm" bind:value={taskPriority}>
+			<option value={0}>P0 - Critical</option>
+			<option value={1}>P1 - High</option>
+			<option value={2}>P2 - Medium</option>
+			<option value={3}>P3 - Low</option>
+			<option value={4}>P4 - Minimal</option>
+		</select>
+	</div>
+	<div>
+		<label class="font-mono text-xs font-semibold block mb-1.5" style="color: oklch(0.65 0.02 250);">Labels (comma-separated)</label>
+		<input
+			type="text"
+			class="input input-bordered w-full font-mono text-sm"
+			placeholder="from-rss, frontend"
+			bind:value={taskLabels}
+		/>
+	</div>
+	<div>
+		<label class="flex items-center gap-2 cursor-pointer">
+			<input type="checkbox" class="checkbox checkbox-sm" bind:checked={enabled} />
+			<span class="font-mono text-xs" style="color: oklch(0.65 0.02 250);">Enable immediately</span>
+		</label>
+	</div>
+{/snippet}
+
+{#snippet reviewStep()}
+	<div class="space-y-3">
+		<h3 class="font-mono text-xs font-semibold" style="color: oklch(0.70 0.02 250);">Review Configuration</h3>
+
+		<div
+			class="rounded-lg overflow-hidden"
+			style="border: 1px solid oklch(0.25 0.02 250);"
+		>
+			{@render reviewRow('Type', typeLabels[sourceType || ''] || sourceType || '')}
+			{@render reviewRow('ID', sourceId || generateId())}
+			{@render reviewRow('Project', project)}
+			{@render reviewRow('Poll Interval', `${pollInterval}s`)}
+			{@render reviewRow('Task Type', taskType)}
+			{@render reviewRow('Priority', `P${taskPriority}`)}
+			{@render reviewRow('Labels', taskLabels || '(none)')}
+			{@render reviewRow('Enabled', enabled ? 'Yes' : 'No')}
+
+			{#if sourceType === 'rss'}
+				{@render reviewRow('Feed URL', feedUrl)}
+			{:else if sourceType === 'slack'}
+				{@render reviewRow('Secret', slackSecretName)}
+				{@render reviewRow('Channel', slackChannel)}
+			{:else if sourceType === 'telegram'}
+				{@render reviewRow('Secret', telegramSecretName)}
+				{@render reviewRow('Chat ID', telegramChatId)}
+			{:else if sourceType === 'custom'}
+				{@render reviewRow('Command', customCommand)}
+			{/if}
+		</div>
+	</div>
+{/snippet}
+
+{#snippet reviewRow(label: string, value: string)}
+	<div
+		class="flex items-start gap-3 px-3 py-2"
+		style="border-bottom: 1px solid oklch(0.22 0.02 250);"
+	>
+		<span class="font-mono text-[10px] font-semibold w-24 shrink-0 pt-0.5" style="color: oklch(0.50 0.02 250);">
+			{label}
+		</span>
+		<span class="font-mono text-xs break-all" style="color: oklch(0.75 0.02 250);">
+			{value}
+		</span>
+	</div>
+{/snippet}

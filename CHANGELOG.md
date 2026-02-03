@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Ingest feed system** - New `/ingest` page for managing RSS, Slack, and Telegram feed sources with guided setup wizard, poll history, manual poll trigger, last-polled timestamps, inline error indicators, and thread reply counts
+- **Ingest daemon** - Background Node.js service (`jat-ingest`) that polls configured feed sources on schedule, with adapter architecture for RSS/Slack/Telegram
+- **Slack channel detection** - Guided wizard flow for Slack source setup that auto-detects available channels via `conversations.list` API
+- **Ingest server management** - Start/stop/restart ingest daemon from IDE Servers page with auto-start config option
 - **Monaco context menu actions** - "Send to LLM" (Alt+L) and "Create Task from Selection" (Alt+T) available in all Monaco editors: FileEditor, MigrationViewer, and DiffViewer
 - **Styled Monaco context menu** - Custom dark theme matching JAT FileTree style with rounded corners, oklch colors, and keybinding badges
 - Task Summary tab in task detail pane showing completion report, suggested tasks, and cross-agent intel
@@ -33,6 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Swarm attack mode for parallel agent execution
 
 ### Changed
+- `get-current-session-id` supports `--wait` flag for fresh startup retry
+- Activity state polling is more resilient to transient network errors (Content-Length mismatches)
+- Sidebar badge positions adjusted for collapsed nav icons
+- Server restart endpoint supports ingest daemon
 - Migrated from jomarchy-agent-tools to JAT branding
 - Upgraded to Tailwind CSS v4
 - Improved theme system with 32 DaisyUI themes

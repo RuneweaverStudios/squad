@@ -28,6 +28,7 @@ BROWSER_DIR="$TOOLS_DIR/browser"
 SIGNAL_DIR="$TOOLS_DIR/signal"
 MEDIA_DIR="$TOOLS_DIR/media"
 MAIL_DIR="$TOOLS_DIR/mail"
+INGEST_DIR="$TOOLS_DIR/ingest"
 
 # Verify directories exist
 if [ ! -d "$CORE_DIR" ] || [ ! -d "$BROWSER_DIR" ]; then
@@ -53,7 +54,11 @@ MEDIA_COUNT=0
 if [ -d "$MEDIA_DIR" ]; then
     MEDIA_COUNT=$(find "$MEDIA_DIR" -maxdepth 1 -type f -executable 2>/dev/null | wc -l)
 fi
-TOOL_COUNT=$(( CORE_COUNT + BROWSER_COUNT + MAIL_COUNT + SIGNAL_COUNT + MEDIA_COUNT ))
+INGEST_COUNT=0
+if [ -d "$INGEST_DIR" ]; then
+    INGEST_COUNT=$(find "$INGEST_DIR" -maxdepth 1 -type f -executable 2>/dev/null | wc -l)
+fi
+TOOL_COUNT=$(( CORE_COUNT + BROWSER_COUNT + MAIL_COUNT + SIGNAL_COUNT + MEDIA_COUNT + INGEST_COUNT ))
 echo "  Found $TOOL_COUNT tools"
 echo "    - $CORE_COUNT in tools/core/"
 echo "    - $BROWSER_COUNT in tools/browser/"
@@ -65,6 +70,9 @@ if [ "$SIGNAL_COUNT" -gt 0 ]; then
 fi
 if [ "$MEDIA_COUNT" -gt 0 ]; then
     echo "    - $MEDIA_COUNT in tools/media/"
+fi
+if [ "$INGEST_COUNT" -gt 0 ]; then
+    echo "    - $INGEST_COUNT in tools/ingest/"
 fi
 echo ""
 
@@ -121,6 +129,9 @@ if [ -d "$SIGNAL_DIR" ]; then
 fi
 if [ -d "$MEDIA_DIR" ]; then
     symlink_tools "$MEDIA_DIR"
+fi
+if [ -d "$INGEST_DIR" ]; then
+    symlink_tools "$INGEST_DIR"
 fi
 
 echo ""

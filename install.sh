@@ -317,6 +317,14 @@ if command -v npm &> /dev/null; then
             echo -e "  ${YELLOW}⚠${NC} browser-tools npm install failed (run manually: cd tools/browser && npm install)"
     fi
 
+    # Install ingest daemon dependencies (better-sqlite3, rss-parser)
+    if [ -f "$INSTALL_DIR/tools/ingest/package.json" ]; then
+        echo "  → Installing ingest daemon dependencies..."
+        (cd "$INSTALL_DIR/tools/ingest" && npm install --silent 2>/dev/null) && \
+            echo -e "  ${GREEN}✓${NC} ingest daemon dependencies installed" || \
+            echo -e "  ${YELLOW}⚠${NC} ingest npm install failed (run manually: cd tools/ingest && npm install)"
+    fi
+
     # Install IDE dependencies (SvelteKit, etc.)
     if [ -f "$INSTALL_DIR/ide/package.json" ]; then
         echo "  → Installing IDE dependencies..."

@@ -1,0 +1,132 @@
+#!/usr/bin/env node
+
+import { loadConfig, configPath } from './lib/config.js';
+import { getDb, closeDb, getAllSourceStats, getLastPoll, getItemCount, getRecentPolls } from './lib/dedup.js';
+
+const args = process.argv.slice(2);
+
+if (args.includes('--help') || args.includes('-h')) {
+  console.log(`jat-ingest-status - Show ingestion source status
+
+USAGE:
+    jat-ingest-status               Overview of all sources
+    jat-ingest-status --source <id> Detailed stats for one source
+    jat-ingest-status --json        Output as JSON
+    jat-ingest-status --help        Show this help`);
+  process.exit(0);
+}
+
+const sourceId = getArg('--source');
+const jsonOutput = args.includes('--json');
+
+try {
+  getDb(); // Ensure DB is initialized
+} catch (err) {
+  console.error(`Database error: ${err.message}`);
+  console.error('Run jat-ingest once to initialize the database.');
+  process.exit(1);
+}
+
+let config;
+try {
+  config = loadConfig();
+} catch (err) {
+  console.error(`Config error: ${err.message}`);
+  process.exit(1);
+}
+
+if (sourceId) {
+  showSourceDetail(sourceId);
+} else {
+  showOverview();
+}
+
+closeDb();
+
+function showOverview() {
+  const stats = getAllSourceStats();
+  const statsMap = new Map(stats.map(s => [s.source_id, s]));
+
+  const results = config.sources.map(source => {
+    const stat = statsMap.get(source.id) || { total_items: 0, last_ingested: null };
+    const lastPoll = getLastPoll(source.id);
+
+    return {
+      id: source.id,
+      type: source.type,
+      enabled: source.enabled !== false,
+      project: source.project,
+      totalItems: stat.total_items,
+      lastIngested: stat.last_ingested,
+      lastPoll: lastPoll?.poll_at || null,
+      lastPollError: lastPoll?.error || null,
+      pollInterval: source.pollInterval || 60
+    };
+  });
+
+  if (jsonOutput) {
+    console.log(JSON.stringify(results, null, 2));
+    return;
+  }
+
+  console.log(`Config: ${configPath()}`);
+  console.log(`Sources: ${config.sources.length}`);
+  console.log('');
+
+  for (const r of results) {
+    const status = !r.enabled ? 'disabled' :
+                   r.lastPollError ? 'error' : 'ok';
+    const statusIcon = status === 'disabled' ? '-' :
+                       status === 'error' ? 'x' : 'o';
+
+    console.log(`[${statusIcon}] ${r.id} (${r.type}) -> ${r.project}`);
+    console.log(`    Items: ${r.totalItems} | Poll interval: ${r.pollInterval}s`);
+    if (r.lastPoll) {
+      console.log(`    Last poll: ${r.lastPoll}`);
+    }
+    if (r.lastPollError) {
+      console.log(`    Last error: ${r.lastPollError}`);
+    }
+    console.log('');
+  }
+}
+
+function showSourceDetail(id) {
+  const source = config.sources.find(s => s.id === id);
+  if (!source) {
+    console.error(`Source not found: ${id}`);
+    process.exit(1);
+  }
+
+  const count = getItemCount(id);
+  const recentPolls = getRecentPolls(id, 20);
+
+  if (jsonOutput) {
+    console.log(JSON.stringify({ source, itemCount: count, recentPolls }, null, 2));
+    return;
+  }
+
+  console.log(`Source: ${source.id}`);
+  console.log(`Type: ${source.type}`);
+  console.log(`Project: ${source.project}`);
+  console.log(`Enabled: ${source.enabled !== false}`);
+  console.log(`Poll interval: ${source.pollInterval || 60}s`);
+  console.log(`Total items ingested: ${count}`);
+  console.log('');
+
+  if (recentPolls.length > 0) {
+    console.log('Recent polls:');
+    for (const poll of recentPolls) {
+      const err = poll.error ? ` ERROR: ${poll.error}` : '';
+      console.log(`  ${poll.poll_at} | found: ${poll.items_found} new: ${poll.items_new} | ${poll.duration_ms}ms${err}`);
+    }
+  } else {
+    console.log('No poll history yet.');
+  }
+}
+
+function getArg(flag) {
+  const idx = args.indexOf(flag);
+  if (idx === -1) return null;
+  return args[idx + 1] || null;
+}

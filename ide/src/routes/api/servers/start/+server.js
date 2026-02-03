@@ -57,68 +57,125 @@ export async function POST({ request }) {
 			// tmux might not be running, continue
 		}
 
-		// Get project settings from jat config
-		let projectPath = null;
-		let serverPath = null;
-		let configPort = null;
-		try {
-			const configPath = `${process.env.HOME}/.config/jat/projects.json`;
-			// Read all project settings at once
-			// Note: \\n creates literal \n for jq to interpret as newline
-			const { stdout: configOutput } = await execAsync(
-				`jq -r '.projects["${projectName}"] | "\\(.path // "")\\n\\(.server_path // "")\\n\\(.port // "")"' "${configPath}" 2>/dev/null`
-			);
-			const [path, srvPath, portStr] = configOutput.trim().split('\n');
-			if (path) {
-				projectPath = path.replace(/^~/, process.env.HOME || '');
-			}
-			if (srvPath) {
-				serverPath = srvPath.replace(/^~/, process.env.HOME || '');
-			}
-			if (portStr && portStr !== 'null') {
-				configPort = parseInt(portStr, 10);
-			}
-		} catch {
-			// Config not available
-		}
+		// Special handling for ingest service
+		let executionPath;
+		let serverCommand;
+		let effectivePort = null;
 
-		// Fall back to default path
-		if (!projectPath) {
-			projectPath = `${process.env.HOME}/code/${projectName}`;
-		}
+		if (projectName === 'ingest') {
+			// Resolve the ingest directory directly from the jat-ingest symlink
+			executionPath = await (async () => {
+				try {
+					const { stdout } = await execAsync('readlink -f "$(which jat-ingest)" 2>/dev/null');
+					const resolved = stdout.trim();
+					if (resolved) {
+						const { stdout: dirOut } = await execAsync(`dirname "${resolved}"`);
+						return dirOut.trim();
+					}
+				} catch { /* fall through */ }
+				// Fallback paths
+				const fallbacks = [
+					`${process.env.JAT_INSTALL_DIR || ''}/tools/ingest`,
+					`${process.env.HOME}/.local/share/jat/tools/ingest`,
+					`${process.env.HOME}/code/jat/tools/ingest`
+				];
+				for (const p of fallbacks) {
+					if (!p.startsWith('/tools')) {
+						try {
+							const { stdout } = await execAsync(`test -d "${p}" && echo "yes" || echo "no"`);
+							if (stdout.trim() === 'yes') return p;
+						} catch { /* continue */ }
+					}
+				}
+				return `${process.env.HOME}/code/jat/tools/ingest`;
+			})();
+			serverCommand = `node jat-ingest`;
 
-		// Use server_path if specified, otherwise use project path
-		const executionPath = serverPath || projectPath;
-
-		// Verify execution path exists
-		try {
-			const { stdout } = await execAsync(`test -d "${executionPath}" && echo "exists" || echo "no"`);
-			if (stdout.trim() !== 'exists') {
+			// Verify execution path exists
+			try {
+				const { stdout } = await execAsync(`test -d "${executionPath}" && echo "exists" || echo "no"`);
+				if (stdout.trim() !== 'exists') {
+					return json(
+						{
+							error: 'Ingest tools not found',
+							message: `Directory does not exist: ${executionPath}`
+						},
+						{ status: 404 }
+					);
+				}
+			} catch {
 				return json(
 					{
-						error: 'Project directory not found',
-						message: `Directory does not exist: ${executionPath}`
+						error: 'Failed to verify ingest path',
+						message: `Could not check directory: ${executionPath}`
 					},
-					{ status: 404 }
+					{ status: 500 }
 				);
 			}
-		} catch {
-			return json(
-				{
-					error: 'Failed to verify project path',
-					message: `Could not check directory: ${executionPath}`
-				},
-				{ status: 500 }
-			);
-		}
+		} else {
+			// Standard project server handling
+			let projectPath = null;
+			let serverPath = null;
+			let configPort = null;
+			try {
+				const configPath = `${process.env.HOME}/.config/jat/projects.json`;
+				// Read all project settings at once
+				// Note: \\n creates literal \n for jq to interpret as newline
+				const { stdout: configOutput } = await execAsync(
+					`jq -r '.projects["${projectName}"] | "\\(.path // "")\\n\\(.server_path // "")\\n\\(.port // "")"' "${configPath}" 2>/dev/null`
+				);
+				const [path, srvPath, portStr] = configOutput.trim().split('\n');
+				if (path) {
+					projectPath = path.replace(/^~/, process.env.HOME || '');
+				}
+				if (srvPath) {
+					serverPath = srvPath.replace(/^~/, process.env.HOME || '');
+				}
+				if (portStr && portStr !== 'null') {
+					configPort = parseInt(portStr, 10);
+				}
+			} catch {
+				// Config not available
+			}
 
-		// Use port from request, config, or nothing (let vite pick default)
-		const effectivePort = port || configPort;
+			// Fall back to default path
+			if (!projectPath) {
+				projectPath = `${process.env.HOME}/code/${projectName}`;
+			}
 
-		// Build the command with port if specified
-		let serverCommand = command;
-		if (effectivePort && !command.includes('--port')) {
-			serverCommand = `${command} -- --port ${effectivePort}`;
+			// Use server_path if specified, otherwise use project path
+			executionPath = serverPath || projectPath;
+
+			// Verify execution path exists
+			try {
+				const { stdout } = await execAsync(`test -d "${executionPath}" && echo "exists" || echo "no"`);
+				if (stdout.trim() !== 'exists') {
+					return json(
+						{
+							error: 'Project directory not found',
+							message: `Directory does not exist: ${executionPath}`
+						},
+						{ status: 404 }
+					);
+				}
+			} catch {
+				return json(
+					{
+						error: 'Failed to verify project path',
+						message: `Could not check directory: ${executionPath}`
+					},
+					{ status: 500 }
+				);
+			}
+
+			// Use port from request, config, or nothing (let vite pick default)
+			effectivePort = port || configPort;
+
+			// Build the command with port if specified
+			serverCommand = command;
+			if (effectivePort && !command.includes('--port')) {
+				serverCommand = `${command} -- --port ${effectivePort}`;
+			}
 		}
 
 		// Create tmux session and start the server
