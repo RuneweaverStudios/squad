@@ -95,12 +95,35 @@
 		return map;
 	});
 
-	// Total configured projects with ports
-	const totalProjects = $derived(projectsWithPorts.length);
+	// Merge running sessions that don't have a matching configured project
+	// This ensures ALL running servers appear in the dropdown, even if their
+	// project doesn't have a port/serverPath in projects.json
+	const allProjects = $derived.by(() => {
+		const configuredKeys = new Set(projectsWithPorts.map((p) => p.key));
+		const extras: ProjectWithPort[] = [];
+		for (const session of sessions) {
+			if (!configuredKeys.has(session.projectName)) {
+				extras.push({
+					key: session.projectName,
+					displayName:
+						session.displayName ||
+						session.projectName.charAt(0).toUpperCase() +
+							session.projectName.slice(1),
+					port: session.port ?? 0,
+					path: session.projectPath || "",
+					serverPath: null,
+				});
+			}
+		}
+		return [...projectsWithPorts, ...extras];
+	});
+
+	// Total projects (configured + any running servers without config)
+	const totalProjects = $derived(allProjects.length);
 
 	// Sorted projects: running/starting first, then stopped
 	const sortedProjects = $derived.by(() => {
-		return [...projectsWithPorts].sort((a, b) => {
+		return [...allProjects].sort((a, b) => {
 			const aSession = sessionsByProject.get(a.key);
 			const bSession = sessionsByProject.get(b.key);
 			const aRunning =

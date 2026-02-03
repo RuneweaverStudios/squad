@@ -48,7 +48,7 @@
 		inactiveColor: string | null;
 		description: string | null;
 		hidden: boolean;
-		source: 'jat-config' | 'filesystem';
+		source: 'jat-config' | 'filesystem' | 'server-session';
 		tasks?: { open: number; total: number };
 		agents?: { active: number; total: number };
 		status?: string | null;
@@ -639,7 +639,8 @@
 		// Ignore if no project is hovered
 		if (!hoveredProject) return;
 
-		const project = projects.find(p => p.name === hoveredProject);
+		const project = projects.find(p => p.name === hoveredProject)
+			|| serverOnlyEntries.find(p => p.name === hoveredProject);
 		if (!project) return;
 
 		const sessionName = getServerSessionName(project.name);
@@ -764,6 +765,31 @@
 		};
 	}
 
+	// Server sessions that have no matching project config entry
+	// These are servers like 'server-ingest' or 'server-finance' that are running
+	// but weren't configured in ~/.config/jat/projects.json
+	const serverOnlyEntries = $derived.by((): Project[] => {
+		const projectNames = new Set(projects.map(p => p.name.toLowerCase()));
+		return serverSessionsState.sessions
+			.filter(s => !projectNames.has(s.projectName.toLowerCase()))
+			.map(s => ({
+				name: s.projectName,
+				displayName: s.displayName || s.projectName.charAt(0).toUpperCase() + s.projectName.slice(1),
+				path: s.projectPath || '',
+				serverPath: null,
+				port: s.port,
+				activeColor: null,
+				inactiveColor: null,
+				description: s.command || null,
+				hidden: false,
+				source: 'server-session' as const,
+				tasks: { open: 0, total: 0 },
+				agents: { active: 0, total: 0 },
+				status: s.status,
+				lastActivity: null
+			}));
+	});
+
 	// Sort projects by user-selected column
 	const sortedProjects = $derived(() => {
 		const getActivityScore = (project: Project): number => {
@@ -787,7 +813,7 @@
 			return project.agents?.active ?? project.agents?.total ?? 0;
 		};
 
-		return [...projects].sort((a, b) => {
+		return [...projects, ...serverOnlyEntries].sort((a, b) => {
 			// First: visible projects before hidden
 			if (a.hidden !== b.hidden) return a.hidden ? 1 : -1;
 
@@ -891,7 +917,7 @@
 		<!-- Loading state -->
 		{#if loading && projects.length === 0}
 			<ProjectsTableSkeleton rows={6} />
-		{:else if projects.length === 0}
+		{:else if projects.length === 0 && serverOnlyEntries.length === 0}
 			<div class="flex items-center justify-center py-12">
 				<div class="text-center">
 					<p class="text-base-content/60 font-mono text-sm">
@@ -915,7 +941,7 @@
 			<!-- Sticky header with Add Project button -->
 			<div class="sticky top-0 z-10 bg-base-100 border-b border-base-content/20 px-4 py-2 flex items-center justify-between">
 				<span class="text-base-content/60 text-xs font-mono uppercase tracking-wider">
-					{projects.length} project{projects.length !== 1 ? 's' : ''}
+					{projects.length} project{projects.length !== 1 ? 's' : ''}{#if serverOnlyEntries.length > 0}<span class="text-base-content/40 mx-1">·</span>{serverOnlyEntries.length} server{serverOnlyEntries.length !== 1 ? 's' : ''}{/if}
 				</span>
 				<button
 					class="btn btn-xs btn-ghost gap-1 text-success border border-success/30"
@@ -1012,6 +1038,7 @@
 					<tbody>
 						{#each sortedProjects() as project (project.name)}
 							{@const runningSessionName = getServerSessionName(project.name)}
+						{@const isServerOnly = project.source === 'server-session'}
 							<tr
 								class="border-b border-base-content/15 transition-colors {runningSessionName ? 'cursor-pointer' : ''} {project.status === 'running' ? 'bg-success/10 hover:bg-success/15' : 'hover:bg-base-200'}"
 								style="opacity: {project.hidden ? '0.5' : '1'};"
@@ -1022,21 +1049,37 @@
 								<!-- Project name and path -->
 								<td class="px-4 py-2">
 									<div class="flex flex-col">
-										<span class="text-base-content/90 font-mono text-sm font-medium">
-											{project.name}
-										</span>
-										<button
-											class="text-base-content/50 font-mono text-[10px] truncate max-w-[160px] hover:underline cursor-pointer text-left"
-											title="Open folder: {project.path}"
-											onclick={(e) => { e.stopPropagation(); openFolder(project.path); }}
-										>
-											{project.path.replace(/^\/home\/[^/]+/, '~')}
-										</button>
+										<div class="flex items-center gap-1.5">
+											<span class="text-base-content/90 font-mono text-sm font-medium">
+												{project.name}
+											</span>
+											{#if isServerOnly}
+												<span class="text-base-content/40 font-mono text-[9px] px-1 py-0.5 rounded bg-base-content/8 leading-none">server</span>
+											{/if}
+										</div>
+										{#if project.path}
+											<button
+												class="text-base-content/50 font-mono text-[10px] truncate max-w-[160px] hover:underline cursor-pointer text-left"
+												title="Open folder: {project.path}"
+												onclick={(e) => { e.stopPropagation(); openFolder(project.path); }}
+											>
+												{project.path.replace(/^\/home\/[^/]+/, '~')}
+											</button>
+										{:else}
+											<span class="text-base-content/40 font-mono text-[10px]">
+												tmux: server-{project.name}
+											</span>
+										{/if}
 									</div>
 								</td>
 
 								<!-- Color (editable with picker) -->
 								<td class="px-2 py-2">
+								{#if isServerOnly}
+									<div class="flex justify-center">
+										<span class="text-base-content/25 text-xs">—</span>
+									</div>
+								{:else}
 									<div class="relative flex justify-center">
 										{#if editingColor === project.name}
 											<!-- Color picker dropdown -->
@@ -1103,11 +1146,20 @@
 											></button>
 										{/if}
 									</div>
+								{/if}
 								</td>
 
-								<!-- Port (editable) -->
+								<!-- Port (editable for projects, read-only for server sessions) -->
 								<td class="px-3 py-3">
-									{#if editingPort === project.name}
+									{#if isServerOnly}
+										{#if project.port && project.status === 'running'}
+											<span class="text-success font-mono text-xs">:{project.port}</span>
+										{:else if project.port}
+											<span class="text-base-content/75 font-mono text-xs">:{project.port}</span>
+										{:else}
+											<span class="text-base-content/45 font-mono text-xs italic">—</span>
+										{/if}
+									{:else if editingPort === project.name}
 										<input
 											type="text"
 											class="w-16 px-2 py-1 rounded font-mono text-xs outline-none bg-base-300 border border-info/50 text-base-content/90"
@@ -1266,6 +1318,8 @@
 										{:else}
 											<span class="text-success">now</span>
 										{/if}
+									{:else if isServerOnly}
+										<span class="text-base-content/30">—</span>
 									{:else if project.lastActivity !== undefined}
 										{project.lastActivity || '-'}
 									{:else}
@@ -1275,7 +1329,9 @@
 
 								<!-- Tasks -->
 								<td class="text-base-content/70 px-3 py-3 font-mono text-xs">
-									{#if project.tasks !== undefined}
+									{#if isServerOnly}
+										<span class="text-base-content/30">—</span>
+									{:else if project.tasks !== undefined}
 										{formatTasks(project.tasks)}
 									{:else}
 										<div class="skeleton h-3 w-8 rounded"></div>
@@ -1284,16 +1340,22 @@
 
 								<!-- Agents -->
 								<td class="text-base-content/70 px-3 py-3 font-mono text-xs">
-									{#if project.agents !== undefined}
+									{#if isServerOnly}
+										<span class="text-base-content/30">—</span>
+									{:else if project.agents !== undefined}
 										{formatAgents(project.agents)}
 									{:else}
 										<div class="skeleton h-3 w-6 rounded"></div>
 									{/if}
 								</td>
 
-								<!-- Description (editable) -->
+								<!-- Description (editable for projects, read-only for server sessions) -->
 								<td class="px-4 py-3">
-									{#if editingDescription === project.name}
+									{#if isServerOnly}
+										<span class="text-base-content/50 font-mono text-xs italic">
+											{project.description || 'server process'}
+										</span>
+									{:else if editingDescription === project.name}
 										<div class="flex items-center gap-2">
 											<input
 												type="text"
@@ -1353,8 +1415,9 @@
 									{/if}
 								</td>
 
-								<!-- Visibility toggle (diminished) -->
+								<!-- Visibility toggle (diminished, hidden for server-only entries) -->
 								<td class="px-2 py-3 text-center">
+									{#if !isServerOnly}
 									<button
 										class="relative w-7 h-3.5 rounded-full transition-all cursor-pointer opacity-60 hover:opacity-100 {project.hidden ? 'bg-base-content/25' : 'bg-success/45'}"
 										onclick={(e) => { e.stopPropagation(); toggleVisibility(project); }}
@@ -1373,6 +1436,7 @@
 											></span>
 										{/if}
 									</button>
+									{/if}
 								</td>
 							</tr>
 						{/each}

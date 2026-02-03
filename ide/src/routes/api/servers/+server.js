@@ -125,11 +125,16 @@ function detectStatus(output, portRunning) {
 		/cannot find module/i    // Module not found
 	];
 
-	for (const pattern of fatalErrorPatterns) {
-		if (pattern.test(recentOutput)) {
-			return 'stopped';
-		}
-	}
+	// Check for ready patterns - these indicate current running state
+	const readyPatterns = [
+		/ready in/i,
+		/ready - polling/i,
+		/listening on/i,
+		/server running/i,
+		/local:/i,
+		/network:/i,
+		/started server/i
+	];
 
 	// Check for startup patterns
 	const startingPatterns = [
@@ -141,26 +146,42 @@ function detectStatus(output, portRunning) {
 		/preparing/i
 	];
 
-	for (const pattern of startingPatterns) {
-		if (pattern.test(recentOutput)) {
-			return 'starting';
+	// Use the LAST few lines to determine current state, since older output
+	// may contain stale patterns (e.g. "starting" from a previous boot cycle
+	// while the server is now "ready - polling")
+	const lines = recentOutput.split('\n').filter(l => l.trim());
+	const lastLines = lines.slice(-10).join('\n');
+
+	// Check last lines first for definitive current state
+	for (const pattern of fatalErrorPatterns) {
+		if (pattern.test(lastLines)) {
+			return 'stopped';
 		}
 	}
 
-	// Check for ready patterns
-	const readyPatterns = [
-		/ready in/i,
-		/ready - polling/i,
-		/listening on/i,
-		/server running/i,
-		/local:/i,
-		/network:/i,
-		/started server/i
-	];
+	for (const pattern of readyPatterns) {
+		if (pattern.test(lastLines)) {
+			return 'running';
+		}
+	}
+
+	// Fall back to full recent output scan - fatal errors first, then
+	// starting, then ready
+	for (const pattern of fatalErrorPatterns) {
+		if (pattern.test(recentOutput)) {
+			return 'stopped';
+		}
+	}
 
 	for (const pattern of readyPatterns) {
 		if (pattern.test(recentOutput)) {
 			return 'running';
+		}
+	}
+
+	for (const pattern of startingPatterns) {
+		if (pattern.test(recentOutput)) {
+			return 'starting';
 		}
 	}
 
