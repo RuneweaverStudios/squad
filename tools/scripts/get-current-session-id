@@ -4,10 +4,19 @@
 # Strategy: Walk up process tree to find Claude Code parent, then read its session file
 # This provides true process isolation - each terminal gets its own session ID
 #
+# Usage: get-current-session-id [--wait]
+#   --wait  Retry up to 5 times (1s apart) if session file not found yet.
+#           Useful on fresh startup before the statusline has run.
+#
 # Returns: session ID (UUID) on stdout
 # Exit code: 0 on success, 1 if no session file found
 
 set -e
+
+WAIT_MODE=false
+if [[ "${1:-}" == "--wait" ]]; then
+    WAIT_MODE=true
+fi
 
 # Function to find Claude Code parent process by walking up the tree
 find_claude_ppid() {
@@ -42,28 +51,49 @@ find_claude_ppid() {
     return 1
 }
 
-# Try to find Claude Code PPID
-claude_ppid=$(find_claude_ppid)
+# Main lookup function - returns 0 on success, 1 on failure
+# Sets session_id variable on success
+try_find_session() {
+    # Try to find Claude Code PPID
+    local claude_ppid
+    claude_ppid=$(find_claude_ppid) || true
 
-if [[ -z "$claude_ppid" ]]; then
-    # Fallback: use most recent session file (old behavior)
-    session_file=$(ls -t /tmp/claude-session-*.txt 2>/dev/null | head -1)
+    if [[ -z "$claude_ppid" ]]; then
+        # Fallback: use most recent session file (old behavior)
+        local session_file
+        session_file=$(ls -t /tmp/claude-session-*.txt 2>/dev/null | head -1)
 
-    if [[ -z "$session_file" ]] || [[ ! -f "$session_file" ]]; then
-        echo "Error: No Claude Code session file found in /tmp" >&2
-        echo "The statusline must run at least once to create the session file" >&2
-        exit 1
+        if [[ -z "$session_file" ]] || [[ ! -f "$session_file" ]]; then
+            return 1
+        fi
+    else
+        local session_file="/tmp/claude-session-${claude_ppid}.txt"
     fi
-else
-    session_file="/tmp/claude-session-${claude_ppid}.txt"
+
+    # Read the session ID
+    session_id=$(cat "$session_file" 2>/dev/null | tr -d '\n')
+    [[ -n "$session_id" ]]
+}
+
+# Try to find session, with optional retry
+session_id=""
+if try_find_session; then
+    echo "$session_id"
+    exit 0
 fi
 
-# Read and output the session ID
-session_id=$(cat "$session_file" 2>/dev/null | tr -d '\n')
-
-if [[ -z "$session_id" ]]; then
-    echo "Error: Session file is empty: $session_file" >&2
-    exit 1
+# If --wait mode, retry up to 5 times
+if [[ "$WAIT_MODE" == true ]]; then
+    for attempt in 1 2 3 4 5; do
+        sleep 1
+        if try_find_session; then
+            echo "$session_id"
+            exit 0
+        fi
+    done
 fi
 
-echo "$session_id"
+echo "Error: No Claude Code session file found in /tmp" >&2
+echo "The statusline must run at least once to create the session file" >&2
+echo "Hint: Use --wait to retry automatically on fresh startup" >&2
+exit 1

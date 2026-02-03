@@ -127,7 +127,8 @@ cmake .. \
     -DWHISPER_BUILD_TESTS=OFF \
     2>&1 | grep -v "^--" || true
 
-make -j$(nproc) whisper-cli 2>&1 | tail -5
+NPROC=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+make -j"$NPROC" whisper-cli 2>&1 | tail -5
 
 if [ ! -f "bin/whisper-cli" ]; then
     echo -e "${RED}Build failed! Check the output above for errors.${NC}"
@@ -202,6 +203,10 @@ echo ""
 echo "To test manually:"
 echo ""
 echo "  # Record audio and transcribe"
-echo "  ffmpeg -f pulse -i default -t 5 -ar 16000 -ac 1 test.wav"
+if [[ "$(uname)" == "Darwin" ]]; then
+    echo "  ffmpeg -f avfoundation -i ':0' -t 5 -ar 16000 -ac 1 test.wav"
+else
+    echo "  ffmpeg -f pulse -i default -t 5 -ar 16000 -ac 1 test.wav"
+fi
 echo "  $WHISPER_DIR/build/bin/whisper-cli -m $WHISPER_DIR/models/$MODEL_NAME -f test.wav"
 echo ""
