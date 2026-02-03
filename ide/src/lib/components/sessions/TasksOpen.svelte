@@ -17,6 +17,13 @@
 		model: string | null;
 	}
 
+	interface Epic {
+		id: string;
+		title: string;
+		status: string;
+		priority: number;
+	}
+
 	const STORAGE_KEY = 'jat-open-tasks-project-filter';
 
 	interface Dependency {
@@ -432,6 +439,139 @@
 		}
 		return map;
 	});
+
+	// === Context Menu ===
+	let contextMenu = $state<{ x: number; y: number; task: Task } | null>(null);
+	let statusSubmenuOpen = $state(false);
+	let epicSubmenuOpen = $state(false);
+	let epics = $state<Epic[]>([]);
+	let epicsLoading = $state(false);
+
+	function handleContextMenu(task: Task, event: MouseEvent) {
+		event.preventDefault();
+		event.stopPropagation();
+
+		// Calculate position with viewport bounds clamping
+		const menuWidth = 200;
+		const menuHeight = 280;
+		let x = event.clientX;
+		let y = event.clientY;
+
+		if (x + menuWidth > window.innerWidth) {
+			x = window.innerWidth - menuWidth - 8;
+		}
+		if (y + menuHeight > window.innerHeight) {
+			y = window.innerHeight - menuHeight - 8;
+		}
+
+		contextMenu = { x, y, task };
+		statusSubmenuOpen = false;
+		epicSubmenuOpen = false;
+	}
+
+	function closeContextMenu() {
+		contextMenu = null;
+		statusSubmenuOpen = false;
+		epicSubmenuOpen = false;
+	}
+
+	// Close context menu on click outside or Escape
+	$effect(() => {
+		if (!contextMenu) return;
+
+		function handleClick() {
+			closeContextMenu();
+		}
+		function handleKeyDown(e: KeyboardEvent) {
+			if (e.key === 'Escape') closeContextMenu();
+		}
+
+		// Defer adding listener to avoid immediate close from the right-click itself
+		const timer = setTimeout(() => {
+			document.addEventListener('click', handleClick);
+			document.addEventListener('keydown', handleKeyDown);
+		}, 0);
+
+		return () => {
+			clearTimeout(timer);
+			document.removeEventListener('click', handleClick);
+			document.removeEventListener('keydown', handleKeyDown);
+		};
+	});
+
+	// Context menu actions
+	async function handleChangeStatus(taskId: string, newStatus: string) {
+		closeContextMenu();
+		try {
+			const response = await fetch(`/api/tasks/${taskId}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ status: newStatus })
+			});
+			if (response.ok) {
+				onRetry(); // Refresh task list
+			}
+		} catch (err) {
+			console.error('Failed to update task status:', err);
+		}
+	}
+
+	async function fetchEpics(projectName: string) {
+		if (!projectName) return;
+		epicsLoading = true;
+		try {
+			const response = await fetch(`/api/epics?project=${projectName}`);
+			if (response.ok) {
+				const data = await response.json();
+				epics = data.epics || [];
+			}
+		} catch (err) {
+			console.error('Failed to fetch epics:', err);
+		} finally {
+			epicsLoading = false;
+		}
+	}
+
+	async function handleLinkToEpic(taskId: string, epicId: string) {
+		closeContextMenu();
+		try {
+			const response = await fetch(`/api/tasks/${taskId}/epic`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ epicId })
+			});
+			if (response.ok) {
+				onRetry(); // Refresh task list
+			}
+		} catch (err) {
+			console.error('Failed to link task to epic:', err);
+		}
+	}
+
+	async function handleDuplicateTask(task: Task) {
+		closeContextMenu();
+		const projectName = getProjectFromTaskId(task.id);
+		try {
+			const response = await fetch('/api/tasks', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					title: task.title,
+					description: task.description || '',
+					priority: task.priority,
+					type: task.issue_type || 'task',
+					project: projectName,
+					labels: task.labels?.join(',') || ''
+				})
+			});
+			if (response.ok) {
+				onRetry(); // Refresh task list
+			}
+		} catch (err) {
+			console.error('Failed to duplicate task:', err);
+		}
+	}
+
 </script>
 
 <section class="open-tasks-section" class:no-header={!showHeader}>
@@ -522,6 +662,7 @@
 							class="task-row {isBlocked && !isExiting ? 'opacity-70' : ''} {isNew ? 'animate-slide-in-fwd-center' : ''} {isExiting ? 'animate-slide-out-bck-center' : ''}"
 							style="{projectColor ? `border-left: 3px solid ${projectColor};` : ''}{isExiting ? ' pointer-events: none;' : ''}"
 							onclick={() => !isExiting && handleRowClick(task.id)}
+							oncontextmenu={(e) => !isExiting && handleContextMenu(task, e)}
 						>
 							<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 							<td class="td-task" style={isExiting ? 'background: transparent;' : ''} onclick={(e) => e.stopPropagation()}>
@@ -636,6 +777,136 @@
 		</div>
 	{/if}
 </section>
+
+<!-- Context Menu -->
+{#if contextMenu}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div
+		class="task-context-menu"
+		style="left: {contextMenu.x}px; top: {contextMenu.y}px;"
+		onclick={(e) => e.stopPropagation()}
+	>
+		<!-- Launch -->
+		<button class="task-context-menu-item" onmouseenter={() => { statusSubmenuOpen = false; epicSubmenuOpen = false; }} onclick={() => { const t = contextMenu!.task; closeContextMenu(); onSpawnTask(t); }}>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M12 2C12 2 8 6 8 12C8 15 9 17 10 18L10 21C10 21.5 10.5 22 11 22H13C13.5 22 14 21.5 14 21L14 18C15 17 16 15 16 12C16 6 12 2 12 2Z" />
+				<circle cx="12" cy="10" r="2" />
+			</svg>
+			<span>Launch</span>
+		</button>
+
+		<!-- View Details -->
+		<button class="task-context-menu-item" onmouseenter={() => { statusSubmenuOpen = false; epicSubmenuOpen = false; }} onclick={() => { const id = contextMenu!.task.id; closeContextMenu(); onTaskClick(id); }}>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+				<circle cx="12" cy="12" r="3" />
+			</svg>
+			<span>View Details</span>
+		</button>
+
+		<div class="task-context-menu-divider"></div>
+
+		<!-- Change Status (submenu) -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div
+			class="task-context-menu-submenu-container"
+			onmouseenter={() => { statusSubmenuOpen = true; epicSubmenuOpen = false; }}
+			onmouseleave={() => { statusSubmenuOpen = false; }}
+		>
+			<button class="task-context-menu-item task-context-menu-item-has-submenu">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+					<polyline points="22 4 12 14.01 9 11.01" />
+				</svg>
+				<span>Change Status</span>
+				<svg class="task-context-menu-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<polyline points="9 18 15 12 9 6" />
+				</svg>
+			</button>
+			{#if statusSubmenuOpen}
+				<div class="task-context-submenu">
+					{#each [
+						{ value: 'open', label: 'Open', color: 'oklch(0.70 0.15 220)' },
+						{ value: 'in_progress', label: 'In Progress', color: 'oklch(0.75 0.15 85)' },
+						{ value: 'blocked', label: 'Blocked', color: 'oklch(0.65 0.18 30)' },
+						{ value: 'closed', label: 'Closed', color: 'oklch(0.65 0.18 145)' }
+					] as status}
+						<button
+							class="task-context-menu-item {contextMenu!.task.status === status.value ? 'task-context-menu-item-active' : ''}"
+							onclick={() => handleChangeStatus(contextMenu!.task.id, status.value)}
+						>
+							<span class="task-status-dot" style="background: {status.color};"></span>
+							<span>{status.label}</span>
+							{#if contextMenu!.task.status === status.value}
+								<svg class="task-context-menu-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+									<polyline points="20 6 9 17 4 12" />
+								</svg>
+							{/if}
+						</button>
+					{/each}
+				</div>
+			{/if}
+		</div>
+
+		<!-- Assign to Epic (submenu) -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div
+			class="task-context-menu-submenu-container"
+			onmouseenter={() => { epicSubmenuOpen = true; statusSubmenuOpen = false; if (contextMenu) { const p = getProjectFromTaskId(contextMenu.task.id); fetchEpics(p); } }}
+			onmouseleave={() => { epicSubmenuOpen = false; }}
+		>
+			<button class="task-context-menu-item task-context-menu-item-has-submenu">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
+				</svg>
+				<span>Assign to Epic</span>
+				<svg class="task-context-menu-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<polyline points="9 18 15 12 9 6" />
+				</svg>
+			</button>
+			{#if epicSubmenuOpen}
+				<div class="task-context-submenu task-context-submenu-epic">
+					{#if epicsLoading}
+						<div class="task-context-menu-loading">Loading...</div>
+					{:else if epics.length === 0}
+						<div class="task-context-menu-empty">No epics found</div>
+					{:else}
+						{#each epics as epic}
+							<button
+								class="task-context-menu-item"
+								onclick={() => handleLinkToEpic(contextMenu!.task.id, epic.id)}
+							>
+								<span class="task-epic-id">{epic.id}</span>
+								<span class="task-epic-title">{epic.title}</span>
+							</button>
+						{/each}
+					{/if}
+				</div>
+			{/if}
+		</div>
+
+		<div class="task-context-menu-divider"></div>
+
+		<!-- Duplicate -->
+		<button class="task-context-menu-item" onmouseenter={() => { statusSubmenuOpen = false; epicSubmenuOpen = false; }} onclick={() => handleDuplicateTask(contextMenu!.task)}>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+				<path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+			</svg>
+			<span>Duplicate</span>
+		</button>
+
+		<!-- Close Task -->
+		<button class="task-context-menu-item task-context-menu-item-danger" onmouseenter={() => { statusSubmenuOpen = false; epicSubmenuOpen = false; }} onclick={() => handleChangeStatus(contextMenu!.task.id, 'closed')}>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<circle cx="12" cy="12" r="10" />
+				<line x1="15" y1="9" x2="9" y2="15" />
+				<line x1="9" y1="9" x2="15" y2="15" />
+			</svg>
+			<span>Close Task</span>
+		</button>
+	</div>
+{/if}
 
 <style>
 	/* Section styling */
@@ -902,5 +1173,145 @@
 		.th-actions {
 			width: 40%;
 		}
+	}
+
+	/* === Context Menu (matches FileTree styling) === */
+	.task-context-menu {
+		position: fixed;
+		z-index: 100;
+		min-width: 180px;
+		background: oklch(0.18 0.02 250);
+		border: 1px solid oklch(0.28 0.02 250);
+		border-radius: 0.5rem;
+		padding: 0.375rem;
+		box-shadow: 0 10px 30px oklch(0.05 0 0 / 0.5);
+		animation: contextMenuIn 0.1s ease;
+	}
+
+	@keyframes contextMenuIn {
+		from { opacity: 0; transform: scale(0.95); }
+		to { opacity: 1; transform: scale(1); }
+	}
+
+	.task-context-menu-item {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		width: 100%;
+		padding: 0.5rem 0.75rem;
+		border: none;
+		background: transparent;
+		color: oklch(0.80 0.02 250);
+		font-size: 0.8125rem;
+		text-align: left;
+		border-radius: 0.375rem;
+		cursor: pointer;
+		transition: all 0.1s ease;
+	}
+
+	.task-context-menu-item:hover {
+		background: oklch(0.25 0.02 250);
+	}
+
+	.task-context-menu-item svg {
+		width: 14px;
+		height: 14px;
+		flex-shrink: 0;
+		color: oklch(0.60 0.02 250);
+	}
+
+	.task-context-menu-item:hover svg {
+		color: oklch(0.75 0.02 250);
+	}
+
+	.task-context-menu-item-danger:hover {
+		background: oklch(0.55 0.15 30 / 0.2);
+		color: oklch(0.75 0.18 30);
+	}
+
+	.task-context-menu-item-danger:hover svg {
+		color: oklch(0.70 0.18 30);
+	}
+
+	.task-context-menu-divider {
+		height: 1px;
+		background: oklch(0.28 0.02 250);
+		margin: 0.375rem 0;
+	}
+
+	/* Submenu container and panel */
+	.task-context-menu-submenu-container {
+		position: relative;
+	}
+
+	.task-context-submenu {
+		position: absolute;
+		left: 100%;
+		top: 0;
+		min-width: 150px;
+		background: oklch(0.18 0.02 250);
+		border: 1px solid oklch(0.28 0.02 250);
+		border-radius: 0.5rem;
+		padding: 0.375rem;
+		box-shadow: 0 10px 30px oklch(0.05 0 0 / 0.5);
+		animation: contextMenuIn 0.1s ease;
+		margin-left: 2px;
+	}
+
+	.task-context-submenu-epic {
+		min-width: 220px;
+		max-height: 240px;
+		overflow-y: auto;
+	}
+
+	/* Chevron for submenu indicators */
+	.task-context-menu-chevron {
+		width: 12px !important;
+		height: 12px !important;
+		margin-left: auto;
+		color: oklch(0.50 0.02 250) !important;
+	}
+
+	/* Status dot */
+	.task-status-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		flex-shrink: 0;
+	}
+
+	/* Active status indicator (checkmark) */
+	.task-context-menu-item-active {
+		color: oklch(0.85 0.02 250);
+	}
+
+	.task-context-menu-check {
+		width: 14px !important;
+		height: 14px !important;
+		margin-left: auto;
+		color: oklch(0.70 0.15 145) !important;
+	}
+
+	/* Epic item styling */
+	.task-epic-id {
+		font-size: 0.6875rem;
+		font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+		color: oklch(0.60 0.02 250);
+		flex-shrink: 0;
+	}
+
+	.task-epic-title {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	/* Loading and empty states in submenu */
+	.task-context-menu-loading,
+	.task-context-menu-empty {
+		padding: 0.5rem 0.75rem;
+		font-size: 0.75rem;
+		color: oklch(0.55 0.02 250);
+		text-align: center;
 	}
 </style>
