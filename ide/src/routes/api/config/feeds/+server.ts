@@ -20,7 +20,7 @@ const FEEDS_PATH = join(homedir(), '.config/jat/feeds.json');
 
 interface FeedSource {
 	id: string;
-	type: 'rss' | 'slack' | 'telegram' | 'custom';
+	type: 'rss' | 'slack' | 'telegram' | 'gmail' | 'custom';
 	enabled: boolean;
 	project: string;
 	pollInterval: number;
@@ -39,6 +39,12 @@ interface FeedSource {
 	maxTrackedThreads?: number;
 	// Telegram
 	chatId?: string;
+	// Gmail
+	imapUser?: string;
+	folder?: string;
+	filterFrom?: string;
+	filterSubject?: string;
+	markAsRead?: boolean;
 	// Custom
 	command?: string;
 }

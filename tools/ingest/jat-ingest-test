@@ -6,13 +6,15 @@ import * as logger from './lib/logger.js';
 import { RssAdapter } from './adapters/rss.js';
 import { TelegramAdapter } from './adapters/telegram.js';
 import { SlackAdapter } from './adapters/slack.js';
+import { GmailAdapter } from './adapters/gmail.js';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 
 const adapters = {
   rss: new RssAdapter(),
   telegram: new TelegramAdapter(),
-  slack: new SlackAdapter()
+  slack: new SlackAdapter(),
+  gmail: new GmailAdapter()
 };
 
 const args = process.argv.slice(2);
@@ -170,6 +172,17 @@ function initConfig() {
         project: 'chimaro',
         pollInterval: 60,
         taskDefaults: { type: 'task', priority: 2, labels: ['from-slack'] }
+      },
+      {
+        id: 'example-gmail',
+        type: 'gmail',
+        enabled: false,
+        secretName: 'gmail-app-password',
+        imapUser: 'you@gmail.com',
+        folder: 'JAT',
+        project: 'jat',
+        pollInterval: 120,
+        taskDefaults: { type: 'task', priority: 2, labels: ['from-gmail'] }
       }
     ]
   };

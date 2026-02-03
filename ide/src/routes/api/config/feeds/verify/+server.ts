@@ -1,17 +1,18 @@
 /**
  * Feed Token Verification API
  *
- * Tests a Slack or Telegram bot token against the external API.
+ * Tests a Slack, Telegram, or Gmail token against the external API.
  * Resolves the token server-side via jat-secret (custom API keys).
  *
  * POST /api/config/feeds/verify
- * Body: { type: 'slack' | 'telegram' | 'telegram-chats' | 'slack-channels', secretName: string }
+ * Body: { type: 'slack' | 'telegram' | 'telegram-chats' | 'slack-channels' | 'gmail', secretName: string, imapUser?: string, folder?: string }
  * Returns: { success, info?, error?, chats?, count?, channels? }
  */
 
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getCustomApiKey } from '$lib/utils/credentials';
+import { ImapFlow } from 'imapflow';
 
 export const POST: RequestHandler = async ({ request }) => {
 	try {
@@ -25,9 +26,10 @@ export const POST: RequestHandler = async ({ request }) => {
 			);
 		}
 
-		if (type !== 'slack' && type !== 'telegram' && type !== 'telegram-chats' && type !== 'slack-channels') {
+		const validTypes = ['slack', 'telegram', 'telegram-chats', 'slack-channels', 'gmail'];
+		if (!validTypes.includes(type)) {
 			return json(
-				{ success: false, error: 'type must be "slack", "telegram", "telegram-chats", or "slack-channels"' },
+				{ success: false, error: `type must be one of: ${validTypes.join(', ')}` },
 				{ status: 400 }
 			);
 		}
@@ -41,7 +43,13 @@ export const POST: RequestHandler = async ({ request }) => {
 			);
 		}
 
-		if (type === 'slack') {
+		if (type === 'gmail') {
+			const { imapUser, folder } = body;
+			if (!imapUser) {
+				return json({ success: false, error: 'imapUser is required for Gmail verification' }, { status: 400 });
+			}
+			return await verifyGmail(token, imapUser, folder || 'INBOX');
+		} else if (type === 'slack') {
 			return await verifySlack(token);
 		} else if (type === 'slack-channels') {
 			return await detectSlackChannels(token);
@@ -203,6 +211,66 @@ async function detectTelegramChats(token: string) {
 		return json({
 			success: false,
 			error: `Failed to detect chats: ${error instanceof Error ? error.message : 'unknown error'}`
+		});
+	}
+}
+
+async function verifyGmail(appPassword: string, imapUser: string, folder: string) {
+	const client = new ImapFlow({
+		host: 'imap.gmail.com',
+		port: 993,
+		secure: true,
+		auth: {
+			user: imapUser,
+			pass: appPassword
+		},
+		logger: false
+	});
+
+	try {
+		await client.connect();
+
+		let info;
+		try {
+			const lock = await client.getMailboxLock(folder);
+			try {
+				const mailbox = client.mailbox;
+				const total = mailbox.exists || 0;
+
+				info = {
+					success: true,
+					info: {
+						email: imapUser,
+						folder,
+						messageCount: total,
+						uidValidity: mailbox.uidValidity
+					}
+				};
+			} finally {
+				lock.release();
+			}
+		} finally {
+			try { await client.logout(); } catch { /* ignore */ }
+		}
+
+		return json(info);
+	} catch (err) {
+		const msg = err instanceof Error ? err.message : String(err);
+		if (msg.includes('AUTHENTICATIONFAILED') || msg.includes('Invalid credentials')) {
+			return json({
+				success: false,
+				error: 'Authentication failed. Check your email address and App Password. Make sure 2FA is enabled and you\'re using an App Password (not your regular password).'
+			});
+		}
+		if (msg.includes('Mailbox not found') || msg.includes('does not exist')) {
+			return json({
+				success: false,
+				error: `Folder "${folder}" not found. Create this Gmail label first, then try again.`
+			});
+		}
+		return json({
+			success: false,
+			error: `Connection failed: ${msg}`
 		});
 	}
 }

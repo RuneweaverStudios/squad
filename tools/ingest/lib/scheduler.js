@@ -7,11 +7,13 @@ import * as logger from './logger.js';
 import { RssAdapter } from '../adapters/rss.js';
 import { TelegramAdapter } from '../adapters/telegram.js';
 import { SlackAdapter } from '../adapters/slack.js';
+import { GmailAdapter } from '../adapters/gmail.js';
 
 const adapters = {
   rss: new RssAdapter(),
   telegram: new TelegramAdapter(),
-  slack: new SlackAdapter()
+  slack: new SlackAdapter(),
+  gmail: new GmailAdapter()
 };
 
 const STAGGER_MS = 2000;
@@ -127,11 +129,16 @@ async function pollSource(source) {
         continue;
       }
 
-      // Download attachments
+      // Download attachments (skip if already saved locally, e.g. Gmail MIME attachments)
       let downloaded = [];
       if (item.attachments?.length > 0) {
-        const authHeaders = getAuthHeaders(source);
-        downloaded = await downloadAttachments(source.id, item.attachments, authHeaders);
+        const allLocal = item.attachments.every(a => a.localPath);
+        if (allLocal) {
+          downloaded = item.attachments;
+        } else {
+          const authHeaders = getAuthHeaders(source);
+          downloaded = await downloadAttachments(source.id, item.attachments, authHeaders);
+        }
       }
 
       // Create task

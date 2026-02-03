@@ -16,7 +16,7 @@
 
 	interface Props {
 		open: boolean;
-		sourceType: 'rss' | 'slack' | 'telegram' | 'custom' | null;
+		sourceType: 'rss' | 'slack' | 'telegram' | 'gmail' | 'custom' | null;
 		editSource?: any | null;
 		onClose: () => void;
 		onSave: (source: any) => void;
@@ -58,6 +58,14 @@
 	let detectedChats = $state<Array<{ id: number; title: string; type: string; username?: string }>>([]);
 	let detectionError = $state('');
 
+	// Gmail fields
+	let gmailSecretName = $state('gmail-app-password');
+	let gmailImapUser = $state('');
+	let gmailFolder = $state('');
+	let gmailFilterFrom = $state('');
+	let gmailFilterSubject = $state('');
+	let gmailMarkAsRead = $state(false);
+
 	// Custom fields
 	let customCommand = $state('');
 
@@ -78,6 +86,7 @@
 		rss: ['Feed URL', 'Project', 'Options', 'Review'],
 		slack: ['Slack Token', 'Channel', 'Project', 'Options', 'Review'],
 		telegram: ['Bot Token', 'Chat', 'Project', 'Options', 'Review'],
+		gmail: ['App Password', 'Gmail Settings', 'Project', 'Options', 'Review'],
 		custom: ['Command', 'Project', 'Options', 'Review']
 	};
 
@@ -87,7 +96,8 @@
 	const nextDisabled = $derived(
 		saving ||
 		(sourceType === 'telegram' && step === 1 && !telegramChatId.trim()) ||
-		(sourceType === 'slack' && step === 1 && !slackChannel.trim())
+		(sourceType === 'slack' && step === 1 && !slackChannel.trim()) ||
+		(sourceType === 'gmail' && step === 1 && (!gmailImapUser.trim() || !gmailFolder.trim()))
 	);
 
 	// Check secret when on step 0 for Slack/Telegram
@@ -100,6 +110,12 @@
 	$effect(() => {
 		if (open && step === 0 && sourceType === 'telegram' && telegramSecretName.trim()) {
 			checkSecret(telegramSecretName.trim());
+		}
+	});
+
+	$effect(() => {
+		if (open && step === 0 && sourceType === 'gmail' && gmailSecretName.trim()) {
+			checkSecret(gmailSecretName.trim());
 		}
 	});
 
@@ -134,7 +150,7 @@
 		sourceId = '';
 		enabled = true;
 		project = projects.length > 0 ? projects[0].name?.toLowerCase() || '' : '';
-		pollInterval = sourceType === 'rss' ? 300 : sourceType === 'telegram' ? 30 : 60;
+		pollInterval = sourceType === 'rss' ? 300 : sourceType === 'gmail' ? 120 : sourceType === 'telegram' ? 30 : 60;
 		taskType = 'task';
 		taskPriority = 2;
 		taskLabels = sourceType ? `from-${sourceType}` : '';
@@ -150,6 +166,12 @@
 		detectingChannels = false;
 		detectedChannels = [];
 		channelDetectionError = '';
+		gmailSecretName = 'gmail-app-password';
+		gmailImapUser = '';
+		gmailFolder = '';
+		gmailFilterFrom = '';
+		gmailFilterSubject = '';
+		gmailMarkAsRead = false;
 		customCommand = '';
 	}
 
@@ -167,6 +189,12 @@
 		includeBots = src.includeBots || false;
 		telegramSecretName = src.secretName || 'telegram-bot';
 		telegramChatId = src.chatId || '';
+		gmailSecretName = src.secretName || 'gmail-app-password';
+		gmailImapUser = src.imapUser || '';
+		gmailFolder = src.folder || '';
+		gmailFilterFrom = src.filterFrom || '';
+		gmailFilterSubject = src.filterSubject || '';
+		gmailMarkAsRead = src.markAsRead || false;
 		customCommand = src.command || '';
 	}
 
@@ -178,6 +206,10 @@
 			} catch {
 				/* ignore */
 			}
+		}
+		if (sourceType === 'gmail' && gmailImapUser) {
+			const local = gmailImapUser.split('@')[0];
+			return `gmail-${local}`;
 		}
 		return `${sourceType}-${Date.now().toString(36).slice(-4)}`;
 	}
@@ -203,10 +235,10 @@
 		}
 	}
 
-	async function saveToken(name: string, token: string, type: 'slack' | 'telegram') {
+	async function saveToken(name: string, token: string, type: 'slack' | 'telegram' | 'gmail') {
 		secretStatus = 'saving';
 		error = '';
-		const envVar = type === 'slack' ? 'SLACK_BOT_TOKEN' : 'TELEGRAM_BOT_TOKEN';
+		const envVar = type === 'slack' ? 'SLACK_BOT_TOKEN' : type === 'gmail' ? 'GMAIL_APP_PASSWORD' : 'TELEGRAM_BOT_TOKEN';
 		try {
 			const res = await fetch('/api/config/credentials/custom', {
 				method: 'PUT',
@@ -234,14 +266,19 @@
 		}
 	}
 
-	async function testConnection(type: 'slack' | 'telegram', secretName: string) {
+	async function testConnection(type: 'slack' | 'telegram' | 'gmail', secretName: string) {
 		testingConnection = true;
 		testResult = null;
 		try {
+			const body: any = { type, secretName };
+			if (type === 'gmail') {
+				body.imapUser = gmailImapUser.trim();
+				body.folder = gmailFolder.trim() || 'INBOX';
+			}
 			const res = await fetch('/api/config/feeds/verify', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ type, secretName })
+				body: JSON.stringify(body)
 			});
 			testResult = await res.json();
 		} catch {
@@ -307,7 +344,7 @@
 		secretMasked = '';
 		testResult = null;
 		showTokenInput = false;
-		const name = sourceType === 'slack' ? slackSecretName : telegramSecretName;
+		const name = sourceType === 'slack' ? slackSecretName : sourceType === 'gmail' ? gmailSecretName : telegramSecretName;
 		if (name.trim()) {
 			checkSecret(name.trim());
 		}
@@ -367,6 +404,29 @@
 			}
 			if (step === 1 && !telegramChatId.trim()) {
 				error = 'Chat ID is required';
+				return false;
+			}
+			if (step === 2 && !project.trim()) {
+				error = 'Select a project';
+				return false;
+			}
+		}
+
+		if (sourceType === 'gmail') {
+			if (step === 0 && !gmailSecretName.trim()) {
+				error = 'Secret name is required';
+				return false;
+			}
+			if (step === 0 && secretStatus !== 'found') {
+				error = 'Save a valid App Password before continuing';
+				return false;
+			}
+			if (step === 1 && !gmailImapUser.trim()) {
+				error = 'Email address is required';
+				return false;
+			}
+			if (step === 1 && !gmailFolder.trim()) {
+				error = 'Gmail label/folder is required';
 				return false;
 			}
 			if (step === 2 && !project.trim()) {
@@ -441,6 +501,16 @@
 				secretName: telegramSecretName.trim(),
 				chatId: telegramChatId.trim()
 			};
+		} else if (sourceType === 'gmail') {
+			source = {
+				...base,
+				secretName: gmailSecretName.trim(),
+				imapUser: gmailImapUser.trim(),
+				folder: gmailFolder.trim(),
+				...(gmailFilterFrom.trim() && { filterFrom: gmailFilterFrom.trim() }),
+				...(gmailFilterSubject.trim() && { filterSubject: gmailFilterSubject.trim() }),
+				markAsRead: gmailMarkAsRead
+			};
 		} else {
 			source = { ...base, command: customCommand.trim() };
 		}
@@ -466,6 +536,7 @@
 		rss: 'RSS Feed',
 		slack: 'Slack Channel',
 		telegram: 'Telegram Chat',
+		gmail: 'Gmail',
 		custom: 'Custom Source'
 	};
 </script>
@@ -843,6 +914,117 @@
 					{/if}
 				{/if}
 
+
+				<!-- Gmail Steps -->
+				{#if sourceType === 'gmail'}
+					{#if step === 0}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render tokenStep('gmail', gmailSecretName)}
+						</div>
+					{:else if step === 1}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							<div>
+								<label class="font-mono text-xs font-semibold block mb-1.5" style="color: oklch(0.65 0.02 250);">Email Address</label>
+								<input
+									type="email"
+									class="input input-bordered w-full font-mono text-sm"
+									placeholder="you@gmail.com"
+									bind:value={gmailImapUser}
+									autofocus
+								/>
+								<p class="font-mono text-[10px] mt-1.5" style="color: oklch(0.45 0.02 250);">
+									The Gmail address to connect to via IMAP
+								</p>
+							</div>
+
+							<div>
+								<label class="font-mono text-xs font-semibold block mb-1.5" style="color: oklch(0.65 0.02 250);">Gmail Label / Folder <span style="color: oklch(0.70 0.12 25);">*required</span></label>
+								<input
+									type="text"
+									class="input input-bordered w-full font-mono text-sm"
+									placeholder="JAT"
+									bind:value={gmailFolder}
+								/>
+								<p class="font-mono text-[10px] mt-1.5" style="color: oklch(0.45 0.02 250);">
+									Only emails in this label become tasks. Create a Gmail label and filter rule to route relevant emails there.
+								</p>
+							</div>
+
+							<!-- Test connection (requires email + folder) -->
+							{#if secretStatus === 'found' && gmailImapUser.trim() && gmailFolder.trim()}
+								<div class="space-y-2">
+									<button
+										class="font-mono text-[11px] px-3 py-1.5 rounded-lg flex items-center gap-2"
+										style="background: oklch(0.22 0.04 25); color: oklch(0.75 0.10 25); border: 1px solid oklch(0.32 0.06 25);"
+										onclick={() => testConnection('gmail', gmailSecretName)}
+										disabled={testingConnection}
+									>
+										{#if testingConnection}
+											<span class="loading loading-spinner loading-xs"></span>
+											Testing IMAP connection...
+										{:else}
+											<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+												<path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H4.28a.75.75 0 00-.75.75v3.955a.75.75 0 001.5 0v-2.134l.235.234a7 7 0 0011.712-3.138.75.75 0 00-1.449-.388zm1.7-5.69a.75.75 0 00-.987-.565 7 7 0 00-11.712 3.138.75.75 0 001.449.388 5.5 5.5 0 019.2-2.466l.313.311h-2.433a.75.75 0 000 1.5H15.8a.75.75 0 00.75-.75V3.778a.75.75 0 00-.538-.044z" clip-rule="evenodd" />
+											</svg>
+											Test Connection
+										{/if}
+									</button>
+
+									{#if testResult}
+										{#if testResult.success}
+											<div class="px-3 py-2 rounded-lg" style="background: oklch(0.20 0.06 145 / 0.2); border: 1px solid oklch(0.30 0.08 145);">
+												<p class="font-mono text-[11px]" style="color: oklch(0.75 0.10 145);">
+													Connected to <strong style="color: oklch(0.85 0.02 250);">{testResult.info.email}</strong>
+												</p>
+												<p class="font-mono text-[10px] mt-0.5" style="color: oklch(0.60 0.06 145);">
+													Folder: {testResult.info.folder} ({testResult.info.messageCount} messages)
+												</p>
+											</div>
+										{:else}
+											<div class="px-3 py-2 rounded-lg" style="background: oklch(0.22 0.06 25 / 0.3); border: 1px solid oklch(0.35 0.08 25);">
+												<p class="font-mono text-[11px]" style="color: oklch(0.75 0.12 25);">{testResult.error}</p>
+											</div>
+										{/if}
+									{/if}
+								</div>
+							{/if}
+
+							<!-- Optional filters -->
+							<details class="rounded-lg" style="background: oklch(0.18 0.02 250 / 0.5); border: 1px solid oklch(0.25 0.02 250);">
+								<summary class="cursor-pointer px-3 py-2 font-mono text-[10px] select-none" style="color: oklch(0.50 0.02 250);">
+									Optional filters
+								</summary>
+								<div class="px-3 pb-3 pt-1 space-y-3">
+									<div>
+										<label class="font-mono text-[10px] font-semibold block mb-1" style="color: oklch(0.60 0.02 250);">Filter by sender</label>
+										<input type="text" class="input input-bordered w-full font-mono text-sm" placeholder="alerts@example.com" bind:value={gmailFilterFrom} />
+									</div>
+									<div>
+										<label class="font-mono text-[10px] font-semibold block mb-1" style="color: oklch(0.60 0.02 250);">Filter by subject (regex)</label>
+										<input type="text" class="input input-bordered w-full font-mono text-sm" bind:value={gmailFilterSubject} />
+									</div>
+									<label class="flex items-center gap-2 cursor-pointer">
+										<input type="checkbox" class="checkbox checkbox-sm" bind:checked={gmailMarkAsRead} />
+										<span class="font-mono text-xs" style="color: oklch(0.65 0.02 250);">Mark emails as read after ingesting</span>
+									</label>
+								</div>
+							</details>
+						</div>
+					{:else if step === 2}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render projectStep()}
+						</div>
+					{:else if step === 3}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render optionsStep()}
+						</div>
+					{:else if step === 4}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render reviewStep()}
+						</div>
+					{/if}
+				{/if}
+
 				<!-- Custom Steps -->
 				{#if sourceType === 'custom'}
 					{#if step === 0}
@@ -911,8 +1093,8 @@
 	</div>
 {/if}
 
-<!-- Token step snippet (shared by Slack and Telegram) -->
-{#snippet tokenStep(type: 'slack' | 'telegram', secretName: string)}
+<!-- Token step snippet (shared by Slack, Telegram, and Gmail) -->
+{#snippet tokenStep(type: 'slack' | 'telegram' | 'gmail', secretName: string)}
 	<div>
 		<label class="font-mono text-xs font-semibold block mb-1.5" style="color: oklch(0.65 0.02 250);">Secret Name</label>
 		{#if type === 'slack'}
@@ -921,6 +1103,15 @@
 				class="input input-bordered w-full font-mono text-sm"
 				placeholder="slack"
 				bind:value={slackSecretName}
+				oninput={handleSecretNameChange}
+				autofocus
+			/>
+		{:else if type === 'gmail'}
+			<input
+				type="text"
+				class="input input-bordered w-full font-mono text-sm"
+				placeholder="gmail-app-password"
+				bind:value={gmailSecretName}
 				oninput={handleSecretNameChange}
 				autofocus
 			/>
@@ -935,7 +1126,7 @@
 			/>
 		{/if}
 		<p class="font-mono text-[10px] mt-1.5" style="color: oklch(0.45 0.02 250);">
-			Name used in <code>jat-secret</code> to retrieve the token
+			Name used in <code>jat-secret</code> to retrieve the {type === 'gmail' ? 'App Password' : 'token'}
 		</p>
 	</div>
 
@@ -1005,6 +1196,13 @@
 							<p class="font-mono text-[10px] mt-0.5" style="color: oklch(0.60 0.06 145);">
 								Bot: @{testResult.info.botName}
 							</p>
+						{:else if type === 'gmail'}
+							<p class="font-mono text-[11px]" style="color: oklch(0.75 0.10 145);">
+								Connected to <strong style="color: oklch(0.85 0.02 250);">{testResult.info.email}</strong>
+							</p>
+							<p class="font-mono text-[10px] mt-0.5" style="color: oklch(0.60 0.06 145);">
+								Folder: {testResult.info.folder} ({testResult.info.messageCount} messages)
+							</p>
 						{:else}
 							<p class="font-mono text-[11px]" style="color: oklch(0.75 0.10 145);">
 								Connected to bot <strong style="color: oklch(0.85 0.02 250);">"{testResult.info.botName}"</strong>
@@ -1045,17 +1243,19 @@
 
 			<div>
 				<label class="font-mono text-[10px] font-semibold block mb-1" style="color: oklch(0.60 0.02 250);">
-					{type === 'slack' ? 'Bot Token' : 'Bot Token'}
+					{type === 'gmail' ? 'App Password' : 'Bot Token'}
 				</label>
 				<input
 					type="password"
 					class="input input-bordered w-full font-mono text-sm"
-					placeholder={type === 'slack' ? 'xoxb-...' : '123456:ABC-DEF...'}
+					placeholder={type === 'slack' ? 'xoxb-...' : type === 'gmail' ? 'xxxx xxxx xxxx xxxx' : '123456:ABC-DEF...'}
 					bind:value={tokenInput}
 				/>
 				<p class="font-mono text-[10px] mt-1" style="color: oklch(0.45 0.02 250);">
 					{#if type === 'slack'}
 						Create a Slack app &rarr; OAuth &amp; Permissions &rarr; Bot User OAuth Token
+					{:else if type === 'gmail'}
+						Google Account &rarr; Security &rarr; 2-Step Verification &rarr; App Passwords
 					{:else}
 						Message @BotFather on Telegram &rarr; /newbot &rarr; copy the token
 					{/if}
@@ -1093,7 +1293,33 @@
 	{/if}
 
 	<!-- Setup guide -->
-	{#if type === 'slack'}
+	{#if type === 'gmail'}
+		<details
+			class="rounded-lg"
+			style="background: oklch(0.20 0.04 25 / 0.3); border: 1px solid oklch(0.30 0.04 25);"
+		>
+			<summary class="cursor-pointer px-3 py-2.5 font-mono text-[11px] font-semibold select-none" style="color: oklch(0.70 0.10 25);">
+				How to get a Gmail App Password
+			</summary>
+			<div class="px-3 pb-3 space-y-2">
+				<ol class="font-mono text-[10px] space-y-1.5 list-decimal list-inside" style="color: oklch(0.60 0.02 250);">
+					<li>Go to <a href="https://myaccount.google.com/security" target="_blank" rel="noopener" class="underline" style="color: oklch(0.70 0.12 25);">myaccount.google.com/security</a></li>
+					<li>Enable <strong style="color: oklch(0.75 0.02 250);">2-Step Verification</strong> if not already on</li>
+					<li>Go to <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener" class="underline" style="color: oklch(0.70 0.12 25);">App Passwords</a></li>
+					<li>Enter a name (e.g. <code style="color: oklch(0.65 0.02 250);">JAT Ingest</code>) and click <strong style="color: oklch(0.75 0.02 250);">Create</strong></li>
+					<li>Copy the 16-character password (spaces are optional)</li>
+				</ol>
+				<div
+					class="px-2.5 py-2 rounded mt-2"
+					style="background: oklch(0.18 0.02 250); border: 1px solid oklch(0.25 0.02 250);"
+				>
+					<p class="font-mono text-[10px]" style="color: oklch(0.55 0.02 250);">
+						Also create a Gmail label (e.g. <code style="color: oklch(0.65 0.02 250);">JAT</code>) and a filter rule to route relevant emails there. Only emails in that label become tasks.
+					</p>
+				</div>
+			</div>
+		</details>
+	{:else if type === 'slack'}
 		<details
 			class="rounded-lg"
 			style="background: oklch(0.20 0.04 220 / 0.3); border: 1px solid oklch(0.30 0.04 220);"
@@ -1239,6 +1465,17 @@
 			{:else if sourceType === 'telegram'}
 				{@render reviewRow('Secret', telegramSecretName)}
 				{@render reviewRow('Chat ID', telegramChatId)}
+			{:else if sourceType === 'gmail'}
+				{@render reviewRow('Secret', gmailSecretName)}
+				{@render reviewRow('Email', gmailImapUser)}
+				{@render reviewRow('Folder', gmailFolder)}
+				{#if gmailFilterFrom}
+					{@render reviewRow('Filter From', gmailFilterFrom)}
+				{/if}
+				{#if gmailFilterSubject}
+					{@render reviewRow('Filter Subject', gmailFilterSubject)}
+				{/if}
+				{@render reviewRow('Mark as Read', gmailMarkAsRead ? 'Yes' : 'No')}
 			{:else if sourceType === 'custom'}
 				{@render reviewRow('Command', customCommand)}
 			{/if}

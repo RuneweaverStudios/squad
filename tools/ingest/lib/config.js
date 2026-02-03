@@ -8,7 +8,7 @@ const CONFIG_PATH = join(process.env.HOME, '.config/jat/feeds.json');
 let cachedConfig = null;
 let cachedMtime = 0;
 
-const VALID_TYPES = ['telegram', 'slack', 'rss'];
+const VALID_TYPES = ['telegram', 'slack', 'rss', 'gmail'];
 
 export function loadConfig() {
   let raw;
@@ -76,6 +76,12 @@ function validate(config) {
     }
     if (src.type === 'slack' && !src.channel) {
       throw new Error(`Slack source ${src.id} must have a "channel"`);
+    }
+    if (src.type === 'gmail' && !src.imapUser) {
+      throw new Error(`Gmail source ${src.id} must have an "imapUser" (email address)`);
+    }
+    if (src.type === 'gmail' && !src.folder) {
+      throw new Error(`Gmail source ${src.id} must have a "folder" (Gmail label name)`);
     }
   }
 }
