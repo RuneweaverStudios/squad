@@ -1,9 +1,9 @@
-import { BaseAdapter, makeAttachment } from './base.js';
-import * as logger from '../lib/logger.js';
+import { BaseAdapter, makeAttachment } from '../base.js';
+import * as logger from '../../lib/logger.js';
 
 const API_BASE = 'https://slack.com/api';
 
-// Cache user ID → display name across poll cycles (only successful lookups)
+// Cache user ID -> display name across poll cycles (only successful lookups)
 const userNameCache = new Map();
 // Track failed lookups to avoid spamming the API (retry after 10 minutes)
 const failedLookups = new Map();
@@ -11,7 +11,52 @@ const FAILED_RETRY_MS = 10 * 60 * 1000;
 // Cache team URL for permalinks (set once on first poll)
 let cachedTeamUrl = null;
 
-export class SlackAdapter extends BaseAdapter {
+/** @type {import('../base.js').PluginMetadata} */
+export const metadata = {
+  type: 'slack',
+  name: 'Slack',
+  description: 'Ingest messages from Slack channels',
+  version: '1.0.0',
+  configFields: [
+    {
+      key: 'secretName',
+      label: 'Bot Token Secret',
+      type: 'secret',
+      required: true,
+      helpText: 'Name of the secret containing the Slack bot token (stored in jat-secret)'
+    },
+    {
+      key: 'channel',
+      label: 'Channel ID',
+      type: 'string',
+      required: true,
+      placeholder: 'C0123ABCDEF',
+      helpText: 'Slack channel ID (not the channel name)'
+    },
+    {
+      key: 'includeBots',
+      label: 'Include Bot Messages',
+      type: 'boolean',
+      default: false,
+      helpText: 'Whether to ingest messages from bots'
+    },
+    {
+      key: 'trackReplies',
+      label: 'Track Thread Replies',
+      type: 'boolean',
+      default: true,
+      helpText: 'Poll for and append thread replies to existing tasks'
+    }
+  ],
+  itemFields: [
+    { key: 'channel', label: 'Channel', type: 'string' },
+    { key: 'isThread', label: 'Is Thread', type: 'boolean' },
+    { key: 'hasAttachments', label: 'Has Attachments', type: 'boolean' },
+    { key: 'authorName', label: 'Author', type: 'string' }
+  ]
+};
+
+export default class SlackAdapter extends BaseAdapter {
   constructor() {
     super('slack');
   }
@@ -66,10 +111,10 @@ export class SlackAdapter extends BaseAdapter {
 
   /**
    * Convert Slack mrkdwn to readable text:
-   *  <@U123>       → @DisplayName
-   *  <#C123|name>  → #name
-   *  <url|label>   → [label](url)
-   *  <url>         → url
+   *  <@U123>       -> @DisplayName
+   *  <#C123|name>  -> #name
+   *  <url|label>   -> [label](url)
+   *  <url>         -> url
    */
   async formatSlackText(text, token) {
     if (!text) return text;
@@ -81,13 +126,13 @@ export class SlackAdapter extends BaseAdapter {
       text = text.replace(match[0], `@${name}`);
     }
 
-    // Channel references: <#C123|channel-name> → #channel-name
+    // Channel references: <#C123|channel-name> -> #channel-name
     text = text.replace(/<#[A-Z0-9]+\|([^>]+)>/g, '#$1');
 
-    // Links with labels: <url|label> → [label](url)
+    // Links with labels: <url|label> -> [label](url)
     text = text.replace(/<(https?:\/\/[^|>]+)\|([^>]+)>/g, '[$2]($1)');
 
-    // Bare links: <url> → url
+    // Bare links: <url> -> url
     text = text.replace(/<(https?:\/\/[^>]+)>/g, '$1');
 
     return text;
@@ -144,9 +189,10 @@ export class SlackAdapter extends BaseAdapter {
 
       const item = messageToItem(msg, source);
       if (item) {
-        if (item.author) {
-          item.author = await this.resolveUserName(item.author, token);
-        }
+        const authorName = item.author
+          ? await this.resolveUserName(item.author, token)
+          : '';
+        item.author = authorName || item.author;
         item.description = await this.formatSlackText(item.description, token);
         item.title = await this.formatSlackText(item.title, token);
         // Add permalink to original Slack message
@@ -154,6 +200,13 @@ export class SlackAdapter extends BaseAdapter {
         if (teamUrl) {
           item.permalink = `${teamUrl}/archives/${source.channel}/p${msg.ts.replace('.', '')}`;
         }
+        // Populate filterable fields
+        item.fields = {
+          channel: source.channel,
+          isThread: !!(msg.thread_ts && msg.reply_count > 0),
+          hasAttachments: (item.attachments?.length || 0) > 0,
+          authorName: authorName || ''
+        };
         items.push(item);
       }
 

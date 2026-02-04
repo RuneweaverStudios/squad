@@ -1,14 +1,74 @@
-import { BaseAdapter } from './base.js';
+import { BaseAdapter } from '../base.js';
 import { ImapFlow } from 'imapflow';
 import { simpleParser } from 'mailparser';
 import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, extname } from 'node:path';
-import * as logger from '../lib/logger.js';
+import * as logger from '../../lib/logger.js';
 
 const ATTACH_BASE = join(process.env.HOME, '.local/share/jat/ingest-files');
 
-export class GmailAdapter extends BaseAdapter {
+/** @type {import('../base.js').PluginMetadata} */
+export const metadata = {
+  type: 'gmail',
+  name: 'Gmail',
+  description: 'Ingest emails from Gmail via IMAP with App Password',
+  version: '1.0.0',
+  configFields: [
+    {
+      key: 'secretName',
+      label: 'App Password Secret',
+      type: 'secret',
+      required: true,
+      helpText: 'Name of the secret containing the Gmail App Password (stored in jat-secret)'
+    },
+    {
+      key: 'imapUser',
+      label: 'Email Address',
+      type: 'string',
+      required: true,
+      placeholder: 'you@gmail.com',
+      helpText: 'Gmail email address for IMAP login'
+    },
+    {
+      key: 'folder',
+      label: 'Gmail Label',
+      type: 'string',
+      required: true,
+      placeholder: 'JAT',
+      helpText: 'Gmail label (folder) to monitor for new emails'
+    },
+    {
+      key: 'filterFrom',
+      label: 'Filter by Sender',
+      type: 'string',
+      placeholder: 'notifications@github.com',
+      helpText: 'Only ingest emails from addresses containing this string'
+    },
+    {
+      key: 'filterSubject',
+      label: 'Filter by Subject',
+      type: 'string',
+      placeholder: '\\[urgent\\]',
+      helpText: 'Regex pattern to filter emails by subject line'
+    },
+    {
+      key: 'markAsRead',
+      label: 'Mark as Read',
+      type: 'boolean',
+      default: false,
+      helpText: 'Mark emails as read after ingesting them'
+    }
+  ],
+  itemFields: [
+    { key: 'folder', label: 'Folder', type: 'string' },
+    { key: 'from', label: 'From', type: 'string' },
+    { key: 'hasAttachments', label: 'Has Attachments', type: 'boolean' },
+    { key: 'isRead', label: 'Is Read', type: 'boolean' }
+  ]
+};
+
+export default class GmailAdapter extends BaseAdapter {
   constructor() {
     super('gmail');
   }
@@ -75,7 +135,8 @@ export class GmailAdapter extends BaseAdapter {
         for await (const msg of client.fetch(range, {
           uid: true,
           envelope: true,
-          source: true
+          source: true,
+          flags: true
         })) {
           if (msg.uid <= lastSeenUid) continue;
 
@@ -126,15 +187,23 @@ export class GmailAdapter extends BaseAdapter {
           const body = parsed.text || parsed.html?.replace(/<[^>]+>/g, ' ').slice(0, 5000) || '';
           const msgId = parsed.messageId || `gmail-${msg.uid}`;
           const hashInput = `${msgId}${subject}${body.slice(0, 200)}`;
+          const fromAddr = parsed.from?.text || '';
+          const isRead = msg.flags?.has('\\Seen') || false;
 
           items.push({
             id: `gmail-${msg.uid}`,
             title: subject.slice(0, 200),
             description: body,
             hash: createHash('sha256').update(hashInput).digest('hex').slice(0, 16),
-            author: parsed.from?.text || null,
+            author: fromAddr || null,
             timestamp: parsed.date?.toISOString() || new Date().toISOString(),
-            attachments
+            attachments,
+            fields: {
+              folder: source.folder,
+              from: fromAddr,
+              hasAttachments: attachments.length > 0,
+              isRead
+            }
           });
 
           if (msg.uid > maxUid) maxUid = msg.uid;

@@ -4,10 +4,10 @@ import { downloadAttachments } from './downloader.js';
 import { createTask, appendToTask, registerTaskAttachments } from './taskCreator.js';
 import * as logger from './logger.js';
 
-import { RssAdapter } from '../adapters/rss.js';
-import { TelegramAdapter } from '../adapters/telegram.js';
-import { SlackAdapter } from '../adapters/slack.js';
-import { GmailAdapter } from '../adapters/gmail.js';
+import RssAdapter from '../adapters/rss/index.js';
+import TelegramAdapter from '../adapters/telegram/index.js';
+import SlackAdapter from '../adapters/slack/index.js';
+import GmailAdapter from '../adapters/gmail/index.js';
 
 const adapters = {
   rss: new RssAdapter(),
@@ -46,7 +46,7 @@ export function start(opts = {}) {
   sources.forEach((source, i) => {
     const delay = i * STAGGER_MS;
     setTimeout(() => {
-      if (running) schedulePoll(source);
+      if (running) schedulePoll(source, true);
     }, delay);
   });
 
@@ -80,7 +80,7 @@ export function stop() {
   sourceState.clear();
 }
 
-function schedulePoll(source) {
+function schedulePoll(source, immediate = false) {
   if (!running) return;
 
   const state = sourceState.get(source.id) || {
@@ -90,7 +90,7 @@ function schedulePoll(source) {
   };
 
   const intervalMs = (source.pollInterval || 60) * 1000;
-  const delay = Math.max(intervalMs, state.backoffMs);
+  const delay = immediate ? 0 : Math.max(intervalMs, state.backoffMs);
 
   state.timer = setTimeout(async () => {
     if (!running) return;

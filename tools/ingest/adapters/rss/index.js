@@ -1,6 +1,6 @@
 import RssParser from 'rss-parser';
 import { createHash } from 'node:crypto';
-import { BaseAdapter, makeAttachment } from './base.js';
+import { BaseAdapter, makeAttachment } from '../base.js';
 
 const parser = new RssParser({
   timeout: 15000,
@@ -9,7 +9,30 @@ const parser = new RssParser({
   }
 });
 
-export class RssAdapter extends BaseAdapter {
+/** @type {import('../base.js').PluginMetadata} */
+export const metadata = {
+  type: 'rss',
+  name: 'RSS Feed',
+  description: 'Ingest items from RSS and Atom feeds',
+  version: '1.0.0',
+  configFields: [
+    {
+      key: 'feedUrl',
+      label: 'Feed URL',
+      type: 'string',
+      required: true,
+      placeholder: 'https://example.com/feed.xml',
+      helpText: 'The URL of the RSS or Atom feed'
+    }
+  ],
+  itemFields: [
+    { key: 'category', label: 'Category', type: 'string' },
+    { key: 'author', label: 'Author', type: 'string' },
+    { key: 'hasImage', label: 'Has Image', type: 'boolean' }
+  ]
+};
+
+export default class RssAdapter extends BaseAdapter {
   constructor() {
     super('rss');
   }
@@ -72,14 +95,22 @@ export class RssAdapter extends BaseAdapter {
         .digest('hex')
         .slice(0, 16);
 
+      const category = entry.categories?.[0] || null;
+      const author = entry.creator || entry.author || null;
+
       items.push({
         id: itemId,
         title: entry.title || 'Untitled',
         description: buildDescription(entry),
         hash,
-        author: entry.creator || entry.author || null,
+        author,
         timestamp: pubDate || new Date().toISOString(),
-        attachments
+        attachments,
+        fields: {
+          category: category || '',
+          author: author || '',
+          hasImage: attachments.length > 0
+        }
       });
 
       if (!newestId) {

@@ -1,8 +1,43 @@
-import { BaseAdapter, makeAttachment } from './base.js';
+import { BaseAdapter, makeAttachment } from '../base.js';
 
 const API_BASE = 'https://api.telegram.org/bot';
 
-export class TelegramAdapter extends BaseAdapter {
+/** @type {import('../base.js').PluginMetadata} */
+export const metadata = {
+  type: 'telegram',
+  name: 'Telegram',
+  description: 'Ingest messages from Telegram chats via bot API',
+  version: '1.0.0',
+  configFields: [
+    {
+      key: 'secretName',
+      label: 'Bot Token Secret',
+      type: 'secret',
+      required: true,
+      helpText: 'Name of the secret containing the Telegram bot token (stored in jat-secret)'
+    },
+    {
+      key: 'chatId',
+      label: 'Chat ID',
+      type: 'string',
+      required: true,
+      placeholder: '-1001234567890',
+      helpText: 'Telegram chat ID (group, channel, or user)'
+    }
+  ],
+  itemFields: [
+    {
+      key: 'chatType',
+      label: 'Chat Type',
+      type: 'enum',
+      values: ['private', 'group', 'supergroup', 'channel']
+    },
+    { key: 'hasMedia', label: 'Has Media', type: 'boolean' },
+    { key: 'mediaGrouped', label: 'Media Grouped', type: 'boolean' }
+  ]
+};
+
+export default class TelegramAdapter extends BaseAdapter {
   constructor() {
     super('telegram');
   }
@@ -76,13 +111,27 @@ export class TelegramAdapter extends BaseAdapter {
 
       // Regular message
       const item = await messageToItem(msg, token);
-      if (item) items.push(item);
+      if (item) {
+        item.fields = {
+          chatType: msg.chat.type || 'private',
+          hasMedia: !!(msg.photo || msg.document || msg.video || msg.audio),
+          mediaGrouped: false
+        };
+        items.push(item);
+      }
     }
 
     // Process media groups into single items
     for (const [groupId, group] of mediaGroups) {
       const item = await mediaGroupToItem(group, token);
-      if (item) items.push(item);
+      if (item) {
+        item.fields = {
+          chatType: group.firstMsg.chat.type || 'private',
+          hasMedia: true,
+          mediaGrouped: true
+        };
+        items.push(item);
+      }
     }
 
     return {
