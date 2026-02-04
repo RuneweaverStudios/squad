@@ -807,9 +807,13 @@ launch_ide() {
     # Auto-install npm dependencies if missing
     if [[ ! -d "$ide_path/node_modules" ]]; then
         echo -e "${DIM}  → Installing IDE dependencies...${NC}"
-        (cd "$ide_path" && npm install --silent) || {
+        (cd "$ide_path" && npm install --legacy-peer-deps 2>&1) || {
             echo -e "${RED}  ✗ Failed to install IDE dependencies${NC}"
-            echo -e "${DIM}  Try manually: cd $ide_path && npm install${NC}"
+            echo -e "${DIM}  Try manually: cd $ide_path && npm install --legacy-peer-deps${NC}"
+            if [[ "$(uname -s)" == "Darwin" ]]; then
+                echo -e "${DIM}  On macOS, you may need Xcode Command Line Tools:${NC}"
+                echo -e "${DIM}    xcode-select --install${NC}"
+            fi
             return 1
         }
         echo -e "${GREEN}  ✓ Dependencies installed${NC}"

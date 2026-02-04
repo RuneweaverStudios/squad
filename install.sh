@@ -334,9 +334,15 @@ if command -v npm &> /dev/null; then
     # Install IDE dependencies (SvelteKit, etc.)
     if [ -f "$INSTALL_DIR/ide/package.json" ]; then
         echo "  → Installing IDE dependencies..."
-        (cd "$INSTALL_DIR/ide" && npm install --legacy-peer-deps --engine-strict=false --silent 2>/dev/null) && \
-            echo -e "  ${GREEN}✓${NC} IDE dependencies installed" || \
+        if (cd "$INSTALL_DIR/ide" && npm install --legacy-peer-deps --engine-strict=false 2>&1); then
+            echo -e "  ${GREEN}✓${NC} IDE dependencies installed"
+        else
             echo -e "  ${YELLOW}⚠${NC} IDE npm install failed (run manually: cd ide && npm install --legacy-peer-deps)"
+            if [ "$(uname -s)" = "Darwin" ]; then
+                echo -e "  ${YELLOW}  On macOS, you may need Xcode Command Line Tools:${NC}"
+                echo -e "  ${YELLOW}    xcode-select --install${NC}"
+            fi
+        fi
     fi
 else
     echo -e "${YELLOW}  ⚠ npm not found - skipping Node.js dependencies${NC}"
