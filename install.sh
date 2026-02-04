@@ -6,6 +6,12 @@
 
 set -e  # Exit on error
 
+# Ensure ~/.local/bin is in PATH for this session
+# Tools install there, but on fresh systems (especially macOS) it's not in PATH yet
+if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+    export PATH="$HOME/.local/bin:$PATH"
+fi
+
 # Color codes
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -144,7 +150,7 @@ if [ -n "$MISSING_DEPS" ]; then
 
                 if [ -n "$STILL_MISSING" ]; then
                     echo -e "${YELLOW}⚠  Some dependencies may not be in PATH:${NC}$STILL_MISSING"
-                    echo "  You may need to open a new terminal or run: source ~/.bashrc"
+                    echo "  You may need to open a new terminal or run: source ~/$([ "$(basename "$SHELL")" = "zsh" ] && echo ".zshrc" || echo ".bashrc")"
                     echo ""
                 fi
             else

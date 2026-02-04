@@ -14,17 +14,26 @@ NC='\033[0m'
 echo -e "${BLUE}Installing Beads CLI...${NC}"
 echo ""
 
+# Ensure ~/.local/bin is in PATH for this session
+# The beads installer puts bd there, but on fresh systems (especially macOS)
+# it's not in PATH yet, causing verify_installation to fail
+if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+    export PATH="$HOME/.local/bin:$PATH"
+fi
+
 # Check if already installed
 if command -v bd &> /dev/null; then
-    CURRENT_VERSION=$(bd --version 2>/dev/null | grep -oP 'v\K[0-9.]+' || echo 'unknown')
+    CURRENT_VERSION=$(bd --version 2>/dev/null | sed -n 's/.*v\([0-9.]*\).*/\1/p' | head -1)
+    CURRENT_VERSION="${CURRENT_VERSION:-unknown}"
     echo -e "${YELLOW}  ⊘ Beads CLI already installed (version $CURRENT_VERSION)${NC}"
     echo "  Checking for updates..."
     echo ""
 
-    # Try to update via installer
-    curl -fsSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash
+    # Try to update via installer (|| true: don't let beads installer PATH warnings kill our script)
+    curl -fsSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash || true
 
-    NEW_VERSION=$(bd --version 2>/dev/null | grep -oP 'v\K[0-9.]+' || echo 'unknown')
+    NEW_VERSION=$(bd --version 2>/dev/null | sed -n 's/.*v\([0-9.]*\).*/\1/p' | head -1)
+    NEW_VERSION="${NEW_VERSION:-unknown}"
     if [ "$CURRENT_VERSION" != "$NEW_VERSION" ]; then
         echo -e "${GREEN}  ✓ Updated Beads from $CURRENT_VERSION to $NEW_VERSION${NC}"
     else
@@ -34,8 +43,8 @@ else
     echo "  → Installing Beads CLI via official installer..."
     echo ""
 
-    # Use official installer
-    curl -fsSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash
+    # Use official installer (|| true: don't let beads installer PATH warnings kill our script)
+    curl -fsSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash || true
 
     echo ""
     echo -e "${GREEN}  ✓ Beads CLI installed${NC}"

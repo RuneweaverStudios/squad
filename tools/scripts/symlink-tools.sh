@@ -278,7 +278,8 @@ echo ""
 # Verify PATH includes ~/.local/bin
 if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
     echo -e "${YELLOW}  ⚠ ~/.local/bin is not in your PATH${NC}"
-    echo "  Add to ~/.bashrc:"
+    SHELL_RC="$([ "$(basename "$SHELL")" = "zsh" ] && echo "~/.zshrc" || echo "~/.bashrc")"
+    echo "  Add to $SHELL_RC:"
     echo "    export PATH=\"\$HOME/.local/bin:\$PATH\""
     echo ""
 fi
