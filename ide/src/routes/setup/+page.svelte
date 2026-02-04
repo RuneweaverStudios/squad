@@ -272,6 +272,61 @@
 					</button>
 				</div>
 			</div>
+
+			<!-- Community CTA (lazygit-style) -->
+			<div
+				class="rounded-xl p-5 space-y-3"
+				style="
+					background: oklch(0.17 0.01 250);
+					border: 1px solid oklch(0.25 0.02 250);
+				"
+			>
+				<p class="text-sm font-mono" style="color: oklch(0.65 0.04 250);">
+					Thanks for setting up JAT! You're a developer &mdash; consider helping make it better:
+				</p>
+				<div class="space-y-2.5 pl-1">
+					<div class="flex items-start gap-2.5">
+						<span class="text-xs font-mono font-bold mt-0.5" style="color: oklch(0.50 0.02 250);">1)</span>
+						<p class="text-xs" style="color: oklch(0.55 0.02 250);">
+							Read the docs and learn what JAT can do:<br/>
+							<a
+								href="https://jat.tools/docs"
+								target="_blank"
+								rel="noopener noreferrer"
+								class="font-mono hover:underline"
+								style="color: oklch(0.70 0.15 240);"
+							>https://jat.tools/docs</a>
+						</p>
+					</div>
+					<div class="flex items-start gap-2.5">
+						<span class="text-xs font-mono font-bold mt-0.5" style="color: oklch(0.50 0.02 250);">2)</span>
+						<p class="text-xs" style="color: oklch(0.55 0.02 250);">
+							Contribute or report issues on GitHub:<br/>
+							<a
+								href="https://github.com/joewinke/jat"
+								target="_blank"
+								rel="noopener noreferrer"
+								class="font-mono hover:underline"
+								style="color: oklch(0.70 0.15 240);"
+							>https://github.com/joewinke/jat</a><br/>
+							<span style="color: oklch(0.50 0.02 250);">Or just star the repo to share the love!</span>
+						</p>
+					</div>
+					<div class="flex items-start gap-2.5">
+						<span class="text-xs font-mono font-bold mt-0.5" style="color: oklch(0.50 0.02 250);">3)</span>
+						<p class="text-xs" style="color: oklch(0.55 0.02 250);">
+							If JAT has saved you time, consider sponsoring development:<br/>
+							<a
+								href="https://github.com/sponsors/joewinke"
+								target="_blank"
+								rel="noopener noreferrer"
+								class="font-mono hover:underline"
+								style="color: oklch(0.70 0.15 240);"
+							>https://github.com/sponsors/joewinke</a>
+						</p>
+					</div>
+				</div>
+			</div>
 		{:else}
 			<!-- Step 1: Prerequisites -->
 			<div
