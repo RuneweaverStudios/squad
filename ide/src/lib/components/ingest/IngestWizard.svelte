@@ -291,7 +291,7 @@
 				body.imapUser = gmailImapUser.trim();
 				body.folder = gmailFolder.trim() || 'INBOX';
 			}
-			const res = await fetch('/api/config/feeds/verify', {
+			const res = await fetch('/api/integrations/verify', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(body)
@@ -308,7 +308,7 @@
 		detectionError = '';
 		detectedChats = [];
 		try {
-			const res = await fetch('/api/config/feeds/verify', {
+			const res = await fetch('/api/integrations/verify', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ type: 'telegram-chats', secretName: telegramSecretName })
@@ -334,7 +334,7 @@
 		channelDetectionError = '';
 		detectedChannels = [];
 		try {
-			const res = await fetch('/api/config/feeds/verify', {
+			const res = await fetch('/api/integrations/verify', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ type: 'slack-channels', secretName: slackSecretName })

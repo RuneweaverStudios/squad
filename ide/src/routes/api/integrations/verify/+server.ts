@@ -1,10 +1,10 @@
 /**
- * Feed Token Verification API
+ * Integration Token Verification API
  *
  * Tests a Slack, Telegram, or Gmail token against the external API.
  * Resolves the token server-side via jat-secret (custom API keys).
  *
- * POST /api/config/feeds/verify
+ * POST /api/integrations/verify
  * Body: { type: 'slack' | 'telegram' | 'telegram-chats' | 'slack-channels' | 'gmail', secretName: string, imapUser?: string, folder?: string }
  * Returns: { success, info?, error?, chats?, count?, channels? }
  */
@@ -234,8 +234,8 @@ async function verifyGmail(appPassword: string, imapUser: string, folder: string
 		try {
 			const lock = await client.getMailboxLock(folder);
 			try {
-				const mailbox = client.mailbox;
-				const total = mailbox.exists || 0;
+				const mailbox = client.mailbox as any;
+				const total = mailbox?.exists || 0;
 
 				info = {
 					success: true,
@@ -243,7 +243,7 @@ async function verifyGmail(appPassword: string, imapUser: string, folder: string
 						email: imapUser,
 						folder,
 						messageCount: total,
-						uidValidity: Number(mailbox.uidValidity)
+						uidValidity: Number(mailbox?.uidValidity)
 					}
 				};
 			} finally {

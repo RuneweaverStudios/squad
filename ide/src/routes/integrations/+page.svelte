@@ -1,8 +1,8 @@
 <script lang="ts">
 	/**
-	 * Ingest Page
+	 * Integrations Page
 	 *
-	 * Template cards for adding RSS, Slack, Telegram, or Custom ingest sources.
+	 * Template cards for adding RSS, Slack, Telegram, or Custom integration sources.
 	 * Shows existing configured sources with edit/delete/toggle.
 	 * Launches wizard drawer for setup.
 	 * Service bar for start/stop/restart of the ingest daemon.
@@ -213,7 +213,7 @@
 	async function fetchSources() {
 		loading = true;
 		try {
-			const resp = await fetch('/api/config/feeds');
+			const resp = await fetch('/api/integrations');
 			const data = await resp.json();
 			if (data.success) {
 				sources = data.config.sources || [];
@@ -247,7 +247,7 @@
 		const method = isEdit ? 'PUT' : 'POST';
 
 		try {
-			const resp = await fetch('/api/config/feeds', {
+			const resp = await fetch('/api/integrations', {
 				method,
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(source)
@@ -265,7 +265,7 @@
 	async function toggleSource(source: any) {
 		const updated = { ...source, enabled: !source.enabled };
 		try {
-			await fetch('/api/config/feeds', {
+			await fetch('/api/integrations', {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(updated)
@@ -278,7 +278,7 @@
 
 	async function deleteSource(source: any) {
 		try {
-			const resp = await fetch(`/api/config/feeds?id=${encodeURIComponent(source.id)}`, {
+			const resp = await fetch(`/api/integrations?id=${encodeURIComponent(source.id)}`, {
 				method: 'DELETE'
 			});
 			const data = await resp.json();
@@ -436,7 +436,7 @@
 </script>
 
 <svelte:head>
-	<title>Ingest | JAT</title>
+	<title>Integrations | JAT</title>
 	<link rel="icon" href="/favicons/ingest.svg" />
 </svelte:head>
 
@@ -448,7 +448,7 @@
 	>
 		<div>
 			<h1 class="font-mono text-sm font-semibold tracking-wide" style="color: oklch(0.85 0.02 250);">
-				Ingest Sources
+				Integrations
 			</h1>
 			<p class="font-mono text-[10px] mt-0.5" style="color: oklch(0.45 0.02 250);">
 				Watch external sources and automatically create tasks

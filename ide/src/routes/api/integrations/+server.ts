@@ -1,7 +1,8 @@
 /**
- * Feeds API Endpoint
+ * Integrations API Endpoint
  *
- * Manages ingest source configuration in ~/.config/jat/feeds.json
+ * Manages ingest source configuration in ~/.config/jat/integrations.json
+ * (auto-migrates from feeds.json if needed)
  *
  * Endpoints:
  * - GET: Returns all configured sources
@@ -12,15 +13,17 @@
 
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
 
-const FEEDS_PATH = join(homedir(), '.config/jat/feeds.json');
+const CONFIG_DIR = join(homedir(), '.config/jat');
+const INTEGRATIONS_PATH = join(CONFIG_DIR, 'integrations.json');
+const LEGACY_PATH = join(CONFIG_DIR, 'feeds.json');
 
-interface FeedSource {
+interface IntegrationSource {
 	id: string;
-	type: 'rss' | 'slack' | 'telegram' | 'gmail' | 'custom';
+	type: string;
 	enabled: boolean;
 	project: string;
 	pollInterval: number;
@@ -29,69 +32,80 @@ interface FeedSource {
 		priority: number;
 		labels: string[];
 	};
-	// RSS
+	// Type-specific fields
 	feedUrl?: string;
-	// Slack
 	secretName?: string;
 	channel?: string;
 	includeBots?: boolean;
 	trackReplies?: boolean;
 	maxTrackedThreads?: number;
-	// Telegram
 	chatId?: string;
-	// Gmail
 	imapUser?: string;
 	folder?: string;
 	filterFrom?: string;
 	filterSubject?: string;
 	markAsRead?: boolean;
-	// Custom
 	command?: string;
+	filter?: any;
+	[key: string]: any;
 }
 
-interface FeedsConfig {
+interface IntegrationsConfig {
 	version: number;
-	sources: FeedSource[];
+	sources: IntegrationSource[];
 }
 
-function readFeeds(): FeedsConfig {
+/**
+ * Resolve config path, auto-migrating feeds.json → integrations.json if needed.
+ */
+function resolveConfigPath(): string {
+	if (existsSync(INTEGRATIONS_PATH)) return INTEGRATIONS_PATH;
+	if (existsSync(LEGACY_PATH)) {
+		copyFileSync(LEGACY_PATH, INTEGRATIONS_PATH);
+		return INTEGRATIONS_PATH;
+	}
+	return INTEGRATIONS_PATH;
+}
+
+function readConfig(): IntegrationsConfig {
 	try {
-		const raw = readFileSync(FEEDS_PATH, 'utf-8');
+		const path = resolveConfigPath();
+		const raw = readFileSync(path, 'utf-8');
 		return JSON.parse(raw);
 	} catch {
 		return { version: 1, sources: [] };
 	}
 }
 
-function writeFeeds(config: FeedsConfig): void {
-	mkdirSync(dirname(FEEDS_PATH), { recursive: true });
-	writeFileSync(FEEDS_PATH, JSON.stringify(config, null, 2) + '\n', { mode: 0o644 });
+function writeConfig(config: IntegrationsConfig): void {
+	mkdirSync(dirname(INTEGRATIONS_PATH), { recursive: true });
+	writeFileSync(INTEGRATIONS_PATH, JSON.stringify(config, null, 2) + '\n', { mode: 0o644 });
 }
 
 /**
- * GET /api/config/feeds
+ * GET /api/integrations
  * Returns all configured sources
  */
 export const GET: RequestHandler = async () => {
 	try {
-		const config = readFeeds();
+		const config = readConfig();
 		return json({ success: true, config });
 	} catch (error) {
 		return json(
-			{ success: false, error: 'Failed to read feeds config' },
+			{ success: false, error: 'Failed to read integrations config' },
 			{ status: 500 }
 		);
 	}
 };
 
 /**
- * POST /api/config/feeds
+ * POST /api/integrations
  * Add a new source
- * Body: FeedSource object
+ * Body: IntegrationSource object
  */
 export const POST: RequestHandler = async ({ request }) => {
 	try {
-		const source: FeedSource = await request.json();
+		const source: IntegrationSource = await request.json();
 
 		if (!source.id || !source.type || !source.project) {
 			return json(
@@ -100,7 +114,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			);
 		}
 
-		const config = readFeeds();
+		const config = readConfig();
 
 		// Check for duplicate id
 		if (config.sources.some((s) => s.id === source.id)) {
@@ -111,7 +125,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		}
 
 		config.sources.push(source);
-		writeFeeds(config);
+		writeConfig(config);
 
 		return json({ success: true, source });
 	} catch (error) {
@@ -126,19 +140,19 @@ export const POST: RequestHandler = async ({ request }) => {
 };
 
 /**
- * PUT /api/config/feeds
+ * PUT /api/integrations
  * Update an existing source
- * Body: FeedSource object (must include id)
+ * Body: IntegrationSource object (must include id)
  */
 export const PUT: RequestHandler = async ({ request }) => {
 	try {
-		const source: FeedSource = await request.json();
+		const source: IntegrationSource = await request.json();
 
 		if (!source.id) {
 			return json({ success: false, error: 'id is required' }, { status: 400 });
 		}
 
-		const config = readFeeds();
+		const config = readConfig();
 		const index = config.sources.findIndex((s) => s.id === source.id);
 
 		if (index === -1) {
@@ -149,7 +163,7 @@ export const PUT: RequestHandler = async ({ request }) => {
 		}
 
 		config.sources[index] = source;
-		writeFeeds(config);
+		writeConfig(config);
 
 		return json({ success: true, source });
 	} catch (error) {
@@ -164,7 +178,7 @@ export const PUT: RequestHandler = async ({ request }) => {
 };
 
 /**
- * DELETE /api/config/feeds
+ * DELETE /api/integrations
  * Remove a source by id
  * Query: ?id=source-id
  */
@@ -176,7 +190,7 @@ export const DELETE: RequestHandler = async ({ url }) => {
 			return json({ success: false, error: 'id query parameter is required' }, { status: 400 });
 		}
 
-		const config = readFeeds();
+		const config = readConfig();
 		const index = config.sources.findIndex((s) => s.id === id);
 
 		if (index === -1) {
@@ -184,7 +198,7 @@ export const DELETE: RequestHandler = async ({ url }) => {
 		}
 
 		config.sources.splice(index, 1);
-		writeFeeds(config);
+		writeConfig(config);
 
 		return json({ success: true });
 	} catch (error) {

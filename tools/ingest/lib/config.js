@@ -1,22 +1,34 @@
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync, statSync, copyFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import * as logger from './logger.js';
 
-const CONFIG_PATH = join(process.env.HOME, '.config/jat/feeds.json');
+const CONFIG_DIR = join(process.env.HOME, '.config/jat');
+const CONFIG_PATH = join(CONFIG_DIR, 'integrations.json');
+const LEGACY_PATH = join(CONFIG_DIR, 'feeds.json');
 
 let cachedConfig = null;
 let cachedMtime = 0;
 
-const VALID_TYPES = ['telegram', 'slack', 'rss', 'gmail'];
+/** Resolve config path with automatic migration from feeds.json */
+function resolveConfigPath() {
+  if (existsSync(CONFIG_PATH)) return CONFIG_PATH;
+  if (existsSync(LEGACY_PATH)) {
+    logger.info(`Migrating ${LEGACY_PATH} → ${CONFIG_PATH}`);
+    copyFileSync(LEGACY_PATH, CONFIG_PATH);
+    return CONFIG_PATH;
+  }
+  return CONFIG_PATH;
+}
 
 export function loadConfig() {
+  const path = resolveConfigPath();
   let raw;
   try {
-    raw = readFileSync(CONFIG_PATH, 'utf-8');
+    raw = readFileSync(path, 'utf-8');
   } catch (err) {
     if (err.code === 'ENOENT') {
-      logger.error(`Config not found: ${CONFIG_PATH}`);
+      logger.error(`Config not found: ${path}`);
       logger.info('Create it with: jat-ingest-test --init');
       return { version: 1, sources: [] };
     }
@@ -29,8 +41,9 @@ export function loadConfig() {
 }
 
 export function getConfig(forceReload = false) {
+  const path = resolveConfigPath();
   try {
-    const st = statSync(CONFIG_PATH);
+    const st = statSync(path);
     const mtime = st.mtimeMs;
     if (!forceReload && cachedConfig && mtime === cachedMtime) {
       return cachedConfig;
@@ -54,7 +67,7 @@ export function getEnabledSources() {
 
 function validate(config) {
   if (!config.sources || !Array.isArray(config.sources)) {
-    throw new Error('feeds.json must have a "sources" array');
+    throw new Error('integrations.json must have a "sources" array');
   }
   const ids = new Set();
   for (const src of config.sources) {
@@ -62,8 +75,8 @@ function validate(config) {
     if (ids.has(src.id)) throw new Error(`Duplicate source id: ${src.id}`);
     ids.add(src.id);
 
-    if (!VALID_TYPES.includes(src.type)) {
-      throw new Error(`Invalid source type "${src.type}" for ${src.id}. Must be: ${VALID_TYPES.join(', ')}`);
+    if (!src.type) {
+      throw new Error(`Source ${src.id} must have a "type" field`);
     }
     if (!src.project) {
       throw new Error(`Source ${src.id} must have a "project" field`);

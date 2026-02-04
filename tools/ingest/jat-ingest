@@ -20,7 +20,7 @@ USAGE:
     jat-ingest --help                 Show this help
 
 CONFIG:
-    ~/.config/jat/feeds.json          Source configuration
+    ~/.config/jat/integrations.json   Source configuration
     ~/.local/share/jat/ingest.db      Dedup database
 
 SOURCES:
@@ -44,7 +44,7 @@ const once = args.includes('--once');
 try {
   const config = loadConfig();
   if (config.sources.length === 0) {
-    logger.warn('No sources configured. Edit ~/.config/jat/feeds.json');
+    logger.warn('No sources configured. Edit ~/.config/jat/integrations.json');
     process.exit(0);
   }
 } catch (err) {

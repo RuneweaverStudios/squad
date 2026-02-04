@@ -9,6 +9,7 @@
  *   /files    - Files (project file browser)
  *   /source   - Source Control (git changes, diff viewer)
  *   /servers  - Servers (project server sessions)
+ *   /integrations - Integrations (external source configuration)
  *   /config   - Config (JAT configuration, includes Projects tab)
  *   /history  - History (completed task history with streak calendar)
  *
@@ -79,10 +80,10 @@ export const unifiedNavConfig: UnifiedNavConfig = {
 			category: 'main'
 		},
 		{
-			id: 'ingest',
-			label: 'Ingest',
-			href: '/ingest',
-			icon: 'ingest',
+			id: 'integrations',
+			label: 'Integrations',
+			href: '/integrations',
+			icon: 'integrations',
 			category: 'main'
 		},
 		{

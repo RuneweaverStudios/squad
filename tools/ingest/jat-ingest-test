@@ -20,10 +20,10 @@ USAGE:
     jat-ingest-test --help                  Show this help
 
 OPTIONS:
-    --source <id>    Source ID from feeds.json to test
-    --type <type>    Adapter type (rss, telegram, slack)
+    --source <id>    Source ID from integrations.json to test
+    --type <type>    Adapter type (rss, telegram, slack, gmail)
     --url <url>      RSS feed URL for direct testing
-    --init           Create sample ~/.config/jat/feeds.json
+    --init           Create sample ~/.config/jat/integrations.json
     --validate       Check config for errors`);
   process.exit(0);
 }
