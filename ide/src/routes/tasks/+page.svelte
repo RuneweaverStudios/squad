@@ -94,7 +94,8 @@
 	// Recoverable sessions state
 	interface RecoverableSession {
 		agentName: string;
-		sessionId: string;
+		sessionId: string | null;
+		resumable: boolean;
 		taskId: string;
 		taskTitle: string;
 		taskPriority: number;
@@ -721,6 +722,40 @@
 			await fetchAllData();
 		} catch (err) {
 			console.error("Failed to resume session:", err);
+		}
+	}
+
+	async function restartTask(taskId: string) {
+		try {
+			const response = await fetch("/api/work/spawn", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ taskId, autoStart: true }),
+			});
+			if (!response.ok) {
+				const data = await response.json();
+				throw new Error(data.error || "Failed to restart task");
+			}
+			await fetchAllData();
+		} catch (err) {
+			console.error("Failed to restart task:", err);
+		}
+	}
+
+	async function unassignTask(taskId: string, agentName: string) {
+		try {
+			const response = await fetch(`/api/tasks/${encodeURIComponent(taskId)}`, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ status: "open", assignee: "" }),
+			});
+			if (!response.ok) {
+				const data = await response.json();
+				throw new Error(data.error || "Failed to unassign task");
+			}
+			await fetchAllData();
+		} catch (err) {
+			console.error("Failed to unassign task:", err);
 		}
 	}
 
@@ -1368,6 +1403,8 @@
 									sessions={projectPausedSessions}
 									{projectColors}
 									onResumeSession={resumeSession}
+									onRestartTask={restartTask}
+									onUnassignTask={unassignTask}
 									onViewTask={(taskId) =>
 										openTaskDetailDrawer(taskId)}
 								/>

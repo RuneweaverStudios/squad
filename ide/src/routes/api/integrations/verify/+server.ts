@@ -1,12 +1,13 @@
 /**
  * Integration Token Verification API
  *
- * Tests a Slack, Telegram, or Gmail token against the external API.
- * Resolves the token server-side via jat-secret (custom API keys).
+ * Tests integration tokens against external APIs.
+ * Supports built-in types (Slack, Telegram, Gmail) and dynamic plugins.
+ * For dynamic plugins, loads the adapter via pluginLoader and calls test().
  *
  * POST /api/integrations/verify
- * Body: { type: 'slack' | 'telegram' | 'telegram-chats' | 'slack-channels' | 'gmail', secretName: string, imapUser?: string, folder?: string }
- * Returns: { success, info?, error?, chats?, count?, channels? }
+ * Body: { type: string, secretName: string, ...typeSpecificFields }
+ * Returns: { success, info?, error?, chats?, count?, channels?, sampleItems? }
  */
 
 import { json } from '@sveltejs/kit';
@@ -14,50 +15,57 @@ import type { RequestHandler } from './$types';
 import { getCustomApiKey } from '$lib/utils/credentials';
 import { ImapFlow } from 'imapflow';
 
+const BUILTIN_TYPES = ['slack', 'telegram', 'telegram-chats', 'slack-channels', 'gmail'];
+
 export const POST: RequestHandler = async ({ request }) => {
 	try {
 		const body = await request.json();
-		const { type, secretName } = body;
+		const { type } = body;
 
-		if (!type || !secretName) {
+		if (!type) {
 			return json(
-				{ success: false, error: 'type and secretName are required' },
+				{ success: false, error: 'type is required' },
 				{ status: 400 }
 			);
 		}
 
-		const validTypes = ['slack', 'telegram', 'telegram-chats', 'slack-channels', 'gmail'];
-		if (!validTypes.includes(type)) {
-			return json(
-				{ success: false, error: `type must be one of: ${validTypes.join(', ')}` },
-				{ status: 400 }
-			);
-		}
-
-		// Resolve the token from credentials store
-		const token = getCustomApiKey(secretName);
-		if (!token) {
-			return json(
-				{ success: false, error: `No token found for secret "${secretName}"` },
-				{ status: 404 }
-			);
-		}
-
-		if (type === 'gmail') {
-			const { imapUser, folder } = body;
-			if (!imapUser) {
-				return json({ success: false, error: 'imapUser is required for Gmail verification' }, { status: 400 });
+		// Built-in types require secretName resolved upfront
+		if (BUILTIN_TYPES.includes(type)) {
+			const { secretName } = body;
+			if (!secretName) {
+				return json(
+					{ success: false, error: 'secretName is required' },
+					{ status: 400 }
+				);
 			}
-			return await verifyGmail(token, imapUser, folder || 'INBOX');
-		} else if (type === 'slack') {
-			return await verifySlack(token);
-		} else if (type === 'slack-channels') {
-			return await detectSlackChannels(token);
-		} else if (type === 'telegram-chats') {
-			return await detectTelegramChats(token);
-		} else {
-			return await verifyTelegram(token);
+
+			const token = getCustomApiKey(secretName);
+			if (!token) {
+				return json(
+					{ success: false, error: `No token found for secret "${secretName}"` },
+					{ status: 404 }
+				);
+			}
+
+			if (type === 'gmail') {
+				const { imapUser, folder } = body;
+				if (!imapUser) {
+					return json({ success: false, error: 'imapUser is required for Gmail verification' }, { status: 400 });
+				}
+				return await verifyGmail(token, imapUser, folder || 'INBOX');
+			} else if (type === 'slack') {
+				return await verifySlack(token);
+			} else if (type === 'slack-channels') {
+				return await detectSlackChannels(token);
+			} else if (type === 'telegram-chats') {
+				return await detectTelegramChats(token);
+			} else {
+				return await verifyTelegram(token);
+			}
 		}
+
+		// Dynamic plugin verification - load adapter and call test()
+		return await verifyPlugin(type, body);
 	} catch (error) {
 		return json(
 			{
@@ -273,6 +281,59 @@ async function verifyGmail(appPassword: string, imapUser: string, folder: string
 		return json({
 			success: false,
 			error: `Connection failed: ${responseText || msg}`
+		});
+	}
+}
+
+/**
+ * Verify a dynamic plugin by loading its adapter and calling test().
+ * Works for any plugin type registered via pluginLoader (built-in or user).
+ */
+async function verifyPlugin(type: string, body: Record<string, any>) {
+	try {
+		const { join } = await import('node:path');
+		const projectRoot = process.cwd().replace(/\/ide$/, '');
+		const pluginLoaderPath = join(projectRoot, 'tools', 'ingest', 'lib', 'pluginLoader.js');
+		const { discoverPlugins } = await import(/* @vite-ignore */ pluginLoaderPath);
+		const plugins = await discoverPlugins();
+		const plugin = plugins.get(type);
+
+		if (!plugin) {
+			return json(
+				{ success: false, error: `No plugin found for type "${type}"` },
+				{ status: 400 }
+			);
+		}
+
+		const adapter = new plugin.AdapterClass();
+
+		// Build a source config from body fields (matches what the adapter expects)
+		const sourceConfig: Record<string, any> = {};
+		for (const field of plugin.metadata.configFields) {
+			if (body[field.key] !== undefined) {
+				sourceConfig[field.key] = body[field.key];
+			}
+		}
+
+		// getSecret resolves secret names via credentials store
+		const getSecret = (name: string) => {
+			const value = getCustomApiKey(name);
+			if (!value) throw new Error(`Secret "${name}" not found in credentials store`);
+			return value;
+		};
+
+		const result = await adapter.test(sourceConfig, getSecret);
+
+		return json({
+			success: result.ok,
+			info: result.ok ? { message: result.message } : undefined,
+			sampleItems: result.sampleItems,
+			error: result.ok ? undefined : result.message
+		});
+	} catch (error) {
+		return json({
+			success: false,
+			error: `Plugin verification failed: ${error instanceof Error ? error.message : 'unknown error'}`
 		});
 	}
 }

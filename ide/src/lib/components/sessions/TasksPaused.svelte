@@ -13,7 +13,8 @@
 	// Types
 	interface PausedSession {
 		agentName: string;
-		sessionId: string;
+		sessionId: string | null;
+		resumable: boolean;
 		taskId: string;
 		taskTitle: string;
 		taskPriority: number;
@@ -27,11 +28,15 @@
 		sessions = [],
 		projectColors = {},
 		onResumeSession,
+		onRestartTask,
+		onUnassignTask,
 		onViewTask
 	}: {
 		sessions: PausedSession[];
 		projectColors: Record<string, string>;
 		onResumeSession?: (agentName: string, sessionId: string) => Promise<void>;
+		onRestartTask?: (taskId: string) => Promise<void>;
+		onUnassignTask?: (taskId: string, agentName: string) => Promise<void>;
 		onViewTask?: (taskId: string) => void;
 	} = $props();
 
@@ -76,8 +81,12 @@
 		actionLoading = session.agentName;
 
 		try {
-			if (actionId === 'resume' && onResumeSession) {
+			if (actionId === 'resume' && onResumeSession && session.sessionId) {
 				await onResumeSession(session.agentName, session.sessionId);
+			} else if (actionId === 'restart' && onRestartTask) {
+				await onRestartTask(session.taskId);
+			} else if (actionId === 'unassign' && onUnassignTask) {
+				await onUnassignTask(session.taskId, session.agentName);
 			} else if (actionId === 'view-task' && onViewTask) {
 				onViewTask(session.taskId);
 			}
@@ -98,7 +107,7 @@
 				</tr>
 			</thead>
 			<tbody>
-				{#each sessions as session (session.sessionId)}
+				{#each sessions as session (session.taskId)}
 					{@const projectColor = projectColors[session.project] || 'oklch(0.70 0.15 200)'}
 					<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
 					<tr class="paused-row clickable" style="--project-color: {projectColor}" onclick={() => onViewTask?.(session.taskId)}>
@@ -131,7 +140,7 @@
 						<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 						<td class="td-action text-right" onclick={(e) => e.stopPropagation()}>
 							<StatusActionBadge
-								sessionState="paused"
+								sessionState={session.resumable ? 'paused' : 'orphaned'}
 								sessionName={`jat-${session.agentName}`}
 								disabled={actionLoading === session.agentName}
 								onAction={(actionId) => handleAction(actionId, session)}

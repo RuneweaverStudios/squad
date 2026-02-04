@@ -37,6 +37,7 @@ interface PluginInfo {
 	error?: string;
 	configFields?: any[];
 	itemFields?: any[];
+	defaultFilter?: any[];
 }
 
 /**
@@ -102,7 +103,8 @@ async function probePlugin(pluginPath: string, isBuiltin: boolean): Promise<Plug
 			isBuiltin,
 			enabled: true,
 			configFields: metadata.configFields,
-			itemFields: metadata.itemFields
+			itemFields: metadata.itemFields,
+			defaultFilter: metadata.defaultFilter
 		};
 	} catch (err: any) {
 		return {

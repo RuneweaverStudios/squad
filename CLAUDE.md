@@ -31,6 +31,10 @@ jat/
 │   ├── signal/          # JAT signal tools (jat-signal, jat-signal-validate)
 │   ├── ingest/          # Feed ingest daemon (RSS, Slack, Telegram)
 │   └── scripts/         # Installation and setup scripts
+├── skills/              # Pi agent skills (SKILL.md format)
+│   ├── jat-start/       # Begin working on a task
+│   ├── jat-complete/    # Complete current task
+│   └── jat-verify/      # Browser verification
 ├── commands/jat/        # JAT workflow commands (9 commands)
 ├── ide/                 # Beads Task IDE (SvelteKit app)
 ├── shared/              # Shared documentation (imported by projects)
@@ -300,28 +304,34 @@ After adding a project, you can start working:
 /jat:start auto
 ```
 
-## IDE AI Features (Optional)
+## IDE AI Features
 
-To enable AI-powered features in the IDE, configure your Anthropic API key via Settings (recommended) or .env file.
+The IDE uses AI for task suggestions, usage metrics, and avatar generation. These features work automatically if you have **any** of the following:
 
-**Option 1: Settings UI (Recommended)**
-1. Open IDE at `http://localhost:3333`
-2. Go to Settings → API Keys tab
-3. Add your Anthropic API key
-4. Key is stored securely in `~/.config/jat/credentials.json`
+1. **Claude Code CLI installed** (recommended) - The IDE falls back to your Claude subscription via `claude -p`. No API key needed.
+2. **Anthropic API key** - Configure via Settings → API Keys tab, or add to `~/code/jat/ide/.env`.
 
-**Option 2: Environment file**
-```bash
-cp ~/code/jat/ide/.env.example ~/code/jat/ide/.env
-# Edit and add: ANTHROPIC_API_KEY=sk-ant-...
-```
+**How the fallback works:**
+The LLM service tries the API key first, then falls back to the Claude CLI subprocess. If you have a Claude Pro/Max subscription and `claude` is installed, AI features work out of the box with zero configuration.
 
-**Features enabled with API key:**
+**Features powered by LLM:**
 - **Task Suggestions** - AI auto-suggests priority, type, labels when creating tasks
 - **Usage Metrics** - Real-time token usage and rate limit tracking
 - **Avatar Generation** - AI-generated agent avatars
 
-Without the API key, the IDE works fully but these AI features are disabled.
+**Agent Authentication:**
+Most supported coding agents use subscription-based auth (no API keys required):
+
+| Agent | Auth Method | Setup Command |
+|-------|-------------|---------------|
+| Claude Code | Claude Pro/Max subscription | `claude auth` |
+| Codex CLI | ChatGPT Plus/Pro subscription | `codex login` |
+| OpenCode | OAuth (Anthropic/OpenAI/Copilot) | `opencode auth login` |
+| Pi | OAuth (Claude/ChatGPT/Copilot/Gemini) | `/login` inside Pi |
+| Gemini CLI | Google Account (free tier included) | First run triggers OAuth |
+| Aider | API keys only | Set provider key in env |
+
+See `~/.config/jat/agents.json` for full agent configuration and Settings → Agents in the IDE.
 
 ## Credentials & Secrets Management
 

@@ -17,6 +17,7 @@
 		id: string;
 		title: string;
 		assignee?: string;
+		created_at: string;
 		updated_at: string;
 		closed_at?: string;
 		priority?: number;
@@ -174,6 +175,35 @@
 		agents: Map<string, number>;
 	}
 
+	function getTaskDuration(task: CompletedTask): number {
+		const end = new Date(task.closed_at || task.updated_at).getTime();
+		const start = new Date(task.created_at).getTime();
+		return Math.max(0, end - start);
+	}
+
+	function formatDuration(ms: number): string {
+		const mins = Math.round(ms / 60000);
+		if (mins < 1) return "<1m";
+		if (mins < 60) return `${mins}m`;
+		const h = Math.floor(mins / 60);
+		const m = mins % 60;
+		return m > 0 ? `${h}h ${m}m` : `${h}h`;
+	}
+
+	function getTimelinePos(task: CompletedTask): { left: number; width: number } {
+		const startDate = new Date(task.created_at);
+		const endDate = new Date(task.closed_at || task.updated_at);
+		const endMins = endDate.getHours() * 60 + endDate.getMinutes();
+		const sameDay =
+			startDate.getFullYear() === endDate.getFullYear() &&
+			startDate.getMonth() === endDate.getMonth() &&
+			startDate.getDate() === endDate.getDate();
+		const startMins = sameDay ? startDate.getHours() * 60 + startDate.getMinutes() : 0;
+		const left = (startMins / 1440) * 100;
+		const width = Math.max(1.2, ((endMins - startMins) / 1440) * 100);
+		return { left, width };
+	}
+
 	const tasksByDay = $derived.by(() => {
 		const groups = new Map<string, DayGroup>();
 
@@ -197,6 +227,15 @@
 			if (task.assignee) {
 				group.agents.set(task.assignee, (group.agents.get(task.assignee) || 0) + 1);
 			}
+		}
+
+		// Sort tasks within each day by completion time descending (most recent first)
+		for (const group of groups.values()) {
+			group.tasks.sort((a, b) => {
+				const aTime = new Date(a.closed_at || a.updated_at).getTime();
+				const bTime = new Date(b.closed_at || b.updated_at).getTime();
+				return bTime - aTime;
+			});
 		}
 
 		// Sort by date descending
@@ -401,6 +440,8 @@
 								</div>
 								<div class="day-tasks">
 									{#each day.tasks as task}
+										{@const duration = getTaskDuration(task)}
+										{@const pos = getTimelinePos(task)}
 										<button
 											class="task-item group"
 											onclick={() => handleTaskClick(task.id)}
@@ -416,8 +457,16 @@
 													{#if task.assignee}
 														<span class="text-success/70">by {task.assignee}</span>
 													{/if}
-													<span class="ml-auto">
-														{formatTime(task.closed_at || task.updated_at)}
+													<span class="ml-auto flex flex-col items-end gap-0.5" title="Duration: {formatDuration(duration)}\nCreated: {new Date(task.created_at).toLocaleString()}{task.closed_at ? '\nCompleted: ' + new Date(task.closed_at).toLocaleString() : ''}">
+														<span class="flex items-center gap-1">
+															<span class="text-base-content/35">{formatTime(task.created_at)}</span>
+															<span class="text-base-content/25">-</span>
+															<span class="text-base-content/55">{formatTime(task.closed_at || task.updated_at)}</span>
+														</span>
+														<span class="relative w-full block" style="height: 3px; background: oklch(from var(--color-base-content) l c h / 6%); border-radius: 1.5px;">
+															<span class="absolute top-0" style="left: 50%; width: 1px; height: 100%; background: oklch(from var(--color-base-content) l c h / 10%)"></span>
+															<span class="absolute top-0" style="left: {pos.left}%; width: {pos.width}%; height: 100%; border-radius: 1.5px; background: linear-gradient(90deg, oklch(from var(--color-info) l c h / 50%), oklch(from var(--color-info) l c h / 75%))"></span>
+														</span>
 													</span>
 												</span>
 											</div>

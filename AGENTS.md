@@ -1,40 +1,227 @@
-# Agent Instructions
+# JAT Agent Instructions
 
-This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
+You are running as part of a **multi-agent development system** called JAT (Jomarchy Agent Tools). This system enables parallel, coordinated work across codebases using multiple AI coding agents.
 
-## Quick Reference
+## Quick Start
 
 ```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --status in_progress  # Claim work
-bd close <id>         # Complete work
-bd sync               # Sync with git
+# Start a session (pick a task)
+/skill:jat-start
+
+# Start a specific task
+/skill:jat-start jat-abc123
+
+# Complete your task
+/skill:jat-complete
+
+# Verify in browser
+/skill:jat-verify
 ```
 
-## Landing the Plane (Session Completion)
+## Core Principles
 
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+1. **One agent = one session = one task** - Each session handles exactly one task
+2. **File reservations prevent conflicts** - Always reserve before editing shared files
+3. **Messages coordinate work** - Check Agent Mail before starting and completing
+4. **Beads is the task queue** - Pick from ready work, update status, close when done
+5. **Signals track your state** - The IDE monitors agents through `jat-signal`
 
-**MANDATORY WORKFLOW:**
+## Beads (Task Management)
 
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
-   ```bash
-   git pull --rebase
-   bd sync
-   git push
-   git status  # MUST show "up to date with origin"
-   ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
+This project uses `bd` (beads) for issue tracking.
 
-**CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
+```bash
+bd ready                    # Find available work (highest priority, no blockers)
+bd show <id>                # View task details
+bd show <id> --json         # JSON format
+bd update <id> --status in_progress --assignee AgentName
+bd close <id> --reason "Completed"
+bd list --status open       # List all open tasks
+bd search "keyword"         # Search tasks
+bd sync                     # Sync with git
+```
 
+**Status values** (use underscores, not hyphens):
+- `open` - Available to start
+- `in_progress` - Being worked on
+- `blocked` - Waiting on something
+- `closed` - Completed
+
+**Task types:** `bug`, `feature`, `task`, `epic`, `chore`
+
+### Dependencies
+
+```bash
+bd dep add parent-id child-id   # parent depends on child
+bd dep tree task-id             # Show dependency tree
+bd dep remove parent-id child-id
+```
+
+### Epics
+
+Epics are **blocked by their children** (children are READY, epic waits):
+
+```bash
+# Create epic
+bd create "Epic title" --type epic --priority 1
+
+# Create children
+bd create "Child task" --type task --priority 2
+
+# Set dependencies: epic depends on children (NOT children on epic)
+bd dep add epic-id child-id
+```
+
+## Agent Mail (Coordination)
+
+Async messaging between agents. All tools are in `~/.local/bin/`.
+
+```bash
+# Identity
+am-register --name AgentName --program pi --model sonnet
+am-whoami
+
+# Messages
+am-inbox AgentName --unread                       # Check inbox
+am-send "Subject" "Body" --from Me --to Other --thread task-id
+am-reply MSG_ID "Response" --agent AgentName
+am-ack MSG_ID --agent AgentName                   # Acknowledge
+
+# File Reservations (prevent conflicts)
+am-reserve "src/**/*.ts" --agent AgentName --ttl 3600 --reason "task-id"
+am-release "src/**/*.ts" --agent AgentName
+am-reservations --json                            # List all locks
+```
+
+**Broadcast recipients:** `@active` (last 60min), `@recent` (24h), `@all`
+
+## Signals (IDE State Tracking)
+
+The IDE tracks your state through signals. Emit them in order:
+
+```bash
+# 1. Starting (after registration)
+jat-signal starting '{"agentName":"NAME","sessionId":"ID","project":"PROJECT","model":"MODEL","gitBranch":"BRANCH","gitStatus":"clean","tools":["bash","read","write","edit"],"uncommittedFiles":[]}'
+
+# 2. Working (before coding)
+jat-signal working '{"taskId":"ID","taskTitle":"TITLE","approach":"PLAN"}'
+
+# 3. Needs Input (before asking user)
+jat-signal needs_input '{"taskId":"ID","question":"QUESTION","questionType":"clarification"}'
+
+# 4. Review (when work is done)
+jat-signal review '{"taskId":"ID","taskTitle":"TITLE","summary":["ITEM1","ITEM2"]}'
+```
+
+**Signal types:** `starting`, `working`, `needs_input`, `review`, `completing`, `complete`
+
+## Session Lifecycle
+
+```
+Spawn agent
+    |
+    v
+ STARTING   /skill:jat-start
+    | jat-signal working
+    v
+ WORKING  <--> NEEDS INPUT
+    | jat-signal review
+    v
+ REVIEW     Work done, awaiting user
+    | /skill:jat-complete
+    v
+ COMPLETE   Task closed, session ends
+```
+
+To work on another task: spawn a new agent session.
+
+## Completion Workflow
+
+When finishing work:
+
+1. Emit `review` signal
+2. Show "READY FOR REVIEW" with summary
+3. Wait for user to run `/skill:jat-complete`
+4. Complete handles: mail check, verify, commit, close, release, announce
+
+**Never say "Task Complete" until `bd close` has run.**
+
+### Completion Steps (jat-step)
+
+These tools emit progress signals automatically:
+
+```bash
+jat-step verifying --task ID --title TITLE --agent NAME    # 0%
+jat-step committing --task ID --title TITLE --agent NAME   # 20%
+jat-step closing --task ID --title TITLE --agent NAME      # 40%
+jat-step releasing --task ID --title TITLE --agent NAME    # 60%
+jat-step announcing --task ID --title TITLE --agent NAME   # 80%
+jat-step complete --task ID --title TITLE --agent NAME     # 100%
+```
+
+## Available Tools
+
+All tools are bash commands in `~/.local/bin/`. Every tool has `--help`.
+
+### Task Management
+| Tool | Purpose |
+|------|---------|
+| `bd` | Beads CLI for task management |
+| `bd-epic-child` | Set epic-child dependency correctly |
+
+### Agent Mail
+| Tool | Purpose |
+|------|---------|
+| `am-register` | Create agent identity |
+| `am-inbox` | Check messages |
+| `am-send` | Send message |
+| `am-reply` | Reply to message |
+| `am-ack` | Acknowledge message |
+| `am-reserve` | Lock files |
+| `am-release` | Unlock files |
+| `am-reservations` | List locks |
+| `am-search` | Search messages |
+| `am-agents` | List agents |
+| `am-whoami` | Current identity |
+
+### Signals
+| Tool | Purpose |
+|------|---------|
+| `jat-signal` | Emit status signal to IDE |
+| `jat-step` | Emit completion step signal |
+
+### Browser Automation
+| Tool | Purpose |
+|------|---------|
+| `browser-start.js` | Launch Chrome with CDP |
+| `browser-nav.js` | Navigate to URL |
+| `browser-screenshot.js` | Capture screenshot |
+| `browser-eval.js` | Execute JS in page |
+| `browser-pick.js` | Click element |
+| `browser-wait.js` | Wait for condition |
+
+### Database
+| Tool | Purpose |
+|------|---------|
+| `db-query` | Run SQL, returns JSON |
+| `db-schema` | Show table structure |
+| `jat-secret` | Retrieve secrets |
+
+## Commit Messages
+
+Use the task type as prefix:
+
+```bash
+git commit -m "task(jat-abc): Add feature X"
+git commit -m "bug(jat-abc): Fix race condition"
+git commit -m "feat(jat-abc): Implement new endpoint"
+```
+
+## Key Behaviors
+
+- **Always check Agent Mail first** - before starting or completing work
+- **Reserve files before editing** - prevents stepping on other agents
+- **Use task IDs everywhere** - thread_id, reservation reason, commits
+- **Update Beads status** - `in_progress` when working, `closed` when done
+- **Emit signals in order** - starting -> working -> review -> complete
+- **Push to remote** - work is NOT complete until `git push` succeeds

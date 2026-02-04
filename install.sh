@@ -416,6 +416,32 @@ else
     echo "  Run later with: bash $INSTALL_DIR/tools/scripts/install-whisper.sh"
 fi
 
+# Install Pi skills if Pi is available
+INSTALL_PI_SKILLS="no"
+if command -v pi &> /dev/null; then
+    echo ""
+    echo "Pi coding agent detected ($(pi --version 2>/dev/null))."
+    echo "JAT skills enable Pi to participate in multi-agent workflows."
+    echo ""
+    if command -v gum &> /dev/null && [ -t 0 ]; then
+        if gum confirm "Install JAT skills for Pi?"; then
+            INSTALL_PI_SKILLS="yes"
+        fi
+    else
+        if prompt_yes_no "Install JAT skills for Pi? [Y/n] " "y"; then
+            INSTALL_PI_SKILLS="yes"
+        fi
+    fi
+
+    if [ "$INSTALL_PI_SKILLS" = "yes" ]; then
+        bash "$INSTALL_DIR/tools/scripts/install-pi-skills.sh"
+    else
+        echo ""
+        echo "  Skipping Pi skills installation"
+        echo "  Run later with: bash $INSTALL_DIR/tools/scripts/install-pi-skills.sh"
+    fi
+fi
+
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${BOLD}Step 9/9: Setting Up Global Configuration${NC}"
@@ -444,6 +470,9 @@ if [ ! -z "$SELECTED_STACKS" ] && echo "$SELECTED_STACKS" | grep -q "SvelteKit";
 fi
 if [ "$INSTALL_WHISPER" = "yes" ]; then
     echo "  ✓ Voice-to-Text (whisper.cpp + large-v3-turbo model)"
+fi
+if [ "$INSTALL_PI_SKILLS" = "yes" ]; then
+    echo "  ✓ Pi Skills (jat-start, jat-complete, jat-verify + AGENTS.md)"
 fi
 echo "  ✓ Multi-line statusline (agent, task, git, context)"
 echo "  ✓ Real-time hooks (auto-refresh on am-*/bd commands)"

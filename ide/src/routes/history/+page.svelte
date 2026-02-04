@@ -25,6 +25,7 @@
 		id: string;
 		title: string;
 		assignee?: string;
+		created_at: string;
 		updated_at: string;
 		closed_at?: string;
 		priority?: number;
@@ -233,6 +234,43 @@
 		agents: Map<string, number>;
 	}
 
+	function getTaskDuration(task: CompletedTask): number {
+		const end = new Date(task.closed_at || task.updated_at).getTime();
+		const start = new Date(task.created_at).getTime();
+		return Math.max(0, end - start);
+	}
+
+	function formatDuration(ms: number): string {
+		const mins = Math.round(ms / 60000);
+		if (mins < 1) return "<1m";
+		if (mins < 60) return `${mins}m`;
+		const h = Math.floor(mins / 60);
+		const m = mins % 60;
+		return m > 0 ? `${h}h ${m}m` : `${h}h`;
+	}
+
+	/** Position a task on a 24h midnight-to-midnight timeline */
+	function getTimelinePos(task: CompletedTask): { left: number; width: number } {
+		const startDate = new Date(task.created_at);
+		const endDate = new Date(task.closed_at || task.updated_at);
+
+		const endMins = endDate.getHours() * 60 + endDate.getMinutes();
+
+		// If task spans multiple days, clamp start to midnight of completion day
+		const sameDay =
+			startDate.getFullYear() === endDate.getFullYear() &&
+			startDate.getMonth() === endDate.getMonth() &&
+			startDate.getDate() === endDate.getDate();
+		const startMins = sameDay
+			? startDate.getHours() * 60 + startDate.getMinutes()
+			: 0;
+
+		const left = (startMins / 1440) * 100;
+		const width = Math.max(1.2, ((endMins - startMins) / 1440) * 100);
+
+		return { left, width };
+	}
+
 	const tasksByDay = $derived.by(() => {
 		const groups = new Map<string, DayGroup>();
 
@@ -259,6 +297,15 @@
 					(group.agents.get(task.assignee) || 0) + 1,
 				);
 			}
+		}
+
+		// Sort tasks within each day by completion time descending (most recent first)
+		for (const group of groups.values()) {
+			group.tasks.sort((a, b) => {
+				const aTime = new Date(a.closed_at || a.updated_at).getTime();
+				const bTime = new Date(b.closed_at || b.updated_at).getTime();
+				return bTime - aTime;
+			});
 		}
 
 		// Sort by date descending and return all days (not limited to 30)
@@ -477,6 +524,8 @@
 							</div>
 							<div class="day-tasks">
 								{#each day.tasks as task}
+									{@const duration = getTaskDuration(task)}
+									{@const pos = getTimelinePos(task)}
 									<button
 										class="task-item group"
 										onclick={() => handleTaskClick(task.id)}
@@ -525,9 +574,20 @@
 													{/if}
 												</button>
 											{/if}
+										<div class="task-time-col" title="Duration: {formatDuration(duration)}\nCreated: {new Date(task.created_at).toLocaleString()}{task.closed_at ? '\nCompleted: ' + new Date(task.closed_at).toLocaleString() : ''}">
 											<span class="task-time">
-												{formatTime(task.closed_at || task.updated_at)}
+												<span class="task-time-start">{formatTime(task.created_at)}</span>
+												<span class="task-time-sep">-</span>
+												<span class="task-time-end">{formatTime(task.closed_at || task.updated_at)}</span>
 											</span>
+											<div class="task-duration-track">
+												<div class="task-duration-noon"></div>
+												<div
+													class="task-duration-fill"
+													style="left: {pos.left}%; width: {pos.width}%"
+												></div>
+											</div>
+										</div>
 											<svg
 												xmlns="http://www.w3.org/2000/svg"
 												fill="none"
@@ -803,11 +863,62 @@
 		flex-shrink: 0;
 	}
 
+	.task-time-col {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 3px;
+		min-width: 130px;
+	}
+
 	.task-time {
 		font-size: 0.7rem;
 		color: oklch(from var(--color-base-content) l c h / 55%);
-		min-width: 60px;
-		text-align: right;
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		white-space: nowrap;
+	}
+
+	.task-time-start {
+		color: oklch(from var(--color-base-content) l c h / 40%);
+	}
+
+	.task-time-sep {
+		color: oklch(from var(--color-base-content) l c h / 30%);
+	}
+
+	.task-time-end {
+		color: oklch(from var(--color-base-content) l c h / 60%);
+	}
+
+	.task-duration-track {
+		position: relative;
+		width: 100%;
+		height: 3px;
+		background: oklch(from var(--color-base-content) l c h / 6%);
+		border-radius: 1.5px;
+	}
+
+	.task-duration-noon {
+		position: absolute;
+		left: 50%;
+		top: 0;
+		width: 1px;
+		height: 100%;
+		background: oklch(from var(--color-base-content) l c h / 10%);
+	}
+
+	.task-duration-fill {
+		position: absolute;
+		top: 0;
+		height: 100%;
+		border-radius: 1.5px;
+		background: linear-gradient(
+			90deg,
+			oklch(from var(--color-info) l c h / 50%),
+			oklch(from var(--color-info) l c h / 75%)
+		);
 	}
 
 	.task-arrow {

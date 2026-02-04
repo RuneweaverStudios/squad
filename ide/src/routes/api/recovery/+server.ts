@@ -90,7 +90,8 @@ function findSessionIdFromJsonl(agentName: string, projectPath: string): { sessi
 
 interface RecoverableSession {
 	agentName: string;
-	sessionId: string;
+	sessionId: string | null;  // null = orphaned (no session file found)
+	resumable: boolean;         // true = can resume with claude -r, false = needs restart
 	taskId: string;
 	taskTitle: string;
 	taskPriority: number;
@@ -275,17 +276,17 @@ export const GET: RequestHandler = async ({ url }) => {
 					sessionInfo = findSessionIdFromJsonl(agentName, projectPath) || undefined;
 				}
 
-				if (!sessionInfo) continue;
-
+				// Include task even without session ID - it's still "paused" (orphaned)
 				recoverable.push({
 					agentName,
-					sessionId: sessionInfo.sessionId,
+					sessionId: sessionInfo?.sessionId || null,
+					resumable: !!sessionInfo,
 					taskId: task.id,
 					taskTitle: task.title,
 					taskPriority: task.priority,
 					project: getProjectFromTaskId(task.id),
 					projectPath,
-					lastActivity: sessionInfo.lastActivity
+					lastActivity: sessionInfo?.lastActivity || new Date().toISOString()
 				});
 			}
 		}
@@ -350,20 +351,20 @@ export const POST: RequestHandler = async ({ request, url, fetch }) => {
 					sessionInfo = findSessionIdFromJsonl(agentName, projectPath) || undefined;
 				}
 
-				if (!sessionInfo) continue;
-
 				// If specific sessions requested, filter
 				if (specificSessions && !specificSessions.includes(agentName)) continue;
 
+				// Include task even without session ID - it's still "paused" (orphaned)
 				recoverable.push({
 					agentName,
-					sessionId: sessionInfo.sessionId,
+					sessionId: sessionInfo?.sessionId || null,
+					resumable: !!sessionInfo,
 					taskId: task.id,
 					taskTitle: task.title,
 					taskPriority: task.priority,
 					project: getProjectFromTaskId(task.id),
 					projectPath,
-					lastActivity: sessionInfo.lastActivity
+					lastActivity: sessionInfo?.lastActivity || new Date().toISOString()
 				});
 			}
 		}
@@ -380,8 +381,11 @@ export const POST: RequestHandler = async ({ request, url, fetch }) => {
 		}> = [];
 		const staggerMs = 3000; // 3 seconds between recoveries
 
-		for (let i = 0; i < recoverable.length; i++) {
-			const session = recoverable[i];
+		// Only attempt to resume sessions that have a session ID
+		const resumableSessions = recoverable.filter(s => s.resumable);
+
+		for (let i = 0; i < resumableSessions.length; i++) {
+			const session = resumableSessions[i];
 
 			try {
 				// Call the existing resume API with project path for reliable lookup
@@ -428,7 +432,7 @@ export const POST: RequestHandler = async ({ request, url, fetch }) => {
 			}
 
 			// Stagger between recoveries (except for last one)
-			if (i < recoverable.length - 1) {
+			if (i < resumableSessions.length - 1) {
 				await new Promise((resolve) => setTimeout(resolve, staggerMs));
 			}
 		}

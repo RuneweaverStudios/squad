@@ -4,21 +4,28 @@
 	 *
 	 * Multi-step drawer wizard for configuring an ingest source.
 	 * Steps vary by source type:
-	 *   RSS:      URL -> Project -> Options -> Review
-	 *   Slack:    Secret -> Channel -> Project -> Options -> Review
-	 *   Telegram: Secret -> Chat ID -> Project -> Options -> Review
-	 *   Custom:   Command -> Project -> Options -> Review
+	 *   RSS:      URL -> Project -> Options -> [Filters] -> Review
+	 *   Slack:    Secret -> Channel -> Project -> Options -> [Filters] -> Review
+	 *   Telegram: Secret -> Chat ID -> Project -> Options -> [Filters] -> Review
+	 *   Gmail:    App Password -> Settings -> Project -> Options -> [Filters] -> Review
+	 *   Custom:   Command -> Project -> Options -> [Filters] -> Review
+	 *   Plugin:   Configuration -> Project -> Options -> [Filters] -> Review
+	 *
+	 * [Filters] step appears when plugin metadata includes itemFields.
+	 * Plugin Configuration step uses DynamicConfigForm for dynamic field rendering.
 	 */
 
 	import { fly, fade } from 'svelte/transition';
 	import { getProjects } from '$lib/stores/configStore.svelte';
 	import ProjectSelector from '$lib/components/ProjectSelector.svelte';
+	import DynamicConfigForm from '$lib/components/integrations/DynamicConfigForm.svelte';
+	import FilterBuilder from '$lib/components/integrations/FilterBuilder.svelte';
 
 	interface Props {
 		open: boolean;
 		sourceType: string | null;
 		editSource?: any | null;
-		pluginMetadata?: { configFields?: any[]; name?: string; type?: string } | null;
+		pluginMetadata?: { configFields?: any[]; itemFields?: any[]; defaultFilter?: any[]; name?: string; type?: string } | null;
 		onClose: () => void;
 		onSave: (source: any) => void;
 	}
@@ -82,6 +89,9 @@
 	let pluginTokenInputs = $state<Record<string, string>>({});
 	let pluginShowTokenInput = $state<Record<string, boolean>>({});
 
+	// Filter conditions
+	let filterConditions = $state<Array<{ field: string; operator: string; value: any }>>([]);
+
 	// Token auth state (shared by Slack and Telegram)
 	let secretStatus = $state<'checking' | 'found' | 'missing' | 'saving' | 'error'>('checking');
 	let secretMasked = $state('');
@@ -94,19 +104,32 @@
 	const projects = $derived(getProjects());
 	const projectNames = $derived(projects.map(p => p.name?.toLowerCase() || p.path?.split('/').pop() || '').filter(Boolean));
 
-	// Steps per type
-	const builtinStepConfigs: Record<string, string[]> = {
-		rss: ['Feed URL', 'Project', 'Options', 'Review'],
-		slack: ['Slack Token', 'Channel', 'Project', 'Options', 'Review'],
-		telegram: ['Bot Token', 'Chat', 'Project', 'Options', 'Review'],
-		gmail: ['App Password', 'Gmail Settings', 'Project', 'Options', 'Review'],
-		custom: ['Command', 'Project', 'Options', 'Review']
-	};
+	// Whether itemFields are available (enables Filters step)
+	const hasItemFields = $derived(pluginMetadata?.itemFields && pluginMetadata.itemFields.length > 0);
 
-	// For plugins: Configuration -> Project -> Options -> Review
+	// Steps per type - Filters step added when itemFields available
+	const builtinStepConfigs = $derived.by(() => {
+		const base: Record<string, string[]> = {
+			rss: ['Feed URL', 'Project', 'Options'],
+			slack: ['Slack Token', 'Channel', 'Project', 'Options'],
+			telegram: ['Bot Token', 'Chat', 'Project', 'Options'],
+			gmail: ['App Password', 'Gmail Settings', 'Project', 'Options'],
+			custom: ['Command', 'Project', 'Options']
+		};
+		// Add Filters step before Review when itemFields are available
+		for (const key of Object.keys(base)) {
+			if (hasItemFields) base[key].push('Filters');
+			base[key].push('Review');
+		}
+		return base;
+	});
+
+	// For plugins: Configuration -> Project -> Options -> [Filters] -> Review
 	const pluginSteps = $derived.by(() => {
-		if (!isPluginType || !pluginMetadata?.configFields?.length) return ['Configuration', 'Project', 'Options', 'Review'];
-		return ['Configuration', 'Project', 'Options', 'Review'];
+		const steps = ['Configuration', 'Project', 'Options'];
+		if (hasItemFields) steps.push('Filters');
+		steps.push('Review');
+		return steps;
 	});
 
 	const steps = $derived(sourceType ? (isPluginType ? pluginSteps : builtinStepConfigs[sourceType] || []) : []);
@@ -213,6 +236,9 @@
 			pluginTokenInputs = {};
 			pluginShowTokenInput = {};
 
+			// Reset filter conditions (initialize from defaultFilter if available)
+			filterConditions = pluginMetadata?.defaultFilter ? [...pluginMetadata.defaultFilter] : [];
+
 			// Initialize plugin fields with defaults
 			if (isPluginType && pluginMetadata?.configFields) {
 				for (const field of pluginMetadata.configFields) {
@@ -297,6 +323,11 @@
 			}
 			pluginFields = { ...pluginFields };
 		}
+
+		// Populate filter conditions from edit source
+		if (src.filter && Array.isArray(src.filter)) {
+			filterConditions = [...src.filter];
+		}
 	}
 
 	function generateId(): string {
@@ -375,6 +406,32 @@
 			if (type === 'gmail') {
 				body.imapUser = gmailImapUser.trim();
 				body.folder = gmailFolder.trim() || 'INBOX';
+			}
+			const res = await fetch('/api/integrations/verify', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(body)
+			});
+			testResult = await res.json();
+		} catch {
+			testResult = { success: false, error: 'Failed to connect to verification endpoint' };
+		}
+		testingConnection = false;
+	}
+
+	async function testPluginConnection() {
+		testingConnection = true;
+		testResult = null;
+		try {
+			// Build body from plugin fields + type
+			const body: Record<string, any> = { type: sourceType };
+			if (pluginMetadata?.configFields) {
+				for (const field of pluginMetadata.configFields) {
+					const val = pluginFields[field.key];
+					if (val !== undefined && val !== null && val !== '') {
+						body[field.key] = val;
+					}
+				}
 			}
 			const res = await fetch('/api/integrations/verify', {
 				method: 'POST',
@@ -717,6 +774,11 @@
 			source = { ...base, command: customCommand.trim() };
 		}
 
+		// Add filter conditions if any
+		if (filterConditions.length > 0) {
+			source.filter = filterConditions;
+		}
+
 		try {
 			onSave(source);
 		} catch (err) {
@@ -847,7 +909,11 @@
 						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
 							{@render optionsStep()}
 						</div>
-					{:else if step === 3}
+					{:else if steps[step] === 'Filters'}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render filtersStep()}
+						</div>
+					{:else if steps[step] === 'Review'}
 						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
 							{@render reviewStep()}
 						</div>
@@ -976,7 +1042,11 @@
 						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
 							{@render optionsStep()}
 						</div>
-					{:else if step === 4}
+					{:else if steps[step] === 'Filters'}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render filtersStep()}
+						</div>
+					{:else if steps[step] === 'Review'}
 						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
 							{@render reviewStep()}
 						</div>
@@ -1117,7 +1187,11 @@
 						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
 							{@render optionsStep()}
 						</div>
-					{:else if step === 4}
+					{:else if steps[step] === 'Filters'}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render filtersStep()}
+						</div>
+					{:else if steps[step] === 'Review'}
 						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
 							{@render reviewStep()}
 						</div>
@@ -1228,7 +1302,11 @@
 						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
 							{@render optionsStep()}
 						</div>
-					{:else if step === 4}
+					{:else if steps[step] === 'Filters'}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render filtersStep()}
+						</div>
+					{:else if steps[step] === 'Review'}
 						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
 							{@render reviewStep()}
 						</div>
@@ -1260,7 +1338,11 @@
 						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
 							{@render optionsStep()}
 						</div>
-					{:else if step === 3}
+					{:else if steps[step] === 'Filters'}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render filtersStep()}
+						</div>
+					{:else if steps[step] === 'Review'}
 						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
 							{@render reviewStep()}
 						</div>
@@ -1271,10 +1353,83 @@
 				{#if isPluginType}
 					{#if step === 0}
 						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
-							{#if pluginMetadata?.configFields}
-								{#each pluginMetadata.configFields as field}
-									{@render pluginFieldInput(field)}
-								{/each}
+							{#if pluginMetadata?.configFields && pluginMetadata.configFields.length > 0}
+								<DynamicConfigForm
+									configFields={pluginMetadata.configFields}
+									values={pluginFields}
+									onValueChange={(key, value) => { pluginFields[key] = value; pluginFields = { ...pluginFields }; }}
+									secretStatus={pluginSecretStatus}
+									secretMasked={pluginSecretMasked}
+									tokenInputs={pluginTokenInputs}
+									showTokenInput={pluginShowTokenInput}
+									onCheckSecret={(fieldKey, secretName) => checkPluginSecret(fieldKey, secretName)}
+									onSaveToken={(fieldKey, secretName, token) => savePluginToken(fieldKey, secretName, token)}
+									onToggleTokenInput={(fieldKey, show) => { pluginShowTokenInput[fieldKey] = show; pluginShowTokenInput = { ...pluginShowTokenInput }; }}
+									onTokenInputChange={(fieldKey, value) => { pluginTokenInputs[fieldKey] = value; pluginTokenInputs = { ...pluginTokenInputs }; }}
+								/>
+
+								<!-- Test Connection for dynamic plugins -->
+								{@const allSecretsReady = pluginMetadata.configFields
+									.filter((f: any) => f.type === 'secret')
+									.every((f: any) => pluginSecretStatus[f.key] === 'found')}
+								{@const allRequiredFilled = pluginMetadata.configFields
+									.filter((f: any) => f.required && f.type !== 'secret')
+									.every((f: any) => {
+										const val = pluginFields[f.key];
+										return val !== undefined && val !== null && (typeof val !== 'string' || val.trim() !== '');
+									})}
+								{#if allSecretsReady && allRequiredFilled}
+									<div class="space-y-2 pt-2" style="border-top: 1px solid oklch(0.22 0.02 250);">
+										<button
+											class="font-mono text-[11px] px-3 py-1.5 rounded-lg flex items-center gap-2"
+											style="background: oklch(0.22 0.04 220); color: oklch(0.75 0.10 220); border: 1px solid oklch(0.32 0.06 220);"
+											onclick={() => testPluginConnection()}
+											disabled={testingConnection}
+										>
+											{#if testingConnection}
+												<span class="loading loading-spinner loading-xs"></span>
+												Testing...
+											{:else}
+												<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+													<path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H4.28a.75.75 0 00-.75.75v3.955a.75.75 0 001.5 0v-2.134l.235.234a7 7 0 0011.712-3.138.75.75 0 00-1.449-.388zm1.7-5.69a.75.75 0 00-.987-.565 7 7 0 00-11.712 3.138.75.75 0 001.449.388 5.5 5.5 0 019.2-2.466l.313.311h-2.433a.75.75 0 000 1.5H15.8a.75.75 0 00.75-.75V3.778a.75.75 0 00-.538-.044z" clip-rule="evenodd" />
+												</svg>
+												Test Connection
+											{/if}
+										</button>
+
+										{#if testResult}
+											{#if testResult.success}
+												<div
+													class="px-3 py-2 rounded-lg"
+													style="background: oklch(0.20 0.06 145 / 0.2); border: 1px solid oklch(0.30 0.08 145);"
+												>
+													<p class="font-mono text-[11px]" style="color: oklch(0.75 0.10 145);">
+														{testResult.info?.message || 'Connection successful'}
+													</p>
+													{#if testResult.sampleItems?.length}
+														<div class="mt-2 space-y-1">
+															<p class="font-mono text-[10px]" style="color: oklch(0.55 0.02 250);">Sample items:</p>
+															{#each testResult.sampleItems.slice(0, 3) as item}
+																<p class="font-mono text-[10px] truncate" style="color: oklch(0.65 0.02 250);">
+																	{item.title}
+																</p>
+															{/each}
+														</div>
+													{/if}
+												</div>
+											{:else}
+												<div
+													class="px-3 py-2 rounded-lg"
+													style="background: oklch(0.20 0.10 25 / 0.2); border: 1px solid oklch(0.30 0.12 25);"
+												>
+													<p class="font-mono text-[11px]" style="color: oklch(0.75 0.10 25);">
+														{testResult.error || 'Connection failed'}
+													</p>
+												</div>
+											{/if}
+										{/if}
+									</div>
+								{/if}
 							{:else}
 								<p class="font-mono text-xs" style="color: oklch(0.50 0.02 250);">
 									No configuration fields defined for this plugin.
@@ -1289,7 +1444,11 @@
 						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
 							{@render optionsStep()}
 						</div>
-					{:else if step === 3}
+					{:else if steps[step] === 'Filters'}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render filtersStep()}
+						</div>
+					{:else if steps[step] === 'Review'}
 						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
 							{@render reviewStep()}
 						</div>
@@ -1733,6 +1892,15 @@
 					{/if}
 				{/each}
 			{/if}
+
+			<!-- Filter conditions -->
+			{#if filterConditions.length > 0}
+				{@render reviewRow('Filters', `${filterConditions.length} condition${filterConditions.length > 1 ? 's' : ''}`)}
+				{#each filterConditions as cond}
+					{@const fieldMeta = pluginMetadata?.itemFields?.find((f: any) => f.key === cond.field)}
+					{@render reviewRow('', `${fieldMeta?.label || cond.field} ${cond.operator.replace(/_/g, ' ')} ${String(cond.value)}`)}
+				{/each}
+			{/if}
 		</div>
 	</div>
 {/snippet}
@@ -1867,6 +2035,23 @@
 			<p class="font-mono text-[10px] mt-1.5" style="color: oklch(0.45 0.02 250);">
 				{field.helpText}
 			</p>
+		{/if}
+	</div>
+{/snippet}
+
+{#snippet filtersStep()}
+	<div class="space-y-3">
+		<h3 class="font-mono text-xs font-semibold" style="color: oklch(0.70 0.02 250);">Item Filters</h3>
+		<p class="font-mono text-[10px]" style="color: oklch(0.45 0.02 250);">
+			Configure conditions to filter which items are ingested. Leave empty to ingest all items.
+		</p>
+		{#if pluginMetadata?.itemFields && pluginMetadata.itemFields.length > 0}
+			<FilterBuilder
+				itemFields={pluginMetadata.itemFields}
+				conditions={filterConditions}
+				defaultFilter={pluginMetadata.defaultFilter}
+				onConditionsChange={(conditions) => { filterConditions = conditions; }}
+			/>
 		{/if}
 	</div>
 {/snippet}

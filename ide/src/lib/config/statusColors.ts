@@ -437,6 +437,7 @@ export type SessionState =
 	| 'polishing'
 	| 'ready'
 	| 'paused'
+	| 'orphaned'
 	| 'idle';
 
 export interface SessionStateVisual {
@@ -690,6 +691,21 @@ export const SESSION_STATE_VISUALS: Record<string, SessionStateVisual> = {
 		bgTint: 'oklch(0.65 0.18 300 / 0.08)',
 		glow: 'oklch(0.65 0.18 300 / 0.3)',
 		icon: 'M14.25 9v6m-4.5 0V9M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+	},
+	orphaned: {
+		label: '⚠ ORPHANED',
+		shortLabel: '⚠ Orphaned',
+		iconType: 'circle',
+		description: 'Session crashed - needs restart',
+		// StatusActionBadge colors - orange/amber for orphaned state
+		bgColor: 'oklch(0.55 0.15 55 / 0.25)',
+		textColor: 'oklch(0.80 0.15 55)',
+		borderColor: 'oklch(0.55 0.15 55 / 0.4)',
+		// SessionCard accent colors
+		accent: 'oklch(0.70 0.18 55)',
+		bgTint: 'oklch(0.70 0.18 55 / 0.08)',
+		glow: 'oklch(0.70 0.18 55 / 0.3)',
+		icon: 'M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z'
 	},
 	ready: {
 		label: '🚀 START',
@@ -1078,6 +1094,29 @@ export const SESSION_STATE_ACTIONS: Record<string, SessionStateAction[]> = {
 			icon: 'M6 18L18 6M6 6l12 12',
 			variant: 'error',
 			description: 'Terminate tmux session'
+		}
+	],
+	orphaned: [
+		{
+			id: 'restart',
+			label: 'Restart Task',
+			icon: 'M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M2.985 19.644l3.181-3.182',
+			variant: 'success',
+			description: 'Spawn a new agent for this task'
+		},
+		{
+			id: 'view-task',
+			label: 'View Task',
+			icon: 'M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
+			variant: 'default',
+			description: 'Open task details'
+		},
+		{
+			id: 'unassign',
+			label: 'Unassign Task',
+			icon: 'M22 10.5h-6m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z',
+			variant: 'warning',
+			description: 'Remove assignee and set task to open'
 		}
 	],
 	idle: [

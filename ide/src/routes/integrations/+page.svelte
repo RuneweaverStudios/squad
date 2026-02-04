@@ -289,9 +289,12 @@
 		setTimeout(() => { installResult = null; }, 5000);
 	}
 
-	function openWizard(type: string) {
+	async function openWizard(type: string) {
 		wizardType = type;
-		wizardPluginMetadata = null;
+		// Look up plugin metadata for itemFields/defaultFilter (even for built-in types)
+		if (!pluginsFetched) await fetchPlugins();
+		const plugin = plugins.find(p => p.type === type);
+		wizardPluginMetadata = plugin ? { configFields: plugin.configFields, itemFields: plugin.itemFields, defaultFilter: plugin.defaultFilter, name: plugin.name, type: plugin.type } : null;
 		editSource = null;
 		wizardOpen = true;
 	}
@@ -300,7 +303,7 @@
 		wizardType = pluginType;
 		// Find the plugin metadata to pass to the wizard
 		const plugin = plugins.find(p => p.type === pluginType);
-		wizardPluginMetadata = plugin ? { configFields: plugin.configFields, name: plugin.name, type: plugin.type } : null;
+		wizardPluginMetadata = plugin ? { configFields: plugin.configFields, itemFields: plugin.itemFields, defaultFilter: plugin.defaultFilter, name: plugin.name, type: plugin.type } : null;
 		editSource = null;
 		wizardOpen = true;
 		activeTab = 'installed';
@@ -308,16 +311,10 @@
 
 	async function openEdit(source: any) {
 		wizardType = source.type;
-		// Look up plugin metadata for plugin-type sources
-		const BUILTIN_TYPES = ['rss', 'slack', 'telegram', 'gmail', 'custom'];
-		if (!BUILTIN_TYPES.includes(source.type)) {
-			// Fetch plugins if not yet loaded
-			if (!pluginsFetched) await fetchPlugins();
-			const plugin = plugins.find(p => p.type === source.type);
-			wizardPluginMetadata = plugin ? { configFields: plugin.configFields, name: plugin.name, type: plugin.type } : null;
-		} else {
-			wizardPluginMetadata = null;
-		}
+		// Look up plugin metadata for itemFields/defaultFilter (all types, including built-in)
+		if (!pluginsFetched) await fetchPlugins();
+		const plugin = plugins.find(p => p.type === source.type);
+		wizardPluginMetadata = plugin ? { configFields: plugin.configFields, itemFields: plugin.itemFields, defaultFilter: plugin.defaultFilter, name: plugin.name, type: plugin.type } : null;
 		editSource = source;
 		wizardOpen = true;
 	}
