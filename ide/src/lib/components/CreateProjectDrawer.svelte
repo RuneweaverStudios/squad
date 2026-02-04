@@ -15,7 +15,7 @@
 	import { tick } from 'svelte';
 	import { isProjectDrawerOpen, closeProjectDrawer, signalProjectCreated } from '$lib/stores/drawerStore';
 	import { playSuccessChime, playErrorSound } from '$lib/utils/soundEffects';
-	import { invalidateAll } from '$app/navigation';
+	import { invalidateAll, goto } from '$app/navigation';
 
 	// Props
 	interface Props {
@@ -861,7 +861,15 @@
 								<button
 									type="button"
 									class="btn btn-sm btn-ghost"
-									onclick={() => { resetForm(); closeProjectDrawer(); }}
+									onclick={() => {
+									const project = createdProjectKey;
+									resetForm();
+									closeProjectDrawer();
+									if (project) {
+										localStorage.setItem('tasks3-selected-project', project);
+									}
+									goto('/tasks');
+								}}
 								>
 									Done
 								</button>
@@ -871,7 +879,8 @@
 				</div>
 			</form>
 
-			<!-- Footer -->
+			<!-- Footer (hidden after successful creation) -->
+			{#if !successMessage}
 			<div
 				class="p-6"
 				style="
@@ -903,6 +912,7 @@
 					</button>
 				</div>
 			</div>
+			{/if}
 		</div>
 	</div>
 </div>

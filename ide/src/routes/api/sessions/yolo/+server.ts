@@ -15,7 +15,23 @@ import { getJatDefaults } from '$lib/server/projectPaths.js';
 const execAsync = promisify(exec);
 
 export async function POST() {
+	const manualCommand = 'claude --dangerously-skip-permissions';
+
 	try {
+		// Check tmux is installed
+		try {
+			await execAsync('which tmux');
+		} catch {
+			const installHint = process.platform === 'darwin'
+				? 'Install with: brew install tmux'
+				: 'Install with: sudo apt install tmux (Debian/Ubuntu) or sudo pacman -S tmux (Arch)';
+			return json({
+				error: 'tmux is not installed',
+				message: `tmux is required to launch a session. ${installHint}`,
+				manualCommand
+			}, { status: 400 });
+		}
+
 		const jatDefaults = await getJatDefaults();
 		const sessionName = `jat-yolo-${Date.now()}`;
 		const projectPath = process.cwd().replace('/ide', '');
@@ -40,7 +56,8 @@ export async function POST() {
 			return json({
 				error: 'Failed to create session',
 				message: errorMessage,
-				sessionName
+				sessionName,
+				manualCommand
 			}, { status: 500 });
 		}
 
@@ -59,7 +76,13 @@ export async function POST() {
 					terminal = existsSync('/Applications/iTerm.app') ? 'iterm2' : 'apple-terminal';
 				}
 			} else {
-				terminal = 'alacritty';  // Will be detected below
+				try {
+					const { stdout: whichResult } = await execAsync('which ghostty alacritty kitty gnome-terminal konsole xterm 2>/dev/null | head -1 || true');
+					const detected = whichResult.trim().split('/').pop();
+					terminal = detected || 'xterm';
+				} catch {
+					terminal = 'xterm';
+				}
 			}
 		}
 
@@ -129,8 +152,9 @@ export async function POST() {
 			return json({
 				success: true,
 				sessionName,
-				message: `Session created but could not open terminal. Run: tmux attach-session -t ${sessionName}`,
-				manualAttach: true
+				message: `Session created but could not open terminal.`,
+				manualAttach: true,
+				manualCommand: `tmux attach-session -t ${sessionName}`
 			});
 		}
 
@@ -143,7 +167,8 @@ export async function POST() {
 		console.error('Error in POST /api/sessions/yolo:', error);
 		return json({
 			error: 'Internal server error',
-			message: error instanceof Error ? error.message : String(error)
+			message: error instanceof Error ? error.message : String(error),
+			manualCommand
 		}, { status: 500 });
 	}
 }

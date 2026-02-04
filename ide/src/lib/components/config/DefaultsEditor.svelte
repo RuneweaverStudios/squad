@@ -62,6 +62,8 @@
 	let newIgnoredDir = $state('');
 	let launchingYolo = $state(false);
 	let savingSkipPermissions = $state(false);
+	let yoloInfoMessage = $state<string | null>(null);
+	let yoloManualCommand = $state<string | null>(null);
 
 	// Track if form has changes
 	let originalValues = $state<JatDefaults | null>(null);
@@ -390,26 +392,49 @@
 	async function launchYoloSession() {
 		launchingYolo = true;
 		error = null;
+		yoloInfoMessage = null;
+		yoloManualCommand = null;
 
+		let response: Response;
 		try {
-			const response = await fetch('/api/sessions/yolo', {
+			response = await fetch('/api/sessions/yolo', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' }
 			});
-
-			const data = await response.json();
-
-			if (!response.ok) {
-				throw new Error(data.error || 'Failed to launch session');
-			}
-
-			success = 'Claude session launched! Accept the permissions warning in your terminal, then enable the toggle here.';
-			setTimeout(() => { success = null; }, 8000);
-		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to launch session';
-		} finally {
+		} catch {
+			error = 'Could not connect to the IDE server. Is it running?';
+			yoloManualCommand = 'claude --dangerously-skip-permissions';
 			launchingYolo = false;
+			return;
 		}
+
+		let data: Record<string, unknown>;
+		try {
+			data = await response.json();
+		} catch {
+			error = `Server error (${response.status}). The server returned an unexpected response.`;
+			yoloManualCommand = 'claude --dangerously-skip-permissions';
+			launchingYolo = false;
+			return;
+		}
+
+		if (!response.ok) {
+			error = (data.message as string) || (data.error as string) || 'Failed to launch session';
+			yoloManualCommand = (data.manualCommand as string) || 'claude --dangerously-skip-permissions';
+			launchingYolo = false;
+			return;
+		}
+
+		if (data.manualAttach) {
+			yoloInfoMessage = 'Session created, but a terminal window could not be opened automatically.';
+			yoloManualCommand = (data.manualCommand as string) || null;
+			launchingYolo = false;
+			return;
+		}
+
+		success = 'Claude session launched! Accept the permissions warning in your terminal, then enable the toggle here.';
+		setTimeout(() => { success = null; }, 8000);
+		launchingYolo = false;
 	}
 
 	/**
@@ -667,6 +692,32 @@
 								{/if}
 							</button>
 						</div>
+
+						{#if yoloInfoMessage}
+							<div class="alert alert-info">
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="alert-icon">
+									<circle cx="12" cy="12" r="10"/>
+									<path d="M12 16v-4M12 8h.01"/>
+								</svg>
+								<span>{yoloInfoMessage}</span>
+							</div>
+						{/if}
+
+						{#if yoloManualCommand}
+							<div class="manual-fallback">
+								<span class="manual-fallback-label">Run this in your terminal instead:</span>
+								<!-- svelte-ignore a11y_click_events_have_key_events -->
+								<!-- svelte-ignore a11y_no_static_element_interactions -->
+								<code class="manual-fallback-cmd" onclick={(e) => {
+									const el = e.currentTarget as HTMLElement;
+									const range = document.createRange();
+									range.selectNodeContents(el);
+									const sel = window.getSelection();
+									sel?.removeAllRanges();
+									sel?.addRange(range);
+								}}>{yoloManualCommand}</code>
+							</div>
+						{/if}
 					</div>
 				{/if}
 
@@ -1198,6 +1249,46 @@
 		background: oklch(0.25 0.08 145);
 		border: 1px solid oklch(0.40 0.12 145);
 		color: oklch(0.85 0.10 145);
+	}
+
+	.alert-info {
+		background: oklch(0.25 0.08 230);
+		border: 1px solid oklch(0.40 0.12 230);
+		color: oklch(0.85 0.10 230);
+	}
+
+	.manual-fallback {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		padding: 0.75rem 1rem;
+		background: oklch(0.14 0.02 250);
+		border: 1px solid oklch(0.28 0.02 250);
+		border-radius: 8px;
+	}
+
+	.manual-fallback-label {
+		font-size: 0.8rem;
+		color: oklch(0.60 0.02 250);
+	}
+
+	.manual-fallback-cmd {
+		display: block;
+		padding: 0.5rem 0.75rem;
+		background: oklch(0.10 0.02 250);
+		border: 1px solid oklch(0.25 0.02 250);
+		border-radius: 6px;
+		font-size: 0.85rem;
+		font-family: ui-monospace, monospace;
+		color: oklch(0.85 0.10 200);
+		cursor: pointer;
+		user-select: all;
+		word-break: break-all;
+	}
+
+	.manual-fallback-cmd:hover {
+		background: oklch(0.12 0.02 250);
+		border-color: oklch(0.35 0.08 200);
 	}
 
 	.alert-icon {
