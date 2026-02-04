@@ -23,6 +23,9 @@ import { join } from 'path';
 
 export const GET: RequestHandler = async ({ url }) => {
 	const projectName = url.searchParams.get('project');
+	if (!projectName) {
+		throw error(400, 'Missing required parameter: project');
+	}
 	const filePath = url.searchParams.get('path');
 	const staged = url.searchParams.get('staged') === 'true';
 	const baseline = url.searchParams.get('baseline'); // New: baseline commit for comparison

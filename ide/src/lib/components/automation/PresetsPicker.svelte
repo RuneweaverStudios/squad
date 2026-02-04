@@ -497,7 +497,7 @@
 			<footer class="flex justify-end gap-3 px-5 py-4 bg-base-300 border-t border-base-300">
 				<button class="py-2 px-5 text-sm font-mono font-medium rounded-md cursor-pointer transition-all duration-150 bg-transparent border border-base-content/30 text-base-content/70 hover:bg-base-100 hover:border-base-content/40" onclick={closePreview}> Close </button>
 				{#if installedPresets.has(previewPreset.id)}
-					<button class="flex items-center gap-2 py-2 px-4 text-sm font-mono font-medium rounded-md cursor-pointer transition-all duration-150 bg-error/20 border border-error/30 text-error hover:bg-error/30" onclick={() => { uninstallPreset(previewPreset); closePreview(); }}>
+					<button class="flex items-center gap-2 py-2 px-4 text-sm font-mono font-medium rounded-md cursor-pointer transition-all duration-150 bg-error/20 border border-error/30 text-error hover:bg-error/30" onclick={() => { if (previewPreset) uninstallPreset(previewPreset); closePreview(); }}>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
 							fill="none"

@@ -204,7 +204,7 @@ export async function GET({ url, locals }) {
 			return json({ agents });
 		} catch (error) {
 			locals.logger?.error({ error }, 'Failed to fetch simple agent list');
-			perf.end({ error: error.message, mode: 'simple' });
+			perf.end({ error: /** @type {Error} */ (error).message, mode: 'simple' });
 			return json({ error: 'Failed to fetch agents', agents: [] }, { status: 500 });
 		}
 	}

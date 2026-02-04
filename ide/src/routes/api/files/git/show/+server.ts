@@ -18,6 +18,9 @@ interface FileChange {
 
 export const GET: RequestHandler = async ({ url }) => {
 	const projectName = url.searchParams.get('project');
+	if (!projectName) {
+		throw error(400, 'Missing required parameter: project');
+	}
 	const commitHash = url.searchParams.get('hash');
 
 	if (!commitHash) {

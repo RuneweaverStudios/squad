@@ -2,10 +2,9 @@
 	/**
 	 * Integrations Page
 	 *
-	 * Template cards for adding RSS, Slack, Telegram, or Custom integration sources.
-	 * Shows existing configured sources with edit/delete/toggle.
-	 * Launches wizard drawer for setup.
+	 * Two-tab layout: Installed (configured sources) and Available (discovered plugins).
 	 * Service bar for start/stop/restart of the ingest daemon.
+	 * Launches wizard drawer for setup.
 	 */
 
 	import { onMount, onDestroy } from 'svelte';
@@ -14,10 +13,24 @@
 	import TaskDetailDrawer from '$lib/components/TaskDetailDrawer.svelte';
 	import { loadProjects } from '$lib/stores/configStore.svelte';
 
+	// Page-level tab
+	let activeTab = $state<'installed' | 'available'>('installed');
+
 	// State
 	let sources: any[] = $state([]);
 	let loading = $state(true);
 	let error = $state('');
+
+	// Available plugins state
+	let plugins: any[] = $state([]);
+	let pluginsLoading = $state(false);
+	let pluginsError = $state('');
+	let pluginsFetched = $state(false);
+
+	// Install from git state
+	let installUrl = $state('');
+	let installing = $state(false);
+	let installResult = $state<{ success: boolean; message: string } | null>(null);
 
 	// Audit expand/collapse state
 	let expandedSource = $state<string | null>(null);
@@ -96,6 +109,11 @@
 		}
 	];
 
+	// Derived
+	let enabledCount = $derived(sources.filter((s) => s.enabled).length);
+	let builtinPlugins = $derived(plugins.filter((p) => p.isBuiltin));
+	let userPlugins = $derived(plugins.filter((p) => !p.isBuiltin));
+
 	onMount(async () => {
 		await Promise.all([fetchSources(), loadProjects(), fetchServiceStatus(), fetchAutoStart(), fetchStats()]);
 		serviceInterval = setInterval(fetchServiceStatus, 5000);
@@ -105,6 +123,13 @@
 	onDestroy(() => {
 		if (serviceInterval) clearInterval(serviceInterval);
 		if (statsInterval) clearInterval(statsInterval);
+	});
+
+	// Fetch available plugins when switching to Available tab
+	$effect(() => {
+		if (activeTab === 'available' && !pluginsFetched) {
+			fetchPlugins();
+		}
 	});
 
 	async function fetchServiceStatus() {
@@ -122,7 +147,6 @@
 		} catch {
 			// Keep current status on network error
 		}
-		// Clear action state once service matches expected state
 		if (serviceAction === 'starting' && serviceStatus === 'running') serviceAction = null;
 		if (serviceAction === 'stopping' && serviceStatus === 'stopped') serviceAction = null;
 		if (serviceAction === 'restarting' && serviceStatus === 'running') serviceAction = null;
@@ -207,9 +231,6 @@
 		}
 	}
 
-	// Derived
-	let enabledCount = $derived(sources.filter((s) => s.enabled).length);
-
 	async function fetchSources() {
 		loading = true;
 		try {
@@ -224,10 +245,60 @@
 		loading = false;
 	}
 
+	async function fetchPlugins() {
+		pluginsLoading = true;
+		pluginsError = '';
+		try {
+			const resp = await fetch('/api/integrations/available');
+			const data = await resp.json();
+			if (data.success) {
+				plugins = data.plugins || [];
+			} else {
+				pluginsError = data.error || 'Failed to load plugins';
+			}
+		} catch {
+			pluginsError = 'Failed to load available plugins';
+		}
+		pluginsLoading = false;
+		pluginsFetched = true;
+	}
+
+	async function installPlugin() {
+		if (!installUrl.trim()) return;
+		installing = true;
+		installResult = null;
+		try {
+			const resp = await fetch('/api/integrations/install', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ repoUrl: installUrl.trim() })
+			});
+			const data = await resp.json();
+			if (data.success) {
+				installResult = { success: true, message: `Installed ${data.plugin.name} (${data.plugin.type})` };
+				installUrl = '';
+				await fetchPlugins();
+			} else {
+				installResult = { success: false, message: data.error || 'Installation failed' };
+			}
+		} catch {
+			installResult = { success: false, message: 'Network error during installation' };
+		}
+		installing = false;
+		setTimeout(() => { installResult = null; }, 5000);
+	}
+
 	function openWizard(type: typeof wizardType) {
 		wizardType = type;
 		editSource = null;
 		wizardOpen = true;
+	}
+
+	function openWizardForPlugin(pluginType: string) {
+		wizardType = pluginType as typeof wizardType;
+		editSource = null;
+		wizardOpen = true;
+		activeTab = 'installed';
 	}
 
 	function openEdit(source: any) {
@@ -297,7 +368,6 @@
 				const oldStats = sourceStats;
 				sourceStats = data.stats;
 
-				// Detect new items and flash
 				for (const [sourceId, stat] of Object.entries(data.stats) as [string, { total: number; lastIngested: string | null }][]) {
 					const oldTotal = oldStats[sourceId]?.total ?? 0;
 					if (oldTotal > 0 && stat.total > oldTotal) {
@@ -308,7 +378,6 @@
 							flashingSources = next;
 						}, 1500);
 
-						// Auto-refresh expanded audit items
 						if (expandedSource === sourceId) {
 							await fetchAuditItems(sourceId);
 						}
@@ -378,7 +447,6 @@
 
 	async function triggerPoll(sourceId: string) {
 		pollingSource = new Set([...pollingSource, sourceId]);
-		// Clear any previous result
 		const cleared = new Map(pollResult);
 		cleared.delete(sourceId);
 		pollResult = cleared;
@@ -391,16 +459,13 @@
 				message: data.success ? 'Poll complete' : (data.error || 'Poll failed')
 			});
 			pollResult = next;
-			// Refresh stats and items after poll
 			await fetchStats();
 			if (expandedSource === sourceId) {
 				await fetchAuditItems(sourceId);
 			}
-			// Refresh poll history if viewing
 			if (expandedTab.get(sourceId) === 'polls') {
 				await fetchPollHistory(sourceId);
 			}
-			// Clear result after 3s
 			setTimeout(() => {
 				const cleared = new Map(pollResult);
 				cleared.delete(sourceId);
@@ -495,7 +560,6 @@
 			</span>
 		</div>
 
-		<!-- Info (when running) -->
 		{#if serviceStatus === 'running' && enabledCount > 0}
 			<span class="font-mono text-[10px]" style="color: oklch(0.45 0.02 250);">
 				polling {enabledCount} source{enabledCount !== 1 ? 's' : ''}
@@ -554,494 +618,813 @@
 		</div>
 	</div>
 
-	<!-- Content -->
+	<!-- Tab Switcher -->
+	<div class="flex items-center gap-0 px-6 mt-4 shrink-0" style="border-bottom: 1px solid oklch(0.22 0.02 250);">
+		<button
+			class="font-mono text-xs font-semibold px-4 py-2.5 cursor-pointer transition-colors duration-100"
+			style="
+				color: {activeTab === 'installed' ? 'oklch(0.85 0.02 250)' : 'oklch(0.50 0.02 250)'};
+				border-bottom: 2px solid {activeTab === 'installed' ? 'oklch(0.60 0.15 200)' : 'transparent'};
+			"
+			onclick={() => activeTab = 'installed'}
+		>
+			Installed
+			{#if sources.length > 0}
+				<span
+					class="ml-1.5 font-mono text-[9px] px-1.5 py-0.5 rounded"
+					style="background: oklch(0.22 0.04 250); color: oklch(0.55 0.02 250);"
+				>
+					{sources.length}
+				</span>
+			{/if}
+		</button>
+		<button
+			class="font-mono text-xs font-semibold px-4 py-2.5 cursor-pointer transition-colors duration-100"
+			style="
+				color: {activeTab === 'available' ? 'oklch(0.85 0.02 250)' : 'oklch(0.50 0.02 250)'};
+				border-bottom: 2px solid {activeTab === 'available' ? 'oklch(0.60 0.15 200)' : 'transparent'};
+			"
+			onclick={() => activeTab = 'available'}
+		>
+			Available
+			{#if plugins.length > 0}
+				<span
+					class="ml-1.5 font-mono text-[9px] px-1.5 py-0.5 rounded"
+					style="background: oklch(0.22 0.04 250); color: oklch(0.55 0.02 250);"
+				>
+					{plugins.length}
+				</span>
+			{/if}
+		</button>
+	</div>
+
+	<!-- Tab Content -->
 	<div class="flex-1 overflow-y-auto px-6 py-5">
-		<!-- Template Cards -->
-		<div class="mb-8">
-			<h2 class="font-mono text-[10px] font-semibold tracking-widest uppercase mb-3" style="color: oklch(0.45 0.02 250);">
-				Add Source
-			</h2>
-			<div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));">
-				{#each templates as tmpl, i}
-					<button
-						class="group flex flex-col rounded-lg overflow-hidden text-left transition-all duration-200 cursor-pointer"
-						style="
-							background: {tmpl.color.bg};
-							border: 1px solid {tmpl.color.border};
-						"
-						onclick={() => openWizard(tmpl.type)}
-					>
-						<!-- Card top -->
-						<div class="px-4 pt-4 pb-3 flex items-start gap-3">
-							<div
-								class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-110"
-								style="background: {tmpl.color.border};"
-							>
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									fill={tmpl.type === 'custom' ? 'none' : 'currentColor'}
-									viewBox={tmpl.type === 'custom' ? '0 0 24 24' : '0 0 24 24'}
-									stroke={tmpl.type === 'custom' ? 'currentColor' : 'none'}
-									stroke-width={tmpl.type === 'custom' ? '1.5' : '0'}
-									class="w-4 h-4"
-									style="color: {tmpl.color.icon};"
-								>
-									<path stroke-linecap="round" stroke-linejoin="round" d={tmpl.icon} />
-								</svg>
-							</div>
-							<div class="flex-1 min-w-0">
-								<h3 class="font-mono text-xs font-semibold" style="color: {tmpl.color.text};">
-									{tmpl.name}
-								</h3>
-								<p class="font-mono text-[10px] mt-1 leading-relaxed" style="color: {tmpl.color.text}; opacity: 0.6;">
-									{tmpl.description}
-								</p>
-							</div>
-						</div>
+		{#if activeTab === 'installed'}
+			<!-- ==================== INSTALLED TAB ==================== -->
 
-						<!-- Hints -->
-						<div class="px-4 pb-3 flex flex-wrap gap-1">
-							{#each tmpl.hints as hint}
-								<span
-									class="font-mono text-[9px] px-1.5 py-0.5 rounded"
-									style="background: oklch(0.18 0.02 250 / 0.5); color: {tmpl.color.text}; opacity: 0.5;"
-								>
-									{hint}
-								</span>
-							{/each}
-						</div>
-
-						<!-- Add button area -->
-						<div
-							class="px-4 py-2.5 flex items-center gap-1.5 transition-all duration-200"
-							style="
-								background: oklch(0.15 0.02 250 / 0.5);
-								border-top: 1px solid {tmpl.color.border};
-								color: {tmpl.color.text};
-								opacity: 0.7;
-							"
-						>
-							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
-								<path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
-							</svg>
-							<span class="font-mono text-[10px] font-semibold">Add {tmpl.name}</span>
-						</div>
-					</button>
-				{/each}
-			</div>
-		</div>
-
-		<!-- Configured Sources -->
-		{#if loading}
-			<div class="space-y-3">
-				{#each [1, 2] as _}
-					<div class="h-16 rounded-lg animate-pulse" style="background: oklch(0.20 0.02 250);"></div>
-				{/each}
-			</div>
-		{:else if sources.length > 0}
-			<div>
+			<!-- Template Cards (Add Source) -->
+			<div class="mb-8">
 				<h2 class="font-mono text-[10px] font-semibold tracking-widest uppercase mb-3" style="color: oklch(0.45 0.02 250);">
-					Configured Sources ({sources.length})
+					Add Source
 				</h2>
-				<div class="space-y-2">
-					{#each [...sources].sort((a, b) => (b.enabled ? 1 : 0) - (a.enabled ? 1 : 0)) as source, i (source.id)}
-						{@const colors = getTypeColor(source.type)}
-						{@const tmpl = templates.find(t => t.type === source.type)}
-						{@const isExpanded = expandedSource === source.id}
-						{@const stats = sourceStats[source.id]}
-						{@const itemCount = stats?.total ?? 0}
-						<div
-							class="rounded-lg overflow-hidden transition-all duration-150"
+				<div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));">
+					{#each templates as tmpl, i}
+						<button
+							class="group flex flex-col rounded-lg overflow-hidden text-left transition-all duration-200 cursor-pointer"
 							style="
-								background: oklch(0.18 0.02 250);
-								border: 1px solid {isExpanded ? 'oklch(0.30 0.04 250)' : 'oklch(0.25 0.02 250)'};
+								background: {tmpl.color.bg};
+								border: 1px solid {tmpl.color.border};
 							"
-							transition:fly={{ y: 10, duration: 150, delay: i * 30 }}
+							onclick={() => openWizard(tmpl.type)}
 						>
-							<!-- Source card header (clickable) -->
-							<!-- svelte-ignore a11y_click_events_have_key_events -->
-							<!-- svelte-ignore a11y_no_static_element_interactions -->
-							<div
-								class="flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors duration-100"
-								style="background: {isExpanded ? 'oklch(0.19 0.02 250)' : 'transparent'};"
-								onclick={() => toggleAudit(source.id)}
-							>
-								<!-- Type icon -->
+							<div class="px-4 pt-4 pb-3 flex items-start gap-3">
 								<div
-									class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-									style="background: {colors.bg}; border: 1px solid oklch(0.30 0.04 250);"
+									class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-110"
+									style="background: {tmpl.color.border};"
 								>
-									{#if tmpl}
-										<svg
-											xmlns="http://www.w3.org/2000/svg"
-											fill={tmpl.type === 'custom' ? 'none' : 'currentColor'}
-											viewBox={tmpl.type === 'custom' ? '0 0 24 24' : '0 0 24 24'}
-											stroke={tmpl.type === 'custom' ? 'currentColor' : 'none'}
-											stroke-width={tmpl.type === 'custom' ? '1.5' : '0'}
-											class="w-4 h-4"
-											style="color: {tmpl.color.icon};"
-										>
-											<path stroke-linecap="round" stroke-linejoin="round" d={tmpl.icon} />
-										</svg>
-									{/if}
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										fill={tmpl.type === 'custom' ? 'none' : 'currentColor'}
+										viewBox="0 0 24 24"
+										stroke={tmpl.type === 'custom' ? 'currentColor' : 'none'}
+										stroke-width={tmpl.type === 'custom' ? '1.5' : '0'}
+										class="w-4 h-4"
+										style="color: {tmpl.color.icon};"
+									>
+										<path stroke-linecap="round" stroke-linejoin="round" d={tmpl.icon} />
+									</svg>
 								</div>
-
-								<!-- Source info -->
 								<div class="flex-1 min-w-0">
-									<div class="flex items-center gap-2">
-										<span class="font-mono text-xs font-semibold truncate" style="color: oklch(0.80 0.02 250);">
-											{source.id}
-										</span>
-										{#if !source.enabled}
-											<span
-												class="font-mono text-[9px] px-1.5 py-0.5 rounded"
-												style="background: oklch(0.22 0.02 250); color: oklch(0.45 0.02 250);"
-											>
-												disabled
-											</span>
-										{/if}
-									</div>
-									<span class="font-mono text-[10px]" style="color: oklch(0.45 0.02 250);">
-										{source.project}
-										{#if source.feedUrl}
-											&middot; {source.feedUrl.replace(/^https?:\/\//, '').slice(0, 40)}
-										{:else if source.channel}
-											&middot; {source.channel}
-										{:else if source.chatId}
-											&middot; {source.chatId}
-										{:else if source.imapUser}
-											&middot; {source.imapUser}{source.folder ? ` / ${source.folder}` : ''}
-										{/if}
-										&middot; {source.pollInterval || 60}s
-									</span>
-								</div>
-
-								<!-- Item count -->
-								{#if itemCount > 0}
-									{@const isFlashing = flashingSources.has(source.id)}
-									<span
-										class="font-mono text-[10px] px-2 py-0.5 rounded shrink-0 transition-all duration-300"
-										style="
-											background: {isFlashing ? 'oklch(0.35 0.15 145)' : 'oklch(0.22 0.03 250)'};
-											color: {isFlashing ? 'oklch(0.90 0.15 145)' : 'oklch(0.55 0.02 250)'};
-											box-shadow: {isFlashing ? '0 0 12px oklch(0.50 0.18 145 / 0.6)' : 'none'};
-										"
-									>
-										{itemCount} item{itemCount !== 1 ? 's' : ''}
-									</span>
-								{/if}
-
-								<!-- Last poll info -->
-								{#if stats?.lastPollAt}
-									<span class="font-mono text-[9px] shrink-0" style="color: oklch(0.40 0.02 250);">
-										polled {timeAgo(stats.lastPollAt)}
-									</span>
-								{/if}
-								{#if stats?.lastPollError}
-									<span
-										class="w-2 h-2 rounded-full shrink-0"
-										title="Last poll error: {stats.lastPollError}"
-										style="background: oklch(0.55 0.18 25);"
-									></span>
-								{/if}
-
-								<!-- Chevron -->
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									viewBox="0 0 20 20"
-									fill="currentColor"
-									class="w-4 h-4 shrink-0 transition-transform duration-200"
-									style="color: oklch(0.40 0.02 250); transform: rotate({isExpanded ? 180 : 0}deg);"
-								>
-									<path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
-								</svg>
-
-								<!-- Actions (stop propagation so clicks don't toggle expand) -->
-								<!-- svelte-ignore a11y_click_events_have_key_events -->
-								<!-- svelte-ignore a11y_no_static_element_interactions -->
-								<div class="flex items-center gap-1 shrink-0" onclick={(e) => e.stopPropagation()}>
-									<!-- Toggle -->
-									<button
-										class="btn btn-xs btn-ghost"
-										onclick={() => toggleSource(source)}
-										title={source.enabled ? 'Disable' : 'Enable'}
-										style="color: {source.enabled ? 'oklch(0.65 0.15 145)' : 'oklch(0.45 0.02 250)'};"
-									>
-										{#if source.enabled}
-											<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
-												<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
-											</svg>
-										{:else}
-											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-												<circle cx="12" cy="12" r="9" />
-											</svg>
-										{/if}
-									</button>
-
-									<!-- Edit -->
-									<button
-										class="btn btn-xs btn-ghost"
-										onclick={() => openEdit(source)}
-										title="Edit"
-										style="color: oklch(0.55 0.02 250);"
-									>
-										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5">
-											<path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
-										</svg>
-									</button>
-
-									<!-- Delete -->
-									<button
-										class="btn btn-xs btn-ghost"
-										onclick={() => deleteSource(source)}
-										title="Delete"
-										style="color: oklch(0.50 0.08 25);"
-									>
-										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5">
-											<path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-										</svg>
-									</button>
-
-									<!-- Poll Now -->
-									<button
-										class="btn btn-xs btn-ghost"
-										onclick={() => triggerPoll(source.id)}
-										disabled={pollingSource.has(source.id)}
-										title="Poll now"
-										style="color: oklch(0.55 0.08 200);"
-									>
-										{#if pollingSource.has(source.id)}
-											<svg class="w-3.5 h-3.5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-												<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-												<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-											</svg>
-										{:else}
-											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5">
-												<path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
-											</svg>
-										{/if}
-									</button>
-									{#if pollResult.has(source.id)}
-										{@const result = pollResult.get(source.id)}
-										<span
-											class="font-mono text-[9px] px-1.5 py-0.5 rounded shrink-0"
-											style="
-												background: {result?.success ? 'oklch(0.22 0.08 145)' : 'oklch(0.22 0.08 25)'};
-												color: {result?.success ? 'oklch(0.65 0.15 145)' : 'oklch(0.65 0.15 25)'};
-											"
-										>
-											{result?.message}
-										</span>
-									{/if}
+									<h3 class="font-mono text-xs font-semibold" style="color: {tmpl.color.text};">
+										{tmpl.name}
+									</h3>
+									<p class="font-mono text-[10px] mt-1 leading-relaxed" style="color: {tmpl.color.text}; opacity: 0.6;">
+										{tmpl.description}
+									</p>
 								</div>
 							</div>
 
-							<!-- Expanded audit panel -->
-							{#if isExpanded}
-								<div
-									transition:slide={{ duration: 200 }}
-									style="border-top: 1px solid oklch(0.22 0.02 250); background: oklch(0.15 0.02 250);"
-								>
-									<!-- Tab switcher -->
-									<div class="flex items-center gap-0 px-4 pt-2" style="border-bottom: 1px solid oklch(0.20 0.02 250);">
-										<button
-											class="font-mono text-[10px] font-semibold px-3 py-1.5 rounded-t cursor-pointer transition-colors duration-100"
-											style="
-												color: {(expandedTab.get(source.id) || 'items') === 'items' ? 'oklch(0.80 0.02 250)' : 'oklch(0.45 0.02 250)'};
-												background: {(expandedTab.get(source.id) || 'items') === 'items' ? 'oklch(0.18 0.02 250)' : 'transparent'};
-												border-bottom: 2px solid {(expandedTab.get(source.id) || 'items') === 'items' ? 'oklch(0.55 0.12 200)' : 'transparent'};
-											"
-											onclick={() => setTab(source.id, 'items')}
-										>
-											Items
-										</button>
-										<button
-											class="font-mono text-[10px] font-semibold px-3 py-1.5 rounded-t cursor-pointer transition-colors duration-100"
-											style="
-												color: {expandedTab.get(source.id) === 'polls' ? 'oklch(0.80 0.02 250)' : 'oklch(0.45 0.02 250)'};
-												background: {expandedTab.get(source.id) === 'polls' ? 'oklch(0.18 0.02 250)' : 'transparent'};
-												border-bottom: 2px solid {expandedTab.get(source.id) === 'polls' ? 'oklch(0.55 0.12 200)' : 'transparent'};
-											"
-											onclick={() => setTab(source.id, 'polls')}
-										>
-											Polls
-										</button>
-									</div>
+							<div class="px-4 pb-3 flex flex-wrap gap-1">
+								{#each tmpl.hints as hint}
+									<span
+										class="font-mono text-[9px] px-1.5 py-0.5 rounded"
+										style="background: oklch(0.18 0.02 250 / 0.5); color: {tmpl.color.text}; opacity: 0.5;"
+									>
+										{hint}
+									</span>
+								{/each}
+							</div>
 
-									{#if (expandedTab.get(source.id) || 'items') === 'items'}
-									{#if auditLoading.has(source.id)}
-										<!-- Loading skeleton -->
-										<div class="px-4 py-3 space-y-2">
-											{#each [1, 2, 3] as _}
-												<div class="flex items-center gap-3">
-													<div class="h-3 w-12 rounded animate-pulse" style="background: oklch(0.22 0.02 250);"></div>
-													<div class="h-3 flex-1 rounded animate-pulse" style="background: oklch(0.22 0.02 250);"></div>
-													<div class="h-3 w-16 rounded animate-pulse" style="background: oklch(0.22 0.02 250);"></div>
-												</div>
-											{/each}
-										</div>
-									{:else if (auditItems.get(source.id) || []).length === 0}
-										<div class="px-4 py-4 text-center">
-											<span class="font-mono text-[10px]" style="color: oklch(0.40 0.02 250);">No ingested items yet</span>
-										</div>
-									{:else}
-										{@const items = auditItems.get(source.id) || []}
-										{@const total = auditTotal.get(source.id) || 0}
-										<div class="px-4 py-2">
-											<div class="space-y-0">
-												{#each items as item}
-													<button
-														class="flex items-center gap-3 py-1.5 w-full text-left transition-colors duration-100"
-														style="border-bottom: 1px solid oklch(0.20 0.02 250); cursor: {item.task_id ? 'pointer' : 'default'};"
-														onmouseenter={(e) => { if (item.task_id) e.currentTarget.style.background = 'oklch(0.20 0.03 250)'; }}
-														onmouseleave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-														onclick={(e) => {
-															e.stopPropagation();
-															if (item.task_id) {
-																selectedTaskId = item.task_id;
-																drawerOpen = true;
-															}
-														}}
-													>
-														<!-- Time ago -->
-														<span
-															class="font-mono text-[9px] w-14 shrink-0 text-right"
-															style="color: oklch(0.42 0.02 250);"
-														>
-															{timeAgo(item.ingested_at)}
-														</span>
-
-														<!-- Title -->
-														<span
-															class="font-mono text-[10px] flex-1 truncate"
-															style="color: oklch(0.65 0.02 250);"
-															title={item.title || '(no title)'}
-														>
-															{item.title || '(no title)'}
-														</span>
-
-														<!-- Task ID badge or no-task indicator -->
-														{#if item.task_id}
-															<span
-																class="font-mono text-[9px] px-1.5 py-0.5 rounded shrink-0"
-																style="background: oklch(0.22 0.08 145); color: oklch(0.65 0.15 145); border: 1px solid oklch(0.30 0.08 145);"
-															>
-																{item.task_id}
-															</span>
-														{:else}
-															<span
-																class="font-mono text-[9px] px-1.5 py-0.5 rounded shrink-0"
-																style="background: oklch(0.22 0.04 250); color: oklch(0.42 0.02 250);"
-															>
-																no task
-															</span>
-														{/if}
-
-														<!-- Thread replies -->
-														{#if item.reply_count > 0}
-															<span
-																class="font-mono text-[9px] px-1.5 py-0.5 rounded shrink-0 flex items-center gap-0.5"
-																style="background: oklch(0.22 0.06 200); color: oklch(0.60 0.10 200);"
-																title="{item.reply_count} replies{item.thread_active ? ' (active)' : ''}"
-															>
-																<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-2.5 h-2.5">
-																	<path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 0 1 .865-.501 48.172 48.172 0 0 0 3.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
-																</svg>
-																{item.reply_count}
-															</span>
-														{/if}
-													</button>
-												{/each}
-											</div>
-
-											<!-- Load more -->
-											{#if items.length < total}
-												<div class="pt-2 pb-1 text-center">
-													<button
-														class="font-mono text-[10px] font-semibold px-3 py-1 rounded cursor-pointer transition-colors duration-150"
-														style="background: oklch(0.22 0.02 250); color: oklch(0.55 0.02 250); border: 1px solid oklch(0.28 0.02 250);"
-														onclick={(e) => { e.stopPropagation(); fetchAuditItems(source.id, items.length); }}
-													>
-														Load more ({total - items.length} remaining)
-													</button>
-												</div>
-											{/if}
-										</div>
-									{/if}
-									{/if}
-
-									<!-- Polls tab -->
-									{#if expandedTab.get(source.id) === 'polls'}
-										{#if pollHistoryLoading.has(source.id)}
-											<div class="px-4 py-3 space-y-2">
-												{#each [1, 2, 3] as _}
-													<div class="flex items-center gap-3">
-														<div class="h-3 w-16 rounded animate-pulse" style="background: oklch(0.22 0.02 250);"></div>
-														<div class="h-3 flex-1 rounded animate-pulse" style="background: oklch(0.22 0.02 250);"></div>
-													</div>
-												{/each}
-											</div>
-										{:else if (pollHistory.get(source.id) || []).length === 0}
-											<div class="px-4 py-4 text-center">
-												<span class="font-mono text-[10px]" style="color: oklch(0.40 0.02 250);">No poll history yet</span>
-											</div>
-										{:else}
-											{@const polls = pollHistory.get(source.id) || []}
-											<div class="px-4 py-2 space-y-0">
-												{#each polls as poll}
-													<div
-														class="flex items-center gap-3 py-1.5"
-														style="border-bottom: 1px solid oklch(0.20 0.02 250);"
-													>
-														<!-- Time -->
-														<span class="font-mono text-[9px] w-14 shrink-0 text-right" style="color: oklch(0.42 0.02 250);">
-															{timeAgo(poll.poll_at)}
-														</span>
-
-														<!-- Status dot -->
-														<span
-															class="w-1.5 h-1.5 rounded-full shrink-0"
-															style="background: {poll.error ? 'oklch(0.55 0.18 25)' : 'oklch(0.55 0.18 145)'};"
-														></span>
-
-														<!-- Items info -->
-														<span class="font-mono text-[10px] flex-1" style="color: oklch(0.60 0.02 250);">
-															{#if poll.error}
-																<span style="color: oklch(0.60 0.12 25);" title={poll.error}>Error: {poll.error.slice(0, 50)}{poll.error.length > 50 ? '...' : ''}</span>
-															{:else}
-																{poll.items_found} found, {poll.items_new} new
-															{/if}
-														</span>
-
-														<!-- Duration -->
-														{#if poll.duration_ms}
-															<span class="font-mono text-[9px] shrink-0" style="color: oklch(0.38 0.02 250);">
-																{poll.duration_ms < 1000 ? `${poll.duration_ms}ms` : `${(poll.duration_ms / 1000).toFixed(1)}s`}
-															</span>
-														{/if}
-													</div>
-												{/each}
-											</div>
-										{/if}
-									{/if}
-								</div>
-							{/if}
-						</div>
+							<div
+								class="px-4 py-2.5 flex items-center gap-1.5 transition-all duration-200"
+								style="
+									background: oklch(0.15 0.02 250 / 0.5);
+									border-top: 1px solid {tmpl.color.border};
+									color: {tmpl.color.text};
+									opacity: 0.7;
+								"
+							>
+								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+									<path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
+								</svg>
+								<span class="font-mono text-[10px] font-semibold">Add {tmpl.name}</span>
+							</div>
+						</button>
 					{/each}
 				</div>
 			</div>
+
+			<!-- Configured Sources -->
+			{#if loading}
+				<div class="space-y-3">
+					{#each [1, 2] as _}
+						<div class="h-16 rounded-lg animate-pulse" style="background: oklch(0.20 0.02 250);"></div>
+					{/each}
+				</div>
+			{:else if sources.length > 0}
+				<div>
+					<h2 class="font-mono text-[10px] font-semibold tracking-widest uppercase mb-3" style="color: oklch(0.45 0.02 250);">
+						Configured Sources ({sources.length})
+					</h2>
+					<div class="space-y-2">
+						{#each [...sources].sort((a, b) => (b.enabled ? 1 : 0) - (a.enabled ? 1 : 0)) as source, i (source.id)}
+							{@const colors = getTypeColor(source.type)}
+							{@const tmpl = templates.find(t => t.type === source.type)}
+							{@const isExpanded = expandedSource === source.id}
+							{@const stats = sourceStats[source.id]}
+							{@const itemCount = stats?.total ?? 0}
+							<div
+								class="rounded-lg overflow-hidden transition-all duration-150"
+								style="
+									background: oklch(0.18 0.02 250);
+									border: 1px solid {isExpanded ? 'oklch(0.30 0.04 250)' : 'oklch(0.25 0.02 250)'};
+								"
+								transition:fly={{ y: 10, duration: 150, delay: i * 30 }}
+							>
+								<!-- Source card header (clickable) -->
+								<!-- svelte-ignore a11y_click_events_have_key_events -->
+								<!-- svelte-ignore a11y_no_static_element_interactions -->
+								<div
+									class="flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors duration-100"
+									style="background: {isExpanded ? 'oklch(0.19 0.02 250)' : 'transparent'};"
+									onclick={() => toggleAudit(source.id)}
+								>
+									<!-- Type icon -->
+									<div
+										class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+										style="background: {colors.bg}; border: 1px solid oklch(0.30 0.04 250);"
+									>
+										{#if tmpl}
+											<svg
+												xmlns="http://www.w3.org/2000/svg"
+												fill={tmpl.type === 'custom' ? 'none' : 'currentColor'}
+												viewBox="0 0 24 24"
+												stroke={tmpl.type === 'custom' ? 'currentColor' : 'none'}
+												stroke-width={tmpl.type === 'custom' ? '1.5' : '0'}
+												class="w-4 h-4"
+												style="color: {tmpl.color.icon};"
+											>
+												<path stroke-linecap="round" stroke-linejoin="round" d={tmpl.icon} />
+											</svg>
+										{/if}
+									</div>
+
+									<!-- Source info -->
+									<div class="flex-1 min-w-0">
+										<div class="flex items-center gap-2">
+											<span class="font-mono text-xs font-semibold truncate" style="color: oklch(0.80 0.02 250);">
+												{source.id}
+											</span>
+											{#if !source.enabled}
+												<span
+													class="font-mono text-[9px] px-1.5 py-0.5 rounded"
+													style="background: oklch(0.22 0.02 250); color: oklch(0.45 0.02 250);"
+												>
+													disabled
+												</span>
+											{/if}
+										</div>
+										<span class="font-mono text-[10px]" style="color: oklch(0.45 0.02 250);">
+											{source.project}
+											{#if source.feedUrl}
+												&middot; {source.feedUrl.replace(/^https?:\/\//, '').slice(0, 40)}
+											{:else if source.channel}
+												&middot; {source.channel}
+											{:else if source.chatId}
+												&middot; {source.chatId}
+											{:else if source.imapUser}
+												&middot; {source.imapUser}{source.folder ? ` / ${source.folder}` : ''}
+											{/if}
+											&middot; {source.pollInterval || 60}s
+										</span>
+									</div>
+
+									<!-- Item count -->
+									{#if itemCount > 0}
+										{@const isFlashing = flashingSources.has(source.id)}
+										<span
+											class="font-mono text-[10px] px-2 py-0.5 rounded shrink-0 transition-all duration-300"
+											style="
+												background: {isFlashing ? 'oklch(0.35 0.15 145)' : 'oklch(0.22 0.03 250)'};
+												color: {isFlashing ? 'oklch(0.90 0.15 145)' : 'oklch(0.55 0.02 250)'};
+												box-shadow: {isFlashing ? '0 0 12px oklch(0.50 0.18 145 / 0.6)' : 'none'};
+											"
+										>
+											{itemCount} item{itemCount !== 1 ? 's' : ''}
+										</span>
+									{/if}
+
+									<!-- Last poll info -->
+									{#if stats?.lastPollAt}
+										<span class="font-mono text-[9px] shrink-0" style="color: oklch(0.40 0.02 250);">
+											polled {timeAgo(stats.lastPollAt)}
+										</span>
+									{/if}
+									{#if stats?.lastPollError}
+										<span
+											class="w-2 h-2 rounded-full shrink-0"
+											title="Last poll error: {stats.lastPollError}"
+											style="background: oklch(0.55 0.18 25);"
+										></span>
+									{/if}
+
+									<!-- Chevron -->
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										viewBox="0 0 20 20"
+										fill="currentColor"
+										class="w-4 h-4 shrink-0 transition-transform duration-200"
+										style="color: oklch(0.40 0.02 250); transform: rotate({isExpanded ? 180 : 0}deg);"
+									>
+										<path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+									</svg>
+
+									<!-- Actions (stop propagation so clicks don't toggle expand) -->
+									<!-- svelte-ignore a11y_click_events_have_key_events -->
+									<!-- svelte-ignore a11y_no_static_element_interactions -->
+									<div class="flex items-center gap-1 shrink-0" onclick={(e) => e.stopPropagation()}>
+										<!-- Toggle -->
+										<button
+											class="btn btn-xs btn-ghost"
+											onclick={() => toggleSource(source)}
+											title={source.enabled ? 'Disable' : 'Enable'}
+											style="color: {source.enabled ? 'oklch(0.65 0.15 145)' : 'oklch(0.45 0.02 250)'};"
+										>
+											{#if source.enabled}
+												<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+													<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
+												</svg>
+											{:else}
+												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+													<circle cx="12" cy="12" r="9" />
+												</svg>
+											{/if}
+										</button>
+
+										<!-- Edit -->
+										<button
+											class="btn btn-xs btn-ghost"
+											onclick={() => openEdit(source)}
+											title="Edit"
+											style="color: oklch(0.55 0.02 250);"
+										>
+											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5">
+												<path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
+											</svg>
+										</button>
+
+										<!-- Delete -->
+										<button
+											class="btn btn-xs btn-ghost"
+											onclick={() => deleteSource(source)}
+											title="Delete"
+											style="color: oklch(0.50 0.08 25);"
+										>
+											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5">
+												<path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+											</svg>
+										</button>
+
+										<!-- Poll Now -->
+										<button
+											class="btn btn-xs btn-ghost"
+											onclick={() => triggerPoll(source.id)}
+											disabled={pollingSource.has(source.id)}
+											title="Poll now"
+											style="color: oklch(0.55 0.08 200);"
+										>
+											{#if pollingSource.has(source.id)}
+												<svg class="w-3.5 h-3.5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+													<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+													<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+												</svg>
+											{:else}
+												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
+												</svg>
+											{/if}
+										</button>
+										{#if pollResult.has(source.id)}
+											{@const result = pollResult.get(source.id)}
+											<span
+												class="font-mono text-[9px] px-1.5 py-0.5 rounded shrink-0"
+												style="
+													background: {result?.success ? 'oklch(0.22 0.08 145)' : 'oklch(0.22 0.08 25)'};
+													color: {result?.success ? 'oklch(0.65 0.15 145)' : 'oklch(0.65 0.15 25)'};
+												"
+											>
+												{result?.message}
+											</span>
+										{/if}
+									</div>
+								</div>
+
+								<!-- Expanded audit panel -->
+								{#if isExpanded}
+									<div
+										transition:slide={{ duration: 200 }}
+										style="border-top: 1px solid oklch(0.22 0.02 250); background: oklch(0.15 0.02 250);"
+									>
+										<!-- Tab switcher -->
+										<div class="flex items-center gap-0 px-4 pt-2" style="border-bottom: 1px solid oklch(0.20 0.02 250);">
+											<button
+												class="font-mono text-[10px] font-semibold px-3 py-1.5 rounded-t cursor-pointer transition-colors duration-100"
+												style="
+													color: {(expandedTab.get(source.id) || 'items') === 'items' ? 'oklch(0.80 0.02 250)' : 'oklch(0.45 0.02 250)'};
+													background: {(expandedTab.get(source.id) || 'items') === 'items' ? 'oklch(0.18 0.02 250)' : 'transparent'};
+													border-bottom: 2px solid {(expandedTab.get(source.id) || 'items') === 'items' ? 'oklch(0.55 0.12 200)' : 'transparent'};
+												"
+												onclick={() => setTab(source.id, 'items')}
+											>
+												Items
+											</button>
+											<button
+												class="font-mono text-[10px] font-semibold px-3 py-1.5 rounded-t cursor-pointer transition-colors duration-100"
+												style="
+													color: {expandedTab.get(source.id) === 'polls' ? 'oklch(0.80 0.02 250)' : 'oklch(0.45 0.02 250)'};
+													background: {expandedTab.get(source.id) === 'polls' ? 'oklch(0.18 0.02 250)' : 'transparent'};
+													border-bottom: 2px solid {expandedTab.get(source.id) === 'polls' ? 'oklch(0.55 0.12 200)' : 'transparent'};
+												"
+												onclick={() => setTab(source.id, 'polls')}
+											>
+												Polls
+											</button>
+										</div>
+
+										{#if (expandedTab.get(source.id) || 'items') === 'items'}
+										{#if auditLoading.has(source.id)}
+											<div class="px-4 py-3 space-y-2">
+												{#each [1, 2, 3] as _}
+													<div class="flex items-center gap-3">
+														<div class="h-3 w-12 rounded animate-pulse" style="background: oklch(0.22 0.02 250);"></div>
+														<div class="h-3 flex-1 rounded animate-pulse" style="background: oklch(0.22 0.02 250);"></div>
+														<div class="h-3 w-16 rounded animate-pulse" style="background: oklch(0.22 0.02 250);"></div>
+													</div>
+												{/each}
+											</div>
+										{:else if (auditItems.get(source.id) || []).length === 0}
+											<div class="px-4 py-4 text-center">
+												<span class="font-mono text-[10px]" style="color: oklch(0.40 0.02 250);">No ingested items yet</span>
+											</div>
+										{:else}
+											{@const items = auditItems.get(source.id) || []}
+											{@const total = auditTotal.get(source.id) || 0}
+											<div class="px-4 py-2">
+												<div class="space-y-0">
+													{#each items as item}
+														<button
+															class="flex items-center gap-3 py-1.5 w-full text-left transition-colors duration-100"
+															style="border-bottom: 1px solid oklch(0.20 0.02 250); cursor: {item.task_id ? 'pointer' : 'default'};"
+															onmouseenter={(e) => { if (item.task_id) e.currentTarget.style.background = 'oklch(0.20 0.03 250)'; }}
+															onmouseleave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+															onclick={(e) => {
+																e.stopPropagation();
+																if (item.task_id) {
+																	selectedTaskId = item.task_id;
+																	drawerOpen = true;
+																}
+															}}
+														>
+															<span
+																class="font-mono text-[9px] w-14 shrink-0 text-right"
+																style="color: oklch(0.42 0.02 250);"
+															>
+																{timeAgo(item.ingested_at)}
+															</span>
+
+															<span
+																class="font-mono text-[10px] flex-1 truncate"
+																style="color: oklch(0.65 0.02 250);"
+																title={item.title || '(no title)'}
+															>
+																{item.title || '(no title)'}
+															</span>
+
+															{#if item.task_id}
+																<span
+																	class="font-mono text-[9px] px-1.5 py-0.5 rounded shrink-0"
+																	style="background: oklch(0.22 0.08 145); color: oklch(0.65 0.15 145); border: 1px solid oklch(0.30 0.08 145);"
+																>
+																	{item.task_id}
+																</span>
+															{:else}
+																<span
+																	class="font-mono text-[9px] px-1.5 py-0.5 rounded shrink-0"
+																	style="background: oklch(0.22 0.04 250); color: oklch(0.42 0.02 250);"
+																>
+																	no task
+																</span>
+															{/if}
+
+															{#if item.reply_count > 0}
+																<span
+																	class="font-mono text-[9px] px-1.5 py-0.5 rounded shrink-0 flex items-center gap-0.5"
+																	style="background: oklch(0.22 0.06 200); color: oklch(0.60 0.10 200);"
+																	title="{item.reply_count} replies{item.thread_active ? ' (active)' : ''}"
+																>
+																	<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-2.5 h-2.5">
+																		<path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 0 1 .865-.501 48.172 48.172 0 0 0 3.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
+																	</svg>
+																	{item.reply_count}
+																</span>
+															{/if}
+														</button>
+													{/each}
+												</div>
+
+												{#if items.length < total}
+													<div class="pt-2 pb-1 text-center">
+														<button
+															class="font-mono text-[10px] font-semibold px-3 py-1 rounded cursor-pointer transition-colors duration-150"
+															style="background: oklch(0.22 0.02 250); color: oklch(0.55 0.02 250); border: 1px solid oklch(0.28 0.02 250);"
+															onclick={(e) => { e.stopPropagation(); fetchAuditItems(source.id, items.length); }}
+														>
+															Load more ({total - items.length} remaining)
+														</button>
+													</div>
+												{/if}
+											</div>
+										{/if}
+										{/if}
+
+										<!-- Polls tab -->
+										{#if expandedTab.get(source.id) === 'polls'}
+											{#if pollHistoryLoading.has(source.id)}
+												<div class="px-4 py-3 space-y-2">
+													{#each [1, 2, 3] as _}
+														<div class="flex items-center gap-3">
+															<div class="h-3 w-16 rounded animate-pulse" style="background: oklch(0.22 0.02 250);"></div>
+															<div class="h-3 flex-1 rounded animate-pulse" style="background: oklch(0.22 0.02 250);"></div>
+														</div>
+													{/each}
+												</div>
+											{:else if (pollHistory.get(source.id) || []).length === 0}
+												<div class="px-4 py-4 text-center">
+													<span class="font-mono text-[10px]" style="color: oklch(0.40 0.02 250);">No poll history yet</span>
+												</div>
+											{:else}
+												{@const polls = pollHistory.get(source.id) || []}
+												<div class="px-4 py-2 space-y-0">
+													{#each polls as poll}
+														<div
+															class="flex items-center gap-3 py-1.5"
+															style="border-bottom: 1px solid oklch(0.20 0.02 250);"
+														>
+															<span class="font-mono text-[9px] w-14 shrink-0 text-right" style="color: oklch(0.42 0.02 250);">
+																{timeAgo(poll.poll_at)}
+															</span>
+
+															<span
+																class="w-1.5 h-1.5 rounded-full shrink-0"
+																style="background: {poll.error ? 'oklch(0.55 0.18 25)' : 'oklch(0.55 0.18 145)'};"
+															></span>
+
+															<span class="font-mono text-[10px] flex-1" style="color: oklch(0.60 0.02 250);">
+																{#if poll.error}
+																	<span style="color: oklch(0.60 0.12 25);" title={poll.error}>Error: {poll.error.slice(0, 50)}{poll.error.length > 50 ? '...' : ''}</span>
+																{:else}
+																	{poll.items_found} found, {poll.items_new} new
+																{/if}
+															</span>
+
+															{#if poll.duration_ms}
+																<span class="font-mono text-[9px] shrink-0" style="color: oklch(0.38 0.02 250);">
+																	{poll.duration_ms < 1000 ? `${poll.duration_ms}ms` : `${(poll.duration_ms / 1000).toFixed(1)}s`}
+																</span>
+															{/if}
+														</div>
+													{/each}
+												</div>
+											{/if}
+										{/if}
+									</div>
+								{/if}
+							</div>
+						{/each}
+					</div>
+				</div>
+			{:else}
+				<div
+					class="text-center py-12 rounded-lg"
+					style="background: oklch(0.16 0.02 250); border: 1px dashed oklch(0.28 0.02 250);"
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" class="w-8 h-8 mx-auto mb-3" style="color: oklch(0.35 0.02 250);">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+					</svg>
+					<p class="font-mono text-xs" style="color: oklch(0.45 0.02 250);">
+						No sources configured yet. Pick a template above to get started.
+					</p>
+				</div>
+			{/if}
+
 		{:else}
+			<!-- ==================== AVAILABLE TAB ==================== -->
+
+			<!-- Install from Git URL -->
 			<div
-				class="text-center py-12 rounded-lg"
-				style="background: oklch(0.16 0.02 250); border: 1px dashed oklch(0.28 0.02 250);"
+				class="mb-6 px-4 py-4 rounded-lg"
+				style="background: oklch(0.16 0.02 250); border: 1px solid oklch(0.25 0.02 250);"
 			>
-				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" class="w-8 h-8 mx-auto mb-3" style="color: oklch(0.35 0.02 250);">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-				</svg>
-				<p class="font-mono text-xs" style="color: oklch(0.45 0.02 250);">
-					No sources configured yet. Pick a template above to get started.
-				</p>
+				<h2 class="font-mono text-[10px] font-semibold tracking-widest uppercase mb-3" style="color: oklch(0.45 0.02 250);">
+					Install Plugin from Git
+				</h2>
+				<div class="flex items-center gap-2">
+					<input
+						type="text"
+						bind:value={installUrl}
+						placeholder="https://github.com/user/jat-ingest-cloudflare"
+						class="font-mono text-xs flex-1 px-3 py-2 rounded"
+						style="
+							background: oklch(0.14 0.02 250);
+							color: oklch(0.80 0.02 250);
+							border: 1px solid oklch(0.28 0.02 250);
+							outline: none;
+						"
+						onfocus={(e) => e.currentTarget.style.borderColor = 'oklch(0.40 0.10 200)'}
+						onblur={(e) => e.currentTarget.style.borderColor = 'oklch(0.28 0.02 250)'}
+						onkeydown={(e) => { if (e.key === 'Enter') installPlugin(); }}
+					/>
+					<button
+						class="font-mono text-[10px] font-semibold px-4 py-2 rounded transition-colors duration-150 cursor-pointer shrink-0"
+						style="
+							background: {installing ? 'oklch(0.22 0.02 250)' : 'oklch(0.30 0.10 200)'};
+							color: {installing ? 'oklch(0.50 0.02 250)' : 'oklch(0.90 0.10 200)'};
+							border: 1px solid {installing ? 'oklch(0.28 0.02 250)' : 'oklch(0.40 0.12 200)'};
+						"
+						onclick={installPlugin}
+						disabled={installing || !installUrl.trim()}
+					>
+						{#if installing}
+							<span class="flex items-center gap-1.5">
+								<svg class="w-3 h-3 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+								</svg>
+								Installing...
+							</span>
+						{:else}
+							Install
+						{/if}
+					</button>
+				</div>
+				{#if installResult}
+					<div
+						class="mt-2 px-3 py-1.5 rounded font-mono text-[10px]"
+						style="
+							background: {installResult.success ? 'oklch(0.22 0.08 145)' : 'oklch(0.22 0.08 25)'};
+							color: {installResult.success ? 'oklch(0.70 0.15 145)' : 'oklch(0.70 0.15 25)'};
+							border: 1px solid {installResult.success ? 'oklch(0.30 0.08 145)' : 'oklch(0.30 0.08 25)'};
+						"
+					>
+						{installResult.message}
+					</div>
+				{/if}
 			</div>
+
+			<!-- Plugins Grid -->
+			{#if pluginsLoading}
+				<div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
+					{#each [1, 2, 3, 4] as _}
+						<div class="h-32 rounded-lg animate-pulse" style="background: oklch(0.20 0.02 250);"></div>
+					{/each}
+				</div>
+			{:else if pluginsError}
+				<div
+					class="text-center py-8 rounded-lg"
+					style="background: oklch(0.16 0.02 250); border: 1px solid oklch(0.30 0.08 25);"
+				>
+					<p class="font-mono text-xs" style="color: oklch(0.65 0.12 25);">{pluginsError}</p>
+					<button
+						class="font-mono text-[10px] font-semibold px-3 py-1.5 rounded mt-3 cursor-pointer"
+						style="background: oklch(0.22 0.02 250); color: oklch(0.60 0.02 250); border: 1px solid oklch(0.30 0.02 250);"
+						onclick={fetchPlugins}
+					>
+						Retry
+					</button>
+				</div>
+			{:else if plugins.length === 0}
+				<div
+					class="text-center py-12 rounded-lg"
+					style="background: oklch(0.16 0.02 250); border: 1px dashed oklch(0.28 0.02 250);"
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" class="w-8 h-8 mx-auto mb-3" style="color: oklch(0.35 0.02 250);">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+					</svg>
+					<p class="font-mono text-xs" style="color: oklch(0.45 0.02 250);">
+						No plugins discovered. Install one from a git URL above.
+					</p>
+				</div>
+			{:else}
+				<!-- Built-in Plugins -->
+				{#if builtinPlugins.length > 0}
+					<div class="mb-6">
+						<h2 class="font-mono text-[10px] font-semibold tracking-widest uppercase mb-3" style="color: oklch(0.45 0.02 250);">
+							Built-in Adapters ({builtinPlugins.length})
+						</h2>
+						<div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
+							{#each builtinPlugins as plugin}
+								{@const tmpl = templates.find(t => t.type === plugin.type)}
+								{@const color = tmpl?.color || { bg: 'oklch(0.22 0.04 250)', border: 'oklch(0.30 0.04 250)', text: 'oklch(0.75 0.02 250)', icon: 'oklch(0.60 0.04 250)' }}
+								{@const isConfigured = sources.some(s => s.type === plugin.type)}
+								<div
+									class="rounded-lg overflow-hidden transition-all duration-200"
+									style="background: oklch(0.18 0.02 250); border: 1px solid oklch(0.25 0.02 250);"
+								>
+									<div class="px-4 pt-4 pb-3 flex items-start gap-3">
+										<div
+											class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+											style="background: {color.bg}; border: 1px solid {color.border};"
+										>
+											{#if tmpl}
+												<svg
+													xmlns="http://www.w3.org/2000/svg"
+													fill={tmpl.type === 'custom' ? 'none' : 'currentColor'}
+													viewBox="0 0 24 24"
+													stroke={tmpl.type === 'custom' ? 'currentColor' : 'none'}
+													stroke-width={tmpl.type === 'custom' ? '1.5' : '0'}
+													class="w-4 h-4"
+													style="color: {color.icon};"
+												>
+													<path stroke-linecap="round" stroke-linejoin="round" d={tmpl.icon} />
+												</svg>
+											{:else}
+												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4" style="color: {color.icon};">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0a.64.64 0 01-.657.643 48.39 48.39 0 01-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 01-.658.663v0c-.355 0-.676-.186-.959-.401a1.647 1.647 0 00-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401v0c.31 0 .555.26.532.57a48.039 48.039 0 01-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 00.657-.643v0c0-.355-.186-.676-.401-.959a1.647 1.647 0 01-.349-1.003c0-1.035 1.008-1.875 2.25-1.875 1.243 0 2.25.84 2.25 1.875 0 .369-.128.713-.349 1.003-.215.283-.4.604-.4.959v0c0 .333.277.599.61.58a48.1 48.1 0 005.427-.63 48.05 48.05 0 00.582-4.717.532.532 0 00-.533-.57v0c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.96.401v0a.656.656 0 00.658-.663 48.422 48.422 0 00-.37-5.36c-1.886.342-3.81.574-5.766.689a.578.578 0 01-.61-.58v0z" />
+												</svg>
+											{/if}
+										</div>
+										<div class="flex-1 min-w-0">
+											<div class="flex items-center gap-2">
+												<h3 class="font-mono text-xs font-semibold" style="color: oklch(0.80 0.02 250);">
+													{plugin.name}
+												</h3>
+												<span
+													class="font-mono text-[8px] px-1.5 py-0.5 rounded"
+													style="background: oklch(0.22 0.06 200); color: oklch(0.65 0.12 200);"
+												>
+													built-in
+												</span>
+												{#if isConfigured}
+													<span
+														class="font-mono text-[8px] px-1.5 py-0.5 rounded"
+														style="background: oklch(0.22 0.06 145); color: oklch(0.60 0.12 145);"
+													>
+														configured
+													</span>
+												{/if}
+											</div>
+											<p class="font-mono text-[10px] mt-1 leading-relaxed" style="color: oklch(0.55 0.02 250);">
+												{plugin.description || 'No description'}
+											</p>
+											{#if plugin.version}
+												<span class="font-mono text-[9px]" style="color: oklch(0.40 0.02 250);">
+													v{plugin.version}
+												</span>
+											{/if}
+										</div>
+									</div>
+
+									{#if !plugin.enabled && plugin.error}
+										<div
+											class="mx-4 mb-3 px-2.5 py-1.5 rounded font-mono text-[9px]"
+											style="background: oklch(0.20 0.06 25); color: oklch(0.60 0.10 25);"
+										>
+											{plugin.error}
+										</div>
+									{/if}
+
+									<div
+										class="px-4 py-2.5 flex items-center justify-end"
+										style="background: oklch(0.15 0.01 250); border-top: 1px solid oklch(0.22 0.02 250);"
+									>
+										<button
+											class="font-mono text-[10px] font-semibold px-3 py-1 rounded cursor-pointer transition-colors duration-150 flex items-center gap-1.5"
+											style="
+												background: oklch(0.22 0.04 250);
+												color: oklch(0.70 0.02 250);
+												border: 1px solid oklch(0.30 0.04 250);
+											"
+											onclick={() => openWizardForPlugin(plugin.type)}
+										>
+											<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
+												<path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
+											</svg>
+											Add Source
+										</button>
+									</div>
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				<!-- User Plugins -->
+				{#if userPlugins.length > 0}
+					<div>
+						<h2 class="font-mono text-[10px] font-semibold tracking-widest uppercase mb-3" style="color: oklch(0.45 0.02 250);">
+							User Plugins ({userPlugins.length})
+						</h2>
+						<div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
+							{#each userPlugins as plugin}
+								{@const isConfigured = sources.some(s => s.type === plugin.type)}
+								<div
+									class="rounded-lg overflow-hidden transition-all duration-200"
+									style="background: oklch(0.18 0.02 250); border: 1px solid oklch(0.25 0.03 280);"
+								>
+									<div class="px-4 pt-4 pb-3 flex items-start gap-3">
+										<div
+											class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+											style="background: oklch(0.22 0.04 280); border: 1px solid oklch(0.30 0.06 280);"
+										>
+											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4" style="color: oklch(0.65 0.10 280);">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0a.64.64 0 01-.657.643 48.39 48.39 0 01-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 01-.658.663v0c-.355 0-.676-.186-.959-.401a1.647 1.647 0 00-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401v0c.31 0 .555.26.532.57a48.039 48.039 0 01-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 00.657-.643v0c0-.355-.186-.676-.401-.959a1.647 1.647 0 01-.349-1.003c0-1.035 1.008-1.875 2.25-1.875 1.243 0 2.25.84 2.25 1.875 0 .369-.128.713-.349 1.003-.215.283-.4.604-.4.959v0c0 .333.277.599.61.58a48.1 48.1 0 005.427-.63 48.05 48.05 0 00.582-4.717.532.532 0 00-.533-.57v0c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.96.401v0a.656.656 0 00.658-.663 48.422 48.422 0 00-.37-5.36c-1.886.342-3.81.574-5.766.689a.578.578 0 01-.61-.58v0z" />
+											</svg>
+										</div>
+										<div class="flex-1 min-w-0">
+											<div class="flex items-center gap-2">
+												<h3 class="font-mono text-xs font-semibold" style="color: oklch(0.80 0.02 250);">
+													{plugin.name}
+												</h3>
+												{#if isConfigured}
+													<span
+														class="font-mono text-[8px] px-1.5 py-0.5 rounded"
+														style="background: oklch(0.22 0.06 145); color: oklch(0.60 0.12 145);"
+													>
+														configured
+													</span>
+												{/if}
+											</div>
+											<p class="font-mono text-[10px] mt-1 leading-relaxed" style="color: oklch(0.55 0.02 250);">
+												{plugin.description || 'No description'}
+											</p>
+											<div class="flex items-center gap-2 mt-1">
+												{#if plugin.version}
+													<span class="font-mono text-[9px]" style="color: oklch(0.40 0.02 250);">
+														v{plugin.version}
+													</span>
+												{/if}
+												<span class="font-mono text-[9px] truncate" style="color: oklch(0.35 0.02 250);" title={plugin.path}>
+													{plugin.path.replace(/^.*\/ingest-plugins\//, '~/.../ingest-plugins/')}
+												</span>
+											</div>
+										</div>
+									</div>
+
+									{#if !plugin.enabled && plugin.error}
+										<div
+											class="mx-4 mb-3 px-2.5 py-1.5 rounded font-mono text-[9px]"
+											style="background: oklch(0.20 0.06 25); color: oklch(0.60 0.10 25);"
+										>
+											{plugin.error}
+										</div>
+									{/if}
+
+									<div
+										class="px-4 py-2.5 flex items-center justify-end"
+										style="background: oklch(0.15 0.01 250); border-top: 1px solid oklch(0.22 0.02 250);"
+									>
+										<button
+											class="font-mono text-[10px] font-semibold px-3 py-1 rounded cursor-pointer transition-colors duration-150 flex items-center gap-1.5"
+											style="
+												background: oklch(0.22 0.04 280);
+												color: oklch(0.70 0.08 280);
+												border: 1px solid oklch(0.30 0.06 280);
+											"
+											onclick={() => openWizardForPlugin(plugin.type)}
+										>
+											<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
+												<path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
+											</svg>
+											Add Source
+										</button>
+									</div>
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/if}
+			{/if}
 		{/if}
 
 		{#if error}

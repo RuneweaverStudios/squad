@@ -568,8 +568,8 @@
 									<div class="flex items-center gap-2">
 										<code class="text-sm font-mono text-primary">{cmd.invocation}</code>
 									</div>
-									{#if cmd.description}
-										<p class="text-xs text-base-content/50 truncate mt-0.5">{cmd.description}</p>
+									{#if cmd.frontmatter?.description}
+										<p class="text-xs text-base-content/50 truncate mt-0.5">{cmd.frontmatter?.description}</p>
 									{/if}
 								</div>
 

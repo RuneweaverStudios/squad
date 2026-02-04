@@ -357,6 +357,7 @@ export async function POST({ params, request }) {
 		}
 
 		// Parse request body for optional session_id
+		/** @type {{project?: string, session_id?: string | null}} */
 		let body = {};
 		try {
 			body = await request.json();
@@ -457,7 +458,7 @@ export async function POST({ params, request }) {
 			await execAsync(tmuxCreateCmd);
 		} catch (e) {
 			// Ignore errors from kill-session if session doesn't exist
-			console.log('tmux session creation:', e.message);
+			console.log('tmux session creation:', /** @type {Error} */ (e).message);
 		}
 
 		// Then launch terminal attached to the tmux session

@@ -26,7 +26,7 @@ const logger = pino({
       level: 'error',
       send: (level, logEvent) => {
         // Send errors to monitoring service in production
-        if (!dev && level.value >= 50) { // error and above
+        if (!dev && (level as any).value >= 50) { // error and above
           fetch('/api/logs', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

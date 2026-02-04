@@ -24,6 +24,7 @@
 	import SessionsTabs from '$lib/components/sessions/SessionsTabs.svelte';
 	import AnimatedDigits from '$lib/components/AnimatedDigits.svelte';
 	import StatusActionBadge from '$lib/components/work/StatusActionBadge.svelte';
+	import type { SessionState } from '$lib/config/statusColors';
 	import SortDropdown from '$lib/components/SortDropdown.svelte';
 
 	interface TmuxSession {
@@ -1186,7 +1187,7 @@
 											</div>
 											<!-- Row 2: Status action badge with elapsed time -->
 											<StatusActionBadge
-												sessionState={activityState || 'idle'}
+												sessionState={(activityState || 'idle') as SessionState}
 												{elapsed}
 												sessionName={session.name}
 												alignRight={true}

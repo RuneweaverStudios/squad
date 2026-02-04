@@ -55,6 +55,7 @@ async function captureSessionLog(sessionName, reason) {
 	const timestamp = new Date().toISOString();
 
 	// Determine separator based on reason
+	/** @type {Record<string, string>} */
 	const separators = {
 		compacted: '📦 CONTEXT COMPACTED',
 		paused: '⏸️ SESSION PAUSED',

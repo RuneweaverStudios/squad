@@ -229,7 +229,7 @@ async function getProjectTaskCounts(projectPath) {
 		const total = tasks.length;
 		return { open, total };
 	} catch (err) {
-		console.error(`[getProjectTaskCounts] Error for ${projectPath}:`, err.message);
+		console.error(`[getProjectTaskCounts] Error for ${projectPath}:`, /** @type {Error} */ (err).message);
 		return { open: 0, total: 0 };
 	}
 }
@@ -499,7 +499,7 @@ export async function GET({ url }) {
 		const jatConfig = await readJatConfig();
 		const ideSettings = await readIdeSettings();
 		// Normalize hidden projects to lowercase for case-insensitive comparison
-		const hiddenProjects = new Set((ideSettings.hiddenProjects || []).map(p => p.toLowerCase()));
+		const hiddenProjects = new Set((ideSettings.hiddenProjects || []).map((/** @type {string} */ p) => p.toLowerCase()));
 
 		let projects = [];
 
@@ -605,6 +605,7 @@ export async function GET({ url }) {
 				};
 				// @ts-ignore - lastActivity exists when includeStats is true
 				const scoreA = getScore(a.lastActivity);
+				// @ts-ignore - lastActivity exists when includeStats is true
 				const scoreB = getScore(b.lastActivity);
 
 				// Define "recent" as within the last week (7 days = 7000 in score)
@@ -633,6 +634,7 @@ export async function GET({ url }) {
 			});
 
 			// Remove internal _agentActivityMs field from response
+			// @ts-ignore - _agentActivityMs exists when includeStats is true
 			projects = projects.map(({ _agentActivityMs, ...project }) => project);
 		}
 

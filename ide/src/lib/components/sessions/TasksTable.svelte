@@ -8,6 +8,7 @@
 
 	import TaskIdBadge from '$lib/components/TaskIdBadge.svelte';
 	import StatusActionBadge from '$lib/components/work/StatusActionBadge.svelte';
+	import type { SessionState } from '$lib/config/statusColors';
 
 	// Normalized row item that works for all three modes
 	interface TableRow {
@@ -70,10 +71,10 @@
 	}
 
 	// Get session state for StatusActionBadge
-	function getSessionState(row: TableRow): string {
+	function getSessionState(row: TableRow): SessionState {
 		if (mode === 'paused') return 'paused';
 		if (mode === 'open') return 'ready'; // For "START" button
-		return row.sessionState || 'idle';
+		return (row.sessionState as SessionState) || 'idle';
 	}
 </script>
 

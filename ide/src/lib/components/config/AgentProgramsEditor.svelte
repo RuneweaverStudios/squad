@@ -240,11 +240,11 @@
 		// Verify first if not skipping
 		if (!skipVerification && !verificationResult) {
 			await verifyHarness();
+		}
 
-			// If verification shows issues, don't add yet (user can click "Add Anyway")
-			if (verificationResult && !verificationResult.ready) {
-				return;
-			}
+		// If verification shows issues, don't add yet (user can click "Add Anyway")
+		if (verificationResult && !verificationResult.ready && !skipVerification) {
+			return;
 		}
 
 		isAdding = true;

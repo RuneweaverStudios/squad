@@ -434,6 +434,8 @@ export type SessionState =
 	| 'completed'
 	| 'auto-proceeding'
 	| 'recovering'
+	| 'polishing'
+	| 'ready'
 	| 'paused'
 	| 'idle';
 

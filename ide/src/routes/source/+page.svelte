@@ -483,7 +483,7 @@
 								title={selectedMigrationTitle}
 								isDiff={isDiff}
 								filename={selectedMigrationFilename}
-								project={selectedProject}
+								project={selectedProject ?? undefined}
 								onClose={handleClearMigration}
 								onSave={(newContent) => { selectedMigrationContent = newContent; }}
 							/>

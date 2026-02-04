@@ -1,6 +1,6 @@
 <script lang="ts">
 	import '../app.css';
-	import { onMount, untrack } from 'svelte';
+	import { onMount, onDestroy, untrack } from 'svelte';
 	import { themeChange } from 'theme-change';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
@@ -272,14 +272,15 @@
 		// Activity polling - 500ms is responsive enough, 200ms was too aggressive
 		startActivityPolling(500);
 
-		return () => {
-			closeSessionEvents(); // Close cross-page BroadcastChannel
-			// Unregister all connections from the manager (handles disconnect)
-			connectionIds.forEach(id => unregisterConnection(id));
-			stopActivityPolling(); // Stop activity polling
-			stopGitStatusPolling(); // Stop git status polling for Files badge
-			clearAllBadges(); // Clear favicon and title badges on unmount
-		};
+	});
+
+	onDestroy(() => {
+		closeSessionEvents(); // Close cross-page BroadcastChannel
+		// Unregister all connections from the manager (handles disconnect)
+		connectionIds.forEach(id => unregisterConnection(id));
+		stopActivityPolling(); // Stop activity polling
+		stopGitStatusPolling(); // Stop git status polling for Files badge
+		clearAllBadges(); // Clear favicon and title badges on unmount
 	});
 
 	// React to session events from other pages/tabs (e.g., session killed on /work)

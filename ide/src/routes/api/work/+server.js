@@ -33,6 +33,7 @@ const execAsync = promisify(exec);
  * Map jat-signal states to SessionCard states
  * Signal uses short names, SessionCard expects hyphenated names
  */
+/** @type {Record<string, string>} */
 const SIGNAL_STATE_MAP = {
 	'working': 'working',
 	'review': 'ready-for-review',
@@ -68,7 +69,7 @@ function readSignalState(sessionName) {
 		// See SIGNAL_TTL in constants.ts for configuration
 		const stats = statSync(signalFile);
 		const ageMs = Date.now() - stats.mtimeMs;
-		const isUserWaitingState = signal.type === 'state' && SIGNAL_TTL.USER_WAITING_STATES.includes(signal.state);
+		const isUserWaitingState = signal.type === 'state' && signal.state && SIGNAL_TTL.USER_WAITING_STATES.includes(/** @type {typeof SIGNAL_TTL.USER_WAITING_STATES[number]} */ (signal.state));
 		const ttl = signal.type === 'complete' || isUserWaitingState ? SIGNAL_TTL.USER_WAITING_MS : SIGNAL_TTL.TRANSIENT_MS;
 		if (ageMs > ttl) {
 			return null;

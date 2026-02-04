@@ -59,7 +59,8 @@ export async function GET({ params }) {
 		const isAgentSession = sessionId.startsWith('jat-') && !sessionId.endsWith('-dev');
 		const isServerSession = sessionId.endsWith('-dev') || sessionId.includes('-dev-');
 
-		let agentName = null;
+		/** @type {string|null} */
+	let agentName = null;
 		let task = null;
 
 		if (isAgentSession) {

@@ -197,34 +197,35 @@
 			});
 
 			// Load Monaco
-			monaco = await loader.init();
+			const monacoInstance = await loader.init();
+			monaco = monacoInstance;
 
 			// Create URIs for the models
-			const originalUri = monaco.Uri.parse(`original://${filePath}`);
-			const modifiedUri = monaco.Uri.parse(`modified://${filePath}`);
+			const originalUri = monacoInstance.Uri.parse(`original://${filePath}`);
+			const modifiedUri = monacoInstance.Uri.parse(`modified://${filePath}`);
 
 			// Dispose existing models if they exist (prevents "already exists" error)
-			const existingOriginal = monaco.editor.getModel(originalUri);
-			const existingModified = monaco.editor.getModel(modifiedUri);
+			const existingOriginal = monacoInstance.editor.getModel(originalUri);
+			const existingModified = monacoInstance.editor.getModel(modifiedUri);
 			if (existingOriginal) existingOriginal.dispose();
 			if (existingModified) existingModified.dispose();
 
 			// Create original model
-			const originalModel = monaco.editor.createModel(
+			const originalModel = monacoInstance.editor.createModel(
 				originalContent,
 				language(),
 				originalUri
 			);
 
 			// Create modified model
-			const modifiedModel = monaco.editor.createModel(
+			const modifiedModel = monacoInstance.editor.createModel(
 				modifiedContent,
 				language(),
 				modifiedUri
 			);
 
 			// Create diff editor
-			diffEditor = monaco.editor.createDiffEditor(containerRef, {
+			const diffEditorInstance = monacoInstance.editor.createDiffEditor(containerRef, {
 				theme: effectiveTheme,
 				readOnly: true,
 				renderSideBySide: true,
@@ -245,8 +246,9 @@
 					horizontalScrollbarSize: 10
 				}
 			});
+			diffEditor = diffEditorInstance;
 
-			diffEditor.setModel({
+			diffEditorInstance.setModel({
 				original: originalModel,
 				modified: modifiedModel
 			});

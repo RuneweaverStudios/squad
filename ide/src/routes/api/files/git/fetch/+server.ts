@@ -39,7 +39,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		}
 
 		// Fetch
-		const fetchResult = await git.fetch(remote, undefined, fetchOptions);
+		const fetchResult = await git.fetch(remote, fetchOptions);
 
 		// Get updated status to show ahead/behind
 		const status = await git.status();

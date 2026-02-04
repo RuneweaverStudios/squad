@@ -271,7 +271,7 @@ export const POST: RequestHandler = async ({ url, request }) => {
 	const effectivePassword = password || getDatabasePassword(projectName, projectPath, serverPath);
 
 	// Get pooler URL (with password)
-	const poolerUrl = getPoolerUrl(supabasePath, effectivePassword);
+	const poolerUrl = getPoolerUrl(supabasePath, effectivePassword ?? undefined);
 	if (!poolerUrl) {
 		return json(
 			{ success: false, error: 'Project not linked to Supabase. Run `supabase link` in the project.' },

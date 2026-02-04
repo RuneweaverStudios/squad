@@ -15,7 +15,7 @@
 	import TaskDetailPaneB from '$lib/components/sessions/TaskDetailPaneB.svelte';
 	import { getReviewRules } from '$lib/stores/reviewRules.svelte';
 	import { computeReviewStatus } from '$lib/utils/reviewStatusUtils';
-	import { getSessionStateVisual } from '$lib/config/statusColors';
+	import { getSessionStateVisual, type SessionState } from '$lib/config/statusColors';
 	import { getNotesUpdateSignal, clearNotesUpdateSignal } from '$lib/stores/taskNotesUpdate.svelte';
 	import MonacoWrapper from '$lib/components/config/MonacoWrapper.svelte';
 
@@ -1100,7 +1100,7 @@
 								{@const autoCompleteDisabled = autoCompleteDisabledMap.get(session.name) ?? reviewBasedDefault}
 								<div class="status-cell-content">
 									<StatusActionBadge
-										sessionState={optimisticStates.get(session.name) || activityState || 'idle'}
+										sessionState={(optimisticStates.get(session.name) || activityState || 'idle') as SessionState}
 										{elapsed}
 										stacked={true}
 										sessionName={session.name}

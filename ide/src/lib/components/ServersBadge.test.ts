@@ -128,6 +128,7 @@ function groupSessionsByProject(
 		task?: { id?: string } | null;
 		lastCompletedTask?: { id?: string } | null;
 		project?: string | null;
+		agentName?: string;
 	}>
 ): Map<string, typeof sessions> {
 	const groups = new Map<string, typeof sessions>();

@@ -829,7 +829,7 @@
 						{#if isExpanded && hooks[eventType.id]}
 							<div class="entries-list" transition:slide={{ duration: 200 }}>
 								{#each filteredIndices as entryIndex (entryIndex)}
-									{@const entry = hooks[eventType.id][entryIndex]}
+									{@const entry = hooks[eventType.id]![entryIndex]}
 									{@const matcherKey = `${eventType.id}-${entryIndex}`}
 									{@const matcherError = matcherErrors.get(matcherKey)}
 									{@const matcherSegments = highlightMatch(entry.matcher, searchQuery)}

@@ -395,6 +395,7 @@ function selectAgentAndModel({ agentId, model, task }) {
  * @param {string} [params.agentName] - Agent name for task injection
  * @param {string} [params.taskId] - Task ID for task injection
  * @param {string} [params.taskTitle] - Task title for task injection
+ * @param {string} [params.mode] - Spawn mode (e.g. 'planning')
  * @returns {{ command: string, env: Record<string, string>, needsJatStart: boolean }}
  */
 function buildAgentCommand({ agent, model, projectPath, jatDefaults, agentName, taskId, taskTitle, mode }) {

@@ -25,11 +25,14 @@
 	interface SessionInfo {
 		name: string;
 		agentName: string;
-		task?: {
+		task: {
 			id: string;
-			title: string;
-			status: string;
-		};
+			title?: string;
+			description?: string;
+			status?: string;
+			priority?: number;
+			issue_type?: string;
+		} | null;
 		status: string;
 	}
 
@@ -61,10 +64,10 @@
 			// Map sessions from store
 			const state = workSessionsState;
 			sessions = (state.sessions || []).map(s => ({
-				name: s.sessionName || s.name,
-				agentName: s.agentName || s.agent || s.name?.replace('jat-', '') || '',
+				name: s.sessionName,
+				agentName: s.agentName || s.sessionName?.replace('jat-', '') || '',
 				task: s.task,
-				status: s.sseState || s.state || 'idle'
+				status: s._sseState || 'idle'
 			}));
 		} catch (err) {
 			console.error('[Swarm] Failed to load sessions:', err);

@@ -5,8 +5,7 @@
 
 import { perfLogger } from './logger';
 import {
-  PRODUCTION_CONFIG,
-  type LogContext
+  PRODUCTION_CONFIG
 } from '$lib/config/logConfig';
 import { browser } from '$app/environment';
 
@@ -57,7 +56,7 @@ export function trackApiPerformance(endpoint: string, metadata?: Record<string, 
       }
 
       // Log performance data
-      const logData: LogContext & Record<string, any> = {
+      const logData: Record<string, any> = {
         endpoint,
         duration,
         category,

@@ -110,6 +110,7 @@ function normalizeProjectName(name) {
 	return name.toLowerCase().replace(/[-_\s]/g, '');
 }
 
+/** @param {string} projectName */
 export async function getProjectPath(projectName) {
 	const normalizedName = normalizeProjectName(projectName);
 

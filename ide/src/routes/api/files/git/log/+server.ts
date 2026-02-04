@@ -10,6 +10,9 @@ import { getGitForProject, formatGitError } from '$lib/server/git.js';
 
 export const GET: RequestHandler = async ({ url }) => {
 	const projectName = url.searchParams.get('project');
+	if (!projectName) {
+		throw error(400, 'Missing required parameter: project');
+	}
 	const limitParam = url.searchParams.get('limit');
 	const limit = limitParam ? parseInt(limitParam, 10) : 20;
 
