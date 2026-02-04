@@ -167,7 +167,7 @@
 					contextMenuGroupId: 'modification',
 					contextMenuOrder: 1.5,
 					precondition: 'editorHasSelection',
-					run: (ed) => {
+					run: (ed: Monaco.editor.ICodeEditor) => {
 						const selection = ed.getSelection();
 						if (selection && !selection.isEmpty()) {
 							const model = ed.getModel();
@@ -191,7 +191,7 @@
 					contextMenuGroupId: 'modification',
 					contextMenuOrder: 1.6,
 					precondition: 'editorHasSelection',
-					run: (ed) => {
+					run: (ed: Monaco.editor.ICodeEditor) => {
 						const selection = ed.getSelection();
 						if (selection && !selection.isEmpty()) {
 							const model = ed.getModel();
