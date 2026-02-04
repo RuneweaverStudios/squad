@@ -62,7 +62,8 @@
 
 	// Wizard state
 	let wizardOpen = $state(false);
-	let wizardType = $state<'rss' | 'slack' | 'telegram' | 'gmail' | 'custom' | null>(null);
+	let wizardType = $state<string | null>(null);
+	let wizardPluginMetadata = $state<any>(null);
 	let editSource = $state<any>(null);
 
 	// Template card definitions
@@ -288,21 +289,35 @@
 		setTimeout(() => { installResult = null; }, 5000);
 	}
 
-	function openWizard(type: typeof wizardType) {
+	function openWizard(type: string) {
 		wizardType = type;
+		wizardPluginMetadata = null;
 		editSource = null;
 		wizardOpen = true;
 	}
 
 	function openWizardForPlugin(pluginType: string) {
-		wizardType = pluginType as typeof wizardType;
+		wizardType = pluginType;
+		// Find the plugin metadata to pass to the wizard
+		const plugin = plugins.find(p => p.type === pluginType);
+		wizardPluginMetadata = plugin ? { configFields: plugin.configFields, name: plugin.name, type: plugin.type } : null;
 		editSource = null;
 		wizardOpen = true;
 		activeTab = 'installed';
 	}
 
-	function openEdit(source: any) {
+	async function openEdit(source: any) {
 		wizardType = source.type;
+		// Look up plugin metadata for plugin-type sources
+		const BUILTIN_TYPES = ['rss', 'slack', 'telegram', 'gmail', 'custom'];
+		if (!BUILTIN_TYPES.includes(source.type)) {
+			// Fetch plugins if not yet loaded
+			if (!pluginsFetched) await fetchPlugins();
+			const plugin = plugins.find(p => p.type === source.type);
+			wizardPluginMetadata = plugin ? { configFields: plugin.configFields, name: plugin.name, type: plugin.type } : null;
+		} else {
+			wizardPluginMetadata = null;
+		}
 		editSource = source;
 		wizardOpen = true;
 	}
@@ -310,6 +325,7 @@
 	function closeWizard() {
 		wizardOpen = false;
 		wizardType = null;
+		wizardPluginMetadata = null;
 		editSource = null;
 	}
 
@@ -1442,6 +1458,7 @@
 <IngestWizard
 	open={wizardOpen}
 	sourceType={wizardType}
+	pluginMetadata={wizardPluginMetadata}
 	{editSource}
 	onClose={closeWizard}
 	onSave={handleSave}

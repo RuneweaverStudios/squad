@@ -16,13 +16,18 @@
 
 	interface Props {
 		open: boolean;
-		sourceType: 'rss' | 'slack' | 'telegram' | 'gmail' | 'custom' | null;
+		sourceType: string | null;
 		editSource?: any | null;
+		pluginMetadata?: { configFields?: any[]; name?: string; type?: string } | null;
 		onClose: () => void;
 		onSave: (source: any) => void;
 	}
 
-	let { open, sourceType, editSource = null, onClose, onSave }: Props = $props();
+	let { open, sourceType, editSource = null, pluginMetadata = null, onClose, onSave }: Props = $props();
+
+	// Known built-in types
+	const BUILTIN_TYPES = ['rss', 'slack', 'telegram', 'gmail', 'custom'];
+	const isPluginType = $derived(sourceType != null && !BUILTIN_TYPES.includes(sourceType));
 
 	// Wizard state
 	let step = $state(0);
@@ -69,6 +74,14 @@
 	// Custom fields
 	let customCommand = $state('');
 
+	// Dynamic plugin fields (keyed by configField.key)
+	let pluginFields = $state<Record<string, any>>({});
+	// Track secret status per secret-type configField key
+	let pluginSecretStatus = $state<Record<string, 'checking' | 'found' | 'missing' | 'saving' | 'error'>>({});
+	let pluginSecretMasked = $state<Record<string, string>>({});
+	let pluginTokenInputs = $state<Record<string, string>>({});
+	let pluginShowTokenInput = $state<Record<string, boolean>>({});
+
 	// Token auth state (shared by Slack and Telegram)
 	let secretStatus = $state<'checking' | 'found' | 'missing' | 'saving' | 'error'>('checking');
 	let secretMasked = $state('');
@@ -82,7 +95,7 @@
 	const projectNames = $derived(projects.map(p => p.name?.toLowerCase() || p.path?.split('/').pop() || '').filter(Boolean));
 
 	// Steps per type
-	const stepConfigs: Record<string, string[]> = {
+	const builtinStepConfigs: Record<string, string[]> = {
 		rss: ['Feed URL', 'Project', 'Options', 'Review'],
 		slack: ['Slack Token', 'Channel', 'Project', 'Options', 'Review'],
 		telegram: ['Bot Token', 'Chat', 'Project', 'Options', 'Review'],
@@ -90,9 +103,30 @@
 		custom: ['Command', 'Project', 'Options', 'Review']
 	};
 
-	const steps = $derived(sourceType ? stepConfigs[sourceType] || [] : []);
+	// For plugins: Configuration -> Project -> Options -> Review
+	const pluginSteps = $derived.by(() => {
+		if (!isPluginType || !pluginMetadata?.configFields?.length) return ['Configuration', 'Project', 'Options', 'Review'];
+		return ['Configuration', 'Project', 'Options', 'Review'];
+	});
+
+	const steps = $derived(sourceType ? (isPluginType ? pluginSteps : builtinStepConfigs[sourceType] || []) : []);
 	const totalSteps = $derived(steps.length);
 	const isLastStep = $derived(step === totalSteps - 1);
+	// Check if required plugin fields are all filled (for step 0 = Configuration)
+	function pluginRequiredFieldsMissing(): boolean {
+		if (!pluginMetadata?.configFields) return false;
+		for (const field of pluginMetadata.configFields) {
+			if (!field.required) continue;
+			if (field.type === 'secret') {
+				if (pluginSecretStatus[field.key] !== 'found') return true;
+			} else {
+				const val = pluginFields[field.key];
+				if (val === undefined || val === null || (typeof val === 'string' && !val.trim())) return true;
+			}
+		}
+		return false;
+	}
+
 	const nextDisabled = $derived(
 		saving ||
 		// RSS: step 0 = Feed URL
@@ -113,7 +147,10 @@
 		(sourceType === 'slack' && step === 2 && !project.trim()) ||
 		(sourceType === 'telegram' && step === 2 && !project.trim()) ||
 		(sourceType === 'gmail' && step === 2 && !project.trim()) ||
-		(sourceType === 'custom' && step === 1 && !project.trim())
+		(sourceType === 'custom' && step === 1 && !project.trim()) ||
+		// Plugin types
+		(isPluginType && step === 0 && pluginRequiredFieldsMissing()) ||
+		(isPluginType && step === 1 && !project.trim())
 	);
 
 	// Check secret when on step 0 for Slack/Telegram
@@ -135,6 +172,21 @@
 		}
 	});
 
+	// Check secrets for plugin-type secret fields when wizard opens
+	$effect(() => {
+		if (open && isPluginType && pluginMetadata?.configFields) {
+			for (const field of pluginMetadata.configFields) {
+				if (field.type === 'secret') {
+					const secretKey = field.key;
+					const secretVal = pluginFields[secretKey];
+					if (secretVal && typeof secretVal === 'string' && secretVal.trim()) {
+						checkPluginSecret(secretKey, secretVal.trim());
+					}
+				}
+			}
+		}
+	});
+
 	// Reset form when source type changes
 	$effect(() => {
 		if (open && sourceType) {
@@ -153,6 +205,29 @@
 			detectedChannels = [];
 			channelDetectionError = '';
 			detectingChannels = false;
+
+			// Reset plugin state
+			pluginFields = {};
+			pluginSecretStatus = {};
+			pluginSecretMasked = {};
+			pluginTokenInputs = {};
+			pluginShowTokenInput = {};
+
+			// Initialize plugin fields with defaults
+			if (isPluginType && pluginMetadata?.configFields) {
+				for (const field of pluginMetadata.configFields) {
+					if (field.default !== undefined) {
+						pluginFields[field.key] = field.default;
+					} else if (field.type === 'boolean') {
+						pluginFields[field.key] = false;
+					} else if (field.type === 'secret') {
+						pluginFields[field.key] = field.key; // Default secret name is the key
+						pluginSecretStatus[field.key] = 'checking';
+					} else {
+						pluginFields[field.key] = '';
+					}
+				}
+			}
 
 			if (editSource) {
 				populateFromEdit(editSource);
@@ -212,6 +287,16 @@
 		gmailFilterSubject = src.filterSubject || '';
 		gmailMarkAsRead = src.markAsRead || false;
 		customCommand = src.command || '';
+
+		// Populate plugin fields from edit source
+		if (isPluginType && pluginMetadata?.configFields) {
+			for (const field of pluginMetadata.configFields) {
+				if (src[field.key] !== undefined) {
+					pluginFields[field.key] = src[field.key];
+				}
+			}
+			pluginFields = { ...pluginFields };
+		}
 	}
 
 	function generateId(): string {
@@ -301,6 +386,63 @@
 			testResult = { success: false, error: 'Failed to connect to verification endpoint' };
 		}
 		testingConnection = false;
+	}
+
+	// --- Plugin secret helpers ---
+
+	async function checkPluginSecret(fieldKey: string, secretName: string) {
+		pluginSecretStatus[fieldKey] = 'checking';
+		pluginSecretMasked[fieldKey] = '';
+		try {
+			const res = await fetch('/api/config/credentials/custom');
+			const data = await res.json();
+			if (data.success && data.customKeys?.[secretName]?.isSet) {
+				pluginSecretStatus[fieldKey] = 'found';
+				pluginSecretMasked[fieldKey] = data.customKeys[secretName].masked;
+				pluginShowTokenInput[fieldKey] = false;
+			} else {
+				pluginSecretStatus[fieldKey] = 'missing';
+			}
+		} catch {
+			pluginSecretStatus[fieldKey] = 'error';
+		}
+		pluginSecretStatus = { ...pluginSecretStatus };
+		pluginSecretMasked = { ...pluginSecretMasked };
+	}
+
+	async function savePluginToken(fieldKey: string, secretName: string, token: string) {
+		pluginSecretStatus[fieldKey] = 'saving';
+		error = '';
+		const envVar = secretName.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+		try {
+			const res = await fetch('/api/config/credentials/custom', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					name: secretName,
+					value: token,
+					envVar,
+					description: `${pluginMetadata?.name || sourceType} API token for jat-ingest`
+				})
+			});
+			const data = await res.json();
+			if (data.success) {
+				pluginSecretStatus[fieldKey] = 'found';
+				pluginSecretMasked[fieldKey] = token.slice(0, 6) + '...' + token.slice(-4);
+				pluginTokenInputs[fieldKey] = '';
+				pluginShowTokenInput[fieldKey] = false;
+			} else {
+				pluginSecretStatus[fieldKey] = 'missing';
+				error = data.error || 'Failed to save token';
+			}
+		} catch {
+			pluginSecretStatus[fieldKey] = 'missing';
+			error = 'Failed to save token';
+		}
+		pluginSecretStatus = { ...pluginSecretStatus };
+		pluginSecretMasked = { ...pluginSecretMasked };
+		pluginTokenInputs = { ...pluginTokenInputs };
+		pluginShowTokenInput = { ...pluginShowTokenInput };
 	}
 
 	async function detectChats() {
@@ -462,6 +604,31 @@
 			}
 		}
 
+		// Plugin types: step 0 = config fields, step 1 = project
+		if (isPluginType && pluginMetadata?.configFields) {
+			if (step === 0) {
+				for (const field of pluginMetadata.configFields) {
+					if (!field.required) continue;
+					if (field.type === 'secret') {
+						if (pluginSecretStatus[field.key] !== 'found') {
+							error = `Save a valid ${field.label || field.key} before continuing`;
+							return false;
+						}
+					} else {
+						const val = pluginFields[field.key];
+						if (val === undefined || val === null || (typeof val === 'string' && !val.trim())) {
+							error = `${field.label || field.key} is required`;
+							return false;
+						}
+					}
+				}
+			}
+			if (step === 1 && !project.trim()) {
+				error = 'Select a project';
+				return false;
+			}
+		}
+
 		return true;
 	}
 
@@ -527,6 +694,25 @@
 				...(gmailFilterSubject.trim() && { filterSubject: gmailFilterSubject.trim() }),
 				markAsRead: gmailMarkAsRead
 			};
+		} else if (isPluginType && pluginMetadata?.configFields) {
+			// Build source from dynamic plugin configFields
+			const pluginConfig: Record<string, any> = {};
+			for (const field of pluginMetadata.configFields) {
+				const val = pluginFields[field.key];
+				if (field.type === 'secret') {
+					// Secret fields store the secret name, not the value
+					pluginConfig[field.key] = typeof val === 'string' ? val.trim() : val;
+				} else if (field.type === 'boolean') {
+					pluginConfig[field.key] = val === true;
+				} else if (field.type === 'number') {
+					pluginConfig[field.key] = Number(val) || 0;
+				} else if (typeof val === 'string') {
+					if (val.trim()) pluginConfig[field.key] = val.trim();
+				} else if (val !== undefined && val !== null && val !== '') {
+					pluginConfig[field.key] = val;
+				}
+			}
+			source = { ...base, ...pluginConfig };
 		} else {
 			source = { ...base, command: customCommand.trim() };
 		}
@@ -555,6 +741,14 @@
 		gmail: 'Gmail',
 		custom: 'Custom Source'
 	};
+
+	// Resolve display label for any source type (built-in or plugin)
+	function getSourceLabel(type: string | null): string {
+		if (!type) return 'Source';
+		if (typeLabels[type]) return typeLabels[type];
+		if (pluginMetadata?.name) return pluginMetadata.name;
+		return type.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+	}
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -587,7 +781,7 @@
 			>
 				<div>
 					<h2 class="font-mono text-sm font-semibold tracking-wide" style="color: oklch(0.85 0.02 250);">
-						{editSource ? 'Edit' : 'Add'} {typeLabels[sourceType] || 'Source'}
+						{editSource ? 'Edit' : 'Add'} {getSourceLabel(sourceType)}
 					</h2>
 					<div class="flex items-center gap-2 mt-1">
 						{#each steps as s, i}
@@ -1072,6 +1266,35 @@
 						</div>
 					{/if}
 				{/if}
+
+				<!-- Dynamic Plugin Steps -->
+				{#if isPluginType}
+					{#if step === 0}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{#if pluginMetadata?.configFields}
+								{#each pluginMetadata.configFields as field}
+									{@render pluginFieldInput(field)}
+								{/each}
+							{:else}
+								<p class="font-mono text-xs" style="color: oklch(0.50 0.02 250);">
+									No configuration fields defined for this plugin.
+								</p>
+							{/if}
+						</div>
+					{:else if step === 1}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render projectStep()}
+						</div>
+					{:else if step === 2}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render optionsStep()}
+						</div>
+					{:else if step === 3}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render reviewStep()}
+						</div>
+					{/if}
+				{/if}
 			</div>
 
 			<!-- Footer -->
@@ -1465,7 +1688,7 @@
 			class="rounded-lg overflow-hidden"
 			style="border: 1px solid oklch(0.25 0.02 250);"
 		>
-			{@render reviewRow('Type', typeLabels[sourceType || ''] || sourceType || '')}
+			{@render reviewRow('Type', getSourceLabel(sourceType))}
 			{@render reviewRow('ID', sourceId || generateId())}
 			{@render reviewRow('Project', project)}
 			{@render reviewRow('Poll Interval', `${pollInterval}s`)}
@@ -1495,8 +1718,156 @@
 				{@render reviewRow('Mark as Read', gmailMarkAsRead ? 'Yes' : 'No')}
 			{:else if sourceType === 'custom'}
 				{@render reviewRow('Command', customCommand)}
+			{:else if isPluginType && pluginMetadata?.configFields}
+				{#each pluginMetadata.configFields as field}
+					{@const val = pluginFields[field.key]}
+					{#if field.type === 'secret'}
+						{@render reviewRow(field.label || field.key, pluginSecretMasked[field.key] || val || '(not set)')}
+					{:else if field.type === 'boolean'}
+						{@render reviewRow(field.label || field.key, val ? 'Yes' : 'No')}
+					{:else if field.type === 'select' && field.options}
+						{@const opt = field.options.find((o: any) => o.value === val)}
+						{@render reviewRow(field.label || field.key, opt?.label || val || '(not set)')}
+					{:else}
+						{@render reviewRow(field.label || field.key, String(val || '(not set)'))}
+					{/if}
+				{/each}
 			{/if}
 		</div>
+	</div>
+{/snippet}
+
+{#snippet pluginFieldInput(field: any)}
+	<div>
+		<label class="font-mono text-xs font-semibold block mb-1.5" style="color: oklch(0.65 0.02 250);">
+			{field.label || field.key}
+			{#if field.required}
+				<span style="color: oklch(0.70 0.12 25);">*</span>
+			{/if}
+		</label>
+
+		{#if field.type === 'string' || field.type === 'number'}
+			<input
+				type={field.type === 'number' ? 'number' : 'text'}
+				class="input input-bordered w-full font-mono text-sm"
+				placeholder={field.placeholder || ''}
+				value={pluginFields[field.key] ?? ''}
+				oninput={(e) => { pluginFields[field.key] = e.currentTarget.value; pluginFields = { ...pluginFields }; }}
+			/>
+		{:else if field.type === 'boolean'}
+			<label class="flex items-center gap-2 cursor-pointer">
+				<input
+					type="checkbox"
+					class="checkbox checkbox-sm"
+					checked={pluginFields[field.key] === true}
+					onchange={(e) => { pluginFields[field.key] = e.currentTarget.checked; pluginFields = { ...pluginFields }; }}
+				/>
+				<span class="font-mono text-xs" style="color: oklch(0.65 0.02 250);">{field.helpText || `Enable ${field.label || field.key}`}</span>
+			</label>
+		{:else if field.type === 'select' && field.options}
+			<select
+				class="select select-bordered w-full font-mono text-sm"
+				value={pluginFields[field.key] ?? ''}
+				onchange={(e) => { pluginFields[field.key] = e.currentTarget.value; pluginFields = { ...pluginFields }; }}
+			>
+				{#each field.options as opt}
+					<option value={opt.value}>{opt.label}</option>
+				{/each}
+			</select>
+		{:else if field.type === 'secret'}
+			<!-- Secret name input -->
+			<input
+				type="text"
+				class="input input-bordered w-full font-mono text-sm"
+				placeholder={field.key}
+				value={pluginFields[field.key] ?? field.key}
+				oninput={(e) => {
+					pluginFields[field.key] = e.currentTarget.value;
+					pluginFields = { ...pluginFields };
+					// Re-check secret when name changes
+					const val = e.currentTarget.value.trim();
+					if (val) checkPluginSecret(field.key, val);
+				}}
+			/>
+			<p class="font-mono text-[10px] mt-1" style="color: oklch(0.45 0.02 250);">
+				Name used in <code>jat-secret</code> to retrieve the token
+			</p>
+
+			<!-- Secret status -->
+			{#if pluginSecretStatus[field.key] === 'checking'}
+				<div
+					class="flex items-center gap-2 px-3 py-2.5 rounded-lg mt-2"
+					style="background: oklch(0.20 0.02 250 / 0.5); border: 1px solid oklch(0.28 0.02 250);"
+				>
+					<span class="loading loading-spinner loading-xs" style="color: oklch(0.55 0.02 250);"></span>
+					<span class="font-mono text-[11px]" style="color: oklch(0.55 0.02 250);">Checking for secret...</span>
+				</div>
+			{:else if pluginSecretStatus[field.key] === 'found' && !pluginShowTokenInput[field.key]}
+				<div
+					class="px-3 py-2.5 rounded-lg mt-2"
+					style="background: oklch(0.20 0.06 145 / 0.3); border: 1px solid oklch(0.35 0.10 145);"
+				>
+					<div class="flex items-center justify-between">
+						<div class="flex items-center gap-2">
+							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5" style="color: oklch(0.70 0.18 145);">
+								<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
+							</svg>
+							<span class="font-mono text-[11px]" style="color: oklch(0.75 0.12 145);">
+								Secret found: <code style="color: oklch(0.65 0.02 250);">{pluginSecretMasked[field.key]}</code>
+							</span>
+						</div>
+						<button
+							class="font-mono text-[10px] px-2 py-0.5 rounded"
+							style="color: oklch(0.60 0.02 250); background: oklch(0.22 0.02 250); border: 1px solid oklch(0.30 0.02 250);"
+							onclick={() => { pluginShowTokenInput[field.key] = true; pluginShowTokenInput = { ...pluginShowTokenInput }; }}
+						>
+							Change
+						</button>
+					</div>
+				</div>
+			{:else}
+				<!-- Secret missing or user clicked Change -->
+				<div
+					class="px-3 py-2.5 rounded-lg space-y-3 mt-2"
+					style="background: oklch(0.20 0.04 60 / 0.2); border: 1px solid oklch(0.35 0.08 60);"
+				>
+					<p class="font-mono text-[11px]" style="color: oklch(0.75 0.10 60);">
+						Enter the API token/secret value:
+					</p>
+					<div class="flex gap-2">
+						<input
+							type="password"
+							class="input input-bordered input-sm flex-1 font-mono text-xs"
+							placeholder="Paste token here..."
+							value={pluginTokenInputs[field.key] || ''}
+							oninput={(e) => { pluginTokenInputs[field.key] = e.currentTarget.value; pluginTokenInputs = { ...pluginTokenInputs }; }}
+						/>
+						<button
+							class="btn btn-sm font-mono text-[11px]"
+							style="background: oklch(0.35 0.10 145); color: oklch(0.95 0.02 250); border: 1px solid oklch(0.45 0.10 145);"
+							onclick={() => {
+								const secretName = (pluginFields[field.key] || field.key).trim();
+								const token = (pluginTokenInputs[field.key] || '').trim();
+								if (secretName && token) savePluginToken(field.key, secretName, token);
+							}}
+							disabled={pluginSecretStatus[field.key] === 'saving' || !(pluginTokenInputs[field.key] || '').trim()}
+						>
+							{#if pluginSecretStatus[field.key] === 'saving'}
+								<span class="loading loading-spinner loading-xs"></span>
+							{:else}
+								Save
+							{/if}
+						</button>
+					</div>
+				</div>
+			{/if}
+		{/if}
+
+		{#if field.helpText && field.type !== 'boolean' && field.type !== 'secret'}
+			<p class="font-mono text-[10px] mt-1.5" style="color: oklch(0.45 0.02 250);">
+				{field.helpText}
+			</p>
+		{/if}
 	</div>
 {/snippet}
 
