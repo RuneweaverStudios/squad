@@ -190,7 +190,7 @@
 		return m > 0 ? `${h}h ${m}m` : `${h}h`;
 	}
 
-	function getTimelinePos(task: CompletedTask): { left: number; width: number } {
+	function getTimelinePos(task: CompletedTask): { left: number; width: number; crossDay: boolean } {
 		const startDate = new Date(task.created_at);
 		const endDate = new Date(task.closed_at || task.updated_at);
 		const endMins = endDate.getHours() * 60 + endDate.getMinutes();
@@ -201,7 +201,7 @@
 		const startMins = sameDay ? startDate.getHours() * 60 + startDate.getMinutes() : 0;
 		const left = (startMins / 1440) * 100;
 		const width = Math.max(1.2, ((endMins - startMins) / 1440) * 100);
-		return { left, width };
+		return { left, width, crossDay: !sameDay };
 	}
 
 	const tasksByDay = $derived.by(() => {
@@ -462,10 +462,14 @@
 															<span class="text-base-content/35">{formatTime(task.created_at)}</span>
 															<span class="text-base-content/25">-</span>
 															<span class="text-base-content/55">{formatTime(task.closed_at || task.updated_at)}</span>
+															<span class="text-base-content/40 font-mono" style="font-size: 0.6rem">{formatDuration(duration)}</span>
 														</span>
 														<span class="relative w-full block" style="height: 3px; background: oklch(from var(--color-base-content) l c h / 6%); border-radius: 1.5px;">
 															<span class="absolute top-0" style="left: 50%; width: 1px; height: 100%; background: oklch(from var(--color-base-content) l c h / 10%)"></span>
-															<span class="absolute top-0" style="left: {pos.left}%; width: {pos.width}%; height: 100%; border-radius: 1.5px; background: linear-gradient(90deg, oklch(from var(--color-info) l c h / 50%), oklch(from var(--color-info) l c h / 75%))"></span>
+															{#if pos.crossDay}
+																<span class="absolute" style="left: 0; top: -1px; width: 2px; height: calc(100% + 2px); background: oklch(from var(--color-warning) l c h / 85%); border-radius: 1px;"></span>
+															{/if}
+															<span class="absolute top-0" style="left: {pos.left}%; width: {pos.width}%; height: 100%; border-radius: 1.5px; background: {pos.crossDay ? 'linear-gradient(90deg, oklch(from var(--color-warning) l c h / 70%), oklch(from var(--color-info) l c h / 55%))' : 'linear-gradient(90deg, oklch(from var(--color-info) l c h / 50%), oklch(from var(--color-info) l c h / 75%))'}"></span>
 														</span>
 													</span>
 												</span>

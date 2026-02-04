@@ -34,6 +34,12 @@
 				Demo
 			</a>
 			<a
+				href="/docs/introduction/"
+				class="text-sm text-gray-400 hover:text-white transition-colors font-medium"
+			>
+				Docs
+			</a>
+			<a
 				href="https://github.com/joewinke/jat"
 				target="_blank"
 				rel="noopener noreferrer"

@@ -278,6 +278,27 @@ JAT isn't trying to replace your editor—it's the control tower for your agent 
 
 ---
 
+## Authentication
+
+**No API keys required.** JAT uses your existing AI assistant subscriptions.
+
+Most coding agents authenticate via their own subscriptions — no separate API keys needed:
+
+| Agent | Auth Method | Setup |
+|-------|-------------|-------|
+| Claude Code | Claude Pro/Max subscription | `claude auth` |
+| Codex CLI | ChatGPT Plus/Pro subscription | `codex login` |
+| Gemini CLI | Google Account (free tier included) | First run triggers OAuth |
+| Aider | API keys only | Set provider key in env |
+
+JAT's built-in AI features (task suggestions, avatars) use an **auto-fallback** system:
+1. **Anthropic API key** — if configured (optional)
+2. **Claude CLI** — falls back to your Claude subscription via `claude -p`
+
+If you have Claude Code installed and authenticated, AI features work out of the box with zero configuration.
+
+---
+
 ## Configuration
 
 `~/.config/jat/projects.json`:
@@ -297,34 +318,32 @@ JAT isn't trying to replace your editor—it's the control tower for your agent 
 }
 ```
 
-`~/.config/jat/credentials.json` (secure API keys):
+**Optional:** API keys and project secrets can be managed at `/config` → API Keys tab, or stored in `~/.config/jat/credentials.json`:
 
 ```json
 {
   "apiKeys": {
-    "anthropic": { "key": "sk-ant-..." },
-    "google": { "key": "..." },
-    "openai": { "key": "sk-..." }
+    "anthropic": { "key": "sk-ant-..." }
   },
   "customApiKeys": {
     "stripe": { "value": "sk_live_...", "envVar": "STRIPE_API_KEY" }
   },
   "projectSecrets": {
-    "myapp": { "database_password": "..." }
+    "myapp": { "supabase_anon_key": { "value": "..." } }
   }
 }
 ```
 
-Manage keys at `/config?tab=apikeys` or use `jat-secret` in scripts:
+Access secrets in scripts:
 ```bash
 jat-secret stripe              # Get value
 eval $(jat-secret --export)    # Load all as env vars
 ```
 
 IDE settings at `/config`:
-- API keys and custom secrets
+- API keys and custom secrets (optional)
 - Per-project credentials (Supabase, databases)
-- Max concurrent sessions
+- Agent routing rules
 - Automation rules
 - Keyboard shortcuts
 

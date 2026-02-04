@@ -5,8 +5,11 @@
 
 	let { children } = $props();
 
-	// Don't show regular Nav on the alien manual page (it has its own)
-	let showNav = $derived(!$page.url.pathname.startsWith('/thealienmanual'));
+	// Don't show regular Nav on pages with their own navigation
+	let showNav = $derived(
+		!$page.url.pathname.startsWith('/thealienmanual') &&
+			!$page.url.pathname.startsWith('/docs')
+	);
 </script>
 
 <div class="min-h-screen bg-[var(--bg-deep)]">

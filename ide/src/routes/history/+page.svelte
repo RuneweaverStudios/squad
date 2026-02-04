@@ -250,7 +250,7 @@
 	}
 
 	/** Position a task on a 24h midnight-to-midnight timeline */
-	function getTimelinePos(task: CompletedTask): { left: number; width: number } {
+	function getTimelinePos(task: CompletedTask): { left: number; width: number; crossDay: boolean } {
 		const startDate = new Date(task.created_at);
 		const endDate = new Date(task.closed_at || task.updated_at);
 
@@ -268,7 +268,7 @@
 		const left = (startMins / 1440) * 100;
 		const width = Math.max(1.2, ((endMins - startMins) / 1440) * 100);
 
-		return { left, width };
+		return { left, width, crossDay: !sameDay };
 	}
 
 	const tasksByDay = $derived.by(() => {
@@ -579,11 +579,16 @@
 												<span class="task-time-start">{formatTime(task.created_at)}</span>
 												<span class="task-time-sep">-</span>
 												<span class="task-time-end">{formatTime(task.closed_at || task.updated_at)}</span>
+												<span class="task-time-duration">{formatDuration(duration)}</span>
 											</span>
 											<div class="task-duration-track">
 												<div class="task-duration-noon"></div>
+												{#if pos.crossDay}
+													<div class="task-duration-overflow-cap"></div>
+												{/if}
 												<div
 													class="task-duration-fill"
+													class:task-duration-overflow={pos.crossDay}
 													style="left: {pos.left}%; width: {pos.width}%"
 												></div>
 											</div>
@@ -892,6 +897,12 @@
 		color: oklch(from var(--color-base-content) l c h / 60%);
 	}
 
+	.task-time-duration {
+		color: oklch(from var(--color-base-content) l c h / 40%);
+		font-family: ui-monospace, monospace;
+		font-size: 0.6rem;
+	}
+
 	.task-duration-track {
 		position: relative;
 		width: 100%;
@@ -919,6 +930,24 @@
 			oklch(from var(--color-info) l c h / 50%),
 			oklch(from var(--color-info) l c h / 75%)
 		);
+	}
+
+	.task-duration-fill.task-duration-overflow {
+		background: linear-gradient(
+			90deg,
+			oklch(from var(--color-warning) l c h / 70%),
+			oklch(from var(--color-info) l c h / 55%)
+		);
+	}
+
+	.task-duration-overflow-cap {
+		position: absolute;
+		left: 0;
+		top: -1px;
+		width: 2px;
+		height: calc(100% + 2px);
+		background: oklch(from var(--color-warning) l c h / 85%);
+		border-radius: 1px;
 	}
 
 	.task-arrow {
