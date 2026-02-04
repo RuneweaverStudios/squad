@@ -62,8 +62,8 @@ function shutdown() {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
-// Start the daemon
-start({ sourceId, dryRun: dryRunMode });
+// Start the daemon (async: discovers plugins before polling)
+await start({ sourceId, dryRun: dryRunMode });
 
 // If --once mode, poll then exit
 if (once) {

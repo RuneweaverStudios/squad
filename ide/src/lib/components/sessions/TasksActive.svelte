@@ -987,12 +987,14 @@
 							: null
 					}
 					{@const elapsed = getElapsedFormatted(session.created)}
+					{@const isPlanning = effectiveState === 'planning'}
 					<tr
 						class="session-row {isNew ? 'animate-slide-in-fwd-center' : ''} {isExiting ? 'animate-slide-out-bck-center' : ''}"
 						class:attached={session.attached}
 						class:expanded={isExpanded}
 						class:expandable={!isExiting}
-						style="{rowProjectColor ? `border-left: 3px solid ${rowProjectColor};` : ''}{isExiting ? ' pointer-events: none;' : ''}"
+						class:planning={isPlanning}
+						style="{rowProjectColor ? `border-left: 3px solid ${rowProjectColor};` : isPlanning ? 'border-left: 3px solid oklch(0.68 0.20 270);' : ''}{isExiting ? ' pointer-events: none;' : ''}"
 						onclick={() => !isExiting && toggleExpanded(session.name)}
 						oncontextmenu={(e) => !isExiting && handleContextMenu(session, e)}
 					>
@@ -1037,20 +1039,27 @@
 											/>
 										</div>
 									{:else}
-										<!-- No task - show project badge if known, otherwise session name -->
-										<div class="agent-badge-row">
+										<!-- No task - planning pill matching agentPill aesthetic -->
+										{@const planningColor = effectiveState === 'planning' ? 'oklch(0.68 0.20 270)' : (rowProjectColor || 'oklch(0.50 0.02 250)')}
+										<div class="inline-flex flex-col items-start mx-2">
+											<button
+												class="planning-pill {isNew ? 'tracking-in-expand' : ''}"
+												style="background: color-mix(in oklch, {planningColor} 12%, transparent); border: 1px solid color-mix(in oklch, {planningColor} 30%, transparent); color: {planningColor};{isNew ? ' animation-delay: 100ms;' : ''}"
+												onclick={(e) => e.stopPropagation()}
+											>
+												<AgentAvatar name={sessionAgentName} size={20} showRing={true} sessionState={effectiveState} showGlow={true} />
+												<span>{sessionAgentName}</span>
+											</button>
 											{#if derivedProject}
-												<span
-													class="project-badge {isNew ? 'tracking-in-expand' : ''}"
-													style="background: {rowProjectColor ? `color-mix(in oklch, ${rowProjectColor} 25%, transparent)` : 'oklch(0.25 0.02 250)'}; border-color: {rowProjectColor || 'oklch(0.35 0.02 250)'}; color: {rowProjectColor || 'oklch(0.75 0.02 250)'};{isNew ? ' animation-delay: 100ms;' : ''}"
-												>
-													{derivedProject}
-												</span>
-											{:else}
-												<span class="session-name-pill {isNew ? 'tracking-in-expand' : ''}" style={isNew ? 'animation-delay: 100ms;' : ''}>{session.name}</span>
+												<div class="flex items-center gap-1 mt-0.5 ml-8">
+													<span
+														class="planning-project-tag"
+														style="color: {rowProjectColor || 'oklch(0.55 0.02 250)'};"
+													>
+														{derivedProject}
+													</span>
+												</div>
 											{/if}
-											<AgentAvatar name={sessionAgentName} size={20} showRing={true} sessionState={effectiveState} />
-											<span class="agent-name-inline {isNew ? 'tracking-in-expand' : ''}" style={isNew ? 'animation-delay: 100ms;' : ''}>{sessionAgentName}</span>
 										</div>
 									{/if}
 								</div>
@@ -1071,7 +1080,12 @@
 											</div>
 										{/if}
 									{:else}
-										<span class="no-task-label">{effectiveState === 'planning' ? 'Planning session' : 'No active task'}</span>
+										{#if effectiveState === 'planning'}
+											<span class="planning-title">Planning session</span>
+											<div class="planning-description">Interactive brainstorming — no task assigned</div>
+										{:else}
+											<span class="no-task-label">No active task</span>
+										{/if}
 									{/if}
 								</div>
 							{:else}
@@ -2082,6 +2096,47 @@
 		font-style: italic;
 	}
 
+	/* Planning session pill - mirrors TaskIdBadge agentPill */
+	.planning-pill {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-family: ui-monospace, monospace;
+		font-weight: 500;
+		font-size: 0.875rem;
+		padding: 0.125rem 0.625rem 0.125rem 0.125rem;
+		border-radius: 9999px;
+		cursor: default;
+		white-space: nowrap;
+	}
+
+	.planning-project-tag {
+		font-size: 0.6875rem;
+		font-weight: 500;
+		font-family: ui-monospace, monospace;
+		opacity: 0.7;
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+	}
+
+	.planning-title {
+		font-size: 0.9375rem;
+		font-weight: 600;
+		color: oklch(0.80 0.12 270);
+		font-family: inherit;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.planning-description {
+		font-size: 0.75rem;
+		color: oklch(0.55 0.05 270);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
 	.server-row {
 		display: flex;
 		align-items: center;
@@ -2182,6 +2237,14 @@
 
 	.session-row.expandable:hover {
 		background: oklch(0.65 0.15 145 / 0.15);
+	}
+
+	.session-row.planning {
+		background: oklch(0.68 0.20 270 / 0.05);
+	}
+
+	.session-row.planning:hover {
+		background: oklch(0.68 0.20 270 / 0.12);
 	}
 
 	.session-row.expanded {

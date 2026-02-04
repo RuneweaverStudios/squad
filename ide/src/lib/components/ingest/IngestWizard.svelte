@@ -95,9 +95,25 @@
 	const isLastStep = $derived(step === totalSteps - 1);
 	const nextDisabled = $derived(
 		saving ||
-		(sourceType === 'telegram' && step === 1 && !telegramChatId.trim()) ||
+		// RSS: step 0 = Feed URL
+		(sourceType === 'rss' && step === 0 && !feedUrl.trim()) ||
+		// Slack: step 0 = token saved, step 1 = channel
+		(sourceType === 'slack' && step === 0 && (secretStatus !== 'found' || !slackSecretName.trim())) ||
 		(sourceType === 'slack' && step === 1 && !slackChannel.trim()) ||
-		(sourceType === 'gmail' && step === 1 && (!gmailImapUser.trim() || !gmailFolder.trim()))
+		// Telegram: step 0 = token saved, step 1 = chat ID
+		(sourceType === 'telegram' && step === 0 && (secretStatus !== 'found' || !telegramSecretName.trim())) ||
+		(sourceType === 'telegram' && step === 1 && !telegramChatId.trim()) ||
+		// Gmail: step 0 = token saved, step 1 = email + folder
+		(sourceType === 'gmail' && step === 0 && (secretStatus !== 'found' || !gmailSecretName.trim())) ||
+		(sourceType === 'gmail' && step === 1 && (!gmailImapUser.trim() || !gmailFolder.trim())) ||
+		// Custom: step 0 = command
+		(sourceType === 'custom' && step === 0 && !customCommand.trim()) ||
+		// Project step (varies by type): project required
+		(sourceType === 'rss' && step === 1 && !project.trim()) ||
+		(sourceType === 'slack' && step === 2 && !project.trim()) ||
+		(sourceType === 'telegram' && step === 2 && !project.trim()) ||
+		(sourceType === 'gmail' && step === 2 && !project.trim()) ||
+		(sourceType === 'custom' && step === 1 && !project.trim())
 	);
 
 	// Check secret when on step 0 for Slack/Telegram
@@ -1073,9 +1089,10 @@
 				<button
 					class="btn btn-sm font-mono text-xs"
 					style="
-						background: {isLastStep ? 'oklch(0.45 0.15 145)' : 'oklch(0.35 0.10 220)'};
-						color: oklch(0.95 0.02 250);
-						border: 1px solid {isLastStep ? 'oklch(0.55 0.15 145)' : 'oklch(0.45 0.10 220)'};
+						background: {nextDisabled ? 'oklch(0.25 0.02 250)' : isLastStep ? 'oklch(0.45 0.15 145)' : 'oklch(0.35 0.10 220)'};
+						color: {nextDisabled ? 'oklch(0.45 0.02 250)' : 'oklch(0.95 0.02 250)'};
+						border: 1px solid {nextDisabled ? 'oklch(0.30 0.02 250)' : isLastStep ? 'oklch(0.55 0.15 145)' : 'oklch(0.45 0.10 220)'};
+						cursor: {nextDisabled ? 'not-allowed' : 'pointer'};
 					"
 					onclick={next}
 					disabled={nextDisabled}

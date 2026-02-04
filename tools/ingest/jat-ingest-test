@@ -2,20 +2,10 @@
 
 import { loadConfig, getSecret, configPath } from './lib/config.js';
 import { getDb, closeDb } from './lib/dedup.js';
+import { discoverPlugins } from './lib/pluginLoader.js';
 import * as logger from './lib/logger.js';
-import RssAdapter from './adapters/rss/index.js';
-import TelegramAdapter from './adapters/telegram/index.js';
-import SlackAdapter from './adapters/slack/index.js';
-import GmailAdapter from './adapters/gmail/index.js';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-
-const adapters = {
-  rss: new RssAdapter(),
-  telegram: new TelegramAdapter(),
-  slack: new SlackAdapter(),
-  gmail: new GmailAdapter()
-};
 
 const args = process.argv.slice(2);
 
@@ -42,6 +32,9 @@ if (args.includes('--init')) {
   initConfig();
   process.exit(0);
 }
+
+// Discover plugins dynamically (needed for --validate, --source, --type)
+const plugins = await discoverPlugins();
 
 if (args.includes('--validate')) {
   validateConfig();
@@ -72,11 +65,12 @@ async function testSource(id) {
     process.exit(1);
   }
 
-  const adapter = adapters[source.type];
-  if (!adapter) {
-    console.error(`No adapter for type: ${source.type}`);
+  const plugin = plugins.get(source.type);
+  if (!plugin) {
+    console.error(`No plugin for type: ${source.type}`);
     process.exit(1);
   }
+  const adapter = new plugin.AdapterClass();
 
   console.log(`Testing source: ${source.id} (${source.type})`);
   console.log('---');
@@ -101,7 +95,12 @@ async function testDirectRss(feedUrl) {
   console.log('---');
 
   const source = { id: '_test', type: 'rss', feedUrl, project: 'test' };
-  const adapter = adapters.rss;
+  const plugin = plugins.get('rss');
+  if (!plugin) {
+    console.error('RSS plugin not found');
+    process.exit(1);
+  }
+  const adapter = new plugin.AdapterClass();
 
   const result = await adapter.test(source, getSecret);
   console.log(`Status: ${result.ok ? 'OK' : 'FAILED'}`);
@@ -124,8 +123,8 @@ function validateConfig() {
     console.log(`Config: ${configPath()}`);
     console.log(`Sources: ${config.sources.length}`);
     for (const src of config.sources) {
-      const adapter = adapters[src.type];
-      const v = adapter ? adapter.validate(src) : { valid: false, error: 'Unknown type' };
+      const plugin = plugins.get(src.type);
+      const v = plugin ? new plugin.AdapterClass().validate(src) : { valid: false, error: 'Unknown type' };
       const status = v.valid ? 'OK' : `ERROR: ${v.error}`;
       const enabled = src.enabled !== false ? '' : ' (disabled)';
       console.log(`  ${src.id} [${src.type}] - ${status}${enabled}`);

@@ -2,19 +2,9 @@ import { getEnabledSources, getConfig, getSecret } from './config.js';
 import { isDuplicate, recordItem, getAdapterState, setAdapterState, logPoll, registerThread, getActiveThreads, updateThreadCursor } from './dedup.js';
 import { downloadAttachments } from './downloader.js';
 import { createTask, appendToTask, registerTaskAttachments } from './taskCreator.js';
+import { discoverPlugins } from './pluginLoader.js';
+import { applyFilter, resolveFilter } from './filterEngine.js';
 import * as logger from './logger.js';
-
-import RssAdapter from '../adapters/rss/index.js';
-import TelegramAdapter from '../adapters/telegram/index.js';
-import SlackAdapter from '../adapters/slack/index.js';
-import GmailAdapter from '../adapters/gmail/index.js';
-
-const adapters = {
-  rss: new RssAdapter(),
-  telegram: new TelegramAdapter(),
-  slack: new SlackAdapter(),
-  gmail: new GmailAdapter()
-};
 
 const STAGGER_MS = 2000;
 const CONFIG_CHECK_INTERVAL = 30000;
@@ -23,13 +13,24 @@ const MAX_BACKOFF_MS = 3600000; // 1 hour
 // Track per-source backoff and timers
 const sourceState = new Map();
 
+/** @type {Map<string, import('./pluginLoader.js').LoadedPlugin>} */
+let plugins = new Map();
+
 let running = false;
 let configCheckTimer = null;
 let dryRun = false;
 
-export function start(opts = {}) {
+export async function start(opts = {}) {
   running = true;
   dryRun = opts.dryRun || false;
+
+  // Discover plugins dynamically instead of hardcoded imports
+  plugins = await discoverPlugins();
+  if (plugins.size === 0) {
+    logger.warn('No plugins discovered');
+  } else {
+    logger.info(`Discovered ${plugins.size} plugin(s): ${[...plugins.keys()].join(', ')}`);
+  }
 
   const sources = opts.sourceId
     ? getEnabledSources().filter(s => s.id === opts.sourceId)
@@ -102,15 +103,17 @@ function schedulePoll(source, immediate = false) {
 }
 
 async function pollSource(source) {
-  const adapter = adapters[source.type];
-  if (!adapter) {
-    logger.error(`No adapter for type: ${source.type}`, source.id);
+  const plugin = plugins.get(source.type);
+  if (!plugin) {
+    logger.error(`No plugin for type: ${source.type}`, source.id);
     return;
   }
 
+  const adapter = new plugin.AdapterClass();
   const startTime = Date.now();
   let itemsFound = 0;
   let itemsNew = 0;
+  let itemsFiltered = 0;
   let error = null;
 
   try {
@@ -119,7 +122,16 @@ async function pollSource(source) {
 
     itemsFound = result.items.length;
 
+    // Resolve filter: source config override > plugin default > pass all
+    const filter = resolveFilter(source.filter, plugin.metadata.defaultFilter);
+
     for (const item of result.items) {
+      // Apply filter before dedup check
+      if (!applyFilter(item, filter)) {
+        itemsFiltered++;
+        continue;
+      }
+
       if (isDuplicate(source.id, item.id)) continue;
 
       itemsNew++;
@@ -152,18 +164,20 @@ async function pollSource(source) {
         registerTaskAttachments(taskId, downloaded, source.project);
       }
 
-      // Register thread for Slack messages that have a task
-      if (taskId && source.type === 'slack' && source.trackReplies !== false) {
-        const tsMatch = item.id.match(/^slack-(.+)$/);
-        if (tsMatch) {
-          registerThread(source.id, item.id, tsMatch[1], taskId);
+      // Register thread for adapters that support replies
+      if (taskId && source.trackReplies !== false) {
+        // Extract thread key from item ID (e.g. "slack-1234.5678" → "1234.5678")
+        const prefix = `${source.type}-`;
+        if (item.id.startsWith(prefix)) {
+          const threadKey = item.id.slice(prefix.length);
+          registerThread(source.id, item.id, threadKey, taskId);
         }
       }
     }
 
-    // Process thread replies (Slack only, wrapped in try/catch)
+    // Process thread replies for any adapter that implements pollReplies
     try {
-      if (source.type === 'slack' && source.trackReplies !== false) {
+      if (source.trackReplies !== false) {
         const threads = getActiveThreads(source.id, source.maxTrackedThreads || 50);
         if (threads.length > 0) {
           const threadResults = await adapter.pollReplies(source, threads, getSecret);
@@ -228,8 +242,13 @@ async function pollSource(source) {
   logPoll(source.id, itemsFound, itemsNew, error, durationMs);
 }
 
+/**
+ * Get auth headers for attachment downloads.
+ * Generic: looks up secretName from source config and returns Bearer token.
+ * Adapters handle their own auth for API calls; this is only for the downloader.
+ */
 function getAuthHeaders(source) {
-  if (source.type === 'slack' && source.secretName) {
+  if (source.secretName) {
     try {
       const token = getSecret(source.secretName);
       return { 'Authorization': `Bearer ${token}` };
