@@ -307,6 +307,17 @@ echo ""
 
 # Check if npm is available
 if command -v npm &> /dev/null; then
+    # Check Node.js version (need LTS: 20 or 22, not odd/current like 23/25)
+    NODE_MAJOR=$(node -v 2>/dev/null | sed 's/v\([0-9]*\).*/\1/')
+    if [ -n "$NODE_MAJOR" ] && [ "$NODE_MAJOR" -gt 22 ] 2>/dev/null; then
+        echo -e "${YELLOW}  ⚠ Node.js v$(node -v | sed 's/v//') detected - this may cause build failures${NC}"
+        echo -e "${YELLOW}  JAT requires Node.js 20 or 22 (LTS). Current/odd versions (23, 25)${NC}"
+        echo -e "${YELLOW}  break native modules like better-sqlite3.${NC}"
+        echo ""
+        echo -e "  Fix with nvm: ${BOLD}nvm install 22 && nvm use 22${NC}"
+        echo -e "  Or Homebrew:  ${BOLD}brew install node@22 && brew link --overwrite node@22${NC}"
+        echo ""
+    fi
     # Install root jat dependencies (better-sqlite3 for lib/beads.js)
     if [ -f "$INSTALL_DIR/package.json" ]; then
         echo "  → Installing jat core dependencies..."
