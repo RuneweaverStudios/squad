@@ -243,7 +243,7 @@ async function verifyGmail(appPassword: string, imapUser: string, folder: string
 						email: imapUser,
 						folder,
 						messageCount: total,
-						uidValidity: mailbox.uidValidity
+						uidValidity: Number(mailbox.uidValidity)
 					}
 				};
 			} finally {
@@ -254,15 +254,17 @@ async function verifyGmail(appPassword: string, imapUser: string, folder: string
 		}
 
 		return json(info);
-	} catch (err) {
-		const msg = err instanceof Error ? err.message : String(err);
-		if (msg.includes('AUTHENTICATIONFAILED') || msg.includes('Invalid credentials')) {
+	} catch (err: any) {
+		const msg = err?.message || String(err);
+		const responseText = err?.responseText || '';
+		const fullMsg = `${msg} ${responseText}`.toLowerCase();
+		if (fullMsg.includes('authenticationfailed') || fullMsg.includes('invalid credentials')) {
 			return json({
 				success: false,
 				error: 'Authentication failed. Check your email address and App Password. Make sure 2FA is enabled and you\'re using an App Password (not your regular password).'
 			});
 		}
-		if (msg.includes('Mailbox not found') || msg.includes('does not exist')) {
+		if (err?.mailboxMissing || err?.serverResponseCode === 'NONEXISTENT' || fullMsg.includes('mailbox not found') || fullMsg.includes('does not exist') || fullMsg.includes('unknown mailbox')) {
 			return json({
 				success: false,
 				error: `Folder "${folder}" not found. Create this Gmail label first, then try again.`
@@ -270,7 +272,7 @@ async function verifyGmail(appPassword: string, imapUser: string, folder: string
 		}
 		return json({
 			success: false,
-			error: `Connection failed: ${msg}`
+			error: `Connection failed: ${responseText || msg}`
 		});
 	}
 }

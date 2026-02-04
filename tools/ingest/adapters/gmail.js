@@ -52,7 +52,7 @@ export class GmailAdapter extends BaseAdapter {
 
         // If uidValidity changed, reset cursor (mailbox was recreated)
         let lastSeenUid = adapterState.lastSeenUid || 0;
-        if (adapterState.uidValidity && adapterState.uidValidity !== mailbox.uidValidity) {
+        if (adapterState.uidValidity && Number(adapterState.uidValidity) !== Number(mailbox.uidValidity)) {
           logger.warn('UIDVALIDITY changed, resetting cursor', source.id);
           lastSeenUid = 0;
         }
@@ -61,8 +61,8 @@ export class GmailAdapter extends BaseAdapter {
         if (lastSeenUid === 0) {
           const state = {
             ...adapterState,
-            lastSeenUid: mailbox.uidNext ? mailbox.uidNext - 1 : 0,
-            uidValidity: mailbox.uidValidity
+            lastSeenUid: Number(mailbox.uidNext ? mailbox.uidNext - 1 : 0),
+            uidValidity: Number(mailbox.uidValidity)
           };
           return { items: [], state };
         }
@@ -153,8 +153,8 @@ export class GmailAdapter extends BaseAdapter {
           items,
           state: {
             ...adapterState,
-            lastSeenUid: maxUid,
-            uidValidity: mailbox.uidValidity
+            lastSeenUid: Number(maxUid),
+            uidValidity: Number(mailbox.uidValidity)
           }
         };
       } finally {
@@ -218,13 +218,15 @@ export class GmailAdapter extends BaseAdapter {
       return info;
     } catch (err) {
       const msg = err.message || String(err);
-      if (msg.includes('AUTHENTICATIONFAILED') || msg.includes('Invalid credentials')) {
+      const responseText = err.responseText || '';
+      const fullMsg = `${msg} ${responseText}`.toLowerCase();
+      if (fullMsg.includes('authenticationfailed') || fullMsg.includes('invalid credentials')) {
         return { ok: false, message: 'Authentication failed. Check your email and App Password.' };
       }
-      if (msg.includes('Mailbox not found') || msg.includes('does not exist')) {
+      if (err.mailboxMissing || err.serverResponseCode === 'NONEXISTENT' || fullMsg.includes('mailbox not found') || fullMsg.includes('does not exist') || fullMsg.includes('unknown mailbox')) {
         return { ok: false, message: `Folder "${source.folder}" not found. Create this Gmail label first.` };
       }
-      return { ok: false, message: `Connection failed: ${msg}` };
+      return { ok: false, message: `Connection failed: ${responseText || msg}` };
     }
   }
 }

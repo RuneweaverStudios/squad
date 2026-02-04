@@ -103,6 +103,17 @@ export const PROVIDERS: Record<string, ProviderInfo> = {
 			'M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 9h-2V5h2v6zm0 4h-2v-2h2v2z'
 	},
 
+	// Pi - Minimal terminal coding agent (pi.dev)
+	pi: {
+		id: 'pi',
+		name: 'Pi',
+		color: 'oklch(0.70 0.20 300)', // Purple/violet matching pi.dev branding
+		viewBox: '0 0 24 24',
+		// Greek letter Pi (π) as icon
+		iconPath:
+			'M6 7h12v2H6V7zm2 0v10h2V7H8zm6 0v10h2V7h-2z'
+	},
+
 	// Generic/fallback
 	generic: {
 		id: 'generic',
@@ -136,7 +147,8 @@ export function getProviderForAgent(
 		'gemini-code': 'gemini',
 		'gemini': 'gemini',
 		'opencode': 'opencode',
-		'aider': 'aider'
+		'aider': 'aider',
+		'pi': 'pi'
 	};
 
 	// Try agent ID mapping first

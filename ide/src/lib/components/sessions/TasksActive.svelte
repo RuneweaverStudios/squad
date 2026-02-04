@@ -1071,7 +1071,7 @@
 											</div>
 										{/if}
 									{:else}
-										<span class="no-task-label">No active task</span>
+										<span class="no-task-label">{effectiveState === 'planning' ? 'Planning session' : 'No active task'}</span>
 									{/if}
 								</div>
 							{:else}
@@ -1241,11 +1241,13 @@
 						{@const expandedSessionInfo = agentSessionInfo.get(expandedAgentName)}
 						<tr class="expanded-row {isExiting ? 'animate-slide-out-bck-top' : ''}" style={isExiting ? 'pointer-events: none;' : ''}>
 							<td colspan="3" class="expanded-content">
+								<!-- svelte-ignore a11y_no_static_element_interactions -->
 								<div
 									class="expanded-session-wrapper"
 									class:with-task-panel={expandedTask && taskDetailOpen && expandedTaskId === expandedTask.id}
 									class:collapsing={isCollapsing}
 									bind:this={splitResizeContainer}
+									oncontextmenu={(e) => !isExiting && handleContextMenu(session, e)}
 								>
 									<!-- SessionCard section -->
 									<div class="session-card-section" style={expandedTask && taskDetailOpen && expandedTaskId === expandedTask.id ? `flex: 0 0 ${sessionPanelPercent}%;` : ''}>

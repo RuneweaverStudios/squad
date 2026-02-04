@@ -71,6 +71,23 @@ export const GEMINI_CLI_READY_PATTERNS = [
 ];
 
 /**
+ * Patterns indicating Pi coding agent is running and ready for input.
+ * Pi is a minimal terminal coding agent from pi.dev (badlogic/pi-mono).
+ * @see https://pi.dev/
+ */
+export const PI_READY_PATTERNS = [
+	'pi>',
+	'pi ',              // Pi prompt
+	'Pi ',              // Capitalized in some outputs
+	'ready',            // Pi shows "ready" when initialized
+	'Type a message',   // Input prompt
+	'Enter a prompt',   // Input prompt variant
+	'/model',           // Command hint visible in UI
+	'/new',             // Command hint visible in UI
+	'provider:',        // Provider display in status
+];
+
+/**
  * Get ready patterns for a specific agent command.
  */
 export function getReadyPatternsForAgent(command: string): string[] {
@@ -82,6 +99,9 @@ export function getReadyPatternsForAgent(command: string): string[] {
 	}
 	if (command === 'gemini') {
 		return GEMINI_CLI_READY_PATTERNS;
+	}
+	if (command === 'pi') {
+		return PI_READY_PATTERNS;
 	}
 	// Default to Claude patterns
 	return CLAUDE_READY_PATTERNS;

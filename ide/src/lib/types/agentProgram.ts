@@ -539,6 +539,29 @@ export const AGENT_PRESETS: AgentProgramPreset[] = [
 			flags: [],
 			taskInjection: 'prompt'
 		}
+	},
+	{
+		id: 'pi',
+		name: 'Pi',
+		description: 'Pi - Minimal terminal coding agent from pi.dev',
+		installCommand: 'npm install -g @mariozechner/pi-coding-agent',
+		installUrl: 'https://pi.dev/',
+		config: {
+			id: 'pi',
+			name: 'Pi',
+			command: 'pi',
+			models: [
+				{ id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', shortName: 'sonnet', costTier: 'medium' },
+				{ id: 'claude-opus-4-5-20251101', name: 'Claude Opus 4.5', shortName: 'opus', costTier: 'high' },
+				{ id: 'gpt-4o', name: 'GPT-4o', shortName: 'gpt4o', costTier: 'high' },
+				{ id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', shortName: 'flash', costTier: 'low' },
+				{ id: 'o4-mini', name: 'O4 Mini', shortName: 'o4-mini', costTier: 'medium' }
+			],
+			defaultModel: 'sonnet',
+			authType: 'subscription',
+			flags: [],
+			taskInjection: 'argument'
+		}
 	}
 ];
 

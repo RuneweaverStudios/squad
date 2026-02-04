@@ -442,7 +442,7 @@ function buildAgentCommand({ agent, model, projectPath, jatDefaults, agentName, 
 		// Add model flag (agent-specific)
 		if (agent.command === 'claude') {
 			agentCmd += ` --model ${model.shortName}`;
-		} else if (agent.command === 'codex' || agent.command === 'gemini') {
+		} else if (agent.command === 'codex' || agent.command === 'gemini' || agent.command === 'pi') {
 			agentCmd += ` --model ${model.id}`;
 		} else if (agent.command === 'opencode') {
 			// OpenCode uses provider/model format (e.g., anthropic/claude-sonnet-4-20250514)

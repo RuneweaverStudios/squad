@@ -521,6 +521,12 @@
 						priority: taskSource.priority,
 						description: taskSource.description,
 					});
+				} else {
+					// No task — override idle state to 'planning'
+					const info = sessionInfoMap.get(session.agentName);
+					if (info && (!info.activityState || info.activityState === 'idle')) {
+						info.activityState = 'planning';
+					}
 				}
 			}
 			agentProjects = projectMap;

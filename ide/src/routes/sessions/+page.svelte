@@ -283,6 +283,12 @@
 						priority: taskSource.priority,
 						description: taskSource.description
 					});
+				} else {
+					// No task — override idle state to 'planning'
+					const info = sessionInfoMap.get(session.agentName);
+					if (info && (!info.activityState || info.activityState === 'idle')) {
+						info.activityState = 'planning';
+					}
 				}
 			}
 			agentProjects = projectMap;
@@ -1144,7 +1150,7 @@
 												{:else}
 													<span class="session-name-pill">{session.name}</span>
 												{/if}
-												<span class="no-task-label">No active task</span>
+												<span class="no-task-label">{activityState === 'planning' ? 'Planning session' : 'No active task'}</span>
 											{/if}
 										</div>
 										<!-- Row 2: Task description (truncated) -->
