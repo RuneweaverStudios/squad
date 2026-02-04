@@ -540,26 +540,32 @@
 			return;
 		}
 
+		const requestProject = project;
 		isLoadingTimeline = true;
 		timelineError = null;
 
 		try {
-			const response = await fetch(`/api/files/git/log?project=${encodeURIComponent(project)}&limit=50`);
+			const response = await fetch(`/api/files/git/log?project=${encodeURIComponent(requestProject)}&limit=50`);
+			if (project !== requestProject) return; // Project changed during fetch
 			if (!response.ok) {
 				const data = await response.json();
 				throw new Error(data.message || 'Failed to fetch commit history');
 			}
 
 			const data = await response.json();
+			if (project !== requestProject) return; // Project changed during parse
 			commits = data.commits || [];
 			unpushedCount = data.unpushedCount || 0;
 			mergeBaseHash = data.mergeBaseHash || null;
 			defaultBranch = data.defaultBranch || null;
 		} catch (err) {
+			if (project !== requestProject) return;
 			timelineError = err instanceof Error ? err.message : 'Failed to fetch commits';
 			console.error('[GitPanel] Error fetching timeline:', err);
 		} finally {
-			isLoadingTimeline = false;
+			if (project === requestProject) {
+				isLoadingTimeline = false;
+			}
 		}
 	}
 
@@ -574,14 +580,18 @@
 			return;
 		}
 
+		const requestProject = project;
+
 		try {
-			const response = await fetch(`/api/files/git/status?project=${encodeURIComponent(project)}`);
+			const response = await fetch(`/api/files/git/status?project=${encodeURIComponent(requestProject)}`);
+			if (project !== requestProject) return; // Project changed during fetch
 			if (!response.ok) {
 				const data = await response.json();
 				throw new Error(data.message || 'Failed to fetch git status');
 			}
 
 			const data = await response.json();
+			if (project !== requestProject) return; // Project changed during parse
 			currentBranch = data.current;
 			tracking = data.tracking;
 			ahead = data.ahead || 0;
@@ -599,10 +609,13 @@
 			isClean = data.isClean;
 			error = null;
 		} catch (err) {
+			if (project !== requestProject) return;
 			error = err instanceof Error ? err.message : 'Failed to fetch git status';
 			console.error('[GitPanel] Error fetching status:', err);
 		} finally {
-			isLoading = false;
+			if (project === requestProject) {
+				isLoading = false;
+			}
 		}
 	}
 
