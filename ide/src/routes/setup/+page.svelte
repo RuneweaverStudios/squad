@@ -143,6 +143,8 @@
 
 <svelte:head>
 	<title>Setup - JAT IDE</title>
+	<meta property="og:title" content="Set Up JAT - The World's First Agentic IDE" />
+	<meta property="og:description" content="Get your multi-agent development environment running. Create tasks, spawn AI agents, ship code." />
 </svelte:head>
 
 <div
