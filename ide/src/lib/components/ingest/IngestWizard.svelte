@@ -15,6 +15,7 @@
 	 * Plugin Configuration step uses DynamicConfigForm for dynamic field rendering.
 	 */
 
+	import { untrack } from 'svelte';
 	import { fly, fade } from 'svelte/transition';
 	import { getProjects } from '$lib/stores/configStore.svelte';
 	import ProjectSelector from '$lib/components/ProjectSelector.svelte';
@@ -203,7 +204,10 @@
 					const secretKey = field.key;
 					const secretVal = pluginFields[secretKey];
 					if (secretVal && typeof secretVal === 'string' && secretVal.trim()) {
-						checkPluginSecret(secretKey, secretVal.trim());
+						const val = secretVal.trim();
+						// untrack prevents checkPluginSecret's writes to pluginSecretStatus/pluginSecretMasked
+						// from being registered as dependencies of this effect, which would cause an infinite loop
+						untrack(() => checkPluginSecret(secretKey, val));
 					}
 				}
 			}
@@ -229,12 +233,11 @@
 			channelDetectionError = '';
 			detectingChannels = false;
 
-			// Reset plugin state
-			pluginFields = {};
-			pluginSecretStatus = {};
-			pluginSecretMasked = {};
-			pluginTokenInputs = {};
-			pluginShowTokenInput = {};
+			// Build plugin state as plain objects first, then assign once.
+			// This avoids reading the reactive proxies (e.g. pluginSecretStatus[key] = ...)
+			// which would register them as dependencies and cause infinite re-triggering.
+			const newPluginFields: Record<string, any> = {};
+			const newPluginSecretStatus: Record<string, string> = {};
 
 			// Reset filter conditions (initialize from defaultFilter if available)
 			filterConditions = pluginMetadata?.defaultFilter ? [...pluginMetadata.defaultFilter] : [];
@@ -243,17 +246,24 @@
 			if (isPluginType && pluginMetadata?.configFields) {
 				for (const field of pluginMetadata.configFields) {
 					if (field.default !== undefined) {
-						pluginFields[field.key] = field.default;
+						newPluginFields[field.key] = field.default;
 					} else if (field.type === 'boolean') {
-						pluginFields[field.key] = false;
+						newPluginFields[field.key] = false;
 					} else if (field.type === 'secret') {
-						pluginFields[field.key] = field.key; // Default secret name is the key
-						pluginSecretStatus[field.key] = 'checking';
+						newPluginFields[field.key] = field.key; // Default secret name is the key
+						newPluginSecretStatus[field.key] = 'checking';
 					} else {
-						pluginFields[field.key] = '';
+						newPluginFields[field.key] = '';
 					}
 				}
 			}
+
+			// Single assignments — effect only writes, never reads these proxies
+			pluginFields = newPluginFields;
+			pluginSecretStatus = newPluginSecretStatus;
+			pluginSecretMasked = {};
+			pluginTokenInputs = {};
+			pluginShowTokenInput = {};
 
 			if (editSource) {
 				populateFromEdit(editSource);
@@ -314,14 +324,16 @@
 		gmailMarkAsRead = src.markAsRead || false;
 		customCommand = src.command || '';
 
-		// Populate plugin fields from edit source
+		// Populate plugin fields from edit source.
+		// Use untrack to avoid reading the reactive proxy as a dependency inside $effect.
 		if (isPluginType && pluginMetadata?.configFields) {
+			const merged: Record<string, any> = untrack(() => ({ ...pluginFields }));
 			for (const field of pluginMetadata.configFields) {
 				if (src[field.key] !== undefined) {
-					pluginFields[field.key] = src[field.key];
+					merged[field.key] = src[field.key];
 				}
 			}
-			pluginFields = { ...pluginFields };
+			pluginFields = merged;
 		}
 
 		// Populate filter conditions from edit source
@@ -2002,6 +2014,25 @@
 					<p class="font-mono text-[11px]" style="color: oklch(0.75 0.10 60);">
 						Enter the API token/secret value:
 					</p>
+
+					{#if field.setupGuide?.length}
+						<details class="mt-1">
+							<summary
+								class="font-mono text-[11px] cursor-pointer select-none"
+								style="color: oklch(0.70 0.12 200);"
+							>
+								{field.setupGuideTitle || 'Setup guide'}
+							</summary>
+							<ol class="list-decimal list-inside space-y-1.5 mt-2 ml-1">
+								{#each field.setupGuide as step}
+									<li class="font-mono text-[11px] leading-relaxed" style="color: oklch(0.60 0.02 250);">
+										{@html step}
+									</li>
+								{/each}
+							</ol>
+						</details>
+					{/if}
+
 					<div class="flex gap-2">
 						<input
 							type="password"
