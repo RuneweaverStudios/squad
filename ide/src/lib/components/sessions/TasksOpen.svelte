@@ -441,7 +441,11 @@
 	});
 
 	// === Context Menu ===
-	let contextMenu = $state<{ x: number; y: number; task: Task } | null>(null);
+	// Separate visibility from task data so DOM persists after first use (no re-creation)
+	let ctxTask = $state<Task | null>(null);
+	let ctxX = $state(0);
+	let ctxY = $state(0);
+	let ctxVisible = $state(false);
 	let statusSubmenuOpen = $state(false);
 	let epicSubmenuOpen = $state(false);
 	let epics = $state<Epic[]>([]);
@@ -454,30 +458,25 @@
 		// Calculate position with viewport bounds clamping
 		const menuWidth = 200;
 		const menuHeight = 280;
-		let x = event.clientX;
-		let y = event.clientY;
 
-		if (x + menuWidth > window.innerWidth) {
-			x = window.innerWidth - menuWidth - 8;
-		}
-		if (y + menuHeight > window.innerHeight) {
-			y = window.innerHeight - menuHeight - 8;
-		}
-
-		contextMenu = { x, y, task };
+		ctxTask = task;
+		ctxX = Math.min(event.clientX, window.innerWidth - menuWidth - 8);
+		ctxY = Math.min(event.clientY, window.innerHeight - menuHeight - 8);
+		ctxVisible = true;
 		statusSubmenuOpen = false;
 		epicSubmenuOpen = false;
 	}
 
 	function closeContextMenu() {
-		contextMenu = null;
+		ctxVisible = false;
 		statusSubmenuOpen = false;
 		epicSubmenuOpen = false;
+		// Note: ctxTask is intentionally NOT cleared so the DOM persists
 	}
 
 	// Close context menu on click outside or Escape
 	$effect(() => {
-		if (!contextMenu) return;
+		if (!ctxVisible) return;
 
 		function handleClick() {
 			closeContextMenu();
@@ -779,15 +778,16 @@
 </section>
 
 <!-- Context Menu -->
-{#if contextMenu}
+{#if ctxTask}
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		class="task-context-menu"
-		style="left: {contextMenu.x}px; top: {contextMenu.y}px;"
+		class:task-context-menu-hidden={!ctxVisible}
+		style="left: {ctxX}px; top: {ctxY}px;"
 		onclick={(e) => e.stopPropagation()}
 	>
 		<!-- Launch -->
-		<button class="task-context-menu-item" onmouseenter={() => { statusSubmenuOpen = false; epicSubmenuOpen = false; }} onclick={() => { const t = contextMenu!.task; closeContextMenu(); onSpawnTask(t); }}>
+		<button class="task-context-menu-item" onmouseenter={() => { statusSubmenuOpen = false; epicSubmenuOpen = false; }} onclick={() => { const t = ctxTask!; closeContextMenu(); onSpawnTask(t); ctxTask = null; }}>
 			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 				<path d="M12 2C12 2 8 6 8 12C8 15 9 17 10 18L10 21C10 21.5 10.5 22 11 22H13C13.5 22 14 21.5 14 21L14 18C15 17 16 15 16 12C16 6 12 2 12 2Z" />
 				<circle cx="12" cy="10" r="2" />
@@ -796,7 +796,7 @@
 		</button>
 
 		<!-- View Details -->
-		<button class="task-context-menu-item" onmouseenter={() => { statusSubmenuOpen = false; epicSubmenuOpen = false; }} onclick={() => { const id = contextMenu!.task.id; closeContextMenu(); onTaskClick(id); }}>
+		<button class="task-context-menu-item" onmouseenter={() => { statusSubmenuOpen = false; epicSubmenuOpen = false; }} onclick={() => { const id = ctxTask!.id; closeContextMenu(); onTaskClick(id); ctxTask = null; }}>
 			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 				<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
 				<circle cx="12" cy="12" r="3" />
@@ -832,12 +832,12 @@
 						{ value: 'closed', label: 'Closed', color: 'oklch(0.65 0.18 145)' }
 					] as status}
 						<button
-							class="task-context-menu-item {contextMenu!.task.status === status.value ? 'task-context-menu-item-active' : ''}"
-							onclick={() => handleChangeStatus(contextMenu!.task.id, status.value)}
+							class="task-context-menu-item {ctxTask!.status === status.value ? 'task-context-menu-item-active' : ''}"
+							onclick={() => handleChangeStatus(ctxTask!.id, status.value)}
 						>
 							<span class="task-status-dot" style="background: {status.color};"></span>
 							<span>{status.label}</span>
-							{#if contextMenu!.task.status === status.value}
+							{#if ctxTask!.status === status.value}
 								<svg class="task-context-menu-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
 									<polyline points="20 6 9 17 4 12" />
 								</svg>
@@ -852,7 +852,7 @@
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			class="task-context-menu-submenu-container"
-			onmouseenter={() => { epicSubmenuOpen = true; statusSubmenuOpen = false; if (contextMenu) { const p = getProjectFromTaskId(contextMenu.task.id); fetchEpics(p); } }}
+			onmouseenter={() => { epicSubmenuOpen = true; statusSubmenuOpen = false; if (ctxTask) { const p = getProjectFromTaskId(ctxTask.id); fetchEpics(p); } }}
 			onmouseleave={() => { epicSubmenuOpen = false; }}
 		>
 			<button class="task-context-menu-item task-context-menu-item-has-submenu">
@@ -874,7 +874,7 @@
 						{#each epics as epic}
 							<button
 								class="task-context-menu-item"
-								onclick={() => handleLinkToEpic(contextMenu!.task.id, epic.id)}
+								onclick={() => handleLinkToEpic(ctxTask!.id, epic.id)}
 							>
 								<span class="task-epic-id">{epic.id}</span>
 								<span class="task-epic-title">{epic.title}</span>
@@ -888,7 +888,7 @@
 		<div class="task-context-menu-divider"></div>
 
 		<!-- Duplicate -->
-		<button class="task-context-menu-item" onmouseenter={() => { statusSubmenuOpen = false; epicSubmenuOpen = false; }} onclick={() => handleDuplicateTask(contextMenu!.task)}>
+		<button class="task-context-menu-item" onmouseenter={() => { statusSubmenuOpen = false; epicSubmenuOpen = false; }} onclick={() => handleDuplicateTask(ctxTask!)}>
 			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 				<rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
 				<path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
@@ -897,7 +897,7 @@
 		</button>
 
 		<!-- Close Task -->
-		<button class="task-context-menu-item task-context-menu-item-danger" onmouseenter={() => { statusSubmenuOpen = false; epicSubmenuOpen = false; }} onclick={() => handleChangeStatus(contextMenu!.task.id, 'closed')}>
+		<button class="task-context-menu-item task-context-menu-item-danger" onmouseenter={() => { statusSubmenuOpen = false; epicSubmenuOpen = false; }} onclick={() => handleChangeStatus(ctxTask!.id, 'closed')}>
 			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 				<circle cx="12" cy="12" r="10" />
 				<line x1="15" y1="9" x2="9" y2="15" />
@@ -1186,6 +1186,10 @@
 		padding: 0.375rem;
 		box-shadow: 0 10px 30px oklch(0.05 0 0 / 0.5);
 		animation: contextMenuIn 0.1s ease;
+	}
+
+	.task-context-menu-hidden {
+		display: none;
 	}
 
 	@keyframes contextMenuIn {
