@@ -453,7 +453,12 @@ function buildAgentCommand({ agent, model, projectPath, jatDefaults, agentName, 
 			agentCmd += ` --model ${model.id}`;
 		}
 
-		const agentFlags = agent.flags ?? [];
+		let agentFlags = agent.flags ?? [];
+
+		// For plan mode, filter out permission-bypass flags (--permission-mode plan takes precedence)
+		if (mode === 'plan' && agent.command === 'claude') {
+			agentFlags = agentFlags.filter(f => f !== '--dangerously-skip-permissions');
+		}
 
 		// Add configured flags
 		if (agentFlags.length > 0) {
@@ -461,7 +466,8 @@ function buildAgentCommand({ agent, model, projectPath, jatDefaults, agentName, 
 		}
 
 		// For Claude Code specifically, handle skip_permissions from JAT config
-		if (agent.command === 'claude' && jatDefaults.skip_permissions) {
+		// Skip this for plan mode since --permission-mode plan takes precedence
+		if (agent.command === 'claude' && jatDefaults.skip_permissions && mode !== 'plan') {
 			// Only add if not already in flags
 			if (!agentFlags.includes('--dangerously-skip-permissions')) {
 				agentCmd += ' --dangerously-skip-permissions';
@@ -491,6 +497,11 @@ function buildAgentCommand({ agent, model, projectPath, jatDefaults, agentName, 
 				? `You are a planning assistant for the ${projName} project. Help the user plan features, discuss architecture, and think through requirements. When the user is ready to create tasks, they can use /jat:tasktree. Do NOT run /jat:start.`
 				: `You are a JAT agent. Run /jat:start to begin work.`;
 			agentCmd += ` --append-system-prompt '${jatBootstrap}'`;
+
+			// Start planning sessions in Claude's native plan mode
+			if (mode === 'plan') {
+				agentCmd += ' --permission-mode plan';
+			}
 		} else if (taskInjectionMode === 'argument' && (agentName || taskId)) {
 			// Agents with argument injection (like Codex) - pass task as positional argument
 			const promptParts = [];

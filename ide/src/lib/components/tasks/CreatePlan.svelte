@@ -20,6 +20,7 @@
 	import { playSuccessChime, playErrorSound } from '$lib/utils/soundEffects';
 	import { revokeAttachmentPreviews } from '$lib/utils/attachmentUpload';
 	import type { PendingAttachment } from '$lib/types/attachment';
+	import AgentAvatar from '$lib/components/AgentAvatar.svelte';
 	import ProjectSelector from './ProjectSelector.svelte';
 	import AttachmentZone from './AttachmentZone.svelte';
 
@@ -47,8 +48,16 @@
 	let activeSessionName = $state<string | null>(null);
 	let activeAgentName = $state<string | null>(null);
 	let contextSent = $state(false);
+	let controlsCollapsed = $state(false);
 	let pollTimer: ReturnType<typeof setInterval> | null = null;
 	let attachments = $state<PendingAttachment[]>([]);
+
+	// Auto-collapse controls when context is sent so terminal gets the space
+	$effect(() => {
+		if (contextSent && activeSessionName) {
+			controlsCollapsed = true;
+		}
+	});
 
 	$effect(() => {
 		if (initialProject) {
@@ -71,9 +80,13 @@
 		const stored = sessionStorage.getItem('jat-plan-session');
 		if (stored) {
 			try {
-				const { sessionName, agentName } = JSON.parse(stored);
+				const { sessionName, agentName, wasSent } = JSON.parse(stored);
 				activeSessionName = sessionName;
 				activeAgentName = agentName;
+				if (wasSent) {
+					contextSent = true;
+					// $effect will auto-collapse
+				}
 			} catch {
 				sessionStorage.removeItem('jat-plan-session');
 			}
@@ -155,6 +168,15 @@
 		const sent = await sendInput(activeSessionName, text, 'text');
 		if (sent) {
 			contextSent = true;
+			// Persist contextSent so collapsed state survives tab switches
+			const stored = sessionStorage.getItem('jat-plan-session');
+			if (stored) {
+				try {
+					const data = JSON.parse(stored);
+					data.wasSent = true;
+					sessionStorage.setItem('jat-plan-session', JSON.stringify(data));
+				} catch { /* ignore */ }
+			}
 		}
 	}
 
@@ -171,6 +193,7 @@
 			activeSessionName = null;
 			activeAgentName = null;
 			contextSent = false;
+			controlsCollapsed = false;
 			sessionStorage.removeItem('jat-plan-session');
 			successToast('Planning session ended');
 		}
@@ -190,124 +213,190 @@
 	}
 </script>
 
-<div class="plan-container" class:plan-stacked={stacked}>
-	<!-- Left: Controls -->
-	<div class="plan-input">
-		<!-- Project selector -->
-		{#if !hideProjectSelector}
-		<div class="mb-3">
-			<label class="label py-1">
-				<span class="label-text text-sm font-medium">Project</span>
-			</label>
-			<ProjectSelector
-				projects={projects}
-				selected={selectedProject}
-				onSelect={(p) => selectedProject = p}
-				disabled={!!activeSessionName}
-			/>
-		</div>
-		{/if}
+<div class="plan-container" class:plan-stacked={stacked} class:plan-collapsed={controlsCollapsed}>
+	<!-- Left: Controls (full or collapsed) -->
+	{#if controlsCollapsed}
+		<!-- Collapsed: compact action bar -->
+		<div class="plan-controls-bar">
+			<div class="flex items-center gap-2 flex-1 min-w-0">
+				{#if activeAgentName}
+					<AgentAvatar name={activeAgentName} size={20} showRing />
+					<span class="text-xs font-mono opacity-60 truncate">{activeAgentName}</span>
+				{/if}
+				<span class="text-xs opacity-40">|</span>
+				<span class="text-xs opacity-50 capitalize">{selectedModel}</span>
+			</div>
 
-		<!-- Model -->
-		<div class="form-control mb-3">
-			<label class="label py-1">
-				<span class="label-text text-sm font-medium">Model</span>
-			</label>
-			<select class="select select-sm select-bordered" bind:value={selectedModel} disabled={!!activeSessionName}>
-				<option value="opus">Opus</option>
-				<option value="sonnet">Sonnet</option>
-				<option value="haiku">Haiku</option>
-			</select>
-		</div>
-
-		<!-- Planning description -->
-		<div class="form-control">
-			<label class="label py-1">
-				<span class="label-text text-sm font-medium">What do you want to plan?</span>
-			</label>
-			<textarea
-				class="textarea textarea-bordered w-full text-sm"
-				rows={8}
-				bind:value={description}
-				disabled={contextSent}
-				placeholder={`Describe the feature or system you want to plan. Be specific about requirements, target users, and technical constraints.\n\nExample: Build a notification system with email and in-app alerts. Users should configure preferences per event type. Support batching to avoid notification fatigue.`}
-			onkeydown={(e) => {
-				if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-					e.preventDefault();
-					if (!activeSessionName && !isSpawning && description.trim()) {
-						handleStartPlanning();
-					} else if (activeSessionName && description.trim() && !contextSent) {
-						sendPlanningContext();
-					}
-				}
-			}}
-			></textarea>
-		</div>
-
-		<!-- Attachments (context for planning) -->
-		<div class="mt-3">
-			<AttachmentZone disabled={!!activeSessionName} bind:attachments />
-		</div>
-
-		<!-- Action buttons -->
-		<div class="flex flex-col gap-2 mt-4">
-			{#if !activeSessionName}
-				<button
-					class="btn btn-sm btn-primary"
-					onclick={handleStartPlanning}
-					disabled={isSpawning || !description.trim()}
-					title="Ctrl+Enter"
-				>
-					{#if isSpawning}
-						<span class="loading loading-spinner loading-xs"></span>
-						Starting...
-					{:else}
-						Start Planning <kbd class="kbd kbd-xs ml-1 opacity-50">Ctrl+Enter</kbd>
+			<div class="flex items-center gap-1.5">
+				{#if activeSessionName}
+					{#if description.trim() && !contextSent}
+						<button
+							class="btn btn-xs btn-secondary"
+							onclick={sendPlanningContext}
+						>
+							Send Context
+						</button>
 					{/if}
-				</button>
-			{:else}
-				{#if description.trim() && !contextSent}
 					<button
-						class="btn btn-sm btn-secondary"
-						onclick={sendPlanningContext}
-						title="Ctrl+Enter"
+						class="btn btn-xs btn-accent"
+						onclick={handleConvertToTasks}
 					>
-						Send Context to Agent <kbd class="kbd kbd-xs ml-1 opacity-50">Ctrl+Enter</kbd>
+						Convert to Tasks
+					</button>
+					<button
+						class="btn btn-xs btn-ghost text-error"
+						onclick={handleEndSession}
+					>
+						End
 					</button>
 				{/if}
 
+				<!-- Expand toggle -->
 				<button
-					class="btn btn-sm btn-accent"
-					onclick={handleConvertToTasks}
+					class="btn btn-xs btn-ghost px-1"
+					onclick={() => controlsCollapsed = false}
+					title="Show planning controls"
 				>
-					Convert to Tasks
+					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5 opacity-50">
+						<path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+					</svg>
 				</button>
+			</div>
+		</div>
+	{:else}
+		<!-- Expanded: full controls -->
+		<div class="plan-input">
+			{#if activeSessionName}
+				<!-- Collapse toggle when session is active -->
+				<div class="flex justify-end mb-1">
+					<button
+						class="btn btn-xs btn-ghost px-1 opacity-40 hover:opacity-80"
+						onclick={() => controlsCollapsed = true}
+						title="Collapse controls to give terminal more space"
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+							<path fill-rule="evenodd" d="M14.77 12.79a.75.75 0 01-1.06-.02L10 8.832 6.29 12.77a.75.75 0 11-1.08-1.04l4.25-4.5a.75.75 0 011.08 0l4.25 4.5a.75.75 0 01-.02 1.06z" clip-rule="evenodd" />
+						</svg>
+					</button>
+				</div>
+			{/if}
 
-				<button
-					class="btn btn-sm btn-ghost text-error"
-					onclick={handleEndSession}
-				>
-					End Session
-				</button>
+			<!-- Project selector -->
+			{#if !hideProjectSelector}
+			<div class="mb-3">
+				<label class="label py-1">
+					<span class="label-text text-sm font-medium">Project</span>
+				</label>
+				<ProjectSelector
+					projects={projects}
+					selected={selectedProject}
+					onSelect={(p) => selectedProject = p}
+					disabled={!!activeSessionName}
+				/>
+			</div>
+			{/if}
+
+			<!-- Model -->
+			<div class="form-control mb-3">
+				<label class="label py-1">
+					<span class="label-text text-sm font-medium">Model</span>
+				</label>
+				<select class="select select-sm select-bordered" bind:value={selectedModel} disabled={!!activeSessionName}>
+					<option value="opus">Opus</option>
+					<option value="sonnet">Sonnet</option>
+					<option value="haiku">Haiku</option>
+				</select>
+			</div>
+
+			<!-- Planning description -->
+			<div class="form-control">
+				<label class="label py-1">
+					<span class="label-text text-sm font-medium">What do you want to plan?</span>
+				</label>
+				<textarea
+					class="textarea textarea-bordered w-full text-sm"
+					rows={8}
+					bind:value={description}
+					disabled={contextSent}
+					placeholder={`Describe the feature or system you want to plan. Be specific about requirements, target users, and technical constraints.\n\nExample: Build a notification system with email and in-app alerts. Users should configure preferences per event type. Support batching to avoid notification fatigue.`}
+				onkeydown={(e) => {
+					if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+						e.preventDefault();
+						if (!activeSessionName && !isSpawning && description.trim()) {
+							handleStartPlanning();
+						} else if (activeSessionName && description.trim() && !contextSent) {
+							sendPlanningContext();
+						}
+					}
+				}}
+				></textarea>
+			</div>
+
+			<!-- Attachments (context for planning) -->
+			<div class="mt-3">
+				<AttachmentZone disabled={!!activeSessionName} bind:attachments />
+			</div>
+
+			<!-- Action buttons -->
+			<div class="flex flex-col gap-2 mt-4">
+				{#if !activeSessionName}
+					<button
+						class="btn btn-sm btn-primary"
+						onclick={handleStartPlanning}
+						disabled={isSpawning || !description.trim()}
+						title="Ctrl+Enter"
+					>
+						{#if isSpawning}
+							<span class="loading loading-spinner loading-xs"></span>
+							Starting...
+						{:else}
+							Start Planning <kbd class="kbd kbd-xs ml-1 opacity-50">Ctrl+Enter</kbd>
+						{/if}
+					</button>
+				{:else}
+					{#if description.trim() && !contextSent}
+						<button
+							class="btn btn-sm btn-secondary"
+							onclick={sendPlanningContext}
+							title="Ctrl+Enter"
+						>
+							Send Context to Agent <kbd class="kbd kbd-xs ml-1 opacity-50">Ctrl+Enter</kbd>
+						</button>
+					{/if}
+
+					<button
+						class="btn btn-sm btn-accent"
+						onclick={handleConvertToTasks}
+					>
+						Convert to Tasks
+					</button>
+
+					<button
+						class="btn btn-sm btn-ghost text-error"
+						onclick={handleEndSession}
+					>
+						End Session
+					</button>
+				{/if}
+			</div>
+
+			<!-- Session info -->
+			{#if activeSessionName && activeAgentName}
+				<div class="defaults-section">
+					<h4 class="text-xs font-medium opacity-50 mb-2">Session</h4>
+					<div class="text-xs opacity-70">
+						<div>Agent: <span class="font-mono">{activeAgentName}</span></div>
+						<div>Session: <span class="font-mono text-[0.6875rem]">{activeSessionName}</span></div>
+						{#if contextSent}
+							<div class="text-success mt-1">Context sent</div>
+						{/if}
+					</div>
+				</div>
 			{/if}
 		</div>
+	{/if}
 
-		<!-- Session info -->
-		{#if activeSessionName && activeAgentName}
-			<div class="defaults-section">
-				<h4 class="text-xs font-medium opacity-50 mb-2">Session</h4>
-				<div class="text-xs opacity-70">
-					<div>Agent: <span class="font-mono">{activeAgentName}</span></div>
-					<div>Session: <span class="font-mono text-[0.6875rem]">{activeSessionName}</span></div>
-					{#if contextSent}
-						<div class="text-success mt-1">Context sent</div>
-					{/if}
-				</div>
-			</div>
-		{/if}
-	</div>
-
-	<!-- Right: Terminal -->
+	<!-- Right/Bottom: Terminal -->
 	<div class="plan-terminal">
 		{#if session}
 			<SessionCard
@@ -349,9 +438,66 @@
 		height: 100%;
 	}
 
+	/* Collapsed side-by-side: narrow left column */
+	.plan-container.plan-collapsed:not(.plan-stacked) {
+		grid-template-columns: auto 1fr;
+		gap: 0.75rem;
+	}
+
+	/* Collapsed stacked: flex column, terminal gets all remaining space */
+	.plan-container.plan-stacked {
+		display: flex;
+		flex-direction: column;
+		gap: 0;
+	}
+
+	.plan-container.plan-stacked .plan-terminal {
+		flex: 1;
+		min-height: 0;
+	}
+
+	.plan-container.plan-stacked:not(.plan-collapsed) {
+		gap: 1rem;
+	}
+
 	.plan-input {
 		display: flex;
 		flex-direction: column;
+	}
+
+	/* Collapsed controls bar */
+	.plan-controls-bar {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.375rem 0.75rem;
+		border-radius: 0.375rem;
+		background: oklch(0.18 0.01 250 / 0.4);
+		border: 1px solid oklch(0.28 0.02 250 / 0.25);
+		flex-shrink: 0;
+	}
+
+	/* In stacked collapsed mode, add margin below bar */
+	.plan-stacked.plan-collapsed .plan-controls-bar {
+		margin-bottom: 0.5rem;
+	}
+
+	/* In side-by-side collapsed mode, bar is vertical */
+	.plan-container.plan-collapsed:not(.plan-stacked) .plan-controls-bar {
+		flex-direction: column;
+		align-items: stretch;
+		padding: 0.5rem;
+		height: 100%;
+		min-width: 9rem;
+	}
+
+	.plan-container.plan-collapsed:not(.plan-stacked) .plan-controls-bar .flex-1 {
+		flex: 0;
+	}
+
+	.plan-container.plan-collapsed:not(.plan-stacked) .plan-controls-bar > .flex:last-child {
+		flex-direction: column;
+		gap: 0.375rem;
 	}
 
 	.plan-terminal {
@@ -379,13 +525,15 @@
 		padding: 2rem;
 	}
 
-	.plan-container.plan-stacked {
-		grid-template-columns: 1fr;
-	}
-
 	@media (max-width: 768px) {
 		.plan-container {
-			grid-template-columns: 1fr;
+			display: flex;
+			flex-direction: column;
+		}
+
+		.plan-container .plan-terminal {
+			flex: 1;
+			min-height: 0;
 		}
 	}
 </style>
