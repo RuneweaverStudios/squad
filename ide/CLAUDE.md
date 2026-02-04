@@ -3123,6 +3123,83 @@ resetGlobalShortcut('new-task'); // Back to 'Alt+N'
 
 - jat-tt20r: Add keyboard shortcut documentation to CLAUDE.md
 
+## Task Context Menus (/tasks page)
+
+### Overview
+
+The `/tasks` page provides right-click context menus for both **open tasks** (TasksOpen) and **active tasks** (TasksActive). The menus are styled with oklch dark theme colors, matching the FileTree context menu aesthetic.
+
+### Open Tasks Context Menu (TasksOpen.svelte)
+
+Right-click any open/standalone task row to see:
+
+| Action | Description |
+|--------|-------------|
+| **Launch** | Spawn an agent session for the task |
+| **View Details** | Open TaskDetailDrawer for the task |
+| **Change Status** | Hover submenu: open, in_progress, blocked, closed |
+| **Assign to Epic** | Hover submenu: list of open epics to link task to |
+| **Duplicate** | Create a copy of the task |
+
+### Active Tasks Context Menu (TasksActive.svelte)
+
+Right-click the **header row** or the **expanded terminal/session area** of any active task:
+
+| Action | Description |
+|--------|-------------|
+| **View Details** | Open TaskDetailDrawer |
+| **Attach Terminal** | Open tmux session in your terminal |
+| **Change Status** | Hover submenu: open, in_progress, blocked, closed |
+| **Duplicate** | Create a copy of the task |
+| **Interrupt** | Send Ctrl+C to the agent session |
+| **Pause** | Pause the agent session |
+| **Complete** | Optimistic state update + signal emission, triggers `/jat:complete` |
+| **Close & Kill** | Close task via API, then kill tmux session (danger action) |
+
+### Performance: CSS Visibility Toggle
+
+Both context menus use a **CSS visibility toggle** pattern instead of Svelte `{#if}` conditional rendering. This prevents a 2-3 second paint delay on right-click in complex components.
+
+**Pattern:**
+```typescript
+// Separate primitive states (not a single object)
+let ctxTask = $state<Task | null>(null);
+let ctxX = $state(0);
+let ctxY = $state(0);
+let ctxVisible = $state(false);
+
+function closeContextMenu() {
+    ctxVisible = false;  // Hide via CSS, don't destroy DOM
+    // ctxTask intentionally NOT cleared - keeps DOM alive
+}
+```
+
+```svelte
+<!-- DOM persists after first creation, hidden via CSS class -->
+{#if ctxTask}
+<div class="task-context-menu" class:task-context-menu-hidden={!ctxVisible}>
+    ...
+</div>
+{/if}
+```
+
+```css
+.task-context-menu-hidden { display: none; }
+```
+
+**Why this works:** The `{#if ctxTask}` creates the DOM once (on first right-click) and never destroys it because `ctxTask` is never cleared. Subsequent right-clicks only toggle `ctxVisible`, which flips a CSS class — no DOM creation/destruction overhead.
+
+### Files
+
+| File | Purpose |
+|------|---------|
+| `src/lib/components/sessions/TasksOpen.svelte` | Open tasks context menu (Launch, View Details, Status, Epic, Duplicate) |
+| `src/lib/components/sessions/TasksActive.svelte` | Active tasks context menu (View Details, Attach, Status, Duplicate, Interrupt, Pause, Complete, Kill) |
+
+### Task Reference
+
+- jat-qqltp: Right-click context menus for standalone tasks on /tasks page (completed)
+
 ## Monaco Editor Context Menu Actions
 
 ### Overview

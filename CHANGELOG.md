@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Ingest server management** - Start/stop/restart ingest daemon from IDE Servers page with auto-start config option
 - **Monaco context menu actions** - "Send to LLM" (Alt+L) and "Create Task from Selection" (Alt+T) available in all Monaco editors: FileEditor, MigrationViewer, and DiffViewer
 - **Styled Monaco context menu** - Custom dark theme matching JAT FileTree style with rounded corners, oklch colors, and keybinding badges
+- **Task context menus** - Right-click context menus on `/tasks` page for both open tasks (Launch, View Details, Change Status, Assign to Epic, Duplicate) and active tasks (View Details, Attach Terminal, Change Status, Duplicate, Interrupt, Pause, Complete, Close & Kill)
 - Task Summary tab in task detail pane showing completion report, suggested tasks, and cross-agent intel
 - Add/Add & Start buttons for creating follow-up tasks directly from Summary tab
 - **Settings UI for API Keys** - Configure Anthropic, Google, OpenAI keys via IDE instead of editing .bashrc
