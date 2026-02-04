@@ -28,7 +28,7 @@ prompt_user() {
     local default="$2"
     local varname="$3"
 
-    echo -n "$prompt"
+    echo -en "$prompt"
 
     # Check if /dev/tty is available for interactive input
     if [ -t 0 ] || [ -e /dev/tty ]; then
