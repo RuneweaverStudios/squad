@@ -27,6 +27,12 @@ import { getIsActive as isEpicSwarmActive, getChildren as getEpicChildren, getNe
 import { getAutoKillDelayForPriority, isAutoKillEnabled, hasPendingAutoKill, clearPendingAutoKill } from './autoKillConfig';
 import { addToast } from './toasts.svelte';
 
+// Maximum accumulated output per session (characters). Prevents unbounded memory
+// growth from delta appending — without this, output strings grow continuously
+// (~1G/30s with multiple active sessions). 200KB ≈ 3000 lines of terminal output.
+const MAX_OUTPUT_LENGTH = 200_000;
+const TRUNCATED_OUTPUT_LENGTH = 150_000;
+
 // Track scheduled auto-kill timers by session name
 // Allows cancellation if user interacts with session before kill occurs
 interface ScheduledAutoKill {
@@ -378,6 +384,13 @@ function handleSessionOutput(data: SessionEvent): void {
 		// If current output is empty, just use the delta
 		// Otherwise, add newline separator and delta
 		newOutput = currentOutput ? `${currentOutput}\n${output}` : output;
+
+		// Truncate accumulated output to prevent unbounded memory growth.
+		if (newOutput.length > MAX_OUTPUT_LENGTH) {
+			const truncStart = newOutput.length - TRUNCATED_OUTPUT_LENGTH;
+			const newlinePos = newOutput.indexOf('\n', truncStart);
+			newOutput = newlinePos !== -1 ? newOutput.substring(newlinePos + 1) : newOutput.substring(truncStart);
+		}
 
 		// Check if output actually changed before triggering re-render
 		if (currentSession.output === newOutput) {
