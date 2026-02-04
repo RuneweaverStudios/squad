@@ -20,6 +20,8 @@
 		placeholder?: string;
 		helpText?: string;
 		options?: ConfigFieldOption[];
+		setupGuideTitle?: string;
+		setupGuide?: string[];
 	}
 
 	interface Props {
@@ -205,6 +207,25 @@
 						<p class="font-mono text-[11px]" style="color: oklch(0.75 0.10 60);">
 							Enter the API token/secret value:
 						</p>
+
+						{#if field.setupGuide?.length}
+							<details open>
+								<summary
+									class="font-mono text-[11px] cursor-pointer select-none"
+									style="color: oklch(0.70 0.12 200);"
+								>
+									{field.setupGuideTitle || 'Setup guide'}
+								</summary>
+								<ol class="list-decimal list-inside space-y-1.5 mt-2 ml-1">
+									{#each field.setupGuide as step}
+										<li class="font-mono text-[11px] leading-relaxed" style="color: oklch(0.60 0.02 250);">
+											{@html step}
+										</li>
+									{/each}
+								</ol>
+							</details>
+						{/if}
+
 						<div class="flex gap-2">
 							<input
 								type="password"

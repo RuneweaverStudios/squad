@@ -1791,7 +1791,7 @@
 		</p>
 	</div>
 	<div>
-		<label class="font-mono text-xs font-semibold block mb-1.5" style="color: oklch(0.65 0.02 250);">Source ID</label>
+		<label class="font-mono text-xs font-semibold block mb-1.5" style="color: oklch(0.65 0.02 250);">Source Name</label>
 		<input
 			type="text"
 			class="input input-bordered w-full font-mono text-sm"
@@ -1799,7 +1799,7 @@
 			bind:value={sourceId}
 		/>
 		<p class="font-mono text-[10px] mt-1.5" style="color: oklch(0.45 0.02 250);">
-			Unique identifier. Leave blank to auto-generate.
+			Internal name for this feed in the ingest config. Leave blank to auto-generate.
 		</p>
 	</div>
 {/snippet}
@@ -1860,7 +1860,7 @@
 			style="border: 1px solid oklch(0.25 0.02 250);"
 		>
 			{@render reviewRow('Type', getSourceLabel(sourceType))}
-			{@render reviewRow('ID', sourceId || generateId())}
+			{@render reviewRow('Source Name', sourceId || generateId())}
 			{@render reviewRow('Project', project)}
 			{@render reviewRow('Poll Interval', `${pollInterval}s`)}
 			{@render reviewRow('Task Type', taskType)}
