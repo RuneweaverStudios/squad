@@ -38,6 +38,7 @@ interface PluginInfo {
 	configFields?: any[];
 	itemFields?: any[];
 	defaultFilter?: any[];
+	icon?: { svg: string; viewBox: string; fill?: boolean; color?: string };
 }
 
 /**
@@ -104,7 +105,8 @@ async function probePlugin(pluginPath: string, isBuiltin: boolean): Promise<Plug
 			enabled: true,
 			configFields: metadata.configFields,
 			itemFields: metadata.itemFields,
-			defaultFilter: metadata.defaultFilter
+			defaultFilter: metadata.defaultFilter,
+			icon: metadata.icon
 		};
 	} catch (err: any) {
 		return {

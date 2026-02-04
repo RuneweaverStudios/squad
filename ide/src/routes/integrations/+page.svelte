@@ -116,7 +116,7 @@
 	let userPlugins = $derived(plugins.filter((p) => !p.isBuiltin));
 
 	onMount(async () => {
-		await Promise.all([fetchSources(), loadProjects(), fetchServiceStatus(), fetchAutoStart(), fetchStats()]);
+		await Promise.all([fetchSources(), loadProjects(), fetchServiceStatus(), fetchAutoStart(), fetchStats(), fetchPlugins()]);
 		serviceInterval = setInterval(fetchServiceStatus, 5000);
 		statsInterval = setInterval(fetchStats, 5000);
 	});
@@ -511,6 +511,11 @@
 		const t = templates.find((t) => t.type === type);
 		return t ? { bg: t.color.bg, text: t.color.text } : { bg: 'oklch(0.22 0.02 250)', text: 'oklch(0.70 0.02 250)' };
 	}
+
+	function getPluginIcon(type: string): { svg: string; viewBox: string; fill?: boolean; color?: string } | null {
+		const plugin = plugins.find(p => p.type === type);
+		return plugin?.icon || null;
+	}
 </script>
 
 <svelte:head>
@@ -800,6 +805,25 @@
 											>
 												<path stroke-linecap="round" stroke-linejoin="round" d={tmpl.icon} />
 											</svg>
+										{:else}
+											{@const pluginIcon = getPluginIcon(source.type)}
+											{#if pluginIcon}
+												<svg
+													xmlns="http://www.w3.org/2000/svg"
+													fill={pluginIcon.fill ? 'currentColor' : 'none'}
+													viewBox={pluginIcon.viewBox || '0 0 24 24'}
+													stroke={pluginIcon.fill ? 'none' : 'currentColor'}
+													stroke-width={pluginIcon.fill ? '0' : '1.5'}
+													class="w-4 h-4"
+													style="color: {pluginIcon.color || 'oklch(0.60 0.10 200)'};"
+												>
+													<path stroke-linecap="round" stroke-linejoin="round" d={pluginIcon.svg} />
+												</svg>
+											{:else}
+												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4" style="color: oklch(0.60 0.10 200);">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0a.64.64 0 01-.657.643 48.39 48.39 0 01-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 01-.658.663v0c-.355 0-.676-.186-.959-.401a1.647 1.647 0 00-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401v0c.31 0 .555.26.532.57a48.039 48.039 0 01-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 00.657-.643v0c0-.355-.186-.676-.401-.959a1.647 1.647 0 01-.349-1.003c0-1.035 1.008-1.875 2.25-1.875 1.243 0 2.25.84 2.25 1.875 0 .369-.128.713-.349 1.003-.215.283-.4.604-.4.959v0c0 .333.277.599.61.58a48.1 48.1 0 005.427-.63 48.05 48.05 0 00.582-4.717.532.532 0 00-.533-.57v0c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.96.401v0a.656.656 0 00.658-.663 48.422 48.422 0 00-.37-5.36c-1.886.342-3.81.574-5.766.689a.578.578 0 01-.61-.58v0z" />
+												</svg>
+											{/if}
 										{/if}
 									</div>
 
@@ -1368,11 +1392,25 @@
 									<div class="px-4 pt-4 pb-3 flex items-start gap-3">
 										<div
 											class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-											style="background: oklch(0.22 0.04 280); border: 1px solid oklch(0.30 0.06 280);"
+											style="background: {plugin.icon?.color ? 'oklch(0.22 0.06 45)' : 'oklch(0.22 0.04 280)'}; border: 1px solid {plugin.icon?.color ? 'oklch(0.30 0.08 45)' : 'oklch(0.30 0.06 280)'};"
 										>
-											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4" style="color: oklch(0.65 0.10 280);">
-												<path stroke-linecap="round" stroke-linejoin="round" d="M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0a.64.64 0 01-.657.643 48.39 48.39 0 01-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 01-.658.663v0c-.355 0-.676-.186-.959-.401a1.647 1.647 0 00-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401v0c.31 0 .555.26.532.57a48.039 48.039 0 01-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 00.657-.643v0c0-.355-.186-.676-.401-.959a1.647 1.647 0 01-.349-1.003c0-1.035 1.008-1.875 2.25-1.875 1.243 0 2.25.84 2.25 1.875 0 .369-.128.713-.349 1.003-.215.283-.4.604-.4.959v0c0 .333.277.599.61.58a48.1 48.1 0 005.427-.63 48.05 48.05 0 00.582-4.717.532.532 0 00-.533-.57v0c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.96.401v0a.656.656 0 00.658-.663 48.422 48.422 0 00-.37-5.36c-1.886.342-3.81.574-5.766.689a.578.578 0 01-.61-.58v0z" />
-											</svg>
+											{#if plugin.icon}
+												<svg
+													xmlns="http://www.w3.org/2000/svg"
+													fill={plugin.icon.fill ? 'currentColor' : 'none'}
+													viewBox={plugin.icon.viewBox || '0 0 24 24'}
+													stroke={plugin.icon.fill ? 'none' : 'currentColor'}
+													stroke-width={plugin.icon.fill ? '0' : '1.5'}
+													class="w-4 h-4"
+													style="color: {plugin.icon.color || 'oklch(0.65 0.10 280)'};"
+												>
+													<path stroke-linecap="round" stroke-linejoin="round" d={plugin.icon.svg} />
+												</svg>
+											{:else}
+												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4" style="color: oklch(0.65 0.10 280);">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0a.64.64 0 01-.657.643 48.39 48.39 0 01-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 01-.658.663v0c-.355 0-.676-.186-.959-.401a1.647 1.647 0 00-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401v0c.31 0 .555.26.532.57a48.039 48.039 0 01-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 00.657-.643v0c0-.355-.186-.676-.401-.959a1.647 1.647 0 01-.349-1.003c0-1.035 1.008-1.875 2.25-1.875 1.243 0 2.25.84 2.25 1.875 0 .369-.128.713-.349 1.003-.215.283-.4.604-.4.959v0c0 .333.277.599.61.58a48.1 48.1 0 005.427-.63 48.05 48.05 0 00.582-4.717.532.532 0 00-.533-.57v0c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.96.401v0a.656.656 0 00.658-.663 48.422 48.422 0 00-.37-5.36c-1.886.342-3.81.574-5.766.689a.578.578 0 01-.61-.58v0z" />
+												</svg>
+											{/if}
 										</div>
 										<div class="flex-1 min-w-0">
 											<div class="flex items-center gap-2">

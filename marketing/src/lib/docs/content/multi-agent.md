@@ -1,46 +1,32 @@
 # Multi-Agent Swarm
 
-JAT enables running multiple AI coding agents in parallel, each working on a separate task from your backlog. This is the "swarm attack" pattern — launch a team of agents, let them coordinate via Agent Mail, and monitor everything from the IDE.
+JAT's swarm mode launches multiple agents that independently pick and work on tasks from your backlog. A single command spawns 4+ agents, each grabbing the highest-priority ready task from Beads.
 
-## Launching a Swarm
+## Launching a swarm
+
+The `jat` CLI accepts a project name and agent count:
 
 ```bash
-# Launch 4 agents that each auto-start the highest priority task
+# Launch 4 agents on the chimaro project
 jat chimaro 4 --auto
 
-# Claude-only (no npm server, browser, or IDE)
+# Claude-only mode (no npm dev server, browser, or IDE)
 jat chimaro 4 --claude --auto
 ```
 
-This will:
-1. Start npm dev server + browser + IDE (unless `--claude`)
-2. Launch 4 Claude sessions in tmux (with stagger delay between each)
-3. Each session runs `/jat:start auto` → picks the top ready task
+Without `--claude`, the full launch sequence runs:
 
-### Spawn Options
+1. Start the npm dev server for the project
+2. Launch the browser with remote debugging
+3. Start the IDE
+4. Spawn 4 Claude Code sessions in tmux (staggered)
+5. Each session runs `/jat:start auto` which picks the top ready task
 
-| Flag | Description |
-|------|-------------|
-| `--auto` | Auto-pick highest priority ready task |
-| `--claude` | Claude sessions only (no npm/browser/IDE) |
-| `--model opus` | Specify model (opus, sonnet, haiku) |
+With `--claude`, only steps 4 and 5 run. This is faster and uses fewer system resources when you dont need the browser or dev server.
 
-## From the IDE
+## Agent stagger timing
 
-The IDE provides several ways to spawn agents:
-
-### Start Next Task
-Click the **Start Next** dropdown (or `Alt+S`) to spawn an agent for the next ready task. The IDE uses routing rules to select the right agent and model.
-
-### Epic Swarm
-Open the **Epic Swarm Modal** (`Alt+E`) to launch agents for all ready subtasks of an epic simultaneously.
-
-### Manual Spawn
-From any task in the task table, click **Launch** to spawn an agent for that specific task.
-
-## Agent Stagger
-
-When launching multiple agents, JAT staggers their startup to avoid resource contention:
+Agents spawn with a configurable delay between each launch. The default is 15 seconds.
 
 ```json
 {
@@ -50,83 +36,116 @@ When launching multiple agents, JAT staggers their startup to avoid resource con
 }
 ```
 
-The `agent_stagger` setting (seconds) controls the delay between spawning each agent. Default is 15 seconds.
+Staggering prevents race conditions. Without it, multiple agents might query `bd ready` at the same instant and grab the same task. The 15-second gap gives each agent time to register, reserve files, and update the task status in Beads before the next one starts.
 
-## Max Concurrent Sessions
+If you have a large backlog with no shared files, you can reduce the stagger to 5 seconds. For repos with lots of overlapping code paths, 20-30 seconds is safer.
+
+## Epic swarm attack
+
+The Epic Swarm feature (Alt+E) spawns agents specifically for the subtasks of an epic.
+
+```
+Epic: "Improve IDE Performance" (jat-abc)
+  |
+  +-- jat-def: "Add caching layer"      --> Agent 1
+  +-- jat-ghi: "Optimize queries"       --> Agent 2
+  +-- jat-jkl: "Add performance tests"  --> Agent 3
+```
+
+The IDE reads the epic's child tasks, filters to those with `open` status, and spawns one agent per ready child. Dependencies between children are respected. If `jat-jkl` depends on `jat-ghi`, only `jat-def` and `jat-ghi` spawn initially. When `jat-ghi` completes, `jat-jkl` becomes ready and the IDE auto-spawns an agent for it.
+
+Epic Swarm uses a special `auto_proceed` completion mode. When an agent finishes a child task, the completion bundle tells the IDE to immediately spawn the next available child. No human review needed between subtasks.
+
+## Max concurrent sessions
+
+System resources limit how many agents you can run simultaneously. Each Claude Code session uses roughly 200-300MB of RAM and generates sustained API traffic.
+
+| Agents | RAM estimate | Good for |
+|--------|-------------|----------|
+| 1-2 | 0.5-1 GB | Development, testing |
+| 3-4 | 1-2 GB | Standard backlog attack |
+| 5-8 | 2-4 GB | Large feature rollout |
+| 8+ | 4+ GB | Parallel epic swarm |
+
+The `claude_startup_timeout` setting controls how long the IDE waits for each agent's Claude TUI to initialize. Default is 20 seconds. On slower machines, increase this to avoid false timeout errors:
 
 ```json
 {
   "defaults": {
-    "max_sessions": 12
+    "claude_startup_timeout": 30
   }
 }
 ```
 
-The IDE enforces a maximum number of concurrent tmux sessions to prevent system overload. Configure in Settings → Autopilot.
+## Review rules for auto-proceed
 
-## Coordination
+Review rules control whether a completed task needs human review or auto-proceeds to the next task. Configure these in `.beads/review-rules.json` or through Settings in the IDE.
 
-Agents coordinate through several mechanisms:
+| Rule condition | Action | Example use case |
+|----------------|--------|------------------|
+| Priority P3-P4 + type chore | Auto-proceed | Low-risk cleanup tasks |
+| Priority P0-P1 + type bug | Always review | High-priority bug fixes |
+| Label "security" | Always review | Security-sensitive changes |
+| Type "epic" | Always review | Epic verification needs human |
+| Default (no match) | Review required | Safe fallback |
 
-### File Reservations
-Before editing files, agents reserve them via Agent Mail:
+When an agent's completion bundle has `completionMode: "auto_proceed"`, the IDE kills the completed session and immediately spawns a new agent on the `nextTaskId`. The entire cycle runs without human intervention.
+
+Per-task overrides are possible. Add `[REVIEW_OVERRIDE:auto_proceed]` or `[REVIEW_OVERRIDE:always_review]` to a task's notes field to override project-level rules.
+
+The detection order is:
+
+1. Task notes override
+2. Session epic context (`.claude/sessions/context-{sessionId}.json`)
+3. Project review rules (`.beads/review-rules.json`)
+4. Default: review required
+
+## Coordination via Agent Mail
+
+When multiple agents work in the same repository, Agent Mail prevents conflicts.
+
+**File reservations** lock file patterns before editing:
 
 ```bash
-am-reserve "src/**/*.ts" --agent AgentName --ttl 3600 --exclusive --reason "jat-abc"
+am-reserve "src/lib/cache/**" --agent FairBay --ttl 3600 --reason "jat-def"
 ```
 
-Other agents see the reservation and avoid those files.
+If another agent tries to reserve overlapping files, it gets a `FILE_RESERVATION_CONFLICT` error and picks a different task.
 
-### Message Threads
-Agents communicate via threaded messages:
+**Broadcast messages** keep agents informed:
 
 ```bash
-am-send "[jat-abc] Starting" "Working on auth module" \
-  --from AgentA --to @active --thread jat-abc
+am-send "[jat-def] Starting: Add cache layer" "Working on Redis integration" \
+  --from FairBay --to @active --thread jat-def
 ```
 
-### Dependency Tracking
-Beads tracks task dependencies. Agents only pick tasks whose dependencies are satisfied (`bd ready`).
+The `@active` recipient sends to all agents that checked in within the last 60 minutes. Other broadcast targets include `@recent` (24 hours), `@all`, and `@project:name`.
 
-## Review Rules
+**Completion announcements** let other agents know when files are released:
 
-Not all completions need human review. The review rules matrix controls which tasks auto-proceed:
-
-```
-              P0        P1        P2        P3        P4
-bug         review    review    review    auto      auto
-feature     review    review    review    auto      auto
-task        review    review    auto      auto      auto
-chore       review    auto      auto      auto      auto
+```bash
+am-send "[jat-def] Completed" "Cache layer done, files released" \
+  --from FairBay --to @active --thread jat-def
 ```
 
-Configure in Settings → Autopilot → Review Rules.
+Agents check their inbox at the start and end of every task. Messages that say "stop" or "requirements changed" halt work before completion. This prevents agents from committing work that's already been superseded.
 
-## Monitoring
+## Agent routing
 
-The IDE provides real-time monitoring:
+The IDE routes tasks to specific agent programs and models based on configurable rules in `~/.config/jat/agents.json`.
 
-- **Work page** — Live terminal output from all agents
-- **Tasks page** — Active tasks with session state badges
-- **Agents page** — Agent grid with token usage and activity
-- **Kanban** — Visual task board with drag-drop
+| Rule | Condition | Routes to |
+|------|-----------|-----------|
+| Security tasks | Label contains "security" | Claude Code + Opus |
+| Chores | Type equals "chore" | Claude Code + Haiku |
+| Frontend work | Label contains "frontend" | Claude Code + Sonnet |
+| Default fallback | No rule matches | Claude Code + Opus |
 
-### Session States
+This lets you optimize cost by routing low-risk tasks to cheaper models while keeping high-stakes work on the most capable model.
 
-Each agent session displays its current state:
+## See also
 
-| State | Meaning |
-|-------|---------|
-| Starting | Agent initializing |
-| Working | Actively coding |
-| Needs Input | Waiting for user decision |
-| Review | Work complete, presenting results |
-| Completing | Running /jat:complete |
-| Completed | Task done |
-
-## See Also
-
-- [Automation Rules](/docs/automation/) — Auto-recovery and auto-continue
-- [Agent Mail](/docs/agent-mail/) — Coordination between agents
-- [Review Rules](/docs/review-rules/) — Auto-proceed configuration
-- [Sessions & Agents](/docs/sessions/) — Agent lifecycle
+- [Workflow Commands](/docs/workflow-commands/) for the agent lifecycle
+- [Automation](/docs/automation/) for auto-recovery during swarm runs
+- [Signals](/docs/signals/) for how agents report state to the IDE
+- [Work Sessions](/docs/work-sessions/) for monitoring running agents

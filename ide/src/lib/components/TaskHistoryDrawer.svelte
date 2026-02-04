@@ -12,6 +12,9 @@
 	import { fly, fade } from 'svelte/transition';
 	import StreakCalendar from './StreakCalendar.svelte';
 	import AnimatedDigits from './AnimatedDigits.svelte';
+	import { getProjectColor, initProjectColors } from '$lib/utils/projectColors';
+	import AgentAvatar from './AgentAvatar.svelte';
+	import { getTypeBadge, getPriorityBadge } from '$lib/utils/badgeHelpers';
 
 	interface CompletedTask {
 		id: string;
@@ -45,6 +48,7 @@
 	// Fetch completed tasks when drawer opens
 	$effect(() => {
 		if (isOpen) {
+			initProjectColors();
 			fetchTasks();
 		}
 	});
@@ -270,16 +274,6 @@
 		});
 	}
 
-	// Priority colors
-	function getPriorityColor(priority: number | undefined): string {
-		switch (priority) {
-			case 0: return 'oklch(0.70 0.18 25)'; // P0 - Red
-			case 1: return 'oklch(0.75 0.15 55)'; // P1 - Orange
-			case 2: return 'oklch(0.75 0.12 85)'; // P2 - Yellow
-			default: return 'oklch(0.55 0.02 250)'; // P3+ - Gray
-		}
-	}
-
 	function handleClose() {
 		isOpen = false;
 		onClose();
@@ -442,21 +436,37 @@
 									{#each day.tasks as task}
 										{@const duration = getTaskDuration(task)}
 										{@const pos = getTimelinePos(task)}
+										{@const color = getProjectColor(task.project || task.id.split('-')[0])}
 										<button
 											class="task-item group"
 											onclick={() => handleTaskClick(task.id)}
 										>
-											<span
-												class="task-priority"
-												style="background: {getPriorityColor(task.priority)}"
-											></span>
+											<div style="display: flex; align-items: center; flex-shrink: 0; --pc: {color}">
+												<span style="width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; overflow: hidden; background: color-mix(in oklch, var(--pc) 20%, var(--color-base-200)); border: 1.5px solid color-mix(in oklch, var(--pc) 40%, transparent); position: relative; z-index: 1;" title={task.assignee || 'Unassigned'}>
+													{#if task.assignee}
+														<AgentAvatar name={task.assignee} size={18} />
+													{:else}
+														<span style="font-size: 0.5rem; font-weight: 700; font-family: ui-monospace, monospace; text-transform: uppercase; color: var(--pc);">??</span>
+													{/if}
+												</span>
+												<span style="margin-left: -4px; padding: 2px 0.4rem 2px calc(0.4rem + 2px); display: flex; flex-direction: column; justify-content: center; gap: 1px; background: color-mix(in oklch, var(--pc) 10%, var(--color-base-300)); border-top: 1px solid color-mix(in oklch, var(--pc) 22%, transparent); border-bottom: 1px solid color-mix(in oklch, var(--pc) 22%, transparent);">
+													<span style="font-size: 0.65rem; font-family: ui-monospace, monospace; font-weight: 600; line-height: 1; color: var(--pc);">{task.id}</span>
+													<span style="display: flex; gap: 3px;">
+														{#if task.issue_type}
+															<span class="badge badge-xs {getTypeBadge(task.issue_type)}" style="font-size: 0.5rem; height: 13px; min-height: 13px; padding: 0 3px;">{task.issue_type}</span>
+														{/if}
+														{#if task.priority != null}
+															<span class="badge badge-xs {getPriorityBadge(task.priority)}" style="font-size: 0.5rem; height: 13px; min-height: 13px; padding: 0 3px;">P{task.priority}</span>
+														{/if}
+													</span>
+												</span>
+												<span style="width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-left: -4px; background: color-mix(in oklch, var(--color-success) 15%, var(--color-base-200)); color: oklch(from var(--color-success) l c h / 65%); border: 1.5px solid color-mix(in oklch, var(--color-success) 30%, transparent); position: relative; z-index: 1;">
+													<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width: 0.65rem; height: 0.65rem"><path fill-rule="evenodd" d="M19.916 4.626a.75.75 0 01.208 1.04l-9 13.5a.75.75 0 01-1.154.114l-6-6a.75.75 0 011.06-1.06l5.353 5.353 8.493-12.739a.75.75 0 011.04-.208z" clip-rule="evenodd" /></svg>
+												</span>
+											</div>
 											<div class="task-info">
 												<span class="text-sm text-base-content/85 whitespace-nowrap overflow-hidden text-ellipsis">{task.title}</span>
 												<span class="flex items-center gap-2 text-[0.65rem] text-base-content/50">
-													<span class="font-mono text-info/70">{task.id}</span>
-													{#if task.assignee}
-														<span class="text-success/70">by {task.assignee}</span>
-													{/if}
 													<span class="ml-auto flex flex-col items-end gap-0.5" title="Duration: {formatDuration(duration)}\nCreated: {new Date(task.created_at).toLocaleString()}{task.closed_at ? '\nCompleted: ' + new Date(task.closed_at).toLocaleString() : ''}">
 														<span class="flex items-center gap-1">
 															<span class="text-base-content/35">{formatTime(task.created_at)}</span>
@@ -637,13 +647,6 @@
 
 	.task-item:hover {
 		background-color: oklch(from var(--color-base-content) l c h / 0.05);
-	}
-
-	.task-priority {
-		width: 3px;
-		height: 1.5rem;
-		border-radius: 0.125rem;
-		flex-shrink: 0;
 	}
 
 	.task-info {

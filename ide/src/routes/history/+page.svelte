@@ -20,6 +20,8 @@
 	import { HistorySkeleton } from "$lib/components/skeleton";
 	import { getProjectColor, initProjectColors } from "$lib/utils/projectColors";
 	import ProjectSelector from "$lib/components/ProjectSelector.svelte";
+	import AgentAvatar from "$lib/components/AgentAvatar.svelte";
+	import { getTypeBadge, getPriorityBadge } from "$lib/utils/badgeHelpers";
 
 	interface CompletedTask {
 		id: string;
@@ -341,20 +343,6 @@
 		});
 	}
 
-	// Priority CSS classes
-	function getPriorityClass(priority: number | undefined): string {
-		switch (priority) {
-			case 0:
-				return "priority-p0"; // P0 - Critical
-			case 1:
-				return "priority-p1"; // P1 - High
-			case 2:
-				return "priority-p2"; // P2 - Medium
-			default:
-				return "priority-default"; // P3+ - Low
-		}
-	}
-
 	function handleTaskClick(taskId: string) {
 		selectedTaskId = taskId;
 		drawerOpen = true;
@@ -526,21 +514,43 @@
 								{#each day.tasks as task}
 									{@const duration = getTaskDuration(task)}
 									{@const pos = getTimelinePos(task)}
+									{@const color = getProjectColor(task.project || task.id.split('-')[0])}
 									<button
 										class="task-item group"
 										onclick={() => handleTaskClick(task.id)}
 									>
-										<span
-											class="task-priority {getPriorityClass(task.priority)}"
-										></span>
-										<div class="task-info">
-											<span class="task-title">{task.title}</span>
-											<span class="task-meta">
-												<span class="task-id">{task.id}</span>
+										<div class="task-badge" style="--pc: {color}">
+											<span class="task-badge-agent" title={task.assignee || 'Unassigned'}>
 												{#if task.assignee}
-													<span class="task-agent">by {task.assignee}</span>
+													<AgentAvatar name={task.assignee} size={22} />
+												{:else}
+													<span class="task-badge-initials">??</span>
 												{/if}
 											</span>
+											<span class="task-badge-center">
+												<span class="task-badge-id">{task.id}</span>
+												<span class="task-badge-tags">
+													{#if task.issue_type}
+														<span class="badge badge-xs {getTypeBadge(task.issue_type)}">{task.issue_type}</span>
+													{/if}
+													{#if task.priority != null}
+														<span class="badge badge-xs {getPriorityBadge(task.priority)}">P{task.priority}</span>
+													{/if}
+												</span>
+											</span>
+											<span class="task-badge-check">
+												<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3 h-3">
+													<path fill-rule="evenodd" d="M19.916 4.626a.75.75 0 01.208 1.04l-9 13.5a.75.75 0 01-1.154.114l-6-6a.75.75 0 011.06-1.06l5.353 5.353 8.493-12.739a.75.75 0 011.04-.208z" clip-rule="evenodd" />
+												</svg>
+											</span>
+										</div>
+										<div class="task-info">
+											<span class="task-title">{task.title}</span>
+											{#if task.assignee}
+												<span class="task-meta">
+													<span class="task-agent">by {task.assignee}</span>
+												</span>
+											{/if}
 										</div>
 										<!-- Right side: resume button + time + arrow -->
 										<div class="task-actions">
@@ -806,25 +816,81 @@
 		background: var(--color-base-200);
 	}
 
-	.task-priority {
-		width: 4px;
-		height: 28px;
-		border-radius: 2px;
+	/* Custom history badge: [agent circle]─[task-id pill]─[check circle] */
+	.task-badge {
+		display: flex;
+		align-items: center;
 		flex-shrink: 0;
 	}
 
-	/* Priority indicator colors */
-	.task-priority.priority-p0 {
-		background: var(--color-error);
+	.task-badge-agent {
+		width: 26px;
+		height: 26px;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		overflow: hidden;
+		background: color-mix(in oklch, var(--pc) 20%, var(--color-base-200));
+		border: 1.5px solid color-mix(in oklch, var(--pc) 40%, transparent);
+		position: relative;
+		z-index: 1;
 	}
-	.task-priority.priority-p1 {
-		background: var(--color-warning);
+
+	.task-badge-initials {
+		font-size: 0.55rem;
+		font-weight: 700;
+		font-family: ui-monospace, monospace;
+		text-transform: uppercase;
+		color: var(--pc);
 	}
-	.task-priority.priority-p2 {
-		background: var(--color-info);
+
+	.task-badge-center {
+		margin-left: -5px;
+		padding: 3px 0.5rem 3px calc(0.5rem + 3px);
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		gap: 1px;
+		background: color-mix(in oklch, var(--pc) 10%, var(--color-base-300));
+		border-top: 1px solid color-mix(in oklch, var(--pc) 22%, transparent);
+		border-bottom: 1px solid color-mix(in oklch, var(--pc) 22%, transparent);
 	}
-	.task-priority.priority-default {
-		background: oklch(from var(--color-base-content) l c h / 40%);
+
+	.task-badge-id {
+		font-size: 0.7rem;
+		font-family: ui-monospace, monospace;
+		font-weight: 600;
+		line-height: 1;
+		color: var(--pc);
+	}
+
+	.task-badge-tags {
+		display: flex;
+		gap: 3px;
+	}
+
+	.task-badge-tags .badge {
+		font-size: 0.5rem;
+		height: 14px;
+		min-height: 14px;
+		padding: 0 4px;
+		line-height: 1;
+	}
+
+	.task-badge-check {
+		width: 26px;
+		height: 26px;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		margin-left: -5px;
+		background: color-mix(in oklch, var(--color-success) 15%, var(--color-base-200));
+		color: oklch(from var(--color-success) l c h / 65%);
+		border: 1.5px solid color-mix(in oklch, var(--color-success) 30%, transparent);
+		position: relative;
+		z-index: 1;
 	}
 
 	.task-info {
@@ -849,11 +915,6 @@
 		gap: 0.5rem;
 		font-size: 0.7rem;
 		color: oklch(from var(--color-base-content) l c h / 55%);
-	}
-
-	.task-id {
-		font-family: ui-monospace, monospace;
-		color: var(--color-info);
 	}
 
 	.task-agent {
