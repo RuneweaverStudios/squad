@@ -10,11 +10,14 @@
 	let {
 		output = '',
 		height = 200,
+		scale: _scale,
 		terminalWidth = 800,
 		onPositionClick = (percent: number) => {}
 	}: {
 		output: string;
 		height?: number;
+		/** Optional fixed scale factor (overrides auto-computed scale) */
+		scale?: number;
 		terminalWidth?: number;
 		onPositionClick?: (percent: number) => void;
 	} = $props();
@@ -34,11 +37,13 @@
 	let naturalHeight = $state(0);
 	let isDragging = $state(false);
 
-	// Compute scale to fit all content in minimap height
+	// Compute scale to fit all content in minimap height (use fixed scale if provided)
 	const computedScale = $derived(
-		naturalHeight > 0 && height > 0
-			? Math.min(1, height / naturalHeight)
-			: 0.1
+		_scale != null
+			? _scale
+			: naturalHeight > 0 && height > 0
+				? Math.min(1, height / naturalHeight)
+				: 0.1
 	);
 
 	$effect(() => {

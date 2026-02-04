@@ -1071,7 +1071,6 @@
 				<ProjectNotes
 					projectName={selectedProject}
 					notes={projectNotes[selectedProject] || ""}
-					notesHeight={projectNotesHeight[selectedProject] || null}
 					{projectColor}
 				/>
 

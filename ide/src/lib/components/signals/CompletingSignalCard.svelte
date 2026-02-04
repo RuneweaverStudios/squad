@@ -17,9 +17,11 @@
 		signal: CompletingSignal;
 		/** Whether to show in compact mode (for inline display) */
 		compact?: boolean;
+		/** Callback when task ID is clicked */
+		onTaskClick?: (taskId: string) => void;
 	}
 
-	let { signal, compact = false }: Props = $props();
+	let { signal, compact = false, onTaskClick }: Props = $props();
 
 	// All completion steps in order
 	const ALL_STEPS: { id: CompletionStep; label: string; icon: string }[] = [
@@ -93,9 +95,15 @@
 					<span class="loading loading-spinner loading-sm text-info"></span>
 					<h3 class="font-semibold text-base-content">Completing Task</h3>
 				</div>
-				<div class="badge badge-info badge-outline font-mono text-xs">
-					{signal.taskId}
-				</div>
+				{#if onTaskClick}
+					<button class="badge badge-info badge-outline font-mono text-xs cursor-pointer hover:brightness-125" onclick={() => onTaskClick(signal.taskId)}>
+						{signal.taskId}
+					</button>
+				{:else}
+					<div class="badge badge-info badge-outline font-mono text-xs">
+						{signal.taskId}
+					</div>
+				{/if}
 			</div>
 
 			<!-- Task title -->

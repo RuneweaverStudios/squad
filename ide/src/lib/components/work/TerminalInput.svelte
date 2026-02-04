@@ -487,8 +487,8 @@
 		<div class="pb-0.5">
 			<VoiceInput
 				size="sm"
-				ontranscription={handleVoiceTranscription}
-				onerror={onVoiceError}
+				ontranscription={(e) => handleVoiceTranscription(e.detail)}
+				onerror={(e) => onVoiceError(e.detail)}
 				onstart={() => triggerFlash((v) => (voiceFlash = v))}
 				onend={() => triggerFlash((v) => (voiceFlash = v))}
 				disabled={sendingInput || disabled}

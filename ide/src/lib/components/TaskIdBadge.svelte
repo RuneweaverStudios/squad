@@ -70,9 +70,11 @@
 		resumed?: boolean;
 		/** Terminal is attached to session (agentPill variant) */
 		attached?: boolean;
+		/** Direct click handler on the badge (bypasses dropdown) */
+		onClick?: () => void;
 	}
 
-	let { task, size = 'sm', showStatus = true, showType = true, showCopyIcon = false, showAssignee = false, minimal = false, color, onOpenTask, onAgentClick, dropdownAlign = 'start', copyOnly = false, blockedBy = [], blocks = [], showDependencies = false, showDepGraph = true, showUnblocksCount = false, statusDotColor, variant = 'default', agentName, animate = false, resumed = false, attached = false }: Props = $props();
+	let { task, size = 'sm', showStatus = true, showType = true, showCopyIcon = false, showAssignee = false, minimal = false, color, onOpenTask, onAgentClick, dropdownAlign = 'start', copyOnly = false, blockedBy = [], blocks = [], showDependencies = false, showDepGraph = true, showUnblocksCount = false, statusDotColor, variant = 'default', agentName, animate = false, resumed = false, attached = false, onClick }: Props = $props();
 
 	// Extract project prefix from task ID (e.g., "jat-abc" -> "jat")
 	const projectPrefix = $derived(task.id.split('-')[0] || task.id);
@@ -236,6 +238,10 @@
 
 	function handleBadgeClick(event: MouseEvent) {
 		event.stopPropagation();
+		if (onClick) {
+			onClick();
+			return;
+		}
 		dropdownOpen = !dropdownOpen;
 	}
 

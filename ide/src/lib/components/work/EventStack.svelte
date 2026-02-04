@@ -1420,7 +1420,6 @@
 									projectName={defaultProject}
 									onTaskClick={onTaskClick}
 									onFileClick={onFileClick}
-									onComplete={onComplete}
 								/>
 							{:else if (event.state === 'review' || event.type === 'review') && event.data}
 								<ReviewSignalCard
