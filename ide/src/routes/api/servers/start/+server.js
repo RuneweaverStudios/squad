@@ -221,7 +221,7 @@ export async function POST({ request }) {
 				mode: 'server',
 				sessionName,
 				projectName,
-				displayName: `${projectName.charAt(0).toUpperCase() + projectName.slice(1)} Dev Server`,
+				displayName: projectName === 'ingest' ? 'Integrations' : `${projectName.charAt(0).toUpperCase() + projectName.slice(1)} Dev Server`,
 				port: effectivePort || null,
 				portRunning: false,
 				status: 'starting',

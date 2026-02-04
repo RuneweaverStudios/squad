@@ -214,6 +214,7 @@ function detectCommand(output) {
  * @returns {string} - Display name (e.g., "Chimaro Dev Server")
  */
 function generateDisplayName(projectName) {
+	if (projectName === 'ingest') return 'Integrations';
 	const capitalized = projectName.charAt(0).toUpperCase() + projectName.slice(1);
 	return `${capitalized} Dev Server`;
 }

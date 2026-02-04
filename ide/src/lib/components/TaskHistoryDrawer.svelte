@@ -14,7 +14,7 @@
 	import AnimatedDigits from './AnimatedDigits.svelte';
 	import { getProjectColor, initProjectColors } from '$lib/utils/projectColors';
 	import AgentAvatar from './AgentAvatar.svelte';
-	import { getTypeBadge, getPriorityBadge } from '$lib/utils/badgeHelpers';
+	import { getIssueTypeVisual } from '$lib/config/statusColors';
 
 	interface CompletedTask {
 		id: string;
@@ -437,32 +437,32 @@
 										{@const duration = getTaskDuration(task)}
 										{@const pos = getTimelinePos(task)}
 										{@const color = getProjectColor(task.project || task.id.split('-')[0])}
+										{@const typeVis = getIssueTypeVisual(task.issue_type)}
+										{@const pColorMap = { 0: { bg: 'oklch(0.55 0.20 25 / 0.25)', text: 'oklch(0.75 0.18 25)', border: 'oklch(0.55 0.20 25 / 0.5)' }, 1: { bg: 'oklch(0.55 0.18 85 / 0.25)', text: 'oklch(0.80 0.15 85)', border: 'oklch(0.55 0.18 85 / 0.5)' }, 2: { bg: 'oklch(0.55 0.15 200 / 0.20)', text: 'oklch(0.75 0.12 200)', border: 'oklch(0.55 0.15 200 / 0.4)' }, 3: { bg: 'oklch(0.35 0.02 250 / 0.30)', text: 'oklch(0.65 0.02 250)', border: 'oklch(0.35 0.02 250 / 0.5)' } }}
+										{@const pc2 = pColorMap[task.priority as keyof typeof pColorMap] || pColorMap[3]}
 										<button
 											class="task-item group"
 											onclick={() => handleTaskClick(task.id)}
 										>
-											<div style="display: flex; align-items: center; flex-shrink: 0; --pc: {color}">
-												<span style="width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; overflow: hidden; background: color-mix(in oklch, var(--pc) 20%, var(--color-base-200)); border: 1.5px solid color-mix(in oklch, var(--pc) 40%, transparent); position: relative; z-index: 1;" title={task.assignee || 'Unassigned'}>
+											<div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0; --pc: {color}">
+												<span style="width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; overflow: hidden; background: color-mix(in oklch, var(--pc) 15%, var(--color-base-200)); border: 1.5px solid color-mix(in oklch, var(--pc) 35%, transparent); flex-shrink: 0;" title={task.assignee || 'Unassigned'}>
 													{#if task.assignee}
-														<AgentAvatar name={task.assignee} size={18} />
+														<AgentAvatar name={task.assignee} size={24} />
 													{:else}
 														<span style="font-size: 0.5rem; font-weight: 700; font-family: ui-monospace, monospace; text-transform: uppercase; color: var(--pc);">??</span>
 													{/if}
 												</span>
-												<span style="margin-left: -4px; padding: 2px 0.4rem 2px calc(0.4rem + 2px); display: flex; flex-direction: column; justify-content: center; gap: 1px; background: color-mix(in oklch, var(--pc) 10%, var(--color-base-300)); border-top: 1px solid color-mix(in oklch, var(--pc) 22%, transparent); border-bottom: 1px solid color-mix(in oklch, var(--pc) 22%, transparent);">
-													<span style="font-size: 0.65rem; font-family: ui-monospace, monospace; font-weight: 600; line-height: 1; color: var(--pc);">{task.id}</span>
-													<span style="display: flex; gap: 3px;">
+												<div style="display: flex; flex-direction: column; gap: 2px;">
+													<span style="font-size: 0.7rem; font-family: ui-monospace, monospace; font-weight: 600; line-height: 1; color: var(--pc);">{task.id}</span>
+													<span style="display: flex; align-items: center; gap: 3px;">
 														{#if task.issue_type}
-															<span class="badge badge-xs {getTypeBadge(task.issue_type)}" style="font-size: 0.5rem; height: 13px; min-height: 13px; padding: 0 3px;">{task.issue_type}</span>
+															<span style="font-size: 0.7rem; line-height: 1;">{typeVis.icon}</span>
 														{/if}
 														{#if task.priority != null}
-															<span class="badge badge-xs {getPriorityBadge(task.priority)}" style="font-size: 0.5rem; height: 13px; min-height: 13px; padding: 0 3px;">P{task.priority}</span>
+															<span style="font-size: 0.6rem; font-weight: 600; padding: 0 4px; border-radius: 3px; line-height: 1.5; background: {pc2.bg}; color: {pc2.text}; border: 1px solid {pc2.border};">P{task.priority}</span>
 														{/if}
 													</span>
-												</span>
-												<span style="width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-left: -4px; background: color-mix(in oklch, var(--color-success) 15%, var(--color-base-200)); color: oklch(from var(--color-success) l c h / 65%); border: 1.5px solid color-mix(in oklch, var(--color-success) 30%, transparent); position: relative; z-index: 1;">
-													<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width: 0.65rem; height: 0.65rem"><path fill-rule="evenodd" d="M19.916 4.626a.75.75 0 01.208 1.04l-9 13.5a.75.75 0 01-1.154.114l-6-6a.75.75 0 011.06-1.06l5.353 5.353 8.493-12.739a.75.75 0 011.04-.208z" clip-rule="evenodd" /></svg>
-												</span>
+												</div>
 											</div>
 											<div class="task-info">
 												<span class="text-sm text-base-content/85 whitespace-nowrap overflow-hidden text-ellipsis">{task.title}</span>

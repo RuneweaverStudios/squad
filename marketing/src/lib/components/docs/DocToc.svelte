@@ -5,39 +5,84 @@
 	let { items = [] }: { items: TocItem[] } = $props();
 
 	let activeId = $state('');
+	let manualClick = false;
 
 	onMount(() => {
-		const observer = new IntersectionObserver(
-			(entries) => {
-				// Find the topmost visible heading
-				const visible = entries
-					.filter((e) => e.isIntersecting)
-					.sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+		const SCROLL_OFFSET = 100; // px from top to consider "active"
 
-				if (visible.length > 0) {
-					activeId = visible[0].target.id;
+		function updateActiveHeading() {
+			if (manualClick) return;
+
+			const headings = document.querySelectorAll(
+				'.doc-content h2[id], .doc-content h3[id], .doc-content h4[id]'
+			);
+			if (headings.length === 0) return;
+
+			// Find the last heading that has scrolled past the offset line
+			let current = '';
+			for (const heading of headings) {
+				const rect = heading.getBoundingClientRect();
+				if (rect.top <= SCROLL_OFFSET) {
+					current = heading.id;
+				} else {
+					break;
 				}
-			},
-			{
-				rootMargin: '-80px 0px -70% 0px',
-				threshold: 0
 			}
-		);
 
-		// Observe all heading elements that match our TOC
-		const headings = document.querySelectorAll(
-			'.doc-content h2[id], .doc-content h3[id], .doc-content h4[id]'
-		);
-		headings.forEach((h) => observer.observe(h));
+			// If nothing passed the offset, use the first heading
+			if (!current && headings.length > 0) {
+				current = headings[0].id;
+			}
 
-		return () => observer.disconnect();
+			if (current) {
+				activeId = current;
+			}
+		}
+
+		// Throttle scroll handler
+		let ticking = false;
+		function onScroll() {
+			if (!ticking) {
+				requestAnimationFrame(() => {
+					updateActiveHeading();
+					ticking = false;
+				});
+				ticking = true;
+			}
+		}
+
+		window.addEventListener('scroll', onScroll, { passive: true });
+		updateActiveHeading(); // Set initial state
+
+		return () => window.removeEventListener('scroll', onScroll);
+	});
+
+	// Scroll the TOC panel to keep active item visible
+	$effect(() => {
+		if (!activeId) return;
+		const activeEl = document.querySelector(`.toc-link.active`);
+		if (activeEl) {
+			const tocNav = activeEl.closest('.doc-toc');
+			if (tocNav) {
+				const tocRect = tocNav.getBoundingClientRect();
+				const elRect = activeEl.getBoundingClientRect();
+				if (elRect.top < tocRect.top || elRect.bottom > tocRect.bottom) {
+					activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+				}
+			}
+		}
 	});
 
 	function scrollToHeading(id: string) {
 		const el = document.getElementById(id);
 		if (el) {
-			el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+			manualClick = true;
 			activeId = id;
+			el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+			// Re-enable scroll tracking after animation settles
+			setTimeout(() => {
+				manualClick = false;
+			}, 800);
 		}
 	}
 </script>
@@ -112,8 +157,10 @@
 	}
 
 	.toc-link.active {
-		color: oklch(80% 0.15 240);
+		color: oklch(85% 0.15 240);
 		border-left-color: oklch(70% 0.18 240);
+		background: oklch(70% 0.18 240 / 0.08);
+		border-radius: 0 0.25rem 0.25rem 0;
 	}
 
 	.toc-link.depth-3 {

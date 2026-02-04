@@ -21,7 +21,7 @@
 	import { getProjectColor, initProjectColors } from "$lib/utils/projectColors";
 	import ProjectSelector from "$lib/components/ProjectSelector.svelte";
 	import AgentAvatar from "$lib/components/AgentAvatar.svelte";
-	import { getTypeBadge, getPriorityBadge } from "$lib/utils/badgeHelpers";
+	import { getIssueTypeVisual } from "$lib/config/statusColors";
 
 	interface CompletedTask {
 		id: string;
@@ -515,34 +515,32 @@
 									{@const duration = getTaskDuration(task)}
 									{@const pos = getTimelinePos(task)}
 									{@const color = getProjectColor(task.project || task.id.split('-')[0])}
+									{@const typeVis = getIssueTypeVisual(task.issue_type)}
+									{@const pColors = { 0: { bg: 'oklch(0.55 0.20 25 / 0.25)', text: 'oklch(0.75 0.18 25)', border: 'oklch(0.55 0.20 25 / 0.5)' }, 1: { bg: 'oklch(0.55 0.18 85 / 0.25)', text: 'oklch(0.80 0.15 85)', border: 'oklch(0.55 0.18 85 / 0.5)' }, 2: { bg: 'oklch(0.55 0.15 200 / 0.20)', text: 'oklch(0.75 0.12 200)', border: 'oklch(0.55 0.15 200 / 0.4)' }, 3: { bg: 'oklch(0.35 0.02 250 / 0.30)', text: 'oklch(0.65 0.02 250)', border: 'oklch(0.35 0.02 250 / 0.5)' } }}
+									{@const pc = pColors[task.priority as keyof typeof pColors] || pColors[3]}
 									<button
 										class="task-item group"
 										onclick={() => handleTaskClick(task.id)}
 									>
 										<div class="task-badge" style="--pc: {color}">
-											<span class="task-badge-agent" title={task.assignee || 'Unassigned'}>
+											<span class="task-badge-avatar" title={task.assignee || 'Unassigned'}>
 												{#if task.assignee}
-													<AgentAvatar name={task.assignee} size={22} />
+													<AgentAvatar name={task.assignee} size={28} />
 												{:else}
 													<span class="task-badge-initials">??</span>
 												{/if}
 											</span>
-											<span class="task-badge-center">
+											<div class="task-badge-info">
 												<span class="task-badge-id">{task.id}</span>
-												<span class="task-badge-tags">
+												<span class="task-badge-tags mt-0.5">
 													{#if task.issue_type}
-														<span class="badge badge-xs {getTypeBadge(task.issue_type)}">{task.issue_type}</span>
+														<span class="task-badge-type">{typeVis.icon}</span>
 													{/if}
 													{#if task.priority != null}
-														<span class="badge badge-xs {getPriorityBadge(task.priority)}">P{task.priority}</span>
+														<span class="task-badge-priority ml-0.5" style="background: {pc.bg}; color: {pc.text}; border: 1px solid {pc.border};">P{task.priority}</span>
 													{/if}
 												</span>
-											</span>
-											<span class="task-badge-check">
-												<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3 h-3">
-													<path fill-rule="evenodd" d="M19.916 4.626a.75.75 0 01.208 1.04l-9 13.5a.75.75 0 01-1.154.114l-6-6a.75.75 0 011.06-1.06l5.353 5.353 8.493-12.739a.75.75 0 011.04-.208z" clip-rule="evenodd" />
-												</svg>
-											</span>
+											</div>
 										</div>
 										<div class="task-info">
 											<span class="task-title">{task.title}</span>
@@ -816,25 +814,25 @@
 		background: var(--color-base-200);
 	}
 
-	/* Custom history badge: [agent circle]─[task-id pill]─[check circle] */
+	/* Task badge - matches /tasks TaskIdBadge layout */
 	.task-badge {
 		display: flex;
 		align-items: center;
+		gap: 6px;
 		flex-shrink: 0;
 	}
 
-	.task-badge-agent {
-		width: 26px;
-		height: 26px;
+	.task-badge-avatar {
+		width: 32px;
+		height: 32px;
 		border-radius: 50%;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		overflow: hidden;
-		background: color-mix(in oklch, var(--pc) 20%, var(--color-base-200));
-		border: 1.5px solid color-mix(in oklch, var(--pc) 40%, transparent);
-		position: relative;
-		z-index: 1;
+		background: color-mix(in oklch, var(--pc) 15%, var(--color-base-200));
+		border: 1.5px solid color-mix(in oklch, var(--pc) 35%, transparent);
+		flex-shrink: 0;
 	}
 
 	.task-badge-initials {
@@ -845,20 +843,14 @@
 		color: var(--pc);
 	}
 
-	.task-badge-center {
-		margin-left: -5px;
-		padding: 3px 0.5rem 3px calc(0.5rem + 3px);
+	.task-badge-info {
 		display: flex;
 		flex-direction: column;
-		justify-content: center;
-		gap: 1px;
-		background: color-mix(in oklch, var(--pc) 10%, var(--color-base-300));
-		border-top: 1px solid color-mix(in oklch, var(--pc) 22%, transparent);
-		border-bottom: 1px solid color-mix(in oklch, var(--pc) 22%, transparent);
+		gap: 2px;
 	}
 
 	.task-badge-id {
-		font-size: 0.7rem;
+		font-size: 0.75rem;
 		font-family: ui-monospace, monospace;
 		font-weight: 600;
 		line-height: 1;
@@ -867,30 +859,21 @@
 
 	.task-badge-tags {
 		display: flex;
+		align-items: center;
 		gap: 3px;
 	}
 
-	.task-badge-tags .badge {
-		font-size: 0.5rem;
-		height: 14px;
-		min-height: 14px;
-		padding: 0 4px;
+	.task-badge-type {
+		font-size: 0.75rem;
 		line-height: 1;
 	}
 
-	.task-badge-check {
-		width: 26px;
-		height: 26px;
-		border-radius: 50%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		margin-left: -5px;
-		background: color-mix(in oklch, var(--color-success) 15%, var(--color-base-200));
-		color: oklch(from var(--color-success) l c h / 65%);
-		border: 1.5px solid color-mix(in oklch, var(--color-success) 30%, transparent);
-		position: relative;
-		z-index: 1;
+	.task-badge-priority {
+		font-size: 0.6rem;
+		font-weight: 600;
+		padding: 0 4px;
+		border-radius: 3px;
+		line-height: 1.5;
 	}
 
 	.task-info {
