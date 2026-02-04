@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/stores';
+	import { untrack } from 'svelte';
 	import { docSections } from '$lib/docs/config';
 
 	let { onNavigate = () => {} }: { onNavigate?: () => void } = $props();
@@ -10,10 +11,14 @@
 	let expandedSections = $state<Set<string>>(new Set());
 
 	$effect(() => {
-		const section = docSections.find((s) => s.pages.some((p) => p.slug === currentSlug));
+		const slug = currentSlug; // only track slug changes
+		const section = docSections.find((s) => s.pages.some((p) => p.slug === slug));
 		if (section) {
-			expandedSections.add(section.title);
-			expandedSections = new Set(expandedSections);
+			untrack(() => {
+				if (!expandedSections.has(section.title)) {
+					expandedSections = new Set([...expandedSections, section.title]);
+				}
+			});
 		}
 	});
 

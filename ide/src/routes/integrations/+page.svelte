@@ -14,7 +14,7 @@
 	import { loadProjects } from '$lib/stores/configStore.svelte';
 
 	// Page-level tab
-	let activeTab = $state<'installed' | 'available'>('installed');
+	let activeTab = $state<'installed' | 'add'>('installed');
 
 	// State
 	let sources: any[] = $state([]);
@@ -112,8 +112,6 @@
 
 	// Derived
 	let enabledCount = $derived(sources.filter((s) => s.enabled).length);
-	let builtinPlugins = $derived(plugins.filter((p) => p.isBuiltin));
-	let userPlugins = $derived(plugins.filter((p) => !p.isBuiltin));
 
 	onMount(async () => {
 		await Promise.all([fetchSources(), loadProjects(), fetchServiceStatus(), fetchAutoStart(), fetchStats(), fetchPlugins()]);
@@ -126,9 +124,9 @@
 		if (statsInterval) clearInterval(statsInterval);
 	});
 
-	// Fetch available plugins when switching to Available tab
+	// Fetch available plugins when switching to Add Integration tab
 	$effect(() => {
-		if (activeTab === 'available' && !pluginsFetched) {
+		if (activeTab === 'add' && !pluginsFetched) {
 			fetchPlugins();
 		}
 	});
@@ -306,7 +304,6 @@
 		wizardPluginMetadata = plugin ? { configFields: plugin.configFields, itemFields: plugin.itemFields, defaultFilter: plugin.defaultFilter, name: plugin.name, type: plugin.type } : null;
 		editSource = null;
 		wizardOpen = true;
-		activeTab = 'installed';
 	}
 
 	async function openEdit(source: any) {
@@ -659,20 +656,12 @@
 		<button
 			class="font-mono text-xs font-semibold px-4 py-2.5 cursor-pointer transition-colors duration-100"
 			style="
-				color: {activeTab === 'available' ? 'oklch(0.85 0.02 250)' : 'oklch(0.50 0.02 250)'};
-				border-bottom: 2px solid {activeTab === 'available' ? 'oklch(0.60 0.15 200)' : 'transparent'};
+				color: {activeTab === 'add' ? 'oklch(0.85 0.02 250)' : 'oklch(0.50 0.02 250)'};
+				border-bottom: 2px solid {activeTab === 'add' ? 'oklch(0.60 0.15 200)' : 'transparent'};
 			"
-			onclick={() => activeTab = 'available'}
+			onclick={() => activeTab = 'add'}
 		>
-			Available
-			{#if plugins.length > 0}
-				<span
-					class="ml-1.5 font-mono text-[9px] px-1.5 py-0.5 rounded"
-					style="background: oklch(0.22 0.04 250); color: oklch(0.55 0.02 250);"
-				>
-					{plugins.length}
-				</span>
-			{/if}
+			Add Integration
 		</button>
 	</div>
 
@@ -680,78 +669,6 @@
 	<div class="flex-1 overflow-y-auto px-6 py-5">
 		{#if activeTab === 'installed'}
 			<!-- ==================== INSTALLED TAB ==================== -->
-
-			<!-- Template Cards (Add Source) -->
-			<div class="mb-8">
-				<h2 class="font-mono text-[10px] font-semibold tracking-widest uppercase mb-3" style="color: oklch(0.45 0.02 250);">
-					Add Source
-				</h2>
-				<div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));">
-					{#each templates as tmpl, i}
-						<button
-							class="group flex flex-col rounded-lg overflow-hidden text-left transition-all duration-200 cursor-pointer"
-							style="
-								background: {tmpl.color.bg};
-								border: 1px solid {tmpl.color.border};
-							"
-							onclick={() => openWizard(tmpl.type)}
-						>
-							<div class="px-4 pt-4 pb-3 flex items-start gap-3">
-								<div
-									class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-110"
-									style="background: {tmpl.color.border};"
-								>
-									<svg
-										xmlns="http://www.w3.org/2000/svg"
-										fill={tmpl.type === 'custom' ? 'none' : 'currentColor'}
-										viewBox="0 0 24 24"
-										stroke={tmpl.type === 'custom' ? 'currentColor' : 'none'}
-										stroke-width={tmpl.type === 'custom' ? '1.5' : '0'}
-										class="w-4 h-4"
-										style="color: {tmpl.color.icon};"
-									>
-										<path stroke-linecap="round" stroke-linejoin="round" d={tmpl.icon} />
-									</svg>
-								</div>
-								<div class="flex-1 min-w-0">
-									<h3 class="font-mono text-xs font-semibold" style="color: {tmpl.color.text};">
-										{tmpl.name}
-									</h3>
-									<p class="font-mono text-[10px] mt-1 leading-relaxed" style="color: {tmpl.color.text}; opacity: 0.6;">
-										{tmpl.description}
-									</p>
-								</div>
-							</div>
-
-							<div class="px-4 pb-3 flex flex-wrap gap-1">
-								{#each tmpl.hints as hint}
-									<span
-										class="font-mono text-[9px] px-1.5 py-0.5 rounded"
-										style="background: oklch(0.18 0.02 250 / 0.5); color: {tmpl.color.text}; opacity: 0.5;"
-									>
-										{hint}
-									</span>
-								{/each}
-							</div>
-
-							<div
-								class="px-4 py-2.5 flex items-center gap-1.5 transition-all duration-200"
-								style="
-									background: oklch(0.15 0.02 250 / 0.5);
-									border-top: 1px solid {tmpl.color.border};
-									color: {tmpl.color.text};
-									opacity: 0.7;
-								"
-							>
-								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
-									<path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
-								</svg>
-								<span class="font-mono text-[10px] font-semibold">Add {tmpl.name}</span>
-							</div>
-						</button>
-					{/each}
-				</div>
-			</div>
 
 			<!-- Configured Sources -->
 			{#if loading}
@@ -762,9 +679,6 @@
 				</div>
 			{:else if sources.length > 0}
 				<div>
-					<h2 class="font-mono text-[10px] font-semibold tracking-widest uppercase mb-3" style="color: oklch(0.45 0.02 250);">
-						Configured Sources ({sources.length})
-					</h2>
 					<div class="space-y-2">
 						{#each [...sources].sort((a, b) => (b.enabled ? 1 : 0) - (a.enabled ? 1 : 0)) as source, i (source.id)}
 							{@const colors = getTypeColor(source.type)}
@@ -1169,14 +1083,21 @@
 					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" class="w-8 h-8 mx-auto mb-3" style="color: oklch(0.35 0.02 250);">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
 					</svg>
-					<p class="font-mono text-xs" style="color: oklch(0.45 0.02 250);">
-						No sources configured yet. Pick a template above to get started.
+					<p class="font-mono text-xs mb-3" style="color: oklch(0.45 0.02 250);">
+						No sources configured yet.
 					</p>
+					<button
+						class="font-mono text-[10px] font-semibold px-4 py-2 rounded cursor-pointer transition-colors duration-150"
+						style="background: oklch(0.30 0.10 200); color: oklch(0.90 0.10 200); border: 1px solid oklch(0.40 0.12 200);"
+						onclick={() => activeTab = 'add'}
+					>
+						Add Integration
+					</button>
 				</div>
 			{/if}
 
 		{:else}
-			<!-- ==================== AVAILABLE TAB ==================== -->
+			<!-- ==================== ADD INTEGRATION TAB ==================== -->
 
 			<!-- Install from Git URL -->
 			<div
@@ -1184,7 +1105,7 @@
 				style="background: oklch(0.16 0.02 250); border: 1px solid oklch(0.25 0.02 250);"
 			>
 				<h2 class="font-mono text-[10px] font-semibold tracking-widest uppercase mb-3" style="color: oklch(0.45 0.02 250);">
-					Install Plugin from Git
+					Install from Git
 				</h2>
 				<div class="flex items-center gap-2">
 					<input
@@ -1239,11 +1160,11 @@
 				{/if}
 			</div>
 
-			<!-- Plugins Grid -->
+			<!-- Unified Adapters Grid -->
 			{#if pluginsLoading}
-				<div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
-					{#each [1, 2, 3, 4] as _}
-						<div class="h-32 rounded-lg animate-pulse" style="background: oklch(0.20 0.02 250);"></div>
+				<div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));">
+					{#each [1, 2, 3, 4, 5] as _}
+						<div class="h-40 rounded-lg animate-pulse" style="background: oklch(0.20 0.02 250);"></div>
 					{/each}
 				</div>
 			{:else if pluginsError}
@@ -1260,222 +1181,229 @@
 						Retry
 					</button>
 				</div>
-			{:else if plugins.length === 0}
-				<div
-					class="text-center py-12 rounded-lg"
-					style="background: oklch(0.16 0.02 250); border: 1px dashed oklch(0.28 0.02 250);"
-				>
-					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" class="w-8 h-8 mx-auto mb-3" style="color: oklch(0.35 0.02 250);">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-					</svg>
-					<p class="font-mono text-xs" style="color: oklch(0.45 0.02 250);">
-						No plugins discovered. Install one from a git URL above.
-					</p>
-				</div>
 			{:else}
-				<!-- Built-in Plugins -->
-				{#if builtinPlugins.length > 0}
-					<div class="mb-6">
-						<h2 class="font-mono text-[10px] font-semibold tracking-widest uppercase mb-3" style="color: oklch(0.45 0.02 250);">
-							Built-in Adapters ({builtinPlugins.length})
-						</h2>
-						<div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
-							{#each builtinPlugins as plugin}
-								{@const tmpl = templates.find(t => t.type === plugin.type)}
-								{@const color = tmpl?.color || { bg: 'oklch(0.22 0.04 250)', border: 'oklch(0.30 0.04 250)', text: 'oklch(0.75 0.02 250)', icon: 'oklch(0.60 0.04 250)' }}
-								{@const isConfigured = sources.some(s => s.type === plugin.type)}
+				<div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));">
+					<!-- Render each plugin as a rich card -->
+					{#each plugins as plugin}
+						{@const tmpl = templates.find(t => t.type === plugin.type)}
+						{@const isConfigured = sources.some(s => s.type === plugin.type)}
+						{@const color = tmpl?.color || {
+							bg: plugin.icon?.color ? 'oklch(0.22 0.06 45)' : 'oklch(0.22 0.04 250)',
+							border: plugin.icon?.color ? 'oklch(0.30 0.08 45)' : 'oklch(0.30 0.04 250)',
+							text: 'oklch(0.75 0.02 250)',
+							icon: plugin.icon?.color || 'oklch(0.60 0.04 250)'
+						}}
+						<button
+							class="group flex flex-col rounded-lg overflow-hidden text-left transition-all duration-200 cursor-pointer"
+							style="
+								background: {color.bg};
+								border: 1px solid {color.border};
+							"
+							onclick={() => tmpl ? openWizard(plugin.type) : openWizardForPlugin(plugin.type)}
+						>
+							<div class="px-4 pt-4 pb-3 flex items-start gap-3">
 								<div
-									class="rounded-lg overflow-hidden transition-all duration-200"
-									style="background: oklch(0.18 0.02 250); border: 1px solid oklch(0.25 0.02 250);"
+									class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-110"
+									style="background: {color.border};"
 								>
-									<div class="px-4 pt-4 pb-3 flex items-start gap-3">
-										<div
-											class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-											style="background: {color.bg}; border: 1px solid {color.border};"
+									{#if tmpl}
+										<svg
+											xmlns="http://www.w3.org/2000/svg"
+											fill={tmpl.type === 'custom' ? 'none' : 'currentColor'}
+											viewBox="0 0 24 24"
+											stroke={tmpl.type === 'custom' ? 'currentColor' : 'none'}
+											stroke-width={tmpl.type === 'custom' ? '1.5' : '0'}
+											class="w-4 h-4"
+											style="color: {color.icon};"
 										>
-											{#if tmpl}
-												<svg
-													xmlns="http://www.w3.org/2000/svg"
-													fill={tmpl.type === 'custom' ? 'none' : 'currentColor'}
-													viewBox="0 0 24 24"
-													stroke={tmpl.type === 'custom' ? 'currentColor' : 'none'}
-													stroke-width={tmpl.type === 'custom' ? '1.5' : '0'}
-													class="w-4 h-4"
-													style="color: {color.icon};"
-												>
-													<path stroke-linecap="round" stroke-linejoin="round" d={tmpl.icon} />
-												</svg>
-											{:else}
-												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4" style="color: {color.icon};">
-													<path stroke-linecap="round" stroke-linejoin="round" d="M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0a.64.64 0 01-.657.643 48.39 48.39 0 01-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 01-.658.663v0c-.355 0-.676-.186-.959-.401a1.647 1.647 0 00-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401v0c.31 0 .555.26.532.57a48.039 48.039 0 01-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 00.657-.643v0c0-.355-.186-.676-.401-.959a1.647 1.647 0 01-.349-1.003c0-1.035 1.008-1.875 2.25-1.875 1.243 0 2.25.84 2.25 1.875 0 .369-.128.713-.349 1.003-.215.283-.4.604-.4.959v0c0 .333.277.599.61.58a48.1 48.1 0 005.427-.63 48.05 48.05 0 00.582-4.717.532.532 0 00-.533-.57v0c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.96.401v0a.656.656 0 00.658-.663 48.422 48.422 0 00-.37-5.36c-1.886.342-3.81.574-5.766.689a.578.578 0 01-.61-.58v0z" />
-												</svg>
-											{/if}
-										</div>
-										<div class="flex-1 min-w-0">
-											<div class="flex items-center gap-2">
-												<h3 class="font-mono text-xs font-semibold" style="color: oklch(0.80 0.02 250);">
-													{plugin.name}
-												</h3>
-												<span
-													class="font-mono text-[8px] px-1.5 py-0.5 rounded"
-													style="background: oklch(0.22 0.06 200); color: oklch(0.65 0.12 200);"
-												>
-													built-in
-												</span>
-												{#if isConfigured}
-													<span
-														class="font-mono text-[8px] px-1.5 py-0.5 rounded"
-														style="background: oklch(0.22 0.06 145); color: oklch(0.60 0.12 145);"
-													>
-														configured
-													</span>
-												{/if}
-											</div>
-											<p class="font-mono text-[10px] mt-1 leading-relaxed" style="color: oklch(0.55 0.02 250);">
-												{plugin.description || 'No description'}
-											</p>
-											{#if plugin.version}
-												<span class="font-mono text-[9px]" style="color: oklch(0.40 0.02 250);">
-													v{plugin.version}
-												</span>
-											{/if}
-										</div>
-									</div>
-
-									{#if !plugin.enabled && plugin.error}
-										<div
-											class="mx-4 mb-3 px-2.5 py-1.5 rounded font-mono text-[9px]"
-											style="background: oklch(0.20 0.06 25); color: oklch(0.60 0.10 25);"
+											<path stroke-linecap="round" stroke-linejoin="round" d={tmpl.icon} />
+										</svg>
+									{:else if plugin.icon}
+										<svg
+											xmlns="http://www.w3.org/2000/svg"
+											fill={plugin.icon.fill ? 'currentColor' : 'none'}
+											viewBox={plugin.icon.viewBox || '0 0 24 24'}
+											stroke={plugin.icon.fill ? 'none' : 'currentColor'}
+											stroke-width={plugin.icon.fill ? '0' : '1.5'}
+											class="w-4 h-4"
+											style="color: {plugin.icon.color || color.icon};"
 										>
-											{plugin.error}
-										</div>
+											<path stroke-linecap="round" stroke-linejoin="round" d={plugin.icon.svg} />
+										</svg>
+									{:else}
+										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4" style="color: {color.icon};">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0a.64.64 0 01-.657.643 48.39 48.39 0 01-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 01-.658.663v0c-.355 0-.676-.186-.959-.401a1.647 1.647 0 00-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401v0c.31 0 .555.26.532.57a48.039 48.039 0 01-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 00.657-.643v0c0-.355-.186-.676-.401-.959a1.647 1.647 0 01-.349-1.003c0-1.035 1.008-1.875 2.25-1.875 1.243 0 2.25.84 2.25 1.875 0 .369-.128.713-.349 1.003-.215.283-.4.604-.4.959v0c0 .333.277.599.61.58a48.1 48.1 0 005.427-.63 48.05 48.05 0 00.582-4.717.532.532 0 00-.533-.57v0c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.96.401v0a.656.656 0 00.658-.663 48.422 48.422 0 00-.37-5.36c-1.886.342-3.81.574-5.766.689a.578.578 0 01-.61-.58v0z" />
+										</svg>
 									{/if}
-
-									<div
-										class="px-4 py-2.5 flex items-center justify-end"
-										style="background: oklch(0.15 0.01 250); border-top: 1px solid oklch(0.22 0.02 250);"
-									>
-										<button
-											class="font-mono text-[10px] font-semibold px-3 py-1 rounded cursor-pointer transition-colors duration-150 flex items-center gap-1.5"
-											style="
-												background: oklch(0.22 0.04 250);
-												color: oklch(0.70 0.02 250);
-												border: 1px solid oklch(0.30 0.04 250);
-											"
-											onclick={() => openWizardForPlugin(plugin.type)}
-										>
-											<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
-												<path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
-											</svg>
-											Add Source
-										</button>
-									</div>
 								</div>
-							{/each}
-						</div>
-					</div>
-				{/if}
+								<div class="flex-1 min-w-0">
+									<div class="flex items-center gap-2">
+										<h3 class="font-mono text-xs font-semibold" style="color: {color.text};">
+											{plugin.name || tmpl?.name || plugin.type}
+										</h3>
+										{#if isConfigured}
+											<span
+												class="font-mono text-[8px] px-1.5 py-0.5 rounded"
+												style="background: oklch(0.22 0.06 145); color: oklch(0.60 0.12 145);"
+											>
+												configured
+											</span>
+										{/if}
+										{#if !plugin.isBuiltin}
+											<span
+												class="font-mono text-[8px] px-1.5 py-0.5 rounded"
+												style="background: oklch(0.22 0.06 280); color: oklch(0.60 0.10 280);"
+											>
+												plugin
+											</span>
+										{/if}
+									</div>
+									<p class="font-mono text-[10px] mt-1 leading-relaxed" style="color: {color.text}; opacity: 0.6;">
+										{plugin.description || tmpl?.description || 'No description'}
+									</p>
+								</div>
+							</div>
 
-				<!-- User Plugins -->
-				{#if userPlugins.length > 0}
-					<div>
-						<h2 class="font-mono text-[10px] font-semibold tracking-widest uppercase mb-3" style="color: oklch(0.45 0.02 250);">
-							User Plugins ({userPlugins.length})
-						</h2>
-						<div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
-							{#each userPlugins as plugin}
-								{@const isConfigured = sources.some(s => s.type === plugin.type)}
+							{#if tmpl?.hints}
+								<div class="px-4 pb-3 flex flex-wrap gap-1">
+									{#each tmpl.hints as hint}
+										<span
+											class="font-mono text-[9px] px-1.5 py-0.5 rounded"
+											style="background: oklch(0.18 0.02 250 / 0.5); color: {color.text}; opacity: 0.5;"
+										>
+											{hint}
+										</span>
+									{/each}
+								</div>
+							{:else if plugin.version}
+								<div class="px-4 pb-3">
+									<span class="font-mono text-[9px]" style="color: oklch(0.40 0.02 250);">
+										v{plugin.version}
+									</span>
+								</div>
+							{/if}
+
+							{#if !plugin.enabled && plugin.error}
 								<div
-									class="rounded-lg overflow-hidden transition-all duration-200"
-									style="background: oklch(0.18 0.02 250); border: 1px solid oklch(0.25 0.03 280);"
+									class="mx-4 mb-2 px-2.5 py-1.5 rounded font-mono text-[9px]"
+									style="background: oklch(0.20 0.06 25); color: oklch(0.60 0.10 25);"
 								>
-									<div class="px-4 pt-4 pb-3 flex items-start gap-3">
-										<div
-											class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-											style="background: {plugin.icon?.color ? 'oklch(0.22 0.06 45)' : 'oklch(0.22 0.04 280)'}; border: 1px solid {plugin.icon?.color ? 'oklch(0.30 0.08 45)' : 'oklch(0.30 0.06 280)'};"
-										>
-											{#if plugin.icon}
-												<svg
-													xmlns="http://www.w3.org/2000/svg"
-													fill={plugin.icon.fill ? 'currentColor' : 'none'}
-													viewBox={plugin.icon.viewBox || '0 0 24 24'}
-													stroke={plugin.icon.fill ? 'none' : 'currentColor'}
-													stroke-width={plugin.icon.fill ? '0' : '1.5'}
-													class="w-4 h-4"
-													style="color: {plugin.icon.color || 'oklch(0.65 0.10 280)'};"
-												>
-													<path stroke-linecap="round" stroke-linejoin="round" d={plugin.icon.svg} />
-												</svg>
-											{:else}
-												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4" style="color: oklch(0.65 0.10 280);">
-													<path stroke-linecap="round" stroke-linejoin="round" d="M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0a.64.64 0 01-.657.643 48.39 48.39 0 01-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 01-.658.663v0c-.355 0-.676-.186-.959-.401a1.647 1.647 0 00-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401v0c.31 0 .555.26.532.57a48.039 48.039 0 01-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 00.657-.643v0c0-.355-.186-.676-.401-.959a1.647 1.647 0 01-.349-1.003c0-1.035 1.008-1.875 2.25-1.875 1.243 0 2.25.84 2.25 1.875 0 .369-.128.713-.349 1.003-.215.283-.4.604-.4.959v0c0 .333.277.599.61.58a48.1 48.1 0 005.427-.63 48.05 48.05 0 00.582-4.717.532.532 0 00-.533-.57v0c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.96.401v0a.656.656 0 00.658-.663 48.422 48.422 0 00-.37-5.36c-1.886.342-3.81.574-5.766.689a.578.578 0 01-.61-.58v0z" />
-												</svg>
-											{/if}
-										</div>
-										<div class="flex-1 min-w-0">
-											<div class="flex items-center gap-2">
-												<h3 class="font-mono text-xs font-semibold" style="color: oklch(0.80 0.02 250);">
-													{plugin.name}
-												</h3>
-												{#if isConfigured}
-													<span
-														class="font-mono text-[8px] px-1.5 py-0.5 rounded"
-														style="background: oklch(0.22 0.06 145); color: oklch(0.60 0.12 145);"
-													>
-														configured
-													</span>
-												{/if}
-											</div>
-											<p class="font-mono text-[10px] mt-1 leading-relaxed" style="color: oklch(0.55 0.02 250);">
-												{plugin.description || 'No description'}
-											</p>
-											<div class="flex items-center gap-2 mt-1">
-												{#if plugin.version}
-													<span class="font-mono text-[9px]" style="color: oklch(0.40 0.02 250);">
-														v{plugin.version}
-													</span>
-												{/if}
-												<span class="font-mono text-[9px] truncate" style="color: oklch(0.35 0.02 250);" title={plugin.path}>
-													{plugin.path.replace(/^.*\/ingest-plugins\//, '~/.../ingest-plugins/')}
-												</span>
-											</div>
-										</div>
-									</div>
-
-									{#if !plugin.enabled && plugin.error}
-										<div
-											class="mx-4 mb-3 px-2.5 py-1.5 rounded font-mono text-[9px]"
-											style="background: oklch(0.20 0.06 25); color: oklch(0.60 0.10 25);"
-										>
-											{plugin.error}
-										</div>
-									{/if}
-
-									<div
-										class="px-4 py-2.5 flex items-center justify-end"
-										style="background: oklch(0.15 0.01 250); border-top: 1px solid oklch(0.22 0.02 250);"
-									>
-										<button
-											class="font-mono text-[10px] font-semibold px-3 py-1 rounded cursor-pointer transition-colors duration-150 flex items-center gap-1.5"
-											style="
-												background: oklch(0.22 0.04 280);
-												color: oklch(0.70 0.08 280);
-												border: 1px solid oklch(0.30 0.06 280);
-											"
-											onclick={() => openWizardForPlugin(plugin.type)}
-										>
-											<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
-												<path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
-											</svg>
-											Add Source
-										</button>
-									</div>
+									{plugin.error}
 								</div>
-							{/each}
-						</div>
+							{/if}
+
+							<div
+								class="px-4 py-2.5 flex items-center gap-1.5 transition-all duration-200 mt-auto"
+								style="
+									background: oklch(0.15 0.02 250 / 0.5);
+									border-top: 1px solid {color.border};
+									color: {color.text};
+									opacity: 0.7;
+								"
+							>
+								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+									<path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
+								</svg>
+								<span class="font-mono text-[10px] font-semibold">Add {plugin.name || tmpl?.name || plugin.type}</span>
+							</div>
+						</button>
+					{/each}
+				</div>
+
+				{#if plugins.length === 0}
+					<div
+						class="text-center py-12 rounded-lg"
+						style="background: oklch(0.16 0.02 250); border: 1px dashed oklch(0.28 0.02 250);"
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" class="w-8 h-8 mx-auto mb-3" style="color: oklch(0.35 0.02 250);">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+						</svg>
+						<p class="font-mono text-xs" style="color: oklch(0.45 0.02 250);">
+							No adapters discovered. Install one from a git URL above.
+						</p>
 					</div>
 				{/if}
 			{/if}
+
+			<!-- Create Your Own -->
+			<details
+				class="mt-6 rounded-lg overflow-hidden"
+				style="background: oklch(0.16 0.02 250); border: 1px solid oklch(0.25 0.02 250);"
+			>
+				<summary
+					class="flex items-center gap-2 px-4 py-3 cursor-pointer font-mono text-[10px] font-semibold tracking-widest uppercase select-none"
+					style="color: oklch(0.50 0.02 250);"
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 shrink-0" style="color: oklch(0.45 0.06 200);">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085" />
+					</svg>
+					Create Your Own Integration
+				</summary>
+				<div class="px-4 pb-4 space-y-3" style="border-top: 1px solid oklch(0.22 0.02 250);">
+					<p class="font-mono text-[10px] leading-relaxed pt-3" style="color: oklch(0.55 0.02 250);">
+						An integration is a single JavaScript file that extends <code class="px-1 py-0.5 rounded" style="background: oklch(0.20 0.02 250); color: oklch(0.65 0.06 200);">BaseAdapter</code> and exports a <code class="px-1 py-0.5 rounded" style="background: oklch(0.20 0.02 250); color: oklch(0.65 0.06 200);">metadata</code> object. Drop it in a folder and it works.
+					</p>
+
+					<!-- Minimal example -->
+					<div class="rounded-lg overflow-hidden" style="border: 1px solid oklch(0.22 0.02 250);">
+						<div class="px-3 py-1.5 font-mono text-[9px] font-semibold" style="background: oklch(0.14 0.02 250); color: oklch(0.45 0.02 250);">
+							my-adapter/index.js
+						</div>
+						<pre
+							class="px-3 py-2 font-mono text-[10px] leading-relaxed overflow-x-auto"
+							style="background: oklch(0.12 0.02 250); color: oklch(0.60 0.02 250); margin: 0;"
+						>{`import { BaseAdapter } from '../base.js';
+
+export const metadata = {
+  type: 'my-source',
+  name: 'My Source',
+  description: 'Polls my data source for new items',
+  version: '1.0.0',
+  configFields: [
+    { key: 'apiUrl', label: 'API URL', type: 'string', required: true },
+    { key: 'token', label: 'API Token', type: 'secret' }
+  ],
+  itemFields: [
+    { key: 'category', label: 'Category', type: 'enum', values: ['news', 'update'] }
+  ]
+};
+
+export default class MyAdapter extends BaseAdapter {
+  constructor() { super(metadata.type); }
+
+  async poll(source, state, getSecret) {
+    // Fetch items, return { items: [...], state: {...} }
+  }
+
+  async test(source, getSecret) {
+    // Return { ok: true, message: 'Connected', sampleItems: [] }
+  }
+}`}</pre>
+					</div>
+
+					<!-- Where to put it -->
+					<div class="flex flex-col gap-2">
+						<div class="flex items-start gap-2">
+							<span class="font-mono text-[10px] font-semibold shrink-0 mt-0.5" style="color: oklch(0.55 0.06 200);">Local:</span>
+							<span class="font-mono text-[10px]" style="color: oklch(0.50 0.02 250);">
+								Place your adapter folder in <code class="px-1 py-0.5 rounded" style="background: oklch(0.20 0.02 250); color: oklch(0.65 0.04 250);">~/.config/jat/ingest-plugins/</code>
+							</span>
+						</div>
+						<div class="flex items-start gap-2">
+							<span class="font-mono text-[10px] font-semibold shrink-0 mt-0.5" style="color: oklch(0.55 0.06 200);">Git:</span>
+							<span class="font-mono text-[10px]" style="color: oklch(0.50 0.02 250);">
+								Push to a repo and use the Install from Git field above
+							</span>
+						</div>
+						<div class="flex items-start gap-2">
+							<span class="font-mono text-[10px] font-semibold shrink-0 mt-0.5" style="color: oklch(0.55 0.06 200);">Reference:</span>
+							<span class="font-mono text-[10px]" style="color: oklch(0.50 0.02 250);">
+								See the built-in adapters in <code class="px-1 py-0.5 rounded" style="background: oklch(0.20 0.02 250); color: oklch(0.65 0.04 250);">tools/ingest/adapters/</code> for working examples
+							</span>
+						</div>
+					</div>
+				</div>
+			</details>
 		{/if}
 
 		{#if error}

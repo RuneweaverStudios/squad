@@ -2,10 +2,23 @@ import { Marked } from 'marked';
 
 const marked = new Marked();
 
-// Custom renderer for heading IDs and anchor links
+// Helper to render inline tokens to HTML
+function renderInline(tokens: Array<{ type: string; text?: string; raw?: string }>): string {
+	return tokens
+		.map((t) => {
+			if (t.type === 'codespan') return `<code>${t.text}</code>`;
+			if (t.type === 'strong') return `<strong>${t.text}</strong>`;
+			if (t.type === 'em') return `<em>${t.text}</em>`;
+			return t.text ?? t.raw ?? '';
+		})
+		.join('');
+}
+
+// Custom renderer for heading IDs, code blocks, and links
 marked.use({
 	renderer: {
-		heading({ text, depth }: { text: string; depth: number }) {
+		heading({ tokens, text, depth }: { tokens?: Array<{ type: string; text?: string; raw?: string }>; text: string; depth: number }) {
+			// Use raw text (no HTML) for the ID
 			const id = text
 				.toLowerCase()
 				.replace(/<[^>]*>/g, '')
@@ -13,7 +26,9 @@ marked.use({
 				.replace(/\s+/g, '-')
 				.replace(/-+/g, '-')
 				.trim();
-			return `<h${depth} id="${id}"><a href="#${id}" class="heading-anchor">#</a>${text}</h${depth}>`;
+			// Render inline tokens for display (handles <code>, <strong>, etc.)
+			const display = tokens ? renderInline(tokens) : text;
+			return `<h${depth} id="${id}"><a href="#${id}" class="heading-anchor">#</a>${display}</h${depth}>`;
 		},
 		code({ text, lang }: { text: string; lang?: string }) {
 			const language = lang || '';
@@ -22,9 +37,6 @@ marked.use({
 				.replace(/</g, '&lt;')
 				.replace(/>/g, '&gt;');
 			return `<div class="code-wrapper"><div class="code-lang">${language}</div><pre><code class="language-${language}">${escaped}</code></pre></div>`;
-		},
-		table({ header, rows }: { header: string; rows: string[] }) {
-			return `<div class="table-wrapper"><table><thead>${header}</thead><tbody>${rows.join('')}</tbody></table></div>`;
 		},
 		link({ href, text }: { href: string; text: string }) {
 			const isExternal = href.startsWith('http');
@@ -67,7 +79,9 @@ export function extractToc(markdown: string): TocItem[] {
 
 export function parseMarkdown(markdown: string): ParsedDoc {
 	const toc = extractToc(markdown);
-	const html = marked.parse(markdown) as string;
+	let html = marked.parse(markdown) as string;
+	// Wrap tables in scrollable container
+	html = html.replace(/<table>/g, '<div class="table-wrapper"><table>').replace(/<\/table>/g, '</table></div>');
 	return { html, toc };
 }
 
