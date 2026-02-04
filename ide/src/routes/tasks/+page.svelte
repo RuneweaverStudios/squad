@@ -195,7 +195,7 @@
 	const epicChildMap = $derived(buildEpicChildMap(allTasks));
 
 	// Get all unique projects from sessions, tasks, and configured projects
-	const allProjects = $derived(() => {
+	const allProjects = $derived.by(() => {
 		const projects = new Set<string>();
 
 		// Add configured projects (includes empty projects)
@@ -233,7 +233,7 @@
 	// NOTE: All smart defaults for subsections are handled in selectProject() to avoid
 	// infinite effect loops. Do NOT add a separate effect for subsection defaults.
 	$effect(() => {
-		const projects = allProjects();
+		const projects = allProjects;
 		if (projects.length > 0 && !selectedProject) {
 			selectProject(projects[0]);
 		} else if (
@@ -247,7 +247,7 @@
 	});
 
 	// Group sessions by project
-	const sessionsByProject = $derived(() => {
+	const sessionsByProject = $derived.by(() => {
 		const grouped = new Map<string, TmuxSession[]>();
 
 		for (const session of sessions.filter((s) => s.type === "agent")) {
@@ -301,7 +301,7 @@
 	}
 
 	// Group tasks by project
-	const tasksByProject = $derived(() => {
+	const tasksByProject = $derived.by(() => {
 		const grouped = new Map<string, Task[]>();
 
 		for (const task of openTasks) {
@@ -764,11 +764,11 @@
 
 	// Count helpers
 	function getProjectSessionCount(project: string): number {
-		return sessionsByProject().get(project)?.length || 0;
+		return sessionsByProject.get(project)?.length || 0;
 	}
 
 	function getProjectTaskCount(project: string): number {
-		const tasks = tasksByProject().get(project) || [];
+		const tasks = tasksByProject.get(project) || [];
 		// Only count open tasks (exclude epics and non-open status)
 		return tasks.filter(
 			(t) => t.status === "open" && t.issue_type !== "epic",
@@ -779,8 +779,8 @@
 	function selectProject(project: string) {
 		selectedProject = project;
 
-		const projectSessions = sessionsByProject().get(project) || [];
-		const projectTasks = tasksByProject().get(project) || [];
+		const projectSessions = sessionsByProject.get(project) || [];
+		const projectTasks = tasksByProject.get(project) || [];
 		const projectPausedSessions = getProjectPausedSessions(project);
 		const hasActiveSessions = projectSessions.length > 0;
 		const hasPausedSessions = projectPausedSessions.length > 0;
@@ -870,12 +870,14 @@
 		}
 	});
 
-	// Refresh data when a new project is created via CreateProjectDrawer
+	// Refresh data when a new project is created via CreateProjectDrawer.
+	// Use Svelte's $-prefix auto-subscription instead of raw .subscribe() inside $effect.
 	$effect(() => {
-		const unsubscribe = projectCreatedSignal.subscribe(() => {
+		const count = $projectCreatedSignal;
+		// Only refetch if signal has been triggered (not on initial mount)
+		if (count > 0) {
 			fetchAllData();
-		});
-		return unsubscribe;
+		}
 	});
 </script>
 
@@ -969,14 +971,14 @@
 			<span>Failed to load data: {sessionsError || tasksError}</span>
 			<button onclick={() => fetchAllData()}>Retry</button>
 		</div>
-	{:else if allProjects().length === 0}
+	{:else if allProjects.length === 0}
 		<div class="empty-state">
 			<span>No projects with active sessions or open tasks</span>
 		</div>
 	{:else}
 		<!-- Project Tabs -->
 		<div class="project-tabs">
-			{#each allProjects() as project (project)}
+			{#each allProjects as project (project)}
 				{@const projectColor =
 					projectColors[project] || "oklch(0.70 0.15 200)"}
 				{@const isActive = selectedProject === project}
@@ -984,7 +986,7 @@
 				{@const taskCount = getProjectTaskCount(project)}
 				{@const recoverableCount = getProjectRecoverableCount(project)}
 				{@const projectAgentSessions =
-					sessionsByProject().get(project) || []}
+					sessionsByProject.get(project) || []}
 				<button
 					class="project-tab"
 					class:active={isActive}
@@ -1054,8 +1056,8 @@
 		<!-- Selected Project Content -->
 		{#if selectedProject}
 			{@const projectSessions =
-				sessionsByProject().get(selectedProject) || []}
-			{@const projectTasks = tasksByProject().get(selectedProject) || []}
+				sessionsByProject.get(selectedProject) || []}
+			{@const projectTasks = tasksByProject.get(selectedProject) || []}
 			{@const projectPausedSessions =
 				getProjectPausedSessions(selectedProject)}
 			{@const sessionsByEpic = getSessionsByEpic(projectSessions)}

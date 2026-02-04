@@ -352,7 +352,7 @@
 	});
 
 	// Derived: sessions to render in order (includes exiting sessions in their original position)
-	const orderedSessions = $derived(() => {
+	const orderedSessions = $derived.by(() => {
 		const result: Array<{ session: TmuxSession; isExiting: boolean; isNew: boolean; hadTaskOnEntry: boolean }> = [];
 		for (const name of sessionOrder) {
 			const session = sessions.find(s => s.name === name) || previousSessionObjects.get(name);
@@ -969,7 +969,7 @@
 				</tr>
 			</thead>
 			<tbody>
-				{#each orderedSessions() as { session, isExiting, isNew, hadTaskOnEntry } (session.name)}
+				{#each orderedSessions as { session, isExiting, isNew, hadTaskOnEntry } (session.name)}
 					{@const typeBadge = getTypeBadge(session.type)}
 					{@const isExpanded = expandedSession === session.name}
 					{@const isCollapsing = collapsingSession === session.name}
@@ -1341,7 +1341,7 @@
 														collapsingSession = null;
 
 														// Find and expand the next session in the list
-														const sessions = orderedSessions();
+														const sessions = orderedSessions;
 														const currentIndex = sessions.findIndex(s => s.session.name === session.name);
 														let foundNext = false;
 														if (currentIndex >= 0) {
@@ -1376,7 +1376,7 @@
 														collapsingSession = null;
 
 														// Find and expand the previous session in the list
-														const sessions = orderedSessions();
+														const sessions = orderedSessions;
 														const currentIndex = sessions.findIndex(s => s.session.name === session.name);
 														let foundPrev = false;
 														if (currentIndex > 0) {
@@ -1412,7 +1412,7 @@
 														collapsingSession = null;
 
 														// Find and expand the next session in the list
-														const sessions = orderedSessions();
+														const sessions = orderedSessions;
 														const currentIndex = sessions.findIndex(s => s.session.name === session.name);
 														let foundNext = false;
 														if (currentIndex >= 0) {
