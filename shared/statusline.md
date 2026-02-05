@@ -83,12 +83,12 @@ All three sessions work independently with their own agent identities.
 │     └─ NO → Show "jat | no agent registered"                          │
 │     └─ YES → Continue to step 2                                       │
 │                                                                        │
-│  2. Check Beads for in_progress tasks assigned to agent               │
-│     └─ FOUND → Use task from Beads (Priority 1 source)                │
+│  2. Check JAT Tasks for in_progress tasks assigned to agent           │
+│     └─ FOUND → Use task from JAT Tasks (Priority 1 source)            │
 │     └─ NOT FOUND → Continue to step 3                                 │
 │                                                                        │
 │  3. Check file reservations for task ID in reason field               │
-│     └─ FOUND → Extract task ID, lookup in Beads (Priority 2 source)   │
+│     └─ FOUND → Extract task ID, lookup in JAT Tasks (Priority 2)      │
 │     └─ NOT FOUND → Continue to step 4                                 │
 │                                                                        │
 │  4. No active task found                                              │
@@ -99,7 +99,7 @@ All three sessions work independently with their own agent identities.
 
 **Priority Order:**
 1. **Agent Registration** - `.claude/sessions/agent-{session_id}.txt` exists?
-2. **Beads in_progress** - `bd list --json | filter(assignee == agent && status == "in_progress")`
+2. **Task in_progress** - `jt list --json | filter(assignee == agent && status == "in_progress")`
 3. **File Reservations** - `am-reservations --agent X | extract task ID from reason`
 4. **Idle State** - Agent registered but no work
 
@@ -127,7 +127,7 @@ Example: `jat@master*` → blue `jat`, dim `@`, green `master`, red `*`
 
 | Issue | Cause | Fix |
 |-------|-------|-----|
-| Shows "idle" but I'm working | Task not marked `in_progress` in Beads | Run `bd update task-id --status in_progress` |
+| Shows "idle" but I'm working | Task not marked `in_progress` | Run `jt update task-id --status in_progress` |
 | Shows wrong task | Old reservation from previous task | Release stale reservation with `am-release` |
 | Shows "no agent registered" | Session file missing | Run `/jat:start` to register |
 

@@ -2,7 +2,7 @@
 
 **Agents discover follow-up work during task completion and signal it to the IDE for human review and batch creation.**
 
-This document explains how suggested tasks flow from agent discovery to Beads task creation.
+This document explains how suggested tasks flow from agent discovery to task creation.
 
 ### Overview
 
@@ -39,7 +39,7 @@ Rather than creating tasks immediately, agents signal these discoveries to the I
 │  6. Human reviews and edits tasks in IDE                              │
 │     └─► Edit priority, type, title, description, project, labels           │
 │                                                                             │
-│  7. Human clicks "Create Tasks" to batch create in Beads                    │
+│  7. Human clicks "Create Tasks" to batch create tasks                       │
 │     └─► POST /api/tasks/bulk creates selected tasks                        │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -155,7 +155,7 @@ The IDE renders suggested tasks in an interactive panel with:
 - Count of selected vs total tasks
 
 **Smart Detection:**
-- Auto-detects if task already exists in Beads (by title match)
+- Auto-detects if task already exists (by title match)
 - Shows "Created" badge for duplicates
 - Prevents re-creation of existing tasks
 
@@ -176,7 +176,7 @@ The IDE renders suggested tasks in an interactive panel with:
 
 **Endpoint:** `POST /api/tasks/bulk`
 
-Creates multiple tasks in Beads using the `bd create` command.
+Creates multiple tasks using the `jt create` command.
 
 #### Request Format
 
@@ -366,7 +366,7 @@ jat-signal complete '{
 # 5. Human edits 2FA task priority to P1, adds "security" label
 # 6. Human selects both tasks and clicks "Create Tasks"
 # 7. IDE calls POST /api/tasks/bulk
-# 8. Tasks created in Beads: jat-abc (2FA), jat-abd (docs)
+# 8. Tasks created: jat-abc (2FA), jat-abd (docs)
 # 9. Success message shown, tasks appear in task list
 ```
 
@@ -376,26 +376,26 @@ When creating multiple related tasks that should be grouped under an epic:
 
 ```bash
 # 1. Create the epic first
-bd create "Epic: Rich Signals System" --type epic --priority 1
+jt create "Epic: Rich Signals System" --type epic --priority 1
 
 # 2. Create child tasks
-bd create "Define signal schema" --type task --priority 1
-bd create "Implement jat-signal command" --type task --priority 1
-bd create "Add PostToolUse hook" --type task --priority 2
+jt create "Define signal schema" --type task --priority 1
+jt create "Implement jat-signal command" --type task --priority 1
+jt create "Add PostToolUse hook" --type task --priority 2
 
 # 3. Link children to epic (USE THE HELPER SCRIPT!)
-# ⚠️ CRITICAL: bd dep add order is easy to get backwards!
-bd-epic-child jat-abc jat-def   # Epic depends on child (correct)
-bd-epic-child jat-abc jat-ghi   # Epic depends on child (correct)
-bd-epic-child jat-abc jat-jkl   # Epic depends on child (correct)
+# ⚠️ CRITICAL: jt dep add order is easy to get backwards!
+jt-epic-child jat-abc jat-def   # Epic depends on child (correct)
+jt-epic-child jat-abc jat-ghi   # Epic depends on child (correct)
+jt-epic-child jat-abc jat-jkl   # Epic depends on child (correct)
 
 # ❌ WRONG (creates child blocked by epic):
-# bd dep add jat-def jat-abc   # Child depends on epic - WRONG!
+# jt dep add jat-def jat-abc   # Child depends on epic - WRONG!
 ```
 
-**Why `bd-epic-child`?**
-- `bd dep add A B` means "A depends on B" (A is blocked until B completes)
-- Easy to accidentally write `bd dep add child epic` (WRONG direction)
-- `bd-epic-child epic child` always does the right thing
+**Why `jt-epic-child`?**
+- `jt dep add A B` means "A depends on B" (A is blocked until B completes)
+- Easy to accidentally write `jt dep add child epic` (WRONG direction)
+- `jt-epic-child epic child` always does the right thing
 
-See `shared/beads.md` for full epic creation documentation.
+See `shared/tasks.md` for full epic creation documentation.

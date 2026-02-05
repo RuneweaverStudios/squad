@@ -17,8 +17,8 @@ Complete current task properly with full verification. Session ends after comple
 2. **Full Completion Protocol**:
    - Verify task (tests, lint, security, browser checks)
    - Commit changes with proper message
-3. **Beads Task Management**:
-   - Mark task as complete in Beads (`bd close`)
+3. **Task Management**:
+   - Mark task as complete (`jt close`)
    - Release file reservations
 4. **Announce Completion** in Agent Mail
 5. **End Session** - Session is complete, user spawns new agent for next task
@@ -81,14 +81,14 @@ When the agent enters "ready-for-review" state (via the `review` signal), the ID
 
 **These are two different states. Never confuse them.**
 
-| State | Meaning | Display | Beads Status |
+| State | Meaning | Display | Task Status |
 |-------|---------|---------|--------------|
 | **Ready for Review** | Code work done, awaiting user decision | "🔍 READY FOR REVIEW" | `in_progress` |
-| **Complete** | Closed in Beads, reservations released | "✅ TASK COMPLETE" | `closed` |
+| **Complete** | Closed, reservations released | "✅ TASK COMPLETE" | `closed` |
 
 **NEVER say "Task Complete" until AFTER:**
 1. Changes committed
-2. `bd close` has run successfully
+2. `jt close` has run successfully
 3. Reservations released
 4. Completion announced via Agent Mail
 
@@ -99,8 +99,8 @@ When the agent enters "ready-for-review" state (via the `review` signal), the ID
 4. THEN display "✅ TASK COMPLETE"
 
 **Why this matters:**
-- Other agents check Beads to see if tasks are available
-- If you say "complete" but haven't run `bd close`, another agent will see the task as still in-progress
+- Other agents check the task queue to see if tasks are available
+- If you say "complete" but haven't run `jt close`, another agent will see the task as still in-progress
 - This causes confusion and coordination problems
 
 ---
@@ -162,8 +162,8 @@ get-current-session-id
 
 #### 1C: Get Current Task
 ```bash
-# Get task from Beads (in_progress tasks for this agent)
-bd list --json | jq -r --arg agent "$agent_name" \
+# Get task (in_progress tasks for this agent)
+jt list --json | jq -r --arg agent "$agent_name" \
   '.[] | select(.assignee == $agent and .status == "in_progress") | .id' | head -1
 ```
 
@@ -178,7 +178,7 @@ bd list --json | jq -r --arg agent "$agent_name" \
 
 **Only execute if Step 1C found no `in_progress` task.**
 
-This step detects ad-hoc work done without a formal Beads task and offers to create a backfilled task record for proper attribution and audit trail.
+This step detects ad-hoc work done without a formal task and offers to create a backfilled task record for proper attribution and audit trail.
 
 #### Analyze Conversation Context
 
@@ -246,7 +246,7 @@ Create a backfilled task record? [Proceed? Y/n]
 
 ```bash
 # Create the backfilled task (already in_progress since work is done)
-bd create "[title]" \
+jt create "[title]" \
   --type [type] \
   --description "[description]" \
   --assignee "$agent_name" \
@@ -264,7 +264,7 @@ Understood. No task record created.
 
 Options:
   • /jat:start - Pick up a new task
-  • bd create "..." - Manually create a task
+  • jt create "..." - Manually create a task
   • Just commit your changes directly with git
 ```
 
@@ -277,7 +277,7 @@ No task in progress and no spontaneous work detected.
 
 Options:
   • /jat:start - Pick a task to work on
-  • bd list - View available tasks
+  • jt list - View available tasks
 ```
 
 **Exit the /jat:complete flow** - do not continue to Step 2.
@@ -497,7 +497,7 @@ Is this change visible to users/stakeholders?
 
 ```bash
 # Get task type for commit message
-task_type=$(bd show "$task_id" --json | jq -r '.[0].issue_type // "task"')
+task_type=$(jt show "$task_id" --json | jq -r '.[0].issue_type // "task"')
 
 # Emit signal + commit changes (skips if no changes)
 jat-step committing --task "$task_id" --title "$task_title" --agent "$agent_name" --type "$task_type"
@@ -505,10 +505,10 @@ jat-step committing --task "$task_id" --title "$task_title" --agent "$agent_name
 
 ---
 
-### STEP 5: Mark Task Complete in Beads
+### STEP 5: Mark Task Complete
 
 ```bash
-# Emit signal + close task in Beads
+# Emit signal + close task
 jat-step closing --task "$task_id" --title "$task_title" --agent "$agent_name"
 ```
 
@@ -522,7 +522,7 @@ This ensures epics don't linger in "open" status when all children are done.
 
 ```bash
 # Auto-close epics where all children are complete
-bd epic close-eligible
+jt epic close-eligible
 
 # This command:
 # - Finds all epics with issue_type=epic and status=open
@@ -565,12 +565,12 @@ jat-step complete --task "$task_id" --title "$task_title" --agent "$agent_name"
 ```
 
 **What this does:**
-1. Fetches task details from Beads
+1. Fetches task details
 2. Collects git status, diff stats, recent commits
 3. Auto-detects completion mode (review_required or auto_proceed) from:
    - Task notes: `[REVIEW_OVERRIDE:auto_proceed]` or `[REVIEW_OVERRIDE:always_review]`
    - Session epic context: `.claude/sessions/context-{session_id}.json`
-   - Project rules: `.beads/review-rules.json`
+   - Project rules: `.jat/review-rules.json`
    - Default: `review_required` (safe fallback)
 4. Calls LLM to generate structured completion bundle
 5. Emits `complete` signal (100%) to IDE
@@ -592,11 +592,11 @@ jat-step complete --task "$task_id" --title "$task_title" --agent "$agent_name"
 
 **Prerequisites:**
 - `ANTHROPIC_API_KEY` environment variable must be set
-- Task must exist in Beads
+- Task must exist in the task database
 
 **If it fails:**
 - Check `ANTHROPIC_API_KEY` is set
-- Check task ID is valid with `bd show $task_id`
+- Check task ID is valid with `jt show $task_id`
 - Check network connectivity
 
 <details>
@@ -606,7 +606,7 @@ The completion mode determines whether to auto-spawn the next task (Epic Swarm m
 
 1. Check task notes for `[REVIEW_OVERRIDE:auto_proceed]` or `[REVIEW_OVERRIDE:always_review]`
 2. Check session epic context: `.claude/sessions/context-{session_id}.json` with `reviewThreshold`
-3. Check project rules: `.beads/review-rules.json`
+3. Check project rules: `.jat/review-rules.json`
 4. Default: `review_required` (safe fallback)
 
 </details>
@@ -622,7 +622,7 @@ When it receives the `complete` signal:
    - Uncompleted actions show warning indicator
 
 2. **Suggested Tasks Panel** - Shows task cards
-   - Each task has "Create in Beads" button
+   - Each task has "Create Task" button
    - One-click creation with all fields pre-filled
    - Bulk "Create All" option
 
@@ -664,7 +664,7 @@ The completion output is generated by `jat-complete-bundle`. A typical flow look
 💾 Committing changes...
    ✅ Committed: "feat: Add user settings page"
 
-✅ Marking task complete in Beads...
+✅ Marking task complete...
    ✅ Closed jat-abc
 
 📢 Announcing completion...
@@ -695,12 +695,12 @@ The completion flow emits **progress signals** at each step, followed by a final
 
 **Completion mode is determined in Step 7.5** based on:
 1. Per-task override in notes (`[REVIEW_OVERRIDE:...]`)
-2. Project review rules (`.beads/review-rules.json`)
+2. Project review rules (`.jat/review-rules.json`)
 3. Safe default: review required (no auto-proceed without explicit configuration)
 
 **Critical timing:**
 - Do NOT run `jat-signal complete` until AFTER all completion steps succeed
-- If you signal early, IDE shows "complete" but task is still open in Beads
+- If you signal early, IDE shows "complete" but task is still open
 - This causes confusion - other agents think task is done when it isn't
 
 **Human actions:**
@@ -755,7 +755,7 @@ Or run /jat:verify to see detailed error report
 | 3.6 | Update Changelog | *(if notable - most tasks skip)* |
 | 4 | Commit Changes | `jat-step committing` (20%) |
 | 5 | Mark Task Complete | `jat-step closing` (40%) |
-| 5.5 | Auto-Close Eligible Epics | `bd epic close-eligible` |
+| 5.5 | Auto-Close Eligible Epics | `jt epic close-eligible` |
 | 6 | Release Reservations | `jat-step releasing` (60%) |
 | 7 | Announce Completion | `jat-step announcing` (80%) |
 | **8** | **Generate & Emit Completion** | **`jat-step complete`** (100%) |
@@ -829,7 +829,7 @@ When creating an epic with child tasks, the dependencies must be set up correctl
 
 **Step 1: Create the epic (will be blocked by children)**
 ```bash
-bd create "Improve IDE Performance" \
+jt create "Improve IDE Performance" \
   --type epic \
   --description "Parent epic for performance improvements. This task becomes verification/UAT once all children complete." \
   --priority 1
@@ -839,22 +839,22 @@ bd create "Improve IDE Performance" \
 **Step 2: Create child tasks**
 ```bash
 # Create children as separate tasks
-bd create "Add caching layer" --type task --priority 2
+jt create "Add caching layer" --type task --priority 2
 # → Creates: jat-def
 
-bd create "Optimize database queries" --type task --priority 2
+jt create "Optimize database queries" --type task --priority 2
 # → Creates: jat-ghi
 
-bd create "Add performance tests" --type task --priority 3
+jt create "Add performance tests" --type task --priority 3
 # → Creates: jat-jkl
 ```
 
 **Step 3: Set up dependencies (epic depends on children)**
 ```bash
 # Epic is blocked by each child (NOT children blocked by epic!)
-bd dep add jat-abc jat-def   # Epic depends on child 1
-bd dep add jat-abc jat-ghi   # Epic depends on child 2
-bd dep add jat-abc jat-jkl   # Epic depends on child 3
+jt dep add jat-abc jat-def   # Epic depends on child 1
+jt dep add jat-abc jat-ghi   # Epic depends on child 2
+jt dep add jat-abc jat-jkl   # Epic depends on child 3
 ```
 
 **Result:**
@@ -869,20 +869,20 @@ If you have an epic with wrong dependency direction:
 
 ```bash
 # Check current state
-bd show jat-abc
+jt show jat-abc
 # If it shows "Blocks: ← jat-abc.1, ← jat-abc.2" - it's WRONG
 
 # Fix by removing and re-adding dependencies
-bd dep remove jat-abc.1 jat-abc    # Remove child → parent dep
-bd dep remove jat-abc.2 jat-abc
-bd dep remove jat-abc.3 jat-abc
+jt dep remove jat-abc.1 jat-abc    # Remove child → parent dep
+jt dep remove jat-abc.2 jat-abc
+jt dep remove jat-abc.3 jat-abc
 
-bd dep add jat-abc jat-abc.1       # Add parent → child dep (correct)
-bd dep add jat-abc jat-abc.2
-bd dep add jat-abc jat-abc.3
+jt dep add jat-abc jat-abc.1       # Add parent → child dep (correct)
+jt dep add jat-abc jat-abc.2
+jt dep add jat-abc jat-abc.3
 
 # Verify fix
-bd show jat-abc
+jt show jat-abc
 # Should now show "Depends on: → jat-abc.1, → jat-abc.2, → jat-abc.3"
 ```
 
@@ -895,7 +895,7 @@ bd show jat-abc
 When you pick up an epic that has become READY (all children completed), your job is:
 
 1. **Verify all children are actually complete**
-   - Check each child task is closed in Beads
+   - Check each child task is closed
    - Review the work done by child agents
 
 2. **Run integration/UAT verification**
@@ -1000,7 +1000,7 @@ When completing a child task that belongs to an epic:
 ```bash
 # Check if parent epic still has blockers
 parent_id=$(echo "$task_id" | sed 's/\.[0-9]*$//')
-remaining=$(bd show "$parent_id" --json | jq -r '.[] | select(.status != "closed") | .id' | grep -v "$parent_id")
+remaining=$(jt show "$parent_id" --json | jq -r '.[] | select(.status != "closed") | .id' | grep -v "$parent_id")
 
 if [[ -z "$remaining" ]]; then
   echo "🎉 This was the last child! Parent epic jat-abc is now READY for verification."

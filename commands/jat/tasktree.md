@@ -2,7 +2,7 @@
 argument-hint: [prd-path]
 ---
 
-Convert a PRD, spec, or requirements doc into structured Beads task tree with dependencies and priorities.
+Convert a PRD, spec, or requirements doc into structured task tree with dependencies and priorities.
 
 # Tasktree: PRD to Tasks + Dependencies
 
@@ -109,7 +109,7 @@ Choose based on the spec:
 
 ---
 
-## STEP 5: Create Tasks in Beads
+## STEP 5: Create Tasks
 
 ### For Multi-Task Features: Create Epic + Children
 
@@ -119,21 +119,21 @@ When breaking down a feature into multiple related tasks, create a parent epic f
 
 ```
 ❌ WRONG - Creates standalone tasks with random IDs:
-   bd create "Epic: Auth" --type epic           → jat-kvtrr
-   bd create "Setup config" --type task         → jat-j2pwt  (NOT a child!)
-   bd create "Add login" --type task            → jat-sud88  (NOT a child!)
-   bd dep add jat-kvtrr jat-j2pwt               (manual wiring, no grouping)
+   jt create "Epic: Auth" --type epic           → jat-kvtrr
+   jt create "Setup config" --type task         → jat-j2pwt  (NOT a child!)
+   jt create "Add login" --type task            → jat-sud88  (NOT a child!)
+   jt dep add jat-kvtrr jat-j2pwt               (manual wiring, no grouping)
 
 ✅ CORRECT - Creates hierarchical child IDs:
-   bd create "Epic: Auth" --type epic           → jat-kvtrr
-   bd create "Setup config" --parent jat-kvtrr  → jat-kvtrr.1  (child!)
-   bd create "Add login" --parent jat-kvtrr     → jat-kvtrr.2  (child!)
+   jt create "Epic: Auth" --type epic           → jat-kvtrr
+   jt create "Setup config" --parent jat-kvtrr  → jat-kvtrr.1  (child!)
+   jt create "Add login" --parent jat-kvtrr     → jat-kvtrr.2  (child!)
    (dependencies auto-wired to epic)
 ```
 
 **Step 5A: Create the Epic**
 ```bash
-bd create "Epic: Feature Name" \
+jt create "Epic: Feature Name" \
   --description "High-level description of the feature" \
   --priority [0-2] \
   --type epic \
@@ -143,14 +143,14 @@ bd create "Epic: Feature Name" \
 
 **Step 5B: Create Child Tasks with --parent**
 ```bash
-bd create "First subtask" \
+jt create "First subtask" \
   --parent jat-a3f8 \
   --description "What to do and acceptance criteria" \
   --priority [0-2] \
   --type task
 # → Returns jat-a3f8.1
 
-bd create "Second subtask" \
+jt create "Second subtask" \
   --parent jat-a3f8 \
   --description "What to do" \
   --priority [0-2] \
@@ -168,24 +168,24 @@ bd create "Second subtask" \
 After creating all child tasks, **immediately close the epic**:
 
 ```bash
-bd close jat-a3f8 --reason "Epic container - work via child tasks jat-a3f8.1 through jat-a3f8.N"
+jt close jat-a3f8 --reason "Epic container - work via child tasks jat-a3f8.1 through jat-a3f8.N"
 ```
 
 **Why close the epic?**
 - Epics are **containers for organization**, not workable tasks
-- If left open, `bd ready` shows the epic as a pickable task
+- If left open, `jt ready` shows the epic as a pickable task
 - An agent picking the epic would try to do "everything" - defeating the breakdown
 - Closing removes it from the work queue while preserving hierarchy
 
 **The epic still provides:**
 - Hierarchical child IDs (jat-a3f8.1, .2, .3)
-- Grouping in `bd list` output
+- Grouping in `jt list` output
 - Reference for what the children accomplish together
 
 ### For Standalone Tasks (No Epic Needed)
 
 ```bash
-bd create "Task title" \
+jt create "Task title" \
   --description "What to do and acceptance criteria" \
   --priority [0-2] \
   --type task \
@@ -195,16 +195,16 @@ bd create "Task title" \
 ### Set Up Dependencies Between Tasks
 
 ```bash
-bd dep add <task-id> <depends-on-task-id>
+jt dep add <task-id> <depends-on-task-id>
 ```
 
 **Example with hierarchical tasks:**
 ```bash
 # Child 2 depends on Child 1
-bd dep add jat-a3f8.2 jat-a3f8.1
+jt dep add jat-a3f8.2 jat-a3f8.1
 
 # Child 3 depends on Child 2
-bd dep add jat-a3f8.3 jat-a3f8.2
+jt dep add jat-a3f8.3 jat-a3f8.2
 ```
 
 ---
@@ -212,7 +212,7 @@ bd dep add jat-a3f8.3 jat-a3f8.2
 ## STEP 6: Verify & Report
 
 ```bash
-bd ready --json
+jt ready --json
 ```
 
 Confirm:
@@ -281,7 +281,7 @@ Confirm:
 │                                                                          │
 └──────────────────────────────────────────────────────────────────────────┘
 
-💡 Next: Run `/jat:start` to pick a task, or `bd ready` to see available work
+💡 Next: Run `/jat:start` to pick a task, or `jt ready` to see available work
 ```
 
 ---
@@ -320,20 +320,20 @@ P2 - Enhancements (children of jat-auth):
 **Creation commands:**
 ```bash
 # Create epic first
-bd create "Epic: User Authentication System" --type epic --priority 1
+jt create "Epic: User Authentication System" --type epic --priority 1
 # → jat-auth
 
 # Create children with --parent
-bd create "Set up Supabase auth config" --parent jat-auth --priority 0 --type task
+jt create "Set up Supabase auth config" --parent jat-auth --priority 0 --type task
 # → jat-auth.1
 
-bd create "Create users table with RLS" --parent jat-auth --priority 0 --type task
+jt create "Create users table with RLS" --parent jat-auth --priority 0 --type task
 # → jat-auth.2
 
 # ... continue for all tasks ...
 
 # IMPORTANT: Close the epic after all children created
-bd close jat-auth --reason "Epic container - work via child tasks jat-auth.1 through jat-auth.9"
+jt close jat-auth --reason "Epic container - work via child tasks jat-auth.1 through jat-auth.9"
 ```
 
 **Execution:**

@@ -1,6 +1,6 @@
 ---
 name: jat-complete
-description: Complete current JAT task with full verification. Checks Agent Mail, verifies work (tests/lint), commits changes, closes task in Beads, releases file reservations, announces completion, and emits final signal. Session ends after completion.
+description: Complete current JAT task with full verification. Checks Agent Mail, verifies work (tests/lint), commits changes, closes task, releases file reservations, announces completion, and emits final signal. Session ends after completion.
 metadata:
   author: jat
   version: "1.0"
@@ -22,7 +22,7 @@ Complete current task with full verification protocol. Session ends after comple
 1. **Read & Respond to Agent Mail** (always, before completing)
 2. **Verify task** (tests, lint, security)
 3. **Commit changes** with proper message
-4. **Mark task complete** in Beads (`bd close`)
+4. **Mark task complete** (`jt close`)
 5. **Release file reservations**
 6. **Announce completion** via Agent Mail
 7. **Emit completion signal** to IDE
@@ -61,7 +61,7 @@ AGENT_NAME="${TMUX_SESSION#jat-}"
 Find your in-progress task:
 
 ```bash
-bd list --json | jq -r '.[] | select(.assignee == "AGENT_NAME" and .status == "in_progress") | .id'
+jt list --json | jq -r '.[] | select(.assignee == "AGENT_NAME" and .status == "in_progress") | .id'
 ```
 
 If no task found, check for spontaneous work (uncommitted changes without a formal task).
@@ -81,7 +81,7 @@ git log --oneline -5
 If work is detected, propose creating a backfill task record:
 
 ```bash
-bd create "INFERRED_TITLE" \
+jt create "INFERRED_TITLE" \
   --type INFERRED_TYPE \
   --description "INFERRED_DESCRIPTION" \
   --assignee "$AGENT_NAME" \
@@ -135,7 +135,7 @@ Most tasks do NOT need doc updates.
 
 ```bash
 # Get task type for commit prefix
-TASK_TYPE=$(bd show "$TASK_ID" --json | jq -r '.[0].issue_type // "task"')
+TASK_TYPE=$(jt show "$TASK_ID" --json | jq -r '.[0].issue_type // "task"')
 
 # Commit with proper message format
 jat-step committing --task "$TASK_ID" --title "$TASK_TITLE" --agent "$AGENT_NAME" --type "$TASK_TYPE"
@@ -150,7 +150,7 @@ git commit -m "TASK_TYPE($TASK_ID): TASK_TITLE
 Co-Authored-By: Pi Agent <noreply@pi.dev>"
 ```
 
-### STEP 5: Mark Task Complete in Beads
+### STEP 5: Mark Task Complete
 
 ```bash
 jat-step closing --task "$TASK_ID" --title "$TASK_TITLE" --agent "$AGENT_NAME"
@@ -159,13 +159,13 @@ jat-step closing --task "$TASK_ID" --title "$TASK_TITLE" --agent "$AGENT_NAME"
 Or manually:
 
 ```bash
-bd close "$TASK_ID" --reason "Completed by $AGENT_NAME"
+jt close "$TASK_ID" --reason "Completed by $AGENT_NAME"
 ```
 
 ### STEP 5.5: Auto-Close Eligible Epics
 
 ```bash
-bd epic close-eligible
+jt epic close-eligible
 ```
 
 ### STEP 6: Release File Reservations
@@ -220,12 +220,12 @@ Session complete. Spawn a new agent for the next task.
 
 ## "Ready for Review" vs "Complete"
 
-| State | Meaning | Beads Status |
+| State | Meaning | Task Status |
 |-------|---------|--------------|
 | Ready for Review | Code done, awaiting user decision | in_progress |
-| Complete | Closed in Beads, reservations released | closed |
+| Complete | Closed, reservations released | closed |
 
-**Never say "Task Complete" until bd close has run.**
+**Never say "Task Complete" until jt close has run.**
 
 ## Error Handling
 
@@ -246,14 +246,14 @@ Fix issues and try again.
 
 | Step | Name | Tool |
 |------|------|------|
-| 1 | Get Task and Agent Identity | bd list, tmux |
+| 1 | Get Task and Agent Identity | jt list, tmux |
 | 1D | Spontaneous Work Detection | git status |
 | 2 | Read & Respond to Mail | am-inbox, am-ack |
 | 3 | Verify Task | jat-step verifying |
 | 3.5 | Update Documentation | (if appropriate) |
 | 4 | Commit Changes | jat-step committing |
 | 5 | Mark Task Complete | jat-step closing |
-| 5.5 | Auto-Close Epics | bd epic close-eligible |
+| 5.5 | Auto-Close Epics | jt epic close-eligible |
 | 6 | Release Reservations | jat-step releasing |
 | 7 | Announce Completion | jat-step announcing |
 | 8 | Emit Completion Signal | jat-step complete |

@@ -6,7 +6,7 @@ You are running as part of a **multi-agent development system** that enables par
 
 **Agent Mail** - Async messaging between agents. Send/receive messages, coordinate handoffs, avoid conflicts via file reservations.
 
-**Beads** - Task management with dependencies. Pick ready work, track status, manage priorities across projects.
+**JAT Tasks** - Task management with dependencies. Pick ready work, track status, manage priorities across projects.
 
 **Workflow Commands** - `/jat:start`, `/jat:complete`, `/jat:pause` - streamlined commands that handle registration, task selection, mail checking, and coordination automatically.
 
@@ -19,7 +19,7 @@ You are running as part of a **multi-agent development system** that enables par
 1. **One agent = one session = one task** - each session handles exactly one task
 2. **File reservations prevent conflicts** - always reserve before editing shared files
 3. **Messages coordinate work** - check mail before starting, announce completions
-4. **Beads is the task queue** - pick from ready work, update status, close when done
+4. **JAT Tasks is the task queue** - pick from ready work, update status, close when done
 5. **The statusline shows your state** - identity, task, locks, messages at a glance
 
 ### Quick Start
@@ -36,7 +36,7 @@ You are running as part of a **multi-agent development system** that enables par
 - **Always check Agent Mail first** - before starting or completing work
 - **Reserve files before editing** - prevents stepping on other agents
 - **Use task IDs everywhere** - thread_id, reservation reason, commits
-- **Update Beads status** - `in_progress` when working, `closed` when done
+- **Update task status** - `in_progress` when working, `closed` when done
 
 ### Session Lifecycle
 

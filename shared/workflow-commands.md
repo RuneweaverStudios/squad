@@ -11,7 +11,7 @@
 
 **Escalation & Planning:**
 - `/jat:verify [url]` - **Escalatory**: browser verification when user wants deeper testing
-- `/jat:tasktree [prd-path]` - Convert PRD/spec into structured Beads tasks with dependencies
+- `/jat:tasktree [prd-path]` - Convert PRD/spec into structured tasks with dependencies
 
 **Maintenance:**
 - `jat-doctor` - Bash script to diagnose installation issues (run anytime)

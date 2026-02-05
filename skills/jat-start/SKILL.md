@@ -1,6 +1,6 @@
 ---
 name: jat-start
-description: Begin working on a JAT task. Registers agent identity, checks Agent Mail, selects a task from Beads, detects conflicts, reserves files, emits IDE signals, and starts work. Use this at the beginning of every JAT session.
+description: Begin working on a JAT task. Registers agent identity, checks Agent Mail, selects a task, detects conflicts, reserves files, emits IDE signals, and starts work. Use this at the beginning of every JAT session.
 metadata:
   author: jat
   version: "1.0"
@@ -27,7 +27,7 @@ Add `quick` to skip conflict checks.
 2. **Check Agent Mail** - Read messages before starting
 3. **Select task** - From parameter or show recommendations
 4. **Review prior tasks** - Check for duplicates and related work
-5. **Start work** - Reserve files, update Beads, announce
+5. **Start work** - Reserve files, update task status, announce
 6. **Emit signals** - IDE tracks state through jat-signal
 
 ## Step-by-Step Instructions
@@ -38,7 +38,7 @@ Check what was passed: `$ARGUMENTS` may contain agent-name, task-id, both, or no
 
 ```bash
 # Test if a param is a valid task ID
-bd show "$PARAM" --json >/dev/null 2>&1 && echo "task-id" || echo "agent-name"
+jt show "$PARAM" --json >/dev/null 2>&1 && echo "task-id" || echo "agent-name"
 ```
 
 ### STEP 2: Get/Create Agent Identity
@@ -89,7 +89,7 @@ Read each message. Reply if needed with `am-reply`. Acknowledge with `am-ack`.
 If a task-id was provided, use it. Otherwise, show available work:
 
 ```bash
-bd ready --json | jq -r '.[] | "  [P\(.priority)] \(.id) - \(.title)"'
+jt ready --json | jq -r '.[] | "  [P\(.priority)] \(.id) - \(.title)"'
 ```
 
 If no task-id provided, display recommendations and stop here.
@@ -100,7 +100,7 @@ Search for related or duplicate work from the last 7 days:
 
 ```bash
 DATE_7D=$(date -d '7 days ago' +%Y-%m-%d 2>/dev/null || date -v-7d +%Y-%m-%d)
-bd search "$SEARCH_TERM" --updated-after "$DATE_7D" --limit 20 --json
+jt search "$SEARCH_TERM" --updated-after "$DATE_7D" --limit 20 --json
 ```
 
 Look for:
@@ -121,7 +121,7 @@ git diff-index --quiet HEAD --  # Check uncommitted changes
 
 ```bash
 # Update task status
-bd update "$TASK_ID" --status in_progress --assignee "$AGENT_NAME"
+jt update "$TASK_ID" --status in_progress --assignee "$AGENT_NAME"
 
 # Reserve files you'll edit
 am-reserve "relevant/files/**" --agent "$AGENT_NAME" --ttl 3600 --reason "$TASK_ID"

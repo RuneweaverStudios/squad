@@ -25,7 +25,7 @@ argument-hint: [agent-name | task-id | agent-name task-id]
 2. **Check Agent Mail** - Read messages before starting work
 3. **Select task** - From parameter or show recommendations
 4. **Review prior tasks** - Check for duplicates and related work
-5. **Start work** - Reserve files, update Beads, announce start
+5. **Start work** - Reserve files, update task status, announce start
 6. **Plan approach** - Analyze task, emit rich working signal
 
 ---
@@ -38,7 +38,7 @@ Detect what was passed: task-id, agent-name, both, or none.
 
 ```bash
 # Check if param is a valid task
-bd show "$PARAM" --json >/dev/null 2>&1 && PARAM_TYPE="task-id"
+jt show "$PARAM" --json >/dev/null 2>&1 && PARAM_TYPE="task-id"
 ```
 
 ---
@@ -116,7 +116,7 @@ Read, reply if needed, then acknowledge: `am-ack {msg_id} --agent "$AGENT_NAME"`
 **If no task-id** → show recommendations and EXIT:
 
 ```bash
-bd ready --json | jq -r '.[] | "  [\(.priority)] \(.id) - \(.title)"'
+jt ready --json | jq -r '.[] | "  [\(.priority)] \(.id) - \(.title)"'
 ```
 
 ---
@@ -132,7 +132,7 @@ This step helps avoid duplicate effort and surfaces relevant context from recent
 TASK_TITLE="Your task title here"
 # Search for tasks updated in last 7 days with similar keywords
 DATE_7_DAYS_AGO=$(date -d '7 days ago' +%Y-%m-%d 2>/dev/null || date -v-7d +%Y-%m-%d)
-bd search "$SEARCH_TERM" --updated-after "$DATE_7_DAYS_AGO" --limit 20 --json
+jt search "$SEARCH_TERM" --updated-after "$DATE_7_DAYS_AGO" --limit 20 --json
 ```
 
 **What to look for:**
@@ -192,7 +192,7 @@ bd search "$SEARCH_TERM" --updated-after "$DATE_7_DAYS_AGO" --limit 20 --json
    ```
 
 2. **Related closed task found** (similar area, useful context):
-   - Read the task description with `bd show jat-xyz`
+   - Read the task description with `jt show jat-xyz`
    - Note the approach used and files modified
    - Mention it in your approach: "Building on jat-xyz which did X..."
    - **Proceed to Step 6**
@@ -218,7 +218,7 @@ bd search "$SEARCH_TERM" --updated-after "$DATE_7_DAYS_AGO" --limit 20 --json
 ```bash
 am-reservations --json          # Check file locks
 git diff-index --quiet HEAD --  # Check uncommitted changes
-bd show "$TASK_ID" --json | jq -r '.[0].dependencies[]'  # Check deps
+jt show "$TASK_ID" --json | jq -r '.[0].dependencies[]'  # Check deps
 ```
 
 ---
@@ -226,7 +226,7 @@ bd show "$TASK_ID" --json | jq -r '.[0].dependencies[]'  # Check deps
 ### STEP 7: Start Task
 
 ```bash
-bd update "$TASK_ID" --status in_progress --assignee "$AGENT_NAME"
+jt update "$TASK_ID" --status in_progress --assignee "$AGENT_NAME"
 am-reserve "relevant/files/**" --agent "$AGENT_NAME" --ttl 3600 --reason "$TASK_ID"
 am-send "[$TASK_ID] Starting: $TASK_TITLE" "Starting work" --from "$AGENT_NAME" --to @active --thread "$TASK_ID"
 ```
@@ -501,8 +501,8 @@ jat-signal review '{"taskId":"ID","taskTitle":"TITLE","summary":["ITEM1","ITEM2"
 
 **Task not found:**
 ```
-Error: Task 'invalid-id' not found in Beads
-Use 'bd list' to see available tasks
+Error: Task 'invalid-id' not found
+Use 'jt list' to see available tasks
 ```
 
 **Reservation conflict:**

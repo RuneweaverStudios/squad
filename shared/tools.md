@@ -6,7 +6,7 @@
 
 ```
 tools/
-├── core/         # Database, monitoring, credentials, Beads review (17 tools)
+├── core/         # Database, monitoring, credentials, task review (17 tools)
 ├── mail/         # Agent Mail coordination (14 tools)
 ├── browser/      # Browser automation via CDP (12 tools)
 ├── media/        # Image generation with Gemini (7 tools)
@@ -43,7 +43,7 @@ am-send "Subject" "Body" --from Me --to @active --importance high --thread task-
 
 ### Core Tools (tools/core/)
 
-Database, monitoring, credentials, and Beads review tools.
+Database, monitoring, credentials, and task review tools.
 
 | Tool | Purpose |
 |------|---------|
@@ -54,13 +54,12 @@ Database, monitoring, credentials, and Beads review tools.
 | `db-connection-test` | Test database connectivity |
 | `edge-logs` | Stream Supabase edge function logs |
 | `lint-staged` | Lint staged git files |
-| `bd-check-review` | Check if task needs human review |
-| `bd-review-rules` | Display review rules for project |
-| `bd-review-rules-loader` | Load/parse review rules from config |
-| `bd-set-review-override` | Set review override for a task |
-| `backup-beads.sh` | Backup Beads database |
-| `rollback-beads.sh` | Rollback Beads to backup |
-| `beads-migrate-prefix.sh` | Migrate task ID prefixes |
+| `jt-check-review` | Check if task needs human review |
+| `jt-review-rules` | Display review rules for project |
+| `jt-review-rules-loader` | Load/parse review rules from config |
+| `jt-set-review-override` | Set review override for a task |
+| `backup-beads.sh` | Backup task database |
+| `rollback-beads.sh` | Rollback task database to backup |
 
 **jat-secret usage:**
 ```bash
@@ -147,7 +146,7 @@ Installation, setup, and utility scripts.
 | `setup-tmux.sh` | Configure tmux for JAT |
 | `setup-global-claude-md.sh` | Setup global CLAUDE.md |
 | `install-agent-mail.sh` | Initialize Agent Mail database |
-| `install-beads.sh` | Install Beads CLI |
+| `install-beads.sh` | Install task CLI (legacy) |
 | `install-hooks.sh` | Install Claude Code hooks |
 | `install-whisper.sh` | Install whisper.cpp for voice input |
 
@@ -157,7 +156,7 @@ Installation, setup, and utility scripts.
 | `jat-step` | Execute completion step with signal emission |
 | `jat-complete-bundle` | Generate structured completion bundle via LLM |
 | `jat-doctor` | Diagnose JAT installation issues |
-| `bd-epic-child` | Set epic→child dependency correctly |
+| `jt-epic-child` | Set epic→child dependency correctly |
 
 **Agent Management:**
 | Script | Purpose |
@@ -195,7 +194,7 @@ jat-step <step> --task <id> --title <title> --agent <name> [--type <type>]
 |------|--------|--------|
 | `verifying` | Emit only (agent does verification) | completing (0%) |
 | `committing` | git add + commit | completing (20%) |
-| `closing` | bd close | completing (40%) |
+| `closing` | jt close | completing (40%) |
 | `releasing` | am-release all | completing (60%) |
 | `announcing` | am-send completion | completing (80%) |
 | `complete` | Generate bundle + emit complete signal | complete (100%) |

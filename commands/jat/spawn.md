@@ -15,7 +15,7 @@ argument-hint: AgentName taskId
 | Generate agent name | Spawn API |
 | Register in Agent Mail | Spawn API |
 | Create tmux session `jat-{Agent}` | Spawn API |
-| Assign task in Beads | Spawn API |
+| Assign task | Spawn API |
 | Write `.tmux-agent-{session}` file | Spawn API |
 | Write `.claude/sessions/agent-{sessionId}.txt` | SessionStart hook |
 
@@ -38,7 +38,7 @@ Get session ID with: `get-current-session-id` (or check `/tmp/claude-session-*.t
 ### 2. Read Task & Plan
 
 ```bash
-bd show jat-abc123 --json
+jt show jat-abc123 --json
 ```
 
 ### 3. Emit Working Signal & Begin
@@ -55,7 +55,7 @@ Then output banner and work:
 ╚════════════════════════════════════════════════════════════════════╝
 
 ✅ Agent: WindyRiver
-📋 Task: {title from bd show}
+📋 Task: {title from jt show}
 
 ┌─ APPROACH ─────────────────────────────────────────────────────────┐
 │  {your approach}                                                   │

@@ -5,7 +5,7 @@ Lightweight bash tools for agent orchestration, database operations, monitoring,
 @~/code/jat/shared/overview.md
 @~/code/jat/shared/agent-mail.md
 @~/code/jat/shared/bash-patterns.md
-@~/code/jat/shared/beads.md
+@~/code/jat/shared/tasks.md
 @~/code/jat/shared/tools.md
 @~/code/jat/shared/agent-app-interface.md
 @~/code/jat/shared/automation.md
@@ -24,7 +24,7 @@ Lightweight bash tools for agent orchestration, database operations, monitoring,
 ```
 jat/
 ├── tools/               # All executable tools
-│   ├── core/            # Database, monitoring, beads review tools
+│   ├── core/            # Database, monitoring, task review tools
 │   ├── mail/            # Agent Mail coordination (11 tools)
 │   ├── browser/         # Browser automation (11 tools)
 │   ├── media/           # Image generation tools (gemini-*, avatar-*)
@@ -36,7 +36,7 @@ jat/
 │   ├── jat-complete/    # Complete current task
 │   └── jat-verify/      # Browser verification
 ├── commands/jat/        # JAT workflow commands (9 commands)
-├── ide/                 # Beads Task IDE (SvelteKit app)
+├── ide/                 # JAT IDE (SvelteKit app)
 ├── shared/              # Shared documentation (imported by projects)
 └── install.sh           # Installation script
 ```
@@ -74,7 +74,7 @@ brew install tmux sqlite jq
 
 # Verify installation
 am-whoami
-bd --version
+jt --version
 browser-start.js --help
 ```
 
@@ -185,18 +185,18 @@ am-register --name TestAgent --program test --model test && \
 # Expected: "Registered agent TestAgent", then shows in list, then removed
 ```
 
-### Beads CLI
+### Task CLI
 ```bash
 # Version and help
-bd --version                 # Expected: beads x.x.x
-bd --help                    # Shows available commands
+jt --version                 # Expected: jt 0.x.x
+jt --help                    # Shows available commands
 
 # Test commands (safe to run - only reads)
-bd ready --json              # Lists ready tasks (may be empty)
-bd list --status open        # Lists open tasks
+jt ready --json              # Lists ready tasks (may be empty)
+jt list --status open        # Lists open tasks
 
 # If no project initialized yet:
-cd ~/code/my-project && bd init  # Initialize a project
+cd ~/code/my-project && jt init  # Initialize a project
 ```
 
 ### Browser Tools (12 tools)
@@ -261,14 +261,14 @@ npm run dev                  # Expected: http://127.0.0.1:5174
 ```bash
 # Quick verification of all symlinks
 ls ~/.local/bin/am-* | wc -l   # Expected: 13 (Agent Mail)
-ls ~/.local/bin/bd* | wc -l    # Expected: 5 (Beads + review tools)
+ls ~/.local/bin/jt* | wc -l    # Expected: 5 (Task CLI + review tools)
 ls ~/.local/bin/browser-* | wc -l  # Expected: 11 (Browser tools)
 ls ~/.local/bin/db-* | wc -l   # Expected: 4 (Database tools)
 ls ~/.local/bin/jat-* | wc -l  # Expected: 5 (JAT tools)
 
 # Check for broken symlinks
 find ~/.local/bin -type l -name "am-*" -exec test ! -e {} \; -print
-find ~/.local/bin -type l -name "bd*" -exec test ! -e {} \; -print
+find ~/.local/bin -type l -name "jt*" -exec test ! -e {} \; -print
 find ~/.local/bin -type l -name "browser-*" -exec test ! -e {} \; -print
 # Expected: No output (no broken symlinks)
 ```
@@ -279,7 +279,7 @@ find ~/.local/bin -type l -name "browser-*" -exec test ! -e {} \; -print
 |-------|-------|-----|
 | `command not found` | ~/.local/bin not in PATH | Add to ~/.bashrc: `export PATH="$HOME/.local/bin:$PATH"` |
 | `am-whoami` fails | Database not initialized | Run: `bash ~/code/jat/tools/scripts/install-agent-mail.sh` |
-| `bd: command not found` | Beads not installed | Run: `bash ~/code/jat/tools/scripts/install-beads.sh` |
+| `jt: command not found` | Task CLI not installed | Run: `./install.sh` to create symlinks |
 | `browser-*.js` fails | npm dependencies missing | Run: `cd ~/code/jat/tools/browser && npm install` |
 | IDE won't start | Dependencies missing | Run: `cd ~/code/jat/ide && npm install` |
 | Broken symlinks | Old installation | Run: `./install.sh` to refresh symlinks |
@@ -290,13 +290,13 @@ find ~/.local/bin -type l -name "browser-*" -exec test ! -e {} \; -print
 
 A valid project is:
 - A **git repository** in `~/code/`
-- Has a **`.beads/` directory** (created by `bd init`)
+- Has a **`.jat/` directory** (created by `jt init`)
 
 ```bash
 # Option 1: Initialize an existing project (recommended)
 cd ~/code/my-project
-bd init
-# Answer prompts (or press Y for defaults)
+jt init
+# Creates .jat/ directory with task database
 
 # Option 2: From the IDE
 jat        # Start the IDE
@@ -564,7 +564,7 @@ jat chimaro 4 --claude --auto
 
 ## IDE Development
 
-**The Beads Task IDE is a SvelteKit 5 application in the `ide/` directory.**
+**The JAT IDE is a SvelteKit 5 application in the `ide/` directory.**
 
 ### Important: IDE-Specific Documentation
 
@@ -660,15 +660,15 @@ bash ~/code/jat/tools/scripts/install-whisper.sh
 
 Projects are automatically discovered by the IDE in two ways:
 
-### Method 1: Run `bd init` (Recommended for quick start)
+### Method 1: Run `jt init` (Recommended for quick start)
 
 ```bash
 cd ~/code/my-new-project
-bd init
-# Answer prompts (or press Y for defaults)
+jt init
+# Creates .jat/ directory with task database
 ```
 
-The IDE automatically scans `~/code/` for directories with `.beads/` and adds them to the project list. After running `bd init`, refresh the IDE to see your project.
+The IDE automatically scans `~/code/` for directories with `.jat/` and adds them to the project list. After running `jt init`, refresh the IDE to see your project.
 
 ### Method 2: Add to JAT Config (Full configuration)
 
@@ -784,7 +784,7 @@ jat-demo clean
 
 | Command | Description |
 |---------|-------------|
-| `jat-demo setup` | Creates demo projects in ~/code/, initializes with beads, adds to config with distinct colors |
+| `jat-demo setup` | Creates demo projects in ~/code/, initializes with jt, adds to config with distinct colors |
 | `jat-demo on` | Hides all non-demo projects in IDE, shows only demo projects |
 | `jat-demo off` | Shows regular projects, hides demo projects |
 | `jat-demo status` | Shows visibility status of all projects |
@@ -793,8 +793,8 @@ jat-demo clean
 ### What `jat-demo setup` Does
 
 1. **Creates project directories** in `~/code/` (skips if they exist)
-2. **Initializes beads** for each project (`bd init`)
-3. **Clears task lists** (empty `.beads/issues.jsonl`)
+2. **Initializes tasks** for each project (`jt init`)
+3. **Clears task lists** (empty task database)
 4. **Adds to JAT config** with distinct `active_color` and `inactive_color`
 5. **Kills stale tmux sessions** (any old `jat-*Agent` sessions)
 

@@ -45,7 +45,7 @@ This layer requires the agent to understand and use JAT's coordination tools.
 
 **How it works:**
 ```
-Agent reads CLAUDE.md ──► Uses Agent Mail ──► Picks tasks from Beads
+Agent reads CLAUDE.md ──► Uses Agent Mail ──► Picks tasks from JAT
                               │                        │
                               ▼                        ▼
                     Coordinates with          Updates task status
@@ -56,7 +56,7 @@ Agent reads CLAUDE.md ──► Uses Agent Mail ──► Picks tasks from Beads
 - Agent knows about and uses the system
 - Requires `CLAUDE.md` to instruct behavior
 - Agent Mail for coordination between agents
-- Beads for task management and dependencies
+- JAT Tasks for task management and dependencies
 
 **Examples:**
 - `/jat:start` - Register agent, pick task
@@ -67,7 +67,7 @@ Agent reads CLAUDE.md ──► Uses Agent Mail ──► Picks tasks from Beads
 **Implementation:**
 - `CLAUDE.md` documents the system
 - Agent Mail tools (`am-*`) for messaging
-- Beads CLI (`bd`) for task management
+- Task CLI (`jt`) for task management
 - Signal system for state updates
 
 ### The Relationship
@@ -78,7 +78,7 @@ Agent reads CLAUDE.md ──► Uses Agent Mail ──► Picks tasks from Beads
 │   LAYER 2: Agent Orchestration (JAT-specific)                      │
 │   ┌─────────────────────────────────────────────────────────────┐  │
 │   │  • Agent Mail (coordination)                                 │  │
-│   │  • Beads (task management)                                   │  │
+│   │  • JAT Tasks (task management)                               │  │
 │   │  • CLAUDE.md (agent instructions)                            │  │
 │   │  • Workflow commands (/jat:start, /jat:complete)            │  │
 │   └─────────────────────────────────────────────────────────────┘  │
@@ -132,4 +132,4 @@ Agent reads CLAUDE.md ──► Uses Agent Mail ──► Picks tasks from Beads
 - `shared/*.md` - Agent documentation
 - `tools/mail/` - Agent Mail tools
 - `commands/jat/` - Workflow commands
-- `.beads/` - Task database
+- `.jat/` - Task database

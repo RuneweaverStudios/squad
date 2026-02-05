@@ -1,8 +1,8 @@
-# Beads Task IDE - Development Guide
+# JAT IDE - Development Guide
 
 ## Project Overview
 
-Multi-project task management IDE powered by Beads + Agent Mail. Built with SvelteKit 5, Tailwind CSS v4, and DaisyUI.
+Multi-project task management IDE powered by JAT Tasks + Agent Mail. Built with SvelteKit 5, Tailwind CSS v4, and DaisyUI.
 
 ## Tech Stack
 
@@ -1721,7 +1721,7 @@ The PostToolUse hook captures these signals and writes them to `/tmp/jat-signal-
 
 **STARTING → WORKING:**
 - Agent runs `jat-signal working '{"taskId":"...","taskTitle":"..."}'`
-- Or inferred from `task.status === 'in_progress'` in Beads
+- Or inferred from `task.status === 'in_progress'` in task database
 
 **WORKING → NEEDS INPUT:**
 - Agent calls AskUserQuestion tool
@@ -1739,7 +1739,7 @@ The PostToolUse hook captures these signals and writes them to `/tmp/jat-signal-
 - Pattern: "jat:complete is running"
 
 **COMPLETING → COMPLETED → IDLE:**
-- Task marked closed in Beads
+- Task marked closed
 - Agent becomes idle
 
 ### Visual Configuration
@@ -4481,7 +4481,7 @@ Before starting Claude Code, the spawn API writes identity files that help hooks
 | **Database access** | Via am-register bash tool | Direct SQLite via better-sqlite3 |
 | **When registered** | By agent after /jat:start | By IDE before Claude starts |
 | **Identity file** | Written by agent | Written by IDE (pre-session) |
-| **Task assignment** | Agent runs `bd update` | IDE runs `bd update` |
+| **Task assignment** | Agent runs `jt update` | IDE runs `jt update` |
 | **Collision check** | am-register handles | JavaScript handles |
 
 **Benefits of new approach:**
@@ -4525,7 +4525,7 @@ Before starting Claude Code, the spawn API writes identity files that help hooks
 
 | Status | Code | Cause |
 |--------|------|-------|
-| 400 | Bad Request | Project path not found, no .beads directory |
+| 400 | Bad Request | Project path not found, no .jat directory |
 | 409 | Conflict | Session already exists (duplicate tmux session name) |
 | 500 | Server Error | Failed to register agent, failed to create session |
 | 202 | Accepted | YOLO warning dialog requires user acceptance |
