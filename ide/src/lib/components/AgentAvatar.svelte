@@ -59,7 +59,12 @@
 	const avatarCache: Map<string, string> = (globalThis as any).__avatarCache ??= new Map();
 
 	// Cache for "no avatar" results to avoid repeated API calls for agents without custom avatars
-	const noAvatarCache: Set<string> = (globalThis as any).__noAvatarCache ??= new Set();
+	// Maps cacheKey -> timestamp of when fallback was cached (for retry logic)
+	const noAvatarCache: Map<string, number> = (globalThis as any).__noAvatarCache ??= new Map();
+
+	// How long to cache a "no avatar" result before retrying (30 seconds)
+	// This allows queued avatar generations to complete before retrying
+	const NO_AVATAR_RETRY_MS = 30_000;
 
 	// Expose caches for debugging in browser console: window.__avatarCache, window.__noAvatarCache
 	if (typeof window !== 'undefined') {
@@ -88,8 +93,8 @@
 				// Only use real generated avatars, not fallbacks with initials
 				const isFallback = svg.includes('<text');
 				if (isFallback) {
-					// Cache the "no avatar" result to avoid repeated API calls
-					noAvatarCache.add(cacheKey);
+					// Cache the "no avatar" result with timestamp for retry logic
+					noAvatarCache.set(cacheKey, Date.now());
 					return null; // Return null so generic avatar icon is shown
 				}
 				avatarCache.set(cacheKey, svg);
@@ -123,11 +128,17 @@
 		}
 
 		// Check negative cache (no avatar - shows fallback icon)
-		if (noAvatarCache.has(cacheKey)) {
-			svgContent = null;
-			loadState = 'error';
-			currentFetchedName = agentName;
-			return;
+		// Allow retry after NO_AVATAR_RETRY_MS to pick up queued generations
+		const noAvatarTimestamp = noAvatarCache.get(cacheKey);
+		if (noAvatarTimestamp !== undefined) {
+			if (Date.now() - noAvatarTimestamp < NO_AVATAR_RETRY_MS) {
+				svgContent = null;
+				loadState = 'error';
+				currentFetchedName = agentName;
+				return;
+			}
+			// Expired - remove from cache and retry
+			noAvatarCache.delete(cacheKey);
 		}
 
 		// Check if there's already a pending fetch for this avatar
@@ -168,6 +179,27 @@
 		if (targetName && targetName !== currentFetchedName) {
 			fetchAvatar(targetName);
 		}
+	});
+
+	// Retry timer: if we got a fallback, retry after the delay
+	// This picks up avatars that were queued and generated after our initial request
+	$effect(() => {
+		if (loadState !== 'error' || !name) return;
+
+		const cacheKey = `${name}:v${CACHE_VERSION}`;
+		const noAvatarTimestamp = noAvatarCache.get(cacheKey);
+		if (noAvatarTimestamp === undefined) return;
+
+		const elapsed = Date.now() - noAvatarTimestamp;
+		const remaining = NO_AVATAR_RETRY_MS - elapsed;
+		if (remaining <= 0) return; // Will be retried on next fetchAvatar call
+
+		const timer = setTimeout(() => {
+			// Clear the cached name to force a re-fetch
+			currentFetchedName = null;
+		}, remaining + 100); // Small buffer
+
+		return () => clearTimeout(timer);
 	});
 </script>
 

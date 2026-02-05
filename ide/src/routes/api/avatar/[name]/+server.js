@@ -25,6 +25,29 @@ const AVATAR_GENERATE_SCRIPT = `${PROJECT_ROOT}/tools/media/avatar-generate`;
 // Track in-flight generation requests to prevent duplicates
 const generatingAvatars = new Set();
 
+// Queue for serializing avatar generation (prevents API rate limit exhaustion)
+let generationQueue = Promise.resolve();
+
+/**
+ * Enqueue an avatar generation request. Requests are processed one at a time
+ * to avoid hitting Claude API rate limits when multiple agents spawn simultaneously.
+ */
+function enqueueGeneration(name, apiKey) {
+	return new Promise((resolve, reject) => {
+		generationQueue = generationQueue.then(async () => {
+			try {
+				await execAsync(`${AVATAR_GENERATE_SCRIPT} "${name}"`, {
+					timeout: 30000,
+					env: { ...process.env, ANTHROPIC_API_KEY: apiKey }
+				});
+				resolve();
+			} catch (err) {
+				reject(err);
+			}
+		});
+	});
+}
+
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ params, url }) {
 	const { name } = params;
@@ -52,7 +75,7 @@ export async function GET({ params, url }) {
 
 		try {
 			generatingAvatars.add(name);
-			console.log(`Auto-generating avatar for: ${name}`);
+			console.log(`Auto-generating avatar for: ${name} (queued)`);
 
 			// Use ANTHROPIC_API_KEY from SvelteKit's env (loaded from .env)
 			const apiKey = env.ANTHROPIC_API_KEY;
@@ -61,10 +84,8 @@ export async function GET({ params, url }) {
 				throw new Error('No API key');
 			}
 
-			await execAsync(`${AVATAR_GENERATE_SCRIPT} "${name}"`, {
-				timeout: 30000, // 30 second timeout
-				env: { ...process.env, ANTHROPIC_API_KEY: apiKey }
-			});
+			// Use queue to serialize generation requests and avoid API rate limits
+			await enqueueGeneration(name, apiKey);
 
 			console.log(`Avatar generated for: ${name}`);
 		} catch (err) {
