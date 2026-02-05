@@ -419,6 +419,7 @@
 							<GitPanel
 								project={selectedProject}
 								onFileClick={handleFileClick}
+								{selectedFilePath}
 							/>
 						{:else}
 							<SupabasePanel
