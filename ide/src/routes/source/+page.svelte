@@ -68,7 +68,7 @@
 	);
 
 	// Layout state
-	let leftPanelWidth = $state(320);
+	let leftPanelWidth = $state(400);
 	const MIN_PANEL_WIDTH = 200;
 	const MAX_PANEL_WIDTH = 500;
 
@@ -366,14 +366,16 @@
 								<span>Migrations</span>
 							{/if}
 							<span class="title-divider"></span>
-							<ProjectSelector
-								projects={projectNames}
-								selectedProject={selectedProject || 'Select Project'}
-								onProjectChange={handleProjectChange}
-								showColors={true}
-								compact={true}
-								{projectColors}
-							/>
+							<div class="project-selector-wrapper">
+								<ProjectSelector
+									projects={projectNames}
+									selectedProject={selectedProject || 'Select Project'}
+									onProjectChange={handleProjectChange}
+									showColors={true}
+									compact={false}
+									{projectColors}
+								/>
+							</div>
 						</div>
 						{#if hasSupabase}
 							<div class="mode-toggle">
@@ -578,6 +580,7 @@
 		align-items: center;
 		gap: 0.5rem;
 		min-width: 0;
+		flex: 1;
 	}
 
 	.title-divider {
@@ -585,6 +588,17 @@
 		height: 1rem;
 		background: oklch(0.30 0.02 250);
 		flex-shrink: 0;
+	}
+
+	.project-selector-wrapper {
+		flex: 1;
+		min-width: 0;
+	}
+
+	/* Make compact ProjectSelector fill available width */
+	.project-selector-wrapper > :global(*) {
+		display: block;
+		width: 100%;
 	}
 
 	.panel-title-icon {
