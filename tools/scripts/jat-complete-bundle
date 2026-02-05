@@ -17,7 +17,7 @@
 #   When --mode is not specified, completion mode is auto-detected from:
 #   1. Task notes: [REVIEW_OVERRIDE:always_review|auto_proceed|force_review]
 #   2. Session epic context: .claude/sessions/context-{session_id}.json
-#   3. Project review rules: .beads/review-rules.json
+#   3. Project review rules: .jat/review-rules.json
 #   4. Default: review_required (safe fallback)
 #
 # Environment:
@@ -66,7 +66,7 @@ Mode Auto-Detection:
   When --mode is not specified, completion mode is auto-detected from:
   1. Task notes: [REVIEW_OVERRIDE:always_review|auto_proceed|force_review]
   2. Session epic context: .claude/sessions/context-{session_id}.json
-  3. Project review rules: .beads/review-rules.json
+  3. Project review rules: .jat/review-rules.json
   4. Default: review_required (safe fallback)
 
 Environment:
@@ -150,8 +150,8 @@ log_dim "Gathering context for completion bundle..."
 # ============================================================================
 
 # 1. Get task details from Beads
-log_dim "  • Fetching task details from Beads..."
-TASK_JSON=$(bd show "$TASK_ID" --json 2>/dev/null || echo "[]")
+log_dim "  • Fetching task details..."
+TASK_JSON=$(jt show "$TASK_ID" --json 2>/dev/null || echo "[]")
 
 if [[ "$TASK_JSON" == "[]" ]] || [[ -z "$TASK_JSON" ]]; then
     log_error "Task not found: $TASK_ID"
@@ -207,8 +207,8 @@ if [[ -z "$COMPLETION_MODE" ]] || [[ "$AUTO_MODE" == true ]]; then
     fi
 
     # 3. Check project review rules (if not already detected)
-    if [[ -z "$DETECTED_MODE" ]] && [[ -f ".beads/review-rules.json" ]]; then
-        DEFAULT_MODE=$(jq -r '.defaultMode // empty' ".beads/review-rules.json" 2>/dev/null)
+    if [[ -z "$DETECTED_MODE" ]] && [[ -f ".jat/review-rules.json" ]]; then
+        DEFAULT_MODE=$(jq -r '.defaultMode // empty' ".jat/review-rules.json" 2>/dev/null)
         if [[ "$DEFAULT_MODE" == "auto_proceed" ]]; then
             DETECTED_MODE="auto_proceed"
             log_dim "    → Project rules: auto_proceed"
@@ -431,7 +431,7 @@ BUNDLE_JSON=$(echo "$BUNDLE_JSON" | jq \
 
 # Add nextTaskId if provided
 if [[ -n "$NEXT_TASK_ID" ]]; then
-    NEXT_TASK_TITLE=$(bd show "$NEXT_TASK_ID" --json 2>/dev/null | jq -r '.[0].title // "Unknown"' || echo "Unknown")
+    NEXT_TASK_TITLE=$(jt show "$NEXT_TASK_ID" --json 2>/dev/null | jq -r '.[0].title // "Unknown"' || echo "Unknown")
     BUNDLE_JSON=$(echo "$BUNDLE_JSON" | jq \
         --arg nextId "$NEXT_TASK_ID" \
         --arg nextTitle "$NEXT_TASK_TITLE" \

@@ -1,0 +1,272 @@
+#!/bin/bash
+
+# jt-review-rules - Manage review rules for JAT tasks
+#
+# Review rules determine whether a task requires human review before
+# auto-closing or can auto-proceed based on type and priority.
+#
+# Rules stored in: .jat/review-rules.json
+#
+# Usage:
+#   jt-review-rules                           # Show all current rules
+#   jt-review-rules --type bug --max-auto 2   # Set bug max auto-proceed to P2
+#   jt-review-rules --type feature            # Show rule for specific type
+#   jt-review-rules --default review          # Set default action (review/auto)
+#   jt-review-rules --reset                   # Reset to default rules
+
+set -e
+
+# Color codes
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+DIM='\033[2m'
+NC='\033[0m'
+
+# Default values
+DEFAULT_ACTION="review"
+DEFAULT_MAX_AUTO=3
+
+# All task types
+TASK_TYPES=("bug" "feature" "task" "chore" "epic")
+
+# Find .jat directory (walk up tree)
+find_jat_dir() {
+    local dir="$PWD"
+    while [[ "$dir" != "/" ]]; do
+        if [[ -d "$dir/.jat" ]]; then
+            echo "$dir/.jat"
+            return 0
+        fi
+        dir=$(dirname "$dir")
+    done
+    echo ""
+    return 1
+}
+
+get_rules_file() {
+    local jat_dir
+    jat_dir=$(find_jat_dir)
+    if [[ -z "$jat_dir" ]]; then
+        echo -e "${RED}Error: No .jat directory found${NC}" >&2
+        exit 1
+    fi
+    echo "$jat_dir/review-rules.json"
+}
+
+# Load rules from JSON file (or generate defaults)
+load_rules() {
+    local rules_file
+    rules_file=$(get_rules_file)
+    if [[ -f "$rules_file" ]]; then
+        cat "$rules_file"
+    else
+        jt-review-rules-loader 2>/dev/null
+    fi
+}
+
+# Get max_auto for a type from rules JSON
+get_max_auto_for_type() {
+    local type="$1"
+    local rules_json="$2"
+    echo "$rules_json" | jq -r --arg t "$type" '
+        (.rules[] | select(.type == $t) | .maxAutoPriority) // .priorityThreshold // 3
+    ' 2>/dev/null || echo "$DEFAULT_MAX_AUTO"
+}
+
+# Set max_auto for a type in rules JSON file
+set_max_auto_for_type() {
+    local type="$1"
+    local max_auto="$2"
+    local rules_file
+    rules_file=$(get_rules_file)
+
+    local rules_json
+    if [[ -f "$rules_file" ]]; then
+        rules_json=$(cat "$rules_file")
+    else
+        rules_json=$(jt-review-rules-loader 2>/dev/null)
+    fi
+
+    # Update or add the rule
+    rules_json=$(echo "$rules_json" | jq --arg type "$type" --argjson max "$max_auto" '
+        .rules = [.rules[] | if .type == $type then .maxAutoPriority = $max else . end] |
+        if ([.rules[] | select(.type == $type)] | length) == 0 then
+            .rules += [{"type": $type, "maxAutoPriority": $max}]
+        else . end
+    ')
+
+    echo "$rules_json" | jq '.' > "$rules_file"
+}
+
+# Parse arguments
+TYPE=""
+MAX_AUTO=""
+DEFAULT=""
+RESET=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --type|-t) TYPE="$2"; shift 2 ;;
+        --max-auto|-m) MAX_AUTO="$2"; shift 2 ;;
+        --default|-d) DEFAULT="$2"; shift 2 ;;
+        --reset|-r) RESET=true; shift ;;
+        --help|-h)
+            echo "jt-review-rules - Manage review rules for tasks"
+            echo ""
+            echo "Usage:"
+            echo "  jt-review-rules                           Show all current rules"
+            echo "  jt-review-rules --type TYPE --max-auto N  Set max auto-proceed priority"
+            echo "  jt-review-rules --type TYPE               Show rule for specific type"
+            echo "  jt-review-rules --default ACTION          Set default action (review/auto)"
+            echo "  jt-review-rules --reset                   Reset to default rules"
+            echo ""
+            echo "Options:"
+            echo "  --type, -t TYPE       Task type: bug, feature, task, chore, epic"
+            echo "  --max-auto, -m N      Max priority that auto-proceeds (0-4, or -1 for none)"
+            echo "  --default, -d ACTION  Default action: 'review' or 'auto'"
+            echo "  --reset, -r           Reset all rules to defaults"
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}Unknown option: $1${NC}" >&2
+            exit 1
+            ;;
+    esac
+done
+
+# Function to get priority name
+priority_name() {
+    local p="$1"
+    case $p in
+        0) echo "P0 (Critical)" ;; 1) echo "P1 (High)" ;; 2) echo "P2 (Medium)" ;;
+        3) echo "P3 (Low)" ;; 4) echo "P4 (Lowest)" ;; *) echo "P$p" ;;
+    esac
+}
+
+# Function to show rule explanation
+explain_rule() {
+    local type="$1" max_auto="$2"
+    if [ "$max_auto" -lt 0 ]; then
+        echo -e "    ${RED}●${NC} All ${BOLD}$type${NC} tasks require human review"
+    elif [ "$max_auto" -ge 4 ]; then
+        echo -e "    ${GREEN}●${NC} All ${BOLD}$type${NC} tasks auto-proceed"
+    else
+        local auto_range="P0"
+        [ "$max_auto" -gt 0 ] && auto_range="P0-P$max_auto"
+        local review_start=$((max_auto + 1))
+        echo -e "    ${GREEN}●${NC} ${BOLD}$type${NC} $auto_range → auto-proceed"
+        echo -e "    ${YELLOW}●${NC} ${BOLD}$type${NC} P$review_start-P4 → requires review"
+    fi
+}
+
+# Reset to defaults
+if [ "$RESET" = true ]; then
+    echo -e "${BLUE}Resetting review rules to defaults...${NC}"
+    local_rules_file=$(get_rules_file)
+    jt-review-rules-loader --init 2>/dev/null <<< "y" || true
+    echo -e "${GREEN}✓ Reset complete${NC}"
+    exit 0
+fi
+
+# Set default action
+if [ -n "$DEFAULT" ]; then
+    if [ "$DEFAULT" != "review" ] && [ "$DEFAULT" != "auto" ]; then
+        echo -e "${RED}Error: Default action must be 'review' or 'auto'${NC}" >&2
+        exit 1
+    fi
+    rules_file=$(get_rules_file)
+    rules_json=$(load_rules)
+    rules_json=$(echo "$rules_json" | jq --arg da "$DEFAULT" '.defaultAction = $da')
+    echo "$rules_json" | jq '.' > "$rules_file"
+    echo -e "${GREEN}✓ Default action set to: $DEFAULT${NC}"
+    exit 0
+fi
+
+# Set rule for specific type
+if [ -n "$TYPE" ] && [ -n "$MAX_AUTO" ]; then
+    # Validate type
+    valid_type=false
+    for t in "${TASK_TYPES[@]}"; do
+        [ "$TYPE" = "$t" ] && valid_type=true && break
+    done
+    if [ "$valid_type" = false ]; then
+        echo -e "${RED}Error: Invalid type '$TYPE'${NC}" >&2
+        exit 1
+    fi
+    # Validate max_auto
+    if ! [[ "$MAX_AUTO" =~ ^-?[0-9]+$ ]] || [ "$MAX_AUTO" -lt -1 ] || [ "$MAX_AUTO" -gt 4 ]; then
+        echo -e "${RED}Error: max-auto must be -1 to 4${NC}" >&2
+        exit 1
+    fi
+    set_max_auto_for_type "$TYPE" "$MAX_AUTO"
+    echo -e "${GREEN}✓ Updated rule for $TYPE${NC}"
+    echo ""
+    explain_rule "$TYPE" "$MAX_AUTO"
+    exit 0
+fi
+
+# Show rule for specific type
+if [ -n "$TYPE" ]; then
+    valid_type=false
+    for t in "${TASK_TYPES[@]}"; do
+        [ "$TYPE" = "$t" ] && valid_type=true && break
+    done
+    if [ "$valid_type" = false ]; then
+        echo -e "${RED}Error: Invalid type '$TYPE'${NC}" >&2
+        exit 1
+    fi
+    rules_json=$(load_rules)
+    max_auto=$(get_max_auto_for_type "$TYPE" "$rules_json")
+    echo -e "${BOLD}Review rule for $TYPE:${NC}"
+    echo "  max_auto: $max_auto"
+    echo ""
+    explain_rule "$TYPE" "$max_auto"
+    exit 0
+fi
+
+# Show all rules (default action)
+rules_json=$(load_rules)
+echo ""
+echo -e "${BOLD}╔══════════════════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${BOLD}║                         📋 Review Rules                                  ║${NC}"
+echo -e "${BOLD}╚══════════════════════════════════════════════════════════════════════════╝${NC}"
+echo ""
+
+default_action=$(echo "$rules_json" | jq -r '.defaultAction // "review"')
+echo -e "  ${CYAN}Default action:${NC} $default_action"
+echo ""
+
+echo -e "  ┌─────────────┬───────────┬────────────────────────────────────────┐"
+echo -e "  │ ${BOLD}Type${NC}        │ ${BOLD}Max Auto${NC}  │ ${BOLD}Behavior${NC}                               │"
+echo -e "  ├─────────────┼───────────┼────────────────────────────────────────┤"
+
+for t in "${TASK_TYPES[@]}"; do
+    max_auto=$(get_max_auto_for_type "$t" "$rules_json")
+    type_padded=$(printf "%-11s" "$t")
+    max_padded=$(printf "%-9s" "$max_auto")
+    if [ "$max_auto" -lt 0 ]; then
+        behavior="All require review"
+    elif [ "$max_auto" -ge 4 ]; then
+        behavior="All auto-proceed"
+    else
+        [ "$max_auto" -eq 0 ] && auto_range="P0" || auto_range="P0-P$max_auto"
+        review_start=$((max_auto + 1))
+        [ "$review_start" -eq 4 ] && review_range="P4" || review_range="P$review_start-P4"
+        behavior="$auto_range auto, $review_range review"
+    fi
+    behavior_padded=$(printf "%-38s" "$behavior")
+    echo -e "  │ $type_padded │ $max_padded │ $behavior_padded │"
+done
+
+echo -e "  └─────────────┴───────────┴────────────────────────────────────────┘"
+echo ""
+echo -e "  ${CYAN}Set rules:${NC}"
+echo "    jt-review-rules --type bug --max-auto 1"
+echo "    jt-review-rules --type feature --max-auto -1"
+echo "    jt-review-rules --default auto"
+echo "    jt-review-rules --reset"
+echo ""

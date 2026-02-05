@@ -213,6 +213,32 @@ else
 fi
 
 echo ""
+echo -e "${BLUE}Setting up jt-epic-child...${NC}"
+echo ""
+
+# Symlink jt-epic-child helper
+JT_EPIC_SOURCE="$PROJECT_ROOT/tools/scripts/jt-epic-child"
+JT_EPIC_TARGET="$HOME/.local/bin/jt-epic-child"
+
+if [ -f "$JT_EPIC_SOURCE" ]; then
+    if [ -L "$JT_EPIC_TARGET" ]; then
+        CURRENT_TARGET=$(readlink "$JT_EPIC_TARGET")
+        if [ "$CURRENT_TARGET" = "$JT_EPIC_SOURCE" ]; then
+            echo -e "  ${GREEN}✓${NC} jt-epic-child (already linked)"
+        else
+            echo -e "  ${YELLOW}↻${NC} jt-epic-child (updating link)"
+            rm "$JT_EPIC_TARGET"
+            ln -s "$JT_EPIC_SOURCE" "$JT_EPIC_TARGET"
+        fi
+    else
+        echo -e "  ${GREEN}+${NC} jt-epic-child (linked)"
+        ln -s "$JT_EPIC_SOURCE" "$JT_EPIC_TARGET"
+    fi
+else
+    echo -e "  ${YELLOW}⚠${NC} jt-epic-child not found at $JT_EPIC_SOURCE"
+fi
+
+echo ""
 echo -e "${BLUE}Setting up jat-demo...${NC}"
 echo ""
 

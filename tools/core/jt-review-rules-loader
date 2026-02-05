@@ -1,0 +1,484 @@
+#!/bin/bash
+
+# jt-review-rules-loader - Load and manage review-rules.json for JAT tasks
+#
+# This script provides a structured JSON file for review rules with schema
+# validation, migration support.
+#
+# Schema location: .jat/review-rules.json
+#
+# Usage:
+#   jt-review-rules-loader                    # Load rules, create defaults if missing
+#   jt-review-rules-loader --init             # Initialize with default rules
+#   jt-review-rules-loader --validate         # Validate existing rules file
+#   jt-review-rules-loader --get TYPE         # Get maxAutoPriority for a type
+#   jt-review-rules-loader --get-override ID  # Get override for a task
+#   jt-review-rules-loader --json             # Output loaded rules as JSON
+#
+# Schema v1:
+#   {
+#     "version": 1,
+#     "defaultAction": "review" | "auto",
+#     "priorityThreshold": 0-4 (global fallback),
+#     "rules": [
+#       { "type": "bug"|"feature"|"task"|"chore"|"epic",
+#         "maxAutoPriority": -1 to 4,
+#         "note": "optional explanation" }
+#     ],
+#     "overrides": [
+#       { "taskId": "xxx", "action": "always_review"|"always_auto",
+#         "reason": "optional" }
+#     ]
+#   }
+
+set -e
+
+# Color codes
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+DIM='\033[2m'
+NC='\033[0m'
+
+# Constants
+CURRENT_SCHEMA_VERSION=1
+VALID_TYPES=("bug" "feature" "task" "chore" "epic")
+VALID_ACTIONS=("review" "auto")
+VALID_OVERRIDE_ACTIONS=("always_review" "always_auto")
+
+# Default values
+DEFAULT_ACTION="review"
+DEFAULT_PRIORITY_THRESHOLD=3
+
+# Find .jat directory (walk up tree)
+find_jat_dir() {
+    local dir="$PWD"
+    while [[ "$dir" != "/" ]]; do
+        if [[ -d "$dir/.jat" ]]; then
+            echo "$dir/.jat"
+            return 0
+        fi
+        dir=$(dirname "$dir")
+    done
+    echo ""
+    return 1
+}
+
+# Get the rules file path
+get_rules_file() {
+    local jat_dir
+    jat_dir=$(find_jat_dir)
+    if [[ -z "$jat_dir" ]]; then
+        echo -e "${RED}Error: No .jat directory found${NC}" >&2
+        echo "Run 'jt init' to initialize a project" >&2
+        exit 1
+    fi
+    echo "$jat_dir/review-rules.json"
+}
+
+# Generate default rules JSON
+generate_defaults() {
+    cat <<EOF
+{
+  "version": $CURRENT_SCHEMA_VERSION,
+  "defaultAction": "$DEFAULT_ACTION",
+  "priorityThreshold": $DEFAULT_PRIORITY_THRESHOLD,
+  "rules": [
+    { "type": "bug", "maxAutoPriority": 3, "note": "P0-P3 bugs auto-proceed, P4 requires review" },
+    { "type": "feature", "maxAutoPriority": 3, "note": "P0-P3 features auto-proceed" },
+    { "type": "task", "maxAutoPriority": 3 },
+    { "type": "chore", "maxAutoPriority": 4, "note": "All chores auto-proceed" },
+    { "type": "epic", "maxAutoPriority": -1, "note": "Epics always require review" }
+  ],
+  "overrides": []
+}
+EOF
+}
+
+# Validate a rules file
+validate_rules() {
+    local rules_file="$1"
+    local errors=()
+
+    if [[ ! -f "$rules_file" ]]; then
+        echo -e "${RED}Error: Rules file not found: $rules_file${NC}" >&2
+        return 1
+    fi
+
+    # Check if valid JSON
+    if ! jq empty "$rules_file" 2>/dev/null; then
+        echo -e "${RED}Error: Invalid JSON in $rules_file${NC}" >&2
+        return 1
+    fi
+
+    local rules_json
+    rules_json=$(cat "$rules_file")
+
+    # Check version
+    local version
+    version=$(echo "$rules_json" | jq -r '.version // 0')
+    if [[ "$version" -lt 1 ]] || [[ "$version" -gt "$CURRENT_SCHEMA_VERSION" ]]; then
+        errors+=("Invalid or unsupported version: $version (expected 1-$CURRENT_SCHEMA_VERSION)")
+    fi
+
+    # Check defaultAction
+    local default_action
+    default_action=$(echo "$rules_json" | jq -r '.defaultAction // ""')
+    if [[ -n "$default_action" ]]; then
+        local valid_action=false
+        for action in "${VALID_ACTIONS[@]}"; do
+            if [[ "$default_action" == "$action" ]]; then
+                valid_action=true
+                break
+            fi
+        done
+        if [[ "$valid_action" == false ]]; then
+            errors+=("Invalid defaultAction: '$default_action' (expected: ${VALID_ACTIONS[*]})")
+        fi
+    fi
+
+    # Validate rules array
+    local rules_count
+    rules_count=$(echo "$rules_json" | jq '.rules | length')
+    for ((i=0; i<rules_count; i++)); do
+        local rule_type rule_max
+        rule_type=$(echo "$rules_json" | jq -r ".rules[$i].type // \"\"")
+        rule_max=$(echo "$rules_json" | jq -r ".rules[$i].maxAutoPriority // -999")
+
+        # Validate type
+        if [[ -n "$rule_type" ]]; then
+            local valid_type=false
+            for t in "${VALID_TYPES[@]}"; do
+                if [[ "$rule_type" == "$t" ]]; then
+                    valid_type=true
+                    break
+                fi
+            done
+            if [[ "$valid_type" == false ]]; then
+                errors+=("rules[$i]: Invalid type '$rule_type' (expected: ${VALID_TYPES[*]})")
+            fi
+        else
+            errors+=("rules[$i]: Missing required field 'type'")
+        fi
+
+        # Validate maxAutoPriority
+        if [[ "$rule_max" == "-999" ]]; then
+            errors+=("rules[$i]: Missing required field 'maxAutoPriority'")
+        elif [[ "$rule_max" -lt -1 ]] || [[ "$rule_max" -gt 4 ]]; then
+            errors+=("rules[$i]: Invalid maxAutoPriority '$rule_max' (expected: -1 to 4)")
+        fi
+    done
+
+    # Report errors
+    if [[ ${#errors[@]} -gt 0 ]]; then
+        echo -e "${RED}Validation errors in $rules_file:${NC}" >&2
+        for err in "${errors[@]}"; do
+            echo -e "  ${RED}•${NC} $err" >&2
+        done
+        return 1
+    fi
+
+    echo -e "${GREEN}✓ Rules file is valid${NC}"
+    return 0
+}
+
+# Load rules, creating defaults if missing
+load_rules() {
+    local rules_file
+    rules_file=$(get_rules_file)
+
+    if [[ ! -f "$rules_file" ]]; then
+        echo -e "${YELLOW}No review-rules.json found, creating defaults...${NC}" >&2
+        generate_defaults > "$rules_file"
+        echo -e "${GREEN}✓ Created $rules_file${NC}" >&2
+    fi
+
+    # Validate
+    if ! validate_rules "$rules_file" >/dev/null 2>&1; then
+        echo -e "${YELLOW}Rules file has validation errors${NC}" >&2
+    fi
+
+    cat "$rules_file"
+}
+
+# Get maxAutoPriority for a type
+get_type_rule() {
+    local type="$1"
+    local rules_json
+    rules_json=$(load_rules 2>/dev/null)
+
+    local max_auto
+    max_auto=$(echo "$rules_json" | jq -r --arg t "$type" '
+        (.rules[] | select(.type == $t) | .maxAutoPriority) // .priorityThreshold // 3
+    ')
+
+    echo "$max_auto"
+}
+
+# Get override for a task
+get_override() {
+    local task_id="$1"
+    local rules_json
+    rules_json=$(load_rules 2>/dev/null)
+
+    local override
+    override=$(echo "$rules_json" | jq -r --arg id "$task_id" '
+        .overrides[] | select(.taskId == $id) | .action
+    ')
+
+    if [[ -z "$override" ]] || [[ "$override" == "null" ]]; then
+        echo "none"
+    else
+        echo "$override"
+    fi
+}
+
+# Add an override to the JSON file
+add_override() {
+    local task_id="$1"
+    local action="$2"
+    local reason="$3"
+
+    # Validate action
+    if [[ "$action" != "always_review" ]] && [[ "$action" != "always_auto" ]]; then
+        echo -e "${RED}Error: action must be 'always_review' or 'always_auto'${NC}" >&2
+        return 1
+    fi
+
+    local rules_file
+    rules_file=$(get_rules_file)
+
+    # Load existing rules or create defaults
+    local rules_json
+    if [[ -f "$rules_file" ]]; then
+        rules_json=$(cat "$rules_file")
+    else
+        rules_json=$(generate_defaults)
+    fi
+
+    # Check if override already exists
+    local existing
+    existing=$(echo "$rules_json" | jq -r --arg id "$task_id" '.overrides[] | select(.taskId == $id) | .taskId')
+
+    if [[ -n "$existing" ]]; then
+        # Update existing override
+        if [[ -n "$reason" ]]; then
+            rules_json=$(echo "$rules_json" | jq --arg id "$task_id" --arg action "$action" --arg reason "$reason" '
+                .overrides = [.overrides[] | if .taskId == $id then {taskId: $id, action: $action, reason: $reason} else . end]
+            ')
+        else
+            rules_json=$(echo "$rules_json" | jq --arg id "$task_id" --arg action "$action" '
+                .overrides = [.overrides[] | if .taskId == $id then {taskId: $id, action: $action} else . end]
+            ')
+        fi
+        echo -e "${GREEN}✓ Updated override for $task_id: $action${NC}"
+    else
+        # Add new override
+        if [[ -n "$reason" ]]; then
+            rules_json=$(echo "$rules_json" | jq --arg id "$task_id" --arg action "$action" --arg reason "$reason" '
+                .overrides += [{taskId: $id, action: $action, reason: $reason}]
+            ')
+        else
+            rules_json=$(echo "$rules_json" | jq --arg id "$task_id" --arg action "$action" '
+                .overrides += [{taskId: $id, action: $action}]
+            ')
+        fi
+        echo -e "${GREEN}✓ Added override for $task_id: $action${NC}"
+    fi
+
+    # Write updated rules
+    echo "$rules_json" | jq '.' > "$rules_file"
+}
+
+# Remove an override from the JSON file
+remove_override() {
+    local task_id="$1"
+
+    local rules_file
+    rules_file=$(get_rules_file)
+
+    if [[ ! -f "$rules_file" ]]; then
+        echo -e "${YELLOW}No rules file found${NC}"
+        return 0
+    fi
+
+    local rules_json
+    rules_json=$(cat "$rules_file")
+
+    # Remove the override
+    rules_json=$(echo "$rules_json" | jq --arg id "$task_id" '
+        .overrides = [.overrides[] | select(.taskId != $id)]
+    ')
+
+    # Write updated rules
+    echo "$rules_json" | jq '.' > "$rules_file"
+    echo -e "${GREEN}✓ Removed override for $task_id${NC}"
+}
+
+# Parse arguments
+ACTION="load"
+TYPE_QUERY=""
+OVERRIDE_QUERY=""
+ADD_OVERRIDE_ID=""
+ADD_OVERRIDE_ACTION=""
+ADD_OVERRIDE_REASON=""
+REMOVE_OVERRIDE_ID=""
+JSON_OUTPUT=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --init|-i)
+            ACTION="init"
+            shift
+            ;;
+        --validate|-v)
+            ACTION="validate"
+            shift
+            ;;
+        --get|-g)
+            ACTION="get_type"
+            TYPE_QUERY="$2"
+            shift 2
+            ;;
+        --get-override)
+            ACTION="get_override"
+            OVERRIDE_QUERY="$2"
+            shift 2
+            ;;
+        --add-override)
+            ACTION="add_override"
+            ADD_OVERRIDE_ID="$2"
+            ADD_OVERRIDE_ACTION="$3"
+            ADD_OVERRIDE_REASON="${4:-}"
+            if [[ -n "$ADD_OVERRIDE_REASON" ]]; then
+                shift 4
+            elif [[ -n "$ADD_OVERRIDE_ACTION" ]]; then
+                shift 3
+            elif [[ -n "$ADD_OVERRIDE_ID" ]]; then
+                shift 2
+            else
+                shift
+            fi
+            ;;
+        --remove-override)
+            ACTION="remove_override"
+            REMOVE_OVERRIDE_ID="$2"
+            shift 2
+            ;;
+        --list-overrides)
+            ACTION="list_overrides"
+            shift
+            ;;
+        --json|-j)
+            JSON_OUTPUT=true
+            shift
+            ;;
+        --help|-h)
+            echo "jt-review-rules-loader - Load and manage review-rules.json"
+            echo ""
+            echo "Usage:"
+            echo "  jt-review-rules-loader                    Load rules (create defaults if missing)"
+            echo "  jt-review-rules-loader --init             Initialize with default rules"
+            echo "  jt-review-rules-loader --validate         Validate existing rules file"
+            echo "  jt-review-rules-loader --get TYPE         Get maxAutoPriority for a type"
+            echo "  jt-review-rules-loader --get-override ID  Get override for a task"
+            echo "  jt-review-rules-loader --json             Output loaded rules as JSON"
+            echo ""
+            echo "Override Management:"
+            echo "  jt-review-rules-loader --add-override ID ACTION [REASON]"
+            echo "  jt-review-rules-loader --remove-override ID"
+            echo "  jt-review-rules-loader --list-overrides"
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}Unknown option: $1${NC}" >&2
+            echo "Use --help for usage information" >&2
+            exit 1
+            ;;
+    esac
+done
+
+# Execute action
+case $ACTION in
+    load)
+        rules=$(load_rules)
+        if [[ "$JSON_OUTPUT" == true ]]; then
+            echo "$rules" | jq '.'
+        else
+            echo ""
+            echo -e "${BOLD}Review Rules (v$(echo "$rules" | jq -r '.version'))${NC}"
+            echo ""
+            echo -e "  ${CYAN}Default action:${NC} $(echo "$rules" | jq -r '.defaultAction')"
+            echo -e "  ${CYAN}Priority threshold:${NC} P$(echo "$rules" | jq -r '.priorityThreshold')"
+            echo ""
+            echo -e "  ${CYAN}Type rules:${NC}"
+            echo "$rules" | jq -r '.rules[] | "    \(.type): maxAutoPriority=\(.maxAutoPriority)\(if .note then " (\(.note))" else "" end)"'
+            echo ""
+            override_count=$(echo "$rules" | jq '.overrides | length')
+            if [[ "$override_count" -gt 0 ]]; then
+                echo -e "  ${CYAN}Overrides:${NC}"
+                echo "$rules" | jq -r '.overrides[] | "    \(.taskId): \(.action)\(if .reason then " (\(.reason))" else "" end)"'
+            else
+                echo -e "  ${DIM}No task-specific overrides${NC}"
+            fi
+            echo ""
+        fi
+        ;;
+    init)
+        rules_file=$(get_rules_file)
+        if [[ -f "$rules_file" ]]; then
+            echo -e "${YELLOW}Rules file already exists: $rules_file${NC}"
+            read -p "Overwrite with defaults? [y/N] " confirm
+            if [[ "$confirm" != "y" ]] && [[ "$confirm" != "Y" ]]; then
+                echo "Aborted"
+                exit 0
+            fi
+        fi
+        generate_defaults > "$rules_file"
+        echo -e "${GREEN}✓ Created $rules_file${NC}"
+        ;;
+    validate)
+        rules_file=$(get_rules_file)
+        validate_rules "$rules_file"
+        ;;
+    get_type)
+        if [[ -z "$TYPE_QUERY" ]]; then
+            echo -e "${RED}Error: --get requires a type argument${NC}" >&2
+            exit 1
+        fi
+        get_type_rule "$TYPE_QUERY"
+        ;;
+    get_override)
+        if [[ -z "$OVERRIDE_QUERY" ]]; then
+            echo -e "${RED}Error: --get-override requires a task ID argument${NC}" >&2
+            exit 1
+        fi
+        get_override "$OVERRIDE_QUERY"
+        ;;
+    add_override)
+        if [[ -z "$ADD_OVERRIDE_ID" ]] || [[ -z "$ADD_OVERRIDE_ACTION" ]]; then
+            echo -e "${RED}Error: --add-override requires TASK_ID ACTION [REASON]${NC}" >&2
+            exit 1
+        fi
+        add_override "$ADD_OVERRIDE_ID" "$ADD_OVERRIDE_ACTION" "$ADD_OVERRIDE_REASON"
+        ;;
+    remove_override)
+        if [[ -z "$REMOVE_OVERRIDE_ID" ]]; then
+            echo -e "${RED}Error: --remove-override requires a task ID${NC}" >&2
+            exit 1
+        fi
+        remove_override "$REMOVE_OVERRIDE_ID"
+        ;;
+    list_overrides)
+        rules_json=$(load_rules 2>/dev/null)
+        override_count=$(echo "$rules_json" | jq '.overrides | length')
+        if [[ "$override_count" -eq 0 ]]; then
+            echo -e "${DIM}No task-specific overrides configured${NC}"
+        else
+            echo "$rules_json" | jq -r '.overrides[] | "\(.taskId): \(.action)\(if .reason then " (\(.reason))" else "" end)"'
+        fi
+        ;;
+esac

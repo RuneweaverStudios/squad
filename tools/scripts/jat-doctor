@@ -78,14 +78,17 @@ if [[ "$TOOLS_OK" == "false" ]]; then
     echo "    Fix: cd ~/code/jat && ./install.sh"
 fi
 
-# 6. Check Beads in current project
+# 6. Check tasks in current project
 echo ""
 echo "Current Project ($(basename "$PWD")):"
-if [[ -d .beads ]]; then
-    TASK_COUNT=$(bd list --json 2>/dev/null | jq length 2>/dev/null || echo "?")
-    pass "Beads initialized ($TASK_COUNT tasks)"
+if [[ -d .jat ]]; then
+    TASK_COUNT=$(jt list --json 2>/dev/null | jq length 2>/dev/null || echo "?")
+    pass "Tasks initialized ($TASK_COUNT tasks)"
+elif [[ -d .beads ]]; then
+    TASK_COUNT=$(jt list --json 2>/dev/null | jq length 2>/dev/null || echo "?")
+    pass "Tasks initialized ($TASK_COUNT tasks, legacy .beads/ dir)"
 else
-    warn "Beads not initialized - run: bd init"
+    warn "Tasks not initialized - run: jt init"
 fi
 
 # 7. Check CLAUDE.md imports

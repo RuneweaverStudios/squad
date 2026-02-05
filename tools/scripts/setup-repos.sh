@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Per-Repository Setup
-# - Initialize Beads (bd init) in each project
+# - Initialize tasks (jt init) in each project
 # - Add jat shared documentation imports to project CLAUDE.md
 
 # Note: Don't use 'set -e' - arithmetic (( )) can return 1 when incrementing from 0
@@ -64,10 +64,10 @@ JAT_GITIGNORE_MARKER=".claude/agent-*.txt"
 echo -e "${BLUE}Setting up repositories for jat (Jomarchy Agent Tools)...${NC}"
 echo ""
 
-# Check if bd command is available
-if ! command -v bd &> /dev/null; then
-    echo -e "${RED}ERROR: 'bd' command not found${NC}"
-    echo "Please install Beads CLI first (run beads-cli.sh)"
+# Check if jt command is available
+if ! command -v jt &> /dev/null; then
+    echo -e "${RED}ERROR: 'jt' command not found${NC}"
+    echo "Please install JAT tools first (run install.sh)"
     exit 1
 fi
 
@@ -87,7 +87,7 @@ if [[ ! "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
     echo ""
     echo "You can initialize projects individually later with:"
     echo "  cd ~/code/<project>"
-    echo "  bd init"
+    echo "  jt init"
     echo ""
     echo "Or run this script again to auto-setup all projects:"
     echo "  bash $SCRIPT_DIR/setup-repos.sh"
@@ -145,22 +145,21 @@ for repo_dir in "$CODE_DIR"/*; do
 
     ((REPOS_FOUND++))
 
-    # Initialize Beads if needed
-    if [ ! -d "$repo_dir/.beads" ]; then
-        echo "  → Initializing Beads..."
+    # Initialize tasks if needed
+    if [ ! -d "$repo_dir/.jat" ] && [ ! -d "$repo_dir/.beads" ]; then
+        echo "  → Initializing tasks..."
         cd "$repo_dir"
 
-        # Run bd init non-interactively
-        echo -e "Y\nY\n" | bd init > /dev/null 2>&1 || {
-            echo -e "  ${YELLOW}⚠ Beads init failed (may already be partially initialized)${NC}"
+        jt init --quiet > /dev/null 2>&1 || {
+            echo -e "  ${YELLOW}⚠ Task init failed (may already be partially initialized)${NC}"
         }
 
-        if [ -d "$repo_dir/.beads" ]; then
-            echo -e "  ${GREEN}✓ Beads initialized${NC}"
+        if [ -d "$repo_dir/.jat" ]; then
+            echo -e "  ${GREEN}✓ Tasks initialized${NC}"
             ((BEADS_INITIALIZED++))
         fi
     else
-        echo -e "  ${GREEN}✓${NC} Beads already initialized"
+        echo -e "  ${GREEN}✓${NC} Tasks already initialized"
     fi
 
     # Update .gitignore with JAT patterns
@@ -227,7 +226,7 @@ $JAT_IMPORTS
 /jat:start
 
 # See available tasks
-bd ready
+jt ready
 \`\`\`
 EOF
         echo -e "  ${GREEN}✓ Created CLAUDE.md with jat imports${NC}"

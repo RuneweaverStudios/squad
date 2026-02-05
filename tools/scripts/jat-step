@@ -8,7 +8,7 @@
 # Steps:
 #   verifying   - Emit signal only (agent does verification)
 #   committing  - Emit signal + git add/commit
-#   closing     - Emit signal + bd close
+#   closing     - Emit signal + jt close
 #   releasing   - Emit signal + release all reservations
 #   announcing  - Emit signal + am-send completion announcement
 #
@@ -47,7 +47,7 @@ Usage:
 Steps:
   verifying   - Emit signal only (agent does verification)
   committing  - Emit signal + git add/commit
-  closing     - Emit signal + bd close
+  closing     - Emit signal + jt close
   releasing   - Emit signal + release all reservations
   announcing  - Emit signal + am-send completion announcement
   complete    - Generate completion bundle via LLM and emit complete signal
@@ -231,8 +231,8 @@ EOF
     closing)
         emit_completing_signal "$STEP" "$TASK_ID" "$TASK_TITLE"
 
-        log_dim "Closing task in Beads..."
-        bd close "$TASK_ID" --reason "Completed by $AGENT_NAME"
+        log_dim "Closing task..."
+        jt close "$TASK_ID" --reason "Completed by $AGENT_NAME"
         log_success "Task closed: $TASK_ID"
         ;;
 

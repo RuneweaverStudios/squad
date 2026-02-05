@@ -1,0 +1,30 @@
+#!/bin/bash
+# jt-epic-child - Add epic→child dependency (correct direction)
+#
+# Usage: jt-epic-child <epic-id> <child-id>
+#
+# This ensures the dependency direction is always correct:
+# - Epic depends on child (epic blocked until child completes)
+# - NOT child depends on epic (which would block the child)
+#
+# Example:
+#   jt-epic-child jat-039k jat-abc
+#   # Result: jat-039k depends on jat-abc
+
+set -euo pipefail
+
+if [[ $# -lt 2 ]]; then
+    echo "Usage: jt-epic-child <epic-id> <child-id>"
+    echo ""
+    echo "Adds epic→child dependency (correct direction)"
+    echo "Epic will be blocked until child completes"
+    exit 1
+fi
+
+EPIC_ID="$1"
+CHILD_ID="$2"
+
+# Add dependency: epic depends on child
+jt dep add "$EPIC_ID" "$CHILD_ID"
+
+echo "✓ $EPIC_ID depends on $CHILD_ID (epic blocked until child completes)"

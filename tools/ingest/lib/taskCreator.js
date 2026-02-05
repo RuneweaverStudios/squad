@@ -7,10 +7,10 @@ import * as logger from './logger.js';
 // Resolve jat root from this file's location (tools/ingest/lib/ → jat/)
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const JAT_ROOT = join(__dirname, '..', '..', '..');
-const TASK_IMAGES_PATH = join(JAT_ROOT, '.beads', 'task-images.json');
+const TASK_IMAGES_PATH = join(JAT_ROOT, '.jat', 'task-images.json');
 
 /**
- * Create a task via bd create CLI.
+ * Create a task via jt create CLI.
  * Returns the created task ID or null on failure.
  */
 export function createTask(source, item, downloadedAttachments = []) {
@@ -26,8 +26,7 @@ export function createTask(source, item, downloadedAttachments = []) {
     item.title,
     '--type', type,
     '--priority', priority,
-    '--description', description,
-    '--silent'
+    '--description', description
   ];
 
   if (labels.length > 0) {
@@ -38,21 +37,20 @@ export function createTask(source, item, downloadedAttachments = []) {
     args.push('--notes', `Author: ${item.author}`);
   }
 
-  // No --prefix needed: cwd is already set to the project directory via getProjectPath(),
-  // and bd auto-detects the prefix from the .beads config. Using --prefix triggers the
-  // multi-rig system which requires routes.jsonl.
-
   try {
-    const taskId = execFileSync('bd', args, {
+    const output = execFileSync('jt', args, {
       encoding: 'utf-8',
       timeout: 15000,
       cwd: getProjectPath(source.project)
     }).trim();
+    // jt create outputs "Created jat-xxxxx: Title" - extract the task ID
+    const match = output.match(/^Created\s+(\S+):/);
+    const taskId = match ? match[1] : output;
 
     logger.info(`created task ${taskId}: ${item.title.slice(0, 60)}`, source.id);
     return taskId;
   } catch (err) {
-    logger.error(`bd create failed: ${err.message}`, source.id);
+    logger.error(`jt create failed: ${err.message}`, source.id);
     return null;
   }
 }
@@ -106,7 +104,7 @@ export function appendToTask(taskId, replies, project) {
   // Read current task description once
   let currentDesc = '';
   try {
-    const showOutput = execFileSync('bd', ['show', taskId, '--json'], {
+    const showOutput = execFileSync('jt', ['show', taskId, '--json'], {
       encoding: 'utf-8',
       timeout: 15000,
       cwd
@@ -115,7 +113,7 @@ export function appendToTask(taskId, replies, project) {
     const task = Array.isArray(parsed) ? parsed[0] : parsed;
     currentDesc = task?.description || '';
   } catch (err) {
-    logger.error(`bd show failed for ${taskId}: ${err.message}`);
+    logger.error(`jt show failed for ${taskId}: ${err.message}`);
     return false;
   }
 
@@ -136,8 +134,7 @@ export function appendToTask(taskId, replies, project) {
 
   // Single write with all replies
   try {
-    execFileSync('bd', ['update', taskId, '--body-file', '-'], {
-      input: newDesc,
+    execFileSync('jt', ['update', taskId, '--description', newDesc], {
       encoding: 'utf-8',
       timeout: 15000,
       cwd
@@ -145,19 +142,19 @@ export function appendToTask(taskId, replies, project) {
     logger.info(`appended ${replies.length} reply(s) to ${taskId}`, project);
     return true;
   } catch (err) {
-    logger.error(`bd update failed for ${taskId}: ${err.message}`);
+    logger.error(`jt update failed for ${taskId}: ${err.message}`);
     return false;
   }
 }
 
 /**
- * Register downloaded files as task attachments in .beads/task-images.json
+ * Register downloaded files as task attachments in .jat/task-images.json
  * so they appear in the IDE's ATTACHMENTS section.
  */
 export function registerTaskAttachments(taskId, downloadedFiles, project) {
   if (!downloadedFiles?.length) return;
 
-  // Write to jat's .beads/task-images.json (where the IDE reads from)
+  // Write to jat's .jat/task-images.json (where the IDE reads from)
   const storePath = TASK_IMAGES_PATH;
 
   // Load existing
@@ -192,11 +189,11 @@ export function registerTaskAttachments(taskId, downloadedFiles, project) {
     return;
   }
 
-  // Sync to task notes so agents see them via bd show
+  // Sync to task notes so agents see them via jt show
   const imageList = existing.map((img, i) => `  ${i + 1}. ${img.path}`).join('\n');
   const notes = `Author: ${project}\n📷 Attached files:\n${imageList}\n(Use Read tool to view)`;
   try {
-    execFileSync('bd', ['update', taskId, '--notes', notes], {
+    execFileSync('jt', ['update', taskId, '--notes', notes], {
       encoding: 'utf-8',
       timeout: 15000,
       cwd: getProjectPath(project)
@@ -219,8 +216,12 @@ export function getProjectPath(projectName) {
 
   for (const p of candidates) {
     try {
-      // Use the path if it has a .beads directory
-      execFileSync('test', ['-d', `${p}/.beads`], { timeout: 1000 });
+      // Use the path if it has a .jat directory (or legacy .beads)
+      try {
+        execFileSync('test', ['-d', `${p}/.jat`], { timeout: 1000 });
+      } catch {
+        execFileSync('test', ['-d', `${p}/.beads`], { timeout: 1000 });
+      }
       return p;
     } catch { /* skip */ }
   }

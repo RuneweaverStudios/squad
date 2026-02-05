@@ -1,0 +1,401 @@
+#!/bin/bash
+
+# jt-check-review - Preview what review action would be taken for a task
+#
+# Shows whether a task would auto-proceed or require human review
+# based on the current review rules configuration.
+#
+# Usage:
+#   jt-check-review <task-id>          # Check single task
+#   jt-check-review <task-id> --json   # Output as JSON
+#   jt-check-review --batch            # Check all open/in_progress tasks
+#
+# Examples:
+#   jt-check-review jat-abc
+#   jt-check-review jat-xyz --json
+#   jt-check-review --batch
+
+set -e
+
+# Color codes
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+DIM='\033[2m'
+NC='\033[0m'
+
+# Icons
+CHECK_ICON="✓"
+REVIEW_ICON="👁"
+AUTO_ICON="⚡"
+
+# Default values
+DEFAULT_ACTION="review"
+DEFAULT_MAX_AUTO=3
+
+# Parse arguments
+TASK_ID=""
+JSON_OUTPUT=false
+BATCH_MODE=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --json|-j)
+            JSON_OUTPUT=true
+            shift
+            ;;
+        --batch|-b)
+            BATCH_MODE=true
+            shift
+            ;;
+        --help|-h)
+            echo "jt-check-review - Preview review action for a task"
+            echo ""
+            echo "Usage:"
+            echo "  jt-check-review <task-id>          Check single task"
+            echo "  jt-check-review <task-id> --json   Output as JSON"
+            echo "  jt-check-review --batch            Check all open/in_progress tasks"
+            echo ""
+            echo "Options:"
+            echo "  --json, -j    Output result as JSON"
+            echo "  --batch, -b   Check all active tasks"
+            echo "  --help, -h    Show this help"
+            echo ""
+            echo "Output explains:"
+            echo "  • Whether task would auto-proceed or require review"
+            echo "  • Why (which rule matched)"
+            echo "  • What priority threshold applied"
+            echo ""
+            echo "Examples:"
+            echo "  jt-check-review jat-abc"
+            echo "  jt-check-review jat-xyz --json"
+            echo "  jt-check-review --batch | grep 'requires review'"
+            exit 0
+            ;;
+        *)
+            if [ -z "$TASK_ID" ]; then
+                TASK_ID="$1"
+            else
+                echo -e "${RED}Unknown option: $1${NC}" >&2
+                echo "Use --help for usage information" >&2
+                exit 1
+            fi
+            shift
+            ;;
+    esac
+done
+
+# Validate arguments
+if [ "$BATCH_MODE" = false ] && [ -z "$TASK_ID" ]; then
+    echo -e "${RED}Error: Task ID required${NC}" >&2
+    echo "Usage: jt-check-review <task-id>" >&2
+    echo "       jt-check-review --batch" >&2
+    exit 1
+fi
+
+# Function to get max_auto for a type from review-rules-loader
+get_max_auto() {
+    local type="$1"
+    local value
+    if command -v jt-review-rules-loader &>/dev/null; then
+        value=$(jt-review-rules-loader --get "$type" 2>/dev/null || echo "")
+    fi
+    if [ -z "$value" ] || [ "$value" = "null" ]; then
+        echo "$DEFAULT_MAX_AUTO"
+    else
+        echo "$value"
+    fi
+}
+
+# Function to get priority name
+priority_name() {
+    local p="$1"
+    case $p in
+        0) echo "P0 (Critical)" ;;
+        1) echo "P1 (High)" ;;
+        2) echo "P2 (Medium)" ;;
+        3) echo "P3 (Low)" ;;
+        4) echo "P4 (Lowest)" ;;
+        *) echo "P$p" ;;
+    esac
+}
+
+# Function to check a single task
+check_task() {
+    local task_id="$1"
+    local json_mode="$2"
+
+    # Get task details
+    local task_json
+    task_json=$(jt show "$task_id" --json 2>/dev/null) || {
+        if [ "$json_mode" = true ]; then
+            echo "{\"error\": \"Task not found: $task_id\"}"
+        else
+            echo -e "${RED}Error: Task not found: $task_id${NC}" >&2
+        fi
+        return 1
+    }
+
+    # Parse task fields
+    local task_type task_priority task_title task_status task_override task_notes
+    task_type=$(echo "$task_json" | jq -r '.[0].issue_type // "task"')
+    task_priority=$(echo "$task_json" | jq -r '.[0].priority // 2')
+    task_title=$(echo "$task_json" | jq -r '.[0].title // "Unknown"')
+    task_status=$(echo "$task_json" | jq -r '.[0].status // "unknown"')
+    # Parse review_override from notes field (stored as [REVIEW_OVERRIDE:value])
+    task_notes=$(echo "$task_json" | jq -r '.[0].notes // ""')
+    task_override=$(echo "$task_notes" | grep -oP '\[REVIEW_OVERRIDE:\K[^\]]+' || echo "null")
+    if [ -z "$task_override" ]; then task_override="null"; fi
+
+    # Handle null/empty type
+    if [ "$task_type" = "null" ] || [ -z "$task_type" ]; then
+        task_type="task"
+    fi
+
+    # Get type-specific rule
+    local max_auto
+    max_auto=$(get_max_auto "$task_type")
+
+    # Determine action and reason
+    local action reason rule_source
+
+    # Check for JSON file override (centralized rules)
+    local json_override=""
+    if command -v jt-review-rules-loader &>/dev/null; then
+        json_override=$(jt-review-rules-loader --get-override "$task_id" 2>/dev/null || echo "none")
+    fi
+
+    # Check for task-level override first (stored on task itself)
+    if [ "$task_override" = "always_review" ]; then
+        action="review"
+        reason="Task has review_override=always_review"
+        rule_source="override"
+    elif [ "$task_override" = "always_auto" ]; then
+        action="auto"
+        reason="Task has review_override=always_auto"
+        rule_source="override"
+    # Then check JSON file override
+    elif [ "$json_override" = "always_review" ]; then
+        action="review"
+        reason="Override in review-rules.json"
+        rule_source="json_override"
+    elif [ "$json_override" = "always_auto" ]; then
+        action="auto"
+        reason="Override in review-rules.json"
+        rule_source="json_override"
+    else
+        # Apply type-specific rule
+        if [ "$max_auto" -lt 0 ]; then
+            # All priorities require review
+            action="review"
+            reason="Type '$task_type' requires review for all priorities (max_auto=-1)"
+            rule_source="type_rule"
+        elif [ "$task_priority" -le "$max_auto" ]; then
+            # Priority within auto-proceed range
+            action="auto"
+            reason="Priority P$task_priority <= max_auto P$max_auto for type '$task_type'"
+            rule_source="type_rule"
+        else
+            # Priority exceeds auto-proceed threshold
+            action="review"
+            reason="Priority P$task_priority > max_auto P$max_auto for type '$task_type'"
+            rule_source="type_rule"
+        fi
+    fi
+
+    # Output result
+    if [ "$json_mode" = true ]; then
+        jq -n \
+            --arg id "$task_id" \
+            --arg title "$task_title" \
+            --arg type "$task_type" \
+            --argjson priority "$task_priority" \
+            --arg status "$task_status" \
+            --arg action "$action" \
+            --arg reason "$reason" \
+            --arg rule_source "$rule_source" \
+            --argjson max_auto "$max_auto" \
+            '{
+                task_id: $id,
+                title: $title,
+                type: $type,
+                priority: $priority,
+                status: $status,
+                review_action: $action,
+                reason: $reason,
+                rule_source: $rule_source,
+                max_auto_priority: $max_auto
+            }'
+    else
+        echo ""
+        echo -e "${BOLD}╔══════════════════════════════════════════════════════════════════════════╗${NC}"
+        echo -e "${BOLD}║                    🔍 Review Check: $task_id${NC}"
+        printf "${BOLD}%-76s${NC}\n" "║"
+        echo -e "${BOLD}╚══════════════════════════════════════════════════════════════════════════╝${NC}"
+        echo ""
+
+        # Task info
+        echo -e "  ${CYAN}Task:${NC} $task_title"
+        echo -e "  ${CYAN}Type:${NC} $task_type"
+        echo -e "  ${CYAN}Priority:${NC} $(priority_name "$task_priority")"
+        echo -e "  ${CYAN}Status:${NC} $task_status"
+        echo ""
+
+        # Rule applied
+        echo -e "  ${CYAN}Rule applied:${NC}"
+        if [ "$rule_source" = "override" ]; then
+            echo -e "    ${DIM}Source: Task-level override${NC}"
+        else
+            echo -e "    ${DIM}Source: Type rule (review_rules.$task_type.max_auto = $max_auto)${NC}"
+        fi
+        echo ""
+
+        # Decision
+        echo -e "  ┌────────────────────────────────────────────────────────────────────────┐"
+        if [ "$action" = "auto" ]; then
+            echo -e "  │  ${GREEN}${AUTO_ICON} DECISION: AUTO-PROCEED${NC}                                          │"
+            echo -e "  │                                                                        │"
+            echo -e "  │  This task will close automatically when the agent marks it complete.  │"
+        else
+            echo -e "  │  ${YELLOW}${REVIEW_ICON} DECISION: REQUIRES REVIEW${NC}                                        │"
+            echo -e "  │                                                                        │"
+            echo -e "  │  This task will wait for human review before closing.                  │"
+        fi
+        echo -e "  │                                                                        │"
+        echo -e "  │  ${DIM}Reason: ${reason:0:60}${NC}"
+        if [ ${#reason} -gt 60 ]; then
+            echo -e "  │  ${DIM}        ${reason:60:60}${NC}"
+        fi
+        echo -e "  └────────────────────────────────────────────────────────────────────────┘"
+        echo ""
+
+        # Actionable info
+        if [ "$action" = "review" ]; then
+            echo -e "  ${CYAN}To change this behavior:${NC}"
+            echo "    • Set task override: jt-set-review-override $task_id always_auto"
+            echo ""
+        fi
+    fi
+}
+
+# Batch mode - check all active tasks
+if [ "$BATCH_MODE" = true ]; then
+    # Get all open and in_progress tasks
+    tasks=$(jt list --status open --json 2>/dev/null | jq -r '.[].id' 2>/dev/null || echo "")
+    tasks_in_progress=$(jt list --status in_progress --json 2>/dev/null | jq -r '.[].id' 2>/dev/null || echo "")
+
+    # Combine and deduplicate
+    all_tasks=$(echo -e "$tasks\n$tasks_in_progress" | sort -u | grep -v '^$' || true)
+
+    if [ -z "$all_tasks" ]; then
+        if [ "$JSON_OUTPUT" = true ]; then
+            echo "[]"
+        else
+            echo -e "${YELLOW}No open or in_progress tasks found${NC}"
+        fi
+        exit 0
+    fi
+
+    if [ "$JSON_OUTPUT" = true ]; then
+        # JSON array output
+        echo "["
+        first=true
+        while IFS= read -r task_id; do
+            if [ -n "$task_id" ]; then
+                if [ "$first" = true ]; then
+                    first=false
+                else
+                    echo ","
+                fi
+                check_task "$task_id" true
+            fi
+        done <<< "$all_tasks"
+        echo "]"
+    else
+        # Human-readable table
+        echo ""
+        echo -e "${BOLD}╔══════════════════════════════════════════════════════════════════════════╗${NC}"
+        echo -e "${BOLD}║                    📋 Review Check: All Active Tasks                     ║${NC}"
+        echo -e "${BOLD}╚══════════════════════════════════════════════════════════════════════════╝${NC}"
+        echo ""
+
+        echo -e "  ┌───────────────┬──────────┬─────────┬──────────┬─────────────────────────┐"
+        echo -e "  │ ${BOLD}Task ID${NC}       │ ${BOLD}Type${NC}     │ ${BOLD}Priority${NC} │ ${BOLD}Action${NC}   │ ${BOLD}Reason${NC}                  │"
+        echo -e "  ├───────────────┼──────────┼─────────┼──────────┼─────────────────────────┤"
+
+        while IFS= read -r task_id; do
+            if [ -n "$task_id" ]; then
+                # Get task details
+                task_json=$(jt show "$task_id" --json 2>/dev/null) || continue
+                task_type=$(echo "$task_json" | jq -r '.[0].issue_type // "task"')
+                task_priority=$(echo "$task_json" | jq -r '.[0].priority // 2')
+                # Parse review_override from notes field
+                task_notes=$(echo "$task_json" | jq -r '.[0].notes // ""')
+                task_override=$(echo "$task_notes" | grep -oP '\[REVIEW_OVERRIDE:\K[^\]]+' || echo "null")
+                if [ -z "$task_override" ]; then task_override="null"; fi
+
+                # Handle null/empty type
+                if [ "$task_type" = "null" ] || [ -z "$task_type" ]; then
+                    task_type="task"
+                fi
+
+                # Get rule
+                max_auto=$(get_max_auto "$task_type")
+
+                # Check JSON override
+                json_override=""
+                if command -v jt-review-rules-loader &>/dev/null; then
+                    json_override=$(jt-review-rules-loader --get-override "$task_id" 2>/dev/null || echo "none")
+                fi
+
+                # Determine action
+                if [ "$task_override" = "always_review" ]; then
+                    action="review"
+                    reason="override"
+                elif [ "$task_override" = "always_auto" ]; then
+                    action="auto"
+                    reason="override"
+                elif [ "$json_override" = "always_review" ]; then
+                    action="review"
+                    reason="json override"
+                elif [ "$json_override" = "always_auto" ]; then
+                    action="auto"
+                    reason="json override"
+                elif [ "$max_auto" -lt 0 ]; then
+                    action="review"
+                    reason="type rule"
+                elif [ "$task_priority" -le "$max_auto" ]; then
+                    action="auto"
+                    reason="P$task_priority <= P$max_auto"
+                else
+                    action="review"
+                    reason="P$task_priority > P$max_auto"
+                fi
+
+                # Format columns
+                id_col=$(printf "%-13s" "$task_id")
+                type_col=$(printf "%-8s" "$task_type")
+                priority_col=$(printf "%-7s" "P$task_priority")
+                reason_col=$(printf "%-23s" "$reason")
+
+                if [ "$action" = "auto" ]; then
+                    action_col="${GREEN}$(printf "%-8s" "auto")${NC}"
+                else
+                    action_col="${YELLOW}$(printf "%-8s" "review")${NC}"
+                fi
+
+                echo -e "  │ $id_col │ $type_col │ $priority_col │ $action_col │ $reason_col │"
+            fi
+        done <<< "$all_tasks"
+
+        echo -e "  └───────────────┴──────────┴─────────┴──────────┴─────────────────────────┘"
+        echo ""
+    fi
+    exit 0
+fi
+
+# Single task mode
+check_task "$TASK_ID" "$JSON_OUTPUT"

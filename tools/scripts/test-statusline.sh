@@ -108,8 +108,8 @@ EOF
     mkdir -p "$TEST_BEADS_DIR"
     cd "$TEST_BEADS_DIR"
 
-    # Initialize Beads database properly
-    bd init >/dev/null 2>&1 || true
+    # Initialize tasks database
+    jt init --quiet >/dev/null 2>&1 || true
 
     cd - >/dev/null
 }

@@ -105,13 +105,16 @@ setup_demo_projects() {
             echo -e "  Creating new project..."
             mkdir -p "$path"
             cd "$path"
-            # Use proper bd init with defaults (no -y flag)
-            echo -e "Y\nY\nY\nY\n" | bd init >/dev/null 2>&1
+            # Initialize task tracking
+            jt init --quiet >/dev/null 2>&1
             ((created++))
         fi
 
         # Always reset task list for demo
-        echo "[]" > "$path/.beads/issues.jsonl"
+        if [[ -f "$path/.jat/tasks.db" ]]; then
+            rm -f "$path/.jat/tasks.db" "$path/.jat/tasks.db-shm" "$path/.jat/tasks.db-wal"
+            (cd "$path" && jt init --quiet >/dev/null 2>&1)
+        fi
         echo -e "  Cleared task list"
 
         # Determine color based on project type
