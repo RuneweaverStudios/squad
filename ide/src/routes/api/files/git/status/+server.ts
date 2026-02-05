@@ -24,6 +24,39 @@ export const GET: RequestHandler = async ({ url }) => {
 	try {
 		const status = await git.status();
 
+		// simple-git's status.renamed includes BOTH staged and unstaged renames
+		// without distinguishing them. Parse porcelain output to find which
+		// renames are already staged (index column = 'R') so we can exclude them.
+		const stagedRenameSet = new Set<string>();
+		try {
+			const porcelain = await git.raw(['status', '--porcelain', '-z']);
+			// -z format for renames: "XY newpath\0oldpath\0"
+			const entries = porcelain.split('\0');
+			for (let i = 0; i < entries.length; i++) {
+				const entry = entries[i];
+				if (!entry || entry.length < 3) continue;
+				const x = entry[0]; // index status
+				const y = entry[1]; // working tree status
+				if (x === 'R' && y === ' ') {
+					// Staged rename, no unstaged changes
+					// entry.slice(3) = new path, entries[i+1] = old path
+					const newPath = entry.slice(3);
+					const oldPath = entries[i + 1];
+					// simple-git uses from=old, to=new
+					if (oldPath) stagedRenameSet.add(`${oldPath}\t${newPath}`);
+					i++; // skip the old path entry
+				}
+			}
+		} catch {
+			// Fall through - porcelain parsing is best-effort
+		}
+
+		// Filter out already-staged renames from the renamed list
+		const unstagedRenamed = status.renamed.filter(r => {
+			const key = `${r.from}\t${r.to}`;
+			return !stagedRenameSet.has(key);
+		});
+
 		return json({
 			project: projectName,
 			projectPath,
@@ -34,7 +67,7 @@ export const GET: RequestHandler = async ({ url }) => {
 			staged: status.staged,
 			modified: status.modified,
 			deleted: status.deleted,
-			renamed: status.renamed,
+			renamed: unstagedRenamed,
 			created: status.created,
 			not_added: status.not_added,
 			conflicted: status.conflicted,

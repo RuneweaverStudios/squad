@@ -301,8 +301,17 @@
 
 		// For renamed files, we need both the old (from) and new (to) paths
 		// Git tracks renames as delete old + add new, so both must be staged
-		const renamedPaths = renamedFiles.flatMap(r => [r.from, r.to]);
-		const allChanges = [...modifiedFiles, ...deletedFiles, ...untrackedFiles, ...createdFiles, ...renamedPaths];
+		const renamedPaths = renamedFiles.filter(r => !stagedFiles.includes(r.to)).flatMap(r => [r.from, r.to]);
+		// Filter out already-staged files: simple-git's status.deleted/modified includes
+		// both staged and unstaged, but git add fails on already-staged deleted files
+		const stagedSet = new Set(stagedFiles);
+		const allChanges = [
+			...modifiedFiles.filter(f => !stagedSet.has(f)),
+			...deletedFiles.filter(f => !stagedSet.has(f)),
+			...untrackedFiles.filter(f => !stagedSet.has(f)),
+			...createdFiles.filter(f => !stagedSet.has(f)),
+			...renamedPaths
+		];
 		if (allChanges.length === 0) return;
 
 		isStagingAll = true;
