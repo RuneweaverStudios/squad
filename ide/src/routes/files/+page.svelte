@@ -1094,7 +1094,7 @@
 								onProjectChange={handleProjectChange}
 								showColors={true}
 								projectColors={projectColorsMap}
-								compact={true}
+								compact={false}
 							/>
 						</div>
 						<!-- Search button -->
