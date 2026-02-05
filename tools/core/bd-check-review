@@ -3,7 +3,7 @@
 # bd-check-review - Preview what review action would be taken for a task
 #
 # Shows whether a task would auto-proceed or require human review
-# based on the current review rules configuration.
+# based on the current review rules configuration (.jat/review-rules.json).
 #
 # Usage:
 #   bd-check-review <task-id>          # Check single task
@@ -96,14 +96,47 @@ if [ "$BATCH_MODE" = false ] && [ -z "$TASK_ID" ]; then
     exit 1
 fi
 
-# Function to get a config value with default
+# Find .jat directory (walk up tree)
+find_jat_dir() {
+    local dir="$PWD"
+    while [[ "$dir" != "/" ]]; do
+        if [[ -d "$dir/.jat" ]]; then
+            echo "$dir/.jat"
+            return 0
+        fi
+        dir=$(dirname "$dir")
+    done
+    echo ""
+    return 1
+}
+
+# Function to get a config value with default (reads from .jat/review-rules.json)
 get_config() {
     local key="$1"
     local default="$2"
-    local value
-    value=$(bd config get "$key" 2>/dev/null || echo "")
-    # bd config get returns "key (not set)" if not set
-    if [ -z "$value" ] || [ "$value" = "null" ] || [[ "$value" == *"(not set)"* ]]; then
+    local jat_dir
+    jat_dir=$(find_jat_dir)
+    local rules_file="${jat_dir}/review-rules.json"
+
+    if [[ ! -f "$rules_file" ]]; then
+        echo "$default"
+        return
+    fi
+
+    local value=""
+    # Parse key format: review_rules.default_action or review_rules.<type>.max_auto
+    case "$key" in
+        review_rules.default_action)
+            value=$(jq -r '.defaultAction // empty' "$rules_file" 2>/dev/null)
+            ;;
+        review_rules.*.max_auto)
+            local type="${key#review_rules.}"
+            type="${type%.max_auto}"
+            value=$(jq -r --arg t "$type" '(.rules[] | select(.type == $t) | .maxAutoPriority) // empty' "$rules_file" 2>/dev/null)
+            ;;
+    esac
+
+    if [ -z "$value" ] || [ "$value" = "null" ]; then
         echo "$default"
     else
         echo "$value"
@@ -130,7 +163,7 @@ check_task() {
 
     # Get task details
     local task_json
-    task_json=$(bd show "$task_id" --json 2>/dev/null) || {
+    task_json=$(jt show "$task_id" --json 2>/dev/null) || {
         if [ "$json_mode" = true ]; then
             echo "{\"error\": \"Task not found: $task_id\"}"
         else
@@ -165,8 +198,8 @@ check_task() {
 
     # Check for JSON file override (centralized rules)
     local json_override=""
-    if command -v bd-review-rules-loader &>/dev/null; then
-        json_override=$(bd-review-rules-loader --get-override "$task_id" 2>/dev/null || echo "none")
+    if command -v jt-review-rules-loader &>/dev/null; then
+        json_override=$(jt-review-rules-loader --get-override "$task_id" 2>/dev/null || echo "none")
     fi
 
     # Check for task-level override first (stored on task itself)
@@ -276,8 +309,8 @@ check_task() {
         # Actionable info
         if [ "$action" = "review" ]; then
             echo -e "  ${CYAN}To change this behavior:${NC}"
-            echo "    • Increase max_auto: bd-review-rules --type $task_type --max-auto $task_priority"
-            echo "    • Set task override: bd-set-review-override $task_id always_auto"
+            echo "    • Increase max_auto: jt-review-rules --type $task_type --max-auto $task_priority"
+            echo "    • Set task override: jt-set-review-override $task_id always_auto"
             echo ""
         fi
     fi
@@ -286,8 +319,8 @@ check_task() {
 # Batch mode - check all active tasks
 if [ "$BATCH_MODE" = true ]; then
     # Get all open and in_progress tasks
-    tasks=$(bd list --status open --json 2>/dev/null | jq -r '.[].id' 2>/dev/null || echo "")
-    tasks_in_progress=$(bd list --status in_progress --json 2>/dev/null | jq -r '.[].id' 2>/dev/null || echo "")
+    tasks=$(jt list --status open --json 2>/dev/null | jq -r '.[].id' 2>/dev/null || echo "")
+    tasks_in_progress=$(jt list --status in_progress --json 2>/dev/null | jq -r '.[].id' 2>/dev/null || echo "")
 
     # Combine and deduplicate
     all_tasks=$(echo -e "$tasks\n$tasks_in_progress" | sort -u | grep -v '^$' || true)
@@ -331,7 +364,7 @@ if [ "$BATCH_MODE" = true ]; then
         while IFS= read -r task_id; do
             if [ -n "$task_id" ]; then
                 # Get task details
-                task_json=$(bd show "$task_id" --json 2>/dev/null) || continue
+                task_json=$(jt show "$task_id" --json 2>/dev/null) || continue
                 task_type=$(echo "$task_json" | jq -r '.[0].issue_type // "task"')
                 task_priority=$(echo "$task_json" | jq -r '.[0].priority // 2')
                 # Parse review_override from notes field
@@ -349,8 +382,8 @@ if [ "$BATCH_MODE" = true ]; then
 
                 # Check JSON override
                 json_override=""
-                if command -v bd-review-rules-loader &>/dev/null; then
-                    json_override=$(bd-review-rules-loader --get-override "$task_id" 2>/dev/null || echo "none")
+                if command -v jt-review-rules-loader &>/dev/null; then
+                    json_override=$(jt-review-rules-loader --get-override "$task_id" 2>/dev/null || echo "none")
                 fi
 
                 # Determine action
@@ -399,7 +432,7 @@ if [ "$BATCH_MODE" = true ]; then
         # Summary
         auto_count=$(echo "$all_tasks" | while IFS= read -r tid; do
             if [ -n "$tid" ]; then
-                tj=$(bd show "$tid" --json 2>/dev/null) || continue
+                tj=$(jt show "$tid" --json 2>/dev/null) || continue
                 tt=$(echo "$tj" | jq -r '.[0].issue_type // "task"')
                 tp=$(echo "$tj" | jq -r '.[0].priority // 2')
                 # Parse review_override from notes field
@@ -410,8 +443,8 @@ if [ "$BATCH_MODE" = true ]; then
                 ma=$(get_config "review_rules.$tt.max_auto" "$DEFAULT_MAX_AUTO")
                 # Check JSON override
                 jo=""
-                if command -v bd-review-rules-loader &>/dev/null; then
-                    jo=$(bd-review-rules-loader --get-override "$tid" 2>/dev/null || echo "none")
+                if command -v jt-review-rules-loader &>/dev/null; then
+                    jo=$(jt-review-rules-loader --get-override "$tid" 2>/dev/null || echo "none")
                 fi
                 if [ "$to" = "always_auto" ]; then echo "auto"
                 elif [ "$to" = "always_review" ]; then :

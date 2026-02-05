@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# bd-set-review-override - Set task-level review override in Beads
+# bd-set-review-override - Set task-level review override
 #
 # This stores the override directly on the task (in the notes field),
 # not in the centralized review-rules.json file.
@@ -23,7 +23,7 @@
 #
 # Priority:
 #   Task-level overrides take precedence over:
-#   1. JSON file overrides (.beads/review-rules.json)
+#   1. JSON file overrides (.jat/review-rules.json)
 #   2. Type-specific rules (review_rules.<type>.max_auto)
 #   3. Default action (review_rules.default_action)
 
@@ -72,13 +72,13 @@ if [[ "$TASK_ID" == "--help" ]] || [[ "$TASK_ID" == "-h" ]] || [[ -z "$TASK_ID" 
 fi
 
 # Verify task exists
-if ! bd show "$TASK_ID" --json >/dev/null 2>&1; then
+if ! jt show "$TASK_ID" --json >/dev/null 2>&1; then
     echo -e "${RED}Error: Task not found: $TASK_ID${NC}" >&2
     exit 1
 fi
 
 # Get current task data
-task_json=$(bd show "$TASK_ID" --json)
+task_json=$(jt show "$TASK_ID" --json)
 task_title=$(echo "$task_json" | jq -r '.[0].title // "Unknown"')
 current_notes=$(echo "$task_json" | jq -r '.[0].notes // ""')
 
@@ -119,9 +119,9 @@ if [[ "$ACTION" == "--clear" ]] || [[ "$ACTION" == "-c" ]]; then
 
     # Update the task
     if [[ -z "$new_notes" ]]; then
-        bd update "$TASK_ID" --notes "" >/dev/null 2>&1
+        jt update "$TASK_ID" --notes "" >/dev/null 2>&1
     else
-        bd update "$TASK_ID" --notes "$new_notes" >/dev/null 2>&1
+        jt update "$TASK_ID" --notes "$new_notes" >/dev/null 2>&1
     fi
 
     echo -e "${GREEN}✓ Cleared override for $TASK_ID${NC}"
@@ -163,7 +163,7 @@ else
 fi
 
 # Update the task
-bd update "$TASK_ID" --notes "$new_notes" >/dev/null 2>&1
+jt update "$TASK_ID" --notes "$new_notes" >/dev/null 2>&1
 
 echo -e "${GREEN}✓ Set override for $TASK_ID: $ACTION${NC}"
 if [[ -n "$REASON" ]]; then

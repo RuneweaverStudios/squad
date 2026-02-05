@@ -1,9 +1,11 @@
 #!/bin/bash
 
-# bd-review-rules - Manage review rules for Beads tasks
+# bd-review-rules - Manage review rules for tasks
 #
 # Review rules determine whether a task requires human review before
 # auto-closing or can auto-proceed based on type and priority.
+#
+# Rules stored in: .jat/review-rules.json
 #
 # Usage:
 #   bd-review-rules                           # Show all current rules
@@ -11,14 +13,6 @@
 #   bd-review-rules --type feature            # Show rule for specific type
 #   bd-review-rules --default review          # Set default action (review/auto)
 #   bd-review-rules --reset                   # Reset to default rules
-#
-# Schema (stored as bd config keys):
-#   review_rules.default_action    = "review" or "auto"
-#   review_rules.bug.max_auto      = 0-4 (max priority that auto-proceeds)
-#   review_rules.feature.max_auto  = 0-4
-#   review_rules.task.max_auto     = 0-4
-#   review_rules.chore.max_auto    = 0-4
-#   review_rules.epic.max_auto     = 0-4
 #
 # Examples:
 #   --max-auto 3 means P0-P3 auto-proceed, P4 requires review
@@ -70,7 +64,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --help|-h)
-            echo "bd-review-rules - Manage review rules for Beads tasks"
+            echo "bd-review-rules - Manage review rules for tasks"
             echo ""
             echo "Usage:"
             echo "  bd-review-rules                           Show all current rules"
@@ -109,32 +103,113 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Function to get a config value with default
+# Find .jat directory (walk up tree)
+find_jat_dir() {
+    local dir="$PWD"
+    while [[ "$dir" != "/" ]]; do
+        if [[ -d "$dir/.jat" ]]; then
+            echo "$dir/.jat"
+            return 0
+        fi
+        dir=$(dirname "$dir")
+    done
+    echo ""
+    return 1
+}
+
+# Get the rules file path
+get_rules_file() {
+    local jat_dir
+    jat_dir=$(find_jat_dir)
+    if [[ -z "$jat_dir" ]]; then
+        echo -e "${RED}Error: No .jat directory found${NC}" >&2
+        exit 1
+    fi
+    echo "$jat_dir/review-rules.json"
+}
+
+# Generate default rules JSON
+generate_defaults() {
+    cat <<EOFDEFAULTS
+{
+  "version": 1,
+  "defaultAction": "$DEFAULT_ACTION",
+  "priorityThreshold": $DEFAULT_MAX_AUTO,
+  "rules": [
+    { "type": "bug", "maxAutoPriority": 3, "note": "P0-P3 bugs auto-proceed, P4 requires review" },
+    { "type": "feature", "maxAutoPriority": 3, "note": "P0-P3 features auto-proceed" },
+    { "type": "task", "maxAutoPriority": 3 },
+    { "type": "chore", "maxAutoPriority": 4, "note": "All chores auto-proceed" },
+    { "type": "epic", "maxAutoPriority": -1, "note": "Epics always require review" }
+  ],
+  "overrides": []
+}
+EOFDEFAULTS
+}
+
+# Ensure rules file exists
+ensure_rules_file() {
+    local rules_file
+    rules_file=$(get_rules_file)
+    if [[ ! -f "$rules_file" ]]; then
+        generate_defaults > "$rules_file"
+    fi
+    echo "$rules_file"
+}
+
+# Function to get a config value with default (reads from .jat/review-rules.json)
 get_config() {
     local key="$1"
     local default="$2"
-    local value
-    value=$(bd config get "$key" 2>/dev/null || echo "")
-    # bd config get returns "key (not set)" if not set
-    if [ -z "$value" ] || [ "$value" = "null" ] || [[ "$value" == *"(not set)"* ]]; then
+    local rules_file
+    rules_file=$(ensure_rules_file)
+
+    local value=""
+    case "$key" in
+        review_rules.default_action)
+            value=$(jq -r '.defaultAction // empty' "$rules_file" 2>/dev/null)
+            ;;
+        review_rules.*.max_auto)
+            local type="${key#review_rules.}"
+            type="${type%.max_auto}"
+            value=$(jq -r --arg t "$type" '(.rules[] | select(.type == $t) | .maxAutoPriority) // empty' "$rules_file" 2>/dev/null)
+            ;;
+    esac
+
+    if [ -z "$value" ] || [ "$value" = "null" ]; then
         echo "$default"
     else
         echo "$value"
     fi
 }
 
-# Function to set a config value
+# Function to set a config value (writes to .jat/review-rules.json)
 set_config() {
     local key="$1"
     local value="$2"
-    bd config set "$key" -- "$value" >/dev/null 2>&1
-}
+    local rules_file
+    rules_file=$(ensure_rules_file)
 
-# Function to sync config to JSON file
-sync_to_json() {
-    if command -v bd-review-rules-loader &>/dev/null; then
-        bd-review-rules-loader --sync-from-config >/dev/null 2>&1 || true
-    fi
+    case "$key" in
+        review_rules.default_action)
+            local tmp
+            tmp=$(jq --arg v "$value" '.defaultAction = $v' "$rules_file")
+            echo "$tmp" > "$rules_file"
+            ;;
+        review_rules.*.max_auto)
+            local type="${key#review_rules.}"
+            type="${type%.max_auto}"
+            local tmp
+            tmp=$(jq --arg t "$type" --argjson m "$value" '
+                if [.rules[] | select(.type == $t)] | length > 0 then
+                    .rules = [.rules[] | if .type == $t then .maxAutoPriority = $m else . end]
+                else
+                    .rules += [{"type": $t, "maxAutoPriority": $m}]
+                end
+            ' "$rules_file")
+            echo "$tmp" > "$rules_file"
+            ;;
+    esac
 }
 
 # Function to get priority name
@@ -182,7 +257,7 @@ if [ "$RESET" = true ]; then
         set_config "review_rules.$t.max_auto" "$DEFAULT_MAX_AUTO"
     done
 
-    sync_to_json
+
     echo -e "${GREEN}✓ Reset complete${NC}"
     echo ""
     echo "Default rules:"
@@ -198,7 +273,7 @@ if [ -n "$DEFAULT" ]; then
         exit 1
     fi
     set_config "review_rules.default_action" "$DEFAULT"
-    sync_to_json
+
     echo -e "${GREEN}✓ Default action set to: $DEFAULT${NC}"
     exit 0
 fi
@@ -227,7 +302,7 @@ if [ -n "$TYPE" ] && [ -n "$MAX_AUTO" ]; then
     fi
 
     set_config "review_rules.$TYPE.max_auto" "$MAX_AUTO"
-    sync_to_json
+
     echo -e "${GREEN}✓ Updated rule for $TYPE${NC}"
     echo ""
     explain_rule "$TYPE" "$MAX_AUTO"

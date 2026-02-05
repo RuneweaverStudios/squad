@@ -14,7 +14,7 @@
 #   Agent Status (Line 1) - COMPACT, NO WRAPPING:
 #     1. Agent identification (set by /jat:start via .claude/agent-{session_id}.txt)
 #     2. Task priority badge [P0/P1/P2] with color coding (Red/Yellow/Green)
-#     3. Task type icon (🐛/✨/🔧/🎯) and task ID from Beads database
+#     3. Task type icon (🐛/✨/🔧/🎯) and task ID from tasks database
 #     4. Active time on task (⏲ since updated_at)
 #     NOTE: Task title removed to prevent wrapping that breaks avatar alignment
 #
@@ -158,7 +158,7 @@ regex_match() {
 # ============================================================================
 # CACHING LAYER
 # ============================================================================
-# Cache expensive queries (bd list, am-reservations, am-inbox) to reduce
+# Cache expensive queries (jt list, am-reservations, am-inbox) to reduce
 # statusline render latency from ~300ms to ~5ms for cached hits.
 #
 # Cache files stored in /tmp with TTL-based invalidation.
@@ -438,8 +438,8 @@ task_progress=""
 task_type=""
 task_updated_at=""
 
-# Priority 1: Check Beads for in_progress tasks (matches IDE logic)
-if command -v bd &>/dev/null; then
+# Priority 1: Check tasks for in_progress tasks (matches IDE logic)
+if command -v jt &>/dev/null; then
     # Change to project directory if provided
     if [[ -n "$cwd" ]] && [[ -d "$cwd" ]]; then
         cd "$cwd" 2>/dev/null || true
@@ -447,9 +447,9 @@ if command -v bd &>/dev/null; then
 
     # Get in_progress task assigned to this agent (cached)
     project_name=$(basename "$cwd")
-    bd_cache_key="${agent_name}-${project_name}-tasks"
-    bd_list_json=$(cache_get_or_run "$bd_cache_key" "bd list --json")
-    task_json=$(echo "$bd_list_json" | jq -r --arg agent "$agent_name" '.[] | select(.assignee == $agent and .status == "in_progress") | @json' 2>/dev/null | head -1)
+    jt_cache_key="${agent_name}-${project_name}-tasks"
+    jt_list_json=$(cache_get_or_run "$jt_cache_key" "jt list --json")
+    task_json=$(echo "$jt_list_json" | jq -r --arg agent "$agent_name" '.[] | select(.assignee == $agent and .status == "in_progress") | @json' 2>/dev/null | head -1)
 
     if [[ -n "$task_json" ]]; then
         task_id=$(echo "$task_json" | jq -r '.id // empty')
@@ -473,8 +473,8 @@ if [[ -z "$task_id" ]] && command -v am-reservations &>/dev/null; then
         task_id=$(echo "$reservation_info" | grep "^Reason:" | sed 's/^Reason: //' | grep -oE "${project_prefix}-[a-z0-9]{3}\b" | head -1)
 
         # If we found a task ID from reservation, get its details from Beads
-        if [[ -n "$task_id" ]] && command -v bd &>/dev/null; then
-            task_json=$(bd show "$task_id" --json 2>/dev/null)
+        if [[ -n "$task_id" ]] && command -v jt &>/dev/null; then
+            task_json=$(jt show "$task_id" --json 2>/dev/null)
             task_priority=$(echo "$task_json" | jq -r '.[0].priority // empty')
             task_progress=$(echo "$task_json" | jq -r '.[0].progress // empty')
             task_type=$(echo "$task_json" | jq -r '.[0].issue_type // empty')
@@ -531,10 +531,10 @@ fi
 
 # Count tasks blocked by current task (shows impact/leverage of current work)
 blocked_count=0
-if [[ -n "$task_id" ]] && command -v bd &>/dev/null; then
+if [[ -n "$task_id" ]] && command -v jt &>/dev/null; then
     # Get dependent tasks (cached) - tasks that are blocked waiting on this task
     blocked_cache_key="${agent_name}-${task_id}-blocked"
-    blocked_json=$(cache_get_or_run "$blocked_cache_key" "bd dep tree '$task_id' --reverse --json")
+    blocked_json=$(cache_get_or_run "$blocked_cache_key" "jt dep tree '$task_id' --reverse --json")
     # Count tasks with depth > 0 (children of current task in dependency tree)
     blocked_count=$(echo "$blocked_json" | jq '[.[] | select(.depth > 0)] | length' 2>/dev/null || echo "0")
     blocked_count=$(echo "$blocked_count" | tr -d '\n' | tr -d ' ')
@@ -709,7 +709,7 @@ if [[ -n "$task_id" ]]; then
     status_line="${status_line} ${GREEN}${task_id}${RESET}"
 
     # Task title removed from line 1 to prevent wrapping that breaks avatar alignment
-    # Title is available via: IDE, bd show <task-id>, or line 3 (optional)
+    # Title is available via: IDE, jt show <task-id>, or line 3 (optional)
 
     # Add active time if available
     if [[ -n "$active_time" ]]; then

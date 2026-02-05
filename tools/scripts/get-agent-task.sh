@@ -2,7 +2,7 @@
 #
 # Get current task ID for an agent
 #
-# Checks BOTH Beads (for in_progress tasks) AND Agent Mail (for file reservations)
+# Checks BOTH tasks DB (for in_progress tasks) AND Agent Mail (for file reservations)
 # to determine if an agent is actively working on a task.
 #
 # This provides consistent status calculation between:
@@ -43,11 +43,11 @@ fi
 
 AGENT_NAME="$1"
 
-# STEP 1: Check Beads for in_progress tasks assigned to this agent
+# STEP 1: Check tasks DB for in_progress tasks assigned to this agent
 # This matches IDE logic: agent.in_progress_tasks > 0
-if command -v bd &>/dev/null; then
+if command -v jt &>/dev/null; then
     # Get all in_progress tasks assigned to this agent
-    in_progress_task=$(bd list --status in_progress --json 2>/dev/null | \
+    in_progress_task=$(jt list --status in_progress --json 2>/dev/null | \
         jq -r --arg agent "$AGENT_NAME" '.[] | select(.assignee == $agent) | .id' 2>/dev/null | \
         head -1)
 

@@ -1,18 +1,16 @@
 #!/bin/bash
 
-# bd-review-rules-loader - Load and manage review-rules.json for Beads
+# bd-review-rules-loader - Load and manage review-rules.json for tasks
 #
 # This script provides a structured JSON file for review rules with schema
-# validation, migration support, and syncing with bd config.
+# validation and migration support.
 #
-# Schema location: .beads/review-rules.json
+# Schema location: .jat/review-rules.json
 #
 # Usage:
 #   bd-review-rules-loader                    # Load rules, create defaults if missing
 #   bd-review-rules-loader --init             # Initialize with default rules
 #   bd-review-rules-loader --validate         # Validate existing rules file
-#   bd-review-rules-loader --sync-to-config   # Sync JSON rules to bd config
-#   bd-review-rules-loader --sync-from-config # Sync bd config to JSON file
 #   bd-review-rules-loader --get TYPE         # Get maxAutoPriority for a type
 #   bd-review-rules-loader --get-override ID  # Get override for a task
 #   bd-review-rules-loader --json             # Output loaded rules as JSON
@@ -55,12 +53,12 @@ VALID_OVERRIDE_ACTIONS=("always_review" "always_auto")
 DEFAULT_ACTION="review"
 DEFAULT_PRIORITY_THRESHOLD=3
 
-# Find .beads directory (walk up tree)
-find_beads_dir() {
+# Find .jat directory (walk up tree)
+find_jat_dir() {
     local dir="$PWD"
     while [[ "$dir" != "/" ]]; do
-        if [[ -d "$dir/.beads" ]]; then
-            echo "$dir/.beads"
+        if [[ -d "$dir/.jat" ]]; then
+            echo "$dir/.jat"
             return 0
         fi
         dir=$(dirname "$dir")
@@ -71,14 +69,14 @@ find_beads_dir() {
 
 # Get the rules file path
 get_rules_file() {
-    local beads_dir
-    beads_dir=$(find_beads_dir)
-    if [[ -z "$beads_dir" ]]; then
-        echo -e "${RED}Error: No .beads directory found${NC}" >&2
-        echo "Run 'bd init' to initialize a beads repository" >&2
+    local jat_dir
+    jat_dir=$(find_jat_dir)
+    if [[ -z "$jat_dir" ]]; then
+        echo -e "${RED}Error: No .jat directory found${NC}" >&2
+        echo "Run 'jt init' to initialize a project" >&2
         exit 1
     fi
-    echo "$beads_dir/review-rules.json"
+    echo "$jat_dir/review-rules.json"
 }
 
 # Generate default rules JSON
@@ -286,79 +284,6 @@ load_rules() {
     cat "$rules_file"
 }
 
-# Sync JSON rules to bd config
-sync_to_config() {
-    local rules_file
-    rules_file=$(get_rules_file)
-
-    if [[ ! -f "$rules_file" ]]; then
-        echo -e "${RED}Error: No rules file found at $rules_file${NC}" >&2
-        echo "Run 'bd-review-rules-loader --init' to create one" >&2
-        exit 1
-    fi
-
-    local rules_json
-    rules_json=$(cat "$rules_file")
-
-    # Sync defaultAction
-    local default_action
-    default_action=$(echo "$rules_json" | jq -r '.defaultAction // "review"')
-    bd config set "review_rules.default_action" "$default_action" >/dev/null 2>&1
-
-    # Sync each type rule
-    local rules_count
-    rules_count=$(echo "$rules_json" | jq '.rules | length')
-    for ((i=0; i<rules_count; i++)); do
-        local rule_type rule_max
-        rule_type=$(echo "$rules_json" | jq -r ".rules[$i].type")
-        rule_max=$(echo "$rules_json" | jq -r ".rules[$i].maxAutoPriority")
-
-        bd config set "review_rules.$rule_type.max_auto" -- "$rule_max" >/dev/null 2>&1
-    done
-
-    echo -e "${GREEN}✓ Synced rules to bd config${NC}"
-}
-
-# Sync bd config to JSON file
-sync_from_config() {
-    local rules_file
-    rules_file=$(get_rules_file)
-
-    # Start with defaults or existing file
-    local rules_json
-    if [[ -f "$rules_file" ]]; then
-        rules_json=$(cat "$rules_file")
-    else
-        rules_json=$(generate_defaults)
-    fi
-
-    # Get values from bd config
-    local default_action
-    default_action=$(bd config get "review_rules.default_action" 2>/dev/null || echo "")
-    if [[ -n "$default_action" ]] && [[ "$default_action" != *"not set"* ]]; then
-        rules_json=$(echo "$rules_json" | jq --arg da "$default_action" '.defaultAction = $da')
-    fi
-
-    # Update each type rule
-    for t in "${VALID_TYPES[@]}"; do
-        local max_auto
-        max_auto=$(bd config get "review_rules.$t.max_auto" 2>/dev/null || echo "")
-        if [[ -n "$max_auto" ]] && [[ "$max_auto" != *"not set"* ]]; then
-            # Update or add the rule
-            rules_json=$(echo "$rules_json" | jq --arg type "$t" --argjson max "$max_auto" '
-                .rules = [.rules[] | if .type == $type then .maxAutoPriority = $max else . end] |
-                if ([.rules[] | select(.type == $type)] | length) == 0 then
-                    .rules += [{"type": $type, "maxAutoPriority": $max}]
-                else . end
-            ')
-        fi
-    done
-
-    # Write updated rules
-    echo "$rules_json" | jq '.' > "$rules_file"
-    echo -e "${GREEN}✓ Synced bd config to rules file${NC}"
-}
-
 # Get maxAutoPriority for a type
 get_type_rule() {
     local type="$1"
@@ -540,14 +465,6 @@ while [[ $# -gt 0 ]]; do
             ACTION="validate"
             shift
             ;;
-        --sync-to-config)
-            ACTION="sync_to"
-            shift
-            ;;
-        --sync-from-config)
-            ACTION="sync_from"
-            shift
-            ;;
         --get|-g)
             ACTION="get_type"
             TYPE_QUERY="$2"
@@ -593,8 +510,6 @@ while [[ $# -gt 0 ]]; do
             echo "  bd-review-rules-loader                    Load rules (create defaults if missing)"
             echo "  bd-review-rules-loader --init             Initialize with default rules"
             echo "  bd-review-rules-loader --validate         Validate existing rules file"
-            echo "  bd-review-rules-loader --sync-to-config   Sync JSON rules to bd config"
-            echo "  bd-review-rules-loader --sync-from-config Sync bd config to JSON file"
             echo "  bd-review-rules-loader --get TYPE         Get maxAutoPriority for a type"
             echo "  bd-review-rules-loader --get-override ID  Get override for a task"
             echo "  bd-review-rules-loader --json             Output loaded rules as JSON"
@@ -680,12 +595,6 @@ case $ACTION in
     validate)
         rules_file=$(get_rules_file)
         validate_rules "$rules_file"
-        ;;
-    sync_to)
-        sync_to_config
-        ;;
-    sync_from)
-        sync_from_config
         ;;
     get_type)
         if [[ -z "$TYPE_QUERY" ]]; then
