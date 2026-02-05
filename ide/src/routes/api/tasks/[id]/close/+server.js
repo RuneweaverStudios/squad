@@ -1,29 +1,15 @@
 /**
  * Task Close API Route
- * Closes a task using `bd close` command
+ * Closes a task using direct lib/tasks.js call
  * Used by Close & Kill action to abandon tasks quickly without full completion
  */
 import { json } from '@sveltejs/kit';
-import { getTaskById } from '../../../../../../../lib/beads.js';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { getTaskById, closeTask } from '$lib/server/beads.js';
 import { invalidateCache } from '$lib/server/cache.js';
 import { _resetTaskCache } from '../../../../api/agents/+server.js';
 
-const execAsync = promisify(exec);
-
 /**
- * Escape a string for safe use in shell commands (single-quoted).
- * @param {string} str - The string to escape
- * @returns {string} - Shell-safe escaped string
- */
-function shellEscape(str) {
-	if (!str) return "''";
-	return "'" + str.replace(/'/g, "'\\''") + "'";
-}
-
-/**
- * Close a task using bd close command
+ * Close a task
  * @type {import('./$types').RequestHandler}
  */
 export async function POST({ params, request }) {
@@ -59,38 +45,20 @@ export async function POST({ params, request }) {
 			// Body is optional, use default reason
 		}
 
-		// Execute bd close command in correct project directory
-		const projectPath = existingTask.project_path;
-		const command = `cd "${projectPath}" && bd close ${taskId} --reason ${shellEscape(reason)}`;
+		// Close the task directly
+		const closedTask = closeTask(taskId, reason, existingTask.project_path);
 
-		try {
-			const { stdout, stderr } = await execAsync(command);
-
-			// Check for errors in stderr
-			if (stderr && stderr.includes('Error:')) {
-				console.error('bd close error:', stderr);
-				return json({ error: 'Failed to close task', details: stderr }, { status: 500 });
-			}
-
-			console.log(`[close] Closed task ${taskId}: ${stdout.trim()}`);
-		} catch (execError) {
-			const err = /** @type {Error & { stderr?: string }} */ (execError);
-			console.error('bd close exec error:', err.message, err.stderr);
-			return json({ error: 'Failed to close task', details: err.message }, { status: 500 });
-		}
+		console.log(`[close] Closed task ${taskId}`);
 
 		// Invalidate related caches
 		invalidateCache.tasks();
 		invalidateCache.agents();
 		_resetTaskCache();
 
-		// Get updated task
-		const updatedTask = getTaskById(taskId);
-
 		return json({
 			success: true,
 			message: `Task ${taskId} closed`,
-			task: updatedTask
+			task: closedTask
 		});
 	} catch (error) {
 		const err = /** @type {Error} */ (error);

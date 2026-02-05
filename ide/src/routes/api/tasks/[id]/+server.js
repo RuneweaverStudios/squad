@@ -3,26 +3,12 @@
  * Provides individual task details including dependencies and enables
  */
 import { json } from '@sveltejs/kit';
-import { getTaskById } from '../../../../../../lib/beads.js';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { getTaskById, updateTask, closeTask, addDependency, removeDependency } from '$lib/server/beads.js';
 import { readFile, writeFile, unlink } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { invalidateCache } from '$lib/server/cache.js';
 import { _resetTaskCache } from '../../../api/agents/+server.js';
-
-const execAsync = promisify(exec);
-
-/**
- * Escape a string for safe use in shell commands (single-quoted).
- * @param {string} str - The string to escape
- * @returns {string} - Shell-safe escaped string
- */
-function shellEscape(str) {
-	if (!str) return "''";
-	return "'" + str.replace(/'/g, "'\\''") + "'";
-}
 
 // Path to task images store
 const getImageStorePath = () => {
@@ -93,15 +79,7 @@ export async function PUT({ params, request }) {
 			return json({ error: 'Task not found' }, { status: 404 });
 		}
 
-		// Build bd update command using shellEscape for safety
-		const args = [];
-
-		// Update title if changed
-		if (updates.title !== undefined) {
-			args.push(`--title ${shellEscape(updates.title)}`);
-		}
-
-		// Update description if changed
+		// Validate description length
 		if (updates.description !== undefined) {
 			if (typeof updates.description === 'string' && updates.description.length > 50_000) {
 				return json(
@@ -109,42 +87,34 @@ export async function PUT({ params, request }) {
 					{ status: 400 }
 				);
 			}
-			args.push(`--description ${shellEscape(updates.description)}`);
 		}
 
-		// Update priority if changed
+		// Build update fields
+		const updateFields = {};
+
+		if (updates.title !== undefined) {
+			updateFields.title = updates.title;
+		}
+		if (updates.description !== undefined) {
+			updateFields.description = updates.description;
+		}
 		if (updates.priority !== undefined) {
-			args.push(`--priority ${updates.priority}`);
+			updateFields.priority = parseInt(updates.priority);
 		}
-
-		// Update status if changed
 		if (updates.status !== undefined) {
-			args.push(`--status ${updates.status}`);
+			updateFields.status = updates.status;
 		}
-
-		// Update assignee if changed (including clearing with null)
 		if (updates.assignee !== undefined) {
-			const sanitizedAssignee = updates.assignee ? updates.assignee.trim() : '';
-			args.push(`--assignee ${shellEscape(sanitizedAssignee)}`);
+			updateFields.assignee = updates.assignee ? updates.assignee.trim() : '';
 		}
-
-		// Update notes if changed
 		if (updates.notes !== undefined) {
-			const sanitizedNotes = updates.notes ? updates.notes.trim() : '';
-			args.push(`--notes ${shellEscape(sanitizedNotes)}`);
+			updateFields.notes = updates.notes ? updates.notes.trim() : '';
 		}
 
-		// Execute bd update command in correct project directory
-		if (args.length > 0) {
-			const projectPath = existingTask.project_path;
-			const command = `cd "${projectPath}" && bd update ${taskId} ${args.join(' ')}`;
-			const { stdout, stderr } = await execAsync(command);
-
-			// Check for errors in stderr (bd CLI uses stderr for some output like warnings)
-			if (stderr && stderr.includes('Error:')) {
-				console.error('bd update error:', stderr);
-				return json({ error: 'Failed to update task', details: stderr }, { status: 500 });
-			}
+		// Execute update if we have fields
+		if (Object.keys(updateFields).length > 0) {
+			updateFields.projectPath = existingTask.project_path;
+			updateTask(taskId, updateFields);
 		}
 
 		// Invalidate related caches (both apiCache and module-level task cache in agents endpoint)
@@ -227,9 +197,6 @@ export async function PATCH({ params, request }) {
 			validationErrors.push(`description: Too long (${updates.description.length} chars). Maximum is 50,000 characters.`);
 		}
 
-		// Note: Labels are not supported by bd update command (skip validation)
-		// Labels can only be set during task creation with bd create --labels
-
 		// Validate dependencies (if provided, must be array of task IDs)
 		if (updates.dependencies !== undefined && updates.dependencies !== null) {
 			if (!Array.isArray(updates.dependencies)) {
@@ -249,78 +216,45 @@ export async function PATCH({ params, request }) {
 			);
 		}
 
-		// Build bd update command with provided fields using shellEscape for safety
-		const args = [];
+		// Build update fields
+		const updateFields = {};
+		const projectPath = existingTask.project_path;
 
-		// Update title
 		if (updates.title !== undefined) {
-			const sanitizedTitle = updates.title.trim();
-			args.push(`--title ${shellEscape(sanitizedTitle)}`);
+			updateFields.title = updates.title.trim();
 		}
-
-		// Update description
 		if (updates.description !== undefined) {
-			const sanitizedDesc = updates.description ? updates.description.trim() : '';
-			args.push(`--description ${shellEscape(sanitizedDesc)}`);
+			updateFields.description = updates.description ? updates.description.trim() : '';
 		}
-
-		// Update priority
 		if (updates.priority !== undefined && updates.priority !== null) {
-			args.push(`--priority ${parseInt(updates.priority)}`);
+			updateFields.priority = parseInt(updates.priority);
 		}
-
-		// Update status
 		if (updates.status !== undefined) {
-			args.push(`--status ${updates.status}`);
+			updateFields.status = updates.status;
 		}
-
-		// Update assignee
 		if (updates.assignee !== undefined) {
-			const sanitizedAssignee = updates.assignee ? updates.assignee.trim() : '';
-			args.push(`--assignee ${shellEscape(sanitizedAssignee)}`);
+			updateFields.assignee = updates.assignee ? updates.assignee.trim() : '';
 		}
-
-		// Update notes (used for image attachments and other metadata)
 		if (updates.notes !== undefined) {
-			const sanitizedNotes = updates.notes ? updates.notes.trim() : '';
-			args.push(`--notes ${shellEscape(sanitizedNotes)}`);
+			updateFields.notes = updates.notes ? updates.notes.trim() : '';
 		}
 
-		// Update labels using --set-labels (replaces all existing labels)
+		// Update labels using lib/tasks.js (replaces all existing labels)
 		if (updates.labels !== undefined) {
-			if (Array.isArray(updates.labels) && updates.labels.length > 0) {
-				// Join labels and quote properly for shell
-				const labelsArg = updates.labels.map((/** @type {string} */ l) => l.trim()).filter(Boolean).join(',');
-				args.push(`--set-labels ${shellEscape(labelsArg)}`);
+			if (Array.isArray(updates.labels)) {
+				updateFields.labels = updates.labels.map((/** @type {string} */ l) => l.trim()).filter(Boolean);
 			} else if (typeof updates.labels === 'string' && updates.labels.trim()) {
-				// Support string format too (comma-separated)
-				args.push(`--set-labels ${shellEscape(updates.labels)}`);
-			}
-			// If empty array or empty string, we could clear labels but bd may not support that
-		}
-
-		// Execute bd update command (only if we have args)
-		if (args.length > 0) {
-			const projectPath = existingTask.project_path;
-			const command = `cd "${projectPath}" && bd update ${taskId} ${args.join(' ')}`;
-			const { stdout, stderr } = await execAsync(command);
-
-			// Check for errors in stderr (bd CLI uses stderr for some output)
-			if (stderr && stderr.includes('Error:')) {
-				console.error('bd update error:', stderr);
-				return json(
-					{
-						error: true,
-						message: 'Failed to update task',
-						details: stderr.trim()
-					},
-					{ status: 500 }
-				);
+				updateFields.labels = updates.labels.split(',').map((/** @type {string} */ l) => l.trim()).filter(Boolean);
 			}
 		}
 
-		// Handle dependencies separately using bd dep add/remove
-		// Note: bd CLI doesn't support --deps flag for updates, need to use bd dep add
+		// Execute update if we have fields
+		if (Object.keys(updateFields).length > 0) {
+			updateFields.projectPath = projectPath;
+			updateTask(taskId, updateFields);
+		}
+
+		// Handle dependencies separately using addDependency/removeDependency
 		if (updates.dependencies !== undefined && Array.isArray(updates.dependencies)) {
 			// Get current dependency IDs from depends_on (array of {id, title, status, ...} objects)
 			/** @type {string[]} */
@@ -337,9 +271,7 @@ export async function PATCH({ params, request }) {
 			// Add new dependencies
 			for (const depId of depsToAdd) {
 				try {
-					const projectPath = existingTask.project_path;
-					const addDepCommand = `cd "${projectPath}" && bd dep add ${taskId} ${depId}`;
-					await execAsync(addDepCommand);
+					addDependency(taskId, depId, projectPath);
 				} catch (err) {
 					const error = /** @type {Error} */ (err);
 					console.error(`Failed to add dependency ${depId}:`, error.message);
@@ -350,9 +282,7 @@ export async function PATCH({ params, request }) {
 			// Remove old dependencies
 			for (const depId of depsToRemove) {
 				try {
-					const projectPath = existingTask.project_path;
-					const removeDepCommand = `cd "${projectPath}" && bd dep remove ${taskId} ${depId}`;
-					await execAsync(removeDepCommand);
+					removeDependency(taskId, depId, projectPath);
 				} catch (err) {
 					const error = /** @type {Error} */ (err);
 					console.error(`Failed to remove dependency ${depId}:`, error.message);
@@ -361,18 +291,24 @@ export async function PATCH({ params, request }) {
 			}
 		}
 
-		// Handle review_override update (stored in notes field via bd-set-review-override)
+		// Handle review_override update (stored in notes field as [REVIEW_OVERRIDE:value] tag)
 		if (updates.review_override !== undefined) {
 			try {
-				const projectPath = existingTask.project_path;
 				const value = updates.review_override;
+				// Get current notes from the task (re-fetch in case notes were updated above)
+				const currentTask = getTaskById(taskId);
+				let currentNotes = currentTask?.notes || '';
+
+				// Remove existing review override tag if present
+				currentNotes = currentNotes.replace(/\[REVIEW_OVERRIDE:[^\]]*\]\n?/g, '').trim();
+
 				if (value === 'always_review' || value === 'always_auto') {
-					const overrideCommand = `cd "${projectPath}" && ${process.env.HOME}/code/jat/tools/core/bd-set-review-override ${taskId} ${value}`;
-					await execAsync(overrideCommand);
+					const overrideTag = `[REVIEW_OVERRIDE:${value}]`;
+					const newNotes = currentNotes ? `${currentNotes}\n${overrideTag}` : overrideTag;
+					updateTask(taskId, { notes: newNotes, projectPath });
 				} else if (value === null || value === '' || value === 'null') {
-					// Clear the override
-					const clearCommand = `cd "${projectPath}" && ${process.env.HOME}/code/jat/tools/core/bd-set-review-override ${taskId} --clear`;
-					await execAsync(clearCommand);
+					// Clear the override - just save notes without the tag
+					updateTask(taskId, { notes: currentNotes, projectPath });
 				}
 			} catch (err) {
 				const error = /** @type {Error} */ (err);
@@ -408,23 +344,11 @@ export async function PATCH({ params, request }) {
 	} catch (err) {
 		console.error('Error updating task:', err);
 
-		// Check if it's a validation error from bd CLI
-		const execErr = /** @type {{ stderr?: string, message?: string }} */ (err);
-		if (execErr.stderr && execErr.stderr.includes('Error:')) {
-			return json(
-				{
-					error: true,
-					message: execErr.stderr.trim(),
-					type: 'validation_error'
-				},
-				{ status: 400 }
-			);
-		}
-
+		const errorObj = /** @type {{ message?: string }} */ (err);
 		return json(
 			{
 				error: true,
-				message: execErr.message || 'Internal server error updating task',
+				message: errorObj.message || 'Internal server error updating task',
 				type: 'server_error'
 			},
 			{ status: 500 }
@@ -449,24 +373,9 @@ export async function DELETE({ params }) {
 			);
 		}
 
-		// Close the task using bd close command in the correct project directory
+		// Close the task directly using lib/tasks.js
 		// Note: We use "close" rather than "delete" to preserve task history
-		const projectPath = existingTask.project_path;
-		const command = `cd "${projectPath}" && bd close ${taskId} --reason "Deleted via IDE"`;
-		const { stdout, stderr } = await execAsync(command);
-
-		// Check for errors in stderr
-		if (stderr && stderr.includes('Error:')) {
-			console.error('bd close error:', stderr);
-			return json(
-				{
-					error: true,
-					message: 'Failed to delete task',
-					details: stderr.trim()
-				},
-				{ status: 500 }
-			);
-		}
+		closeTask(taskId, 'Deleted via IDE', existingTask.project_path);
 
 		// Permanently delete attachments since this is a DELETE (not just close)
 		await cleanupTaskAttachments(taskId);
@@ -484,23 +393,11 @@ export async function DELETE({ params }) {
 	} catch (err) {
 		console.error('Error deleting task:', err);
 
-		// Check if it's a validation error from bd CLI
-		const execErr = /** @type {{ stderr?: string, message?: string }} */ (err);
-		if (execErr.stderr && execErr.stderr.includes('Error:')) {
-			return json(
-				{
-					error: true,
-					message: execErr.stderr.trim(),
-					type: 'validation_error'
-				},
-				{ status: 400 }
-			);
-		}
-
+		const errorObj = /** @type {{ message?: string }} */ (err);
 		return json(
 			{
 				error: true,
-				message: execErr.message || 'Internal server error deleting task',
+				message: errorObj.message || 'Internal server error deleting task',
 				type: 'server_error'
 			},
 			{ status: 500 }

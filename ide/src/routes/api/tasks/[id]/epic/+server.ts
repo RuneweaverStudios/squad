@@ -7,20 +7,9 @@
 
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import { getTaskById } from '../../../../../../../lib/beads.js';
+import { getTaskById, updateTask, addDependency, removeDependency, getDependencyTree } from '$lib/server/beads.js';
 import { invalidateCache } from '$lib/server/cache.js';
 import { _resetTaskCache } from '../../../agents/+server.js';
-
-const execAsync = promisify(exec);
-
-/**
- * Escape a string for safe shell usage
- */
-function escapeForShell(str: string): string {
-	return str.replace(/'/g, "'\\''");
-}
 
 interface EpicInfo {
 	exists: boolean;
@@ -31,17 +20,9 @@ interface EpicInfo {
 /**
  * Get info about an epic (exists, type, status)
  */
-async function getEpicInfo(epicId: string, projectPath?: string): Promise<EpicInfo> {
+function getEpicInfo(epicId: string): EpicInfo {
 	try {
-		let command = `bd show '${escapeForShell(epicId)}' --json`;
-		if (projectPath) {
-			command = `cd '${escapeForShell(projectPath)}' && ${command}`;
-		}
-
-		const { stdout } = await execAsync(command, { timeout: 10000 });
-		const epics = JSON.parse(stdout.trim());
-		const epic = Array.isArray(epics) ? epics[0] : epics;
-
+		const epic = getTaskById(epicId);
 		if (!epic) return { exists: false, isEpic: false, isClosed: false };
 		return {
 			exists: true,
@@ -56,14 +37,9 @@ async function getEpicInfo(epicId: string, projectPath?: string): Promise<EpicIn
 /**
  * Reopen a closed epic
  */
-async function reopenEpic(epicId: string, projectPath?: string): Promise<boolean> {
+function reopenEpic(epicId: string, projectPath?: string): boolean {
 	try {
-		let command = `bd update '${escapeForShell(epicId)}' --status open`;
-		if (projectPath) {
-			command = `cd '${escapeForShell(projectPath)}' && ${command}`;
-		}
-
-		await execAsync(command, { timeout: 10000 });
+		updateTask(epicId, { status: 'open', projectPath });
 		console.log(`[task-epic] Reopened closed epic ${epicId}`);
 		return true;
 	} catch (error) {
@@ -75,16 +51,10 @@ async function reopenEpic(epicId: string, projectPath?: string): Promise<boolean
 /**
  * Find the epic(s) that a task is currently linked to (parent epics that depend on this task)
  */
-async function findParentEpics(taskId: string, projectPath?: string): Promise<string[]> {
+function findParentEpics(taskId: string, projectPath?: string): string[] {
 	try {
-		// bd dep tree --reverse shows what depends ON this task
-		let command = `bd dep tree '${escapeForShell(taskId)}' --reverse --json`;
-		if (projectPath) {
-			command = `cd '${escapeForShell(projectPath)}' && ${command}`;
-		}
-
-		const { stdout } = await execAsync(command, { timeout: 10000 });
-		const result = JSON.parse(stdout.trim());
+		// getDependencyTree with reverse=true shows what depends ON this task
+		const result = getDependencyTree(taskId, { reverse: true, projectPath });
 
 		// Result is an array of tasks. depth=0 is the task itself, depth>0 are parents.
 		// Filter to only return epics at depth > 0 (direct parent epics)
@@ -100,7 +70,7 @@ async function findParentEpics(taskId: string, projectPath?: string): Promise<st
 
 		return parentEpics;
 	} catch {
-		// If command fails (e.g., no dependencies), return empty array
+		// If function fails (e.g., no dependencies), return empty array
 		return [];
 	}
 }
@@ -108,14 +78,9 @@ async function findParentEpics(taskId: string, projectPath?: string): Promise<st
 /**
  * Remove a task from an epic (remove the epic->task dependency)
  */
-async function unlinkFromEpic(taskId: string, epicId: string, projectPath?: string): Promise<boolean> {
+function unlinkFromEpic(taskId: string, epicId: string, projectPath?: string): boolean {
 	try {
-		let command = `bd dep remove '${escapeForShell(epicId)}' '${escapeForShell(taskId)}'`;
-		if (projectPath) {
-			command = `cd '${escapeForShell(projectPath)}' && ${command}`;
-		}
-
-		await execAsync(command, { timeout: 10000 });
+		removeDependency(epicId, taskId, projectPath);
 		console.log(`[task-epic] Removed task ${taskId} from epic ${epicId}`);
 		return true;
 	} catch (error) {
@@ -155,7 +120,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 		const projectPath = task.project_path;
 
 		// Verify the epic exists
-		const epicInfo = await getEpicInfo(epicId, projectPath);
+		const epicInfo = getEpicInfo(epicId);
 		if (!epicInfo.exists || !epicInfo.isEpic) {
 			return json(
 				{ success: false, error: `Epic '${epicId}' not found` },
@@ -166,7 +131,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 		// If epic is closed, auto-reopen it since user is adding work to it
 		let epicReopened = false;
 		if (epicInfo.isClosed) {
-			epicReopened = await reopenEpic(epicId, projectPath);
+			epicReopened = reopenEpic(epicId, projectPath);
 			if (!epicReopened) {
 				return json(
 					{ success: false, error: `Failed to reopen closed epic '${epicId}'` },
@@ -176,7 +141,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 		}
 
 		// Check if task is already in an epic (support "move" between epics)
-		const currentEpics = await findParentEpics(taskId, projectPath);
+		const currentEpics = findParentEpics(taskId, projectPath);
 		let movedFrom: string | null = null;
 
 		// If already in the target epic, return early
@@ -193,7 +158,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 		// If in a different epic, remove from the old one first (move operation)
 		if (currentEpics.length > 0) {
 			for (const oldEpicId of currentEpics) {
-				const removed = await unlinkFromEpic(taskId, oldEpicId, projectPath);
+				const removed = unlinkFromEpic(taskId, oldEpicId, projectPath);
 				if (removed) {
 					movedFrom = oldEpicId;
 					console.log(`[task-epic] Moving task ${taskId} from epic ${oldEpicId} to ${epicId}`);
@@ -203,15 +168,13 @@ export const POST: RequestHandler = async ({ params, request }) => {
 
 		// CRITICAL: Dependency direction is epic depends on child
 		// This makes child READY (can be worked on) and epic BLOCKED (until children complete)
-		// The command is: bd dep add [A] [B] meaning "A depends on B"
-		const command = `cd '${escapeForShell(projectPath)}' && bd dep add '${escapeForShell(epicId)}' '${escapeForShell(taskId)}'`;
+		try {
+			addDependency(epicId, taskId, projectPath);
+		} catch (depError) {
+			const errorMessage = depError instanceof Error ? depError.message : String(depError);
 
-		const { stderr } = await execAsync(command, { timeout: 10000 });
-
-		// Check for errors
-		if (stderr && (stderr.includes('Error:') || stderr.includes('error:'))) {
 			// Handle "already linked" case gracefully (UNIQUE constraint)
-			if (stderr.includes('UNIQUE constraint failed')) {
+			if (errorMessage.includes('UNIQUE constraint failed')) {
 				console.log(`[task-epic] Task ${taskId} already linked to epic ${epicId}`);
 				return json({
 					success: true,
@@ -222,9 +185,9 @@ export const POST: RequestHandler = async ({ params, request }) => {
 				});
 			}
 
-			console.error('[task-epic] bd dep add error:', stderr);
+			console.error('[task-epic] addDependency error:', errorMessage);
 			return json(
-				{ success: false, error: stderr.trim() },
+				{ success: false, error: errorMessage },
 				{ status: 500 }
 			);
 		}
@@ -320,17 +283,18 @@ export const DELETE: RequestHandler = async ({ params, request }) => {
 		const projectPath = task.project_path;
 
 		// Remove the dependency: epic depends on child
-		const command = `cd '${escapeForShell(projectPath)}' && bd dep remove '${escapeForShell(epicId)}' '${escapeForShell(taskId)}'`;
-
-		const { stderr } = await execAsync(command, { timeout: 10000 });
-
-		// Check for errors (but not "not found" which is fine)
-		if (stderr && stderr.includes('Error:') && !stderr.includes('not found')) {
-			console.error('[task-epic] bd dep remove error:', stderr);
-			return json(
-				{ success: false, error: stderr.trim() },
-				{ status: 500 }
-			);
+		try {
+			removeDependency(epicId, taskId, projectPath);
+		} catch (depError) {
+			const errorMessage = depError instanceof Error ? depError.message : String(depError);
+			// "not found" is fine - dependency already removed
+			if (!errorMessage.includes('not found')) {
+				console.error('[task-epic] removeDependency error:', errorMessage);
+				return json(
+					{ success: false, error: errorMessage },
+					{ status: 500 }
+				);
+			}
 		}
 
 		// Invalidate caches

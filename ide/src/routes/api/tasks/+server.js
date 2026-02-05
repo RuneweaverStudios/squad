@@ -1,31 +1,12 @@
 /**
  * Tasks API Route
- * Provides Beads task data to the IDE
+ * Provides task data to the IDE
  */
 import { json } from '@sveltejs/kit';
-import { getTasks, getProjects, getTaskById } from '../../../../../lib/beads.js';
+import { getTasks, getProjects, getTaskById, createTask, updateTask } from '$lib/server/beads.js';
 import { invalidateCache } from '$lib/server/cache.js';
 import { _resetTaskCache } from '../../api/agents/+server.js';
 import { getProjectPath } from '$lib/server/projectPaths.js';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-
-const execAsync = promisify(exec);
-
-/**
- * Escape a string for safe use in shell commands (single-quoted).
- * Single quotes don't interpret any special characters, so we just need
- * to handle single quotes themselves by ending the quote, adding an escaped
- * single quote, and starting a new quoted section.
- * @param {string} str - The string to escape
- * @returns {string} - Shell-safe escaped string
- */
-function shellEscape(str) {
-	if (!str) return "''";
-	// Replace single quotes with: end quote, escaped quote, start quote
-	// 'foo'bar' becomes 'foo'\''bar'
-	return "'" + str.replace(/'/g, "'\\''") + "'";
-}
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ url }) {
@@ -117,7 +98,7 @@ export async function GET({ url }) {
 }
 
 /**
- * Create a new task using bd create CLI
+ * Create a new task
  * @type {import('./$types').RequestHandler}
  */
 export async function POST({ request }) {
@@ -187,52 +168,10 @@ export async function POST({ request }) {
 		const description = body.description ? body.description.trim() : '';
 		const priority = body.priority !== undefined ? parseInt(body.priority) : 2; // Default to P2
 		const type = body.type.trim().toLowerCase();
-		// Note: project is already extracted at the top of try block
 
-		// Build bd create command using shellEscape for safety
-		let command = `bd create ${shellEscape(title)}`;
-
-		// Add type flag
-		command += ` --type ${type}`;
-
-		// Add priority flag
-		command += ` --priority ${priority}`;
-
-		// Add description if provided
-		if (description) {
-			command += ` --description ${shellEscape(description)}`;
-		}
-
-		// Add notes if provided
-		if (body.notes && typeof body.notes === 'string' && body.notes.trim()) {
-			command += ` --notes ${shellEscape(body.notes.trim())}`;
-		}
-
-		// Add labels if provided
-		if (body.labels && Array.isArray(body.labels) && body.labels.length > 0) {
-			const sanitizedLabels = body.labels
-				.filter((/** @type {unknown} */ l) => typeof l === 'string' && /** @type {string} */ (l).trim())
-				.map((/** @type {string} */ l) => l.trim())
-				.join(',');
-			if (sanitizedLabels) {
-				command += ` --labels ${sanitizedLabels}`;
-			}
-		}
-
-		// Add dependencies if provided
-		if (body.deps && Array.isArray(body.deps) && body.deps.length > 0) {
-			const sanitizedDeps = body.deps
-				.filter((/** @type {unknown} */ d) => typeof d === 'string' && /** @type {string} */ (d).trim())
-				.map((/** @type {string} */ d) => d.trim())
-				.join(',');
-			if (sanitizedDeps) {
-				command += ` --deps ${sanitizedDeps}`;
-			}
-		}
-
-		// Add project if provided (changes working directory)
+		// Get project path
+		let projectPath = null;
 		if (project) {
-			// Look up actual project path from JAT config or beads-discovered projects
 			const projectInfo = await getProjectPath(project);
 
 			if (!projectInfo.exists) {
@@ -246,87 +185,69 @@ export async function POST({ request }) {
 				);
 			}
 
-			command = `cd "${projectInfo.path}" && ${command}`;
+			projectPath = projectInfo.path;
 		}
 
-		// Execute bd create command
-		const { stdout, stderr } = await execAsync(command);
-
-		// Parse task ID from output (e.g., "✓ Created issue: jat-abc" or "community_connect-xyz")
-		// Support project names with underscores, hyphens, mixed case
-		const match = stdout.match(/Created issue: ([\w]+-[\w]+)/i);
-		if (!match) {
-			console.error('Failed to parse task ID from bd create output:', stdout);
-			return json(
-				{
-					error: true,
-					message: 'Task may have been created but failed to parse task ID',
-					output: stdout,
-					stderr: stderr
-				},
-				{ status: 500 }
-			);
+		// Resolve project path if not provided - use the IDE's parent directory
+		if (!projectPath) {
+			projectPath = process.cwd().replace(/\/ide$/, '');
 		}
 
-		const taskId = match[1];
+		// Build labels array
+		let labels = [];
+		if (body.labels && Array.isArray(body.labels) && body.labels.length > 0) {
+			labels = body.labels
+				.filter((/** @type {unknown} */ l) => typeof l === 'string' && /** @type {string} */ (l).trim())
+				.map((/** @type {string} */ l) => l.trim());
+		}
 
-		// Set review_override if provided (stored in notes field)
+		// Build deps array
+		let deps = [];
+		if (body.deps && Array.isArray(body.deps) && body.deps.length > 0) {
+			deps = body.deps
+				.filter((/** @type {unknown} */ d) => typeof d === 'string' && /** @type {string} */ (d).trim())
+				.map((/** @type {string} */ d) => d.trim());
+		}
+
+		// Build notes with review_override if provided
+		let notes = body.notes && typeof body.notes === 'string' ? body.notes.trim() : '';
 		if (body.review_override && (body.review_override === 'always_review' || body.review_override === 'always_auto')) {
-			try {
-				const overrideCommand = project
-					? `cd ${process.env.HOME}/code/${project} && ${process.env.HOME}/code/jat/tools/core/bd-set-review-override ${taskId} ${body.review_override}`
-					: `${process.env.HOME}/code/jat/tools/core/bd-set-review-override ${taskId} ${body.review_override}`;
-				await execAsync(overrideCommand);
-			} catch (err) {
-				console.error('Failed to set review_override:', err);
-				// Continue without failing - task was created successfully
-			}
+			const overrideTag = `[REVIEW_OVERRIDE:${body.review_override}]`;
+			notes = notes ? `${notes}\n${overrideTag}` : overrideTag;
 		}
+
+		// Create the task directly
+		const createdTask = createTask({
+			projectPath,
+			title,
+			description,
+			type,
+			priority,
+			labels,
+			deps,
+			assignee: null,
+			notes
+		});
 
 		// Invalidate caches so subsequent fetches get fresh data
-		// This is critical for reactive updates on /work page
-		// Also reset module-level task cache in agents endpoint
 		invalidateCache.tasks();
 		invalidateCache.agents();
 		_resetTaskCache();
 
-		// Try to fetch the created task to return full object
-		// Note: This may fail for cross-project tasks since getTaskById only looks in current project
-		const createdTask = getTaskById(taskId);
-
-		if (createdTask) {
-			return json({
-				success: true,
-				task: createdTask,
-				message: `Task ${taskId} created successfully`
-			}, { status: 201 });
-		}
-
-		// Task was created but we can't fetch it (cross-project creation)
-		// Return success with minimal task info
 		return json({
 			success: true,
-			task: {
-				id: taskId,
-				title: title,
-				type: type,
-				priority: priority,
-				status: 'open',
-				project: project || null
-			},
-			message: `Task ${taskId} created successfully`
+			task: createdTask,
+			message: `Task ${createdTask.id} created successfully`
 		}, { status: 201 });
 
 	} catch (err) {
 		console.error('Error creating task:', err);
 
-		// Check if it's a validation error from bd create
-		const execErr = /** @type {{ stderr?: string, message?: string }} */ (err);
-		const stderr = execErr.stderr || '';
-		const message = execErr.message || '';
+		const errorObj = /** @type {{ message?: string }} */ (err);
+		const message = errorObj.message || '';
 
-		// Check for "no beads database found" error - project not initialized
-		if (stderr.includes('no beads database found') || message.includes('no beads database found')) {
+		// Check for "no .jat/ database" error - project not initialized
+		if (message.includes('No .jat/ database') || message.includes('Run initProject()')) {
 			const projectName = project || 'this project';
 			return json(
 				{
@@ -334,17 +255,6 @@ export async function POST({ request }) {
 					message: `Project "${projectName}" has not been initialized for task tracking. Run "bd init" in the project directory, or use the "Add Project" button on the Projects page.`,
 					type: 'project_not_initialized',
 					hint: `cd ~/code/${projectName} && bd init`
-				},
-				{ status: 400 }
-			);
-		}
-
-		if (stderr.includes('Error:')) {
-			return json(
-				{
-					error: true,
-					message: stderr.trim(),
-					type: 'validation_error'
 				},
 				{ status: 400 }
 			);

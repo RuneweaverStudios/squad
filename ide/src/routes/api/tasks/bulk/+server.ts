@@ -3,17 +3,14 @@
  * POST /api/tasks/bulk
  *
  * Accepts an array of task objects from JAT:SUGGESTED_TASKS format
- * and creates them in Beads via bd create command.
+ * and creates them via lib/tasks.js direct calls.
  */
 import { json } from '@sveltejs/kit';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import type { RequestHandler } from './$types';
+import { createTask as libCreateTask, getTaskById, addDependency } from '$lib/server/beads.js';
 import { invalidateCache } from '$lib/server/cache.js';
 import { _resetTaskCache } from '../../../api/agents/+server.js';
 import { getProjectPath } from '$lib/server/projectPaths.js';
-
-const execAsync = promisify(exec);
 
 /** Suggested task from JAT:SUGGESTED_TASKS marker */
 interface SuggestedTask {
@@ -184,59 +181,34 @@ function validateTask(task: unknown, index: number): { valid: boolean; error?: s
 }
 
 /**
- * Escape a string for safe shell usage
- */
-function escapeForShell(str: string): string {
-	// Use single quotes and escape any single quotes within
-	return str.replace(/'/g, "'\\''");
-}
-
-/**
  * Check if an epic is still open (not closed)
- * @param epicId - The epic task ID to check
- * @param projectPath - Optional project path to run command in
- * @returns true if epic exists and is not closed, false otherwise
  */
-async function isEpicOpen(epicId: string, projectPath?: string): Promise<boolean> {
+function isEpicOpen(epicId: string): boolean {
 	try {
-		let command = `bd show '${escapeForShell(epicId)}' --json`;
-		if (projectPath) {
-			command = `cd '${escapeForShell(projectPath)}' && ${command}`;
-		}
-		const { stdout } = await execAsync(command);
-		const epics = JSON.parse(stdout.trim());
-		// bd show --json returns an array, not a single object
-		const epic = Array.isArray(epics) ? epics[0] : epics;
+		const epic = getTaskById(epicId);
 		if (!epic) return false;
 		return epic.status !== 'closed';
 	} catch {
-		// If we can't check, assume epic doesn't exist or is closed
 		return false;
 	}
 }
 
 /**
  * Link a task to an epic by adding epic->child dependency
- * Uses bd dep add with CORRECT direction: epic depends on child (not child depends on epic)
+ * Uses addDependency with CORRECT direction: epic depends on child (not child depends on epic)
  * This ensures child is READY and epic is BLOCKED until child completes
  *
  * IMPORTANT: This function checks if the epic is still open before linking.
  * Tasks will NOT be linked to closed epics (prevents stale epic state bugs).
- *
- * @param epicId - The parent epic task ID
- * @param childId - The newly created child task ID
- * @param projectPath - Optional project path to run command in
- * @returns Success/error result
  */
-async function linkTaskToEpic(
+function linkTaskToEpic(
 	epicId: string,
 	childId: string,
 	projectPath?: string
-): Promise<{ success: boolean; error?: string; skipped?: boolean }> {
+): { success: boolean; error?: string; skipped?: boolean } {
 	try {
 		// Check if epic is still open before linking
-		// This prevents linking to closed epics (e.g., when IDE state is stale)
-		const epicOpen = await isEpicOpen(epicId, projectPath);
+		const epicOpen = isEpicOpen(epicId);
 		if (!epicOpen) {
 			console.warn(
 				`Skipping epic link: Epic ${epicId} is closed or not found. ` +
@@ -252,22 +224,18 @@ async function linkTaskToEpic(
 
 		// CRITICAL: Dependency direction is epic depends on child
 		// This makes child READY (can be worked on) and epic BLOCKED (until children complete)
-		// The command is: bd dep add [A] [B] meaning "A depends on B"
-		let command = `bd dep add '${escapeForShell(epicId)}' '${escapeForShell(childId)}'`;
-
-		if (projectPath) {
-			command = `cd '${escapeForShell(projectPath)}' && ${command}`;
-		}
-
-		await execAsync(command);
+		addDependency(epicId, childId, projectPath);
 		return { success: true };
 	} catch (err) {
-		const error = err as Error & { stderr?: string };
+		const error = err as Error;
 		console.error(`Error linking task ${childId} to epic ${epicId}:`, error);
 
-		let errorMessage = error.message || 'Unknown error';
-		if (error.stderr) {
-			errorMessage = error.stderr.trim();
+		const errorMessage = error.message || 'Unknown error';
+
+		// Handle "already linked" case gracefully (UNIQUE constraint)
+		if (errorMessage.includes('UNIQUE constraint failed')) {
+			console.log(`Task ${childId} already linked to epic ${epicId}`);
+			return { success: true };
 		}
 
 		return { success: false, error: errorMessage };
@@ -275,7 +243,7 @@ async function linkTaskToEpic(
 }
 
 /**
- * Create a single task using bd create
+ * Create a single task using lib/tasks.js createTask
  */
 async function createTask(
 	task: SuggestedTask,
@@ -301,60 +269,9 @@ async function createTask(
 		// Use task-level epicId if provided, otherwise use request-level default
 		const epicId = task.epicId || defaultEpicId;
 
-		// Build bd create command with safe escaping
-		const args: string[] = [];
-
-		// Title as positional argument (escaped)
-		args.push(`'${escapeForShell(title)}'`);
-
-		// Type flag
-		args.push(`--type ${type}`);
-
-		// Priority flag
-		args.push(`--priority ${priority}`);
-
-		// Description if provided
-		if (description) {
-			args.push(`--description '${escapeForShell(description)}'`);
-		}
-
-		// Labels if provided (can be string or array)
-		if (task.labels) {
-			let labelsStr: string;
-			if (Array.isArray(task.labels)) {
-				labelsStr = task.labels
-					.filter((l): l is string => typeof l === 'string' && l.trim() !== '')
-					.map((l) => l.trim())
-					.join(',');
-			} else if (typeof task.labels === 'string') {
-				labelsStr = task.labels.trim();
-			} else {
-				labelsStr = '';
-			}
-			if (labelsStr) {
-				args.push(`--labels '${escapeForShell(labelsStr)}'`);
-			}
-		}
-
-		// Dependencies if provided
-		if (task.depends_on && Array.isArray(task.depends_on) && task.depends_on.length > 0) {
-			const depsStr = task.depends_on
-				.filter((d): d is string => typeof d === 'string' && d.trim() !== '')
-				.map((d) => d.trim())
-				.join(',');
-			if (depsStr) {
-				args.push(`--deps '${escapeForShell(depsStr)}'`);
-			}
-		}
-
-		// Add JSON output for easier parsing
-		args.push('--json');
-
-		let command = `bd create ${args.join(' ')}`;
-
-		// Change directory to project if specified
+		// Resolve project path
+		let projectPath: string | undefined;
 		if (project) {
-			// Look up actual project path from JAT config or beads-discovered projects
 			const projectInfo = await getProjectPath(project);
 
 			if (!projectInfo.exists) {
@@ -365,44 +282,51 @@ async function createTask(
 				};
 			}
 
-			command = `cd '${escapeForShell(projectInfo.path)}' && ${command}`;
+			projectPath = projectInfo.path;
 		}
 
-		const { stdout, stderr } = await execAsync(command);
+		// If no project, use IDE's parent directory
+		if (!projectPath) {
+			projectPath = process.cwd().replace(/\/ide$/, '');
+		}
 
-		// Parse JSON output to get task ID
-		// bd create --json may output warning messages before the JSON line
-		// e.g.: "⚠ Creating issue with 'Test' prefix...\n{\"id\":\"jat-abc\",...}"
-		// So we need to extract just the JSON line
-		let taskId: string | undefined;
-
-		try {
-			// Try to find a JSON line in stdout (line starting with '{')
-			const lines = stdout.trim().split('\n');
-			const jsonLine = lines.find((line) => line.trim().startsWith('{'));
-			if (jsonLine) {
-				const result = JSON.parse(jsonLine);
-				if (result.id) {
-					taskId = result.id;
-				}
-			}
-		} catch {
-			// Fallback to regex parsing if JSON parsing fails
-			const match = stdout.match(/Created issue: ([\w]+-[\w]+)/i);
-			if (match) {
-				taskId = match[1];
+		// Build labels array
+		let labels: string[] = [];
+		if (task.labels) {
+			if (Array.isArray(task.labels)) {
+				labels = task.labels
+					.filter((l): l is string => typeof l === 'string' && l.trim() !== '')
+					.map((l) => l.trim());
+			} else if (typeof task.labels === 'string') {
+				labels = task.labels
+					.split(',')
+					.map((l) => l.trim())
+					.filter(Boolean);
 			}
 		}
 
-		// If we couldn't parse the task ID, return failure
-		if (!taskId) {
-			console.error('Failed to parse task ID from bd create output:', stdout, stderr);
-			return {
-				title,
-				success: false,
-				error: 'Task may have been created but failed to parse task ID'
-			};
+		// Build deps array
+		let deps: string[] = [];
+		if (task.depends_on && Array.isArray(task.depends_on) && task.depends_on.length > 0) {
+			deps = task.depends_on
+				.filter((d): d is string => typeof d === 'string' && d.trim() !== '')
+				.map((d) => d.trim());
 		}
+
+		// Create the task directly via lib/tasks.js
+		const createdTask = libCreateTask({
+			projectPath,
+			title,
+			description,
+			type,
+			priority,
+			labels,
+			deps,
+			assignee: null,
+			notes: ''
+		});
+
+		const taskId = createdTask.id;
 
 		// Task created successfully - now link to epic if epicId is provided
 		const taskResult: TaskResult = {
@@ -412,16 +336,7 @@ async function createTask(
 		};
 
 		if (epicId) {
-			// Get project path for epic linking command
-			let epicProjectPath: string | undefined;
-			if (project) {
-				const projectInfo = await getProjectPath(project);
-				if (projectInfo.exists) {
-					epicProjectPath = projectInfo.path;
-				}
-			}
-
-			const linkResult = await linkTaskToEpic(epicId, taskId, epicProjectPath);
+			const linkResult = linkTaskToEpic(epicId, taskId, projectPath);
 			if (linkResult.success && !linkResult.skipped) {
 				taskResult.linkedToEpic = true;
 				console.log(`Linked task ${taskId} to epic ${epicId}`);
@@ -439,19 +354,15 @@ async function createTask(
 
 		return taskResult;
 	} catch (err) {
-		const error = err as Error & { stderr?: string };
+		const error = err as Error;
 		console.error('Error creating task:', error);
 
-		// Extract meaningful error message
 		let errorMessage = error.message || 'Unknown error';
-		const stderr = error.stderr || '';
 
-		// Check for "no beads database found" error - project not initialized
-		if (stderr.includes('no beads database found') || errorMessage.includes('no beads database found')) {
+		// Check for "no .jat/ database" error - project not initialized
+		if (errorMessage.includes('No .jat/ database') || errorMessage.includes('Run initProject()')) {
 			const projectName = defaultProject || task.project || 'this project';
 			errorMessage = `Project "${projectName}" has not been initialized for task tracking. Run "bd init" in the project directory, or use the "Add Project" button on the Projects page.`;
-		} else if (stderr.includes('Error:')) {
-			errorMessage = stderr.trim();
 		}
 
 		return {
@@ -534,7 +445,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			);
 		}
 
-		// Create tasks sequentially to avoid race conditions with bd create
+		// Create tasks sequentially
 		const results: TaskResult[] = [];
 		let created = 0;
 		let failed = 0;

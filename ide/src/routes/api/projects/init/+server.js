@@ -27,6 +27,7 @@ import { join, basename, resolve, normalize } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { invalidateCache } from '$lib/server/cache.js';
+import { initProject } from '$lib/server/beads.js';
 
 const execAsync = promisify(exec);
 
@@ -232,14 +233,11 @@ export async function POST({ request }) {
 			}, { status: 200 });
 		}
 
-		// STEP 4: Run bd init
+		// STEP 4: Initialize task database
 		const projectName = basename(absolutePath);
 		try {
-			const { stdout, stderr } = await execAsync('bd init --quiet', {
-				cwd: absolutePath,
-				timeout: 30000
-			});
-			steps.push('Initialized Beads task management');
+			initProject(absolutePath);
+			steps.push('Initialized task management');
 
 			// Add project to projects.json
 			addProjectToConfig(projectName, absolutePath);
@@ -256,19 +254,17 @@ export async function POST({ request }) {
 					prefix: projectName.toLowerCase()
 				},
 				message: `Successfully set up project: ${projectName}`,
-				steps,
-				stdout: stdout || undefined,
-				stderr: stderr || undefined
+				steps
 			}, { status: 201 });
 
 		} catch (initError) {
-			const err = /** @type {{ message?: string, stderr?: string }} */ (initError);
-			console.error('bd init failed:', err);
+			const err = /** @type {{ message?: string }} */ (initError);
+			console.error('initProject failed:', err);
 
 			return json(
 				{
 					error: true,
-					message: `Failed to initialize Beads: ${err.stderr || err.message}`,
+					message: `Failed to initialize tasks: ${err.message}`,
 					type: 'init_failed',
 					steps // Include steps taken before failure
 				},

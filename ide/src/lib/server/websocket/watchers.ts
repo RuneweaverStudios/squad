@@ -5,7 +5,7 @@
  * This replaces/complements the existing SSE implementation for tasks.
  *
  * Watched files:
- * - .beads/issues.jsonl - Task changes (new, removed, updated)
+ * - .jat/last-touched - Task mutation sentinel (written by lib/tasks.js on every write)
  * - .claude/sessions/agent-*.txt - Agent state changes
  *
  * Usage:
@@ -20,10 +20,13 @@
 
 import { watch, type FSWatcher } from 'fs';
 import { readFile } from 'fs/promises';
-import { join, dirname, basename } from 'path';
+import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { broadcastTaskChange, broadcastAgentState, broadcastOutput, isInitialized, getChannelSubscriberCount } from './connectionPool.js';
+// NOTE: Must use relative import (not $lib alias) because this file is transitively
+// imported by vite.config.ts via vitePlugin.ts, and $lib isn't available at config time.
+import { getTasks } from '../beads.js';
 
 const execAsync = promisify(exec);
 
@@ -32,11 +35,10 @@ const execAsync = promisify(exec);
 // ============================================================================
 
 // IDE runs from /home/jw/code/jat/ide
-// Beads file is at /home/jw/code/jat/.beads/issues.jsonl (parent directory)
+// Sentinel file is at /home/jw/code/jat/.jat/last-touched (parent directory)
 const PROJECT_ROOT = join(process.cwd(), '..');
-const BEADS_FILE = join(PROJECT_ROOT, '.beads', 'issues.jsonl');
-const BEADS_DIR = dirname(BEADS_FILE);
-const BEADS_FILENAME = basename(BEADS_FILE);
+const JAT_DIR = join(PROJECT_ROOT, '.jat');
+const SENTINEL_FILENAME = 'last-touched';
 
 const SESSIONS_DIR = join(PROJECT_ROOT, '.claude', 'sessions');
 
@@ -44,7 +46,7 @@ const SESSIONS_DIR = join(PROJECT_ROOT, '.claude', 'sessions');
 // State
 // ============================================================================
 
-let beadsWatcher: FSWatcher | null = null;
+let taskWatcher: FSWatcher | null = null;
 let sessionsWatcher: FSWatcher | null = null;
 let outputPollingInterval: NodeJS.Timeout | null = null;
 let debounceTimers: Map<string, NodeJS.Timeout> = new Map();
@@ -61,26 +63,16 @@ const EXEC_TIMEOUT_MS = 5000; // Timeout for exec commands
 let isPolling = false;
 
 // ============================================================================
-// Task (Beads) Watcher
+// Task Watcher (watches .jat/last-touched sentinel)
 // ============================================================================
 
 /**
- * Parse task IDs from the beads JSONL file
+ * Get current task IDs via lib/tasks.js (reads from SQLite)
  */
-async function getTaskIds(): Promise<Set<string>> {
+function getTaskIds(): Set<string> {
 	try {
-		const content = await readFile(BEADS_FILE, 'utf-8');
-		const ids = new Set<string>();
-		for (const line of content.split('\n')) {
-			if (!line.trim()) continue;
-			try {
-				const task = JSON.parse(line);
-				if (task.id) ids.add(task.id);
-			} catch {
-				// Skip invalid lines
-			}
-		}
-		return ids;
+		const tasks = getTasks({});
+		return new Set(tasks.map((t: any) => t.id));
 	} catch {
 		return new Set();
 	}
@@ -89,10 +81,10 @@ async function getTaskIds(): Promise<Set<string>> {
 /**
  * Check for task changes and broadcast if any
  */
-async function checkTaskChanges(): Promise<void> {
+function checkTaskChanges(): void {
 	if (!isInitialized()) return;
 
-	const currentIds = await getTaskIds();
+	const currentIds = getTaskIds();
 
 	// Find new tasks
 	const newTasks: string[] = [];
@@ -120,44 +112,42 @@ async function checkTaskChanges(): Promise<void> {
 }
 
 /**
- * Start watching the beads file
+ * Start watching the .jat/last-touched sentinel file for task mutations
  */
-function startBeadsWatcher(): void {
-	if (beadsWatcher) {
-		console.log('[WS Watcher] Beads watcher already running');
+function startTaskWatcher(): void {
+	if (taskWatcher) {
+		console.log('[WS Watcher] Task watcher already running');
 		return;
 	}
 
-	console.log(`[WS Watcher] Starting beads watcher: ${BEADS_DIR}`);
+	console.log(`[WS Watcher] Starting task watcher: ${JAT_DIR}`);
 
 	// Initialize previous task IDs
-	getTaskIds().then(ids => {
-		previousTaskIds = ids;
-		console.log(`[WS Watcher] Initialized with ${ids.size} existing tasks`);
-	});
+	previousTaskIds = getTaskIds();
+	console.log(`[WS Watcher] Initialized with ${previousTaskIds.size} existing tasks`);
 
 	try {
-		// Watch the directory (more reliable than watching the file directly)
-		beadsWatcher = watch(BEADS_DIR, { persistent: false }, (eventType, filename) => {
-			if (filename === BEADS_FILENAME || filename === null) {
+		// Watch the .jat/ directory for last-touched changes
+		taskWatcher = watch(JAT_DIR, { persistent: false }, (eventType, filename) => {
+			if (filename === SENTINEL_FILENAME || filename === null) {
 				// Debounce rapid changes
-				const existingTimer = debounceTimers.get('beads');
+				const existingTimer = debounceTimers.get('tasks');
 				if (existingTimer) clearTimeout(existingTimer);
 
-				debounceTimers.set('beads', setTimeout(() => {
+				debounceTimers.set('tasks', setTimeout(() => {
 					checkTaskChanges();
-					debounceTimers.delete('beads');
+					debounceTimers.delete('tasks');
 				}, 100));
 			}
 		});
 
-		beadsWatcher.on('error', (err) => {
-			console.error('[WS Watcher] Beads watcher error:', err);
+		taskWatcher.on('error', (err) => {
+			console.error('[WS Watcher] Task watcher error:', err);
 		});
 
-		console.log('[WS Watcher] Beads watcher started');
+		console.log('[WS Watcher] Task watcher started');
 	} catch (err) {
-		console.error('[WS Watcher] Failed to start beads watcher:', err);
+		console.error('[WS Watcher] Failed to start task watcher:', err);
 	}
 }
 
@@ -400,7 +390,7 @@ export function startWatchers(): void {
 	}
 
 	console.log('[WS Watcher] Starting all watchers...');
-	startBeadsWatcher();
+	startTaskWatcher();
 	startSessionsWatcher();
 	startOutputPolling();
 	isWatching = true;
@@ -421,9 +411,9 @@ export function stopWatchers(): void {
 	stopOutputPolling();
 
 	// Close watchers
-	if (beadsWatcher) {
-		beadsWatcher.close();
-		beadsWatcher = null;
+	if (taskWatcher) {
+		taskWatcher.close();
+		taskWatcher = null;
 	}
 
 	if (sessionsWatcher) {

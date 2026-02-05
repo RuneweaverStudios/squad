@@ -10,20 +10,10 @@
 
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { getTasks, createTask, addDependency } from '$lib/server/beads.js';
 import { invalidateCache } from '$lib/server/cache.js';
 import { _resetTaskCache } from '../agents/+server.js';
-
-const execAsync = promisify(exec);
-
-/**
- * Escape a string for safe shell usage (single-quoted)
- */
-function shellEscape(str: string): string {
-	if (!str) return "''";
-	return "'" + str.replace(/'/g, "'\\''") + "'";
-}
+import { getProjectPath } from '$lib/server/projectPaths.js';
 
 interface Epic {
 	id: string;
@@ -48,23 +38,15 @@ export const GET: RequestHandler = async ({ url }) => {
 		const project = url.searchParams.get('project');
 		const statusFilter = url.searchParams.get('status') || 'all';
 
-		// Build the bd list command based on status filter
-		let command = 'bd list --type epic --json';
+		// Build filter options for getTasks
+		const filters: Record<string, string | number> = {};
 		if (statusFilter === 'open' || statusFilter === 'closed') {
-			command = `bd list --type epic --status ${statusFilter} --json`;
+			filters.status = statusFilter;
 		}
 
-		const { stdout } = await execAsync(command, {
-			timeout: 10000
-		});
-
-		let epics: Epic[] = [];
-		try {
-			epics = JSON.parse(stdout.trim());
-		} catch {
-			// Empty or invalid JSON
-			epics = [];
-		}
+		// Get all tasks and filter to epics
+		const allTasks = getTasks(filters);
+		let epics: Epic[] = allTasks.filter((t: any) => t.issue_type === 'epic');
 
 		// Filter by project if specified
 		if (project && epics.length > 0) {
@@ -123,30 +105,38 @@ export const POST: RequestHandler = async ({ request }) => {
 			);
 		}
 
-		// Build the bd create command
-		let command = `bd create ${shellEscape(title.trim())} --type epic --priority 1`;
-
-		const { stdout, stderr } = await execAsync(command, { timeout: 10000 });
-
-		// Parse the created epic ID from stdout (bd create outputs the ID)
-		const epicIdMatch = stdout.match(/([a-z]+-[a-z0-9]+)/i);
-		if (!epicIdMatch) {
-			console.error('[epics] Failed to parse epic ID from output:', stdout);
-			return json(
-				{ success: false, error: 'Failed to create epic - could not parse ID' },
-				{ status: 500 }
-			);
+		// Resolve project path
+		let projectPath: string;
+		if (project) {
+			const projectInfo = await getProjectPath(project);
+			if (!projectInfo.exists) {
+				return json(
+					{ success: false, error: `Project '${project}' not found` },
+					{ status: 400 }
+				);
+			}
+			projectPath = projectInfo.path;
+		} else {
+			// Default to IDE's parent directory
+			projectPath = process.cwd().replace(/\/ide$/, '');
 		}
 
-		const epicId = epicIdMatch[1];
+		// Create the epic directly using lib/tasks.js
+		const createdEpic = createTask({
+			projectPath,
+			title: title.trim(),
+			type: 'epic',
+			priority: 1
+		});
+
+		const epicId = createdEpic.id;
 		console.log(`[epics] Created epic: ${epicId}`);
 
 		// If linkTaskId provided, link the task to the new epic
 		if (linkTaskId) {
 			try {
 				// Epic depends on task (correct direction - makes task READY, epic BLOCKED)
-				const linkCommand = `bd dep add ${shellEscape(epicId)} ${shellEscape(linkTaskId)}`;
-				await execAsync(linkCommand, { timeout: 10000 });
+				addDependency(epicId, linkTaskId, projectPath);
 				console.log(`[epics] Linked task ${linkTaskId} to epic ${epicId}`);
 			} catch (linkError) {
 				console.error('[epics] Failed to link task to epic:', linkError);

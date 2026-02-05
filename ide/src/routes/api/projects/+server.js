@@ -18,6 +18,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { apiCache, cacheKey, CACHE_TTL, invalidateCache } from '$lib/server/cache.js';
 import { rgbToHex } from '$lib/utils/projectConfig';
+import { getTasks, initProject } from '$lib/server/beads.js';
 
 const execAsync = promisify(exec);
 
@@ -192,39 +193,29 @@ async function initializeBeads(projectPath) {
 		return { success: true, steps };
 	}
 
-	// Run bd init
+	// Initialize task database directly via lib/tasks.js
 	try {
-		await execAsync('bd init --quiet', {
-			cwd: projectPath,
-			timeout: 30000
-		});
-		steps.push('Initialized Beads task management');
+		initProject(projectPath);
+		steps.push('Initialized task management');
 		return { success: true, steps };
 	} catch (initError) {
 		return {
 			success: false,
 			steps,
-			error: `Failed to initialize Beads: ${initError instanceof Error ? initError.message : 'Unknown error'}`
+			error: `Failed to initialize tasks: ${initError instanceof Error ? initError.message : 'Unknown error'}`
 		};
 	}
 }
 
 /**
- * Get task counts for a project from Beads
+ * Get task counts for a project from lib/tasks.js
  * @param {string} projectPath
  */
-async function getProjectTaskCounts(projectPath) {
+function getProjectTaskCounts(projectPath) {
 	try {
-		const { stdout, stderr } = await execAsync(`bd list --json`, {
-			cwd: projectPath,
-			timeout: 10000,
-			maxBuffer: 10 * 1024 * 1024  // 10MB buffer for large task lists
-		});
-		if (stderr) {
-			console.error(`[getProjectTaskCounts] stderr for ${projectPath}:`, stderr);
-		}
-		/** @type {Array<{status: string}>} */
-		const tasks = JSON.parse(stdout || '[]');
+		// Extract project name from path for filtering by task ID prefix
+		const projectName = projectPath.split('/').pop();
+		const tasks = getTasks({ projectName });
 		const open = tasks.filter((/** @type {{status: string}} */ t) => t.status === 'open' || t.status === 'in_progress').length;
 		const total = tasks.length;
 		return { open, total };
