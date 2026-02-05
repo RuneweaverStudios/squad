@@ -1,0 +1,851 @@
+#!/bin/bash
+# jt - JAT task CLI (replaces bd)
+# Pure bash + sqlite3. No Node startup cost.
+set -euo pipefail
+
+VERSION="0.1.0"
+DB_NAME=".jat/tasks.db"
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+die() { echo "Error: $*" >&2; exit 1; }
+
+# Find the project root (walk up looking for .jat/ or .git/)
+find_project_root() {
+  local dir="$PWD"
+  while [[ "$dir" != "/" ]]; do
+    [[ -d "$dir/.jat" ]] && echo "$dir" && return 0
+    [[ -d "$dir/.git" ]] && echo "$dir" && return 0
+    dir="$(dirname "$dir")"
+  done
+  echo "$PWD"
+}
+
+PROJECT_ROOT="$(find_project_root)"
+DB="$PROJECT_ROOT/$DB_NAME"
+
+# Get project prefix from directory name
+project_prefix() {
+  basename "$PROJECT_ROOT" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9_-'
+}
+
+# Generate random task ID: prefix-xxxxx
+gen_id() {
+  local prefix
+  prefix="$(project_prefix)"
+  local rand
+  rand=$(cat /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c5)
+  echo "${prefix}-${rand}"
+}
+
+# Current ISO timestamp
+now_ts() {
+  date -u +"%Y-%m-%dT%H:%M:%S.000Z"
+}
+
+# Touch sentinel for file watchers
+touch_sentinel() {
+  local sentinel="$PROJECT_ROOT/.jat/last-touched"
+  date +%s%N > "$sentinel" 2>/dev/null || true
+}
+
+# Run a query, output JSON array (always returns [] for empty)
+sql_json() {
+  local out
+  out="$(sqlite3 -json "$DB" "$1")"
+  if [[ -z "$out" ]]; then
+    echo "[]"
+  else
+    echo "$out"
+  fi
+}
+
+# Run a query, no output expected
+sql_exec() {
+  sqlite3 "$DB" "$1"
+}
+
+# Ensure DB exists
+require_db() {
+  [[ -f "$DB" ]] || die "No .jat/ database found. Run 'jt init' first."
+}
+
+# Escape single quotes for SQL
+sql_escape() {
+  echo "${1//\'/\'\'}"
+}
+
+# ---------------------------------------------------------------------------
+# Schema (embedded)
+# ---------------------------------------------------------------------------
+
+SCHEMA='
+CREATE TABLE IF NOT EXISTS tasks (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT DEFAULT "",
+    notes TEXT DEFAULT "",
+    status TEXT NOT NULL DEFAULT "open",
+    priority INTEGER NOT NULL DEFAULT 2,
+    issue_type TEXT NOT NULL DEFAULT "task",
+    assignee TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    closed_at TEXT,
+    close_reason TEXT DEFAULT ""
+);
+CREATE TABLE IF NOT EXISTS dependencies (
+    issue_id TEXT NOT NULL,
+    depends_on_id TEXT NOT NULL,
+    type TEXT DEFAULT "blocks",
+    PRIMARY KEY (issue_id, depends_on_id),
+    FOREIGN KEY (issue_id) REFERENCES tasks(id) ON DELETE CASCADE,
+    FOREIGN KEY (depends_on_id) REFERENCES tasks(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS labels (
+    issue_id TEXT NOT NULL,
+    label TEXT NOT NULL,
+    PRIMARY KEY (issue_id, label),
+    FOREIGN KEY (issue_id) REFERENCES tasks(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    issue_id TEXT NOT NULL,
+    author TEXT NOT NULL,
+    text TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (issue_id) REFERENCES tasks(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority);
+CREATE INDEX IF NOT EXISTS idx_tasks_status_priority ON tasks(status, priority);
+CREATE INDEX IF NOT EXISTS idx_deps_issue ON dependencies(issue_id);
+CREATE INDEX IF NOT EXISTS idx_deps_depends ON dependencies(depends_on_id);
+CREATE INDEX IF NOT EXISTS idx_labels_label ON labels(label);
+CREATE INDEX IF NOT EXISTS idx_comments_issue ON comments(issue_id);
+'
+
+# ---------------------------------------------------------------------------
+# Commands
+# ---------------------------------------------------------------------------
+
+cmd_init() {
+  local quiet=false
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --quiet|-q) quiet=true; shift ;;
+      *) shift ;;
+    esac
+  done
+
+  local jat_dir="$PROJECT_ROOT/.jat"
+  mkdir -p "$jat_dir"
+
+  # .gitignore for .jat/
+  if [[ ! -f "$jat_dir/.gitignore" ]]; then
+    printf 'tasks.db\ntasks.db-wal\ntasks.db-shm\nlast-touched\n' > "$jat_dir/.gitignore"
+  fi
+
+  sqlite3 "$jat_dir/tasks.db" "PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; $SCHEMA"
+  touch_sentinel
+
+  $quiet || echo "Initialized .jat/ in $PROJECT_ROOT"
+}
+
+cmd_create() {
+  require_db
+  local title="" description="" type="task" priority=2 labels="" deps="" assignee="" json_out=false explicit_id=""
+
+  # First positional arg is title
+  if [[ $# -gt 0 && ! "$1" =~ ^-- ]]; then
+    title="$1"; shift
+  fi
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --type)        type="$2"; shift 2 ;;
+      --priority)    priority="$2"; shift 2 ;;
+      --description) description="$2"; shift 2 ;;
+      --labels)      labels="$2"; shift 2 ;;
+      --deps)        deps="$2"; shift 2 ;;
+      --assignee)    assignee="$2"; shift 2 ;;
+      --id)          explicit_id="$2"; shift 2 ;;
+      --json)        json_out=true; shift ;;
+      *)             [[ -z "$title" ]] && title="$1"; shift ;;
+    esac
+  done
+
+  [[ -n "$title" ]] || die "Usage: jt create \"title\" [--type X] [--priority N] [--description \"...\"] [--labels \"a,b\"] [--deps \"id1,id2\"] [--assignee \"X\"] [--json]"
+
+  local id="${explicit_id:-$(gen_id)}"
+  local ts
+  ts="$(now_ts)"
+  local esc_title esc_desc esc_assignee
+  esc_title="$(sql_escape "$title")"
+  esc_desc="$(sql_escape "$description")"
+  esc_assignee="$(sql_escape "$assignee")"
+
+  sql_exec "PRAGMA foreign_keys=ON;
+    INSERT INTO tasks (id, title, description, status, priority, issue_type, assignee, created_at, updated_at)
+    VALUES ('$id', '$esc_title', '$esc_desc', 'open', $priority, '$type', $([ -n "$assignee" ] && echo "'$esc_assignee'" || echo "NULL"), '$ts', '$ts');"
+
+  # Insert labels
+  if [[ -n "$labels" ]]; then
+    IFS=',' read -ra LABEL_ARR <<< "$labels"
+    for lbl in "${LABEL_ARR[@]}"; do
+      lbl="$(echo "$lbl" | xargs)"  # trim whitespace
+      [[ -n "$lbl" ]] && sql_exec "INSERT INTO labels (issue_id, label) VALUES ('$id', '$(sql_escape "$lbl")');"
+    done
+  fi
+
+  # Insert dependencies
+  if [[ -n "$deps" ]]; then
+    IFS=',' read -ra DEP_ARR <<< "$deps"
+    for dep_id in "${DEP_ARR[@]}"; do
+      dep_id="$(echo "$dep_id" | xargs)"
+      [[ -n "$dep_id" ]] && sql_exec "PRAGMA foreign_keys=ON; INSERT OR IGNORE INTO dependencies (issue_id, depends_on_id, type) VALUES ('$id', '$(sql_escape "$dep_id")', 'blocks');"
+    done
+  fi
+
+  touch_sentinel
+
+  if $json_out; then
+    cmd_show "$id" --json
+  else
+    echo "Created $id: $title"
+  fi
+}
+
+cmd_update() {
+  require_db
+  local task_id="" json_out=false
+  local -a sets=()
+
+  # First positional arg is task_id
+  if [[ $# -gt 0 && ! "$1" =~ ^-- ]]; then
+    task_id="$1"; shift
+  fi
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --status)      sets+=("status = '$(sql_escape "$2")'"); shift 2 ;;
+      --priority)    sets+=("priority = $2"); shift 2 ;;
+      --title)       sets+=("title = '$(sql_escape "$2")'"); shift 2 ;;
+      --description) sets+=("description = '$(sql_escape "$2")'"); shift 2 ;;
+      --notes)       sets+=("notes = '$(sql_escape "$2")'"); shift 2 ;;
+      --type)        sets+=("issue_type = '$(sql_escape "$2")'"); shift 2 ;;
+      --assignee)    sets+=("assignee = '$(sql_escape "$2")'"); shift 2 ;;
+      --labels)
+        # Replace all labels
+        sql_exec "DELETE FROM labels WHERE issue_id = '$(sql_escape "$task_id")';"
+        IFS=',' read -ra LABEL_ARR <<< "$2"
+        for lbl in "${LABEL_ARR[@]}"; do
+          lbl="$(echo "$lbl" | xargs)"
+          [[ -n "$lbl" ]] && sql_exec "INSERT INTO labels (issue_id, label) VALUES ('$(sql_escape "$task_id")', '$(sql_escape "$lbl")');"
+        done
+        shift 2
+        ;;
+      --json)        json_out=true; shift ;;
+      *)             [[ -z "$task_id" ]] && task_id="$1"; shift ;;
+    esac
+  done
+
+  [[ -n "$task_id" ]] || die "Usage: jt update TASK_ID [--status X] [--priority N] [--assignee X] [--title X] [--json]"
+
+  # Check task exists
+  local exists
+  exists="$(sql_json "SELECT id FROM tasks WHERE id = '$(sql_escape "$task_id")';" 2>/dev/null)"
+  [[ "$exists" == "[]" || -z "$exists" ]] && die "Task not found: $task_id"
+
+  if [[ ${#sets[@]} -gt 0 ]]; then
+    local ts
+    ts="$(now_ts)"
+    # Handle closed_at for status transitions
+    local status_set=""
+    for s in "${sets[@]}"; do
+      if [[ "$s" == *"status = 'closed'"* ]]; then
+        status_set="closed"
+      fi
+    done
+
+    local set_clause
+    set_clause="$(IFS=','; echo "${sets[*]}")"
+    set_clause="$set_clause, updated_at = '$ts'"
+
+    if [[ "$status_set" == "closed" ]]; then
+      set_clause="$set_clause, closed_at = '$ts'"
+    fi
+
+    sql_exec "UPDATE tasks SET $set_clause WHERE id = '$(sql_escape "$task_id")';"
+  fi
+
+  touch_sentinel
+
+  if $json_out; then
+    cmd_show "$task_id" --json
+  else
+    echo "Updated $task_id"
+  fi
+}
+
+cmd_close() {
+  require_db
+  local task_id="" reason="" json_out=false
+
+  if [[ $# -gt 0 && ! "$1" =~ ^-- ]]; then
+    task_id="$1"; shift
+  fi
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --reason) reason="$2"; shift 2 ;;
+      --json)   json_out=true; shift ;;
+      *)        [[ -z "$task_id" ]] && task_id="$1"; shift ;;
+    esac
+  done
+
+  [[ -n "$task_id" ]] || die "Usage: jt close TASK_ID [--reason \"...\"] [--json]"
+
+  local exists
+  exists="$(sql_json "SELECT id FROM tasks WHERE id = '$(sql_escape "$task_id")';" 2>/dev/null)"
+  [[ "$exists" == "[]" || -z "$exists" ]] && die "Task not found: $task_id"
+
+  local ts
+  ts="$(now_ts)"
+  sql_exec "UPDATE tasks SET status = 'closed', closed_at = '$ts', close_reason = '$(sql_escape "$reason")', updated_at = '$ts' WHERE id = '$(sql_escape "$task_id")';"
+
+  touch_sentinel
+
+  if $json_out; then
+    cmd_show "$task_id" --json
+  else
+    echo "Closed $task_id"
+  fi
+}
+
+# Build JSON for a task matching bd's output format
+# Uses a single SQL query that aggregates labels and deps
+_task_json() {
+  local task_id="$1"
+  local esc_id
+  esc_id="$(sql_escape "$task_id")"
+
+  sql_json "
+    SELECT
+      t.id, t.title, t.description, t.status, t.priority, t.issue_type,
+      t.assignee, t.created_at, t.updated_at, t.closed_at, t.close_reason,
+      COALESCE(
+        (SELECT json_group_array(l.label) FROM labels l WHERE l.issue_id = t.id),
+        '[]'
+      ) as labels,
+      COALESCE(
+        (SELECT json_group_array(json_object(
+          'id', d.depends_on_id,
+          'title', t2.title,
+          'status', t2.status,
+          'priority', t2.priority,
+          'issue_type', t2.issue_type,
+          'dependency_type', d.type
+        ))
+        FROM dependencies d
+        LEFT JOIN tasks t2 ON d.depends_on_id = t2.id
+        WHERE d.issue_id = t.id),
+        '[]'
+      ) as dependencies,
+      COALESCE(
+        (SELECT json_group_array(json_object(
+          'id', d2.issue_id,
+          'title', t3.title,
+          'status', t3.status,
+          'priority', t3.priority,
+          'issue_type', t3.issue_type,
+          'dependency_type', d2.type
+        ))
+        FROM dependencies d2
+        LEFT JOIN tasks t3 ON d2.issue_id = t3.id
+        WHERE d2.depends_on_id = t.id),
+        '[]'
+      ) as dependents
+    FROM tasks t
+    WHERE t.id = '$esc_id';
+  "
+}
+
+cmd_show() {
+  require_db
+  local task_id="" json_out=false
+
+  if [[ $# -gt 0 && ! "$1" =~ ^-- ]]; then
+    task_id="$1"; shift
+  fi
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --json) json_out=true; shift ;;
+      *)      [[ -z "$task_id" ]] && task_id="$1"; shift ;;
+    esac
+  done
+
+  [[ -n "$task_id" ]] || die "Usage: jt show TASK_ID [--json]"
+
+  local result
+  result="$(_task_json "$task_id")"
+
+  if [[ "$result" == "[]" || -z "$result" ]]; then
+    die "Task not found: $task_id"
+  fi
+
+  if $json_out; then
+    # Post-process: parse embedded JSON strings into actual arrays
+    echo "$result" | _fix_json_arrays
+  else
+    # Human-readable output
+    echo "$result" | _fix_json_arrays | _pretty_print_task
+  fi
+}
+
+# Fix sqlite3's json_group_array returning strings instead of arrays
+_fix_json_arrays() {
+  python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for item in data:
+    for key in ('labels', 'dependencies', 'dependents'):
+        val = item.get(key)
+        if isinstance(val, str):
+            try:
+                item[key] = json.loads(val)
+            except (json.JSONDecodeError, TypeError):
+                pass
+    # Remove null fields to match bd output
+    for key in list(item.keys()):
+        if item[key] is None and key not in ('assignee',):
+            del item[key]
+json.dump(data, sys.stdout, indent=2)
+print()
+"
+}
+
+# Pretty-print a task for human consumption
+_pretty_print_task() {
+  python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for t in data:
+    print(f\"[P{t['priority']}] {t['id']}: {t['title']}\")
+    print(f\"  Status: {t['status']}  Type: {t['issue_type']}\")
+    if t.get('assignee'):
+        print(f\"  Assignee: {t['assignee']}\")
+    if t.get('description'):
+        desc = t['description'][:200]
+        print(f\"  Description: {desc}\")
+    labels = t.get('labels', [])
+    if labels:
+        print(f\"  Labels: {', '.join(labels)}\")
+    deps = t.get('dependencies', [])
+    if deps:
+        print('  Dependencies:')
+        for d in deps:
+            print(f\"    -> {d['id']}: {d.get('title','')} [{d.get('status','')}]\")
+    dependents = t.get('dependents', [])
+    if dependents:
+        print('  Dependents:')
+        for d in dependents:
+            print(f\"    <- {d['id']}: {d.get('title','')} [{d.get('status','')}]\")
+"
+}
+
+cmd_list() {
+  require_db
+  local status="" type="" json_out=false limit=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --status) status="$2"; shift 2 ;;
+      --type)   type="$2"; shift 2 ;;
+      --limit)  limit="$2"; shift 2 ;;
+      --json)   json_out=true; shift ;;
+      *)        shift ;;
+    esac
+  done
+
+  local where="1=1"
+  [[ -n "$status" ]] && where="$where AND status = '$(sql_escape "$status")'"
+  [[ -n "$type" ]]   && where="$where AND issue_type = '$(sql_escape "$type")'"
+  local limit_clause=""
+  [[ -n "$limit" ]] && limit_clause="LIMIT $limit"
+
+  local result
+  result="$(sql_json "
+    SELECT
+      t.id, t.title, t.description, t.status, t.priority, t.issue_type,
+      t.assignee, t.created_at, t.updated_at, t.closed_at,
+      COALESCE(
+        (SELECT json_group_array(l.label) FROM labels l WHERE l.issue_id = t.id),
+        '[]'
+      ) as labels,
+      (SELECT COUNT(*) FROM dependencies d WHERE d.issue_id = t.id) as dependency_count,
+      (SELECT COUNT(*) FROM dependencies d WHERE d.depends_on_id = t.id) as dependent_count
+    FROM tasks t
+    WHERE $where
+    ORDER BY t.priority ASC, t.created_at DESC
+    $limit_clause;
+  ")"
+
+  if $json_out; then
+    echo "$result" | _fix_json_arrays
+  else
+    if [[ "$result" == "[]" || -z "$result" ]]; then
+      echo "No tasks found."
+    else
+      echo "$result" | _fix_json_arrays | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for t in data:
+    labels = t.get('labels', [])
+    lbl_str = (' [' + ', '.join(labels) + ']') if labels else ''
+    assignee = (' @' + t['assignee']) if t.get('assignee') else ''
+    print(f\"  [P{t['priority']}] {t['id']}: {t['title']}{lbl_str}{assignee} ({t['status']})\")
+"
+    fi
+  fi
+}
+
+cmd_ready() {
+  require_db
+  local json_out=false limit=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --json)  json_out=true; shift ;;
+      --limit) limit="$2"; shift 2 ;;
+      *)       shift ;;
+    esac
+  done
+
+  local limit_clause=""
+  [[ -n "$limit" ]] && limit_clause="LIMIT $limit"
+
+  # Ready = open + no open/in_progress dependencies
+  local result
+  result="$(sql_json "
+    SELECT
+      t.id, t.title, t.description, t.status, t.priority, t.issue_type,
+      t.assignee, t.created_at, t.updated_at,
+      COALESCE(
+        (SELECT json_group_array(l.label) FROM labels l WHERE l.issue_id = t.id),
+        '[]'
+      ) as labels,
+      (SELECT COUNT(*) FROM dependencies d WHERE d.issue_id = t.id) as dependency_count,
+      (SELECT COUNT(*) FROM dependencies d WHERE d.depends_on_id = t.id) as dependent_count
+    FROM tasks t
+    WHERE t.status = 'open'
+      AND NOT EXISTS (
+        SELECT 1 FROM dependencies d
+        JOIN tasks blocker ON d.depends_on_id = blocker.id
+        WHERE d.issue_id = t.id AND blocker.status != 'closed'
+      )
+    ORDER BY t.priority ASC, t.created_at DESC
+    $limit_clause;
+  ")"
+
+  if $json_out; then
+    echo "$result" | _fix_json_arrays
+  else
+    if [[ "$result" == "[]" || -z "$result" ]]; then
+      echo "No ready tasks."
+    else
+      echo "Ready tasks:"
+      echo "$result" | _fix_json_arrays | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for t in data:
+    labels = t.get('labels', [])
+    lbl_str = (' [' + ', '.join(labels) + ']') if labels else ''
+    print(f\"  [P{t['priority']}] {t['id']}: {t['title']}{lbl_str}\")
+"
+    fi
+  fi
+}
+
+cmd_dep() {
+  require_db
+  local subcmd="${1:-}"; shift || true
+
+  case "$subcmd" in
+    add)    cmd_dep_add "$@" ;;
+    remove) cmd_dep_remove "$@" ;;
+    tree)   cmd_dep_tree "$@" ;;
+    cycles) cmd_dep_cycles "$@" ;;
+    *)      die "Usage: jt dep {add|remove|tree|cycles} ..." ;;
+  esac
+}
+
+cmd_dep_add() {
+  local task_id="${1:-}" depends_on="${2:-}"
+  [[ -n "$task_id" && -n "$depends_on" ]] || die "Usage: jt dep add TASK_ID DEPENDS_ON_ID"
+
+  [[ "$task_id" == "$depends_on" ]] && die "A task cannot depend on itself"
+
+  # Cycle detection
+  local would_cycle
+  would_cycle="$(sql_json "
+    WITH RECURSIVE chain(id) AS (
+      SELECT '$(sql_escape "$depends_on")'
+      UNION ALL
+      SELECT d.depends_on_id FROM dependencies d
+      JOIN chain c ON d.issue_id = c.id
+    )
+    SELECT 1 as cycle FROM chain WHERE id = '$(sql_escape "$task_id")' LIMIT 1;
+  ")"
+
+  [[ "$would_cycle" != "[]" && -n "$would_cycle" ]] && die "Adding dependency would create a cycle: $task_id -> $depends_on"
+
+  sql_exec "PRAGMA foreign_keys=ON; INSERT OR IGNORE INTO dependencies (issue_id, depends_on_id, type) VALUES ('$(sql_escape "$task_id")', '$(sql_escape "$depends_on")', 'blocks');"
+  touch_sentinel
+  echo "Added: $task_id depends on $depends_on"
+}
+
+cmd_dep_remove() {
+  local task_id="${1:-}" depends_on="${2:-}"
+  [[ -n "$task_id" && -n "$depends_on" ]] || die "Usage: jt dep remove TASK_ID DEPENDS_ON_ID"
+
+  sql_exec "DELETE FROM dependencies WHERE issue_id = '$(sql_escape "$task_id")' AND depends_on_id = '$(sql_escape "$depends_on")';"
+  touch_sentinel
+  echo "Removed: $task_id no longer depends on $depends_on"
+}
+
+cmd_dep_tree() {
+  local task_id="" reverse=false json_out=false
+
+  if [[ $# -gt 0 && ! "$1" =~ ^-- ]]; then
+    task_id="$1"; shift
+  fi
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --reverse) reverse=true; shift ;;
+      --json)    json_out=true; shift ;;
+      *)         [[ -z "$task_id" ]] && task_id="$1"; shift ;;
+    esac
+  done
+
+  [[ -n "$task_id" ]] || die "Usage: jt dep tree TASK_ID [--reverse] [--json]"
+
+  local esc_id
+  esc_id="$(sql_escape "$task_id")"
+  local result
+
+  if $reverse; then
+    # What depends on this task
+    result="$(sql_json "
+      WITH RECURSIVE tree(id, depth) AS (
+        SELECT d.issue_id, 1 FROM dependencies d WHERE d.depends_on_id = '$esc_id'
+        UNION ALL
+        SELECT d.issue_id, t.depth + 1 FROM dependencies d
+        JOIN tree t ON d.depends_on_id = t.id
+        WHERE t.depth < 20
+      )
+      SELECT DISTINCT tree.id, tree.depth, tsk.title, tsk.status, tsk.priority
+      FROM tree
+      LEFT JOIN tasks tsk ON tree.id = tsk.id
+      ORDER BY tree.depth ASC, tsk.priority ASC;
+    ")"
+  else
+    # What this task depends on
+    result="$(sql_json "
+      WITH RECURSIVE tree(id, depth) AS (
+        SELECT d.depends_on_id, 1 FROM dependencies d WHERE d.issue_id = '$esc_id'
+        UNION ALL
+        SELECT d.depends_on_id, t.depth + 1 FROM dependencies d
+        JOIN tree t ON d.issue_id = t.id
+        WHERE t.depth < 20
+      )
+      SELECT DISTINCT tree.id, tree.depth, tsk.title, tsk.status, tsk.priority
+      FROM tree
+      LEFT JOIN tasks tsk ON tree.id = tsk.id
+      ORDER BY tree.depth ASC, tsk.priority ASC;
+    ")"
+  fi
+
+  if $json_out; then
+    echo "$result"
+  else
+    if [[ "$result" == "[]" || -z "$result" ]]; then
+      if $reverse; then
+        echo "No tasks depend on $task_id"
+      else
+        echo "$task_id has no dependencies"
+      fi
+    else
+      if $reverse; then
+        echo "Tasks that depend on $task_id:"
+      else
+        echo "Dependencies of $task_id:"
+      fi
+      echo "$result" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for d in data:
+    indent = '  ' * d['depth']
+    print(f\"{indent}-> {d['id']}: {d.get('title','')} [{d.get('status','')}]\")
+"
+    fi
+  fi
+}
+
+cmd_dep_cycles() {
+  local result
+  result="$(sql_json "
+    WITH RECURSIVE chain(start_id, id, depth) AS (
+      SELECT issue_id, depends_on_id, 1 FROM dependencies
+      UNION ALL
+      SELECT c.start_id, d.depends_on_id, c.depth + 1
+      FROM chain c
+      JOIN dependencies d ON c.id = d.issue_id
+      WHERE c.depth < 20
+    )
+    SELECT DISTINCT start_id as cycle_member FROM chain WHERE id = start_id;
+  ")"
+
+  if [[ "$result" == "[]" || -z "$result" ]]; then
+    echo "No cycles detected."
+  else
+    echo "Cycles detected involving:"
+    echo "$result" | python3 -c "
+import sys, json
+for item in json.load(sys.stdin):
+    print(f\"  - {item['cycle_member']}\")
+"
+  fi
+}
+
+cmd_search() {
+  require_db
+  local query="" updated_after="" limit=50 json_out=false
+
+  if [[ $# -gt 0 && ! "$1" =~ ^-- ]]; then
+    query="$1"; shift
+  fi
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --updated-after) updated_after="$2"; shift 2 ;;
+      --limit)         limit="$2"; shift 2 ;;
+      --json)          json_out=true; shift ;;
+      *)               [[ -z "$query" ]] && query="$1"; shift ;;
+    esac
+  done
+
+  [[ -n "$query" ]] || die "Usage: jt search \"query\" [--updated-after DATE] [--limit N] [--json]"
+
+  local esc_query
+  esc_query="$(sql_escape "$query")"
+  local where="(title LIKE '%${esc_query}%' OR description LIKE '%${esc_query}%')"
+  [[ -n "$updated_after" ]] && where="$where AND updated_at >= '$(sql_escape "$updated_after")'"
+
+  local result
+  result="$(sql_json "
+    SELECT
+      t.id, t.title, t.description, t.status, t.priority, t.issue_type,
+      t.assignee, t.created_at, t.updated_at, t.closed_at,
+      COALESCE(
+        (SELECT json_group_array(l.label) FROM labels l WHERE l.issue_id = t.id),
+        '[]'
+      ) as labels
+    FROM tasks t
+    WHERE $where
+    ORDER BY t.updated_at DESC
+    LIMIT $limit;
+  ")"
+
+  if $json_out; then
+    echo "$result" | _fix_json_arrays
+  else
+    if [[ "$result" == "[]" || -z "$result" ]]; then
+      echo "No tasks matching \"$query\"."
+    else
+      echo "Search results for \"$query\":"
+      echo "$result" | _fix_json_arrays | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for t in data:
+    print(f\"  [P{t['priority']}] {t['id']}: {t['title']} ({t['status']})\")
+"
+    fi
+  fi
+}
+
+cmd_delete() {
+  require_db
+  local task_id=""
+
+  if [[ $# -gt 0 && ! "$1" =~ ^-- ]]; then
+    task_id="$1"; shift
+  fi
+
+  [[ -n "$task_id" ]] || die "Usage: jt delete TASK_ID"
+
+  local exists
+  exists="$(sql_json "SELECT id FROM tasks WHERE id = '$(sql_escape "$task_id")';" 2>/dev/null)"
+  [[ "$exists" == "[]" || -z "$exists" ]] && die "Task not found: $task_id"
+
+  sql_exec "PRAGMA foreign_keys=ON; DELETE FROM tasks WHERE id = '$(sql_escape "$task_id")';"
+  touch_sentinel
+  echo "Deleted $task_id"
+}
+
+cmd_help() {
+  cat <<'HELP'
+jt - JAT task CLI
+
+Usage: jt <command> [options]
+
+Commands:
+  create  "title" [--type X] [--priority N] [--description "..."]
+                   [--labels "a,b"] [--deps "id1,id2"] [--assignee "X"] [--json]
+  update  TASK_ID  [--status X] [--priority N] [--assignee X] [--title X]
+                   [--description "..."] [--notes "..."] [--labels "a,b"] [--json]
+  close   TASK_ID  [--reason "..."] [--json]
+  delete  TASK_ID
+  show    TASK_ID  [--json]
+  list    [--status X] [--type X] [--limit N] [--json]
+  ready   [--json] [--limit N]
+  search  "query"  [--updated-after DATE] [--limit N] [--json]
+  dep     add TASK_ID DEPENDS_ON_ID
+  dep     remove TASK_ID DEPENDS_ON_ID
+  dep     tree TASK_ID [--reverse] [--json]
+  dep     cycles
+  init    [--quiet]
+
+Options:
+  --version    Show version
+  --help       Show this help
+
+Status values: open, in_progress, blocked, closed
+Task types: bug, feature, task, epic, chore
+HELP
+}
+
+# ---------------------------------------------------------------------------
+# Main dispatch
+# ---------------------------------------------------------------------------
+
+case "${1:-}" in
+  create)    shift; cmd_create "$@" ;;
+  update)    shift; cmd_update "$@" ;;
+  close)     shift; cmd_close "$@" ;;
+  delete)    shift; cmd_delete "$@" ;;
+  show)      shift; cmd_show "$@" ;;
+  list)      shift; cmd_list "$@" ;;
+  ready)     shift; cmd_ready "$@" ;;
+  search)    shift; cmd_search "$@" ;;
+  dep)       shift; cmd_dep "$@" ;;
+  init)      shift; cmd_init "$@" ;;
+  --version) echo "jt $VERSION" ;;
+  --help|-h|help) cmd_help ;;
+  "")        cmd_help ;;
+  *)         die "Unknown command: $1. Run 'jt --help' for usage." ;;
+esac

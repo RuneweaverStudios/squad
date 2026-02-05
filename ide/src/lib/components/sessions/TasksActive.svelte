@@ -750,33 +750,12 @@
 				}
 			}
 
-			// Write IDE-initiated signal if transitioning from input-waiting states
-			// Use 'polishing' for completed sessions (post-task follow-up), 'working' for others
-			const agentName = getAgentName(expandedSession);
-			const sessionState = agentSessionInfo.get(agentName)?.activityState;
-			const waitingStates = ['ready-for-review', 'needs-input', 'completed', 'idle'];
-			if (waitingStates.includes(sessionState || '')) {
-				const task = agentTasks.get(agentName);
-				const signalType = sessionState === 'completed' ? 'polishing' : 'working';
-				try {
-					await fetch(`/api/sessions/${encodeURIComponent(expandedSession)}/signal`, {
-						method: 'POST',
-						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({
-							type: signalType,
-							data: {
-								taskId: task?.id || '',
-								taskTitle: task?.title || '',
-								agentName,
-								approach: sessionState === 'completed' ? 'Post-completion follow-up' : 'Processing user input'
-							}
-						})
-					});
-					console.log(`[TasksActive] Wrote IDE-initiated ${signalType} signal after user input`);
-				} catch (e) {
-					console.warn(`[TasksActive] Failed to write ${signalType} signal:`, e);
-				}
-			}
+			// Note: Signal emission for user input is handled by SessionCard (which calls this
+			// function via onSendInput). SessionCard emits the "Processing user input" working
+			// signal once before sending the actual message text. We don't emit here to avoid
+			// duplicate timeline entries — previously every key event (ctrl-c, escape, enter)
+			// was also generating a signal, causing 5-6 "Processing user input" entries per
+			// single user message. See: jat-ljhxi
 
 			const response = await fetch(`/api/work/${encodeURIComponent(expandedSession)}/input`, {
 				method: 'POST',
