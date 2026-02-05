@@ -702,8 +702,35 @@
 		return `jat-files-starred-${project}`;
 	}
 
+	// Files to auto-star by default when a project has no starred files yet
+	const DEFAULT_STARRED_FILES = ['README.md', 'AGENTS.md', 'CLAUDE.md'];
+
 	// Starred files state
 	let starredFiles = $state<Set<string>>(new Set());
+
+	// Check which default files exist in the project root and auto-star them
+	async function initDefaultStarredFiles(project: string) {
+		const initKey = `jat-files-starred-init-${project}`;
+		if (localStorage.getItem(initKey)) return; // Already initialized
+
+		try {
+			const res = await fetch(`/api/files?project=${encodeURIComponent(project)}`);
+			if (!res.ok) return;
+			const data = await res.json();
+			const entries: Array<{ name: string; type: string }> = data.entries || [];
+			const rootFiles = new Set(entries.filter(e => e.type === 'file').map(e => e.name));
+
+			const defaults = DEFAULT_STARRED_FILES.filter(f => rootFiles.has(f));
+			if (defaults.length > 0) {
+				starredFiles = new Set(defaults);
+				saveStarredFilesToStorage();
+			}
+		} catch {
+			// Silently fail — user can star files manually
+		}
+
+		localStorage.setItem(initKey, '1');
+	}
 
 	// Load starred files from localStorage
 	function loadStarredFilesFromStorage() {
@@ -721,6 +748,8 @@
 			}
 		} else {
 			starredFiles = new Set();
+			// Auto-star default documentation files for new projects
+			initDefaultStarredFiles(selectedProject);
 		}
 	}
 

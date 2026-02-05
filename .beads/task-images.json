@@ -802,5 +802,12 @@
       "uploadedAt": "2026-02-05T12:09:30.346Z",
       "id": "att-1770293367370-yv2jtx"
     }
+  ],
+  "flush-xmf": [
+    {
+      "path": "/home/jw/.local/share/jat/ingest-files/slack-pe-flush/tax_added_to_invoice.png",
+      "uploadedAt": "2026-02-05T18:47:39.996Z",
+      "id": "img-ingest-1770317259996-lq2o6r"
+    }
   ]
 }
