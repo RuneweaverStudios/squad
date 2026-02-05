@@ -440,6 +440,10 @@ do_update() {
         bash "$JAT_SOURCE_DIR/tools/scripts/symlink-tools.sh" &>/dev/null || true
     fi
 
+    # Ensure all configured projects have .jat/ initialized
+    echo -e "${DIM}Checking project databases...${NC}"
+    ensure_project_dbs
+
     # Restore stashed changes if any
     if [[ "${stashed:-}" == "true" ]]; then
         echo -e "${DIM}Restoring local changes...${NC}"
@@ -1471,6 +1475,38 @@ ADVANCED:
 CONFIG: ~/.config/jat/projects.json
 
 EOF
+}
+
+#------------------------------------------------------------------------------
+# Ensure Project Databases (auto-init .jat/ for configured projects)
+#------------------------------------------------------------------------------
+
+ensure_project_dbs() {
+    local initialized=0
+
+    for project in $(list_projects 2>/dev/null); do
+        local config path
+        config=$(get_project_config "$project")
+        [[ -z "$config" ]] && continue
+
+        path=$(echo "$config" | jq -r '.path' | sed "s|^~|$HOME|")
+
+        # Skip if project directory doesn't exist or isn't a git repo
+        [[ ! -d "$path" ]] && continue
+        [[ ! -d "$path/.git" ]] && continue
+
+        # Skip if already initialized
+        [[ -d "$path/.jat" ]] && continue
+
+        # Initialize .jat/ for this project (suppress sqlite WAL mode output)
+        (cd "$path" && jt init --quiet) >/dev/null 2>&1 || continue
+        initialized=$((initialized + 1))
+        echo -e "  ${GREEN}✓ Initialized .jat/ for $project${NC}"
+    done
+
+    if [[ $initialized -gt 0 ]]; then
+        echo -e "  ${DIM}Initialized $initialized project database(s)${NC}"
+    fi
 }
 
 #------------------------------------------------------------------------------
@@ -2516,6 +2552,9 @@ main() {
 
         # Check for updates only on IDE launch (interactive prompt)
         interactive_update_check
+
+        # Ensure all configured projects have .jat/ initialized
+        ensure_project_dbs
 
         # Sweep zombie tasks (in_progress with no live tmux session)
         sweep_zombie_tasks
