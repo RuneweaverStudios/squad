@@ -349,7 +349,8 @@ function messageToItem(msg, source) {
   const text = msg.text || '';
   if (!text && !msg.files?.length) return null;
 
-  const title = text.split('\n')[0].slice(0, 120) || 'Slack message';
+  const firstLine = text.split('\n')[0];
+  const title = (firstLine.length > 200 ? firstLine.slice(0, 200) + '...' : firstLine) || 'Slack message';
   const attachments = [];
 
   // Process file attachments

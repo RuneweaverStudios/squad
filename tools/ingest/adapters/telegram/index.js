@@ -186,7 +186,8 @@ async function messageToItem(msg, token) {
     if (url) attachments.push(makeAttachment(url, 'file', msg.document.file_name));
   }
 
-  const title = text.split('\n')[0].slice(0, 120) || 'Telegram message';
+  const firstLine = text.split('\n')[0];
+  const title = (firstLine.length > 200 ? firstLine.slice(0, 200) + '...' : firstLine) || 'Telegram message';
   const author = formatAuthor(msg.from);
 
   return {
@@ -206,7 +207,8 @@ async function mediaGroupToItem(group, token) {
 
   // Caption comes from any message in the group
   const text = allMsgs.map(m => m.caption).filter(Boolean).join('\n') || '';
-  const title = text.split('\n')[0].slice(0, 120) || 'Telegram media group';
+  const firstLine = text.split('\n')[0];
+  const title = (firstLine.length > 200 ? firstLine.slice(0, 200) + '...' : firstLine) || 'Telegram media group';
 
   const attachments = [];
   for (const msg of allMsgs) {
