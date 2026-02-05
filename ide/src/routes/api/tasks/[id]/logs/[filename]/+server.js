@@ -25,7 +25,7 @@ export async function GET({ params, url }) {
 	try {
 		// Get the project root (parent of ide)
 		const projectRoot = resolve(process.cwd(), '..');
-		const logPath = join(projectRoot, '.beads', 'logs', filename);
+		const logPath = join(projectRoot, '.jat', 'logs', filename);
 
 		// Check file exists
 		try {

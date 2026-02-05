@@ -8,7 +8,7 @@
 #
 # Monitored commands:
 #   - am-* (Agent Mail: reserve, release, send, reply, ack, etc.)
-#   - bd (Beads: create, update, close, etc.)
+#   - jt (JAT Tasks: create, update, close, etc.)
 #   - /jat:* slash commands (via SlashCommand tool)
 #
 # Hook input (stdin): JSON with tool name, input, and output
@@ -26,8 +26,8 @@ if [[ -z "$command" || "$command" == "null" ]]; then
 fi
 
 # Detect agent coordination commands
-# Pattern: am-* (Agent Mail tools) or bd followed by space (Beads commands)
-if echo "$command" | grep -qE '^(am-|bd\s)'; then
+# Pattern: am-* (Agent Mail tools) or jt followed by space (JAT Tasks commands)
+if echo "$command" | grep -qE '^(am-|jt\s)'; then
     # Extract the base command for display (first word)
     base_cmd=$(echo "$command" | awk '{print $1}')
 

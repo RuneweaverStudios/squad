@@ -411,7 +411,7 @@
 	// Map of normalized task title -> task ID for detecting already-created suggested tasks
 	let existingTaskTitles = $state<Map<string, string>>(new Map());
 
-	// Fetch existing task titles from Beads for "already created" detection
+	// Fetch existing task titles from JAT for "already created" detection
 	async function fetchExistingTaskTitles() {
 		try {
 			// Fetch all tasks (high limit to capture recent tasks)
@@ -460,7 +460,7 @@
 			const taskKey = getSuggestedTaskKey(task, idx);
 			const state = eventTasksState!.get(taskKey) || { selected: false, edited: false };
 
-			// Check if this task already exists in Beads (by normalized title)
+			// Check if this task already exists in JAT (by normalized title)
 			const normalizedTitle = task.title?.toLowerCase().trim();
 			const existingTaskId = normalizedTitle ? existingTaskTitles.get(normalizedTitle) : undefined;
 			const alreadyCreated = !!existingTaskId;
@@ -490,7 +490,7 @@
 			const taskKey = getSuggestedTaskKey(task, idx);
 			const state = eventTasksState!.get(taskKey) || { selected: false, edited: false };
 
-			// Check if this task already exists in Beads (by normalized title)
+			// Check if this task already exists in JAT (by normalized title)
 			const normalizedTitle = task.title?.toLowerCase().trim();
 			const existingTaskId = normalizedTitle ? existingTaskTitles.get(normalizedTitle) : undefined;
 			const alreadyCreated = !!existingTaskId;

@@ -1,6 +1,6 @@
 # Agent Mail Workflow Examples
 
-This directory contains practical examples of multi-agent coordination using Agent Mail and Beads.
+This directory contains practical examples of multi-agent coordination using Agent Mail and JAT Tasks.
 
 ## What's Here
 
@@ -47,7 +47,7 @@ All examples use a temporary test database so they won't affect your real Agent 
 
 These examples are based on actual multi-agent development sessions:
 
-- **PaleStar + IDEBuilder**: Building the Beads IDE (foundation + UI tasks in parallel)
+- **PaleStar + IDEBuilder**: Building the JAT IDE (foundation + UI tasks in parallel)
 - **Cross-project coordination**: Multiple agents working across different repositories
 - **Conflict prevention**: File reservations preventing merge conflicts
 
@@ -66,7 +66,7 @@ After exploring these examples:
 
 1. **Try it yourself**: Register an agent in your project
 2. **Coordinate with teammates**: Share Agent Mail database across team
-3. **Integrate with Beads**: Use task IDs as thread IDs
+3. **Integrate with JAT Tasks**: Use task IDs as thread IDs
 4. **Scale up**: Add more agents as needed (no coordination overhead)
 
 ## Documentation

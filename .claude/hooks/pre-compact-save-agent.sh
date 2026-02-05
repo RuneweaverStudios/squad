@@ -7,7 +7,7 @@
 
 PROJECT_DIR="$(pwd)"
 CLAUDE_DIR="$PROJECT_DIR/.claude"
-BEADS_LOGS_DIR="$PROJECT_DIR/.beads/logs"
+JAT_LOGS_DIR="$PROJECT_DIR/.jat/logs"
 
 # Use WINDOWID for persistence (stable across /clear, unique per terminal)
 # Falls back to PPID if WINDOWID not available
@@ -29,7 +29,7 @@ fi
 # ============================================================================
 # CAPTURE TERMINAL SCROLLBACK BEFORE COMPACTION
 # This preserves the pre-compaction terminal history that would otherwise be lost
-# Uses unified session log: .beads/logs/session-{sessionName}.log
+# Uses unified session log: .jat/logs/session-{sessionName}.log
 # ============================================================================
 if [[ -n "$TMUX_SESSION" ]]; then
     # Use the unified capture script
@@ -39,8 +39,8 @@ if [[ -n "$TMUX_SESSION" ]]; then
         echo "[PreCompact] Captured scrollback for $TMUX_SESSION (compacted)" >> "$CLAUDE_DIR/.agent-activity.log"
     else
         # Fallback: inline capture if script not found
-        mkdir -p "$BEADS_LOGS_DIR" 2>/dev/null
-        LOG_FILE="$BEADS_LOGS_DIR/session-${TMUX_SESSION}.log"
+        mkdir -p "$JAT_LOGS_DIR" 2>/dev/null
+        LOG_FILE="$JAT_LOGS_DIR/session-${TMUX_SESSION}.log"
         TIMESTAMP=$(date -Iseconds)
 
         SCROLLBACK=$(tmux capture-pane -t "$TMUX_SESSION" -p -S - -E - 2>/dev/null || true)
@@ -86,11 +86,11 @@ if [[ -f "$AGENT_FILE" ]]; then
         TASK_TITLE=$(jq -r '.data.taskTitle // .taskTitle // ""' "$SIGNAL_FILE" 2>/dev/null)
     fi
 
-    # If no signal file, try to get task from Beads
-    if [[ -z "$TASK_ID" ]] && command -v bd &>/dev/null; then
-        TASK_ID=$(bd list --json 2>/dev/null | jq -r --arg a "$AGENT_NAME" '.[] | select(.assignee == $a and .status == "in_progress") | .id' 2>/dev/null | head -1)
+    # If no signal file, try to get task from JAT Tasks
+    if [[ -z "$TASK_ID" ]] && command -v jt &>/dev/null; then
+        TASK_ID=$(jt list --json 2>/dev/null | jq -r --arg a "$AGENT_NAME" '.[] | select(.assignee == $a and .status == "in_progress") | .id' 2>/dev/null | head -1)
         if [[ -n "$TASK_ID" ]]; then
-            TASK_TITLE=$(bd show "$TASK_ID" --json 2>/dev/null | jq -r '.[0].title // ""' 2>/dev/null)
+            TASK_TITLE=$(jt show "$TASK_ID" --json 2>/dev/null | jq -r '.[0].title // ""' 2>/dev/null)
         fi
     fi
 

@@ -5,7 +5,7 @@
  * Query params:
  *   ?path=/custom/path - Scan a specific directory (default: ~/code)
  *
- * Returns: { directories: [{ path, name, isGitRepo, hasBeads }], basePath: string }
+ * Returns: { directories: [{ path, name, isGitRepo, hasJat }], basePath: string }
  *
  * Security: Only allows paths under user's home directory.
  * Used by CreateProjectDrawer path picker.
@@ -53,12 +53,12 @@ function isGitRepo(dirPath) {
 }
 
 /**
- * Check if a directory has Beads initialized
+ * Check if a directory has JAT initialized
  * @param {string} dirPath
  * @returns {boolean}
  */
-function hasBeads(dirPath) {
-	return existsSync(join(dirPath, '.beads'));
+function hasJat(dirPath) {
+	return existsSync(join(dirPath, '.jat'));
 }
 
 export async function GET({ url }) {
@@ -101,7 +101,7 @@ export async function GET({ url }) {
 					path: fullPath,
 					name: entry.name,
 					isGitRepo: isGitRepo(fullPath),
-					hasBeads: hasBeads(fullPath)
+					hasJat: hasJat(fullPath)
 				};
 			})
 			// Sort alphabetically by name

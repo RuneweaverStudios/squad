@@ -17,7 +17,7 @@
 Requirements:
 - Focus-to-edit, blur-to-save behavior
 - Match existing theme/style
-- Store in SQLite via Beads
+- Store in SQLite via JAT
 - Display below description section`,
 		notes: 'Checked the API - notes field already exists in schema. Need to add UI component.'
 	});
@@ -40,12 +40,12 @@ Requirements:
 		],
 		timeline: [
 			{ type: 'signal' as const, timestamp: '2025-01-15T14:30:00Z', data: { state: 'working', agentName: 'DeepStar', taskTitle: 'Add notes field' } },
-			{ type: 'beads_event' as const, event: 'status_changed', timestamp: '2025-01-15T14:00:00Z', description: 'Status changed to in_progress', metadata: { status: 'in_progress' } },
+			{ type: 'jat_event' as const, event: 'status_changed', timestamp: '2025-01-15T14:00:00Z', description: 'Status changed to in_progress', metadata: { status: 'in_progress' } },
 			{ type: 'agent_mail' as const, event: 'message', timestamp: '2025-01-15T12:00:00Z', description: 'Starting work on notes field implementation', metadata: { from_agent: 'DeepStar' } },
-			{ type: 'beads_event' as const, event: 'assigned', timestamp: '2025-01-14T10:30:00Z', description: 'Assigned to DeepStar', metadata: { assignee: 'DeepStar' } },
-			{ type: 'beads_event' as const, event: 'created', timestamp: '2025-01-14T10:00:00Z', description: 'Task created', metadata: {} }
+			{ type: 'jat_event' as const, event: 'assigned', timestamp: '2025-01-14T10:30:00Z', description: 'Assigned to DeepStar', metadata: { assignee: 'DeepStar' } },
+			{ type: 'jat_event' as const, event: 'created', timestamp: '2025-01-14T10:00:00Z', description: 'Task created', metadata: {} }
 		],
-		timelineCounts: { total: 5, beads_events: 3, agent_mail: 1, signals: 1 }
+		timelineCounts: { total: 5, jat_events: 3, agent_mail: 1, signals: 1 }
 	};
 
 	function handleViewTask(taskId: string) {

@@ -18,10 +18,10 @@ Begins a work session. This command establishes agent identity, checks for messa
 1. **Parse parameters** to detect if a task ID, agent name, or both were provided
 2. **Get/create agent** by checking for pre-registered identity (IDE-spawned) or registering a new one via `am-register`
 3. **Check Agent Mail** with `am-inbox` to read unread messages before starting
-4. **Select task** from parameter or display ready work with `bd ready --json`
+4. **Select task** from parameter or display ready work with `jt ready --json`
 5. **Review prior tasks** to check for duplicates and related work in the last 7 days
 6. **Detect conflicts** by checking file reservations and uncommitted changes
-7. **Start task** by updating Beads status, reserving files, and announcing via Agent Mail
+7. **Start task** by updating task status, reserving files, and announcing via Agent Mail
 8. **Emit signals** in sequence: `starting` then `working`
 
 The starting signal fires immediately after registration:
@@ -64,17 +64,17 @@ Finishes the current task with full verification. The session ends after this co
 
 | Step | Action | Tool | Signal |
 |------|--------|------|--------|
-| 1 | Get task and agent identity | `get-current-session-id`, Beads lookup | - |
+| 1 | Get task and agent identity | `get-current-session-id`, task lookup | - |
 | 2 | Read and respond to Agent Mail | `am-inbox`, `am-reply`, `am-ack` | - |
 | 3 | Verify task (tests, lint, security) | `jat-step verifying` | completing (0%) |
 | 4 | Commit changes | `jat-step committing` | completing (20%) |
-| 5 | Mark task complete in Beads | `jat-step closing` | completing (40%) |
-| 5.5 | Auto-close eligible parent epics | `bd epic close-eligible` | - |
+| 5 | Mark task complete | `jat-step closing` | completing (40%) |
+| 5.5 | Auto-close eligible parent epics | `jt epic close-eligible` | - |
 | 6 | Release file reservations | `jat-step releasing` | completing (60%) |
 | 7 | Announce completion via Agent Mail | `jat-step announcing` | completing (80%) |
 | 8 | Generate completion bundle and emit | `jat-step complete` | complete (100%) |
 
-**The difference between "Ready for Review" and "Complete" matters.** Ready for Review means the agent finished coding and is presenting results. Complete means Beads is closed, reservations released, and mail sent. Never say "Task Complete" before step 8 finishes.
+**The difference between "Ready for Review" and "Complete" matters.** Ready for Review means the agent finished coding and is presenting results. Complete means the task is closed, reservations released, and mail sent. Never say "Task Complete" before step 8 finishes.
 
 The `--kill` flag tells the IDE to auto-terminate the tmux session after completion. Without it, the session stays open for the user to review output.
 
@@ -84,7 +84,7 @@ The `--kill` flag tells the IDE to auto-terminate the tmux session after complet
 
 Pauses current work to pivot to something else. Unlike `/jat:complete`, this doesn't close the task.
 
-The agent's task stays `in_progress` in Beads. File reservations remain active. The pause is announced via Agent Mail so other agents know the task isn't abandoned.
+The agent's task stays `in_progress`. File reservations remain active. The pause is announced via Agent Mail so other agents know the task isn't abandoned.
 
 Use `/jat:pause` when you need to:
 

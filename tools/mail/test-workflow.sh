@@ -27,20 +27,20 @@ echo "2. List all agents..."
 ./am-agents
 echo ""
 
-echo "3. Alice reserves frontend files for task bd-101..."
-./am-reserve "src/components/**" --agent Alice --ttl 7200 --reason "bd-101" --exclusive
+echo "3. Alice reserves frontend files for task jat-101..."
+./am-reserve "src/components/**" --agent Alice --ttl 7200 --reason "jat-101" --exclusive
 echo ""
 
 echo "4. Bob tries to reserve same files (should fail)..."
-./am-reserve "src/components/**" --agent Bob --ttl 3600 --reason "bd-102" 2>&1 || echo "(Expected conflict)"
+./am-reserve "src/components/**" --agent Bob --ttl 3600 --reason "jat-102" 2>&1 || echo "(Expected conflict)"
 echo ""
 
 echo "5. Bob reserves backend files instead..."
-./am-reserve "api/**" --agent Bob --ttl 7200 --reason "bd-102" --exclusive
+./am-reserve "api/**" --agent Bob --ttl 7200 --reason "jat-102" --exclusive
 echo ""
 
 echo "6. Carol reserves test files (shared lock)..."
-./am-reserve "tests/**" --agent Carol --ttl 7200 --reason "bd-103" --shared
+./am-reserve "tests/**" --agent Carol --ttl 7200 --reason "jat-103" --shared
 echo ""
 
 echo "7. List all active reservations..."
@@ -48,15 +48,15 @@ echo "7. List all active reservations..."
 echo ""
 
 echo "8. Alice sends project kickoff message..."
-./am-send "[bd-101] Starting frontend refactor" \
+./am-send "[jat-101] Starting frontend refactor" \
   "I'm beginning work on the component refactor. Will update in a few hours." \
-  --from Alice --to Bob,Carol --thread bd-101 --importance high --ack
+  --from Alice --to Bob,Carol --thread jat-101 --importance high --ack
 echo ""
 
 echo "9. Bob sends backend update..."
-./am-send "[bd-102] API changes ready" \
+./am-send "[jat-102] API changes ready" \
   "The new REST endpoints are implemented. Please review when you have time." \
-  --from Bob --to Alice --cc Carol --thread bd-102 --importance normal
+  --from Bob --to Alice --cc Carol --thread jat-102 --importance normal
 echo ""
 
 echo "10. Check Bob's inbox (should have 1 message)..."
@@ -64,7 +64,7 @@ echo "10. Check Bob's inbox (should have 1 message)..."
 echo ""
 
 echo "11. Bob marks Alice's message as read and acknowledges it..."
-./am-inbox Bob --thread bd-101 --mark-read
+./am-inbox Bob --thread jat-101 --mark-read
 ./am-ack 1 --agent Bob
 echo ""
 
@@ -84,8 +84,8 @@ echo "15. Search for messages about 'API'..."
 ./am-search "API"
 echo ""
 
-echo "16. Search within thread bd-102..."
-./am-search "review" --thread bd-102
+echo "16. Search within thread jat-102..."
+./am-search "review" --thread jat-102
 echo ""
 
 echo "17. Check Alice's status..."
@@ -97,7 +97,7 @@ echo "18. Alice finishes work and releases her reservation..."
 echo ""
 
 echo "19. Now Bob can reserve frontend files..."
-./am-reserve "src/components/**" --agent Bob --ttl 3600 --reason "bd-104"
+./am-reserve "src/components/**" --agent Bob --ttl 3600 --reason "jat-104"
 echo ""
 
 echo "20. List final reservations..."
@@ -105,9 +105,9 @@ echo "20. List final reservations..."
 echo ""
 
 echo "21. Carol sends test completion message..."
-./am-send "[bd-103] Tests passing" \
+./am-send "[jat-103] Tests passing" \
   "All tests are green. Good work team!" \
-  --from Carol --to Alice,Bob --thread bd-103 --importance high
+  --from Carol --to Alice,Bob --thread jat-103 --importance high
 echo ""
 
 echo "22. Final inbox check for Alice..."

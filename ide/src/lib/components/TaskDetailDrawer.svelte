@@ -82,7 +82,7 @@
 
 	// Task history state
 	interface TimelineEvent {
-		type: 'beads_event' | 'agent_mail';
+		type: 'jat_event' | 'agent_mail';
 		event: string;
 		timestamp: string;
 		description: string;
@@ -95,7 +95,7 @@
 		timeline: TimelineEvent[];
 		count: {
 			total: number;
-			beads_events: number;
+			jat_events: number;
 			agent_mail: number;
 		};
 		timestamp: string;
@@ -381,7 +381,7 @@
 	const filteredTimeline = $derived((): TimelineEvent[] => {
 		if (!taskHistory?.timeline) return [];
 		if (timelineFilter === 'all') return taskHistory.timeline;
-		if (timelineFilter === 'tasks') return taskHistory.timeline.filter(e => e.type === 'beads_event');
+		if (timelineFilter === 'tasks') return taskHistory.timeline.filter(e => e.type === 'jat_event');
 		return taskHistory.timeline.filter(e => e.type === 'agent_mail');
 	});
 
@@ -2916,7 +2916,7 @@
 										class="tab {timelineFilter === 'tasks' ? 'tab-active' : ''}"
 										onclick={() => timelineFilter = 'tasks'}
 									>
-										Tasks ({taskHistory?.count?.beads_events || 0})
+										Tasks ({taskHistory?.count?.jat_events || 0})
 									</button>
 									<button
 										class="tab {timelineFilter === 'messages' ? 'tab-active' : ''}"
@@ -2958,10 +2958,10 @@
 										<li style="grid-template-columns: 30% min-content 1fr;">
 											<!-- Top connector (skip for first item) -->
 											{#if i > 0}
-												<hr class="{event.type === 'beads_event' ? 'bg-info' : 'bg-warning'}" />
+												<hr class="{event.type === 'jat_event' ? 'bg-info' : 'bg-warning'}" />
 											{/if}
 
-											{#if event.type === 'beads_event'}
+											{#if event.type === 'jat_event'}
 												<!-- Task events on LEFT side (timeline-start) -->
 												<div class="timeline-start timeline-box text-xs mb-4 border-info/30 bg-info/5">
 													<!-- Event description -->
@@ -3081,7 +3081,7 @@
 
 											<!-- Bottom connector (skip for last item) -->
 											{#if i < filteredTimeline().length - 1}
-												<hr class="{filteredTimeline()[i + 1]?.type === 'beads_event' ? 'bg-info' : 'bg-warning'}" />
+												<hr class="{filteredTimeline()[i + 1]?.type === 'jat_event' ? 'bg-info' : 'bg-warning'}" />
 											{/if}
 										</li>
 									{/each}

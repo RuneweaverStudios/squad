@@ -36,8 +36,8 @@ cd jat
 # 2. Run the installer locally
 ./install.sh
 
-# 3. Initialize Beads in the repo
-bd init
+# 3. Initialize JAT Tasks in the repo
+jt init
 
 # 4. Register as an agent (for testing)
 am-register --program dev --model test
@@ -474,7 +474,7 @@ Brief description of what this PR does.
 jat/
 ├── tools/                     # All executable tools
 │   ├── browser/              # Browser automation (browser-*.js)
-│   ├── core/                 # Core utilities (db-*, bd-*, etc.)
+│   ├── core/                 # Core utilities (db-*, jt-*, etc.)
 │   ├── mail/                 # Agent Mail (am-*)
 │   ├── media/                # Image generation (gemini-*, avatar-*)
 │   ├── signal/               # JAT signal tools
@@ -485,7 +485,7 @@ jat/
 │   ├── complete.md           # /jat:complete command
 │   └── ...                   # Other commands
 │
-├── ide/                 # Beads Task IDE (SvelteKit)
+├── ide/                 # JAT IDE (SvelteKit)
 │   ├── src/                  # Source files
 │   └── CLAUDE.md             # IDE-specific docs
 │
@@ -516,15 +516,15 @@ jat/
 # 1. Start session
 /register
 
-# 2. Create Beads task
-bd create "Add new tool: db-backup" \
+# 2. Create task
+jt create "Add new tool: db-backup" \
   --type feature \
   --labels tools,database \
   --priority 1 \
   --description "Create PostgreSQL backup tool with compression and rotation"
 
 # 3. Reserve files
-am-reserve "tools/db-backup" --agent DevAgent --ttl 3600 --reason "bd-123"
+am-reserve "tools/db-backup" --agent DevAgent --ttl 3600 --reason "jat-123"
 
 # 4. Develop tool
 vim tools/db-backup
@@ -543,7 +543,7 @@ git commit -m "feat: add db-backup tool for PostgreSQL dumps"
 
 # 8. Release and complete
 am-release "tools/db-backup" --agent DevAgent
-bd close bd-123 --reason "Completed: db-backup tool implemented"
+jt close jat-123 --reason "Completed: db-backup tool implemented"
 
 # 9. Push and create PR
 git push origin feature/db-backup

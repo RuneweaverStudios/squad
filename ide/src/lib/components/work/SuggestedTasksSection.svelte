@@ -30,7 +30,7 @@
 	interface SuggestedTaskWithState extends SuggestedTask {
 		selected: boolean;
 		edited: boolean;
-		/** Whether this task already exists in Beads (matched by title) */
+		/** Whether this task already exists in JAT (matched by title) */
 		alreadyCreated?: boolean;
 		/** Task ID if this task was already created (for displaying clickable badge) */
 		taskId?: string;
@@ -415,7 +415,7 @@
 											? 'checkbox-human-selected'
 											: 'checkbox-agent-selected'
 										: 'checkbox-default'}"
-								title={task.alreadyCreated ? 'Already created in Beads' : ''}
+								title={task.alreadyCreated ? 'Already created in JAT' : ''}
 							>
 								{#if task.alreadyCreated || task.selected}
 									<svg
@@ -539,7 +539,7 @@
 										{:else}
 											<span
 												class="badge badge-xs badge-success font-mono gap-1"
-												title="This task already exists in Beads"
+												title="This task already exists in JAT"
 											>
 												<svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
 													<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />

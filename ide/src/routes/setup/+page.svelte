@@ -449,7 +449,7 @@
 					</div>
 				{:else}
 					<p class="text-sm" style="color: oklch(0.60 0.02 250);">
-						JAT tracks tasks using Beads &mdash; a lightweight, git-friendly task system.
+						JAT tracks tasks using a lightweight, git-friendly task system.
 						Add a project from <code class="px-1 py-0.5 rounded text-xs" style="background: oklch(0.22 0.01 250);">~/code/</code> to get started.
 					</p>
 
@@ -470,7 +470,7 @@
 					</button>
 
 					<p class="text-[11px] font-mono text-center" style="color: oklch(0.45 0.02 250);">
-						Or from terminal: <code class="px-1 py-0.5 rounded" style="background: oklch(0.22 0.01 250);">cd ~/code/project && bd init</code>
+						Or from terminal: <code class="px-1 py-0.5 rounded" style="background: oklch(0.22 0.01 250);">cd ~/code/project && jt init</code>
 					</p>
 				{/if}
 			</div>

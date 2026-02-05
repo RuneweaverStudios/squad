@@ -1,7 +1,7 @@
 /**
  * Completion Bundle Storage
  *
- * Persists completion bundles to .beads/completions.json
+ * Persists completion bundles to .jat/completions.json
  * Similar pattern to task-images.json for auxiliary task data
  *
  * Storage format:
@@ -25,12 +25,12 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
 /**
- * Get the path to completions.json in the project's .beads directory
+ * Get the path to completions.json in the project's .jat directory
  * @returns {string}
  */
 function getCompletionsPath() {
 	const projectPath = process.cwd().replace('/ide', '');
-	return join(projectPath, '.beads', 'completions.json');
+	return join(projectPath, '.jat', 'completions.json');
 }
 
 /**

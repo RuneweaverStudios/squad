@@ -34,7 +34,7 @@ export const docSections: DocSection[] = [
 			{
 				slug: 'task-management',
 				title: 'Task Management',
-				description: 'Beads: dependency-aware task planning'
+				description: 'Dependency-aware task planning'
 			},
 			{
 				slug: 'agent-mail',
@@ -46,7 +46,7 @@ export const docSections: DocSection[] = [
 	{
 		title: 'The IDE',
 		pages: [
-			{ slug: 'ide-overview', title: 'IDE Overview', description: 'The Beads Task IDE' },
+			{ slug: 'ide-overview', title: 'IDE Overview', description: 'The JAT IDE' },
 			{ slug: 'work-sessions', title: 'Work Sessions', description: 'Managing agent sessions' },
 			{
 				slug: 'task-views',

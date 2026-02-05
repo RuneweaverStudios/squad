@@ -26,7 +26,7 @@ import { promisify } from 'util';
 import { broadcastTaskChange, broadcastAgentState, broadcastOutput, isInitialized, getChannelSubscriberCount } from './connectionPool.js';
 // NOTE: Must use relative import (not $lib alias) because this file is transitively
 // imported by vite.config.ts via vitePlugin.ts, and $lib isn't available at config time.
-import { getTasks } from '../beads.js';
+import { getTasks } from '../jat-tasks.js';
 
 const execAsync = promisify(exec);
 

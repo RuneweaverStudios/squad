@@ -41,12 +41,12 @@ fi
 
 # Test database paths
 TEST_DB="/tmp/test-agent-mail-${RANDOM}.db"
-TEST_BEADS_DIR="/tmp/test-beads-${RANDOM}"
+TEST_PROJECT_DIR="/tmp/test-jat-${RANDOM}"
 
 # Cleanup function
 cleanup() {
     rm -f "$TEST_DB"
-    rm -rf "$TEST_BEADS_DIR"
+    rm -rf "$TEST_PROJECT_DIR"
 }
 trap cleanup EXIT
 
@@ -101,12 +101,12 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 
 -- Insert test project
-INSERT INTO projects (slug, human_key) VALUES ('test-project', '$TEST_BEADS_DIR');
+INSERT INTO projects (slug, human_key) VALUES ('test-project', '$TEST_PROJECT_DIR');
 EOF
 
-    # Create test Beads database directory
-    mkdir -p "$TEST_BEADS_DIR"
-    cd "$TEST_BEADS_DIR"
+    # Create test project directory
+    mkdir -p "$TEST_PROJECT_DIR"
+    cd "$TEST_PROJECT_DIR"
 
     # Initialize tasks database
     jt init --quiet >/dev/null 2>&1 || true
@@ -143,19 +143,19 @@ VALUES (1, $agent_id, '$pattern', 1, '$reason', '$expires_ts');
 EOF
 }
 
-# Helper: Create Beads task
-create_beads_task() {
+# Helper: Create task in JAT database
+create_task() {
     local task_id="$1"
     local title="$2"
     local status="$3"
     local assignee="${4:-}"
     local priority="${5:-1}"
 
-    # Database is always beads.db
-    local db_file="$TEST_BEADS_DIR/.beads/beads.db"
+    # Database is always tasks.db
+    local db_file="$TEST_PROJECT_DIR/.jat/tasks.db"
 
     if [[ ! -f "$db_file" ]]; then
-        echo "Error: Beads database not found at $db_file" >&2
+        echo "Error: Tasks database not found at $db_file" >&2
         return 1
     fi
 
@@ -185,7 +185,7 @@ run_statusline_test() {
     local json_input
     json_input=$(cat <<EOF
 {
-  "cwd": "$TEST_BEADS_DIR",
+  "cwd": "$TEST_PROJECT_DIR",
   "session_id": "$session_id",
   "transcript_path": "$transcript_path"
 }
@@ -201,18 +201,18 @@ EOF
         # Create test command wrappers
         mkdir -p /tmp/test-bin
 
-        # bd wrapper
-        cat > /tmp/test-bin/bd <<BDEOF
+        # jt wrapper
+        cat > /tmp/test-bin/jt <<JTEOF
 #!/bin/bash
-cd "$TEST_BEADS_DIR"
-$(which bd) "\$@"
-BDEOF
-        chmod +x /tmp/test-bin/bd
+cd "$TEST_PROJECT_DIR"
+$(which jt) "\$@"
+JTEOF
+        chmod +x /tmp/test-bin/jt
 
         # am-reservations wrapper
         cat > /tmp/test-bin/am-reservations <<AMEOF
 #!/bin/bash
-AGENT_MAIL_DB="$TEST_DB" $(which am-reservations) --project "$TEST_BEADS_DIR" "\$@"
+AGENT_MAIL_DB="$TEST_DB" $(which am-reservations) --project "$TEST_PROJECT_DIR" "\$@"
 AMEOF
         chmod +x /tmp/test-bin/am-reservations
 
@@ -224,8 +224,8 @@ INEOF
         chmod +x /tmp/test-bin/am-inbox
 
         # Create agent session file
-        mkdir -p "$TEST_BEADS_DIR/.claude"
-        echo "$agent_name" > "$TEST_BEADS_DIR/.claude/agent-${session_id}.txt"
+        mkdir -p "$TEST_PROJECT_DIR/.claude"
+        echo "$agent_name" > "$TEST_PROJECT_DIR/.claude/agent-${session_id}.txt"
 
         # Run statusline
         echo "$json_input" | .claude/statusline.sh
@@ -301,12 +301,12 @@ echo "Test 1: Agent with in_progress task (no reservations)"
 echo "------------------------------------------------------"
 
 register_test_agent "TestAgent1"
-create_beads_task "jat-abc" "Test Task 1" "in_progress" "TestAgent1" 1
+create_task "jat-abc" "Test Task 1" "in_progress" "TestAgent1" 1
 
 output=$(run_statusline_test "TestAgent1")
 
-assert_contains "$output" "jat-abc" "Shows task ID from Beads"
-assert_contains "$output" "Test Task 1" "Shows task title from Beads"
+assert_contains "$output" "jat-abc" "Shows task ID from JAT"
+assert_contains "$output" "Test Task 1" "Shows task title from JAT"
 
 echo ""
 
@@ -317,16 +317,16 @@ echo "Test 2: Agent with reservations (no in_progress task)"
 echo "------------------------------------------------------"
 
 register_test_agent "TestAgent2"
-create_beads_task "jat-xyz" "Test Task 2" "open" "" 1
+create_task "jat-xyz" "Test Task 2" "open" "" 1
 create_reservation "TestAgent2" "src/**/*.ts" "jat-xyz" 3600
 
 # Debug: Check what am-reservations returns
 if [[ "$VERBOSE" == "true" ]]; then
-    echo "  Debug: TEST_BEADS_DIR=$TEST_BEADS_DIR"
+    echo "  Debug: TEST_PROJECT_DIR=$TEST_PROJECT_DIR"
     echo "  Debug: Checking projects table"
     sqlite3 "$TEST_DB" "SELECT * FROM projects;"
     echo "  Debug: Checking am-reservations output"
-    AGENT_MAIL_DB="$TEST_DB" am-reservations --project "$TEST_BEADS_DIR" --agent "TestAgent2" 2>&1
+    AGENT_MAIL_DB="$TEST_DB" am-reservations --project "$TEST_PROJECT_DIR" --agent "TestAgent2" 2>&1
     echo "  Debug: Checking database contents"
     sqlite3 "$TEST_DB" "SELECT * FROM file_reservations;"
     sqlite3 "$TEST_DB" "SELECT * FROM agents;"
@@ -335,7 +335,7 @@ fi
 output=$(run_statusline_test "TestAgent2")
 
 assert_contains "$output" "jat-xyz" "Shows task ID from reservation"
-assert_contains "$output" "Test Task 2" "Shows task title from Beads lookup"
+assert_contains "$output" "Test Task 2" "Shows task title from JAT lookup"
 
 echo ""
 
@@ -346,8 +346,8 @@ echo "Test 3: Agent with in_progress task AND reservations"
 echo "------------------------------------------------------"
 
 register_test_agent "TestAgent3"
-create_beads_task "jat-pqr" "Test Task 3 Priority" "in_progress" "TestAgent3" 0
-create_beads_task "jat-stu" "Test Task 3 Reserve" "open" "" 1
+create_task "jat-pqr" "Test Task 3 Priority" "in_progress" "TestAgent3" 0
+create_task "jat-stu" "Test Task 3 Reserve" "open" "" 1
 create_reservation "TestAgent3" "src/**/*.ts" "jat-stu" 3600
 
 output=$(run_statusline_test "TestAgent3")
@@ -375,13 +375,13 @@ assert_not_contains "$output" "jat-" "Does not show any task ID"
 echo ""
 
 # ----------------------------------------------------------------------------
-# TEST 5: Edge case - Closed task in Beads
+# TEST 5: Edge case - Closed task in JAT
 # ----------------------------------------------------------------------------
 echo "Test 5: Edge case - Closed task should not appear"
 echo "------------------------------------------------------"
 
 register_test_agent "TestAgent5"
-create_beads_task "jat-cls" "Closed Task" "closed" "TestAgent5" 1
+create_task "jat-cls" "Closed Task" "closed" "TestAgent5" 1
 
 output=$(run_statusline_test "TestAgent5")
 
@@ -397,7 +397,7 @@ echo "Test 6: Priority badge display"
 echo "------------------------------------------------------"
 
 register_test_agent "TestAgent6"
-create_beads_task "jat-p0t" "P0 Task" "in_progress" "TestAgent6" 0
+create_task "jat-p0t" "P0 Task" "in_progress" "TestAgent6" 0
 
 output=$(run_statusline_test "TestAgent6")
 
@@ -413,7 +413,7 @@ echo "Test 7: File lock count indicator"
 echo "------------------------------------------------------"
 
 register_test_agent "TestAgent7"
-create_beads_task "jat-lck" "Lock Task" "in_progress" "TestAgent7" 1
+create_task "jat-lck" "Lock Task" "in_progress" "TestAgent7" 1
 create_reservation "TestAgent7" "src/**/*.ts" "jat-lck" 3600
 create_reservation "TestAgent7" "test/**/*.ts" "jat-lck" 3600
 

@@ -4,14 +4,14 @@
  * GET /api/tasks/{id}/history - Returns unified timeline of task events
  *
  * Combines:
- * - Beads task state changes (created, status updates, assignee changes, etc.)
+ * - JAT task state changes (created, status updates, assignee changes, etc.)
  * - Agent Mail coordination messages (filtered by thread_id = task.id)
  *
  * Returns chronological timeline with visual distinction between event types.
  */
 
 import { json } from '@sveltejs/kit';
-import { getTaskById } from '$lib/server/beads.js';
+import { getTaskById } from '$lib/server/jat-tasks.js';
 import { getThreadMessages } from '$lib/server/agent-mail.js';
 
 /** @type {import('./$types').RequestHandler} */
@@ -23,7 +23,7 @@ export async function GET({ params }) {
 	}
 
 	try {
-		// Fetch task data from Beads
+		// Fetch task data from JAT
 		const task = getTaskById(id);
 
 		if (!task) {
@@ -43,14 +43,14 @@ export async function GET({ params }) {
 		// Build unified timeline
 		const timeline = [];
 
-		// 1. Add Beads events
+		// 1. Add JAT events
 
 		// Task created event
 		/** @type {{ type?: string, closed_at?: string, created_at?: string, updated_at?: string, priority?: number, status?: string, assignee?: string, title?: string }} */
 		const taskData = task;
 		if (taskData.created_at) {
 			timeline.push({
-				type: 'beads_event',
+				type: 'jat_event',
 				event: 'task_created',
 				timestamp: taskData.created_at,
 				description: 'Task created',
@@ -65,7 +65,7 @@ export async function GET({ params }) {
 		// Task updated event (if different from created)
 		if (taskData.updated_at && taskData.updated_at !== taskData.created_at) {
 			timeline.push({
-				type: 'beads_event',
+				type: 'jat_event',
 				event: 'task_updated',
 				timestamp: taskData.updated_at,
 				description: 'Task updated',
@@ -79,7 +79,7 @@ export async function GET({ params }) {
 		// Task closed event (if applicable)
 		if (taskData.closed_at) {
 			timeline.push({
-				type: 'beads_event',
+				type: 'jat_event',
 				event: 'task_closed',
 				timestamp: taskData.closed_at,
 				description: 'Task closed',
@@ -120,7 +120,7 @@ export async function GET({ params }) {
 			timeline: timeline,
 			count: {
 				total: timeline.length,
-				beads_events: timeline.filter(e => e.type === 'beads_event').length,
+				jat_events: timeline.filter(e => e.type === 'jat_event').length,
 				agent_mail: timeline.filter(e => e.type === 'agent_mail').length
 			},
 			timestamp: new Date().toISOString()

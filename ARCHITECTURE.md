@@ -144,7 +144,7 @@ Bash tools are better when:
 │ Bash Tools   │   │  State Management        │
 │ (28+ tools)  │   │                          │
 │              │   │  • Agent Mail (SQLite)   │
-│ am-*         │◄──┤  • Beads (per-project)   │
+│ am-*         │◄──┤  • JAT Tasks (per-project)│
 │ browser-*    │   │  • File Reservations     │
 │ db-*         │   │  • Message Threads       │
 └──────────────┘   └──────────────────────────┘
@@ -163,15 +163,15 @@ Bash tools are better when:
    - Check conflicts (file locks, git, inbox)
    - Reserve files via `am-reserve`
    - Announce via `am-send`
-   - Query dependencies via `bd show`
+   - Query dependencies via `jt show`
    - BEGIN WORK
 4. **Bash tools execute:**
    - `am-reserve "src/**"` → SQLite INSERT
-   - `am-send "[bd-123] Starting..."` → SQLite INSERT + notification
-   - `bd show bd-123 --json` → Reads .beads/beads.base.jsonl
+   - `am-send "[jat-123] Starting..."` → SQLite INSERT + notification
+   - `jt show jat-123 --json` → Reads .jat/tasks.db
 5. **State persists:**
    - Agent Mail: `~/.agent-mail.db`
-   - Beads: `.beads/beads.base.jsonl` (git-committable)
+   - JAT Tasks: `.jat/tasks.db` (SQLite, per-project)
    - File locks: SQLite with TTL expiry
 
 **Zero HTTP calls. Zero servers. Pure bash + SQLite.**
@@ -231,7 +231,7 @@ CREATE TABLE messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id INTEGER NOT NULL,
     sender_id INTEGER NOT NULL,
-    thread_id TEXT,                      -- Use Beads task ID (e.g., "bd-123")
+    thread_id TEXT,                      -- Use JAT task ID (e.g., "jat-123")
     subject TEXT NOT NULL,
     body_md TEXT NOT NULL,               -- Markdown content
     importance TEXT NOT NULL DEFAULT 'normal', -- normal | high | urgent
@@ -244,7 +244,7 @@ CREATE TABLE messages (
 
 **Purpose:** Async communication between agents.
 
-**Why thread_id?** Links messages to Beads tasks for traceability.
+**Why thread_id?** Links messages to JAT tasks for traceability.
 
 **Why Markdown?** Structured content (code blocks, lists, links) in messages.
 
@@ -274,7 +274,7 @@ CREATE TABLE file_reservations (
     project_id INTEGER NOT NULL,
     pattern TEXT NOT NULL,               -- Glob pattern (e.g., "src/**/*.ts")
     lock_type TEXT NOT NULL DEFAULT 'exclusive', -- exclusive | shared
-    reason TEXT,                         -- Why reserved (e.g., "bd-123: Auth work")
+    reason TEXT,                         -- Why reserved (e.g., "jat-123: Auth work")
     created_ts TEXT NOT NULL DEFAULT (datetime('now')),
     expires_ts TEXT NOT NULL,            -- TTL-based expiry
     FOREIGN KEY (agent_id) REFERENCES agents(id),
@@ -303,21 +303,20 @@ CREATE INDEX idx_reservations_expires ON file_reservations(expires_ts);
 
 **Why these indexes?**
 
-- Thread queries: `am-search --thread bd-123`
+- Thread queries: `am-search --thread jat-123`
 - Project queries: `am-inbox AgentName` (filtered by project)
 - Expiry cleanup: Periodic TTL cleanup scans
 - Conflict checks: `am-reserve` checks existing locks
 
-### Beads Schema (`.beads/beads.base.jsonl`)
+### JAT Tasks Schema (`.jat/tasks.db`)
 
-**Format:** JSONL (JSON Lines) for git-friendly diffs
+**Format:** SQLite database (per-project)
 
 **Example task:**
 
 ```json
 {
   "id": "chimaro-abc",
-  "content_hash": "...",
   "title": "Implement OAuth login",
   "description": "Add Google OAuth to auth system",
   "status": "open",
@@ -325,25 +324,23 @@ CREATE INDEX idx_reservations_expires ON file_reservations(expires_ts);
   "issue_type": "feature",
   "created_at": "2025-01-15T10:30:00Z",
   "updated_at": "2025-01-15T10:30:00Z",
-  "source_repo": ".",
   "labels": ["auth", "oauth", "p1"],
-  "depends_on": ["chimaro-xyz"],
-  "blocked_by": []
+  "depends_on": ["chimaro-xyz"]
 }
 ```
 
-**Why JSONL (not SQLite)?**
+**Why SQLite?**
 
-- Git-friendly (line-by-line diffs)
-- Committable (task state in version control)
-- Human-readable (can edit manually)
-- Cross-machine sync (via git pull/push)
+- ACID transactions (reliable concurrent access)
+- Fast queries with indexes
+- Zero configuration
+- Per-project isolation
 
 **Why per-project databases?**
 
 - Clean separation (each repo has own tasks)
-- Committable to repo (no global state leakage)
-- IDE aggregation (Chimaro reads all `~/code/*/.beads/`)
+- No global state leakage
+- IDE aggregation (JAT IDE reads all `~/code/*/.jat/`)
 
 ---
 
@@ -396,7 +393,7 @@ fi
 {
   am-inbox AgentName --unread --json > /tmp/inbox.json &
   am-reservations --agent AgentName > /tmp/reservations.txt &
-  bd ready --json > /tmp/tasks.json &
+  jt ready --json > /tmp/tasks.json &
   wait
 }
 
@@ -411,8 +408,8 @@ jq '.[] | .subject' /tmp/inbox.json
 ### Pattern 5: Incremental Processing (while read)
 
 ```bash
-# Process each task from Beads queue
-bd ready --json | jq -c '.[]' | while read task; do
+# Process each task from JAT Tasks queue
+jt ready --json | jq -c '.[]' | while read task; do
   task_id=$(echo "$task" | jq -r '.id')
   priority=$(echo "$task" | jq -r '.priority')
   echo "Processing $task_id (P$priority)"
@@ -420,7 +417,7 @@ bd ready --json | jq -c '.[]' | while read task; do
 done
 ```
 
-**Tools used:** `bd` → `jq` → `while read`
+**Tools used:** `jt` → `jq` → `while read`
 
 **Pattern:** Stream → Parse → Iterate
 
@@ -458,7 +455,7 @@ am-inbox AgentName --unread --json | \
    - Request overhead:                  500 tokens
    - Response JSON:                     800 tokens
 
-3. Get tasks (hypothetical mcp.beads.get_ready):
+3. Get tasks (hypothetical mcp.jat_tasks.get_ready):
    - Request overhead:                  500 tokens
    - Response JSON:                   1,200 tokens
 
@@ -481,7 +478,7 @@ Total:                                36,500 tokens
    - Tool name:                          20 tokens
    - Response JSON:                     800 tokens
 
-2. Get tasks (bd ready --json):
+2. Get tasks (jt ready --json):
    - Tool name:                          20 tokens
    - Response JSON:                   1,200 tokens
 
@@ -566,21 +563,19 @@ Total per invocation:    2,080-5,180ms
 
 **Mitigation:** WAL mode enabled (`PRAGMA journal_mode=WAL`) for better concurrency.
 
-### Beads JSONL Performance
+### JAT Tasks SQLite Performance
 
 **Read performance:**
 
-- Small files (<1000 tasks): 5-10ms
-- Large files (>10,000 tasks): 50-100ms
+- Indexed queries: 1-10ms
+- Full table scan (<1000 tasks): 5-10ms
 
 **Write performance:**
 
-- Append-only: 5-10ms
-- Full rewrite: 50-100ms (for status updates)
+- Single transaction: 5-20ms
+- Batch operations: Serialized via WAL mode
 
-**Trade-off:** Git-friendly format vs SQLite speed.
-
-**Why we accept it:** Task updates are infrequent (seconds apart, not milliseconds).
+**Why SQLite for tasks:** Fast queries, ACID transactions, and zero configuration. Task updates are infrequent (seconds apart, not milliseconds).
 
 ---
 
@@ -668,7 +663,7 @@ am-reserve "../../../etc/passwd"  # Directory traversal
 2. **Don't expose SQLite database** over network
 3. **Audit agent behavior** (check git history for rogue commits)
 4. **Use file reservations** (prevent accidental conflicts, not attacks)
-5. **Review Beads tasks** (verify task descriptions before accepting)
+5. **Review JAT tasks** (verify task descriptions before accepting)
 
 **JAT prioritizes simplicity over paranoia.** Designed for cooperative agents on trusted machines.
 
@@ -693,12 +688,12 @@ am-reserve "../../../etc/passwd"  # Directory traversal
 **How many projects can one agent work across?**
 
 - Agent Mail: One `~/.agent-mail.db` for all projects
-- Beads: One `.beads/` per project
+- JAT Tasks: One `.jat/` per project
 - **Limit:** Unlimited (tested with 50+ projects)
 
 **IDE aggregation:**
 
-- Chimaro scans `~/code/*/.beads/`
+- JAT IDE scans `~/code/*/.jat/`
 - Linear scan: ~10ms per project
 - 50 projects: 500ms total
 
@@ -754,7 +749,7 @@ am-reserve "../../../etc/passwd"  # Directory traversal
 |----------|---------|------|
 | Bash over HTTP | Instant startup, composability | No remote access |
 | SQLite over PostgreSQL | Zero config, single-file | Write concurrency limit |
-| JSONL over SQLite (Beads) | Git-friendly, committable | Slower queries |
+| SQLite per-project (JAT Tasks) | Fast queries, ACID transactions | Not directly git-diffable |
 | Advisory locks | Simple, no enforcement overhead | Requires cooperative agents |
 | Local-only | Fast, no network latency | Can't coordinate across machines |
 

@@ -2,7 +2,7 @@
  * Agent Unassign Task API - Unassign Specific Task from Agent
  * POST /api/agents/[name]/unassign-task
  *
- * Unassigns a specific task from the agent using bd update
+ * Unassigns a specific task from the agent using jt update
  */
 
 import { json } from '@sveltejs/kit';
@@ -36,12 +36,12 @@ export async function POST({ params, request }) {
 		}
 
 		// Verify task exists and is assigned to this agent
-		const showCommand = `bd show ${taskId} --json`;
+		const showCommand = `jt show ${taskId} --json`;
 
 		try {
 			const { stdout } = await execAsync(showCommand, { cwd: projectPath });
 			const taskData = JSON.parse(stdout.trim());
-			// bd show --json returns an array, get the first element
+			// jt show --json returns an array, get the first element
 			const task = Array.isArray(taskData) ? taskData[0] : taskData;
 
 			if (!task) {
@@ -62,7 +62,7 @@ export async function POST({ params, request }) {
 			}
 
 			// Unassign the task
-			const updateCommand = `bd update ${taskId} --assignee ""`;
+			const updateCommand = `jt update ${taskId} --assignee ""`;
 			await execAsync(updateCommand, { cwd: projectPath });
 
 			return json({

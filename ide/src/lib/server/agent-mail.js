@@ -46,7 +46,7 @@ export function getInboxForThread(agentName, threadId = undefined, options = {})
 
 /**
  * Get recent activities for an agent (last 10 messages)
- * @deprecated Use getBeadsActivities() instead - shows agent's task history, not shared inbox
+ * @deprecated Use getTaskActivities() instead - shows agent's task history from JAT, not shared inbox
  * @param {string} agentName - Agent name
  * @returns {Activity[]} - Array of activity objects {ts, preview, content, type}
  */
@@ -68,17 +68,17 @@ export function getAgentActivities(agentName) {
 }
 
 /**
- * @typedef {import('../../../../lib/beads.js').Task} Task
+ * @typedef {import('../../../../lib/jat-tasks.js').Task} Task
  */
 
 /**
- * Get recent Beads task activities for an agent (last 10 task updates)
+ * Get recent JAT task activities for an agent (last 10 task updates)
  * Shows tasks the agent worked on, with their status transitions
  * @param {string} agentName - Agent name
- * @param {Task[]} allTasks - All tasks from Beads (from getTasks())
+ * @param {Task[]} allTasks - All tasks from JAT (from getTasks())
  * @returns {Activity[]} - Array of activity objects {ts, preview, content, type}
  */
-export function getBeadsActivities(agentName, allTasks) {
+export function getTaskActivities(agentName, allTasks) {
 	if (!allTasks || allTasks.length === 0) {
 		return [];
 	}

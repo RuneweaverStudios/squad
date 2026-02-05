@@ -1787,7 +1787,7 @@
 			showColors={true}
 		/>
 		<p class="font-mono text-[10px] mt-1.5" style="color: oklch(0.45 0.02 250);">
-			Tasks will be created in this project's Beads database
+			Tasks will be created in this project's task database
 		</p>
 	</div>
 	<div>

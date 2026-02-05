@@ -23,22 +23,21 @@ You are running as part of a **multi-agent development system** called JAT (Joma
 1. **One agent = one session = one task** - Each session handles exactly one task
 2. **File reservations prevent conflicts** - Always reserve before editing shared files
 3. **Messages coordinate work** - Check Agent Mail before starting and completing
-4. **Beads is the task queue** - Pick from ready work, update status, close when done
+4. **JAT Tasks is the task queue** - Pick from ready work, update status, close when done
 5. **Signals track your state** - The IDE monitors agents through `jat-signal`
 
-## Beads (Task Management)
+## JAT Tasks (Task Management)
 
-This project uses `bd` (beads) for issue tracking.
+This project uses `jt` (JAT Tasks) for issue tracking.
 
 ```bash
-bd ready                    # Find available work (highest priority, no blockers)
-bd show <id>                # View task details
-bd show <id> --json         # JSON format
-bd update <id> --status in_progress --assignee AgentName
-bd close <id> --reason "Completed"
-bd list --status open       # List all open tasks
-bd search "keyword"         # Search tasks
-bd sync                     # Sync with git
+jt ready                    # Find available work (highest priority, no blockers)
+jt show <id>                # View task details
+jt show <id> --json         # JSON format
+jt update <id> --status in_progress --assignee AgentName
+jt close <id> --reason "Completed"
+jt list --status open       # List all open tasks
+jt search "keyword"         # Search tasks
 ```
 
 **Status values** (use underscores, not hyphens):
@@ -52,9 +51,9 @@ bd sync                     # Sync with git
 ### Dependencies
 
 ```bash
-bd dep add parent-id child-id   # parent depends on child
-bd dep tree task-id             # Show dependency tree
-bd dep remove parent-id child-id
+jt dep add parent-id child-id   # parent depends on child
+jt dep tree task-id             # Show dependency tree
+jt dep remove parent-id child-id
 ```
 
 ### Epics
@@ -63,13 +62,13 @@ Epics are **blocked by their children** (children are READY, epic waits):
 
 ```bash
 # Create epic
-bd create "Epic title" --type epic --priority 1
+jt create "Epic title" --type epic --priority 1
 
 # Create children
-bd create "Child task" --type task --priority 2
+jt create "Child task" --type task --priority 2
 
 # Set dependencies: epic depends on children (NOT children on epic)
-bd dep add epic-id child-id
+jt dep add epic-id child-id
 ```
 
 ## Agent Mail (Coordination)
@@ -144,7 +143,7 @@ When finishing work:
 3. Wait for user to run `/skill:jat-complete`
 4. Complete handles: mail check, verify, commit, close, release, announce
 
-**Never say "Task Complete" until `bd close` has run.**
+**Never say "Task Complete" until `jt close` has run.**
 
 ### Completion Steps (jat-step)
 
@@ -166,8 +165,8 @@ All tools are bash commands in `~/.local/bin/`. Every tool has `--help`.
 ### Task Management
 | Tool | Purpose |
 |------|---------|
-| `bd` | Beads CLI for task management |
-| `bd-epic-child` | Set epic-child dependency correctly |
+| `jt` | JAT Tasks CLI for task management |
+| `jt-epic-child` | Set epic-child dependency correctly |
 
 ### Agent Mail
 | Tool | Purpose |
@@ -222,6 +221,6 @@ git commit -m "feat(jat-abc): Implement new endpoint"
 - **Always check Agent Mail first** - before starting or completing work
 - **Reserve files before editing** - prevents stepping on other agents
 - **Use task IDs everywhere** - thread_id, reservation reason, commits
-- **Update Beads status** - `in_progress` when working, `closed` when done
+- **Update task status** - `in_progress` when working, `closed` when done
 - **Emit signals in order** - starting -> working -> review -> complete
 - **Push to remote** - work is NOT complete until `git push` succeeds

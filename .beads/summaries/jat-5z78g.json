@@ -1,0 +1,36 @@
+{
+  "taskId": "jat-5z78g",
+  "title": "show resumable session count badge on /tasks project",
+  "summary": [
+    "Implemented instant signal pattern for session state transitions",
+    "Added working signal on resume action",
+    "Added starting signal on start action",
+    "Added auto-proceeding signal on start-next action",
+    "Updated signal API to write directly to files for instant feedback"
+  ],
+  "outcome": "completed",
+  "duration": "8h 35m",
+  "agent": "WideMist",
+  "keyChanges": [],
+  "quality": {
+    "tests": "not_run",
+    "build": "passing",
+    "lint": "not_checked"
+  },
+  "suggestedTasks": [
+    {
+      "title": "Add instant signal for cleanup action",
+      "type": "task",
+      "priority": 3,
+      "description": "Apply same instant signal pattern to cleanup session action"
+    },
+    {
+      "title": "Add instant signal for kill action",
+      "type": "task",
+      "priority": 3,
+      "description": "Apply same instant signal pattern to kill session action"
+    }
+  ],
+  "humanActions": [],
+  "generatedAt": "2026-01-22T15:53:04.821Z"
+}

@@ -34,13 +34,13 @@ jobs:
     - name: Install Node dependencies
       run: npm ci
 
-    - name: Create mock Beads directories for tests
+    - name: Create mock JAT directories for tests
       run: |
-        mkdir -p ~/code/jomarchy-agent-tools/.beads
-        mkdir -p ~/code/chimaro/.beads
-        mkdir -p ~/code/test-project/.beads
+        mkdir -p ~/code/jomarchy-agent-tools/.jat
+        mkdir -p ~/code/chimaro/.jat
+        mkdir -p ~/code/test-project/.jat
         # Create minimal test databases for query layer tests
-        echo "Creating test Beads databases..."
+        echo "Creating test JAT databases..."
         # Note: The actual test databases will be created by test scripts
 
     - name: Run all tests
@@ -107,6 +107,6 @@ jobs:
     - name: Verify lib exports
       run: |
         echo "Verifying lib/ exports..."
-        test -f lib/beads.js || (echo "Missing lib/beads.js" && exit 1)
+        test -f lib/tasks.js || (echo "Missing lib/tasks.js" && exit 1)
         test -f lib/agent-mail.js || (echo "Missing lib/agent-mail.js" && exit 1)
         echo "✓ All lib exports present"

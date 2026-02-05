@@ -256,13 +256,13 @@ echo ""
 echo "Complete AI-assisted development environment:"
 echo ""
 echo "  • Agent Mail (15 bash/SQLite coordination tools)"
-echo "  • Beads CLI (dependency-aware task planning)"
+echo "  • JAT Task CLI (dependency-aware task planning)"
 echo "  • 48 bash tools (am-*, browser-*, db-*, media-*, etc.)"
 echo "  • Multi-line statusline (agent, task, git, context)"
 echo "  • Real-time hooks (auto-refresh statusline)"
 echo "  • Optional tech stack tools (SvelteKit + Supabase, etc.)"
 echo "  • Global ~/.claude/CLAUDE.md configuration"
-echo "  • Per-repository setup (bd init, CLAUDE.md templates)"
+echo "  • Per-repository setup (jt init, CLAUDE.md templates)"
 echo ""
 echo "This will save 32,000+ tokens vs MCP servers!"
 echo ""
@@ -285,30 +285,16 @@ bash "$INSTALL_DIR/tools/scripts/install-agent-mail.sh"
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}Step 2/9: Installing Beads CLI${NC}"
+echo -e "${BOLD}Step 2/9: Setting Up JAT Task CLI${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-bash "$INSTALL_DIR/tools/scripts/install-beads.sh"
-
-# Auto-migrate .beads/ to .jat/ if needed
-NEEDS_MIGRATION=false
-for dir in "$HOME"/code/*/; do
-    if [[ -f "$dir/.beads/beads.db" ]] && [[ ! -f "$dir/.jat/tasks.db" ]]; then
-        NEEDS_MIGRATION=true
-        break
-    fi
-done
-
-if $NEEDS_MIGRATION; then
-    echo ""
-    echo -e "${YELLOW}Found projects with .beads/ that need migration to .jat/${NC}"
-    if prompt_yes_no "  Migrate task databases now? [Y/n] " "y"; then
-        bash "$INSTALL_DIR/tools/scripts/migrate-beads-to-jat.sh"
-    else
-        echo "  Skipping migration. Run later with:"
-        echo "    bash $INSTALL_DIR/tools/scripts/migrate-beads-to-jat.sh"
-    fi
+# jt CLI is symlinked via symlink-tools.sh (Step 3)
+# Just verify the binary exists
+if [ -f "$INSTALL_DIR/cli/jat" ]; then
+    echo -e "  ${GREEN}✓${NC} JAT CLI found (will be symlinked in next step)"
+else
+    echo -e "  ${YELLOW}⚠${NC} JAT CLI not found at $INSTALL_DIR/cli/jat"
 fi
 
 echo ""
@@ -338,7 +324,7 @@ if command -v npm &> /dev/null; then
         echo -e "  Or Homebrew:  ${BOLD}brew install node@22 && brew link --overwrite node@22${NC}"
         echo ""
     fi
-    # Install root jat dependencies (better-sqlite3 for lib/beads.js)
+    # Install root jat dependencies (better-sqlite3 for lib/tasks.js)
     if [ -f "$INSTALL_DIR/package.json" ]; then
         echo "  → Installing jat core dependencies..."
         (cd "$INSTALL_DIR" && npm install --silent 2>/dev/null) && \
@@ -504,7 +490,7 @@ echo ""
 echo "What was installed:"
 echo ""
 echo "  ✓ Agent Mail (14 bash/SQLite tools: am-register, am-send, am-inbox, etc.)"
-echo "  ✓ Beads CLI (bd command + 4 review tools)"
+echo "  ✓ JAT Task CLI (jt command + 4 review tools)"
 echo "  ✓ Browser Tools (12 CDP automation tools: browser-*.js)"
 echo "  ✓ Database Tools (4 tools: db-query, db-schema, etc.)"
 echo "  ✓ Signal Tools (2 tools: jat-signal, jat-signal-validate)"
@@ -518,10 +504,10 @@ if [ "$INSTALL_PI_SKILLS" = "yes" ]; then
     echo "  ✓ Pi Skills (jat-start, jat-complete, jat-verify + AGENTS.md)"
 fi
 echo "  ✓ Multi-line statusline (agent, task, git, context)"
-echo "  ✓ Real-time hooks (auto-refresh on am-*/bd commands)"
+echo "  ✓ Real-time hooks (auto-refresh on am-*/jt commands)"
 echo "  ✓ Git pre-commit hook (agent registration check)"
 echo "  ✓ Global ~/.claude/CLAUDE.md (multi-project instructions)"
-echo "  ✓ Per-repo setup (bd init, CLAUDE.md templates)"
+echo "  ✓ Per-repo setup (jt init, CLAUDE.md templates)"
 echo ""
 # Detect shell config file
 SHELL_NAME=$(basename "$SHELL")

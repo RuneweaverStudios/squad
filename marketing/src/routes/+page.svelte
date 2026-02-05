@@ -83,7 +83,7 @@
 			color: 'from-[var(--color-primary)] to-cyan-500',
 			tagline: 'All projects. One view.',
 			bullets: ['12 ready tasks', '3 in progress', '2 blocked'],
-			code: `$ bd ready --json
+			code: `$ jt ready --json
 [{
   "id": "jat-7kx2m",
   "title": "Add OAuth",
@@ -91,7 +91,7 @@
   "status": "open"
 }]
 
-$ bd list --project chimaro
+$ jt list --project chimaro
 jat-3nf8p [P0] Rate limit
 jat-7kx2m [P1] OAuth flow`
 		},
@@ -115,7 +115,7 @@ Task: jat-3nf8p`
 			color: 'from-emerald-500 to-teal-500',
 			tagline: 'Ship features, not tasks.',
 			bullets: ['Visual dep graph', 'Auto-blocked status', 'Progress tracking'],
-			code: `$ bd dep tree jat-epic
+			code: `$ jt dep tree jat-epic
 jat-epic [BLOCKED]
 ├── jat-7kx OAuth [READY]
 ├── jat-8p Session [OPEN]
@@ -148,7 +148,7 @@ Progress: 0/3`
 			color: 'from-rose-500 to-red-500',
 			tagline: 'AI fills in the details.',
 			bullets: ['Auto-suggest type', 'Smart priority', 'Label inference'],
-			code: `$ bd create "Rate limit" \\
+			code: `$ jt create "Rate limit" \\
   --type feature \\
   --priority 0 \\
   --labels api,security

@@ -20,7 +20,7 @@ npm install
 npm run dev
 ```
 
-The IDE discovers projects automatically by scanning `~/code/` for directories with a `.beads/` folder. No configuration file needed for basic use.
+The IDE discovers projects automatically by scanning `~/code/` for directories with a `.jat/` folder. No configuration file needed for basic use.
 
 ## Main pages
 
@@ -74,7 +74,7 @@ The IDE plays subtle audio cues for state transitions. These are configurable th
 
 | Event | Sound | When it plays |
 |-------|-------|---------------|
-| Task created | Chime | New task added to Beads |
+| Task created | Chime | New task added |
 | Session complete | Success tone | Agent finishes task |
 | Question asked | Alert | Agent needs input |
 | Error | Warning tone | Session crash or failure |

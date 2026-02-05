@@ -216,12 +216,7 @@ export function getProjectPath(projectName) {
 
   for (const p of candidates) {
     try {
-      // Use the path if it has a .jat directory (or legacy .beads)
-      try {
-        execFileSync('test', ['-d', `${p}/.jat`], { timeout: 1000 });
-      } catch {
-        execFileSync('test', ['-d', `${p}/.beads`], { timeout: 1000 });
-      }
+      execFileSync('test', ['-d', `${p}/.jat`], { timeout: 1000 });
       return p;
     } catch { /* skip */ }
   }

@@ -3,7 +3,7 @@
  * Provides individual task details including dependencies and enables
  */
 import { json } from '@sveltejs/kit';
-import { getTaskById, updateTask, closeTask, addDependency, removeDependency } from '$lib/server/beads.js';
+import { getTaskById, updateTask, closeTask, addDependency, removeDependency } from '$lib/server/jat-tasks.js';
 import { readFile, writeFile, unlink } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
@@ -13,7 +13,7 @@ import { _resetTaskCache } from '../../../api/agents/+server.js';
 // Path to task images store
 const getImageStorePath = () => {
 	const projectPath = process.cwd().replace('/ide', '');
-	return join(projectPath, '.beads', 'task-images.json');
+	return join(projectPath, '.jat', 'task-images.json');
 };
 
 /**
@@ -357,7 +357,7 @@ export async function PATCH({ params, request }) {
 }
 
 /**
- * Delete task (closes task in Beads)
+ * Delete task (closes task in JAT)
  * @type {import('./$types').RequestHandler}
  */
 export async function DELETE({ params }) {

@@ -7,12 +7,12 @@
  */
 
 import { json } from '@sveltejs/kit';
-import { getReadyTasks } from '$lib/server/beads.js';
+import { getReadyTasks } from '$lib/server/jat-tasks.js';
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET() {
 	try {
-		// Get ready tasks from all projects using the beads.js library
+		// Get ready tasks from all projects using the jat-tasks.js library
 		const tasks = getReadyTasks();
 
 		return json({

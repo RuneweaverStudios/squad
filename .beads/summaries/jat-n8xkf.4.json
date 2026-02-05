@@ -1,0 +1,55 @@
+{
+  "taskId": "jat-n8xkf.4",
+  "title": "Migrate shell scripts and hooks from bd to jt",
+  "summary": [
+    "Migrated shell scripts from 'bd' to 'jt' command prefix across multiple scripts",
+    "Updated 4 shell callsites to use new 'jt' commands instead of 'bd'",
+    "Renamed and updated helper scripts with new .jat/ path references",
+    "Simplified backup and rollback scripts for task database management"
+  ],
+  "outcome": "completed",
+  "duration": "25 minutes",
+  "agent": "PaleCove",
+  "keyChanges": [
+    "tools/scripts/get-agent-task.sh",
+    ".claude/statusline.sh",
+    "tools/scripts/setup-repos.sh"
+  ],
+  "quality": {
+    "tests": "passing",
+    "build": "clean"
+  },
+  "suggestedTasks": [
+    {
+      "type": "chore",
+      "title": "Create comprehensive script migration documentation",
+      "description": "Document the migration process from 'bd' to 'jt' commands. Create a detailed guide explaining the changes made, new command structures, and potential impact on existing workflows. Include a mapping of old 'bd' commands to new 'jt' commands for reference.",
+      "priority": 2,
+      "reason": "Ensure clear understanding of command migration for team members"
+    },
+    {
+      "type": "task",
+      "title": "Audit remaining scripts for potential bd/jt command references",
+      "description": "Perform a comprehensive search across the entire codebase to identify any remaining 'bd' command references that might have been missed during this migration. Create a script or process to systematically replace these references and ensure complete migration.",
+      "priority": 3,
+      "reason": "Ensure complete migration and prevent potential future inconsistencies"
+    }
+  ],
+  "crossAgentIntel": {
+    "files": [
+      "tools/scripts/get-agent-task.sh",
+      ".claude/statusline.sh",
+      "tools/scripts/setup-repos.sh"
+    ],
+    "patterns": [
+      "Migrate command prefixes from 'bd' to 'jt'",
+      "Update path references from .beads/ to .jat/"
+    ],
+    "gotchas": [
+      "Careful replacement of command references to avoid breaking existing scripts",
+      "Ensure path updates are consistent across multiple files"
+    ]
+  },
+  "riskLevel": "low",
+  "generatedAt": "2026-02-05T12:39:05.264Z"
+}

@@ -316,7 +316,7 @@ Tested with 20+ concurrent agents. Limited by your machine and API rate limits, 
 
 **Q: Can I use this with existing projects?**
 
-Yes. Run `bd init` in any git repo to add task tracking. JAT auto-discovers projects in `~/code/`.
+Yes. Run `jt init` in any git repo to add task tracking. JAT auto-discovers projects in `~/code/`.
 
 **Q: Is there a hosted version?**
 
@@ -331,7 +331,7 @@ Yes. JAT handles agent orchestration and code review. Use your favorite editor f
 - **[@joewinke](https://github.com/joewinke)** — Creator
 - **Mario Zechner** — [What if you don't need MCP?](https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/) (inspiration)
 - **Agent Mail** — Inspired by [Dicklesworthstone/mcp_agent_mail](https://github.com/Dicklesworthstone/mcp_agent_mail)
-- **Beads** — Task management ([steveyegge/beads](https://github.com/steveyegge/beads))
+- **JAT Tasks** — Task management (inspired by [steveyegge/beads](https://github.com/steveyegge/beads))
 - **Monaco** — Code editor engine
 - **SvelteKit** — IDE framework
 - **DaisyUI** — UI components

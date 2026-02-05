@@ -11,7 +11,7 @@
  *
  * Behavior:
  * 1. Capture full tmux pane content
- * 2. Append to unified session log: .beads/logs/session-{sessionId}.log
+ * 2. Append to unified session log: .jat/logs/session-{sessionId}.log
  * 3. Return log file path
  *
  * The unified log accumulates all session history across compactions,
@@ -24,7 +24,7 @@ import { promisify } from 'util';
 import { writeFile, appendFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
-import { getTasks } from '$lib/server/beads.js';
+import { getTasks } from '$lib/server/jat-tasks.js';
 
 const execAsync = promisify(exec);
 
@@ -50,7 +50,7 @@ export async function POST({ params, request }) {
 		}
 
 		const projectPath = process.cwd().replace('/ide', '');
-		const logsDir = path.join(projectPath, '.beads', 'logs');
+		const logsDir = path.join(projectPath, '.jat', 'logs');
 		const reason = body.reason || 'completed';
 
 		// Extract agent name from session name (jat-AgentName -> AgentName)

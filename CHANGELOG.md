@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`jat-secret` bash tool** - Retrieve secrets in scripts: `jat-secret stripe`, `eval $(jat-secret --export)`
 - Supabase panel integration with credentials system (checks credentials.json before .env)
 - Initial public release of JAT
-- Beads Task IDE (SvelteKit 5)
+- JAT Task IDE (SvelteKit 5)
 - Agent Mail coordination system
 - Browser automation tools (11 tools)
 - Media generation tools (avatar, image generation)
@@ -58,7 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial dashboard implementation
 - Basic Agent Mail functionality
 - Core browser tools
-- Beads task tracking
+- JAT task tracking
 
 ## Notes
 

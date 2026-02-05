@@ -18,7 +18,7 @@
  * - Response includes: meta.dateRange with parsed from/to dates
  * - Each agent includes: activityInRange (count), lastActiveInRange (timestamp)
  *
- * Each agent in full mode includes an 'activities' array with recent Beads task history:
+ * Each agent in full mode includes an 'activities' array with recent JAT task history:
  * - ts: timestamp (ISO 8601)
  * - preview: task status update (e.g., "[jat-abc] Completed: Task title")
  * - content: task description
@@ -26,8 +26,8 @@
  */
 
 import { json } from '@sveltejs/kit';
-import { getAgents, getReservations, getBeadsActivities, getAgentCounts } from '$lib/server/agent-mail.js';
-import { getTasks } from '$lib/server/beads.js';
+import { getAgents, getReservations, getTaskActivities, getAgentCounts } from '$lib/server/agent-mail.js';
+import { getTasks } from '$lib/server/jat-tasks.js';
 import { getAllAgentUsageAsync, getHourlyUsageAsync, getAgentHourlyUsageAsync, getAgentContextPercent } from '$lib/utils/tokenUsage.js';
 import { apiCache, cacheKey, CACHE_TTL, invalidateCache } from '$lib/server/cache.js';
 import { exec } from 'child_process';
@@ -73,7 +73,7 @@ function getCachedTasks(projectName = null, forceFresh = false) {
 			cachedTasksProject = projectName;
 			taskCacheTimestamp = now;
 		} catch (err) {
-			console.error('Failed to fetch tasks from Beads:', err);
+			console.error('Failed to fetch tasks from JAT:', err);
 			// Return stale cache on error
 		}
 	}
@@ -355,12 +355,12 @@ export async function GET({ url, locals }) {
 				return expiresAt > new Date() && !r.released_ts;
 			});
 
-			// Get recent activities from Beads task history (last 10 task updates)
+			// Get recent activities from JAT task history (last 10 task updates)
 			/** @type {Activity[]} */
 			let activities = [];
 			if (includeActivities) {
 				try {
-					activities = getBeadsActivities(agent.name, tasks);
+					activities = getTaskActivities(agent.name, tasks);
 				} catch (err) {
 					console.error(`Failed to fetch activities for agent ${agent.name}:`, err);
 					// Continue with empty activities array
@@ -528,7 +528,7 @@ export async function GET({ url, locals }) {
 		/** @type {{ poll_interval_ms: number, data_sources: string[], cache_ttl_ms: number, dateRange?: { from: string | null, to: string | null } }} */
 		const meta = {
 			poll_interval_ms: 3000, // Recommended poll interval for frontend
-			data_sources: ['agent-mail', 'beads'],
+			data_sources: ['agent-mail', 'jat'],
 			cache_ttl_ms: 2000 // Data freshness guarantee
 		};
 
@@ -652,7 +652,7 @@ export async function POST({ request, locals }) {
 
 		// Verify task exists before assigning
 		try {
-			const { stdout } = await execAsync(`bd show "${taskId}" --json`);
+			const { stdout } = await execAsync(`jt show "${taskId}" --json`);
 			const taskData = JSON.parse(stdout);
 			if (!taskData || taskData.length === 0) {
 				return json({
@@ -667,10 +667,10 @@ export async function POST({ request, locals }) {
 			}, { status: 404 });
 		}
 
-		// Assign task to agent using bd CLI
+		// Assign task to agent using jt CLI
 		try {
 			await execAsync(
-				`bd update "${taskId}" --assignee "${agentName}"`
+				`jt update "${taskId}" --assignee "${agentName}"`
 			);
 
 			// Invalidate caches since task assignment changed
@@ -678,7 +678,7 @@ export async function POST({ request, locals }) {
 			invalidateCache.tasks();
 
 			// Get updated task data
-			const { stdout: updatedTaskJson } = await execAsync(`bd show "${taskId}" --json`);
+			const { stdout: updatedTaskJson } = await execAsync(`jt show "${taskId}" --json`);
 			const updatedTask = JSON.parse(updatedTaskJson);
 
 			locals.logger?.info({
@@ -699,7 +699,7 @@ export async function POST({ request, locals }) {
 				error: err,
 				taskId,
 				agentName
-			}, 'Failed to assign task via bd CLI');
+			}, 'Failed to assign task via jt CLI');
 
 			perf.end({ error: err instanceof Error ? err.message : 'Unknown error' });
 

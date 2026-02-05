@@ -143,8 +143,8 @@ export interface ProjectColors {
  * Project stats computed by the API.
  */
 export interface ProjectStats {
-	/** Whether the project has a .beads/ directory initialized */
-	hasBeads: boolean;
+	/** Whether the project has a .jat/ directory initialized */
+	hasJat: boolean;
 	/** Whether the project has a CLAUDE.md or AGENTS.md file */
 	hasClaudeMd: boolean;
 	/** Number of active agents working on this project */

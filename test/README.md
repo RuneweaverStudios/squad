@@ -2,16 +2,16 @@
 
 Test suite for jat.
 
-## Beads + Agent Mail Integration Tests
+## JAT Tasks + Agent Mail Integration Tests
 
-Run integration tests to verify cross-referencing between Beads tasks and Agent Mail coordination:
+Run integration tests to verify cross-referencing between JAT tasks and Agent Mail coordination:
 
 ```bash
 node test/test-integration.js
 ```
 
 Tests verify:
-- ✅ Cross-referencing between Beads and Agent Mail
+- ✅ Cross-referencing between JAT Tasks and Agent Mail
 - ✅ File reservation tracking
 - ✅ Agent assignment queries
 - ✅ Active work tracking
@@ -58,6 +58,6 @@ node test/test-integration.js
 # macOS compatibility
 bash test/test-macos-compat.sh
 
-# Beads workflow test
+# JAT workflow test
 bash mail/test-workflow.sh
 ```

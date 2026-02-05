@@ -22,7 +22,7 @@ import { json } from '@sveltejs/kit';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { readFileSync, existsSync, statSync } from 'fs';
-import { getTasks } from '$lib/server/beads.js';
+import { getTasks } from '$lib/server/jat-tasks.js';
 import { getAgentUsageAsync, getAgentHourlyUsageAsync, getAgentContextPercent } from '$lib/utils/tokenUsage.js';
 import { apiCache, cacheKey, CACHE_TTL } from '$lib/server/cache.js';
 import { SIGNAL_TTL } from '$lib/config/constants.js';

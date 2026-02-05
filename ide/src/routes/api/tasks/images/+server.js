@@ -13,7 +13,7 @@ import { join } from 'path';
 // Path to store task image mappings
 const getImageStorePath = () => {
 	const projectPath = process.cwd().replace('/ide', '');
-	return join(projectPath, '.beads', 'task-images.json');
+	return join(projectPath, '.jat', 'task-images.json');
 };
 
 /**

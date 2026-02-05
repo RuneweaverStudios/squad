@@ -85,7 +85,7 @@ function getParentEpicIdFromDotNotation(taskId) {
 async function findEpicContainingTask(taskId, projectPath) {
 	try {
 		// First, check if the task itself has a parent field
-		const { stdout: taskStdout } = await execAsync(`bd show "${taskId}" --json`, {
+		const { stdout: taskStdout } = await execAsync(`jt show "${taskId}" --json`, {
 			cwd: projectPath,
 			timeout: 10000
 		});
@@ -96,7 +96,7 @@ async function findEpicContainingTask(taskId, projectPath) {
 		if (task?.parent) {
 			// Task has a parent field - fetch the parent to get its title
 			try {
-				const { stdout: parentStdout } = await execAsync(`bd show "${task.parent}" --json`, {
+				const { stdout: parentStdout } = await execAsync(`jt show "${task.parent}" --json`, {
 					cwd: projectPath,
 					timeout: 10000
 				});
@@ -112,10 +112,10 @@ async function findEpicContainingTask(taskId, projectPath) {
 		}
 
 		// No parent field - search for epics that have this task as a dependency
-		// Use bd list to find epics in the same project
+		// Use jt list to find epics in the same project
 		const projectPrefix = taskId.split('-')[0];
 		const { stdout: epicsStdout } = await execAsync(
-			`bd list --type epic --status open --json`,
+			`jt list --type epic --status open --json`,
 			{
 				cwd: projectPath,
 				timeout: 10000
@@ -131,7 +131,7 @@ async function findEpicContainingTask(taskId, projectPath) {
 
 			// Fetch full epic with dependencies
 			try {
-				const { stdout: epicFullStdout } = await execAsync(`bd show "${epic.id}" --json`, {
+				const { stdout: epicFullStdout } = await execAsync(`jt show "${epic.id}" --json`, {
 					cwd: projectPath,
 					timeout: 5000
 				});
@@ -189,8 +189,8 @@ function isTaskReady(task) {
  */
 async function findNextEpicSibling(completedTaskId, epicId, projectPath, project) {
 	try {
-		// Fetch the epic with its children using bd show
-		const { stdout } = await execAsync(`bd show "${epicId}" --json`, {
+		// Fetch the epic with its children using jt show
+		const { stdout } = await execAsync(`jt show "${epicId}" --json`, {
 			cwd: projectPath,
 			timeout: 10000
 		});
@@ -251,10 +251,10 @@ async function findNextEpicSibling(completedTaskId, epicId, projectPath, project
  */
 async function findFromBacklog(projectPath, project) {
 	try {
-		// Use bd ready which returns ready tasks sorted by priority
+		// Use jt ready which returns ready tasks sorted by priority
 		// When filtering by project, we need to fetch more tasks since the top task might not be from the target project
 		const limit = (project && project !== 'All Projects') ? 50 : 1;
-		const { stdout } = await execAsync(`bd ready --json --limit ${limit} --sort hybrid`, {
+		const { stdout } = await execAsync(`jt ready --json --limit ${limit} --sort hybrid`, {
 			cwd: projectPath,
 			timeout: 10000
 		});

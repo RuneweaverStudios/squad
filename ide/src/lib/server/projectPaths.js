@@ -1,7 +1,7 @@
 /**
  * Project Path Resolution
  *
- * Looks up project paths from JAT config and beads-discovered projects.
+ * Looks up project paths from JAT config and jat-discovered projects.
  * Used by task creation endpoints to find the correct directory.
  */
 import { readFile, readdir } from 'fs/promises';
@@ -54,10 +54,10 @@ async function readJatConfig() {
 }
 
 /**
- * Scan ~/code for projects with .beads/ directories
+ * Scan ~/code for projects with .jat/ directories
  * @returns {Promise<Array<{name: string, path: string}>>}
  */
-async function scanBeadsProjects() {
+async function scanJatProjects() {
 	const codeDir = join(homedir(), 'code');
 	if (!existsSync(codeDir)) {
 		return [];
@@ -65,7 +65,7 @@ async function scanBeadsProjects() {
 
 	try {
 		const entries = await readdir(codeDir, { withFileTypes: true });
-		const beadsProjects = [];
+		const jatProjects = [];
 
 		for (const entry of entries) {
 			if (!entry.isDirectory() || entry.name.startsWith('.')) {
@@ -73,17 +73,17 @@ async function scanBeadsProjects() {
 			}
 
 			const projectPath = join(codeDir, entry.name);
-			const beadsDir = join(projectPath, '.beads');
+			const jatDir = join(projectPath, '.jat');
 
-			if (existsSync(beadsDir)) {
-				beadsProjects.push({
+			if (existsSync(jatDir)) {
+				jatProjects.push({
 					name: entry.name,
 					path: projectPath
 				});
 			}
 		}
 
-		return beadsProjects;
+		return jatProjects;
 	} catch {
 		return [];
 	}
@@ -94,11 +94,11 @@ async function scanBeadsProjects() {
  *
  * Looks up in order:
  * 1. JAT config (supports custom paths)
- * 2. Beads-discovered projects (~/code/{name}/.beads/)
+ * 2. JAT-discovered projects (~/code/{name}/.jat/)
  * 3. Default fallback (~/code/{name})
  *
  * @param {string} projectName - Project name (e.g., "chimaro", "jat")
- * @returns {Promise<{path: string, source: 'jat-config' | 'beads-discovered' | 'default', exists: boolean}>}
+ * @returns {Promise<{path: string, source: 'jat-config' | 'jat-discovered' | 'default', exists: boolean}>}
  */
 /**
  * Normalize a project name for comparison

@@ -69,7 +69,7 @@ am-register --name Alice --program cursor --model gpt-4 --task "Backend"
 
 ```bash
 # Exclusive lock (default)
-am-reserve "src/**/*.ts" --agent Alice --ttl 3600 --reason "bd-123"
+am-reserve "src/**/*.ts" --agent Alice --ttl 3600 --reason "jat-123"
 
 # Shared lock
 am-reserve "docs/**" --agent Bob --ttl 7200 --shared
@@ -82,9 +82,9 @@ am-reserve "docs/**" --agent Bob --ttl 7200 --shared
 am-send "Update" "Progress report" --from Alice --to Bob
 
 # With thread and acknowledgment
-am-send "[bd-123] Ready" "Files reserved" \
+am-send "[jat-123] Ready" "Files reserved" \
   --from Alice --to Bob,Carol \
-  --thread bd-123 --importance high --ack
+  --thread jat-123 --importance high --ack
 ```
 
 ### 4. Check inbox
@@ -97,7 +97,7 @@ am-inbox Alice
 am-inbox Bob --unread
 
 # By thread
-am-inbox Carol --thread bd-123 --mark-read
+am-inbox Carol --thread jat-123 --mark-read
 ```
 
 ### 5. Acknowledge and reply
@@ -117,7 +117,7 @@ am-reply 5 "Thanks for the update" --agent Bob
 am-search "authentication bug"
 
 # Within thread
-am-search "review" --thread bd-123
+am-search "review" --thread jat-123
 
 # List agents
 am-agents
@@ -174,24 +174,24 @@ All tools support `--help` for detailed usage.
 - **Exclusive** (default) - Blocks all other reservations
 - **Shared** (`--shared`) - Allows other shared locks
 
-## Integration with Beads
+## Integration with JAT Tasks
 
-Use Beads task IDs as message thread IDs for unified workflows:
+Use JAT task IDs as message thread IDs for unified workflows:
 
 ```bash
 # Pick work
-bd ready --json
+jt ready --json
 
 # Reserve files
-am-reserve "src/**" --agent Alice --ttl 3600 --reason "bd-123"
+am-reserve "src/**" --agent Alice --ttl 3600 --reason "jat-123"
 
 # Announce
-am-send "[bd-123] Starting work" "..." --from Alice --to Team --thread bd-123
+am-send "[jat-123] Starting work" "..." --from Alice --to Team --thread jat-123
 
 # Complete
-bd close bd-123 --reason "Done"
+jt close jat-123 --reason "Done"
 am-release "src/**" --agent Alice
-am-send "[bd-123] Completed" "Summary" --from Alice --to Team --thread bd-123
+am-send "[jat-123] Completed" "Summary" --from Alice --to Team --thread jat-123
 ```
 
 ## File Conflict Prevention
@@ -200,7 +200,7 @@ Before editing files:
 
 ```bash
 # 1. Reserve
-am-reserve "path/to/files/**" --agent MyAgent --ttl 3600 --exclusive --reason "bd-456"
+am-reserve "path/to/files/**" --agent MyAgent --ttl 3600 --exclusive --reason "jat-456"
 
 # 2. Edit files
 # ... make changes ...
@@ -297,19 +297,19 @@ am-send "Daily Update" \
 ```bash
 # Agent 1 finishes
 am-release "frontend/**" --agent Alice
-am-send "[bd-123] Ready for review" "..." --from Alice --to Bob
+am-send "[jat-123] Ready for review" "..." --from Alice --to Bob
 
 # Agent 2 takes over
-am-reserve "frontend/**" --agent Bob --ttl 3600 --reason "bd-123"
+am-reserve "frontend/**" --agent Bob --ttl 3600 --reason "jat-123"
 ```
 
 ### Blocking issue
 
 ```bash
-am-send "[bd-456] BLOCKED" \
+am-send "[jat-456] BLOCKED" \
   "Need database access to continue" \
   --from Carol --to Alice,Bob \
-  --thread bd-456 --importance urgent --ack
+  --thread jat-456 --importance urgent --ack
 ```
 
 ## Troubleshooting
@@ -356,13 +356,13 @@ Should match message count.
 - [ ] Web UI for visualization
 - [ ] Multi-project IDE
 - [ ] Integration with git hooks
-- [ ] Automatic Beads task updates
+- [ ] Automatic JAT task updates
 
 ## Credits
 
 Inspired by:
 - [mcp_agent_mail](https://github.com/Dicklesworthstone/mcp_agent_mail) - Original Python/MCP implementation
-- [Beads](https://github.com/steveyegge/beads) - Dependency-aware task management
+- [Beads](https://github.com/steveyegge/beads) - Dependency-aware task management (original inspiration for JAT Tasks)
 - [What if you don't need MCP?](https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/) - Token efficiency philosophy
 
 ## License

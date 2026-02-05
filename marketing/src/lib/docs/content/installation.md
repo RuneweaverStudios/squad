@@ -53,7 +53,7 @@ The installer creates symlinks in `~/.local/bin/` pointing to the actual tool sc
 - Agent Mail database at `~/.agent-mail.db`
 - Claude Code hooks in `~/.claude/hooks/`
 - Statusline script at `~/.claude/statusline.sh`
-- Beads CLI (`bd` command)
+- Task CLI (`jt` command)
 
 Make sure `~/.local/bin` is in your PATH. Add this to your `~/.bashrc` or `~/.zshrc` if it isnt already:
 
@@ -75,13 +75,13 @@ jq --version         # Should print jq-1.x
 am-whoami            # Should print "Not registered" or an agent name
 am-agents            # Lists all registered agents
 
-# Beads CLI
-bd --version         # Should print beads x.x.x
-bd --help            # Shows available commands
+# Task CLI
+jt --version         # Should print jt x.x.x
+jt --help            # Shows available commands
 
 # Check symlink counts
 ls ~/.local/bin/am-* | wc -l        # Expected: 13
-ls ~/.local/bin/bd* | wc -l         # Expected: 5
+ls ~/.local/bin/jt* | wc -l         # Expected: 5
 ls ~/.local/bin/browser-* | wc -l   # Expected: 11
 ```
 
@@ -89,19 +89,19 @@ If any command returns `command not found`, the most likely cause is `~/.local/b
 
 ## Add your first project
 
-JAT needs at least one project before the IDE or agents can do anything useful. A valid project is a git repository with a `.beads/` directory.
+JAT needs at least one project before the IDE or agents can do anything useful. A valid project is a git repository with a `.jat/` directory.
 
 ```bash
 cd ~/code/my-project
-bd init
+jt init
 ```
 
-The `bd init` command creates a `.beads/` directory with the task database files. These JSONL files get committed to git so tasks sync across machines. The SQLite cache stays local and rebuilds automatically.
+The `jt init` command creates a `.jat/` directory with the task database.
 
 After initialization, verify it worked:
 
 ```bash
-bd list --status open    # Should return an empty list (no tasks yet)
+jt list --status open    # Should return an empty list (no tasks yet)
 ```
 
 You can also add projects through the IDE once its running. Go to the Tasks page and click "Add Project."
@@ -120,7 +120,7 @@ This launches the SvelteKit-based IDE, checks for updates, and opens your browse
 |---------|-------|-----|
 | `command not found` | PATH not configured | Add `~/.local/bin` to your PATH |
 | `am-whoami` fails | Database not initialized | Run `bash ~/code/jat/tools/scripts/install-agent-mail.sh` |
-| `bd: command not found` | Beads not installed | Run `bash ~/code/jat/tools/scripts/install-beads.sh` |
+| `jt: command not found` | Task CLI not installed | Run `./install.sh` to create symlinks |
 | Browser tools fail | npm dependencies missing | Run `cd ~/code/jat/tools/browser && npm install` |
 | IDE wont start | Dependencies missing | Run `cd ~/code/jat/ide && npm install` |
 | Broken symlinks | Stale installation | Run `./install.sh` again to refresh |

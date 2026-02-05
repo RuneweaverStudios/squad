@@ -18,7 +18,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { apiCache, cacheKey, CACHE_TTL, invalidateCache } from '$lib/server/cache.js';
 import { rgbToHex } from '$lib/utils/projectConfig';
-import { getTasks, initProject } from '$lib/server/beads.js';
+import { getTasks, initProject } from '$lib/server/jat-tasks.js';
 
 const execAsync = promisify(exec);
 
@@ -99,17 +99,17 @@ async function scanCodeDirectory() {
 }
 
 /**
- * Scan ~/code for directories with .beads/ initialized
- * Returns projects that have Beads set up but aren't in JAT config
+ * Scan ~/code for directories with .jat/ initialized
+ * Returns projects that have JAT set up but aren't in JAT config
  */
-async function scanBeadsProjects() {
+async function scanJatProjects() {
 	const codeDir = join(homedir(), 'code');
 	if (!existsSync(codeDir)) {
 		return [];
 	}
 
 	const entries = await readdir(codeDir, { withFileTypes: true });
-	const beadsProjects = [];
+	const jatProjects = [];
 
 	for (const entry of entries) {
 		if (!entry.isDirectory() || entry.name.startsWith('.')) {
@@ -117,19 +117,19 @@ async function scanBeadsProjects() {
 		}
 
 		const projectPath = join(codeDir, entry.name);
-		const beadsDir = join(projectPath, '.beads');
+		const jatDir = join(projectPath, '.jat');
 
-		// Only include if .beads/ directory exists
-		if (existsSync(beadsDir)) {
-			beadsProjects.push({
+		// Only include if .jat/ directory exists
+		if (existsSync(jatDir)) {
+			jatProjects.push({
 				name: entry.name,
 				path: projectPath,
-				source: 'beads-discovered'
+				source: 'jat-discovered'
 			});
 		}
 	}
 
-	return beadsProjects;
+	return jatProjects;
 }
 
 /**
@@ -147,21 +147,21 @@ async function isGitRepo(dirPath) {
 }
 
 /**
- * Check if beads is initialized in a directory
+ * Check if JAT is initialized in a directory
  * @param {string} dirPath
  * @returns {boolean}
  */
-function hasBeadsInit(dirPath) {
-	return existsSync(join(dirPath, '.beads'));
+function hasJatInit(dirPath) {
+	return existsSync(join(dirPath, '.jat'));
 }
 
 /**
- * Initialize beads in a project directory
+ * Initialize JAT in a project directory
  * Returns { success, steps, error? }
  * @param {string} projectPath
  * @returns {Promise<{ success: boolean, steps: string[], error?: string }>}
  */
-async function initializeBeads(projectPath) {
+async function initializeJat(projectPath) {
 	const steps = [];
 
 	// Initialize git if not a git repo
@@ -187,9 +187,9 @@ async function initializeBeads(projectPath) {
 		}
 	}
 
-	// Check if beads is already initialized
-	if (hasBeadsInit(projectPath)) {
-		steps.push('Beads already initialized');
+	// Check if JAT is already initialized
+	if (hasJatInit(projectPath)) {
+		steps.push('JAT already initialized');
 		return { success: true, steps };
 	}
 
@@ -369,7 +369,7 @@ async function getServerStatus(projectName, port) {
 /**
  * Get last activity time for a project
  * Checks multiple sources and returns the most recent:
- * 1. Beads task file (.beads/issues.jsonl) - task creation/updates
+ * 1. JAT task file (.jat/issues.jsonl) - task creation/updates
  * 2. Agent session files (.claude/sessions/agent-*.txt) - agent activity
  * 3. Git commit time
  * 4. Directory mtime (fallback)
@@ -380,17 +380,17 @@ async function getLastActivity(projectPath) {
 	let mostRecentMs = 0;
 	let agentActivityMs = 0;
 
-	// Check .beads/issues.jsonl first (most meaningful for task activity)
+	// Check .jat/issues.jsonl first (most meaningful for task activity)
 	try {
-		const beadsFile = join(projectPath, '.beads', 'issues.jsonl');
-		if (existsSync(beadsFile)) {
-			const stats = await stat(beadsFile);
+		const jatFile = join(projectPath, '.jat', 'issues.jsonl');
+		if (existsSync(jatFile)) {
+			const stats = await stat(jatFile);
 			if (stats.mtimeMs > mostRecentMs) {
 				mostRecentMs = stats.mtimeMs;
 			}
 		}
 	} catch {
-		// Ignore errors checking beads file
+		// Ignore errors checking jat file
 	}
 
 	// Check .claude/sessions/agent-*.txt files (agent session activity)
@@ -533,9 +533,9 @@ export async function GET({ url }) {
 		// Add stats if requested
 		if (includeStats) {
 			projects = await Promise.all(projects.map(async (project) => {
-				// Check if .beads/ directory exists
-				const beadsDir = join(project.path, '.beads');
-				const hasBeads = existsSync(beadsDir);
+				// Check if .jat/ directory exists
+				const jatDir = join(project.path, '.jat');
+				const hasJat = existsSync(jatDir);
 
 				// Check if CLAUDE.md or AGENTS.md exists in project root
 				const hasClaudeMd = existsSync(join(project.path, 'CLAUDE.md')) ||
@@ -551,7 +551,7 @@ export async function GET({ url }) {
 				return {
 					...project,
 					stats: {
-						hasBeads,
+						hasJat,
 						hasClaudeMd,
 						agentCount: agents.active,
 						taskCount: tasks.total,
@@ -821,13 +821,13 @@ export async function POST({ request }) {
 				}
 			}
 
-			// Initialize beads (and git if needed) in the directory
-			const beadsResult = await initializeBeads(resolvedPath);
-			if (!beadsResult.success) {
+			// Initialize JAT (and git if needed) in the directory
+			const jatResult = await initializeJat(resolvedPath);
+			if (!jatResult.success) {
 				return json({
-					error: beadsResult.error || 'Failed to initialize Beads',
+					error: jatResult.error || 'Failed to initialize JAT',
 					path: resolvedPath,
-					steps: beadsResult.steps
+					steps: jatResult.steps
 				}, { status: 500 });
 			}
 
@@ -880,7 +880,7 @@ export async function POST({ request }) {
 					key,
 					...jatConfig.projects[key]
 				},
-				steps: [...beadsResult.steps, 'Added to JAT configuration'],
+				steps: [...jatResult.steps, 'Added to JAT configuration'],
 				message: `Successfully created project: ${key}`
 			});
 		}

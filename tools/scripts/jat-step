@@ -78,7 +78,7 @@ get_step_config() {
             echo '20|["verifying"]|["committing","closing","releasing","announcing"]|Committing changes'
             ;;
         closing)
-            echo '40|["verifying","committing"]|["closing","releasing","announcing"]|Closing task in Beads'
+            echo '40|["verifying","committing"]|["closing","releasing","announcing"]|Closing task in JAT'
             ;;
         releasing)
             echo '60|["verifying","committing","closing"]|["releasing","announcing"]|Releasing file reservations'

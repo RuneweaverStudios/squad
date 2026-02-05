@@ -3,11 +3,11 @@
  *
  * GET /api/tasks/{id}/logs - Returns session logs related to a task
  *
- * Searches .beads/logs/ for log files that contain the task ID.
+ * Searches .jat/logs/ for log files that contain the task ID.
  * Task ID is detected via:
  * - [JAT:WORKING task=X] markers
  * - [JAT:READY ...] markers after task work
- * - bd update/show commands referencing the task
+ * - jt update/show commands referencing the task
  * - Git commit messages with task ID
  */
 
@@ -26,7 +26,7 @@ export async function GET({ params }) {
 	try {
 		// Get the project root (parent of ide)
 		const projectRoot = resolve(process.cwd(), '..');
-		const logsDir = join(projectRoot, '.beads', 'logs');
+		const logsDir = join(projectRoot, '.jat', 'logs');
 
 		// Check if logs directory exists
 		let logFiles = [];
@@ -82,10 +82,10 @@ export async function GET({ params }) {
 					`[JAT:READY task=${id}]`,
 					`[JAT:NEEDS_REVIEW task=${id}]`,
 					`[JAT:COMPLETED task=${id}]`,
-					// Beads commands
-					`bd show ${id}`,
-					`bd update ${id}`,
-					`bd close ${id}`,
+					// JAT commands
+					`jt show ${id}`,
+					`jt update ${id}`,
+					`jt close ${id}`,
 					// Task references in text (with task ID)
 					`task: ${id}`,
 					`Task: ${id}`,

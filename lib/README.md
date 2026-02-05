@@ -1,25 +1,25 @@
 # Query Layers & Integration
 
-Node.js query layers for Beads and Agent Mail, plus integration functions for cross-referencing.
+Node.js query layers for JAT Tasks and Agent Mail, plus integration functions for cross-referencing.
 
 ## Overview
 
 This directory contains three modules:
 
-1. **beads.js** - Query Beads task databases across multiple projects
+1. **tasks.js** - Query JAT task databases across multiple projects
 2. **agent-mail.js** - Query Agent Mail message database
-3. **integration.js** - Cross-reference functions linking Beads tasks with Agent Mail activity
+3. **integration.js** - Cross-reference functions linking JAT tasks with Agent Mail activity
 
 ## Usage
 
-### Beads Query Layer (beads.js)
+### Task Query Layer (tasks.js)
 
-Query Beads task databases from Node.js:
+Query JAT task databases from Node.js:
 
 ```javascript
-import { getProjects, getTasks, getTaskById, getReadyTasks } from './lib/beads.js';
+import { getProjects, getTasks, getTaskById, getReadyTasks } from './lib/tasks.js';
 
-// Get all projects with Beads databases
+// Get all projects with JAT databases
 const projects = getProjects();
 // → [{name: "chimaro", path: "/home/user/code/chimaro", dbPath: "..."}]
 
@@ -70,7 +70,7 @@ const results = searchMessages('authentication bug');
 
 ### Integration Layer (integration.js)
 
-Cross-reference Beads tasks with Agent Mail activity:
+Cross-reference JAT tasks with Agent Mail activity:
 
 ```javascript
 import {
@@ -133,11 +133,11 @@ const stats = getIntegrationStats();
 
 ### Pattern 1: Use Task IDs as Thread IDs
 
-**Beads task ID** = **Agent Mail thread ID**
+**JAT task ID** = **Agent Mail thread ID**
 
 ```bash
-# Create Beads task
-bd create "Implement auth system" --priority P1
+# Create JAT task
+jt create "Implement auth system" --priority 1
 # → Returns: chimaro-abc
 
 # Send Agent Mail message with same ID as thread
@@ -193,7 +193,7 @@ Show which agents are working on which tasks:
 
 ```javascript
 // Get all active work for specific agent
-const paleStar Work = getActiveWork({ agentName: 'PaleStar' });
+const paleStarWork = getActiveWork({ agentName: 'PaleStar' });
 
 // Get agents involved in specific task
 const agents = getAgentsForTask('chimaro-abc');
@@ -211,18 +211,18 @@ node test/test-integration.js
 ```
 
 This validates:
-- ✅ Cross-referencing between Beads and Agent Mail
-- ✅ File reservation tracking
-- ✅ Agent assignment queries
-- ✅ Active work tracking
-- ✅ Handoff history
-- ✅ Integration statistics
+- Cross-referencing between JAT Tasks and Agent Mail
+- File reservation tracking
+- Agent assignment queries
+- Active work tracking
+- Handoff history
+- Integration statistics
 
 ## Database Schema
 
-### Beads Schema
+### JAT Tasks Schema
 
-Location: `~/code/PROJECT/.beads/beads.db`
+Location: `~/code/PROJECT/.jat/tasks.db`
 
 Key tables:
 - `issues` - Tasks with id, title, status, priority, etc.
@@ -242,7 +242,7 @@ Key tables:
 
 ### Integration Key
 
-The `reason` field in `file_reservations` typically contains the Beads task ID:
+The `reason` field in `file_reservations` typically contains the JAT task ID:
 
 ```sql
 -- Example reservation
@@ -255,18 +255,18 @@ This allows `getFileReservationsByTask()` to link reservations to tasks.
 ## Why This Integration Matters
 
 **Before integration:**
-- Beads: Task planning (WHAT to do)
+- JAT Tasks: Task planning (WHAT to do)
 - Agent Mail: Coordination (WHO is doing WHAT)
-- ❌ No visibility into agent assignments
-- ❌ No way to see who worked on a task
-- ❌ No audit trail of handoffs
+- No visibility into agent assignments
+- No way to see who worked on a task
+- No audit trail of handoffs
 
 **After integration:**
-- ✅ Full visibility: See which agents are working on which tasks
-- ✅ Audit trail: Complete history of messages + reservations per task
-- ✅ Active work IDE: Real-time view of agent activity
-- ✅ Handoff tracking: Know when work was passed between agents
-- ✅ Metrics: Integration adoption rate, agent activity stats
+- Full visibility: See which agents are working on which tasks
+- Audit trail: Complete history of messages + reservations per task
+- Active work IDE: Real-time view of agent activity
+- Handoff tracking: Know when work was passed between agents
+- Metrics: Integration adoption rate, agent activity stats
 
 ## Examples
 

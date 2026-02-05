@@ -146,7 +146,6 @@ Installation, setup, and utility scripts.
 | `setup-tmux.sh` | Configure tmux for JAT |
 | `setup-global-claude-md.sh` | Setup global CLAUDE.md |
 | `install-agent-mail.sh` | Initialize Agent Mail database |
-| `install-beads.sh` | Install task CLI (legacy) |
 | `install-hooks.sh` | Install Claude Code hooks |
 | `install-whisper.sh` | Install whisper.cpp for voice input |
 

@@ -6,13 +6,13 @@ import { json } from '@sveltejs/kit';
 import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
 
-// Find .beads directory by walking up from cwd
-function findBeadsDir() {
+// Find .jat directory by walking up from cwd
+function findJatDir() {
 	let dir = process.cwd();
 	while (dir !== '/') {
-		const beadsPath = resolve(dir, '.beads');
-		if (existsSync(beadsPath)) {
-			return beadsPath;
+		const jatPath = resolve(dir, '.jat');
+		if (existsSync(jatPath)) {
+			return jatPath;
 		}
 		dir = resolve(dir, '..');
 	}
@@ -163,12 +163,12 @@ export async function POST({ request }) {
 		}
 
 		// Load current rules
-		const beadsDir = findBeadsDir();
+		const jatDir = findJatDir();
 		/** @type {ReviewRules} */
 		let rules = DEFAULT_RULES;
 
-		if (beadsDir) {
-			const rulesPath = resolve(beadsDir, 'review-rules.json');
+		if (jatDir) {
+			const rulesPath = resolve(jatDir, 'review-rules.json');
 			if (existsSync(rulesPath)) {
 				const content = readFileSync(rulesPath, 'utf-8');
 				rules = /** @type {ReviewRules} */ (JSON.parse(content));

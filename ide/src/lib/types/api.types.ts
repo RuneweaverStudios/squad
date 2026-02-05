@@ -75,7 +75,7 @@ export interface TaskDependency {
 }
 
 /**
- * Beads task
+ * JAT task
  */
 export interface Task {
 	id: string;

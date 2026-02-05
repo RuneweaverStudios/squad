@@ -5,7 +5,7 @@
 #   session-name: tmux session name (e.g., "jat-WisePrairie")
 #   reason: compacted | paused | killed | completed
 #
-# Appends current tmux scrollback to .beads/logs/session-{session-name}.log
+# Appends current tmux scrollback to .jat/logs/session-{session-name}.log
 # with a separator indicating the reason for capture.
 
 set -euo pipefail
@@ -18,19 +18,19 @@ if [[ -z "$SESSION_NAME" ]]; then
     exit 1
 fi
 
-# Find project directory (look for .beads directory)
+# Find project directory (look for .jat directory)
 PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
-if [[ ! -d "$PROJECT_DIR/.beads" ]]; then
+if [[ ! -d "$PROJECT_DIR/.jat" ]]; then
     # Try parent directory (if running from ide/)
-    if [[ -d "$PROJECT_DIR/../.beads" ]]; then
+    if [[ -d "$PROJECT_DIR/../.jat" ]]; then
         PROJECT_DIR="$PROJECT_DIR/.."
     else
-        echo "Error: Cannot find .beads directory" >&2
+        echo "Error: Cannot find .jat directory" >&2
         exit 1
     fi
 fi
 
-LOGS_DIR="$PROJECT_DIR/.beads/logs"
+LOGS_DIR="$PROJECT_DIR/.jat/logs"
 LOG_FILE="$LOGS_DIR/session-${SESSION_NAME}.log"
 
 # Ensure logs directory exists

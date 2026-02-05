@@ -45,8 +45,8 @@ Sometimes you want to override the matrix for a specific task. Two override valu
 Set overrides from the CLI:
 
 ```bash
-bd-set-review-override jat-abc always_review
-bd-set-review-override jat-xyz always_auto
+jt-set-review-override jat-abc always_review
+jt-set-review-override jat-xyz always_auto
 ```
 
 Or configure them in the centralized `review-rules.json` file under the `overrides` array.
@@ -77,19 +77,19 @@ The `maxAutoPriority` field means: tasks with priority >= this value auto-procee
 
 ```bash
 # Show all current rules
-bd-review-rules
+jt-review-rules
 
 # Set max auto-proceed priority for a type
-bd-review-rules --type bug --max-auto 1
+jt-review-rules --type bug --max-auto 1
 
 # Require review for all features
-bd-review-rules --type feature --max-auto -1
+jt-review-rules --type feature --max-auto -1
 
 # Check what would happen for a specific task
-bd-check-review jat-abc
+jt-check-review jat-abc
 
 # Check all active tasks in batch
-bd-check-review --batch
+jt-check-review --batch
 ```
 
 ## How agents use review rules

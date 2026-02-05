@@ -1,7 +1,7 @@
 /**
  * Integration tests for isEpicOpen function
  *
- * Tests that isEpicOpen correctly parses the bd show --json array response
+ * Tests that isEpicOpen correctly parses the jt show --json array response
  * and handles various edge cases (closed epics, missing epics, errors).
  */
 
@@ -45,13 +45,13 @@ const execAsync = (command: string): Promise<ExecResult> => {
  */
 async function isEpicOpen(epicId: string, projectPath?: string): Promise<boolean> {
 	try {
-		let command = `bd show '${escapeForShell(epicId)}' --json`;
+		let command = `jt show '${escapeForShell(epicId)}' --json`;
 		if (projectPath) {
 			command = `cd '${escapeForShell(projectPath)}' && ${command}`;
 		}
 		const { stdout } = await execAsync(command);
 		const epics = JSON.parse(stdout.trim());
-		// bd show --json returns an array, not a single object
+		// jt show --json returns an array, not a single object
 		const epic = Array.isArray(epics) ? epics[0] : epics;
 		if (!epic) return false;
 		return epic.status !== 'closed';
@@ -65,7 +65,7 @@ async function isEpicOpen(epicId: string, projectPath?: string): Promise<boolean
 // Test Fixtures
 // ============================================================================
 
-/** bd show --json returns an array with one element */
+/** jt show --json returns an array with one element */
 const MOCK_OPEN_EPIC = JSON.stringify([{
 	id: 'jat-epic1',
 	title: 'Test Epic',
@@ -159,7 +159,7 @@ describe('isEpicOpen', () => {
 		vi.restoreAllMocks();
 	});
 
-	describe('array response parsing (bd show --json format)', () => {
+	describe('array response parsing (jt show --json format)', () => {
 		it('should return true for open epic in array format', async () => {
 			mockExecSuccess(MOCK_OPEN_EPIC);
 
@@ -167,7 +167,7 @@ describe('isEpicOpen', () => {
 
 			expect(result).toBe(true);
 			expect(exec).toHaveBeenCalledWith(
-				expect.stringContaining("bd show 'jat-epic1' --json"),
+				expect.stringContaining("jt show 'jat-epic1' --json"),
 				expect.any(Function)
 			);
 		});
@@ -256,7 +256,7 @@ describe('isEpicOpen', () => {
 			await isEpicOpen("jat-epic'test");
 
 			expect(exec).toHaveBeenCalledWith(
-				expect.stringContaining("bd show 'jat-epic'\\''test' --json"),
+				expect.stringContaining("jt show 'jat-epic'\\''test' --json"),
 				expect.any(Function)
 			);
 		});
@@ -269,7 +269,7 @@ describe('isEpicOpen', () => {
 			await isEpicOpen('jat-epic1', '/home/user/project');
 
 			expect(exec).toHaveBeenCalledWith(
-				expect.stringContaining("cd '/home/user/project' && bd show 'jat-epic1' --json"),
+				expect.stringContaining("cd '/home/user/project' && jt show 'jat-epic1' --json"),
 				expect.any(Function)
 			);
 		});
@@ -281,7 +281,7 @@ describe('isEpicOpen', () => {
 
 			const callArg = vi.mocked(exec).mock.calls[0][0];
 			expect(callArg).not.toContain('cd ');
-			expect(callArg).toBe("bd show 'jat-epic1' --json");
+			expect(callArg).toBe("jt show 'jat-epic1' --json");
 		});
 
 		it('should escape single quotes in project path', async () => {

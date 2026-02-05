@@ -14,10 +14,10 @@ If you prefer to skip the IDE and work purely from the terminal, thats fine too.
 
 ## Create a task
 
-Tasks live in the Beads system. You can create them from the IDE's task view or from the command line:
+Tasks live in the JAT task system. You can create them from the IDE's task view or from the command line:
 
 ```bash
-bd create "Add user settings page" \
+jt create "Add user settings page" \
   --type feature \
   --priority 1 \
   --labels frontend,ui \
@@ -80,7 +80,7 @@ Summary:
 Run /jat:complete when ready to close this task.
 ```
 
-At this point the work is done but the task is still `in_progress` in Beads. You review the changes before completing.
+At this point the work is done but the task is still `in_progress`. You review the changes before completing.
 
 ## Complete the task
 
@@ -95,7 +95,7 @@ This triggers the completion protocol:
 1. Checks Agent Mail one final time
 2. Runs verification (tests, lint, type checking)
 3. Commits changes with a task-ID-prefixed message
-4. Closes the task in Beads (`bd close`)
+4. Closes the task (`jt close`)
 5. Releases all file reservations
 6. Announces completion to other active agents
 7. Generates a structured completion bundle with suggested follow-up tasks
@@ -139,7 +139,7 @@ JAT really shines when you run several agents in parallel:
 jat myproject 4 --auto
 ```
 
-This launches four agents with a 15-second stagger between each. Every agent picks the next highest-priority task from Beads automatically. Agent Mail prevents file conflicts, and the IDE shows all sessions in a unified dashboard.
+This launches four agents with a 15-second stagger between each. Every agent picks the next highest-priority ready task automatically. Agent Mail prevents file conflicts, and the IDE shows all sessions in a unified dashboard.
 
 ## Common commands
 
@@ -151,8 +151,8 @@ This launches four agents with a 15-second stagger between each. Every agent pic
 | `/jat:start task-id` | Start a specific task |
 | `/jat:complete` | Run the full completion protocol |
 | `/jat:pause` | Pause current work and pivot |
-| `bd ready --json` | List tasks ready to start |
-| `bd list --status open` | List all open tasks |
+| `jt ready --json` | List tasks ready to start |
+| `jt list --status open` | List all open tasks |
 | `am-inbox AgentName --unread` | Check agent's messages |
 
 ## Next steps

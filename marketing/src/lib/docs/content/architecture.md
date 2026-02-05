@@ -10,7 +10,7 @@ JAT is built on two distinct layers. The first layer works with any CLI agent wi
 │   LAYER 2: Agent Orchestration (JAT-specific)                      │
 │   ┌─────────────────────────────────────────────────────────────┐  │
 │   │  Agent Mail (coordination)                                   │  │
-│   │  Beads (task management)                                     │  │
+│   │  JAT Tasks (task management)                                     │  │
 │   │  CLAUDE.md (agent instructions)                              │  │
 │   │  Workflow commands (/jat:start, /jat:complete)              │  │
 │   └─────────────────────────────────────────────────────────────┘  │
@@ -80,13 +80,13 @@ The agent never knew it was talking to a web UI. It just asked a question and go
 
 ## Layer 2: Explicit coordination
 
-The agent actively participates in the system. It reads `CLAUDE.md` for instructions, uses Agent Mail for coordination, and follows Beads for task management.
+The agent actively participates in the system. It reads `CLAUDE.md` for instructions, uses Agent Mail for coordination, and follows JAT Tasks for task management.
 
 ### Components
 
 **Agent Mail** is an async messaging system built on SQLite. Agents register identities, send and receive messages, and reserve files to prevent edit conflicts. All communication happens through lightweight bash tools (`am-send`, `am-inbox`, `am-reserve`).
 
-**Beads** is a dependency-aware task database. Each project has a `.beads/` directory with JSONL files that commit to git. The `bd` CLI handles task creation, status updates, dependency tracking, and priority-based work selection.
+**JAT Tasks** is a dependency-aware task database. Each project has a `.jat/` directory with a SQLite database. The `jt` CLI handles task creation, status updates, dependency tracking, and priority-based work selection.
 
 **Workflow commands** (`/jat:start`, `/jat:complete`, `/jat:pause`) are JAT-specific slash commands that handle the full lifecycle: registration, mail checking, task selection, file reservations, status signals, and completion protocols.
 
@@ -125,7 +125,7 @@ am-send "[myproject-abc] Starting" "Working on settings page" \
 | Layer | Files |
 |-------|-------|
 | Layer 1 | `.claude/hooks/`, `.claude/settings.json`, `/tmp/claude-question-*.json`, `ide/src/routes/api/sessions/` |
-| Layer 2 | `CLAUDE.md`, `shared/*.md`, `tools/mail/`, `commands/jat/`, `.beads/` |
+| Layer 2 | `CLAUDE.md`, `shared/*.md`, `tools/mail/`, `commands/jat/`, `.jat/` |
 
 ## Next steps
 

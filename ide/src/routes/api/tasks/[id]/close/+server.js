@@ -4,7 +4,7 @@
  * Used by Close & Kill action to abandon tasks quickly without full completion
  */
 import { json } from '@sveltejs/kit';
-import { getTaskById, closeTask } from '$lib/server/beads.js';
+import { getTaskById, closeTask } from '$lib/server/jat-tasks.js';
 import { invalidateCache } from '$lib/server/cache.js';
 import { _resetTaskCache } from '../../../../api/agents/+server.js';
 

@@ -1,8 +1,8 @@
-# Beads IDE API Documentation
+# JAT IDE API Documentation
 
 ## Overview
 
-The Beads Task IDE provides a REST API for accessing task, agent, and coordination data. All endpoints return JSON and support CORS for local development.
+The JAT IDE provides a REST API for accessing task, agent, and coordination data. All endpoints return JSON and support CORS for local development.
 
 ## Base URL
 
@@ -180,7 +180,7 @@ Get unified view of all agent coordination data. This endpoint combines agents, 
   "timestamp": "2025-11-20T05:45:00Z",
   "meta": {
     "poll_interval_ms": 3000,
-    "data_sources": ["agent-mail", "beads"],
+    "data_sources": ["agent-mail", "jat-tasks"],
     "cache_ttl_ms": 2000
   }
 }
@@ -200,7 +200,7 @@ The API aggregates data from two main sources:
    - File reservations
    - Message threads
 
-2. **Beads** (`.beads/beads.base.jsonl` per project):
+2. **JAT Tasks** (`.jat/tasks.db` per project):
    - Tasks and issues
    - Task dependencies
    - Task status and metadata

@@ -346,19 +346,7 @@
 					class="git-panel-left"
 					style="{isMobileLayout ? `height: ${topPanelHeight}%` : `width: ${leftPanelWidth}px`};"
 				>
-					<!-- Project Selector in Panel Header -->
-					<div class="panel-header project-header">
-						<ProjectSelector
-							projects={projectNames}
-							selectedProject={selectedProject || 'Select Project'}
-							onProjectChange={handleProjectChange}
-							showColors={true}
-							compact={true}
-							{projectColors}
-						/>
-					</div>
-
-					<!-- Page Title with Mode Toggle -->
+					<!-- Source Control Header: Project Selector + Title + Mode Toggle -->
 					<div class="panel-title-header">
 						<div class="title-left">
 							{#if activeMode === 'git'}
@@ -377,6 +365,15 @@
 								</svg>
 								<span>Migrations</span>
 							{/if}
+							<span class="title-divider"></span>
+							<ProjectSelector
+								projects={projectNames}
+								selectedProject={selectedProject || 'Select Project'}
+								onProjectChange={handleProjectChange}
+								showColors={true}
+								compact={true}
+								{projectColors}
+							/>
 						</div>
 						{#if hasSupabase}
 							<div class="mode-toggle">
@@ -527,11 +524,6 @@
 		min-height: 0;
 	}
 
-	/* Project Selector (compact) */
-	.project-header {
-		padding: 0.375rem 0.5rem;
-	}
-
 	/* Body: Side-by-side layout */
 	.git-body {
 		display: flex;
@@ -564,17 +556,6 @@
 		background: oklch(0.14 0.01 250);
 	}
 
-	/* Panel Header */
-	.panel-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 0.5rem 0.75rem;
-		background: oklch(0.17 0.01 250);
-		border-bottom: 1px solid oklch(0.22 0.02 250);
-		flex-shrink: 0;
-	}
-
 	/* Panel Title Header */
 	.panel-title-header {
 		display: flex;
@@ -596,6 +577,14 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
+		min-width: 0;
+	}
+
+	.title-divider {
+		width: 1px;
+		height: 1rem;
+		background: oklch(0.30 0.02 250);
+		flex-shrink: 0;
 	}
 
 	.panel-title-icon {

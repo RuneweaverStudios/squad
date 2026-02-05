@@ -61,7 +61,7 @@ THEMES=(
 )
 
 echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}"
-echo -e "${BLUE}║   DaisyUI Theme Testing - Beads IDE               ║${NC}"
+echo -e "${BLUE}║   DaisyUI Theme Testing - JAT IDE                  ║${NC}"
 echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}"
 echo ""
 

@@ -1,6 +1,6 @@
 /**
  * Projects Init API
- * POST /api/projects/init - Initialize a new project with Beads
+ * POST /api/projects/init - Initialize a new project with JAT Tasks
  *
  * Request body:
  *   { path: string, createIfMissing?: boolean }  - Path to the project directory
@@ -12,7 +12,7 @@
  * Behavior (unified onboarding flow):
  *   1. Creates directory if it doesn't exist (when createIfMissing=true or path is in ~/code/)
  *   2. Initializes git if not already a git repository
- *   3. Runs bd init to set up Beads
+ *   3. Runs jt init to set up JAT Tasks
  *   4. Adds project to ~/.config/jat/projects.json
  *
  * Security:
@@ -27,7 +27,7 @@ import { join, basename, resolve, normalize } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { invalidateCache } from '$lib/server/cache.js';
-import { initProject } from '$lib/server/beads.js';
+import { initProject } from '$lib/server/jat-tasks.js';
 
 const execAsync = promisify(exec);
 
@@ -72,12 +72,12 @@ async function isGitRepo(path) {
 }
 
 /**
- * Check if .beads/ already exists
+ * Check if .jat/ already exists
  * @param {string} path
  * @returns {boolean}
  */
-function hasBeadsInit(path) {
-	return existsSync(join(path, '.beads'));
+function hasJatInit(path) {
+	return existsSync(join(path, '.jat'));
 }
 
 /**
@@ -118,7 +118,7 @@ function addProjectToConfig(projectKey, absolutePath) {
 
 /**
  * POST /api/projects/init
- * Unified project onboarding - creates directory, inits git, inits beads, adds to config
+ * Unified project onboarding - creates directory, inits git, inits jat, adds to config
  */
 export async function POST({ request }) {
 	try {
@@ -211,8 +211,8 @@ export async function POST({ request }) {
 			}
 		}
 
-		// STEP 3: Check if Beads is already initialized
-		if (hasBeadsInit(absolutePath)) {
+		// STEP 3: Check if JAT Tasks is already initialized
+		if (hasJatInit(absolutePath)) {
 			// Already initialized - just add to config if not already there
 			const projectName = basename(absolutePath);
 			addProjectToConfig(projectName, absolutePath);
@@ -226,8 +226,8 @@ export async function POST({ request }) {
 					prefix: projectName.toLowerCase()
 				},
 				message: steps.length > 0
-					? `Project setup complete (Beads was already initialized)`
-					: `Beads already initialized in ${projectName}`,
+					? `Project setup complete (JAT was already initialized)`
+					: `JAT already initialized in ${projectName}`,
 				steps,
 				alreadyInitialized: true
 			}, { status: 200 });

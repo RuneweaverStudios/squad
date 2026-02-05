@@ -290,7 +290,7 @@ if [[ "$SIGNAL_TYPE" == "question" ]]; then
 fi
 
 # Write per-task signal timeline for TaskDetailDrawer
-# Stored in .beads/signals/{taskId}.jsonl so it persists with the repo
+# Stored in .jat/signals/{taskId}.jsonl so it persists with the repo
 if [[ -n "$TASK_ID" ]]; then
 
     # Extract project prefix from task ID (e.g., "jat-abc" -> "jat")
@@ -303,7 +303,7 @@ if [[ -n "$TASK_ID" ]]; then
     TARGET_DIR=""
     FALLBACK_DIR=""
     for BASE_DIR in $SEARCH_DIRS; do
-        if [[ -d "${BASE_DIR}/.beads" ]]; then
+        if [[ -d "${BASE_DIR}/.jat" ]]; then
             DIR_NAME=$(basename "$BASE_DIR")
             # If directory name matches task project prefix, use it
             if [[ -n "$TASK_PROJECT" ]] && [[ "$DIR_NAME" == "$TASK_PROJECT" ]]; then
@@ -321,7 +321,7 @@ if [[ -n "$TASK_ID" ]]; then
     CHOSEN_DIR="${TARGET_DIR:-$FALLBACK_DIR}"
 
     if [[ -n "$CHOSEN_DIR" ]]; then
-        SIGNALS_DIR="${CHOSEN_DIR}/.beads/signals"
+        SIGNALS_DIR="${CHOSEN_DIR}/.jat/signals"
         mkdir -p "$SIGNALS_DIR" 2>/dev/null || true
 
         # Add agent name to the signal for task context

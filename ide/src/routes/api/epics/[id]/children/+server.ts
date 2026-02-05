@@ -5,11 +5,11 @@
  * Returns all children of an epic with blocking information.
  * This powers the EpicSwarmModal task list.
  *
- * Performance: Uses the beads.js SQLite library directly instead of spawning
- * bd CLI commands. This reduces response time from ~15s to <100ms.
+ * Performance: Uses the jat-tasks.js SQLite library directly instead of spawning
+ * jt CLI commands. This reduces response time from ~15s to <100ms.
  */
 import { json } from '@sveltejs/kit';
-import { getTasks, getTaskById } from '$lib/server/beads.js';
+import { getTasks, getTaskById } from '$lib/server/jat-tasks.js';
 import type { RequestHandler } from './$types';
 
 /** Child task with blocking info */
@@ -54,7 +54,7 @@ export const GET: RequestHandler = async ({ params }) => {
 		// Get all tasks first (needed for both epic lookup and child detection)
 		const allTasks = getTasks();
 
-		// Get the epic details using beads.js library (much faster than bd CLI)
+		// Get the epic details using jat-tasks.js library (much faster than jt CLI)
 		const epic = getTaskById(epicId);
 
 		// Method 1: Find children by hierarchical ID pattern (e.g., jat-cptest.1, jat-cptest.2)

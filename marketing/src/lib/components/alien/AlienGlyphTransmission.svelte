@@ -27,7 +27,7 @@
 	const floatingTerms = [
 		'agents', 'subagents', 'prompts', 'contexts', 'memory',
 		'modes', 'permissions', 'tools', 'plugins', 'skills',
-		'hooks', 'MCP', 'workflows', 'signals', 'beads'
+		'hooks', 'MCP', 'workflows', 'signals', 'tasks'
 	];
 
 	onMount(() => {

@@ -27,7 +27,7 @@ import type { RequestHandler } from './$types';
  */
 function captureSessionLog(sessionName: string, reason: string): string | null {
 	const projectPath = process.cwd().replace('/ide', '');
-	const logsDir = path.join(projectPath, '.beads', 'logs');
+	const logsDir = path.join(projectPath, '.jat', 'logs');
 	const logFile = path.join(logsDir, `session-${sessionName}.log`);
 
 	// Ensure logs directory exists

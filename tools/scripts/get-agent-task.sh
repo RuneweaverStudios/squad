@@ -19,7 +19,7 @@
 #   - Exit code 1: No task found
 #
 # Algorithm (matches IDE logic):
-#   1. Check Beads for in_progress tasks assigned to agent
+#   1. Check JAT Tasks for in_progress tasks assigned to agent
 #   2. Check Agent Mail for active file reservations by agent
 #   3. Return task_id if found from EITHER source
 #
@@ -65,11 +65,11 @@ if command -v am-reservations &>/dev/null; then
 
     if [[ -n "$reservation_info" ]]; then
         # Extract task ID from "Reason:" field
-        # Common patterns: "jat-abc", "bd-123", "task-xyz"
+        # Common patterns: "jat-abc", "task-xyz"
         task_id=$(echo "$reservation_info" | \
             grep "^Reason:" | \
             sed 's/^Reason: //' | \
-            grep -oE '(jat|bd|task)-[a-z0-9]{3}\b' | \
+            grep -oE '(jat|task)-[a-z0-9]{3}\b' | \
             head -1)
 
         if [[ -n "$task_id" ]]; then

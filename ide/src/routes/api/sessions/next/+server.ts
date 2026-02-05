@@ -12,7 +12,7 @@
 import { json } from '@sveltejs/kit';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { getReadyTasks } from '$lib/server/beads.js';
+import { getReadyTasks } from '$lib/server/jat-tasks.js';
 import {
 	DEFAULT_MODEL,
 	AGENT_MAIL_URL

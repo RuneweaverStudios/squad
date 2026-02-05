@@ -137,20 +137,20 @@ if [[ -f "$PERSISTENT_STATE_FILE" ]]; then
 fi
 
 # Fallback: If no state file but agent has in_progress task, still output working marker
-if [[ -z "$TASK_ID" ]] && [[ -n "$AGENT_NAME" ]] && command -v bd &>/dev/null; then
-    TASK_ID=$(bd list --json 2>/dev/null | jq -r --arg a "$AGENT_NAME" '.[] | select(.assignee == $a and .status == "in_progress") | .id' 2>/dev/null | head -1)
+if [[ -z "$TASK_ID" ]] && [[ -n "$AGENT_NAME" ]] && command -v jt &>/dev/null; then
+    TASK_ID=$(jt list --json 2>/dev/null | jq -r --arg a "$AGENT_NAME" '.[] | select(.assignee == $a and .status == "in_progress") | .id' 2>/dev/null | head -1)
     if [[ -n "$TASK_ID" ]]; then
-        TASK_TITLE=$(bd show "$TASK_ID" --json 2>/dev/null | jq -r '.[0].title // ""' 2>/dev/null)
+        TASK_TITLE=$(jt show "$TASK_ID" --json 2>/dev/null | jq -r '.[0].title // ""' 2>/dev/null)
         echo "[JAT:WORKING task=$TASK_ID]"
         echo ""
-        echo "=== JAT WORKFLOW CONTEXT (restored from Beads) ==="
+        echo "=== JAT WORKFLOW CONTEXT (restored from JAT Tasks) ==="
         echo "Agent: $AGENT_NAME"
         echo "Task: $TASK_ID - $TASK_TITLE"
         echo "Last Signal: unknown (no state file)"
         echo "NEXT ACTION: Emit 'working' signal if continuing work, or 'review' signal if done"
         echo "=================================================="
 
-        echo "[SessionStart] Fallback context from Beads: task=$TASK_ID" >> "$CLAUDE_DIR/.agent-activity.log"
+        echo "[SessionStart] Fallback context from JAT Tasks: task=$TASK_ID" >> "$CLAUDE_DIR/.agent-activity.log"
     fi
 fi
 

@@ -22,7 +22,7 @@ DEMO_DESCRIPTIONS=(
 
 show_usage() {
     echo "Usage: jat-demo [setup|on|off|status|clean]"
-    echo "  setup  - Create demo projects and initialize with beads"
+    echo "  setup  - Create demo projects and initialize with JAT tasks"
     echo "  on     - Show only demo projects in dashboard"
     echo "  off    - Hide demo projects, show regular projects"
     echo "  status - Show current visibility status"
@@ -98,7 +98,7 @@ setup_demo_projects() {
         echo -e "\n${YELLOW}Checking $project...${NC}"
 
         # Check if project already exists
-        if [[ -d "$path/.beads" ]]; then
+        if [[ -d "$path/.jat" ]]; then
             echo -e "  ${BLUE}→ Already exists, skipping creation${NC}"
             ((skipped++))
         else

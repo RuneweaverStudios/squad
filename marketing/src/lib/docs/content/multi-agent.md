@@ -1,6 +1,6 @@
 # Multi-Agent Swarm
 
-JAT's swarm mode launches multiple agents that independently pick and work on tasks from your backlog. A single command spawns 4+ agents, each grabbing the highest-priority ready task from Beads.
+JAT's swarm mode launches multiple agents that independently pick and work on tasks from your backlog. A single command spawns 4+ agents, each grabbing the highest-priority ready task from JAT Tasks.
 
 ## Launching a swarm
 
@@ -36,7 +36,7 @@ Agents spawn with a configurable delay between each launch. The default is 15 se
 }
 ```
 
-Staggering prevents race conditions. Without it, multiple agents might query `bd ready` at the same instant and grab the same task. The 15-second gap gives each agent time to register, reserve files, and update the task status in Beads before the next one starts.
+Staggering prevents race conditions. Without it, multiple agents might query `jt ready` at the same instant and grab the same task. The 15-second gap gives each agent time to register, reserve files, and update the task status before the next one starts.
 
 If you have a large backlog with no shared files, you can reduce the stagger to 5 seconds. For repos with lots of overlapping code paths, 20-30 seconds is safer.
 
@@ -79,7 +79,7 @@ The `claude_startup_timeout` setting controls how long the IDE waits for each ag
 
 ## Review rules for auto-proceed
 
-Review rules control whether a completed task needs human review or auto-proceeds to the next task. Configure these in `.beads/review-rules.json` or through Settings in the IDE.
+Review rules control whether a completed task needs human review or auto-proceeds to the next task. Configure these in `.jat/review-rules.json` or through Settings in the IDE.
 
 | Rule condition | Action | Example use case |
 |----------------|--------|------------------|
@@ -97,7 +97,7 @@ The detection order is:
 
 1. Task notes override
 2. Session epic context (`.claude/sessions/context-{sessionId}.json`)
-3. Project review rules (`.beads/review-rules.json`)
+3. Project review rules (`.jat/review-rules.json`)
 4. Default: review required
 
 ## Coordination via Agent Mail

@@ -455,7 +455,7 @@
         "taskDescription": {
           "type": "string",
           "maxLength": 5000,
-          "description": "Full description from Beads"
+          "description": "Full description from JAT task database"
         },
         "taskPriority": {
           "type": "integer",

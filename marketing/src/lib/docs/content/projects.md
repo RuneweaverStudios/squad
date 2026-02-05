@@ -1,37 +1,34 @@
 # Projects configuration
 
-JAT discovers projects automatically. Any git repository under `~/code/` that has a `.beads/` directory shows up in the IDE. No config file needed for the basics.
+JAT discovers projects automatically. Any git repository under `~/code/` that has a `.jat/` directory shows up in the IDE. No config file needed for the basics.
 
 ## Auto-discovery
 
-The IDE scans `~/code/` for directories containing `.beads/`. When it finds one, that project appears in the sidebar, task views and agent routing.
+The IDE scans `~/code/` for directories containing `.jat/`. When it finds one, that project appears in the sidebar, task views and agent routing.
 
 To make any repo a JAT project:
 
 ```bash
 cd ~/code/my-project
-bd init
+jt init
 ```
 
-The `bd init` command creates a `.beads/` directory with JSONL task files. These files get committed to git so tasks sync across machines. The SQLite cache stays local and rebuilds automatically from the JSONL source of truth.
+The `jt init` command creates a `.jat/` directory with the task database. The SQLite database stays local.
 
 After initialization, refresh the IDE to see your project.
 
-You can also add projects from the IDE. Go to the Tasks page and click "Add Project." This runs `bd init` for you and adds the project to the IDE automatically.
+You can also add projects from the IDE. Go to the Tasks page and click "Add Project." This runs `jt init` for you and adds the project to the IDE automatically.
 
 ## What gets committed
 
-The `.beads/` directory contains both committed and ignored files:
+The `.jat/` directory contains both committed and ignored files:
 
 | Path | Committed | Purpose |
 |------|-----------|---------|
-| `.beads/issues.jsonl` | Yes | Task data (syncs across machines) |
-| `.beads/config.yaml` | Yes | Project Beads configuration |
-| `.beads/metadata.json` | Yes | Repository and clone IDs |
-| `.beads/.gitignore` | Yes | Ignore rules for SQLite files |
-| `.beads/beads.db*` | No | Local SQLite cache (auto-rebuilt) |
+| `.jat/.gitignore` | Yes | Ignore rules for SQLite files |
+| `.jat/tasks.db*` | No | Local SQLite task database |
 
-Do not add `.beads/` to your root `.gitignore`. The `.beads/.gitignore` file handles ignoring the SQLite files while tracking the JSONL source of truth.
+Do not add `.jat/` to your root `.gitignore`. The `.jat/.gitignore` file handles ignoring the SQLite files.
 
 ## The projects.json file
 
@@ -117,7 +114,7 @@ The IDE aggregates tasks from all projects into a single view. Task IDs are pref
 
 You can filter by project using the dropdown in the navigation bar. The URL updates with a `?project=chimaro` parameter so filtered views are bookmarkable.
 
-The `bd` CLI works within whatever project directory youre in. Run `bd ready` in `~/code/jat` and you see only JAT tasks. Run it in `~/code/chimaro` and you see Chimaro tasks. The IDE shows everything.
+The `jt` CLI works within whatever project directory youre in. Run `jt ready` in `~/code/jat` and you see only JAT tasks. Run it in `~/code/chimaro` and you see Chimaro tasks. The IDE shows everything.
 
 ## See also
 

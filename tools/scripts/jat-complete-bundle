@@ -149,7 +149,7 @@ log_dim "Gathering context for completion bundle..."
 # CONTEXT GATHERING
 # ============================================================================
 
-# 1. Get task details from Beads
+# 1. Get task details from JAT
 log_dim "  • Fetching task details..."
 TASK_JSON=$(jt show "$TASK_ID" --json 2>/dev/null || echo "[]")
 

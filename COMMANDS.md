@@ -43,7 +43,7 @@
 2. Session persistence (updates statusline)
 3. Task selection (from parameter, context, or priority)
 4. Conflict detection (file locks, git, dependencies)
-5. Actually starts work (reserves files, sends mail, updates Beads)
+5. Actually starts work (reserves files, sends mail, updates task status)
 
 ---
 
@@ -59,7 +59,7 @@
 - ✅ Commit changes
 - ✅ Acknowledge all unread Agent Mail
 - ✅ Announce completion
-- ✅ Mark task complete in Beads
+- ✅ Mark task complete in JAT Tasks
 - ✅ Release file locks
 - ✅ **Session ends** (one agent = one task)
 
@@ -148,7 +148,7 @@
 **What it does:**
 - Analyzes conversation history OR written PRD
 - Breaks work into atomic, testable tasks
-- Creates Beads tasks with proper dependency chains
+- Creates JAT tasks with proper dependency chains
 - Sets priorities (P0 = foundation, P1 = features, P2 = polish)
 - Generates task descriptions with acceptance criteria
 
@@ -168,14 +168,14 @@
 - ✅ Statusline installed (`~/.claude/statusline.sh`)
 - ✅ Agent commands installed (`~/.claude/commands/jat/*.md`)
 - ✅ Tools symlinked to `~/.local/bin`
-- ✅ Beads initialized in project (`.beads/` directory)
+- ✅ JAT Tasks initialized in project (`.jat/` directory)
 
 **What it repairs:**
 - 🔧 Missing imports in CLAUDE.md (adds all 7)
 - 🔧 Malformed imports (fixes paths, typos)
 - 🔧 Duplicate imports (removes extras)
 - 🔧 Missing statusline (copies from jat)
-- 🔧 Missing Beads (runs `bd init`)
+- 🔧 Missing JAT Tasks (runs `jt init`)
 
 **When to use:**
 - After cloning a new project
@@ -196,7 +196,7 @@
 ✓ Statusline installed
 ✓ Agent commands installed (9)
 ✓ Tools available
-✓ Beads initialized
+✓ JAT Tasks initialized
 ```
 
 ---
@@ -275,4 +275,4 @@
 - **Project-Specific Docs:** `CLAUDE.md`
 - **Command Implementations:** `commands/jat/*.md`
 - **IDE:** Run `jat` to see tasks visually
-- **Beads:** See `README.md` section on Beads command reference
+- **JAT Tasks:** See `README.md` section on JAT Tasks command reference

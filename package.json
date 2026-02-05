@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "type": "module",
   "description": "Agent Mail and supporting tools for multi-agent coordination",
-  "main": "lib/beads.js",
+  "main": "lib/tasks.js",
   "scripts": {
-    "test": "node test/test-beads.js"
+    "test": "node test/test-tasks.js"
   },
   "repository": {
     "type": "git",
@@ -22,7 +22,7 @@
   },
   "keywords": [
     "agent-mail",
-    "beads",
+    "jat-tasks",
     "multi-agent",
     "coordination",
     "ai-agents",

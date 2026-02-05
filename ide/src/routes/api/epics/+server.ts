@@ -10,7 +10,7 @@
 
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { getTasks, createTask, addDependency } from '$lib/server/beads.js';
+import { getTasks, createTask, addDependency } from '$lib/server/jat-tasks.js';
 import { invalidateCache } from '$lib/server/cache.js';
 import { _resetTaskCache } from '../agents/+server.js';
 import { getProjectPath } from '$lib/server/projectPaths.js';

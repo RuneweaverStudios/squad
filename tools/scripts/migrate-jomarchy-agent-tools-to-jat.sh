@@ -2,7 +2,7 @@
 #
 # Migration: Rename jomarchy-agent-tools-* tasks to jat-*
 #
-# This script updates task IDs in the jat Beads database:
+# This script updates task IDs in the jat tasks database:
 # - Changes all jomarchy-agent-tools-XXX -> jat-XXX
 # - Updates references in dependencies table
 # - Creates backup before making changes
@@ -10,10 +10,10 @@
 
 set -e  # Exit on error
 
-DB_PATH="$HOME/code/jat/.beads/beads.db"
-BACKUP_PATH="$HOME/code/jat/.beads/beads.db.backup-$(date +%Y%m%d-%H%M%S)"
+DB_PATH="$HOME/code/jat/.jat/tasks.db"
+BACKUP_PATH="$HOME/code/jat/.jat/tasks.db.backup-$(date +%Y%m%d-%H%M%S)"
 
-echo "🔍 Beads Database Migration: jomarchy-agent-tools → jat"
+echo "🔍 JAT Tasks Database Migration: jomarchy-agent-tools → jat"
 echo ""
 
 # Check if database exists

@@ -2,7 +2,7 @@
 	/**
 	 * HelpGuide.svelte
 	 *
-	 * Comprehensive help documentation modal for the Beads Task IDE.
+	 * Comprehensive help documentation modal for the JAT IDE.
 	 * Documents the drawer sidebar navigation pattern and all IDE features.
 	 */
 
@@ -43,7 +43,7 @@
 						Getting Started
 					</h3>
 					<div class="space-y-2 text-sm">
-						<p>Welcome to the Beads Task IDE! This IDE helps you manage tasks across multiple projects with powerful filtering, visualization, and agent coordination features.</p>
+						<p>Welcome to the JAT IDE! This IDE helps you manage tasks across multiple projects with powerful filtering, visualization, and agent coordination features.</p>
 						<p class="font-semibold mt-3">Key Features:</p>
 						<ul class="list-disc list-inside space-y-1 ml-2">
 							<li><strong>Drawer Sidebar Navigation:</strong> Quick access to all 5 main views</li>

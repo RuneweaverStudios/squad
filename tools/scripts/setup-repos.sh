@@ -35,7 +35,7 @@ fi
 JAT_IMPORTS="@$JAT_DIR/shared/overview.md
 @$JAT_DIR/shared/agent-mail.md
 @$JAT_DIR/shared/bash-patterns.md
-@$JAT_DIR/shared/beads.md
+@$JAT_DIR/shared/tasks.md
 @$JAT_DIR/shared/tools.md
 @$JAT_DIR/shared/workflow-commands.md
 @$JAT_DIR/shared/statusline.md"
@@ -49,8 +49,7 @@ JAT_MARKER="@.*/shared/overview.md"
 #   - .mcp.json (may contain API keys)
 # These should be committed:
 #   - .claude/settings.json (team config)
-#   - .beads/*.jsonl (task data - source of truth)
-#   - .beads/config.yaml, metadata.json
+#   - .jat/tasks.db (task data - source of truth, ignored via .jat/.gitignore)
 JAT_GITIGNORE_PATTERNS='# Claude Code session-specific files (per-developer, do not commit)
 .claude/agent-*.txt
 .claude/agent-*-activity.jsonl
@@ -73,7 +72,7 @@ fi
 
 # Ask if user wants to auto-setup existing projects
 echo -e "${YELLOW}JAT can automatically initialize all projects in ~/code/ with:${NC}"
-echo "  • Beads task management (.beads/ directory)"
+echo "  • JAT task management (.jat/ directory)"
 echo "  • JAT documentation imports (CLAUDE.md)"
 echo "  • Git hooks for agent coordination"
 echo "  • .gitignore patterns"
@@ -111,7 +110,7 @@ echo "Scanning ~/code/ for projects..."
 echo ""
 
 REPOS_FOUND=0
-BEADS_INITIALIZED=0
+TASKS_INITIALIZED=0
 GITIGNORE_UPDATED=0
 HOOKS_INSTALLED=0
 IMPORTS_ADDED=0
@@ -146,7 +145,7 @@ for repo_dir in "$CODE_DIR"/*; do
     ((REPOS_FOUND++))
 
     # Initialize tasks if needed
-    if [ ! -d "$repo_dir/.jat" ] && [ ! -d "$repo_dir/.beads" ]; then
+    if [ ! -d "$repo_dir/.jat" ]; then
         echo "  → Initializing tasks..."
         cd "$repo_dir"
 
@@ -156,7 +155,7 @@ for repo_dir in "$CODE_DIR"/*; do
 
         if [ -d "$repo_dir/.jat" ]; then
             echo -e "  ${GREEN}✓ Tasks initialized${NC}"
-            ((BEADS_INITIALIZED++))
+            ((TASKS_INITIALIZED++))
         fi
     else
         echo -e "  ${GREEN}✓${NC} Tasks already initialized"
@@ -275,7 +274,7 @@ echo -e "${GREEN}Repository Setup Complete${NC}"
 echo -e "${GREEN}=========================================${NC}"
 echo ""
 echo "  Total repos found: $REPOS_FOUND"
-echo "  Beads initialized: $BEADS_INITIALIZED"
+echo "  Tasks initialized: $TASKS_INITIALIZED"
 echo "  .gitignore updated: $GITIGNORE_UPDATED"
 echo "  Git hooks installed: $HOOKS_INSTALLED"
 echo "  jat imports added: $IMPORTS_ADDED"
@@ -292,7 +291,7 @@ else
     echo "    @$JAT_DIR/shared/overview.md      # System overview"
     echo "    @$JAT_DIR/shared/agent-mail.md    # Agent Mail docs"
     echo "    @$JAT_DIR/shared/bash-patterns.md # Bash patterns"
-    echo "    @$JAT_DIR/shared/beads.md         # Beads task planning"
+    echo "    @$JAT_DIR/shared/tasks.md         # JAT task planning"
     echo "    @$JAT_DIR/shared/tools.md         # 33 bash tools"
     echo "    @$JAT_DIR/shared/workflow-commands.md # /jat:* commands"
     echo "    @$JAT_DIR/shared/statusline.md    # Statusline docs"

@@ -126,7 +126,7 @@ The IDE writes this signal directly to the timeline file when a user sends input
 │       ↓                                                             │
 │  Step 4: Commit changes                                             │
 │       ↓                                                             │
-│  Step 5: Close task in Beads (bd close)                             │
+│  Step 5: Close task in JAT Tasks (jt close)                         │
 │       ↓                                                             │
 │  Step 6: Release file reservations                                  │
 │       ↓                                                             │
@@ -155,7 +155,7 @@ The IDE writes this signal directly to the timeline file when a user sends input
 |-------|----------|------|-------------|
 | taskId | **Yes** | string | Task ID (e.g., "jat-abc") |
 | taskTitle | **Yes** | string | Human-readable title |
-| taskDescription | No | string | Full description from Beads |
+| taskDescription | No | string | Full description from JAT Tasks |
 | taskPriority | No | number | 0-4 |
 | taskType | No | string | feature/bug/task/chore/epic |
 | approach | No | string | How you'll implement this |
@@ -670,7 +670,7 @@ jat-step committing --task jat-abc --title "Add auth flow" --agent FairBay --typ
 # → emits completing (20%) + git commit
 
 jat-step closing --task jat-abc --title "Add auth flow" --agent FairBay
-# → emits completing (40%) + bd close
+# → emits completing (40%) + jt close
 
 jat-step releasing --task jat-abc --title "Add auth flow" --agent FairBay
 # → emits completing (60%) + am-release all
@@ -702,7 +702,7 @@ When `/jat:complete` determines the task can auto-proceed (based on review rules
 │     └─► Step 7.5 determines: completionMode="auto_proceed"                 │
 │                                                                             │
 │  2. Agent queries next ready task                                           │
-│     └─► bd ready --json | jq '.[0]'                                        │
+│     └─► jt ready --json | jq '.[0]'                                        │
 │         └─► Gets nextTaskId + nextTaskTitle                                │
 │                                                                             │
 │  3. Agent emits complete signal with auto_proceed mode                      │

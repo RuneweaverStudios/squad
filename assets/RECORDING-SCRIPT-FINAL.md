@@ -227,7 +227,7 @@ Rapid cuts:
 - Focus on project organization features
 
 ### If tasks don't create properly:
-- Have backup `.beads/issues.jsonl` ready
+- Have backup tasks ready via `jt create`
 - Can manually create tasks quickly
 
 ### If recording runs long:

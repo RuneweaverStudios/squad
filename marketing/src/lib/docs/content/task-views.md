@@ -27,7 +27,7 @@ All filters persist in URL parameters. The URL `/tasks?project=jat&status=open&p
 
 The Kanban view at `/kanban` displays tasks as draggable cards in columns. Default columns map to status values: Open, In Progress, Blocked, Closed.
 
-Drag a card between columns to update its status. The status change saves to Beads immediately. Cards show priority badges, type icons, assignee, and project.
+Drag a card between columns to update its status. The status change saves immediately. Cards show priority badges, type icons, assignee, and project.
 
 You can switch the grouping axis. Group by priority instead of status and the columns become P0, P1, P2, P3, P4 with drag to reprioritize.
 

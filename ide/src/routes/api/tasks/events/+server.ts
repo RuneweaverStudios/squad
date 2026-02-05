@@ -1,6 +1,6 @@
 /**
  * SSE endpoint for real-time task events
- * Watches the beads database file and pushes updates when tasks change
+ * Watches the JAT tasks database file and pushes updates when tasks change
  */
 
 import { watch, type FSWatcher, existsSync } from 'fs';
@@ -8,10 +8,10 @@ import { readFile } from 'fs/promises';
 import { join, dirname, basename } from 'path';
 
 // IDE runs from /home/jw/code/jat/ide
-// Beads file is at /home/jw/code/jat/.beads/issues.jsonl (parent directory)
-const BEADS_FILE = join(process.cwd(), '..', '.beads', 'issues.jsonl');
-const BEADS_DIR = dirname(BEADS_FILE);
-const BEADS_FILENAME = basename(BEADS_FILE);
+// JAT tasks file is at /home/jw/code/jat/.jat/issues.jsonl (parent directory)
+const JAT_TASKS_FILE = join(process.cwd(), '..', '.jat', 'issues.jsonl');
+const JAT_TASKS_DIR = dirname(JAT_TASKS_FILE);
+const JAT_TASKS_FILENAME = basename(JAT_TASKS_FILE);
 
 // Track connected clients and file watcher
 let watcher: FSWatcher | null = null;
@@ -29,7 +29,7 @@ interface TaskSnapshot {
 
 async function getTaskSnapshots(): Promise<Map<string, TaskSnapshot>> {
 	try {
-		const content = await readFile(BEADS_FILE, 'utf-8');
+		const content = await readFile(JAT_TASKS_FILE, 'utf-8');
 		const snapshots = new Map<string, TaskSnapshot>();
 		for (const line of content.split('\n')) {
 			if (!line.trim()) continue;
@@ -120,14 +120,14 @@ function startWatcher() {
 		return;
 	}
 
-	// Check if .beads directory exists (jat repo itself doesn't have one)
-	if (!existsSync(BEADS_DIR)) {
-		console.log(`[SSE] Skipping watcher - ${BEADS_DIR} does not exist (normal for jat repo itself)`);
+	// Check if .jat directory exists (jat repo itself doesn't have one)
+	if (!existsSync(JAT_TASKS_DIR)) {
+		console.log(`[SSE] Skipping watcher - ${JAT_TASKS_DIR} does not exist (normal for jat repo itself)`);
 		return;
 	}
 
 	// Watch the DIRECTORY instead of the file - more reliable for atomic writes
-	console.log(`[SSE] Starting directory watcher for: ${BEADS_DIR} (watching ${BEADS_FILENAME})`);
+	console.log(`[SSE] Starting directory watcher for: ${JAT_TASKS_DIR} (watching ${JAT_TASKS_FILENAME})`);
 
 	// Initialize previous task snapshots
 	getTaskSnapshots().then(snapshots => {
@@ -137,9 +137,9 @@ function startWatcher() {
 
 	try {
 		// Watch the directory and filter for our target file
-		watcher = watch(BEADS_DIR, { persistent: false }, (eventType, filename) => {
+		watcher = watch(JAT_TASKS_DIR, { persistent: false }, (eventType, filename) => {
 			// Only react to changes in our target file
-			if (filename === BEADS_FILENAME || filename === null) {
+			if (filename === JAT_TASKS_FILENAME || filename === null) {
 				console.log(`[SSE] File event: ${eventType} for ${filename || 'unknown'}`);
 				// Debounce rapid changes
 				if (debounceTimer) clearTimeout(debounceTimer);
@@ -150,12 +150,12 @@ function startWatcher() {
 		});
 
 		watcher.on('error', (err) => {
-			console.error('[SSE] Beads directory watcher error:', err);
+			console.error('[SSE] JAT directory watcher error:', err);
 		});
 
 		console.log('[SSE] Directory watcher started successfully');
 	} catch (err) {
-		console.error('[SSE] Failed to start beads watcher:', err);
+		console.error('[SSE] Failed to start JAT watcher:', err);
 	}
 }
 

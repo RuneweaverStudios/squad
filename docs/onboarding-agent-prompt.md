@@ -18,7 +18,7 @@ Guide the user through this 5-step journey:
 
 1. **Discover**: What do they want to build?
 2. **Define**: Help them write a Product Requirements Document (PRD)
-3. **Initialize**: Set up project structure and Beads task management
+3. **Initialize**: Set up project structure and JAT task management
 4. **Plan**: Break the PRD into actionable tasks
 5. **Launch**: Offer to start working on the first task
 
@@ -121,12 +121,12 @@ Based on your answers, I'll draft a PRD we can refine together.
 
 ### Step 3: Initialize Project Structure
 
-**Goal**: Create the project directory and set up Beads.
+**Goal**: Create the project directory and set up JAT Tasks.
 
 **Actions:**
 1. Create project directory: `~/code/{project-name}/`
 2. Write CLAUDE.md with the PRD
-3. Run `bd init` to initialize Beads
+3. Run `jt init` to initialize JAT Tasks
 4. Create basic project structure (README, .gitignore, etc.)
 5. Add project to `~/.config/jat/projects.json`
 
@@ -141,8 +141,8 @@ cat > CLAUDE.md << 'EOF'
 {PRD content}
 EOF
 
-# Initialize Beads
-bd init
+# Initialize JAT Tasks
+jt init
 
 # Create basic files
 cat > README.md << 'EOF'
@@ -156,10 +156,10 @@ See CLAUDE.md for full project documentation.
 EOF
 
 cat > .gitignore << 'EOF'
-# Beads
-.beads/db.sqlite
-.beads/db.sqlite-shm
-.beads/db.sqlite-wal
+# JAT Tasks
+.jat/tasks.db
+.jat/tasks.db-shm
+.jat/tasks.db-wal
 
 # Claude Code
 .claude/agent-*.txt
@@ -191,7 +191,7 @@ mv /tmp/jat-config.json ~/.config/jat/projects.json
 I've set up:
 - ~/code/my-awesome-app/
 - CLAUDE.md with your PRD
-- Beads task management (.beads/)
+- JAT task management (.jat/)
 - README.md and .gitignore
 - Git repository (initial commit)
 
@@ -211,26 +211,26 @@ Your project is now registered with JAT!
    - P2: Important features (should-haves)
    - P3: Nice-to-haves
    - P4: Future enhancements
-4. Use `bd create` for each task
+4. Use `jt create` for each task
 5. Add dependencies where appropriate
 
 **Task Creation Pattern:**
 ```bash
 # Setup tasks (P0)
-bd create "Initialize project repository" --type task --priority P0 --description "Set up git, npm/cargo/go, and basic project structure"
-bd create "Set up development environment" --type task --priority P0 --description "Configure linting, testing, CI/CD basics"
+jt create "Initialize project repository" --type task --priority P0 --description "Set up git, npm/cargo/go, and basic project structure"
+jt create "Set up development environment" --type task --priority P0 --description "Configure linting, testing, CI/CD basics"
 
 # Core features (P1)
-bd create "Implement [Feature X]" --type feature --priority P1 --description "Detailed feature description"
-bd create "Add [Component Y]" --type feature --priority P1 --description "Detailed component description"
+jt create "Implement [Feature X]" --type feature --priority P1 --description "Detailed feature description"
+jt create "Add [Component Y]" --type feature --priority P1 --description "Detailed component description"
 
 # Supporting tasks (P2)
-bd create "Write documentation for [Feature X]" --type task --priority P2
-bd create "Add tests for [Component Y]" --type task --priority P2
+jt create "Write documentation for [Feature X]" --type task --priority P2
+jt create "Add tests for [Component Y]" --type task --priority P2
 
 # Polish (P3)
-bd create "Improve error messages" --type chore --priority P3
-bd create "Add usage examples" --type task --priority P3
+jt create "Improve error messages" --type chore --priority P3
+jt create "Add usage examples" --type task --priority P3
 ```
 
 **Example Output:**
@@ -251,7 +251,7 @@ bd create "Add usage examples" --type task --priority P3
 - Add unit tests
 - Set up CI/CD
 
-Run `bd ready` to see all tasks ready to work on!
+Run `jt ready` to see all tasks ready to work on!
 ```
 
 ### Step 5: Offer to Start Working
@@ -370,21 +370,21 @@ USER: Looks great!
 
 AGENT: Excellent! Let me set up your project now...
 
-[Agent runs commands to create directory, write files, run bd init]
+[Agent runs commands to create directory, write files, run jt init]
 
 ✅ Project structure created!
 
 I've set up:
 - ~/code/reading-list-cli/
 - CLAUDE.md with your PRD
-- Beads task management (.beads/)
+- JAT task management (.jat/)
 - README.md and .gitignore
 - Git repository (initial commit)
 - Added to JAT config
 
 Now let me break this down into tasks...
 
-[Agent creates tasks with bd create]
+[Agent creates tasks with jt create]
 
 📋 I've created 7 tasks to get you started:
 
@@ -401,7 +401,7 @@ Now let me break this down into tasks...
 **Polish (P2):**
 - Add Rich formatting for pretty output
 
-Run `bd ready` to see tasks!
+Run `jt ready` to see tasks!
 
 🎉 Your project is ready! Would you like me to start working on
 "Set up Python project structure" right now?
@@ -461,7 +461,7 @@ We'll figure out the rest together. Sound good?
 ## Tools You'll Use
 
 - **File operations**: `mkdir`, `cat >`, `Write` tool
-- **Beads**: `bd init`, `bd create`
+- **JAT Tasks**: `jt init`, `jt create`
 - **JAT config**: `jq` to modify `~/.config/jat/projects.json`
 - **Git**: `git init`, `git add`, `git commit`
 - **AskUserQuestion**: For multiple-choice questions
@@ -470,7 +470,7 @@ We'll figure out the rest together. Sound good?
 
 1. ✅ A project directory created
 2. ✅ A clear PRD in CLAUDE.md
-3. ✅ Beads initialized with tasks
+3. ✅ JAT Tasks initialized with tasks
 4. ✅ Project registered in JAT config
 5. ✅ Confidence to start working
 

@@ -107,7 +107,7 @@
 						<svg class="w-5 h-5 flex-shrink-0 mt-0.5" style="color: oklch(0.70 0.18 145);" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
 						</svg>
-						<span>Initialized with <strong>Beads</strong> (creates a <code class="px-1 rounded text-sm" style="background: oklch(0.25 0.02 250);">.beads/</code> directory)</span>
+						<span>Initialized with <strong>JAT Tasks</strong> (creates a <code class="px-1 rounded text-sm" style="background: oklch(0.25 0.02 250);">.jat/</code> directory)</span>
 					</li>
 				</ul>
 			</div>
@@ -180,9 +180,9 @@
 								style="background: oklch(0.12 0.01 250); border: 1px solid oklch(0.22 0.02 250);"
 							>
 								<div class="flex items-center gap-2 mb-2" style="color: oklch(0.50 0.02 250);">
-									<span class="text-xs uppercase tracking-wider">Step 2: Initialize Beads</span>
+									<span class="text-xs uppercase tracking-wider">Step 2: Initialize JAT Tasks</span>
 								</div>
-								<code style="color: oklch(0.75 0.15 85);">bd init</code>
+								<code style="color: oklch(0.75 0.15 85);">jt init</code>
 							</div>
 
 							<div
@@ -205,7 +205,7 @@
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
 						</svg>
 						<div class="text-sm" style="color: oklch(0.75 0.10 85);">
-							<strong>Tip:</strong> The IDE automatically discovers any project in <code class="px-1 rounded" style="background: oklch(0.25 0.02 250);">~/code/</code> that has a <code class="px-1 rounded" style="background: oklch(0.25 0.02 250);">.beads/</code> directory.
+							<strong>Tip:</strong> The IDE automatically discovers any project in <code class="px-1 rounded" style="background: oklch(0.25 0.02 250);">~/code/</code> that has a <code class="px-1 rounded" style="background: oklch(0.25 0.02 250);">.jat/</code> directory.
 						</div>
 					</div>
 				</div>

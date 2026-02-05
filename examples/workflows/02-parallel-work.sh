@@ -46,7 +46,7 @@ echo "Step 2: IDEBuilder sends welcome message with parallel work opportunities"
   "$(cat <<'EOF'
 I'm setting up the IDE foundation. Here are P0 tasks we can do in parallel:
 
-1. Build Beads query layer (lib/beads.js)
+1. Build JAT Tasks query layer (lib/tasks.js)
 2. Build Agent Mail query layer (lib/agent-mail.js)
 
 These are independent of my ide/ work. Pick one and we'll coordinate!
@@ -67,8 +67,8 @@ echo "Step 4: Both agents announce their parallel work"
   "Setting up minimal SvelteKit + Svelte 5. ETA: 20 minutes." \
   --from IDEBuilder --to PaleStar --thread dashboard-setup
 
-./am-send "[query-layers] Starting Beads query layer" \
-  "Building lib/beads.js with better-sqlite3. ETA: 30 minutes." \
+./am-send "[query-layers] Starting JAT Tasks query layer" \
+  "Building lib/tasks.js with better-sqlite3. ETA: 30 minutes." \
   --from PaleStar --to IDEBuilder --thread query-layers
 echo ""
 
@@ -82,8 +82,8 @@ echo ""
 
 # Step 6: PaleStar finishes query layer
 echo "Step 6: PaleStar completes query layer"
-./am-send "[query-layers] ✅ COMPLETE - Beads layer ready" \
-  "lib/beads.js complete with full test coverage. IDE can now query tasks!" \
+./am-send "[query-layers] ✅ COMPLETE - JAT Tasks layer ready" \
+  "lib/tasks.js complete with full test coverage. IDE can now query tasks!" \
   --from PaleStar --to IDEBuilder --thread query-layers --importance high
 ./am-release "lib/**" --agent PaleStar
 echo ""

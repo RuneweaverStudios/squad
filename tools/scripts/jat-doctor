@@ -65,7 +65,7 @@ fi
 echo ""
 echo "Tools:"
 TOOLS_OK=true
-for tool in am-register am-inbox am-send bd jat-signal; do
+for tool in am-register am-inbox am-send jt jat-signal; do
     if command -v $tool &>/dev/null; then
         pass "$tool"
     else
@@ -84,9 +84,6 @@ echo "Current Project ($(basename "$PWD")):"
 if [[ -d .jat ]]; then
     TASK_COUNT=$(jt list --json 2>/dev/null | jq length 2>/dev/null || echo "?")
     pass "Tasks initialized ($TASK_COUNT tasks)"
-elif [[ -d .beads ]]; then
-    TASK_COUNT=$(jt list --json 2>/dev/null | jq length 2>/dev/null || echo "?")
-    pass "Tasks initialized ($TASK_COUNT tasks, legacy .beads/ dir)"
 else
     warn "Tasks not initialized - run: jt init"
 fi
@@ -101,7 +98,7 @@ if [[ -f CLAUDE.md ]]; then
         echo "    Add to CLAUDE.md:"
         echo "      @~/code/jat/shared/overview.md"
         echo "      @~/code/jat/shared/agent-mail.md"
-        echo "      @~/code/jat/shared/beads.md"
+        echo "      @~/code/jat/shared/tasks.md"
         echo "      @~/code/jat/shared/tools.md"
         echo "      @~/code/jat/shared/workflow-commands.md"
     fi

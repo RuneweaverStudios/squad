@@ -7,7 +7,7 @@
 	 * - Text input for path or browse button
 	 * - Directory browser via /api/directories
 	 * - Validation that path is a git repo
-	 * - Call bd init on selected path via /api/projects/init
+	 * - Call jt init on selected path via /api/projects/init
 	 * - Success/error feedback
 	 * - Refresh project list on success
 	 */
@@ -28,7 +28,7 @@
 		path: string;
 		name: string;
 		isGitRepo: boolean;
-		hasBeads: boolean;
+		hasJat: boolean;
 	}
 
 	// Reactive state from store
@@ -125,9 +125,9 @@
 		showBrowser = false;
 
 		// Update validation based on directory state
-		if (dir.hasBeads) {
+		if (dir.hasJat) {
 			validationStatus = 'already-initialized';
-			validationMessage = 'Beads already initialized in this project';
+			validationMessage = 'JAT already initialized in this project';
 		} else if (!dir.isGitRepo) {
 			validationStatus = 'needs-git';
 			validationMessage = 'Not a git repository. Initialize git to continue.';
@@ -268,7 +268,7 @@
 
 				if (isUnderHome && (data.message?.includes('not found') || data.error?.includes('not found') || response.status === 404)) {
 					validationStatus = 'will-create';
-					validationMessage = 'Will create directory, initialize git, and set up Beads';
+					validationMessage = 'Will create directory, initialize git, and set up JAT Tasks';
 					selectedDirectory = null;
 					return;
 				}
@@ -300,9 +300,9 @@
 
 			if (dirInfo) {
 				selectedDirectory = dirInfo;
-				if (dirInfo.hasBeads) {
+				if (dirInfo.hasJat) {
 					validationStatus = 'already-initialized';
-					validationMessage = 'Beads already initialized in this project';
+					validationMessage = 'JAT already initialized in this project';
 				} else if (!dirInfo.isGitRepo) {
 					validationStatus = 'invalid';
 					validationMessage = 'Not a git repository. Run "git init" first.';
@@ -347,7 +347,7 @@
 		}
 
 		if (validationStatus === 'already-initialized') {
-			submitError = 'This project is already initialized with Beads';
+			submitError = 'This project is already initialized with JAT';
 			return;
 		}
 
@@ -489,7 +489,7 @@
 							Add Project
 						</h2>
 						<p class="text-sm mt-1" style="color: oklch(0.55 0.02 250);">
-							Initialize a git repository with Beads
+							Initialize a git repository with JAT Tasks
 						</p>
 					</div>
 				</div>
@@ -597,7 +597,7 @@
 										</li>
 										<li class="flex items-center gap-1.5">
 											<span style="color: oklch(0.70 0.18 145);">3.</span>
-											Set up Beads task management
+											Set up JAT task management
 										</li>
 										<li class="flex items-center gap-1.5">
 											<span style="color: oklch(0.70 0.18 145);">4.</span>
@@ -717,12 +717,12 @@
 
 											<!-- Status badges -->
 											<div class="flex items-center gap-1">
-												{#if dir.hasBeads}
+												{#if dir.hasJat}
 													<span
 														class="badge badge-xs"
 														style="background: oklch(0.35 0.15 145); color: oklch(0.90 0.02 250);"
 													>
-														Beads
+														JAT
 													</span>
 												{/if}
 												{#if dir.isGitRepo}
@@ -773,7 +773,7 @@
 								<svg class="w-4 h-4 flex-shrink-0" style="color: oklch(0.70 0.18 145);" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
 								</svg>
-								<span>Beads task management set up for you</span>
+								<span>JAT task management set up for you</span>
 							</li>
 						</ul>
 					</div>

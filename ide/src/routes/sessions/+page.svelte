@@ -92,7 +92,7 @@
 	}
 
 	interface TimelineEvent {
-		type: 'beads_event' | 'agent_mail' | 'signal';
+		type: 'jat_event' | 'agent_mail' | 'signal';
 		event?: string;
 		timestamp: string;
 		description?: string;
@@ -109,7 +109,7 @@
 		updated_at?: string;
 		attachments: TaskAttachment[];
 		timeline: TimelineEvent[];
-		timelineCounts: { total: number; beads_events: number; agent_mail: number; signals?: number };
+		timelineCounts: { total: number; jat_events: number; agent_mail: number; signals?: number };
 	}
 
 	let expandedTaskDetails = $state<ExtendedTaskDetails | null>(null);
@@ -569,7 +569,7 @@
 
 			const taskData = taskRes.ok ? await taskRes.json() : null;
 			const attachmentsData = attachmentsRes.ok ? await attachmentsRes.json() : { images: [] };
-			const historyData = historyRes.ok ? await historyRes.json() : { timeline: [], count: { total: 0, beads_events: 0, agent_mail: 0 } };
+			const historyData = historyRes.ok ? await historyRes.json() : { timeline: [], count: { total: 0, jat_events: 0, agent_mail: 0 } };
 			const signalsData = signalsRes.ok ? await signalsRes.json() : { signals: [] };
 
 			// Convert signals to timeline event format and merge with history
@@ -603,7 +603,7 @@
 				timeline: mergedTimeline,
 				timelineCounts: {
 					total: mergedTimeline.length,
-					beads_events: historyData.count?.beads_events || 0,
+					jat_events: historyData.count?.jat_events || 0,
 					agent_mail: historyData.count?.agent_mail || 0,
 					signals: signalEvents.length
 				}
@@ -614,7 +614,7 @@
 				labels: [],
 				attachments: [],
 				timeline: [],
-				timelineCounts: { total: 0, beads_events: 0, agent_mail: 0 }
+				timelineCounts: { total: 0, jat_events: 0, agent_mail: 0 }
 			};
 		} finally {
 			taskDetailsLoading = false;
@@ -1528,7 +1528,7 @@
 																				class:active={timelineFilter === 'tasks'}
 																				onclick={() => timelineFilter = 'tasks'}
 																			>
-																				Tasks ({expandedTaskDetails.timelineCounts.beads_events})
+																				Tasks ({expandedTaskDetails.timelineCounts.jat_events})
 																			</button>
 																			<button
 																				class="timeline-tab"
@@ -1542,13 +1542,13 @@
 																	<div class="task-panel-timeline">
 																		{#each expandedTaskDetails.timeline.filter(e =>
 																			timelineFilter === 'all' ||
-																			(timelineFilter === 'tasks' && (e.type === 'beads_event' || e.type === 'signal')) ||
+																			(timelineFilter === 'tasks' && (e.type === 'jat_event' || e.type === 'signal')) ||
 																			(timelineFilter === 'messages' && e.type === 'agent_mail')
 																		) as event}
-																			<div class="timeline-event" class:task-event={event.type === 'beads_event'} class:message-event={event.type === 'agent_mail'} class:signal-event={event.type === 'signal'}>
+																			<div class="timeline-event" class:task-event={event.type === 'jat_event'} class:message-event={event.type === 'agent_mail'} class:signal-event={event.type === 'signal'}>
 																				<div class="timeline-event-header">
 																					<span class="timeline-event-type">
-																						{#if event.type === 'beads_event'}
+																						{#if event.type === 'jat_event'}
 																							📋
 																						{:else if event.type === 'signal'}
 																							⚡

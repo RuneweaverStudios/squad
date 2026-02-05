@@ -664,7 +664,7 @@
 								</div>
 								<p class="text-sm text-base-content/70">
 									Analyzes conversation history OR written PRD, breaks work into atomic tasks,
-									creates Beads tasks with proper dependency chains.
+									creates JAT tasks with proper dependency chains.
 								</p>
 							</div>
 						</div>
@@ -967,8 +967,8 @@
 								<pre><code># 1. Install (run in your terminal/bash)</code></pre>
 								<pre><code>curl -fsSL https://raw.githubusercontent.com/joewinke/jat/master/install.sh | bash</code></pre>
 								<pre><code></code></pre>
-								<pre><code># 2. Initialize Beads in your project</code></pre>
-								<pre><code>bd init</code></pre>
+								<pre><code># 2. Initialize JAT in your project</code></pre>
+								<pre><code>jt init</code></pre>
 								<pre><code></code></pre>
 								<pre><code># 3. Start working (registers agent + picks task)</code></pre>
 								<pre><code>/jat:start</code></pre>
@@ -994,7 +994,7 @@
 									<strong>Transcend</strong> project folders and context window bounds with persistent state
 								</li>
 								<li>
-									<strong>Plan</strong> work with dependency-aware task management (Beads)
+									<strong>Plan</strong> work with dependency-aware task management (JAT Tasks)
 								</li>
 								<li>
 									<strong>Execute</strong> with 28 composable bash tools (no HTTP servers, no running daemons)
@@ -1018,7 +1018,7 @@
 								<pre><code>             │</code></pre>
 								<pre><code>  ┌──────────┼──────────┐</code></pre>
 								<pre><code>  ▼          ▼          ▼</code></pre>
-								<pre><code>Agent    Beads    28 Tools</code></pre>
+								<pre><code>Agent   JAT Tasks  28 Tools</code></pre>
 								<pre><code> Mail      CLI     (bash)</code></pre>
 							</div>
 						</div>
@@ -1034,7 +1034,7 @@
 								</div>
 								<div class="alert alert-success">
 									<span class="text-sm"
-										><strong>Beads:</strong> Dependency-aware task planning with CLI</span
+										><strong>JAT Tasks:</strong> Dependency-aware task planning with CLI</span
 									>
 								</div>
 								<div class="alert alert-warning">

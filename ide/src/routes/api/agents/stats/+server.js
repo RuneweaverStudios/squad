@@ -4,7 +4,7 @@ import { execSync } from 'child_process';
 /**
  * API endpoint for fetching agent statistics
  *
- * Returns agent status breakdown from Agent Mail + Beads
+ * Returns agent status breakdown from Agent Mail + JAT Tasks
  *
  * Response format:
  * {
@@ -17,8 +17,8 @@ import { execSync } from 'child_process';
  */
 export async function GET({ url }) {
 	try {
-		// Get all tasks from Beads
-		const tasksJson = execSync('bd list --json', {
+		// Get all tasks from JAT
+		const tasksJson = execSync('jt list --json', {
 			encoding: 'utf-8',
 			cwd: process.env.HOME + '/code/jat'
 		});

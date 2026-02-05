@@ -3,7 +3,7 @@
 # Run all tests for jat (Jomarchy Agent Tools)
 #
 # Orchestrates all test scripts:
-#   - Node.js tests (test-beads.js, test-agent-mail.js)
+#   - Node.js tests (test-tasks.js, test-agent-mail.js)
 #   - Agent Mail workflow test (mail/test-workflow.sh)
 #   - Example workflow scripts (examples/workflows/*.sh)
 #
@@ -103,7 +103,7 @@ echo "════════════════════════�
 echo ""
 
 # Run Node.js tests
-run_test "Beads SQLite Query Layer" "node test/test-beads.js"
+run_test "JAT Tasks SQLite Query Layer" "node test/test-tasks.js"
 run_test "Agent Mail SQLite Query Layer" "node test/test-agent-mail.js"
 
 # Run Agent Mail workflow test

@@ -533,7 +533,7 @@ export async function spawnNextAgent(): Promise<SpawnResult | null> {
  * - Auto-generating unique agent names
  * - Registering agents in Agent Mail database
  * - Detecting project from task ID prefix
- * - Assigning tasks to agents in Beads
+ * - Assigning tasks to agents in JAT
  *
  * @param taskId - The task ID to assign to the agent
  * @returns Spawn result
@@ -1001,7 +1001,7 @@ export function clearSpawnError(): void {
 
 /**
  * Refresh epic children status from the API
- * Call this to sync the store with actual beads database state
+ * Call this to sync the store with actual jat database state
  *
  * Also checks if the epic itself was closed externally (e.g., via /jat:complete)
  * and stops the swarm if so.
@@ -1040,7 +1040,7 @@ export async function refreshEpicState(): Promise<void> {
 		state.children = state.children.map((child) => {
 			const apiChild = apiChildren.get(child.id);
 			if (apiChild) {
-				// Map beads status to our ChildStatus
+				// Map JAT task status to our ChildStatus
 				let newStatus: ChildStatus = child.status;
 				if (apiChild.status === 'closed') {
 					newStatus = 'completed';

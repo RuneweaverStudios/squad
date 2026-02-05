@@ -58,7 +58,7 @@ In the IDE:
 Or via CLI:
 ```bash
 cd ~/code/my-project
-bd create "Add user authentication" --priority 1 --type feature
+jt create "Add user authentication" --priority 1 --type feature
 ```
 
 ### 5. Launch an Agent
@@ -131,9 +131,9 @@ Task closed, agent session ends
 Next task → spawn new agent
 ```
 
-### Beads Task Sync
+### JAT Task Sync
 
-Tasks live in `.beads/issues.jsonl` and sync via git:
+Tasks live in `.jat/tasks.db` and sync via git:
 - You commit → tasks sync to repo
 - Teammate pulls → they see your tasks
 - Shared backlog across the team
@@ -150,8 +150,8 @@ Tasks live in `.beads/issues.jsonl` and sync via git:
 | `jat <project> 4` | Launch 4 agents |
 | `jat list` | Show all projects |
 | `jat init` | Auto-discover projects |
-| `bd ready` | Show tasks ready to work |
-| `bd create "Title"` | Create a task |
+| `jt ready` | Show tasks ready to work |
+| `jt create "Title"` | Create a task |
 
 ---
 
@@ -191,5 +191,5 @@ npm run dev
 - Edit `~/.config/jat/projects.json` manually (see step 2 above)
 
 **Tasks not syncing?**
-- Commit `.beads/issues.jsonl` to git
+- Commit `.jat/tasks.db` to git
 - Teammate pulls to get updates

@@ -38,7 +38,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { readFileSync, existsSync, statSync, readdirSync, watch, type FSWatcher } from 'fs';
 import { join } from 'path';
-import { getTasks } from '$lib/server/beads.js';
+import { getTasks } from '$lib/server/jat-tasks.js';
 import { persistCompletionBundle } from '$lib/server/completionBundles.js';
 import { SIGNAL_TTL } from '$lib/config/constants.js';
 
@@ -449,7 +449,7 @@ function processSignalFileChange(sessionName: string): void {
 		if (completeHash !== prevFileState.completeHash) {
 			currentFileState.completeHash = completeHash;
 			if (bundle) {
-				// Persist the completion bundle to .beads/completions.json
+				// Persist the completion bundle to .jat/completions.json
 				// This ensures the bundle survives session restarts
 				if (bundle.taskId) {
 					const persistResult = persistCompletionBundle(bundle.taskId, bundle, sessionName);

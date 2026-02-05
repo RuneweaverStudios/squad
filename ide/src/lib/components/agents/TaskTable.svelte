@@ -677,7 +677,7 @@
 			successToast(`Epic Complete: ${title}`, `All children of ${epicId} are now closed`);
 		}
 
-		// If auto-close is enabled, close the epics in Beads
+		// If auto-close is enabled, close the epics in JAT
 		if (getEpicAutoClose()) {
 			for (const epicId of epicIds) {
 				try {
@@ -2229,7 +2229,7 @@
 	}
 
 	/**
-	 * Update task notes with all file paths so agents see them via bd show
+	 * Update task notes with all file paths so agents see them via jt show
 	 */
 	async function updateTaskNotesWithFiles(taskId: string) {
 		try {

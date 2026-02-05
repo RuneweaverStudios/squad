@@ -31,7 +31,7 @@ const execAsync = promisify(exec);
  */
 async function readSessionLog(sessionId) {
 	const projectPath = process.cwd().replace('/ide', '');
-	const logsDir = path.join(projectPath, '.beads', 'logs');
+	const logsDir = path.join(projectPath, '.jat', 'logs');
 	const logFile = path.join(logsDir, `session-${sessionId}.log`);
 
 	if (!existsSync(logFile)) {

@@ -136,8 +136,8 @@ EOF
     # Commit initial state
     (cd "$project_dir" && git add -A && git commit -q -m "Initial demo project setup")
 
-    # Initialize Beads
-    (cd "$project_dir" && bd init -q 2>/dev/null || true)
+    # Initialize JAT Tasks
+    (cd "$project_dir" && jt init -q 2>/dev/null || true)
 
     log_done "acme-saas created"
 }
@@ -249,8 +249,8 @@ EOF
     # Commit initial state
     (cd "$project_dir" && git add -A && git commit -q -m "Initial demo project setup")
 
-    # Initialize Beads
-    (cd "$project_dir" && bd init -q 2>/dev/null || true)
+    # Initialize JAT Tasks
+    (cd "$project_dir" && jt init -q 2>/dev/null || true)
 
     log_done "pixel-art created"
 }
@@ -265,78 +265,78 @@ create_acme_tasks() {
 
     (cd "$project_dir"
         # Epic: User Authentication System
-        bd create "Epic: User authentication system" \
+        jt create "Epic: User authentication system" \
             --type epic \
             --priority 0 \
             --labels auth,security,core \
             --description "Complete authentication system with OAuth and email/password login. This epic covers all auth-related work." \
             2>/dev/null || true
 
-        local epic_id=$(bd list --json 2>/dev/null | jq -r '.[] | select(.title | contains("Epic: User")) | .id' | head -1)
+        local epic_id=$(jt list --json 2>/dev/null | jq -r '.[] | select(.title | contains("Epic: User")) | .id' | head -1)
 
         # Epic subtasks
-        bd create "Set up OAuth providers (Google, GitHub)" \
+        jt create "Set up OAuth providers (Google, GitHub)" \
             --type task \
             --priority 0 \
             --labels auth,oauth \
             --description "Configure OAuth 2.0 providers for social login. Support Google and GitHub initially." \
             2>/dev/null || true
-        local oauth_id=$(bd list --json 2>/dev/null | jq -r '.[] | select(.title | contains("OAuth providers")) | .id' | head -1)
+        local oauth_id=$(jt list --json 2>/dev/null | jq -r '.[] | select(.title | contains("OAuth providers")) | .id' | head -1)
 
-        bd create "Build login/signup UI components" \
+        jt create "Build login/signup UI components" \
             --type task \
             --priority 1 \
             --labels auth,ui,frontend \
             --description "Create responsive login and signup forms with validation, error states, and loading indicators." \
             2>/dev/null || true
-        local login_ui_id=$(bd list --json 2>/dev/null | jq -r '.[] | select(.title | contains("login/signup UI")) | .id' | head -1)
+        local login_ui_id=$(jt list --json 2>/dev/null | jq -r '.[] | select(.title | contains("login/signup UI")) | .id' | head -1)
 
-        bd create "Implement session management" \
+        jt create "Implement session management" \
             --type task \
             --priority 1 \
             --labels auth,backend,security \
             --description "Handle JWT tokens, refresh logic, and secure session storage. Include logout and session invalidation." \
             2>/dev/null || true
-        local session_id=$(bd list --json 2>/dev/null | jq -r '.[] | select(.title | contains("session management")) | .id' | head -1)
+        local session_id=$(jt list --json 2>/dev/null | jq -r '.[] | select(.title | contains("session management")) | .id' | head -1)
 
         # Set up epic dependencies (epic depends on subtasks)
         if [[ -n "$epic_id" && -n "$oauth_id" ]]; then
-            bd dep add "$epic_id" "$oauth_id" 2>/dev/null || true
+            jt dep add "$epic_id" "$oauth_id" 2>/dev/null || true
         fi
         if [[ -n "$epic_id" && -n "$login_ui_id" ]]; then
-            bd dep add "$epic_id" "$login_ui_id" 2>/dev/null || true
+            jt dep add "$epic_id" "$login_ui_id" 2>/dev/null || true
         fi
         if [[ -n "$epic_id" && -n "$session_id" ]]; then
-            bd dep add "$epic_id" "$session_id" 2>/dev/null || true
+            jt dep add "$epic_id" "$session_id" 2>/dev/null || true
         fi
         # Session depends on OAuth (OAuth must be done first)
         if [[ -n "$session_id" && -n "$oauth_id" ]]; then
-            bd dep add "$session_id" "$oauth_id" 2>/dev/null || true
+            jt dep add "$session_id" "$oauth_id" 2>/dev/null || true
         fi
 
         # Other standalone tasks
-        bd create "Add Stripe billing integration" \
+        jt create "Add Stripe billing integration" \
             --type feature \
             --priority 1 \
             --labels billing,stripe,backend \
             --description "Integrate Stripe for subscription billing. Support monthly/yearly plans, usage-based pricing, and invoice management." \
             2>/dev/null || true
 
-        bd create "Build analytics dashboard widgets" \
+        jt create "Build analytics dashboard widgets" \
             --type feature \
             --priority 2 \
             --labels analytics,dashboard,frontend \
             --description "Create dashboard widgets showing key metrics: active users, MRR, churn rate, feature usage." \
             2>/dev/null || true
 
-        bd create "Fix mobile responsive layout issues" \
+        jt create "Fix mobile responsive layout issues" \
             --type bug \
             --priority 1 \
             --labels ui,mobile,bug \
             --description "Navigation menu breaks on screens under 768px. Settings page has overflow issues on mobile." \
             2>/dev/null || true
 
-        bd create "Write API documentation" \
+        jt create "Write API documentation" \
             --type chore \
             --priority 3 \
             --labels docs,api \
@@ -352,35 +352,35 @@ create_pixel_art_tasks() {
     log_info "Creating pixel-art tasks..."
 
     (cd "$project_dir"
-        bd create "Implement brush tool with size control" \
+        jt create "Implement brush tool with size control" \
             --type feature \
             --priority 1 \
             --labels tools,canvas \
             --description "Create a brush tool that supports variable sizes (1-32px), opacity control, and smooth drawing." \
             2>/dev/null || true
 
-        bd create "Add layer support" \
+        jt create "Add layer support" \
             --type feature \
             --priority 2 \
             --labels layers,canvas,core \
             --description "Implement layer system with add/remove/reorder layers, opacity per layer, and merge functionality." \
             2>/dev/null || true
 
-        bd create "Export to PNG and GIF" \
+        jt create "Export to PNG and GIF" \
             --type feature \
             --priority 1 \
             --labels export,core \
             --description "Allow exporting artwork to PNG (single frame) and animated GIF (from layers as frames)." \
             2>/dev/null || true
 
-        bd create "Build color palette picker" \
+        jt create "Build color palette picker" \
             --type feature \
             --priority 2 \
             --labels ui,tools \
             --description "Create color picker with HSL sliders, saved palettes, and eyedropper tool for picking colors from canvas." \
             2>/dev/null || true
 
-        bd create "Add keyboard shortcuts" \
+        jt create "Add keyboard shortcuts" \
             --type chore \
             --priority 3 \
             --labels ux,accessibility \

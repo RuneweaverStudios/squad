@@ -1276,7 +1276,7 @@
 	// Version counter to force $derived reactivity when existingTaskTitles is updated
 	let existingTaskTitlesVersion = $state(0);
 
-	// Fetch existing task titles from Beads (normalized for comparison)
+	// Fetch existing task titles from JAT (normalized for comparison)
 	async function fetchExistingTaskTitles(): Promise<void> {
 		try {
 			// Use repeated status params (API doesn't support comma-separated)
@@ -2355,8 +2355,8 @@
 				return positions[0].state;
 			}
 
-			// No markers found - check Beads task status
-			// If task is in_progress in Beads, agent is working (handles resumed sessions after context compaction)
+			// No markers found - check JAT task status
+			// If task is in_progress in JAT, agent is working (handles resumed sessions after context compaction)
 			// Otherwise, agent is still starting/initializing
 			if (task.status === "in_progress") {
 				return "working";
@@ -2634,7 +2634,7 @@
 		selected: boolean;
 		/** Whether user has edited this task */
 		edited: boolean;
-		/** Whether this task already exists in Beads (matched by title) */
+		/** Whether this task already exists in JAT (matched by title) */
 		alreadyCreated?: boolean;
 		/** Task ID if this task was already created (for displaying clickable badge) */
 		taskId?: string;
@@ -2688,7 +2688,7 @@
 			const edits = suggestedTaskEdits.get(key);
 			const hasEdits = edits && Object.keys(edits).length > 0;
 
-			// Check if task title already exists in Beads (normalized comparison)
+			// Check if task title already exists in JAT (normalized comparison)
 			const effectiveTitle = hasEdits && edits.title ? edits.title : task.title;
 			const normalizedTitle = effectiveTitle?.toLowerCase().trim() || "";
 			const existingTaskId = normalizedTitle
@@ -3108,7 +3108,7 @@
 
 	// Task to display - either active task or last completed task
 	// Show lastCompletedTask in most states to maintain task linkage throughout the session lifecycle
-	// During completing/completed states, the task prop may be null (task closed in Beads),
+	// During completing/completed states, the task prop may be null (task closed in JAT),
 	// so we fall back to extracting task info from the rich signal payload
 	const displayTask = $derived.by(() => {
 		if (task) return task;
@@ -3301,7 +3301,7 @@
 		}
 	}
 
-	// Capture session log to .beads/logs/ on completion
+	// Capture session log to .jat/logs/ on completion
 	async function captureSessionLog() {
 		if (logCaptured || !sessionName) return;
 

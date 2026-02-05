@@ -37,7 +37,7 @@ curl -fsSL https://raw.githubusercontent.com/joewinke/jat/master/install.sh | ba
 ```
 
 **This symlinks all tools to `~/.local/bin/`:**
-- `bd-*` - Beads CLI (13 commands)
+- `jt-*` - JAT Tasks CLI
 - `am-*` - Agent Mail (13 commands)
 - `browser-*` - Browser automation (11 commands)
 - `db-*` - Database tools (4 commands)
@@ -51,7 +51,7 @@ source ~/.bashrc  # or ~/.zshrc on macOS
 **Verify:**
 ```bash
 am-whoami    # Should show "Not registered" (expected)
-bd --version # Should show version number
+jt --version # Should show version number
 ```
 
 ---
@@ -60,7 +60,7 @@ bd --version # Should show version number
 
 ```bash
 cd ~/code/myproject
-bd init
+jt init
 ```
 
 **Answer the prompts** (or press Enter for defaults):
@@ -68,7 +68,7 @@ bd init
 - Default priority: `2` (Medium)
 - Task prefix: `mp` (e.g., mp-001, mp-002)
 
-**This creates `.beads/` directory** - git-backed task tracking.
+**This creates `.jat/` directory** - git-backed task tracking.
 
 ---
 
@@ -239,12 +239,12 @@ jat-myproject        # ✅ Launcher creates tmux session
 
 ### "IDE says 'No projects found'"
 
-**Cause:** Haven't run `bd init` in your project
+**Cause:** Haven't run `jt init` in your project
 
 **Fix:**
 ```bash
 cd ~/code/myproject
-bd init
+jt init
 # Refresh IDE
 ```
 
@@ -340,11 +340,11 @@ jat list                        # Show all projects
 
 ### Task Management
 ```bash
-bd ready                        # Tasks ready to work
-bd create "Title" --priority 1  # Create task (P1 = High)
-bd show <id>                    # View task details
-bd close <id>                   # Close completed task
-bd dep add <task> <blocker>     # Add dependency
+jt ready                        # Tasks ready to work
+jt create "Title" --priority 1  # Create task (P1 = High)
+jt show <id>                    # View task details
+jt close <id>                   # Close completed task
+jt dep add <task> <blocker>     # Add dependency
 ```
 
 ### Agent Coordination

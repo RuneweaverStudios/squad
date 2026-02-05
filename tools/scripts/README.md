@@ -4,15 +4,15 @@ Helper scripts for agent orchestration workflows.
 
 ## get-agent-task.sh
 
-**Purpose:** Get current task ID for an agent by checking both Beads and Agent Mail.
+**Purpose:** Get current task ID for an agent by checking both JAT Tasks and Agent Mail.
 
-**Problem Solved:** Provides consistent agent status calculation between statusline and IDE. Previously, the statusline only checked file reservations while the IDE checked both Beads tasks and reservations, causing inconsistent status display.
+**Problem Solved:** Provides consistent agent status calculation between statusline and IDE. Previously, the statusline only checked file reservations while the IDE checked both JAT tasks and reservations, causing inconsistent status display.
 
 ### Algorithm
 
 The script checks TWO sources (matching IDE logic):
 
-1. **Beads Database** - Check for `in_progress` tasks assigned to agent
+1. **JAT Tasks Database** - Check for `in_progress` tasks assigned to agent
 2. **Agent Mail** - Check for active file reservations by agent
 
 Returns task_id if found from **EITHER** source.
@@ -78,7 +78,7 @@ $ echo $?
 # Old approach (only checks reservations):
 task_id=$(am-reservations --agent "$agent_name" | grep "^Reason:" | ...)
 
-# New approach (checks both Beads and reservations):
+# New approach (checks both JAT Tasks and reservations):
 task_id=$(./scripts/get-agent-task.sh "$agent_name")
 ```
 
@@ -89,14 +89,13 @@ Already implements this logic correctly (serves as reference implementation).
 
 The script recognizes these task ID patterns from reservation reasons:
 - `jat-abc` (Jomarchy Agent Tools)
-- `bd-123` (Beads tasks)
 - `task-xyz` (Generic tasks)
 
-Pattern: `(jat|bd|task)-[a-z0-9]{3}\b`
+Pattern: `(jat|task)-[a-z0-9]{3}\b`
 
 ### Dependencies
 
-- `bd` command (Beads CLI)
+- `jt` command (JAT Tasks CLI)
 - `am-reservations` command (Agent Mail)
 - `jq` (for JSON parsing)
 
@@ -118,7 +117,7 @@ All dependencies are optional - script gracefully handles missing commands.
 ### Test Coverage
 
 1. ✅ Agent with in_progress task (no file reservations)
-   - Verifies Beads in_progress tasks appear in statusline
+   - Verifies JAT Tasks in_progress tasks appear in statusline
    - Checks task ID and title display
 
 2. ✅ Agent with file reservations (no in_progress task)
@@ -166,9 +165,9 @@ Exits with proper status codes for automated testing.
 ### Implementation Details
 
 **Test Environment:**
-- Creates isolated temporary databases for Agent Mail and Beads
+- Creates isolated temporary databases for Agent Mail and JAT Tasks
 - Mocks complete Agent Mail schema (projects, agents, file_reservations)
-- Initializes real Beads database with `bd init`
+- Initializes real JAT Tasks database with `jt init`
 - Injects test data via direct SQLite inserts
 
 **Test Execution:**
@@ -184,7 +183,7 @@ Exits with proper status codes for automated testing.
 
 - `sqlite3` - Database operations
 - `jq` - JSON processing
-- `bd` - Beads task manager (must be installed)
+- `jt` - JAT Tasks CLI (must be installed)
 - `am-reservations` - Agent Mail file reservations command
 - `am-inbox` - Agent Mail inbox command
 
@@ -228,14 +227,14 @@ CREATE TABLE file_reservations (
 
 - Tests only status calculation logic (not full statusline features)
 - Mock data doesn't include all Agent Mail features (e.g., message threading, unread counts)
-- Requires actual `bd` and `am-*` commands to be installed
+- Requires actual `jt` and `am-*` commands to be installed
 - Date handling assumes GNU date (may need adjustment for macOS)
 
 ### Troubleshooting
 
-**Tests fail with "Error: Beads database not found"**
-- Check that `bd init` succeeds
-- Verify `.beads/beads.db` is created in test directory
+**Tests fail with "Error: JAT Tasks database not found"**
+- Check that `jt init` succeeds
+- Verify `.jat/tasks.db` is created in test directory
 
 **Tests fail with "no such table: projects"**
 - Schema mismatch - update test database creation

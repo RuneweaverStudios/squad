@@ -1,17 +1,17 @@
-# Beads Task IDE
+# JAT IDE
 
-A modern, real-time task management IDE for multi-project Beads workflows. Built with SvelteKit 5, Tailwind CSS, and DaisyUI.
+A modern, real-time task management IDE for multi-project JAT Tasks workflows. Built with SvelteKit 5, Tailwind CSS, and DaisyUI.
 
 [![Svelte 5](https://img.shields.io/badge/Svelte-5-FF3E00?logo=svelte)](https://svelte.dev)
 [![SvelteKit](https://img.shields.io/badge/SvelteKit-2-FF3E00)](https://kit.svelte.dev)
 [![DaisyUI](https://img.shields.io/badge/DaisyUI-32%20Themes-5A0EF8)](https://daisyui.com)
 
 ![IDE Screenshot](./ide-screenshot.png)
-*Beads Task IDE with dependency graph visualization showing task relationships*
+*JAT IDE with dependency graph visualization showing task relationships*
 
 ## Overview
 
-The Beads Task IDE provides a unified web interface for viewing and managing tasks across multiple projects using the [Beads CLI](https://github.com/steveyegge/beads). It aggregates tasks from all your project repositories in `~/code/*` and displays them with powerful filtering, search, and real-time updates.
+The JAT IDE provides a unified web interface for viewing and managing tasks across multiple projects using JAT Tasks (`jt` CLI). It aggregates tasks from all your project repositories in `~/code/*` and displays them with powerful filtering, search, and real-time updates.
 
 **Key Features:**
 
@@ -32,8 +32,8 @@ The Beads Task IDE provides a unified web interface for viewing and managing tas
 
 - Node.js 18+ (or bun/pnpm)
 - [Jomarchy Agent Tools](https://github.com/joewinke/jat) installed
-- [Beads CLI](https://github.com/steveyegge/beads) installed and configured
-- Projects with `.beads/` directories in `~/code/*`
+- [JAT Tasks CLI](https://github.com/joewinke/jat) (`jt`) installed and configured
+- Projects with `.jat/` directories in `~/code/*`
 
 ### Quick Start
 
@@ -50,13 +50,13 @@ npm run dev
 # Open browser to http://127.0.0.1:5173
 ```
 
-The IDE will automatically scan `~/code/*` for projects with Beads databases and aggregate all tasks.
+The IDE will automatically scan `~/code/*` for projects with JAT Tasks databases and aggregate all tasks.
 
 ## Usage
 
 ### Viewing Tasks
 
-The IDE displays all tasks from your Beads-enabled projects. Each task shows:
+The IDE displays all tasks from your JAT-enabled projects. Each task shows:
 
 - **Project Badge** - Color-coded by project (e.g., `chimaro-abc`, `jomarchy-xyz`)
 - **Priority Badge** - P0 (Critical/Red) through P3 (Low/Green)
@@ -152,7 +152,7 @@ Theme preference is saved to localStorage and persists across sessions.
 
 ### Auto-Refresh
 
-The IDE auto-refreshes every 30 seconds to stay in sync with Beads task changes. You can also manually refresh using the "Refresh" button.
+The IDE auto-refreshes every 30 seconds to stay in sync with JAT task changes. You can also manually refresh using the "Refresh" button.
 
 ## Architecture
 
@@ -161,7 +161,7 @@ The IDE auto-refreshes every 30 seconds to stay in sync with Beads task changes.
 - **Framework**: SvelteKit 2 with Svelte 5
 - **Styling**: Tailwind CSS 4 + DaisyUI 5
 - **Visualization**: D3.js 7 (force-directed graphs, interactive SVG)
-- **Database**: Better-SQLite3 (reads Beads `.beads/*.jsonl` databases)
+- **Database**: Better-SQLite3 (reads JAT `.jat/tasks.db` databases)
 - **Build**: Vite 7
 - **Adapter**: @sveltejs/adapter-node (for production deployment)
 
@@ -195,8 +195,8 @@ ide/
 
 1. **Frontend** (`+page.svelte`) renders filters and `TaskList` component
 2. **TaskList** fetches data from `/api/tasks` endpoint
-3. **API** (`/api/tasks/+server.ts`) scans `~/code/*/.beads/beads.base.jsonl` files
-4. **API** parses JSONL, aggregates tasks, extracts project names from IDs
+3. **API** (`/api/tasks/+server.ts`) scans `~/code/*/.jat/tasks.db` databases
+4. **API** queries tasks, aggregates across projects, extracts project names from IDs
 5. **TaskList** receives `{ tasks, projects }` and displays with reactive filtering
 6. **Auto-refresh** polls every 30s via `setInterval` + `$effect` cleanup
 
@@ -405,7 +405,7 @@ npm run check      # Type-check with svelte-check
 
 #### `GET /api/tasks`
 
-Returns aggregated task data from all Beads projects:
+Returns aggregated task data from all JAT projects:
 
 ```json
 {
@@ -479,7 +479,7 @@ node build/index.js
 Or use a process manager:
 
 ```bash
-pm2 start build/index.js --name beads-ide
+pm2 start build/index.js --name jat-ide
 ```
 
 ### Environment Variables
@@ -496,7 +496,7 @@ PORT=8080 HOST=0.0.0.0 node build/index.js
 ```nginx
 server {
   listen 80;
-  server_name beads.example.com;
+  server_name jat.example.com;
 
   location / {
     proxy_pass http://127.0.0.1:3000;
@@ -516,9 +516,9 @@ server {
 **Issue**: IDE shows "No tasks found"
 
 **Solutions**:
-- Ensure Beads databases exist in `~/code/*/.beads/beads.base.jsonl`
+- Ensure JAT task databases exist in `~/code/*/.jat/tasks.db`
 - Check API response at `http://127.0.0.1:5173/api/tasks`
-- Verify permissions on `.beads/` directories
+- Verify permissions on `.jat/` directories
 - Check browser console for fetch errors
 
 ### Theme Not Persisting
@@ -556,7 +556,7 @@ MIT - See [LICENSE](../LICENSE) for details.
 
 ## Related Projects
 
-- [Beads CLI](https://github.com/steveyegge/beads) - Dependency-aware task planning
+- [Beads CLI](https://github.com/steveyegge/beads) - Original dependency-aware task planning (JAT Tasks fork)
 - [Jomarchy Agent Tools](https://github.com/joewinke/jat) - Multi-agent coordination
 - [Agent Mail](../tools/am-*) - Bash-based agent messaging and file locks
 

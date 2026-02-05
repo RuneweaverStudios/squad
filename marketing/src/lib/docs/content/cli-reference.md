@@ -13,28 +13,28 @@ jat update --check       # Check without installing
 jat update --status      # Show installation path and version
 ```
 
-## bd (Beads task management)
+## jt (JAT task management)
 
 ```bash
 # Creating tasks
-bd create "Fix login bug" --type bug --priority 1 --description "..." --labels security,auth
-bd create "Add search" --type feature --priority 2 --deps jat-abc
+jt create "Fix login bug" --type bug --priority 1 --description "..." --labels security,auth
+jt create "Add search" --type feature --priority 2 --deps jat-abc
 
 # Listing and viewing
-bd list --status open         # List open tasks
-bd ready --json               # Get ready tasks (no blockers)
-bd show jat-abc               # Show task details
+jt list --status open         # List open tasks
+jt ready --json               # Get ready tasks (no blockers)
+jt show jat-abc               # Show task details
 
 # Updating tasks
-bd update jat-abc --status in_progress --assignee AgentName
-bd close jat-abc --reason "Completed"
+jt update jat-abc --status in_progress --assignee AgentName
+jt close jat-abc --reason "Completed"
 
 # Dependencies
-bd dep add jat-abc jat-xyz    # abc depends on xyz
-bd dep remove jat-abc jat-xyz # Remove dependency
-bd dep tree jat-abc           # Show dependency tree
-bd dep tree jat-abc --reverse # Show what depends on abc
-bd dep cycles                 # Find circular dependencies
+jt dep add jat-abc jat-xyz    # abc depends on xyz
+jt dep remove jat-abc jat-xyz # Remove dependency
+jt dep tree jat-abc           # Show dependency tree
+jt dep tree jat-abc --reverse # Show what depends on abc
+jt dep cycles                 # Find circular dependencies
 ```
 
 ## am-* (Agent Mail)
@@ -105,14 +105,14 @@ jat-secret --list            # List all secrets
 jat-secret --export          # Output export statements
 
 # Review rules
-bd-review-rules                            # Show all rules
-bd-review-rules --type bug --max-auto 1    # Set rule
-bd-check-review jat-abc                    # Check single task
-bd-check-review --batch                    # Check all tasks
+jt-review-rules                            # Show all rules
+jt-review-rules --type bug --max-auto 1    # Set rule
+jt-check-review jat-abc                    # Check single task
+jt-check-review --batch                    # Check all tasks
 
 # Utilities
 jat-step committing --task jat-abc --title "Fix bug" --agent AgentName
-bd-epic-child jat-abc jat-def              # Set epic->child dependency
+jt-epic-child jat-abc jat-def              # Set epic->child dependency
 ```
 
 ## Quick reference table
@@ -120,12 +120,12 @@ bd-epic-child jat-abc jat-def              # Set epic->child dependency
 | Category | Tool Count | Prefix |
 |----------|-----------|--------|
 | Agent Mail | 14 | `am-*` |
-| Beads CLI | 5 | `bd*` |
+| Task CLI | 5 | `jt*` |
 | Browser | 12 | `browser-*` |
 | Database | 4 | `db-*` |
 | Signal | 3 | `jat-signal*` |
 | Media | 7 | `gemini-*`, `avatar-*` |
-| Core/Review | 6 | `bd-check-*`, `bd-review-*`, `jat-secret` |
+| Core/Review | 6 | `jt-check-*`, `jt-review-*`, `jat-secret` |
 
 ## See also
 

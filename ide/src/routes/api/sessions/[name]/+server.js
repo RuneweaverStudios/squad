@@ -10,7 +10,7 @@ import { promisify } from 'util';
 import { appendFile, mkdir, access, readFile, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
-import { getTasks } from '$lib/server/beads.js';
+import { getTasks } from '$lib/server/jat-tasks.js';
 
 const execAsync = promisify(exec);
 
@@ -21,7 +21,7 @@ const execAsync = promisify(exec);
  */
 async function captureSessionLog(sessionName, reason) {
 	const projectPath = process.cwd().replace('/ide', '');
-	const logsDir = path.join(projectPath, '.beads', 'logs');
+	const logsDir = path.join(projectPath, '.jat', 'logs');
 	const logFile = path.join(logsDir, `session-${sessionName}.log`);
 
 	// Ensure logs directory exists
@@ -247,14 +247,14 @@ export async function DELETE({ params }) {
 		let releasedTaskId = null;
 
 		try {
-			// Use beads.js to find tasks across all projects
+			// Use jat-tasks.js to find tasks across all projects
 			const allTasks = getTasks({ status: 'in_progress' });
 			const agentTask = allTasks.find(t => t.assignee === agentName);
 
 			if (agentTask) {
 				// Release the task: set status back to open and clear assignee
-				// Run bd update in the task's project directory
-				await execAsync(`bd update "${agentTask.id}" --status open --assignee ""`, {
+				// Run jt update in the task's project directory
+				await execAsync(`jt update "${agentTask.id}" --status open --assignee ""`, {
 					cwd: agentTask.project_path,
 					timeout: 10000
 				});

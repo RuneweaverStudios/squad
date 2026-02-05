@@ -29,13 +29,13 @@ export async function POST({ request }) {
 			priorityThreshold = 4
 		} = body;
 
-		// Get ready tasks from Beads
+		// Get ready tasks from JAT
 		let readyTasks = [];
 		try {
-			const { stdout } = await execAsync('bd ready --json');
+			const { stdout } = await execAsync('jt ready --json');
 			readyTasks = JSON.parse(stdout);
 		} catch {
-			// No ready tasks or bd not available
+			// No ready tasks or jt not available
 			readyTasks = [];
 		}
 
@@ -66,7 +66,7 @@ export async function POST({ request }) {
 		// Get agents currently working on tasks
 		let busyAgents = new Set();
 		try {
-			const { stdout } = await execAsync('bd list --json');
+			const { stdout } = await execAsync('jt list --json');
 			const allTasks = JSON.parse(stdout);
 			const inProgressTasks = allTasks.filter((/** @type {{ status?: string }} */ t) =>
 				t.status === 'in_progress'
@@ -117,7 +117,7 @@ export async function POST({ request }) {
 			} else {
 				// Actually assign the task
 				try {
-					await execAsync(`bd update "${task.id}" --assignee "${agent}" --status in_progress`);
+					await execAsync(`jt update "${task.id}" --assignee "${agent}" --status in_progress`);
 					assignments.push({
 						taskId: task.id,
 						taskTitle: task.title,

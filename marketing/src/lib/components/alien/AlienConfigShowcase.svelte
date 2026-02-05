@@ -74,7 +74,7 @@ Agents: 4 active | 0 idle
 		tasks: {
 			title: 'Dependency-Aware Task Queue',
 			description: 'Tasks with blockers wait. When dependencies complete, work becomes ready.',
-			code: `$ bd ready --json
+			code: `$ jt ready --json
 
 [
   {
@@ -96,7 +96,7 @@ Agents: 4 active | 0 idle
 ]
 
 # Blocked tasks (deps not met):
-$ bd list --status blocked
+$ jt list --status blocked
 jat-9abc: Dashboard UI [blocked by jat-7kx2m]
 jat-5def: Email notify [blocked by jat-3nf8p]`
 		}

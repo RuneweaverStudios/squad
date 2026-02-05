@@ -728,7 +728,7 @@ launch_claude() {
         local session_name="jat-pending-$$-$i"
 
         # Create logs directory if it doesn't exist
-        local logs_dir="$path/.beads/logs"
+        local logs_dir="$path/.jat/logs"
         mkdir -p "$logs_dir"
 
         # Log file starts with session name, will be renamed when task is claimed
@@ -1207,20 +1207,20 @@ edit_config() {
 # List Projects - Helper Functions
 #------------------------------------------------------------------------------
 
-# Get task counts from Beads for a project path
+# Get task counts for a project path
 get_project_tasks() {
     local project_path="$1"
-    local beads_dir="$project_path/.beads"
+    local jat_dir="$project_path/.jat"
 
-    if [[ ! -d "$beads_dir" ]]; then
+    if [[ ! -d "$jat_dir" ]]; then
         echo "-"
         return
     fi
 
-    # Count open and total tasks
+    # Count open and total tasks via jt CLI
     local total open
-    total=$(find "$beads_dir" -name "*.json" -type f 2>/dev/null | wc -l)
-    open=$(grep -l '"status": "open"\|"status": "in_progress"' "$beads_dir"/*.json 2>/dev/null | wc -l)
+    total=$(cd "$project_path" && jt list --json 2>/dev/null | jq 'length' 2>/dev/null || echo "0")
+    open=$(cd "$project_path" && jt list --status open --json 2>/dev/null | jq 'length' 2>/dev/null || echo "0")
 
     if [[ "$total" -eq 0 ]]; then
         echo "-"
@@ -1486,17 +1486,17 @@ sweep_zombie_tasks() {
 
     local swept=0
 
-    # Iterate over all projects that have .beads/
+    # Iterate over all projects that have .jat/
     for project in $(list_projects 2>/dev/null); do
         local config path
         config=$(get_project_config "$project")
         path=$(echo "$config" | jq -r '.path' | sed "s|^~|$HOME|")
 
-        [[ ! -d "$path/.beads" ]] && continue
+        [[ ! -d "$path/.jat" ]] && continue
 
         # Get in_progress tasks with assignees
         local tasks_json
-        tasks_json=$(cd "$path" && bd list --status in_progress --json 2>/dev/null || echo "[]")
+        tasks_json=$(cd "$path" && jt list --status in_progress --json 2>/dev/null || echo "[]")
 
         [[ "$tasks_json" == "[]" ]] && continue
 
@@ -1525,7 +1525,7 @@ sweep_zombie_tasks() {
             fi
 
             # Assignee is dead - reset task
-            (cd "$path" && bd update "$task_id" --status open --assignee "" 2>/dev/null)
+            (cd "$path" && jt update "$task_id" --status open --assignee "" 2>/dev/null)
             swept=$((swept + 1))
 
             if [[ "$verbose" == "true" ]]; then
@@ -1609,10 +1609,10 @@ cleanup_agents() {
                 fi
             fi
 
-            # Check 3: Does the agent have ANY tasks ever assigned in Beads? (task history)
-            if [[ "$keep" == "false" ]] && command -v bd &>/dev/null; then
+            # Check 3: Does the agent have ANY tasks ever assigned? (task history)
+            if [[ "$keep" == "false" ]] && command -v jt &>/dev/null; then
                 local task_history
-                task_history=$(bd list --json 2>/dev/null | jq -r --arg agent "$agent_name" \
+                task_history=$(jt list --json 2>/dev/null | jq -r --arg agent "$agent_name" \
                     '[.[] | select(.assignee == $agent)] | length' 2>/dev/null || echo "0")
                 if [[ "$task_history" -gt 0 ]]; then
                     keep=true
@@ -1676,10 +1676,10 @@ cleanup_agents() {
         if [[ -z "$agents_json" ]] || [[ "$agents_json" == "[]" ]]; then
             echo -e "  ${DIM}No agents in database${NC}"
         else
-            # Cache Beads tasks list once (avoid repeated calls)
-            local beads_tasks=""
-            if command -v bd &>/dev/null; then
-                beads_tasks=$(bd list --json 2>/dev/null || echo "[]")
+            # Cache tasks list once (avoid repeated calls)
+            local jt_tasks=""
+            if command -v jt &>/dev/null; then
+                jt_tasks=$(jt list --json 2>/dev/null || echo "[]")
             fi
 
             # Cache session files list
@@ -1734,10 +1734,10 @@ cleanup_agents() {
                     fi
                 fi
 
-                # Check 3: Does the agent have ANY tasks ever assigned in Beads? (task history)
-                if [[ "$keep" == "false" ]] && [[ -n "$beads_tasks" ]] && [[ "$beads_tasks" != "[]" ]]; then
+                # Check 3: Does the agent have ANY tasks ever assigned? (task history)
+                if [[ "$keep" == "false" ]] && [[ -n "$jt_tasks" ]] && [[ "$jt_tasks" != "[]" ]]; then
                     local task_history
-                    task_history=$(echo "$beads_tasks" | jq -r --arg agent "$agent_name" \
+                    task_history=$(echo "$jt_tasks" | jq -r --arg agent "$agent_name" \
                         '[.[] | select(.assignee == $agent)] | length' 2>/dev/null || echo "0")
                     if [[ "$task_history" -gt 0 ]]; then
                         keep=true
@@ -1859,7 +1859,7 @@ install_hooks() {
     echo ""
     echo "The pre-commit hook will:"
     echo "  • Block commits if no agent is registered (run /jat:start first)"
-    echo "  • Auto-sync beads changes before commit"
+    echo "  • Auto-sync task changes before commit"
     echo ""
     echo "To bypass: git commit --no-verify"
     echo ""

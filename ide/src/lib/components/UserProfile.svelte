@@ -626,7 +626,7 @@
 				onclick={handleEpicAutoCloseToggle}
 				class="flex items-center gap-2 w-full px-2 py-1.5 rounded transition-colors {epicAutoClose ? 'bg-success/20' : ''}"
 				title={epicAutoClose
-					? 'Automatically close the epic in Beads when all children complete'
+					? 'Automatically close the epic in JAT when all children complete'
 					: 'Keep epic open even when all children complete'}
 			>
 				<span

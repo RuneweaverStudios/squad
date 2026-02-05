@@ -1379,7 +1379,7 @@
 		openTaskDrawer(project);
 	}
 
-	// Hide project from IDE (doesn't delete .beads/)
+	// Hide project from IDE (doesn't delete .jat/)
 	async function hideProject(project: string) {
 		isHiding = true;
 		try {
@@ -1986,7 +1986,7 @@
 					Are you sure you want to hide <span class="font-semibold text-primary">{projectToHide}</span> from the IDE?
 				</p>
 				<p class="text-sm text-base-content/70 bg-base-200 rounded p-3">
-					This only hides the project from the IDE. The project's <code class="text-primary">.beads/</code> directory and all task data will remain untouched.
+					This only hides the project from the IDE. The project's <code class="text-primary">.jat/</code> directory and all task data will remain untouched.
 				</p>
 				<p class="text-xs text-base-content/50 mt-3">
 					To restore hidden projects, edit <code>~/.config/jat/ide-projects.json</code>

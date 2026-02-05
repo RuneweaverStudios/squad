@@ -101,7 +101,7 @@ Every session moves through a defined set of states. The IDE tracks these states
        |
        v
   ┌──────────┐
-  │ COMPLETE │  Task closed in Beads, session ends
+  │ COMPLETE │  Task closed, session ends
   └──────────┘
 ```
 
@@ -151,6 +151,6 @@ The IDE provides two ways to interact with sessions from the UI:
 
 ## Next steps
 
-- [Task Management](/docs/task-management/) - How Beads tracks work
+- [Task Management](/docs/task-management/) - How JAT Tasks tracks work
 - [Agent Mail](/docs/agent-mail/) - Coordination between agents
 - [Workflow Commands](/docs/workflow-commands/) - /jat:start, /jat:complete in detail

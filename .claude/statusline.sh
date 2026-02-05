@@ -418,14 +418,14 @@ fi
 # ============================================================================
 # Determines what task/status to display based on priority-based decision tree:
 #
-# 1. Check Beads for in_progress tasks assigned to this agent (PRIORITY 1)
+# 1. Check JAT Tasks for in_progress tasks assigned to this agent (PRIORITY 1)
 #    - Source of truth for current work
 #    - Most accurate representation of agent state
 #
 # 2. Fall back to file reservations if no in_progress task found (PRIORITY 2)
 #    - Extract task ID from reservation reason field
-#    - Lookup task details in Beads
-#    - Handles case where agent has locks but forgot to update Beads
+#    - Lookup task details in JAT Tasks
+#    - Handles case where agent has locks but forgot to update JAT Tasks
 #
 # 3. If neither found, show "idle" state
 #
@@ -472,7 +472,7 @@ if [[ -z "$task_id" ]] && command -v am-reservations &>/dev/null; then
         project_prefix=$(basename "$cwd")
         task_id=$(echo "$reservation_info" | grep "^Reason:" | sed 's/^Reason: //' | grep -oE "${project_prefix}-[a-z0-9]{3}\b" | head -1)
 
-        # If we found a task ID from reservation, get its details from Beads
+        # If we found a task ID from reservation, get its details from JAT Tasks
         if [[ -n "$task_id" ]] && command -v jt &>/dev/null; then
             task_json=$(jt show "$task_id" --json 2>/dev/null)
             task_priority=$(echo "$task_json" | jq -r '.[0].priority // empty')

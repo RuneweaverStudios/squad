@@ -34,7 +34,7 @@
 	}
 
 	interface TimelineEvent {
-		type: 'beads_event' | 'agent_mail' | 'signal';
+		type: 'jat_event' | 'agent_mail' | 'signal';
 		event?: string;
 		timestamp: string;
 		description?: string;
@@ -52,7 +52,7 @@
 		updated_at?: string;
 		attachments: TaskAttachment[];
 		timeline: TimelineEvent[];
-		timelineCounts: { total: number; beads_events: number; agent_mail: number; signals?: number };
+		timelineCounts: { total: number; jat_events: number; agent_mail: number; signals?: number };
 	}
 
 	// Props
@@ -715,10 +715,10 @@
 					{#if details?.timeline && details.timeline.length > 0}
 						<div class="task-panel-timeline">
 							{#each details.timeline as event}
-								<div class="timeline-event" class:task-event={event.type === 'beads_event'} class:message-event={event.type === 'agent_mail'} class:signal-event={event.type === 'signal'}>
+								<div class="timeline-event" class:task-event={event.type === 'jat_event'} class:message-event={event.type === 'agent_mail'} class:signal-event={event.type === 'signal'}>
 									<div class="timeline-event-header">
 										<span class="timeline-event-type">
-											{#if event.type === 'beads_event'}
+											{#if event.type === 'jat_event'}
 												{event.event}
 											{:else if event.type === 'signal'}
 												{event.data?.state || 'signal'}

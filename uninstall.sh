@@ -40,14 +40,14 @@ echo -e "${BLUE}JAT Complete Uninstall${NC}"
 echo ""
 echo -e "${YELLOW}This will remove:${NC}"
 echo "  • JAT installation directory"
-echo "  • ~/.local/bin symlinks (bd, am-*, jat, browser-*, etc.)"
+echo "  • ~/.local/bin symlinks (jt, am-*, jat, browser-*, etc.)"
 echo "  • ~/.config/jat config files"
 echo "  • ~/.claude/commands/jat"
 echo "  • Running tmux sessions (server-jat, jat-*)"
 echo "  • Bash launcher functions from ~/.bashrc"
 echo ""
-echo -e "${RED}WARNING: This does NOT remove .beads/ from your projects${NC}"
-echo -e "${YELLOW}(Remove those manually if desired: rm -rf ~/code/*/.beads)${NC}"
+echo -e "${RED}WARNING: This does NOT remove .jat/ from your projects${NC}"
+echo -e "${YELLOW}(Remove those manually if desired: rm -rf ~/code/*/.jat)${NC}"
 echo ""
 read -p "Continue? [y/N] " -r
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -66,7 +66,7 @@ done
 
 # 2. Remove symlinks from ~/.local/bin
 echo -e "${BLUE}[2/7] Removing symlinks from ~/.local/bin...${NC}"
-for tool in bd bd-* am-* browser-* db-* signal-* omarchy-* jat jat-*; do
+for tool in jt jt-* am-* browser-* db-* signal-* omarchy-* jat jat-*; do
     if [ -L ~/.local/bin/"$tool" ]; then
         rm ~/.local/bin/"$tool" && echo "  ✓ Removed $tool"
     fi
@@ -133,8 +133,8 @@ echo -e "${BLUE}[7/7] Cleanup summary${NC}"
 echo ""
 echo -e "${GREEN}✓ JAT uninstalled${NC}"
 echo ""
-echo -e "${YELLOW}To remove .beads from projects (optional):${NC}"
-echo "  cd ~/code && for dir in */; do rm -rf \"\${dir}.beads\"; done"
+echo -e "${YELLOW}To remove .jat from projects (optional):${NC}"
+echo "  cd ~/code && for dir in */; do rm -rf \"\${dir}.jat\"; done"
 echo ""
 echo -e "${YELLOW}To remove git hooks from projects (optional):${NC}"
 echo "  cd ~/code && for dir in */; do rm -f \"\${dir}.git/hooks/pre-commit\"; done"

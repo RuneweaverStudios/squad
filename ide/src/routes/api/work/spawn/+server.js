@@ -7,7 +7,7 @@
  * 2. Validate agent is enabled and auth is available
  * 3. Generate agent name and register in Agent Mail
  * 4. Create tmux session jat-{AgentName}
- * 5. If taskId provided: Assign task to agent in Beads (bd update)
+ * 5. If taskId provided: Assign task to agent in JAT Tasks (jt update)
  * 6. Run agent CLI with /jat:start (with agent name, optionally with task)
  * 7. Return new WorkSession with agent selection info
  *
@@ -32,7 +32,7 @@ import {
 	AGENT_MAIL_URL,
 	CLAUDE_STARTUP_TIMEOUT_SECONDS
 } from '$lib/config/spawnConfig.js';
-import { getTaskById } from '$lib/server/beads.js';
+import { getTaskById } from '$lib/server/jat-tasks.js';
 import { getProjectPath, getJatDefaults } from '$lib/server/projectPaths.js';
 import { CLAUDE_READY_PATTERNS, SHELL_PROMPT_PATTERNS, isYoloWarningDialog, getReadyPatternsForAgent } from '$lib/server/shellPatterns.js';
 import { stripAnsi } from '$lib/utils/ansiToHtml.js';
@@ -643,12 +643,12 @@ export async function POST({ request }) {
 			}, { status: 400 });
 		}
 
-		// Validate beads database exists in project
-		const beadsPath = `${projectPath}/.beads`;
-		if (!existsSync(beadsPath)) {
+		// Validate JAT task database exists in project
+		const jatPath = `${projectPath}/.jat`;
+		if (!existsSync(jatPath)) {
 			return json({
-				error: 'Beads database not found',
-				message: `No .beads directory found in ${projectPath}. Run 'bd init' to initialize.`,
+				error: 'JAT task database not found',
+				message: `No .jat directory found in ${projectPath}. Run 'jt init' to initialize.`,
 				projectPath,
 				taskId
 			}, { status: 400 });
@@ -703,7 +703,7 @@ export async function POST({ request }) {
 		// Step 2: Assign task to new agent in Beads (if taskId provided)
 		if (taskId) {
 			try {
-				await execAsync(`bd update "${taskId}" --status in_progress --assignee "${agentName}"`, {
+				await execAsync(`jt update "${taskId}" --status in_progress --assignee "${agentName}"`, {
 					cwd: projectPath,
 					timeout: 10000
 				});
@@ -722,7 +722,7 @@ export async function POST({ request }) {
 				return json({
 					error: 'Failed to assign task',
 					message: errorDetail,
-					detail: `Task ${taskId} may not exist in ${projectPath}/.beads`,
+					detail: `Task ${taskId} may not exist in ${projectPath}/.jat`,
 					agentName,
 					taskId,
 					projectPath

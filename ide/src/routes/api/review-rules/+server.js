@@ -1,6 +1,6 @@
 /**
  * Review Rules API Route
- * GET - Load current review rules from .beads/review-rules.json
+ * GET - Load current review rules from .jat/review-rules.json
  * PUT - Update review rules
  * POST /reset - Reset to default rules
  */
@@ -12,13 +12,13 @@ import { resolve } from 'path';
 
 const execAsync = promisify(exec);
 
-// Find .beads directory by walking up from cwd
-function findBeadsDir() {
+// Find .jat directory by walking up from cwd
+function findJatDir() {
 	let dir = process.cwd();
 	while (dir !== '/') {
-		const beadsPath = resolve(dir, '.beads');
-		if (existsSync(beadsPath)) {
-			return beadsPath;
+		const jatPath = resolve(dir, '.jat');
+		if (existsSync(jatPath)) {
+			return jatPath;
 		}
 		dir = resolve(dir, '..');
 	}
@@ -45,12 +45,12 @@ const DEFAULT_RULES = {
 /** @type {import('./$types').RequestHandler} */
 export async function GET() {
 	try {
-		const beadsDir = findBeadsDir();
-		if (!beadsDir) {
-			return json({ error: true, message: 'No .beads directory found' }, { status: 404 });
+		const jatDir = findJatDir();
+		if (!jatDir) {
+			return json({ error: true, message: 'No .jat directory found' }, { status: 404 });
 		}
 
-		const rulesPath = resolve(beadsDir, 'review-rules.json');
+		const rulesPath = resolve(jatDir, 'review-rules.json');
 
 		if (!existsSync(rulesPath)) {
 			// Return defaults if file doesn't exist
@@ -74,12 +74,12 @@ export async function GET() {
 /** @type {import('./$types').RequestHandler} */
 export async function PUT({ request }) {
 	try {
-		const beadsDir = findBeadsDir();
-		if (!beadsDir) {
-			return json({ error: true, message: 'No .beads directory found' }, { status: 404 });
+		const jatDir = findJatDir();
+		if (!jatDir) {
+			return json({ error: true, message: 'No .jat directory found' }, { status: 404 });
 		}
 
-		const rulesPath = resolve(beadsDir, 'review-rules.json');
+		const rulesPath = resolve(jatDir, 'review-rules.json');
 		const updates = await request.json();
 
 		// Load existing rules or use defaults
@@ -116,12 +116,12 @@ export async function PUT({ request }) {
 		// Write updated rules
 		writeFileSync(rulesPath, JSON.stringify(rules, null, 2) + '\n');
 
-		// Sync to bd config
+		// Sync to jt config
 		try {
-			await execAsync('bd-review-rules-loader --sync-to-config');
+			await execAsync('jt-review-rules-loader --sync-to-config');
 		} catch (syncErr) {
 			const syncMessage = syncErr instanceof Error ? syncErr.message : 'Unknown sync error';
-			console.warn('Failed to sync to bd config:', syncMessage);
+			console.warn('Failed to sync to jt config:', syncMessage);
 		}
 
 		return json({ success: true, rules });
@@ -142,20 +142,20 @@ export async function POST({ request }) {
 
 		// Handle reset action
 		if (body.action === 'reset') {
-			const beadsDir = findBeadsDir();
-			if (!beadsDir) {
-				return json({ error: true, message: 'No .beads directory found' }, { status: 404 });
+			const jatDir = findJatDir();
+			if (!jatDir) {
+				return json({ error: true, message: 'No .jat directory found' }, { status: 404 });
 			}
 
-			const rulesPath = resolve(beadsDir, 'review-rules.json');
+			const rulesPath = resolve(jatDir, 'review-rules.json');
 			writeFileSync(rulesPath, JSON.stringify(DEFAULT_RULES, null, 2) + '\n');
 
-			// Sync to bd config
+			// Sync to jt config
 			try {
-				await execAsync('bd-review-rules-loader --sync-to-config');
+				await execAsync('jt-review-rules-loader --sync-to-config');
 			} catch (syncErr) {
 				const syncMessage = syncErr instanceof Error ? syncErr.message : 'Unknown sync error';
-				console.warn('Failed to sync to bd config:', syncMessage);
+				console.warn('Failed to sync to jt config:', syncMessage);
 			}
 
 			return json({ success: true, rules: DEFAULT_RULES, message: 'Rules reset to defaults' });

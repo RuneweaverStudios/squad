@@ -433,12 +433,12 @@ fi
  * Agent Command Template
  *
  * Template for agent coordination commands (like /jat:start, /jat:complete).
- * Includes signal emissions, Agent Mail integration, and Beads coordination.
+ * Includes signal emissions, Agent Mail integration, and JAT Tasks coordination.
  */
 const agentTemplate: CommandTemplate = {
 	id: 'agent',
 	name: 'Agent',
-	description: 'Agent coordination with signals, mail, and Beads',
+	description: 'Agent coordination with signals, mail, and JAT Tasks',
 	icon: '🤖',
 	useCase: 'Agent workflow commands, coordination, task management',
 	frontmatter: {
@@ -474,7 +474,7 @@ argument-hint: [task-id]
 2. **Validate State** - Ensure preconditions are met
 3. **Perform Action** - Main operation
 4. **Emit Signal** - Update IDE state
-5. **Coordinate** - Update Beads, reservations, send messages
+5. **Coordinate** - Update JAT Tasks, reservations, send messages
 
 ---
 
@@ -539,8 +539,8 @@ Available signals:
 ### STEP 5: Coordinate
 
 \`\`\`bash
-# Update Beads
-bd update task-id --status in_progress --assignee "$AGENT_NAME"
+# Update task
+jt update task-id --status in_progress --assignee "$AGENT_NAME"
 
 # Reserve files
 am-reserve "src/**/*.ts" --agent "$AGENT_NAME" --ttl 3600 --reason "task-id"
@@ -579,7 +579,7 @@ Error: No agent registered. Run /jat:start first.
 
 **Task not found:**
 \`\`\`
-Error: Task 'task-id' not found in Beads.
+Error: Task 'task-id' not found in JAT.
 \`\`\`
 
 ---

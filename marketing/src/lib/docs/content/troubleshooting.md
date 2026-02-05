@@ -149,7 +149,7 @@ curl http://localhost:3333/api/transcribe
 |-------|-------|-----|
 | `command not found` | `~/.local/bin` not in PATH | Add to `~/.bashrc`: `export PATH="$HOME/.local/bin:$PATH"` |
 | `am-whoami` fails | Database not initialized | Run `bash ~/code/jat/tools/scripts/install-agent-mail.sh` |
-| `bd: command not found` | Beads CLI not installed | Run `bash ~/code/jat/tools/scripts/install-beads.sh` |
+| `jt: command not found` | Task CLI not installed | Run `./install.sh` to create symlinks |
 | `NOT IN TMUX SESSION` | Claude started outside tmux | Exit and restart with launcher function |
 | `FILE_RESERVATION_CONFLICT` | Another agent holds the lock | Wait for TTL expiry or use non-exclusive |
 | `from_agent not registered` | Agent didnt run am-register | Run `/jat:start` to auto-register |

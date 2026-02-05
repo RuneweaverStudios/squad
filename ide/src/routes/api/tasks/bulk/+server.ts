@@ -7,7 +7,7 @@
  */
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { createTask as libCreateTask, getTaskById, addDependency } from '$lib/server/beads.js';
+import { createTask as libCreateTask, getTaskById, addDependency } from '$lib/server/jat-tasks.js';
 import { invalidateCache } from '$lib/server/cache.js';
 import { _resetTaskCache } from '../../../api/agents/+server.js';
 import { getProjectPath } from '$lib/server/projectPaths.js';
@@ -362,7 +362,7 @@ async function createTask(
 		// Check for "no .jat/ database" error - project not initialized
 		if (errorMessage.includes('No .jat/ database') || errorMessage.includes('Run initProject()')) {
 			const projectName = defaultProject || task.project || 'this project';
-			errorMessage = `Project "${projectName}" has not been initialized for task tracking. Run "bd init" in the project directory, or use the "Add Project" button on the Projects page.`;
+			errorMessage = `Project "${projectName}" has not been initialized for task tracking. Run "jt init" in the project directory, or use the "Add Project" button on the Projects page.`;
 		}
 
 		return {

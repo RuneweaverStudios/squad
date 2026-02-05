@@ -18,7 +18,7 @@
 
 	const credits = [
 		{ name: 'Joe Winke', link: 'https://github.com/joewinke', label: 'Creator' },
-		{ name: 'Steve Yegge', link: 'https://steve-yegge.blogspot.com/', label: 'Beads' },
+		{ name: 'Steve Yegge', link: 'https://steve-yegge.blogspot.com/', label: 'Tasks' },
 		{ name: 'Nicholas Marriott', link: 'https://github.com/tmux/tmux', label: 'Tmux' },
 		{ name: 'Jeff Emanuel', link: 'https://github.com/Dicklesworthstone/mcp_agent_mail', label: 'Agent Mail' },
 		{ name: 'Mario Zechner', link: 'https://mariozechner.at/', label: 'Inspiration' },

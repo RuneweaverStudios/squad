@@ -18,7 +18,7 @@ const execAsync = promisify(exec);
  */
 export const POST: RequestHandler = async () => {
 	try {
-		const { stdout } = await execAsync('bd epic close-eligible --json');
+		const { stdout } = await execAsync('jt epic close-eligible --json');
 		const result = JSON.parse(stdout || '{}');
 
 		return json({

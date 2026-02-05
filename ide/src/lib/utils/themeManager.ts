@@ -1,7 +1,7 @@
 // src/lib/utils/themeManager.ts
 
 /**
- * Theme management utility for Beads IDE.
+ * Theme management utility for JAT IDE.
  *
  * Theme preference is managed by the unified preferences store.
  * This module provides theme validation and the list of available themes.

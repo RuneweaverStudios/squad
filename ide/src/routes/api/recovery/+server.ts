@@ -133,7 +133,7 @@ async function getActiveTmuxSessions(): Promise<Set<string>> {
  */
 async function getInProgressTasks(projectPath: string): Promise<Task[]> {
 	try {
-		const { stdout } = await execAsync(`cd "${projectPath}" && bd list --status in_progress --json`);
+		const { stdout } = await execAsync(`cd "${projectPath}" && jt list --status in_progress --json`);
 		const tasks: Task[] = JSON.parse(stdout);
 		return tasks.filter((t) => t.assignee);
 	} catch {
@@ -221,8 +221,8 @@ function getConfiguredProjects(): string[] {
 					projectPath = join(homeDir, projectPath.slice(2));
 				}
 
-				// Only include if it has a .beads directory
-				if (existsSync(join(projectPath, '.beads'))) {
+				// Only include if it has a .jat directory
+				if (existsSync(join(projectPath, '.jat'))) {
 					projects.push(projectPath);
 				}
 			}

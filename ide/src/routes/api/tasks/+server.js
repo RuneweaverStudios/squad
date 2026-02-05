@@ -3,7 +3,7 @@
  * Provides task data to the IDE
  */
 import { json } from '@sveltejs/kit';
-import { getTasks, getProjects, getTaskById, createTask, updateTask } from '$lib/server/beads.js';
+import { getTasks, getProjects, getTaskById, createTask, updateTask } from '$lib/server/jat-tasks.js';
 import { invalidateCache } from '$lib/server/cache.js';
 import { _resetTaskCache } from '../../api/agents/+server.js';
 import { getProjectPath } from '$lib/server/projectPaths.js';
@@ -178,7 +178,7 @@ export async function POST({ request }) {
 				return json(
 					{
 						error: true,
-						message: `Project directory not found: ${projectInfo.path}. Either create the directory and run 'bd init', or add the project to ~/.config/jat/projects.json with the correct path.`,
+						message: `Project directory not found: ${projectInfo.path}. Either create the directory and run 'jt init', or add the project to ~/.config/jat/projects.json with the correct path.`,
 						type: 'project_not_found'
 					},
 					{ status: 400 }
@@ -252,9 +252,9 @@ export async function POST({ request }) {
 			return json(
 				{
 					error: true,
-					message: `Project "${projectName}" has not been initialized for task tracking. Run "bd init" in the project directory, or use the "Add Project" button on the Projects page.`,
+					message: `Project "${projectName}" has not been initialized for task tracking. Run "jt init" in the project directory, or use the "Add Project" button on the Projects page.`,
 					type: 'project_not_initialized',
-					hint: `cd ~/code/${projectName} && bd init`
+					hint: `cd ~/code/${projectName} && jt init`
 				},
 				{ status: 400 }
 			);

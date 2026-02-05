@@ -17,7 +17,7 @@
 			number: 'I',
 			glyph: '⌬',
 			title: 'Task Architecture',
-			subtitle: 'Beads: Dependency-Aware Work',
+			subtitle: 'JAT Tasks: Dependency-Aware Work',
 			description: 'Structure your work into epics, features, and tasks with automatic dependency tracking. When Agent A finishes a blocker, Agent B is automatically ready.',
 			features: [
 				'Priority-based task queues',
@@ -25,7 +25,7 @@
 				'Status propagation',
 				'Multi-project aggregation'
 			],
-			code: `$ bd ready --json
+			code: `$ jt ready --json
 [{
   "id": "jat-7kx2m",
   "title": "Add OAuth",

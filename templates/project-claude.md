@@ -44,23 +44,23 @@
 
 ## Agent Tools Configuration
 
-**Global instructions:** See `~/.claude/CLAUDE.md` for Agent Mail, Beads, and bash tools documentation.
+**Global instructions:** See `~/.claude/CLAUDE.md` for Agent Mail, JAT Tasks, and bash tools documentation.
 
 **This project uses:**
-- ✅ Beads task planning (`.beads/` directory)
+- ✅ JAT task planning (`.jat/` directory)
 - ✅ Agent Mail coordination (project key: `[absolute path to this repo]`)
 - ✅ 28 generic bash tools available globally
 
 **Quick start for AI assistants:**
 ```bash
 # See tasks ready to work
-bd ready
+jt ready
 
 # Register with Agent Mail
 am-register --program claude-code --model sonnet-4.5
 
 # Reserve files before editing
-am-reserve "src/**" --agent AgentName --ttl 3600 --reason "bd-123"
+am-reserve "src/**" --agent AgentName --ttl 3600 --reason "jat-123"
 ```
 
 ## Troubleshooting

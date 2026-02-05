@@ -9,7 +9,7 @@
 First-time JAT users who install the system but don't have an existing project are stuck. The IDE shows an empty state with no clear path forward. These users need guided onboarding to:
 - Create their first project
 - Write a Product Requirements Document (PRD)
-- Initialize Beads task management
+- Initialize JAT task management
 - Generate initial tasks
 - Start working with their first agent
 
@@ -53,7 +53,7 @@ Create a guided onboarding experience where a special "Project Setup Agent" walk
 │  5. Agent Creates Project Structure                             │
 │     ├─► Creates ~/code/<project-name>/                         │
 │     ├─► Writes CLAUDE.md with PRD                              │
-│     ├─► Runs `bd init`                                         │
+│     ├─► Runs `jt init`                                         │
 │     └─► Adds project to JAT config                             │
 │                                                                 │
 │  6. Agent Creates Initial Tasks                                 │
@@ -130,10 +130,10 @@ Create a guided onboarding experience where a special "Project Setup Agent" walk
   - Writes to `CLAUDE.md`
   - Type: task, Priority: P1
 
-- **jat-TBD9**: Agent Beads initialization
-  - Runs `bd init` in project directory
-  - Explains what Beads does
-  - Shows how to use basic bd commands
+- **jat-TBD9**: Agent JAT Tasks initialization
+  - Runs `jt init` in project directory
+  - Explains what JAT Tasks does
+  - Shows how to use basic jt commands
   - Type: task, Priority: P1
 
 - **jat-TBD10**: Agent JAT config integration
@@ -147,7 +147,7 @@ Create a guided onboarding experience where a special "Project Setup Agent" walk
 - **jat-TBD11**: Agent task breakdown from PRD
   - Reads PRD from CLAUDE.md
   - Creates logical task breakdown
-  - Uses `bd create` for each task
+  - Uses `jt create` for each task
   - Sets appropriate priorities and dependencies
   - Type: task, Priority: P1
 
@@ -172,7 +172,7 @@ Create a guided onboarding experience where a special "Project Setup Agent" walk
   - Type: task, Priority: P2
 
 - **jat-TBD15**: Import existing project backend
-  - Runs `bd init` if no .beads exists
+  - Runs `jt init` if no .jat exists
   - Creates basic CLAUDE.md if missing
   - Adds to JAT config
   - Type: task, Priority: P2
@@ -210,7 +210,7 @@ Create a guided onboarding experience where a special "Project Setup Agent" walk
 2. Uses dedicated onboarding system prompt (not regular agent prompt)
 3. Has access to:
    - File operations (mkdir, write)
-   - bd commands (init, create)
+   - jt commands (init, create)
    - JAT config modification
 4. Self-terminates after successful project creation
 
@@ -227,7 +227,7 @@ Create a guided onboarding experience where a special "Project Setup Agent" walk
 ## Dependencies
 
 - Existing JAT config system (`~/.config/jat/projects.json`)
-- Beads CLI (`bd init`, `bd create`)
+- JAT Tasks CLI (`jt init`, `jt create`)
 - IDE SessionCard component
 - tmux session management
 

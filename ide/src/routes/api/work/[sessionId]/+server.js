@@ -14,7 +14,7 @@
 import { json } from '@sveltejs/kit';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { getTasks } from '$lib/server/beads.js';
+import { getTasks } from '$lib/server/jat-tasks.js';
 
 const execAsync = promisify(exec);
 
@@ -74,12 +74,12 @@ export async function DELETE({ params }) {
 			}
 		}
 
-		// Step 4: Close the task in Beads if one was found
+		// Step 4: Close the task in JAT if one was found
 		let taskClosed = false;
 		let closedTaskId = null;
 		if (taskToClose) {
 			try {
-				await execAsync(`bd update "${taskToClose.id}" --status closed`, {
+				await execAsync(`jt update "${taskToClose.id}" --status closed`, {
 					cwd: projectPath,
 					timeout: 10000
 				});

@@ -38,7 +38,7 @@ export interface WorkingSignal {
 	taskId: string;
 	/** Task title (e.g., "Add user authentication") */
 	taskTitle: string;
-	/** Full description from Beads */
+	/** Full description from JAT Tasks */
 	taskDescription: string;
 	/** Priority level: 0-4 (P0=critical, P4=lowest) */
 	taskPriority: number;

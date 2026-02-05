@@ -9,7 +9,7 @@ Patterns that work well and anti-patterns to avoid, learned from real multi-agen
 - [Agent Coordination](#agent-coordination)
 - [Common Anti-Patterns](#common-anti-patterns)
 - [Performance Tips](#performance-tips)
-- [Integration with Beads](#integration-with-beads)
+- [Integration with JAT Tasks](#integration-with-jat-tasks)
 
 ---
 
@@ -96,7 +96,7 @@ am-reserve "src/**" --reason "task-123: Refactoring auth"
 
 **1. Use Task IDs as Thread IDs**
 ```bash
-# ✅ GOOD: Consistent threading with Beads
+# ✅ GOOD: Consistent threading with JAT Tasks
 am-send "[task-123] Starting" "..." --thread task-123
 am-send "[task-123] Update" "..." --thread task-123
 am-send "[task-123] Complete" "..." --thread task-123
@@ -263,7 +263,7 @@ am-reserve "src/auth/**" --ttl 3600  # Just auth, 1 hour
 
 **Problem:** Not checking for conflicts before starting
 ```bash
-# (Sees task in Beads)
+# (Sees task in JAT Tasks)
 # (Starts working immediately)
 # (Realizes Alice is already working on it)
 # (Wasted time)
@@ -340,31 +340,31 @@ am-reserve "src/**"  # Entire src directory!
 
 ---
 
-## Integration with Beads
+## Integration with JAT Tasks
 
 ### ✅ Best Practices
 
-**1. Use Beads Task IDs as Thread IDs**
+**1. Use JAT Task IDs as Thread IDs**
 ```bash
 # ✅ GOOD: Consistent across tools
-bd create "Implement auth" --priority P1
+jt create "Implement auth" --priority 1
 # → Creates task-123
 
 am-send "[task-123] Starting" "..." --thread task-123
 am-reserve "src/**" --reason "task-123: Auth implementation"
 ```
 
-**2. Update Beads Status with Agent Mail**
+**2. Update JAT Task Status with Agent Mail**
 ```bash
-# ✅ GOOD: Keep Beads in sync
+# ✅ GOOD: Keep JAT Tasks in sync
 am-send "[task-123] Complete" "..." --from Alice
-bd close task-123 --reason "Completed by Alice"
+jt close task-123 --reason "Completed by Alice"
 ```
 
-**3. Check Beads Dependencies Before Starting**
+**3. Check JAT Dependencies Before Starting**
 ```bash
 # ✅ GOOD: Respect dependencies
-bd show task-123 --json | jq '.depends_on'
+jt show task-123 --json | jq '.depends_on'
 # (Check if blockers are complete)
 
 # ✗ BAD: Start without checking (wasted work if blocked)
@@ -372,24 +372,24 @@ bd show task-123 --json | jq '.depends_on'
 
 ### Common Integration Patterns
 
-**Pattern 1: Start from Beads**
+**Pattern 1: Start from JAT Tasks**
 ```bash
-bd ready  # Get ready tasks
-bd show task-123  # Review details
+jt ready  # Get ready tasks
+jt show task-123  # Review details
 am-reserve "..." --reason "task-123"
 am-send "[task-123] Starting" "..."
 ```
 
-**Pattern 2: Complete to Beads**
+**Pattern 2: Complete to JAT Tasks**
 ```bash
 am-send "[task-123] Complete" "..."
 am-release "..."
-bd close task-123
+jt close task-123
 ```
 
-**Pattern 3: Beads + Agent Mail Together**
+**Pattern 3: JAT Tasks + Agent Mail Together**
 ```bash
-# Beads tracks WHAT (tasks, status, dependencies)
+# JAT Tasks tracks WHAT (tasks, status, dependencies)
 # Agent Mail tracks WHO and HOW (coordination, files, messages)
 ```
 
@@ -402,11 +402,11 @@ bd close task-123
 | Situation | Tool | Command |
 |-----------|------|---------|
 | Starting work | Agent Mail | `am-reserve`, `am-send` |
-| Check what's ready | Beads | `bd ready` |
+| Check what's ready | JAT Tasks | `jt ready` |
 | Coordinate with agent | Agent Mail | `am-send --to AgentName` |
 | Check conflicts | Agent Mail | `am-reservations` |
 | Hand off work | Agent Mail | `am-send` (with context), `am-release` |
-| Mark task complete | Beads | `bd close` |
+| Mark task complete | JAT Tasks | `jt close` |
 | Find past messages | Agent Mail | `am-search` |
 | Check agent status | Agent Mail | `am-whoami` |
 
@@ -434,7 +434,7 @@ am-send "[odm] Starting SvelteKit" --from IDEBuilder
 
 # PaleStar: P0 query layers (parallel)
 am-reserve "lib/**" --agent PaleStar
-am-send "[rpe] Starting Beads layer" --from PaleStar
+am-send "[rpe] Starting JAT Tasks layer" --from PaleStar
 
 # Both work simultaneously (no conflicts!)
 
@@ -448,7 +448,7 @@ am-release "lib/**" --agent PaleStar
 
 # IDEBuilder uses PaleStar's work
 am-reserve "ide/src/**" --agent IDEBuilder
-am-send "[qx8] Starting UI (using lib/beads.js)" --from IDEBuilder
+am-send "[qx8] Starting UI (using lib/tasks.js)" --from IDEBuilder
 
 # Result: 3 P0 tasks done in 90 minutes with ZERO conflicts
 ```

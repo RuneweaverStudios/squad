@@ -73,7 +73,7 @@ for repo_dir in "$CODE_DIR"/*; do
 
     FUNCTIONS_BLOCK+="$FUNC_NAME() {
     local session_name=\"jat-pending-\$\$\"
-    local logs_dir=~/code/$REPO_NAME/.beads/logs
+    local logs_dir=~/code/$REPO_NAME/.jat/logs
     local log_file=\"\$logs_dir/session-\${session_name}-\$(date +%Y%m%d-%H%M%S).log\"
 
     cd ~/code/$REPO_NAME

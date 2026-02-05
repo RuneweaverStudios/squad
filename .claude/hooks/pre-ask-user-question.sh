@@ -73,10 +73,10 @@ if [[ -n "$TMUX_SESSION" ]]; then
     QUESTION_TEXT=$(echo "$TOOL_INFO" | jq -r '.tool_input.questions[0].question // "Question from agent"' 2>/dev/null || echo "Question from agent")
     QUESTION_TYPE=$(echo "$TOOL_INFO" | jq -r 'if .tool_input.questions[0].multiSelect then "multi-select" else "choice" end' 2>/dev/null || echo "choice")
 
-    # Get current task ID from beads if available
+    # Get current task ID from JAT Tasks if available
     TASK_ID=""
-    if command -v bd &>/dev/null && [[ -n "$AGENT_NAME" ]]; then
-        TASK_ID=$(bd list --json 2>/dev/null | jq -r --arg agent "$AGENT_NAME" '.[] | select(.assignee == $agent and .status == "in_progress") | .id' 2>/dev/null | head -1 || echo "")
+    if command -v jt &>/dev/null && [[ -n "$AGENT_NAME" ]]; then
+        TASK_ID=$(jt list --json 2>/dev/null | jq -r --arg agent "$AGENT_NAME" '.[] | select(.assignee == $agent and .status == "in_progress") | .id' 2>/dev/null | head -1 || echo "")
     fi
 
     # Build signal data - use type: "state" and state: "needs_input"

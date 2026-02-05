@@ -63,7 +63,7 @@
 	}
 
 	interface TimelineEvent {
-		type: 'beads_event' | 'agent_mail' | 'signal';
+		type: 'jat_event' | 'agent_mail' | 'signal';
 		event?: string;
 		timestamp: string;
 		description?: string;
@@ -81,7 +81,7 @@
 		updated_at?: string;
 		attachments: TaskAttachment[];
 		timeline: TimelineEvent[];
-		timelineCounts: { total: number; beads_events: number; agent_mail: number; signals?: number };
+		timelineCounts: { total: number; jat_events: number; agent_mail: number; signals?: number };
 	}
 
 	// Props
@@ -551,7 +551,7 @@
 
 			const taskData = taskRes.ok ? await taskRes.json() : null;
 			const attachmentsData = attachmentsRes.ok ? await attachmentsRes.json() : { images: [] };
-			const historyData = historyRes.ok ? await historyRes.json() : { timeline: [], count: { total: 0, beads_events: 0, agent_mail: 0 } };
+			const historyData = historyRes.ok ? await historyRes.json() : { timeline: [], count: { total: 0, jat_events: 0, agent_mail: 0 } };
 			const signalsData = signalsRes.ok ? await signalsRes.json() : { signals: [] };
 
 			const signalEvents = (signalsData.signals || []).map((signal: any) => ({
@@ -584,7 +584,7 @@
 				timeline: mergedTimeline,
 				timelineCounts: {
 					total: mergedTimeline.length,
-					beads_events: historyData.count?.beads_events || 0,
+					jat_events: historyData.count?.jat_events || 0,
 					agent_mail: historyData.count?.agent_mail || 0,
 					signals: signalEvents.length
 				}
@@ -598,7 +598,7 @@
 				labels: [],
 				attachments: [],
 				timeline: [],
-				timelineCounts: { total: 0, beads_events: 0, agent_mail: 0 }
+				timelineCounts: { total: 0, jat_events: 0, agent_mail: 0 }
 			};
 		} finally {
 			taskDetailsLoading = false;

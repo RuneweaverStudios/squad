@@ -8,14 +8,14 @@
  * Returns a formatted text string containing:
  * - Session name
  * - Agent name (from session name)
- * - Task info (from Beads, if agent has an assigned task)
+ * - Task info (from JAT Tasks, if agent has an assigned task)
  * - Terminal output (stripped of ANSI codes)
  */
 
 import { json } from '@sveltejs/kit';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { getTasks } from '$lib/server/beads.js';
+import { getTasks } from '$lib/server/jat-tasks.js';
 
 const execAsync = promisify(exec);
 

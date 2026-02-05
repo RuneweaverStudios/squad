@@ -30,11 +30,11 @@ mcp_agent_mail/
 # Plan mode temporary files
 .plan/
 
-# Beads task data (user-specific, don't commit to open source repo)
-# When users add their OWN projects via "Add Project", bd init creates
-# .beads/ with a DIFFERENT gitignore that SYNCS tasks via git.
+# JAT task data (user-specific, don't commit to open source repo)
+# When users add their OWN projects via "Add Project", jt init creates
+# .jat/ with a .gitignore that ignores SQLite files.
 # This entry only affects the JAT repo itself.
-.beads/
+.jat/
 
 # Generated avatars (per-machine, don't commit)
 avatars/

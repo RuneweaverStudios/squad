@@ -256,7 +256,7 @@ After installation:
 3. **Initialize a project**:
    ```bash
    cd ~/code/myproject
-   bd init
+   jt init
    ```
 4. **Read the docs**: Check out [CLAUDE.md](CLAUDE.md) for full documentation
 

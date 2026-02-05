@@ -182,7 +182,7 @@
 
 	async function handleConvertToTasks() {
 		if (!activeSessionName) return;
-		await sendInput(activeSessionName, 'Please convert our plan into a structured task tree. Create the tasks in Beads using bd create with proper types, priorities, labels, descriptions, and dependency ordering.', 'text');
+		await sendInput(activeSessionName, 'Please convert our plan into a structured task tree. Create the tasks in JAT using jt create with proper types, priorities, labels, descriptions, and dependency ordering.', 'text');
 	}
 
 	async function handleEndSession() {

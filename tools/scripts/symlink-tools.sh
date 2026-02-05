@@ -321,6 +321,6 @@ echo "    • Agent Mail (12): am-register, am-inbox, am-send, am-reply, am-ack,
 echo "    • Browser (11): browser-start.js, browser-nav.js, browser-eval.js, ..."
 echo "    • Signal (2): jat-signal, jat-signal-validate"
 echo "    • Media (4+): gemini-image, gemini-edit, gemini-compose, avatar-generate"
-echo "    • Additional (15): db-*, bd-*, monitoring tools"
+echo "    • Additional (15): db-*, jt-*, monitoring tools"
 echo "    • JAT CLI: jat - Launch IDE"
 echo ""

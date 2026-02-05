@@ -60,7 +60,7 @@ Create well-organized commits with automatic code cleanup and documentation upda
    - **If `$1` is empty or "session"**: Filter to session work only
      - Check file reservations for context
      - Check Agent Mail for task context
-     - Look for Beads task ID if in agent workflow
+     - Look for JAT task ID if in agent workflow
      - Identify files YOU modified (not other developers)
 
    - **If `$1` is "all"**: Include everything
@@ -118,7 +118,7 @@ For each identified change group:
    - Check if part of agent workflow:
      - File reservations → extract task context
      - Agent Mail thread → extract task ID
-     - Beads task → get task ID and description
+     - JAT task → get task ID and description
    - Extract feature/fix description
    - Identify impacted areas
 
@@ -243,7 +243,7 @@ The command will automatically:
 1. **Extract task context:**
    - Check for active file reservations → get task ID
    - Check Agent Mail thread → get task description
-   - Check Beads task → get full context
+   - Check JAT task → get full context
 
 2. **Include in commit messages:**
    ```

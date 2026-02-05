@@ -148,7 +148,7 @@ Live terminal output for all running agents:
 
 ### Task Management (`/tasks`)
 
-Beads-powered git-backed issue tracking:
+JAT Tasks-powered issue tracking:
 
 - Create tasks with priorities (P0-P4)
 - Epic workflows with subtask spawning
@@ -369,7 +369,7 @@ Any terminal-based AI: Claude Code, Aider, Cline, Codex, etc.
 Tested with 20+. Limited by your machine and API limits, not JAT.
 
 **Can I use existing projects?**
-Yes. Run `bd init` in any git repo to initialize Beads tracking, then add the project via `/config` → Projects tab, or use the "Add Project" button on the Tasks page.
+Yes. Run `jt init` in any git repo to initialize task tracking, then add the project via `/config` → Projects tab, or use the "Add Project" button on the Tasks page.
 
 **Is there a hosted version?**
 No. JAT runs 100% locally. Code never leaves your machine.
@@ -402,8 +402,8 @@ Open a PR against `master`. All contributions are licensed under MIT.
 ## Credits
 
 - **[Joe Winke](https://x.com/joewinke)** — Creator [Github](https://github.com/joewinke)
-- **Agent Mail** — Agent Comms ([Dicklesworthstone/mcp_agent_mail](https://github.com/Dicklesworthstone/mcp_agent_mail))
-- **Beads** — Task management ([steveyegge/beads](https://github.com/steveyegge/beads))
+- **Agent Mail** — Original Agent Comms inspiration ([Dicklesworthstone/mcp_agent_mail](https://github.com/Dicklesworthstone/mcp_agent_mail))
+- **Beads** — Original task management inspiration ([steveyegge/beads](https://github.com/steveyegge/beads))
 - **Mario Zechner** — Think different about Agents ([What if you don't need MCP?](https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/))
 - **Andrej Karpathy** - Naming the Problem ([Some Powerful Alien Tool](https://x.com/karpathy/status/2004607146781278521?s=20))
 - **DHH** - Developer-centric OS ([Omarchy](https://omarchy.org/))

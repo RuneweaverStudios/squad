@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# backup-beads.sh - Task database backup utility
+# backup-beads.sh - JAT task database backup utility
 #
-# Creates timestamped backups of the task database (.jat/tasks.db)
+# Creates timestamped backups of the JAT task database (.jat/tasks.db)
 # and Agent Mail database (~/.agent-mail.db) with SHA256 checksums.
 #
 # Usage:
@@ -39,7 +39,7 @@ log_info() { echo -e "${CYAN}ℹ${NC}  $1"; }
 
 show_help() {
     cat <<EOF
-${SCRIPT_NAME} v${VERSION} - Task database backup utility
+${SCRIPT_NAME} v${VERSION} - JAT task database backup utility
 
 USAGE:
     $SCRIPT_NAME --project PATH [OPTIONS]
@@ -53,7 +53,7 @@ OPTIONS:
 
 DESCRIPTION:
     Creates timestamped backups of:
-    - Task database (.jat/tasks.db)
+    - JAT task database (.jat/tasks.db)
     - Agent Mail database (~/.agent-mail.db, if exists)
 
 BACKUP LOCATION:
@@ -126,7 +126,7 @@ fi
 
 # Metadata
 cat > "${BACKUP_DIR}/metadata.txt" <<EOF
-Task Database Backup
+JAT Task Database Backup
 Created: $(date)
 Script: $SCRIPT_NAME v$VERSION
 Project: $PROJECT_PATH

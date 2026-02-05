@@ -709,7 +709,7 @@
 					<input
 						type="text"
 						class="input input-bordered input-sm"
-						placeholder="e.g., Run Beads"
+						placeholder="e.g., Run JAT"
 						bind:value={commandFormData.label}
 					/>
 				</div>
@@ -722,7 +722,7 @@
 					<input
 						type="text"
 						class="input input-bordered input-sm"
-						placeholder="e.g., Convert PRD to Beads tasks"
+						placeholder="e.g., Convert PRD to JAT tasks"
 						bind:value={commandFormData.description}
 					/>
 				</div>

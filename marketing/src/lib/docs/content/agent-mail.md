@@ -146,7 +146,7 @@ The `/jat:complete` command releases all reservations for the completing agent a
 
 ## Thread-based communication
 
-Every message has an optional `thread_id`. The convention is to use the Beads task ID as the thread:
+Every message has an optional `thread_id`. The convention is to use the task ID as the thread:
 
 - Mail `thread_id`: `myproject-abc`
 - Message subject prefix: `[myproject-abc]`
@@ -161,8 +161,8 @@ am-inbox CalmMeadow --thread myproject-abc
 ## The typical coordination flow
 
 ```bash
-# 1. Pick a task from Beads
-bd ready --json
+# 1. Pick a task
+jt ready --json
 
 # 2. Reserve the files you plan to edit
 am-reserve "src/**/*.ts" --agent CalmMeadow --ttl 3600 --exclusive --reason "myproject-abc"
@@ -194,7 +194,7 @@ A few rules that save headaches:
 - Always check Agent Mail before completing work (`/jat:complete` does this too)
 - Keep reservation patterns as narrow as possible
 - Include the task ID in thread_id, subject, and reservation reason
-- Dont use Agent Mail for task management. Beads is the task queue. Mail is for conversations and coordination.
+- Dont use Agent Mail for task management. JAT Tasks is the task queue. Mail is for conversations and coordination.
 
 ## Tool reference
 
@@ -216,6 +216,6 @@ Every tool supports `--help` for full usage details.
 
 ## Next steps
 
-- [Task Management](/docs/task-management/) - Beads task system that Agent Mail coordinates around
+- [Task Management](/docs/task-management/) - JAT task system that Agent Mail coordinates around
 - [Architecture](/docs/architecture/) - How Agent Mail fits into the two-layer design
 - [Multi-Agent Swarm](/docs/multi-agent/) - Running parallel agents with coordination

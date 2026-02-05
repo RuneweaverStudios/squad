@@ -524,9 +524,9 @@ describe('getFolderIcon', () => {
 			expect(getFolderIcon('migrations', false)).toBe('🔄');
 		});
 
-		it('should return beads for .beads', () => {
-			expect(getFolderIcon('.beads', true)).toBe('📿');
-			expect(getFolderIcon('.beads', false)).toBe('📿');
+		it('should return beads for .jat', () => {
+			expect(getFolderIcon('.jat', true)).toBe('📿');
+			expect(getFolderIcon('.jat', false)).toBe('📿');
 		});
 
 		it('should return robot for .claude', () => {
