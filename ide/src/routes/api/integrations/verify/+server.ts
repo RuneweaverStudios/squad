@@ -100,9 +100,17 @@ async function verifySlack(token: string) {
 				}
 			});
 		} else {
+			let error = `Slack API error: ${data.error}`;
+			if (data.error === 'missing_scope') {
+				const needed = data.needed || 'unknown';
+				const provided = data.provided || 'none';
+				error = `Missing Slack scope: "${needed}" is required but your token only has: ${provided}. Go to your Slack app → OAuth & Permissions → add the missing scope → reinstall the app → paste the new token.`;
+			} else if (data.error === 'invalid_auth' || data.error === 'token_revoked') {
+				error = `Slack token is invalid or revoked. Generate a new Bot User OAuth Token from your Slack app settings.`;
+			}
 			return json({
 				success: false,
-				error: `Slack API error: ${data.error}`
+				error
 			});
 		}
 	} catch (error) {
@@ -124,9 +132,17 @@ async function detectSlackChannels(token: string) {
 		const data = await res.json();
 
 		if (!data.ok) {
+			let error = `Slack API error: ${data.error}`;
+			if (data.error === 'missing_scope') {
+				const needed = data.needed || 'unknown';
+				const provided = data.provided || 'none';
+				error = `Missing Slack scope: "${needed}" is required but your token only has: ${provided}. Go to your Slack app → OAuth & Permissions → add the missing scope → reinstall the app → paste the new token.`;
+			} else if (data.error === 'invalid_auth' || data.error === 'token_revoked') {
+				error = `Slack token is invalid or revoked. Generate a new Bot User OAuth Token from your Slack app settings.`;
+			}
 			return json({
 				success: false,
-				error: `Slack API error: ${data.error}`
+				error
 			});
 		}
 
