@@ -94,8 +94,19 @@
 		}
 	}
 
-	// Project names for ProjectSelector (sorted by recent activity from API)
-	const projectNames = $derived(["All Projects", ...projects.map(p => p.name)]);
+	// Project names derived from actual closed tasks (only show projects with history)
+	const projectNames = $derived.by(() => {
+		const counts = new Map<string, number>();
+		for (const task of tasks) {
+			const proj = task.project || task.id.split("-")[0];
+			counts.set(proj, (counts.get(proj) || 0) + 1);
+		}
+		// Sort by task count descending
+		const sorted = Array.from(counts.entries())
+			.sort((a, b) => b[1] - a[1])
+			.map(([name]) => name);
+		return ["All Projects", ...sorted];
+	});
 
 	// Project colors map for ProjectSelector
 	const projectColorsMap = $derived(
