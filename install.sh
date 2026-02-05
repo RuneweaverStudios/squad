@@ -291,6 +291,26 @@ echo ""
 
 bash "$INSTALL_DIR/tools/scripts/install-beads.sh"
 
+# Auto-migrate .beads/ to .jat/ if needed
+NEEDS_MIGRATION=false
+for dir in "$HOME"/code/*/; do
+    if [[ -f "$dir/.beads/beads.db" ]] && [[ ! -f "$dir/.jat/tasks.db" ]]; then
+        NEEDS_MIGRATION=true
+        break
+    fi
+done
+
+if $NEEDS_MIGRATION; then
+    echo ""
+    echo -e "${YELLOW}Found projects with .beads/ that need migration to .jat/${NC}"
+    if prompt_yes_no "  Migrate task databases now? [Y/n] " "y"; then
+        bash "$INSTALL_DIR/tools/scripts/migrate-beads-to-jat.sh"
+    else
+        echo "  Skipping migration. Run later with:"
+        echo "    bash $INSTALL_DIR/tools/scripts/migrate-beads-to-jat.sh"
+    fi
+fi
+
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${BOLD}Step 3/9: Symlinking Generic Tools${NC}"
