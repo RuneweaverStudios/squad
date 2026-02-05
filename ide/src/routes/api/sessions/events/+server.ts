@@ -123,7 +123,6 @@ interface CompletionBundle {
 }
 
 interface SessionState {
-	output: string;
 	outputHash: string;
 	lineCount: number;
 	state: string;
@@ -561,10 +560,6 @@ function startSignalWatcher(): void {
 
 	try {
 		signalWatcher = watch('/tmp', (eventType, filename) => {
-			// Debug: log all .json file events
-			if (filename?.endsWith('.json')) {
-				console.log(`[SSE Signal] fs.watch event: ${eventType} ${filename}`);
-			}
 			if (!filename || !filename.endsWith('.json')) return;
 
 			// Handle signal files: jat-signal-tmux-{sessionName}.json
@@ -796,7 +791,7 @@ async function captureOutput(sessionName: string, lines: number): Promise<string
 	try {
 		const { stdout } = await execAsync(
 			`tmux capture-pane -p -e -t "${sessionName}" -S -${lines}`,
-			{ maxBuffer: 1024 * 1024 * 5 }
+			{ maxBuffer: 512 * 1024 }
 		);
 		return stdout;
 	} catch {
@@ -997,6 +992,33 @@ async function pollSessions(outputLines: number, debounceMs: number): Promise<vo
 		if (!currentSessionNames.has(sessionName)) {
 			broadcast('session-destroyed', { sessionName });
 			sessionStates.delete(sessionName);
+
+			// Clean up signal/question file tracking for this session
+			signalFileStates.delete(sessionName);
+			questionFileStates.delete(sessionName);
+
+			// Clean up debounce timers
+			const debounceTimer = debounceTimers.get(sessionName);
+			if (debounceTimer) {
+				clearTimeout(debounceTimer);
+				debounceTimers.delete(sessionName);
+			}
+			const signalTimer = signalDebounceTimers.get(sessionName);
+			if (signalTimer) {
+				clearTimeout(signalTimer);
+				signalDebounceTimers.delete(sessionName);
+			}
+			const questionTimer = questionDebounceTimers.get(sessionName);
+			if (questionTimer) {
+				clearTimeout(questionTimer);
+				questionDebounceTimers.delete(sessionName);
+			}
+
+			// Clean up client cursor state for this session
+			for (const clientState of clientStates.values()) {
+				clientState.cursors.delete(sessionName);
+				clientState.initializedSessions.delete(sessionName);
+			}
 		}
 	}
 
@@ -1027,7 +1049,6 @@ async function pollSessions(outputLines: number, debounceMs: number): Promise<vo
 
 		// Update stored state (without signal file data - that's handled by watcher)
 		sessionStates.set(session.name, {
-			output,
 			outputHash,
 			lineCount,
 			state,

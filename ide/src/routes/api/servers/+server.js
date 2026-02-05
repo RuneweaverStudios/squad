@@ -297,14 +297,14 @@ export async function GET({ url }) {
 				let deepOutput = '';
 				let lineCount = 0;
 				try {
-					// Deep capture for port detection (2000 lines back - vite outputs many warnings)
-					const deepCaptureCommand = `tmux capture-pane -p -t "${session.name}" -S -2000`;
-					const { stdout: deepStdout } = await execAsync(deepCaptureCommand, { maxBuffer: 1024 * 1024 * 5 });
+					// Deep capture for port detection (200 lines back - ports appear in first ~20 lines)
+					const deepCaptureCommand = `tmux capture-pane -p -t "${session.name}" -S -200`;
+					const { stdout: deepStdout } = await execAsync(deepCaptureCommand, { maxBuffer: 512 * 1024 });
 					deepOutput = deepStdout;
 
 					// Recent capture for display (with ANSI codes for colors)
 					const captureCommand = `tmux capture-pane -p -e -t "${session.name}" -S -${lines}`;
-					const { stdout } = await execAsync(captureCommand, { maxBuffer: 1024 * 1024 * 5 });
+					const { stdout } = await execAsync(captureCommand, { maxBuffer: 512 * 1024 });
 					output = stdout;
 
 					// Get total history line count from tmux for activity tracking

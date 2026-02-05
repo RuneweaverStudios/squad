@@ -10,6 +10,7 @@
 	 * - Timeline with commit history
 	 */
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import BranchSwitcherModal from './BranchSwitcherModal.svelte';
 	import CommitDetailModal from './CommitDetailModal.svelte';
 	import { openDiffPreviewDrawer } from '$lib/stores/drawerStore';
@@ -17,6 +18,7 @@
 	interface Props {
 		project: string;
 		onFileClick?: (path: string, isStaged: boolean) => void;
+		selectedFilePath?: string | null;
 	}
 
 	interface Commit {
@@ -32,7 +34,7 @@
 		isRemoteHead?: boolean;
 	}
 
-	let { project, onFileClick }: Props = $props();
+	let { project, onFileClick, selectedFilePath = null }: Props = $props();
 
 	// Branch switcher modal state
 	let showBranchModal = $state(false);
@@ -89,6 +91,95 @@
 		renamedFiles.filter(r => !stagedFiles.includes(r.to)).length +
 		conflictedFiles.length // Conflicted files always show, can't be staged until resolved
 	);
+
+	// Flat ordered list of all visible files for keyboard navigation
+	const navigableFiles = $derived.by(() => {
+		const files: { path: string; isStaged: boolean }[] = [];
+		// Staged files (if section is expanded)
+		if (!stagedCollapsed) {
+			for (const f of stagedFiles) {
+				files.push({ path: f, isStaged: true });
+			}
+		}
+		// Unstaged changes (if section is expanded)
+		if (!changesCollapsed) {
+			for (const f of modifiedFiles) {
+				if (!stagedFiles.includes(f)) files.push({ path: f, isStaged: false });
+			}
+			for (const f of deletedFiles) {
+				if (!stagedFiles.includes(f)) files.push({ path: f, isStaged: false });
+			}
+			for (const f of untrackedFiles) {
+				if (!stagedFiles.includes(f)) files.push({ path: f, isStaged: false });
+			}
+			for (const f of createdFiles) {
+				if (!stagedFiles.includes(f)) files.push({ path: f, isStaged: false });
+			}
+			for (const r of renamedFiles) {
+				if (!stagedFiles.includes(r.to)) files.push({ path: r.to, isStaged: false });
+			}
+			for (const f of conflictedFiles) {
+				files.push({ path: f, isStaged: false });
+			}
+		}
+		return files;
+	});
+
+	function handleGlobalKeyNavigation(e: KeyboardEvent) {
+		if (!selectedFilePath) return;
+		// Don't intercept when typing in inputs
+		const tag = (e.target as HTMLElement)?.tagName;
+		if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+		// Don't intercept when modifier keys are held (let other shortcuts work)
+		if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+		const isStaged = stagedFiles.includes(selectedFilePath);
+
+		switch (e.key) {
+			case 'ArrowUp':
+			case 'ArrowDown': {
+				if (navigableFiles.length === 0) return;
+				e.preventDefault();
+				const currentIndex = navigableFiles.findIndex(f => f.path === selectedFilePath);
+				if (currentIndex === -1) return;
+				const nextIndex = e.key === 'ArrowDown'
+					? (currentIndex < navigableFiles.length - 1 ? currentIndex + 1 : 0)
+					: (currentIndex > 0 ? currentIndex - 1 : navigableFiles.length - 1);
+				const next = navigableFiles[nextIndex];
+				if (next && onFileClick) {
+					onFileClick(next.path, next.isStaged);
+					requestAnimationFrame(() => {
+						document.querySelector('.file-item.active')?.scrollIntoView({ block: 'nearest' });
+					});
+				}
+				break;
+			}
+			case ' ': // Space = toggle stage/unstage
+				e.preventDefault();
+				if (isStaged) {
+					unstageFile(selectedFilePath);
+				} else {
+					stageFile(selectedFilePath);
+				}
+				break;
+			case 's': // S = stage
+				e.preventDefault();
+				if (!isStaged) stageFile(selectedFilePath);
+				break;
+			case 'u': // U = unstage
+				e.preventDefault();
+				if (isStaged) unstageFile(selectedFilePath);
+				break;
+			case 'd': // D = discard changes
+				e.preventDefault();
+				if (!isStaged) startDiscardConfirm(selectedFilePath);
+				break;
+			case 'Enter': // Enter = open in file editor
+				e.preventDefault();
+				goto(`/files?project=${encodeURIComponent(project)}&file=${encodeURIComponent(selectedFilePath)}`);
+				break;
+		}
+	}
 
 	// Timeline state
 	let commits = $state<Commit[]>([]);
@@ -865,6 +956,8 @@
 	});
 </script>
 
+<svelte:window onkeydown={handleGlobalKeyNavigation} />
+
 <div class="git-panel">
 	{#if isLoading}
 		<!-- Loading State -->
@@ -986,7 +1079,7 @@
 								{@const status = getStatusIndicator(file, 'staged')}
 								{@const fileName = getFileName(file)}
 								{@const directory = getDirectory(file)}
-								<div class="file-item">
+								<div class="file-item" class:active={selectedFilePath === file}>
 									<button
 										class="unstage-btn"
 										onclick={() => unstageFile(file)}
@@ -1173,7 +1266,7 @@
 								{@const fileName = getFileName(file)}
 								{@const directory = getDirectory(file)}
 								{@const isPendingDiscard = pendingDiscardFile === file}
-								<div class="file-item" class:pending-discard={isPendingDiscard}>
+								<div class="file-item" class:pending-discard={isPendingDiscard} class:active={selectedFilePath === file}>
 									{#if isPendingDiscard}
 										<!-- Slide to confirm discard -->
 										<div
@@ -1261,7 +1354,7 @@
 								{@const fileName = getFileName(file)}
 								{@const directory = getDirectory(file)}
 								{@const isPendingDiscard = pendingDiscardFile === file}
-								<div class="file-item" class:pending-discard={isPendingDiscard}>
+								<div class="file-item" class:pending-discard={isPendingDiscard} class:active={selectedFilePath === file}>
 									{#if isPendingDiscard}
 										<!-- Slide to confirm restore -->
 										<div
@@ -1348,7 +1441,7 @@
 								{@const status = getStatusIndicator(file, 'untracked')}
 								{@const fileName = getFileName(file)}
 								{@const directory = getDirectory(file)}
-								<div class="file-item">
+								<div class="file-item" class:active={selectedFilePath === file}>
 									<button
 										class="stage-btn"
 										onclick={() => stageFile(file)}
@@ -1385,7 +1478,7 @@
 								{@const status = getStatusIndicator(file, 'created')}
 								{@const fileName = getFileName(file)}
 								{@const directory = getDirectory(file)}
-								<div class="file-item">
+								<div class="file-item" class:active={selectedFilePath === file}>
 									<button
 										class="stage-btn"
 										onclick={() => stageFile(file)}
@@ -1423,7 +1516,7 @@
 								{@const fileName = getFileName(renamed.to)}
 								{@const fromFileName = getFileName(renamed.from)}
 								{@const directory = getDirectory(renamed.to)}
-								<div class="file-item">
+								<div class="file-item" class:active={selectedFilePath === renamed.to}>
 									<button
 										class="stage-btn"
 										onclick={() => stageRename(renamed)}
@@ -1460,7 +1553,7 @@
 								{@const status = getStatusIndicator(file, 'conflicted')}
 								{@const fileName = getFileName(file)}
 								{@const directory = getDirectory(file)}
-								<div class="file-item conflicted">
+								<div class="file-item conflicted" class:active={selectedFilePath === file}>
 									<span class="conflict-icon" title="Resolve conflict before staging">
 										<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 											<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
@@ -2580,6 +2673,14 @@
 
 	.file-item:hover {
 		background: oklch(0.18 0.02 250);
+	}
+
+	.file-item.active {
+		background: oklch(0.22 0.04 220 / 0.5);
+	}
+
+	.file-item.active:hover {
+		background: oklch(0.24 0.04 220 / 0.5);
 	}
 
 	.stage-btn,

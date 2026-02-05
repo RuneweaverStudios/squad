@@ -25,6 +25,8 @@ import Database from 'better-sqlite3';
 import * as path from 'path';
 import * as os from 'os';
 import { readdir, readFile, stat } from 'fs/promises';
+import { createReadStream } from 'fs';
+import { createInterface } from 'readline';
 import type { Database as DatabaseType } from 'better-sqlite3';
 
 // ============================================================================
@@ -270,8 +272,11 @@ function calculateCost(input: number, cacheCreation: number, cacheRead: number, 
 }
 
 /**
- * Process a single JSONL file incrementally
+ * Process a single JSONL file incrementally using streaming
  * Returns number of new entries processed
+ *
+ * IMPORTANT: Uses streaming to avoid loading entire files into memory.
+ * With 950+ JSONL files totaling 2.2GB, loading files fully caused OOM crashes.
  */
 async function processJSONLFile(
 	filePath: string,
@@ -284,7 +289,7 @@ async function processJSONLFile(
 	const stateRow = db.prepare('SELECT last_position, last_modified FROM aggregation_state WHERE file_path = ?')
 		.get(filePath) as AggregationStateRow | undefined;
 
-	let lastPosition = stateRow?.last_position ?? 0;
+	const lastPosition = stateRow?.last_position ?? 0;
 	const lastModified = stateRow?.last_modified ?? 0;
 
 	// Check file modification time
@@ -295,10 +300,6 @@ async function processJSONLFile(
 	if (currentModified <= lastModified && lastPosition > 0) {
 		return 0;
 	}
-
-	// Read file content
-	const content = await readFile(filePath, 'utf-8');
-	const lines = content.split('\n');
 
 	// Get agent for this session
 	const agent = getAgentForSession(sessionId);
@@ -313,44 +314,68 @@ async function processJSONLFile(
 	}>();
 
 	let entriesProcessed = 0;
-	let currentPosition = 0;
+	let currentPosition = lastPosition;
+	let isFirstLine = lastPosition > 0; // Skip first partial line when resuming
 
-	for (const line of lines) {
-		currentPosition += line.length + 1; // +1 for newline
+	// Use streaming to avoid loading entire file into memory
+	const stream = createReadStream(filePath, {
+		start: lastPosition,
+		encoding: 'utf-8'
+	});
 
-		// Skip already processed content
-		if (currentPosition <= lastPosition) {
-			continue;
-		}
+	const rl = createInterface({
+		input: stream,
+		crlfDelay: Infinity
+	});
 
-		if (!line.trim()) continue;
+	try {
+		for await (const line of rl) {
+			const lineBytes = Buffer.byteLength(line, 'utf-8') + 1; // +1 for newline
+			currentPosition += lineBytes;
 
-		try {
-			const entry: JSONLEntry = JSON.parse(line);
-
-			if (!entry.message?.usage || !entry.timestamp) continue;
-
-			const usage = entry.message.usage;
-			const bucketStart = roundToBucket(new Date(entry.timestamp));
-
-			// Get or create bucket
-			let bucket = hourlyBuckets.get(bucketStart);
-			if (!bucket) {
-				bucket = { input: 0, cacheCreation: 0, cacheRead: 0, output: 0, count: 0 };
-				hourlyBuckets.set(bucketStart, bucket);
+			// Skip the first line if we're resuming mid-file (it's likely partial)
+			if (isFirstLine) {
+				isFirstLine = false;
+				continue;
 			}
 
-			// Accumulate tokens
-			bucket.input += usage.input_tokens || 0;
-			bucket.cacheCreation += usage.cache_creation_input_tokens || 0;
-			bucket.cacheRead += usage.cache_read_input_tokens || 0;
-			bucket.output += usage.output_tokens || 0;
-			bucket.count++;
+			if (!line.trim()) continue;
 
-			entriesProcessed++;
-		} catch {
-			// Skip malformed lines
+			try {
+				const entry: JSONLEntry = JSON.parse(line);
+
+				if (!entry.message?.usage || !entry.timestamp) continue;
+
+				const usage = entry.message.usage;
+				const bucketStart = roundToBucket(new Date(entry.timestamp));
+
+				// Get or create bucket
+				let bucket = hourlyBuckets.get(bucketStart);
+				if (!bucket) {
+					bucket = { input: 0, cacheCreation: 0, cacheRead: 0, output: 0, count: 0 };
+					hourlyBuckets.set(bucketStart, bucket);
+				}
+
+				// Accumulate tokens
+				bucket.input += usage.input_tokens || 0;
+				bucket.cacheCreation += usage.cache_creation_input_tokens || 0;
+				bucket.cacheRead += usage.cache_read_input_tokens || 0;
+				bucket.output += usage.output_tokens || 0;
+				bucket.count++;
+
+				entriesProcessed++;
+			} catch {
+				// Skip malformed lines
+			}
 		}
+	} finally {
+		// Ensure stream is closed
+		stream.destroy();
+	}
+
+	// Only update if we processed something
+	if (entriesProcessed === 0 && hourlyBuckets.size === 0) {
+		return 0;
 	}
 
 	// Update SQLite with aggregated data (upsert pattern)
