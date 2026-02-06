@@ -9,7 +9,7 @@
 	 * - Maintains the aesthetic of /tasks2 while simplifying navigation
 	 */
 
-	import { onMount, onDestroy } from "svelte";
+	import { onMount, onDestroy, untrack } from "svelte";
 	import { slide } from "svelte/transition";
 	import { goto } from "$app/navigation";
 	import SortDropdown from "$lib/components/SortDropdown.svelte";
@@ -82,6 +82,11 @@
 	let agentProjects = $state<Map<string, string>>(new Map());
 	let agentTasks = $state<Map<string, AgentTask>>(new Map());
 	let agentSessionInfo = $state<Map<string, AgentSessionInfo>>(new Map());
+
+	// Track exiting agent sessions for project tabs (avatar exit animation)
+	let prevProjectSessionNames = $state<Set<string>>(new Set());
+	let cachedSessionObjects = $state<Map<string, TmuxSession>>(new Map());
+	let exitingAgentSessions = $state<Map<string, TmuxSession>>(new Map());
 
 	// Project colors
 	let projectColors = $state<Record<string, string>>({});
@@ -287,6 +292,50 @@
 		}
 
 		return grouped;
+	});
+
+	// Detect exiting agent sessions for project tab avatar exit animations
+	$effect(() => {
+		const agentSessions = sessions.filter(s => s.type === 'agent');
+		const currentNames = new Set(agentSessions.map(s => s.name));
+		const prev = untrack(() => prevProjectSessionNames);
+		const prevExiting = untrack(() => exitingAgentSessions);
+		const cache = untrack(() => cachedSessionObjects);
+
+		// Always update session object cache with current data
+		const updatedCache = new Map(cache);
+		for (const s of agentSessions) {
+			updatedCache.set(s.name, s);
+		}
+		cachedSessionObjects = updatedCache;
+
+		// Find sessions that just disappeared
+		const newExiting = new Map(prevExiting);
+		let hasNew = false;
+		for (const name of prev) {
+			if (!currentNames.has(name) && !prevExiting.has(name)) {
+				const cached = updatedCache.get(name);
+				if (cached) {
+					newExiting.set(name, cached);
+					hasNew = true;
+				}
+			}
+		}
+
+		if (hasNew) {
+			exitingAgentSessions = newExiting;
+			const exitNames = [...newExiting.keys()].filter(n => !prevExiting.has(n));
+			setTimeout(() => {
+				const cleaned = new Map(exitingAgentSessions);
+				for (const name of exitNames) {
+					cleaned.delete(name);
+					cachedSessionObjects.delete(name);
+				}
+				exitingAgentSessions = cleaned;
+			}, 600);
+		}
+
+		prevProjectSessionNames = currentNames;
 	});
 
 	// Group sessions by epic within a project
@@ -1144,6 +1193,7 @@
 				{@const recoverableCount = getProjectRecoverableCount(project)}
 				{@const projectAgentSessions =
 					sessionsByProject.get(project) || []}
+				{@const exitingSessions = [...exitingAgentSessions.values()].filter(s => (s.project || 'Unknown') === project)}
 				<button
 					class="project-tab"
 					class:active={isActive}
@@ -1154,9 +1204,9 @@
 					<span class="project-tab-name mt-1"
 						>{project.toUpperCase()}</span
 					>
-					{#if projectAgentSessions.length > 0}
+					{#if projectAgentSessions.length > 0 || exitingSessions.length > 0}
 						<div class="project-tab-agents mt-2.5">
-							{#each projectAgentSessions as session}
+							{#each projectAgentSessions as session (session.name)}
 								{@const agentName = getAgentName(session.name)}
 								<WorkingAgentBadge
 									name={agentName}
@@ -1164,6 +1214,17 @@
 									variant="avatar"
 									isWorking={true}
 									sessionState={agentSessionInfo.get(agentName)?.activityState}
+								/>
+							{/each}
+							{#each exitingSessions as session (session.name)}
+								{@const agentName = getAgentName(session.name)}
+								<WorkingAgentBadge
+									name={agentName}
+									size={20}
+									variant="avatar"
+									isWorking={true}
+									sessionState={agentSessionInfo.get(agentName)?.activityState}
+									exiting={true}
 								/>
 							{/each}
 						</div>
