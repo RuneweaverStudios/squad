@@ -126,7 +126,6 @@
 				for (let i = start; i <= end; i++) next.add(ids[i]);
 				selectedTasks = next;
 				lastClickedTaskId = taskId;
-				window.getSelection()?.removeAllRanges();
 				return;
 			}
 		}
@@ -952,7 +951,7 @@
 			</div>
 		{/if}
 		<div class="tasks-table-wrapper">
-			<table class="tasks-table">
+			<table class="tasks-table" onmousedown={(e) => { if (e.shiftKey) e.preventDefault(); }}>
 				<thead>
 					<tr>
 						<th class="th-checkbox">
