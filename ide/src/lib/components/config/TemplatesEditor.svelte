@@ -23,7 +23,7 @@
 	let error = $state<string | null>(null);
 
 	// Category state
-	let expandedCategories = $state<Set<string>>(new Set(['commands']));
+	let expandedCategories = $state<Set<string>>(new Set());
 
 	// Editor state
 	let isEditorOpen = $state(false);

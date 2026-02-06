@@ -1015,6 +1015,7 @@
 												animate={isNew && hadTaskOnEntry}
 												resumed={session.resumed}
 												attached={session.attached}
+												exiting={isExiting}
 											/>
 										</div>
 									{:else}

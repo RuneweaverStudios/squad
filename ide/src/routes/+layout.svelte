@@ -142,6 +142,7 @@
 	// Derived project data
 	// Use config projects (from JAT config) with "All Projects" prepended
 	const projects = $derived(['All Projects', ...configProjects]);
+	// Task counts by project (used by child pages via context if needed)
 	const taskCounts = $derived(getTaskCountByProject(allTasks, 'open'));
 
 

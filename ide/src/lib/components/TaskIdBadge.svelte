@@ -72,9 +72,11 @@
 		attached?: boolean;
 		/** Direct click handler on the badge (bypasses dropdown) */
 		onClick?: () => void;
+		/** Play exit animation (flip-out) on avatar */
+		exiting?: boolean;
 	}
 
-	let { task, size = 'sm', showStatus = true, showType = true, showCopyIcon = false, showAssignee = false, minimal = false, color, onOpenTask, onAgentClick, dropdownAlign = 'start', copyOnly = false, blockedBy = [], blocks = [], showDependencies = false, showDepGraph = true, showUnblocksCount = false, statusDotColor, variant = 'default', agentName, animate = false, resumed = false, attached = false, onClick }: Props = $props();
+	let { task, size = 'sm', showStatus = true, showType = true, showCopyIcon = false, showAssignee = false, minimal = false, color, onOpenTask, onAgentClick, dropdownAlign = 'start', copyOnly = false, blockedBy = [], blocks = [], showDependencies = false, showDepGraph = true, showUnblocksCount = false, statusDotColor, variant = 'default', agentName, animate = false, resumed = false, attached = false, onClick, exiting = false }: Props = $props();
 
 	// Extract project prefix from task ID (e.g., "jat-abc" -> "jat")
 	const projectPrefix = $derived(task.id.split('-')[0] || task.id);
@@ -368,7 +370,7 @@
 			{:else}
 				<!-- Avatar with status ring using AgentAvatar's built-in ring support -->
 				{#if agentName}
-					<AgentAvatar name={agentName} size={avatarSize - 4} showRing={true} ringColor={ringColor} showGlow={true} />
+					<AgentAvatar name={agentName} size={avatarSize - 4} showRing={true} ringColor={ringColor} showGlow={true} {exiting} />
 				{:else}
 					<!-- Fallback dot if no agent -->
 					<div

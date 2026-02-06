@@ -1052,9 +1052,6 @@
 						</div>
 					{/if}
 					<div class="project-tab-counts mt-1.5">
-						<!-- {#if sessionCount > 0}
-							<span class="tab-count sessions">{sessionCount} active</span>
-						{/if} -->
 						{#if recoverableCount > 0}
 							<span
 								class="tab-count paused"
@@ -1064,7 +1061,7 @@
 									: ''}">{recoverableCount} paused</span
 							>
 						{/if}
-						{#if taskCount > 0 && sessionCount === 0}
+						{#if taskCount > 0}
 							<span class="tab-count tasks">{taskCount} open</span
 							>
 						{/if}
