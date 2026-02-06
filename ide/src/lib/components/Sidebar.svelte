@@ -174,7 +174,7 @@
 						<!-- Git changes badge for Source (VSCode convention: show changed files count on source control) -->
 						{#if navItem.id === 'source' && $gitChangesCount > 0}
 							<span
-								class="font-mono text-[10px] px-1.5 py-0.5 rounded-full ml-auto"
+								class="font-mono text-[10px] px-1.5 pt-0.5 rounded-full ml-auto"
 								style="
 									background: oklch(0.55 0.15 220 / 0.25);
 									color: oklch(0.80 0.12 220);
@@ -189,7 +189,7 @@
 						<!-- Active sessions badge for Sessions -->
 						{#if navItem.id === 'sessions' && $activeSessionsCount > 0}
 							<span
-								class="font-mono text-[10px] px-1.5 py-0.5 rounded-full ml-auto"
+								class="font-mono text-[10px] px-1.5 pt-0.5 rounded-full ml-auto"
 								style="
 									background: oklch(0.55 0.15 145 / 0.25);
 									color: oklch(0.75 0.15 145);
@@ -204,7 +204,7 @@
 						<!-- Running servers badge for Servers -->
 						{#if navItem.id === 'servers' && $runningServersCount > 0}
 							<span
-								class="font-mono text-[10px] px-1.5 py-0.5 rounded-full ml-auto"
+								class="font-mono text-[10px] px-1.5 pt-0.5 rounded-full ml-auto"
 								style="
 									background: oklch(0.50 0.02 250 / 0.3);
 									color: oklch(0.75 0.02 250);
@@ -219,7 +219,7 @@
 						<!-- Active agent sessions badge for Tasks (agents working on tasks) -->
 						{#if navItem.id === 'tasks' && $activeAgentSessionsCount > 0}
 							<span
-								class="font-mono text-[10px] px-1.5 py-0.5 rounded-full ml-auto"
+								class="font-mono text-[10px] px-1.5 pt-0.5 rounded-full ml-auto"
 								style="
 									background: oklch(0.55 0.15 85 / 0.25);
 									color: oklch(0.80 0.15 85);
@@ -234,7 +234,7 @@
 						<!-- File tree changes badge for Files (external changes detected) -->
 						{#if navItem.id === 'files' && $fileChangesCount > 0}
 							<span
-								class="font-mono text-[10px] px-1.5 py-0.5 rounded-full ml-auto"
+								class="font-mono text-[10px] px-1.5 pt-0.5 rounded-full ml-auto"
 								style="
 									background: oklch(0.55 0.18 310 / 0.25);
 									color: oklch(0.80 0.15 310);
@@ -352,7 +352,7 @@
 						<!-- Active sessions badge for Sessions -->
 						{#if navItem.id === 'sessions' && $activeSessionsCount > 0}
 							<span
-								class="font-mono text-[10px] px-1.5 py-0.5 rounded-full ml-auto"
+								class="font-mono text-[10px] px-1.5 pt-0.5 rounded-full ml-auto"
 								style="
 									background: oklch(0.55 0.15 145 / 0.25);
 									color: oklch(0.75 0.15 145);
