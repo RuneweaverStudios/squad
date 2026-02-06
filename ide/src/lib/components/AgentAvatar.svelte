@@ -173,6 +173,9 @@
 		currentFetchedName = agentName;
 	}
 
+	// Animation class: flip-in on enter, flip-out on exit
+	const flipClass = $derived(exiting ? 'avatar-flip-out' : 'avatar-flip-in');
+
 	// React to name prop changes - this is the reactive trigger
 	$effect(() => {
 		// Capture the current name value to create a dependency
@@ -205,8 +208,6 @@
 		return () => clearTimeout(timer);
 	});
 </script>
-
-{@const flipClass = exiting ? 'avatar-flip-out' : 'avatar-flip-in'}
 
 {#if showRing && effectiveRingColor}
 	<!-- Avatar with status ring -->
