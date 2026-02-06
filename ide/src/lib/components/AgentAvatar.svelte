@@ -27,6 +27,8 @@
 		sessionState?: string;
 		/** Show glow effect around ring */
 		showGlow?: boolean;
+		/** Play exit animation (flip-out) instead of entrance */
+		exiting?: boolean;
 	}
 
 	let {
@@ -36,7 +38,8 @@
 		showRing = false,
 		ringColor,
 		sessionState,
-		showGlow = false
+		showGlow = false,
+		exiting = false
 	}: Props = $props();
 
 	// Compute effective ring color from props, session state, or store lookup
@@ -203,10 +206,13 @@
 	});
 </script>
 
+{@const flipClass = exiting ? 'avatar-flip-out' : 'avatar-flip-in'}
+
 {#if showRing && effectiveRingColor}
 	<!-- Avatar with status ring -->
 	<div
 		class="inline-flex items-center justify-center rounded-full flex-shrink-0 {className}"
+		class:avatar-ring-exit={exiting}
 		style="
 			width: {size + 4}px;
 			height: {size + 4}px;
@@ -223,11 +229,11 @@
 			{#if loadState === 'loading'}
 				<div class="w-full h-full animate-pulse" style="background: oklch(0.30 0.02 250);"></div>
 			{:else if loadState === 'success' && svgContent}
-				<div class="w-full h-full avatar-flip-in" style="background: oklch(0.15 0.01 250);">
+				<div class="w-full h-full {flipClass}" style="background: oklch(0.15 0.01 250);">
 					{@html svgContent}
 				</div>
 			{:else}
-				<div class="w-full h-full flex items-center justify-center avatar-flip-in" style="background: oklch(0.25 0.02 250);">
+				<div class="w-full h-full flex items-center justify-center {flipClass}" style="background: oklch(0.25 0.02 250);">
 					<svg viewBox="0 0 24 24" fill="currentColor" class="text-base-content/50" style="width: {size * 0.65}px; height: {size * 0.65}px;">
 						<path fill-rule="evenodd" d="M18.685 19.097A9.723 9.723 0 0021.75 12c0-5.385-4.365-9.75-9.75-9.75S2.25 6.615 2.25 12a9.723 9.723 0 003.065 7.097A9.716 9.716 0 0012 21.75a9.716 9.716 0 006.685-2.653zm-12.54-1.285A7.486 7.486 0 0112 15a7.486 7.486 0 015.855 2.812A8.224 8.224 0 0112 20.25a8.224 8.224 0 01-5.855-2.438zM15.75 9a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" clip-rule="evenodd" />
 					</svg>
@@ -248,17 +254,17 @@
 				style="background: oklch(0.30 0.02 250);"
 			></div>
 		{:else if loadState === 'success' && svgContent}
-			<!-- SVG avatar with flip-in animation -->
+			<!-- SVG avatar with flip animation -->
 			<div
-				class="w-full h-full avatar-flip-in"
+				class="w-full h-full {flipClass}"
 				style="background: oklch(0.15 0.01 250);"
 			>
 				{@html svgContent}
 			</div>
 		{:else}
-			<!-- Fallback: generic avatar icon with flip-in animation -->
+			<!-- Fallback: generic avatar icon with flip animation -->
 			<div
-				class="w-full h-full flex items-center justify-center avatar-flip-in"
+				class="w-full h-full flex items-center justify-center {flipClass}"
 				style="background: oklch(0.25 0.02 250);"
 			>
 				<svg
@@ -299,6 +305,50 @@
 		100% {
 			transform: rotateY(0deg) scale(1);
 			opacity: 1;
+		}
+	}
+
+	/* Flip-out exit animation (mirrors flip-in) */
+	.avatar-flip-out {
+		animation: avatarFlipOut 0.45s cubic-bezier(0.550, 0.085, 0.680, 0.530) forwards;
+		transform-style: preserve-3d;
+	}
+
+	@keyframes avatarFlipOut {
+		0% {
+			transform: rotateY(0deg) scale(1);
+			opacity: 1;
+		}
+		50% {
+			opacity: 0.6;
+		}
+		100% {
+			transform: rotateY(90deg) scale(0.6);
+			opacity: 0;
+		}
+	}
+
+	/* Ring fade-out when exiting */
+	.avatar-ring-exit {
+		animation: avatarRingExit 0.45s cubic-bezier(0.550, 0.085, 0.680, 0.530) forwards;
+	}
+
+	@keyframes avatarRingExit {
+		0% {
+			opacity: 1;
+			transform: scale(1);
+		}
+		100% {
+			opacity: 0;
+			transform: scale(0.7);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.avatar-flip-in,
+		.avatar-flip-out,
+		.avatar-ring-exit {
+			animation: none !important;
 		}
 	}
 </style>

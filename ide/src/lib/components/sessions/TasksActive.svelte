@@ -1026,7 +1026,7 @@
 												style="background: color-mix(in oklch, {planningColor} 12%, transparent); border: 1px solid color-mix(in oklch, {planningColor} 30%, transparent); color: {planningColor};{isNew ? ' animation-delay: 100ms;' : ''}"
 												onclick={(e) => e.stopPropagation()}
 											>
-												<AgentAvatar name={sessionAgentName} size={20} showRing={true} sessionState={effectiveState} showGlow={true} />
+												<AgentAvatar name={sessionAgentName} size={20} showRing={true} sessionState={effectiveState} showGlow={true} exiting={isExiting} />
 												<span>{sessionAgentName}</span>
 											</button>
 											{#if derivedProject}

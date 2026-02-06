@@ -37,7 +37,9 @@
 
 	// Advance step when prior steps are complete
 	$effect(() => {
-		if (hasAgents && hasProjects && hasTasks && currentStep < 5) {
+		if (hasAgents && hasProjects && hasTasks && hasAutonomous && currentStep < 6) {
+			currentStep = 6;
+		} else if (hasAgents && hasProjects && hasTasks && currentStep < 5) {
 			currentStep = 5;
 		} else if (hasAgents && hasProjects && currentStep < 4) {
 			currentStep = 4;

@@ -27,6 +27,7 @@
 	} from '$lib/types/config';
 	import { isMcpServerHttp, isMcpServerStdio } from '$lib/types/config';
 	import { getProjects } from '$lib/stores/configStore.svelte';
+	import ProjectSelector from '$lib/components/ProjectSelector.svelte';
 
 	interface Props {
 		/** Custom class */
@@ -37,7 +38,13 @@
 
 	// Project selection
 	const projects = $derived(getProjects());
-	let selectedProjectPath = $state('');
+	const projectNames = $derived(projects.map((p) => p.name));
+	let selectedProjectName = $state('All Projects');
+	let selectedProjectPath = $derived.by(() => {
+		if (selectedProjectName === 'All Projects') return '';
+		const found = projects.find((p) => p.name === selectedProjectName);
+		return found?.path ?? '';
+	});
 
 	// State
 	let isLoading = $state(true);
@@ -347,36 +354,15 @@
 
 <div class="mcp-editor {className}">
 	<!-- Project Selector (always shown) -->
-	<div class="project-selector">
-		<label class="project-label">
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				fill="none"
-				viewBox="0 0 24 24"
-				stroke-width="1.5"
-				stroke="currentColor"
-				class="w-4 h-4"
-			>
-				<path
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"
-				/>
-			</svg>
-			Project
-		</label>
-		<select
-			class="project-select"
-			bind:value={selectedProjectPath}
-		>
-			<option value="">-- Select a project --</option>
-			{#each projects as project}
-				<option value={project.path}>{project.name}</option>
-			{/each}
-		</select>
-	</div>
+	<ProjectSelector
+		projects={projectNames}
+		selectedProject={selectedProjectName}
+		onProjectChange={(name) => selectedProjectName = name}
+		compact={false}
+		showColors={true}
+	/>
 
-	{#if !selectedProjectPath}
+	{#if selectedProjectName === 'All Projects'}
 		<!-- No Project Selected -->
 		<div class="empty-state" transition:fade={{ duration: 150 }}>
 			<svg
@@ -394,7 +380,7 @@
 				/>
 			</svg>
 			<p class="empty-title">Select a project to view MCP configuration</p>
-			<p class="empty-hint">Choose a project from the dropdown above</p>
+			<p class="empty-hint">Choose a project from the selector above</p>
 		</div>
 	{:else if isLoading}
 		<!-- Loading State -->
@@ -868,51 +854,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
-	}
-
-	/* Project selector */
-	.project-selector {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		padding: 0.75rem 1rem;
-		background: oklch(0.18 0.02 250);
-		border: 1px solid oklch(0.25 0.02 250);
-		border-radius: 8px;
-		margin-bottom: 0.5rem;
-	}
-
-	.project-label {
-		display: flex;
-		align-items: center;
-		gap: 0.375rem;
-		font-size: 0.85rem;
-		font-weight: 500;
-		color: oklch(0.65 0.02 250);
-		font-family: ui-monospace, monospace;
-	}
-
-	.project-select {
-		flex: 1;
-		padding: 0.5rem 0.75rem;
-		font-size: 0.85rem;
-		font-family: ui-monospace, monospace;
-		background: oklch(0.14 0.01 250);
-		border: 1px solid oklch(0.30 0.02 250);
-		border-radius: 6px;
-		color: oklch(0.90 0.02 250);
-		cursor: pointer;
-		transition: all 0.15s ease;
-	}
-
-	.project-select:hover {
-		border-color: oklch(0.40 0.08 200);
-	}
-
-	.project-select:focus {
-		outline: none;
-		border-color: oklch(0.55 0.15 200);
-		box-shadow: 0 0 0 2px oklch(0.55 0.15 200 / 0.2);
 	}
 
 	/* Loading state */

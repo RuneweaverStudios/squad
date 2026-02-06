@@ -30,6 +30,8 @@
 		onClick?: (agentName: string) => void;
 		/** Additional CSS classes */
 		class?: string;
+		/** Play exit animation */
+		exiting?: boolean;
 	}
 
 	let {
@@ -40,7 +42,8 @@
 		startTime = null,
 		variant = 'timer',
 		onClick,
-		class: className = ''
+		class: className = '',
+		exiting = false
 	}: Props = $props();
 
 	// Effective session state for ring color
@@ -116,7 +119,7 @@
 		title={tooltipText}
 		onclick={handleClick}
 	>
-		<AgentAvatar {name} {size} showRing={isWorking} sessionState={effectiveState} />
+		<AgentAvatar {name} {size} showRing={isWorking} sessionState={effectiveState} {exiting} />
 	</div>
 {:else}
 	<!-- Avatar + name (+ timer if variant === 'timer') -->
@@ -126,7 +129,7 @@
 		class="inline-flex items-center gap-1.5 {onClick ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''} {className}"
 		onclick={handleClick}
 	>
-		<AgentAvatar {name} {size} showRing={isWorking} sessionState={effectiveState} />
+		<AgentAvatar {name} {size} showRing={isWorking} sessionState={effectiveState} {exiting} />
 		<span class="font-medium text-xs" style={ringColor ? `color: ${ringColor};` : 'color: oklch(0.70 0.18 250);'}>{name}</span>
 		{#if variant === 'timer' && workingDuration}
 			<span class="countdown font-mono text-xs tabular-nums text-info/70" title="Working for {workingDuration.display}">
