@@ -39,6 +39,7 @@
 		priority?: number;
 		description?: string;
 		notes?: string;
+		labels?: string[];
 	}
 
 	interface AgentSessionInfo {
@@ -223,9 +224,10 @@
 	let sessionOrder = $state<string[]>([]); // Tracks order for position preservation
 	let newSessionNames = $state<string[]>([]);
 	let exitingSessionNames = $state<Set<string>>(new Set());
-	// Snapshot task data for exiting sessions so avatar exit animation can play
-	// (agentTasks may lose the entry before the session exits the DOM)
-	let exitingTaskSnapshot = $state<Map<string, AgentTask>>(new Map());
+	// Persistent cache of last-known task per agent - survives agentTasks removal
+	// so exit animation can still render the TaskIdBadge (agentPill variant).
+	// Entries are only cleaned up after the exit animation timeout fires.
+	let cachedAgentTasks = $state<Map<string, AgentTask>>(new Map());
 	// Track sessions that had task data when they first appeared (for text animation)
 	let sessionsWithTaskOnEntry = $state<Set<string>>(new Set());
 
@@ -255,6 +257,21 @@
 		if (changed) {
 			optimisticStates = newOptimistic;
 		}
+	});
+
+	// Keep task cache up-to-date so exit animations can render TaskIdBadge
+	// (agentTasks may lose entries before the session exit is detected)
+	$effect(() => {
+		const prev = untrack(() => cachedAgentTasks);
+		let changed = false;
+		const updated = new Map(prev);
+		for (const [name, task] of agentTasks) {
+			if (prev.get(name) !== task) {
+				updated.set(name, task);
+				changed = true;
+			}
+		}
+		if (changed) cachedAgentTasks = updated;
 	});
 
 	// Effect to detect new and exiting sessions while preserving order
@@ -325,15 +342,6 @@
 		}
 
 		if (exitNames.size > 0) {
-			// Snapshot task data for exiting sessions before it disappears from agentTasks
-			const newSnapshots = new Map(untrack(() => exitingTaskSnapshot));
-			for (const name of exitNames) {
-				const agentName = name.startsWith('jat-') ? name.slice(4) : name;
-				const task = agentTasks.get(agentName);
-				if (task) newSnapshots.set(name, task);
-			}
-			exitingTaskSnapshot = newSnapshots;
-
 			// Add new exiting sessions to the set
 			exitingSessionNames = new Set([...prevExiting, ...exitNames]);
 			// Clear them after animation completes (250ms delay + 500ms row animation)
@@ -341,10 +349,13 @@
 				exitingSessionNames = new Set([...exitingSessionNames].filter(n => !exitNames.has(n)));
 				// Also remove from order after animation
 				sessionOrder = sessionOrder.filter(n => !exitNames.has(n));
-				// Clean up task snapshots
-				const cleaned = new Map(exitingTaskSnapshot);
-				for (const name of exitNames) cleaned.delete(name);
-				exitingTaskSnapshot = cleaned;
+				// Clean up task cache for exited agents
+				const cleanedCache = new Map(cachedAgentTasks);
+				for (const name of exitNames) {
+					const agentName = name.startsWith('jat-') ? name.slice(4) : name;
+					cleanedCache.delete(agentName);
+				}
+				cachedAgentTasks = cleanedCache;
 			}, 850);
 		}
 
@@ -385,6 +396,12 @@
 	});
 
 	// Helper functions
+	function getTaskHarness(task: AgentTask | null): string {
+		if (!task?.labels) return 'claude-code';
+		const harnessLabel = task.labels.find(l => l.startsWith('harness:'));
+		return harnessLabel ? harnessLabel.replace('harness:', '') : 'claude-code';
+	}
+
 	function getAgentName(sessionName: string): string {
 		if (sessionName.startsWith('jat-')) {
 			return sessionName.slice(4);
@@ -969,7 +986,7 @@
 					{@const isExpanded = expandedSession === session.name}
 					{@const isCollapsing = collapsingSession === session.name}
 					{@const sessionAgentName = getAgentName(session.name)}
-					{@const sessionTask = agentTasks.get(sessionAgentName) || (isExiting ? exitingTaskSnapshot.get(session.name) : null)}
+					{@const sessionTask = agentTasks.get(sessionAgentName) || (isExiting ? cachedAgentTasks.get(sessionAgentName) : null)}
 					{@const sessionInfo = agentSessionInfo.get(sessionAgentName)}
 					{@const activityState = sessionInfo?.activityState}
 					{@const effectiveState = optimisticStates.get(session.name) || activityState || 'idle'}
@@ -1032,6 +1049,7 @@
 												resumed={session.resumed}
 												attached={session.attached}
 												exiting={isExiting}
+												harness={getTaskHarness(sessionTask)}
 											/>
 										</div>
 									{:else}

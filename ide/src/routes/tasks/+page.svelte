@@ -56,6 +56,7 @@
 		title?: string;
 		priority?: number;
 		description?: string;
+		labels?: string[];
 	}
 
 	interface AgentSessionInfo {
@@ -528,6 +529,7 @@
 						title: taskSource.title,
 						priority: taskSource.priority,
 						description: taskSource.description,
+						labels: taskSource.labels,
 					});
 				} else {
 					// No task — override idle state to 'planning'
@@ -783,6 +785,12 @@
 			if (selection) {
 				if (selection.agentId) body.agentId = selection.agentId;
 				if (selection.model) body.model = selection.model;
+			} else {
+				// No explicit selection — use task's harness label if set
+				const harnessLabel = task.labels?.find((l: string) => l.startsWith('harness:'));
+				if (harnessLabel) {
+					body.agentId = harnessLabel.replace('harness:', '');
+				}
 			}
 
 			const response = await fetch("/api/work/spawn", {

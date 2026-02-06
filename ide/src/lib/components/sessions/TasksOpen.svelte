@@ -11,6 +11,9 @@
 	import TaskIdBadge from '$lib/components/TaskIdBadge.svelte';
 	import { getProjectColor } from '$lib/utils/projectColors';
 	import AgentSelector from '$lib/components/agents/AgentSelector.svelte';
+	import { bulkApiOperation, fetchWithTimeout, createDeleteRequest, handleApiError, formatBulkResultMessage } from '$lib/utils/bulkApiHelpers';
+	import { AGENT_PRESETS } from '$lib/types/agentProgram';
+	import ProviderLogo from '$lib/components/agents/ProviderLogo.svelte';
 
 	interface AgentSelection {
 		agentId: string | null;
@@ -77,6 +80,277 @@
 	// Position for fixed-positioned agent picker (to escape overflow containers)
 	// Uses bottom/left to drop up and to the left for better visibility
 	let agentPickerPosition = $state<{ bottom: number; left: number } | null>(null);
+
+	// === Bulk Selection ===
+	let selectedTasks = $state<Set<string>>(new Set());
+	let lastClickedTaskId = $state<string | null>(null);
+	let bulkActionLoading = $state(false);
+	let bulkActionError = $state('');
+	let priorityDropdownOpen = $state(false);
+	let harnessDropdownOpen = $state(false);
+
+	// === Single-task Harness Picker ===
+	let harnessPickerTaskId = $state<string | null>(null);
+	let harnessPickerPos = $state({ x: 0, y: 0 });
+
+	const selectionCount = $derived(selectedTasks.size);
+	const allVisibleSelected = $derived.by(() => {
+		const visible = orderedTasks().filter(e => !e.isExiting);
+		return visible.length > 0 && visible.every(e => selectedTasks.has(e.task.id));
+	});
+	const someVisibleSelected = $derived.by(() => {
+		const visible = orderedTasks().filter(e => !e.isExiting);
+		return visible.some(e => selectedTasks.has(e.task.id)) && !allVisibleSelected;
+	});
+
+	// Clean up stale selections when tasks change
+	$effect(() => {
+		const openIds = new Set(tasks.filter(t => t.status === 'open').map(t => t.id));
+		const stale = [...selectedTasks].filter(id => !openIds.has(id));
+		if (stale.length > 0) {
+			const next = new Set(selectedTasks);
+			for (const id of stale) next.delete(id);
+			selectedTasks = next;
+		}
+	});
+
+	function toggleTask(taskId: string, event?: MouseEvent) {
+		const visible = orderedTasks().filter(e => !e.isExiting);
+		if (event?.shiftKey && lastClickedTaskId) {
+			const ids = visible.map(e => e.task.id);
+			const a = ids.indexOf(lastClickedTaskId);
+			const b = ids.indexOf(taskId);
+			if (a !== -1 && b !== -1) {
+				const [start, end] = a < b ? [a, b] : [b, a];
+				const next = new Set(selectedTasks);
+				for (let i = start; i <= end; i++) next.add(ids[i]);
+				selectedTasks = next;
+				lastClickedTaskId = taskId;
+				window.getSelection()?.removeAllRanges();
+				return;
+			}
+		}
+		const next = new Set(selectedTasks);
+		if (next.has(taskId)) {
+			next.delete(taskId);
+		} else {
+			next.add(taskId);
+		}
+		selectedTasks = next;
+		lastClickedTaskId = taskId;
+	}
+
+	function toggleAllVisible() {
+		const visible = orderedTasks().filter(e => !e.isExiting).map(e => e.task.id);
+		const allSelected = visible.length > 0 && visible.every(id => selectedTasks.has(id));
+		if (allSelected) {
+			selectedTasks = new Set();
+		} else {
+			selectedTasks = new Set(visible);
+		}
+	}
+
+	function clearSelection() {
+		selectedTasks = new Set();
+		lastClickedTaskId = null;
+		priorityDropdownOpen = false;
+		harnessDropdownOpen = false;
+	}
+
+	async function handleBulkDelete() {
+		const ids = [...selectedTasks];
+		if (ids.length === 0) return;
+		if (!confirm(`Delete ${ids.length} task${ids.length > 1 ? 's' : ''}? This cannot be undone.`)) return;
+		bulkActionLoading = true;
+		bulkActionError = '';
+		try {
+			const result = await bulkApiOperation(ids, async (taskId) => {
+				const response = await fetchWithTimeout(`/api/tasks/${taskId}`, createDeleteRequest());
+				if (!response.ok) {
+					throw new Error(await handleApiError(response, `delete task ${taskId}`));
+				}
+			});
+			if (!result.success) {
+				bulkActionError = formatBulkResultMessage(result, 'task');
+			}
+			clearSelection();
+			onRetry();
+		} catch (err) {
+			bulkActionError = err instanceof Error ? err.message : String(err);
+		} finally {
+			bulkActionLoading = false;
+		}
+	}
+
+	async function handleBulkClose() {
+		const ids = [...selectedTasks];
+		if (ids.length === 0) return;
+		if (!confirm(`Close ${ids.length} task${ids.length > 1 ? 's' : ''}?`)) return;
+		bulkActionLoading = true;
+		bulkActionError = '';
+		try {
+			const result = await bulkApiOperation(ids, async (taskId) => {
+				const response = await fetchWithTimeout(`/api/tasks/${taskId}`, {
+					method: 'PUT',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ status: 'closed' })
+				});
+				if (!response.ok) {
+					throw new Error(await handleApiError(response, `close task ${taskId}`));
+				}
+			});
+			if (!result.success) {
+				bulkActionError = formatBulkResultMessage(result, 'task');
+			}
+			clearSelection();
+			onRetry();
+		} catch (err) {
+			bulkActionError = err instanceof Error ? err.message : String(err);
+		} finally {
+			bulkActionLoading = false;
+		}
+	}
+
+	async function handleBulkSpawn() {
+		const ids = [...selectedTasks];
+		if (ids.length === 0) return;
+		if (!confirm(`Spawn ${ids.length} agent${ids.length > 1 ? 's' : ''}? One per selected task.`)) return;
+		bulkActionLoading = true;
+		bulkActionError = '';
+		try {
+			for (const taskId of ids) {
+				const task = tasks.find(t => t.id === taskId);
+				if (task) onSpawnTask(task);
+			}
+			clearSelection();
+		} catch (err) {
+			bulkActionError = err instanceof Error ? err.message : String(err);
+		} finally {
+			bulkActionLoading = false;
+		}
+	}
+
+	async function handleDeleteTask(taskId: string) {
+		closeContextMenu();
+		if (!confirm(`Delete task ${taskId}? This cannot be undone.`)) return;
+		try {
+			const response = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
+			if (response.ok) {
+				onRetry();
+			}
+		} catch (err) {
+			console.error('Failed to delete task:', err);
+		}
+	}
+
+	/** Extract harness from task labels (e.g., 'harness:codex-cli' → 'codex-cli') */
+	function getTaskHarness(task: Task): string {
+		if (!task.labels) return 'claude-code';
+		const harnessLabel = task.labels.find(l => l.startsWith('harness:'));
+		return harnessLabel ? harnessLabel.replace('harness:', '') : 'claude-code';
+	}
+
+	async function handleBulkPriority(priority: number) {
+		const ids = [...selectedTasks];
+		if (ids.length === 0) return;
+		priorityDropdownOpen = false;
+		bulkActionLoading = true;
+		bulkActionError = '';
+		try {
+			const result = await bulkApiOperation(ids, async (taskId) => {
+				const response = await fetchWithTimeout(`/api/tasks/${taskId}`, {
+					method: 'PUT',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ priority })
+				});
+				if (!response.ok) {
+					throw new Error(await handleApiError(response, `update priority for ${taskId}`));
+				}
+			});
+			if (!result.success) {
+				bulkActionError = formatBulkResultMessage(result, 'task');
+			}
+			clearSelection();
+			onRetry();
+		} catch (err) {
+			bulkActionError = err instanceof Error ? err.message : String(err);
+		} finally {
+			bulkActionLoading = false;
+		}
+	}
+
+	async function handleBulkHarness(agentId: string) {
+		const ids = [...selectedTasks];
+		if (ids.length === 0) return;
+		harnessDropdownOpen = false;
+		bulkActionLoading = true;
+		bulkActionError = '';
+		try {
+			const result = await bulkApiOperation(ids, async (taskId) => {
+				const task = tasks.find(t => t.id === taskId);
+				if (!task) return;
+				// Remove existing harness: labels, add new one (or remove if default)
+				const otherLabels = (task.labels || []).filter(l => !l.startsWith('harness:'));
+				const newLabels = agentId === 'claude-code' ? otherLabels : [...otherLabels, `harness:${agentId}`];
+				const response = await fetchWithTimeout(`/api/tasks/${taskId}`, {
+					method: 'PATCH',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ labels: newLabels.join(',') })
+				});
+				if (!response.ok) {
+					throw new Error(await handleApiError(response, `update harness for ${taskId}`));
+				}
+			});
+			if (!result.success) {
+				bulkActionError = formatBulkResultMessage(result, 'task');
+			}
+			clearSelection();
+			onRetry();
+		} catch (err) {
+			bulkActionError = err instanceof Error ? err.message : String(err);
+		} finally {
+			bulkActionLoading = false;
+		}
+	}
+
+	async function handleSingleHarnessChange(taskId: string, agentId: string) {
+		harnessPickerTaskId = null;
+		const task = tasks.find(t => t.id === taskId);
+		if (!task) return;
+		const otherLabels = (task.labels || []).filter(l => !l.startsWith('harness:'));
+		const newLabels = agentId === 'claude-code'
+			? otherLabels
+			: [...otherLabels, `harness:${agentId}`];
+		await fetchWithTimeout(`/api/tasks/${taskId}`, {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ labels: newLabels.join(',') })
+		});
+		onRetry();
+	}
+
+	// Close single-task harness picker on click outside or Escape
+	$effect(() => {
+		if (!harnessPickerTaskId) return;
+
+		function handleClick() {
+			harnessPickerTaskId = null;
+		}
+		function handleKeyDown(e: KeyboardEvent) {
+			if (e.key === 'Escape') harnessPickerTaskId = null;
+		}
+
+		const timer = setTimeout(() => {
+			document.addEventListener('click', handleClick);
+			document.addEventListener('keydown', handleKeyDown);
+		}, 0);
+
+		return () => {
+			clearTimeout(timer);
+			document.removeEventListener('click', handleClick);
+			document.removeEventListener('keydown', handleKeyDown);
+		};
+	});
 
 	// Track Alt key state for visual feedback
 	$effect(() => {
@@ -498,6 +772,28 @@
 		};
 	});
 
+	// Close floating bar dropdowns on click outside
+	$effect(() => {
+		if (!priorityDropdownOpen && !harnessDropdownOpen) return;
+
+		function handleClickOutside(e: MouseEvent) {
+			const target = e.target as HTMLElement;
+			if (!target.closest('.floating-dropdown-wrapper')) {
+				priorityDropdownOpen = false;
+				harnessDropdownOpen = false;
+			}
+		}
+
+		const timer = setTimeout(() => {
+			document.addEventListener('click', handleClickOutside);
+		}, 0);
+
+		return () => {
+			clearTimeout(timer);
+			document.removeEventListener('click', handleClickOutside);
+		};
+	});
+
 	// Context menu actions
 	async function handleChangeStatus(taskId: string, newStatus: string) {
 		closeContextMenu();
@@ -573,11 +869,15 @@
 
 </script>
 
-<section class="open-tasks-section" class:no-header={!showHeader}>
+<section class="open-tasks-section" class:no-header={!showHeader} class:has-selection={selectionCount > 0}>
 	{#if showHeader}
 		<div class="section-header">
 			<h2>Open Tasks</h2>
 			<span class="task-count">{sortedOpenTasks.length}</span>
+			{#if selectionCount > 0}
+				<span class="selection-count">{selectionCount} selected</span>
+				<button type="button" class="selection-clear-btn" onclick={clearSelection}>Clear</button>
+			{/if}
 
 			{#if uniqueProjects().length > 1}
 				<div class="project-filter">
@@ -641,10 +941,29 @@
 			{/if}
 		</div>
 	{:else}
+		{#if bulkActionError}
+			<div class="bulk-error">
+				<span>{bulkActionError}</span>
+				<button type="button" onclick={() => bulkActionError = ''}>
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+						<line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+					</svg>
+				</button>
+			</div>
+		{/if}
 		<div class="tasks-table-wrapper">
 			<table class="tasks-table">
 				<thead>
 					<tr>
+						<th class="th-checkbox">
+							<input
+								type="checkbox"
+								class="bulk-checkbox select-all-checkbox"
+								checked={allVisibleSelected}
+								indeterminate={someVisibleSelected}
+								onclick={(e) => { e.stopPropagation(); toggleAllVisible(); }}
+							/>
+						</th>
 						<th class="th-task">Task</th>
 						<th class="th-title">Title</th>
 						<th class="th-actions">Actions</th>
@@ -657,22 +976,38 @@
 						{@const blockReason = isBlocked ? getBlockingReason(task) : ''}
 						{@const unresolvedBlockers = task.depends_on?.filter(d => d.status !== 'closed') || []}
 						{@const blockedTasks = blockedByMap.get(task.id) || []}
+						{@const isSelected = selectedTasks.has(task.id)}
+						{@const harness = getTaskHarness(task)}
 						<tr
-							class="task-row {isBlocked && !isExiting ? 'opacity-70' : ''} {isNew ? 'animate-slide-in-fwd-center' : ''} {isExiting ? 'animate-slide-out-bck-center' : ''}"
+							class="task-row {isBlocked && !isExiting ? 'opacity-70' : ''} {isNew ? 'animate-slide-in-fwd-center' : ''} {isExiting ? 'animate-slide-out-bck-center' : ''} {isSelected ? 'selected-row' : ''}"
 							style="{projectColor ? `border-left: 3px solid ${projectColor};` : ''}{isExiting ? ' pointer-events: none;' : ''}"
 							onclick={() => !isExiting && handleRowClick(task.id)}
 							oncontextmenu={(e) => !isExiting && handleContextMenu(task, e)}
 						>
 							<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+							<td class="td-checkbox" style={isExiting ? 'background: transparent;' : ''} onclick={(e) => { e.stopPropagation(); toggleTask(task.id, e); }}>
+								<input
+									type="checkbox"
+									class="bulk-checkbox"
+									checked={isSelected}
+									style="pointer-events: none;"
+								/>
+							</td>
+							<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 							<td class="td-task" style={isExiting ? 'background: transparent;' : ''} onclick={(e) => e.stopPropagation()}>
 								<div class="task-cell-content">
-									<div class="agent-badge-row mx-2">
+									<div class="agent-badge-row">
 										<TaskIdBadge
 											{task}
 											size="sm"
 											variant="agentPill"
 											onClick={() => !isExiting && handleRowClick(task.id)}
 											animate={isNew}
+											{harness}
+											onHarnessClick={(e) => {
+												harnessPickerTaskId = task.id;
+												harnessPickerPos = { x: e.clientX, y: e.clientY };
+											}}
 										/>
 									</div>
 								</div>
@@ -776,6 +1111,86 @@
 		</div>
 	{/if}
 </section>
+
+<!-- Floating Action Bar -->
+{#if selectionCount > 0}
+	<div class="floating-action-bar" transition:fade={{ duration: 150 }}>
+		<span class="floating-count">{selectionCount} selected</span>
+		<div class="floating-divider"></div>
+		<button type="button" class="floating-btn floating-btn-spawn" onclick={handleBulkSpawn} disabled={bulkActionLoading}>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+				<path d="M12 2C12 2 8 6 8 12C8 15 9 17 10 18L10 21C10 21.5 10.5 22 11 22H13C13.5 22 14 21.5 14 21L14 18C15 17 16 15 16 12C16 6 12 2 12 2Z" />
+				<circle cx="12" cy="10" r="2" />
+			</svg>
+			Spawn
+		</button>
+		<button type="button" class="floating-btn floating-btn-close" onclick={handleBulkClose} disabled={bulkActionLoading}>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+				<circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
+			</svg>
+			Close
+		</button>
+		<button type="button" class="floating-btn floating-btn-delete" onclick={handleBulkDelete} disabled={bulkActionLoading}>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+				<polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+			</svg>
+			Delete
+		</button>
+		<div class="floating-divider"></div>
+		<!-- Priority dropdown -->
+		<div class="floating-dropdown-wrapper" onclick={(e) => e.stopPropagation()}>
+			<button type="button" class="floating-btn floating-btn-priority" onclick={() => { priorityDropdownOpen = !priorityDropdownOpen; harnessDropdownOpen = false; }} disabled={bulkActionLoading}>
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+					<path d="M3 3v18h18" /><path d="M18 9l-5-6-4 4-4 2" />
+				</svg>
+				Priority
+			</button>
+			{#if priorityDropdownOpen}
+				<div class="floating-dropdown" transition:fade={{ duration: 100 }}>
+					{#each [
+						{ p: 0, label: 'P0 Critical', color: 'oklch(0.75 0.18 25)' },
+						{ p: 1, label: 'P1 High', color: 'oklch(0.80 0.15 85)' },
+						{ p: 2, label: 'P2 Medium', color: 'oklch(0.75 0.12 200)' },
+						{ p: 3, label: 'P3 Low', color: 'oklch(0.65 0.02 250)' },
+						{ p: 4, label: 'P4 Lowest', color: 'oklch(0.55 0.02 250)' }
+					] as item}
+						<button class="floating-dropdown-item" onclick={() => handleBulkPriority(item.p)}>
+							<span class="floating-priority-dot" style="background: {item.color};"></span>
+							{item.label}
+						</button>
+					{/each}
+				</div>
+			{/if}
+		</div>
+		<!-- Harness dropdown -->
+		<div class="floating-dropdown-wrapper" onclick={(e) => e.stopPropagation()}>
+			<button type="button" class="floating-btn floating-btn-harness" onclick={() => { harnessDropdownOpen = !harnessDropdownOpen; priorityDropdownOpen = false; }} disabled={bulkActionLoading}>
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+					<path d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
+					<circle cx="12" cy="12" r="3" />
+				</svg>
+				Harness
+			</button>
+			{#if harnessDropdownOpen}
+				<div class="floating-dropdown" transition:fade={{ duration: 100 }}>
+					{#each AGENT_PRESETS as preset}
+						<button class="floating-dropdown-item" onclick={() => handleBulkHarness(preset.id)}>
+							<ProviderLogo agentId={preset.id} size={14} />
+							<span>{preset.name}</span>
+						</button>
+					{/each}
+				</div>
+			{/if}
+		</div>
+		<div class="floating-divider"></div>
+		<button type="button" class="floating-btn floating-btn-clear" onclick={clearSelection} disabled={bulkActionLoading}>
+			Clear
+		</button>
+		{#if bulkActionLoading}
+			<div class="floating-spinner"></div>
+		{/if}
+	</div>
+{/if}
 
 <!-- Context Menu -->
 {#if ctxTask}
@@ -905,6 +1320,42 @@
 			</svg>
 			<span>Close Task</span>
 		</button>
+
+		<!-- Delete Task -->
+		<button class="task-context-menu-item task-context-menu-item-danger" onmouseenter={() => { statusSubmenuOpen = false; epicSubmenuOpen = false; }} onclick={() => handleDeleteTask(ctxTask!.id)}>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<polyline points="3 6 5 6 21 6" />
+				<path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+				<line x1="10" y1="11" x2="10" y2="17" />
+				<line x1="14" y1="11" x2="14" y2="17" />
+			</svg>
+			<span>Delete Task</span>
+		</button>
+	</div>
+{/if}
+
+<!-- Single-task Harness Picker -->
+{#if harnessPickerTaskId}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<div class="harness-picker-backdrop" onclick={() => harnessPickerTaskId = null}></div>
+	<div class="harness-picker" style="left: {harnessPickerPos.x}px; top: {harnessPickerPos.y}px;" onclick={(e) => e.stopPropagation()}>
+		{#each AGENT_PRESETS as preset}
+			{@const pickerTask = tasks.find(t => t.id === harnessPickerTaskId)}
+			{@const currentHarness = pickerTask ? getTaskHarness(pickerTask) : 'claude-code'}
+			<button
+				class="harness-picker-item {currentHarness === preset.id ? 'active' : ''}"
+				onclick={() => handleSingleHarnessChange(harnessPickerTaskId!, preset.id)}
+			>
+				<ProviderLogo agentId={preset.id} size={16} />
+				<span>{preset.name}</span>
+				{#if currentHarness === preset.id}
+					<svg class="w-3 h-3 ml-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+						<polyline points="20 6 9 17 4 12" />
+					</svg>
+				{/if}
+			</button>
+		{/each}
 	</div>
 {/if}
 
@@ -1317,5 +1768,331 @@
 		font-size: 0.75rem;
 		color: oklch(0.55 0.02 250);
 		text-align: center;
+	}
+
+	/* === Bulk Selection === */
+
+	/* Checkbox columns */
+	.th-checkbox, .td-checkbox {
+		width: 32px;
+		min-width: 32px;
+		max-width: 32px;
+		text-align: center;
+		padding: 0 !important;
+	}
+
+	.td-checkbox {
+		cursor: pointer;
+	}
+
+	/* Checkbox styling */
+	.bulk-checkbox {
+		width: 14px;
+		height: 14px;
+		cursor: pointer;
+		accent-color: oklch(0.70 0.18 240);
+		opacity: 0;
+		transition: opacity 0.15s;
+	}
+
+	/* Show checkboxes: on row hover, when checked, or when any selection active */
+	.task-row:hover .bulk-checkbox,
+	.bulk-checkbox:checked,
+	.has-selection .bulk-checkbox {
+		opacity: 1;
+	}
+
+	/* Select-all checkbox always visible when there's a selection */
+	.select-all-checkbox {
+		opacity: 0;
+		transition: opacity 0.15s;
+	}
+
+	.has-selection .select-all-checkbox,
+	.tasks-table thead:hover .select-all-checkbox {
+		opacity: 1;
+	}
+
+	/* Selected row highlight */
+	.selected-row {
+		background: oklch(0.70 0.18 240 / 0.08) !important;
+	}
+
+	.selected-row:hover {
+		background: oklch(0.70 0.18 240 / 0.12) !important;
+	}
+
+	/* Selection count badge in header */
+	.selection-count {
+		font-size: 0.75rem;
+		font-weight: 500;
+		padding: 0.125rem 0.5rem;
+		background: oklch(0.70 0.18 240 / 0.15);
+		border: 1px solid oklch(0.70 0.18 240 / 0.3);
+		border-radius: 9999px;
+		color: oklch(0.80 0.12 240);
+	}
+
+	.selection-clear-btn {
+		font-size: 0.6875rem;
+		padding: 0.125rem 0.375rem;
+		border-radius: 0.25rem;
+		border: 1px solid oklch(0.35 0.02 250);
+		background: transparent;
+		color: oklch(0.65 0.02 250);
+		cursor: pointer;
+		transition: all 0.15s;
+	}
+
+	.selection-clear-btn:hover {
+		background: oklch(0.25 0.02 250);
+		color: oklch(0.80 0.02 250);
+	}
+
+	/* Bulk error banner */
+	.bulk-error {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.5rem 1rem;
+		background: oklch(0.55 0.15 30 / 0.12);
+		border-bottom: 1px solid oklch(0.55 0.15 30 / 0.25);
+		color: oklch(0.75 0.15 30);
+		font-size: 0.8125rem;
+	}
+
+	.bulk-error span {
+		flex: 1;
+	}
+
+	.bulk-error button {
+		display: flex;
+		align-items: center;
+		background: transparent;
+		border: none;
+		color: oklch(0.65 0.10 30);
+		cursor: pointer;
+		padding: 0.125rem;
+		border-radius: 0.25rem;
+	}
+
+	.bulk-error button:hover {
+		color: oklch(0.80 0.15 30);
+		background: oklch(0.55 0.15 30 / 0.15);
+	}
+
+	/* === Floating Action Bar === */
+	:global(.floating-action-bar) {
+		position: fixed;
+		bottom: 1.5rem;
+		left: 50%;
+		transform: translateX(-50%);
+		z-index: 50;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.5rem 0.75rem;
+		background: oklch(0.16 0.02 250);
+		border: 1px solid oklch(0.30 0.02 250);
+		border-radius: 0.75rem;
+		box-shadow: 0 8px 32px oklch(0.05 0 0 / 0.6), 0 2px 8px oklch(0.05 0 0 / 0.3);
+	}
+
+	:global(.floating-count) {
+		font-size: 0.8125rem;
+		font-weight: 600;
+		color: oklch(0.85 0.02 250);
+		white-space: nowrap;
+	}
+
+	:global(.floating-divider) {
+		width: 1px;
+		height: 1.25rem;
+		background: oklch(0.30 0.02 250);
+	}
+
+	:global(.floating-btn) {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		padding: 0.375rem 0.625rem;
+		border: 1px solid transparent;
+		border-radius: 0.375rem;
+		font-size: 0.75rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.15s;
+		white-space: nowrap;
+	}
+
+	:global(.floating-btn:disabled) {
+		opacity: 0.5;
+		pointer-events: none;
+	}
+
+	:global(.floating-btn-spawn) {
+		background: oklch(0.65 0.18 250 / 0.15);
+		color: oklch(0.82 0.14 250);
+		border-color: oklch(0.65 0.18 250 / 0.3);
+	}
+
+	:global(.floating-btn-spawn:hover) {
+		background: oklch(0.65 0.18 250 / 0.25);
+	}
+
+	:global(.floating-btn-close) {
+		background: oklch(0.75 0.15 85 / 0.12);
+		color: oklch(0.80 0.12 85);
+		border-color: oklch(0.75 0.15 85 / 0.25);
+	}
+
+	:global(.floating-btn-close:hover) {
+		background: oklch(0.75 0.15 85 / 0.22);
+	}
+
+	:global(.floating-btn-delete) {
+		background: oklch(0.55 0.18 30 / 0.15);
+		color: oklch(0.80 0.15 30);
+		border-color: oklch(0.55 0.18 30 / 0.3);
+	}
+
+	:global(.floating-btn-delete:hover) {
+		background: oklch(0.55 0.18 30 / 0.25);
+	}
+
+	:global(.floating-btn-clear) {
+		background: transparent;
+		color: oklch(0.65 0.02 250);
+	}
+
+	:global(.floating-btn-clear:hover) {
+		background: oklch(0.25 0.02 250);
+		color: oklch(0.80 0.02 250);
+	}
+
+	:global(.floating-spinner) {
+		width: 14px;
+		height: 14px;
+		border: 2px solid oklch(0.35 0.02 250);
+		border-top-color: oklch(0.70 0.15 240);
+		border-radius: 50%;
+		animation: spin 0.6s linear infinite;
+	}
+
+	@keyframes spin {
+		to { transform: rotate(360deg); }
+	}
+
+	/* Priority button */
+	:global(.floating-btn-priority) {
+		background: oklch(0.55 0.15 200 / 0.15);
+		color: oklch(0.80 0.12 200);
+		border-color: oklch(0.55 0.15 200 / 0.3);
+	}
+
+	:global(.floating-btn-priority:hover) {
+		background: oklch(0.55 0.15 200 / 0.25);
+	}
+
+	/* Harness button */
+	:global(.floating-btn-harness) {
+		background: oklch(0.55 0.15 300 / 0.15);
+		color: oklch(0.80 0.12 300);
+		border-color: oklch(0.55 0.15 300 / 0.3);
+	}
+
+	:global(.floating-btn-harness:hover) {
+		background: oklch(0.55 0.15 300 / 0.25);
+	}
+
+	/* Dropdown wrapper for floating bar */
+	:global(.floating-dropdown-wrapper) {
+		position: relative;
+	}
+
+	/* Dropdown menu above the floating bar */
+	:global(.floating-dropdown) {
+		position: absolute;
+		bottom: calc(100% + 8px);
+		left: 50%;
+		transform: translateX(-50%);
+		min-width: 160px;
+		background: oklch(0.18 0.02 250);
+		border: 1px solid oklch(0.30 0.02 250);
+		border-radius: 0.5rem;
+		padding: 0.375rem;
+		box-shadow: 0 8px 24px oklch(0.05 0 0 / 0.5);
+		z-index: 60;
+	}
+
+	:global(.floating-dropdown-item) {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		width: 100%;
+		padding: 0.375rem 0.625rem;
+		border: none;
+		background: transparent;
+		color: oklch(0.80 0.02 250);
+		font-size: 0.75rem;
+		text-align: left;
+		border-radius: 0.375rem;
+		cursor: pointer;
+		transition: background 0.1s;
+		white-space: nowrap;
+	}
+
+	:global(.floating-dropdown-item:hover) {
+		background: oklch(0.25 0.02 250);
+	}
+
+	:global(.floating-priority-dot) {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		flex-shrink: 0;
+	}
+
+	/* === Single-task Harness Picker === */
+	.harness-picker-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 49;
+	}
+
+	.harness-picker {
+		position: fixed;
+		z-index: 50;
+		background: oklch(0.18 0.02 250);
+		border: 1px solid oklch(0.30 0.03 250);
+		border-radius: 8px;
+		padding: 4px;
+		box-shadow: 0 8px 32px oklch(0 0 0 / 0.5);
+		min-width: 180px;
+		animation: contextMenuIn 0.1s ease;
+	}
+
+	.harness-picker-item {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 6px 10px;
+		border-radius: 6px;
+		width: 100%;
+		color: oklch(0.80 0.02 250);
+		font-size: 0.8125rem;
+		background: transparent;
+		border: none;
+		cursor: pointer;
+		transition: background 0.1s;
+		text-align: left;
+	}
+
+	.harness-picker-item:hover {
+		background: oklch(0.25 0.03 250);
+	}
+
+	.harness-picker-item.active {
+		color: oklch(0.85 0.12 200);
 	}
 </style>

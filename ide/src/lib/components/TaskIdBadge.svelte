@@ -5,6 +5,7 @@
 	import { isHumanTask } from '$lib/utils/badgeHelpers';
 	import WorkingAgentBadge from '$lib/components/WorkingAgentBadge.svelte';
 	import AgentAvatar from '$lib/components/AgentAvatar.svelte';
+	import ProviderLogo from '$lib/components/agents/ProviderLogo.svelte';
 
 	/** Dependency task info */
 	interface DepTask {
@@ -74,9 +75,13 @@
 		onClick?: () => void;
 		/** Play exit animation (flip-out) on avatar */
 		exiting?: boolean;
+		/** Agent harness/program ID (e.g., 'claude-code', 'codex-cli') for provider logo */
+		harness?: string;
+		/** Callback when user clicks the harness icon in the avatar slot (agentPill variant, no agent assigned) */
+		onHarnessClick?: (event: MouseEvent) => void;
 	}
 
-	let { task, size = 'sm', showStatus = true, showType = true, showCopyIcon = false, showAssignee = false, minimal = false, color, onOpenTask, onAgentClick, dropdownAlign = 'start', copyOnly = false, blockedBy = [], blocks = [], showDependencies = false, showDepGraph = true, showUnblocksCount = false, statusDotColor, variant = 'default', agentName, animate = false, resumed = false, attached = false, onClick, exiting = false }: Props = $props();
+	let { task, size = 'sm', showStatus = true, showType = true, showCopyIcon = false, showAssignee = false, minimal = false, color, onOpenTask, onAgentClick, dropdownAlign = 'start', copyOnly = false, blockedBy = [], blocks = [], showDependencies = false, showDepGraph = true, showUnblocksCount = false, statusDotColor, variant = 'default', agentName, animate = false, resumed = false, attached = false, onClick, exiting = false, harness, onHarnessClick }: Props = $props();
 
 	// Extract project prefix from task ID (e.g., "jat-abc" -> "jat")
 	const projectPrefix = $derived(task.id.split('-')[0] || task.id);
@@ -371,8 +376,18 @@
 				<!-- Avatar with status ring using AgentAvatar's built-in ring support -->
 				{#if agentName}
 					<AgentAvatar name={agentName} size={avatarSize - 4} showRing={true} ringColor={ringColor} showGlow={true} {exiting} />
+				{:else if harness}
+					<!-- Harness icon as avatar when no agent assigned -->
+					<button
+						class="rounded-full shrink-0 flex items-center justify-center cursor-pointer hover:brightness-125 transition-all"
+						style="width: {avatarSize}px; height: {avatarSize}px; background: oklch(0.20 0.02 250); border: 2px solid oklch(0.35 0.03 250);"
+						onclick={(e) => { e.stopPropagation(); onHarnessClick?.(e); }}
+						title="Harness: {harness} — click to change"
+					>
+						<ProviderLogo agentId={harness} size={avatarSize - 10} />
+					</button>
 				{:else}
-					<!-- Fallback dot if no agent -->
+					<!-- Fallback dot if no agent and no harness -->
 					<div
 						class="rounded-full shrink-0"
 						style="
@@ -417,7 +432,11 @@
 					style="background: {pColor.bg}; color: {pColor.text}; border: 1px solid {pColor.border};"
 				>P{task.priority}</span>
 			{/if}
-
+			{#if harness && agentName}
+				<span class="inline-flex scale-75" title={harness}>
+					<ProviderLogo agentId={harness} size={12} />
+				</span>
+			{/if}
 
 			{#if isHuman && !isClosed}
 				<span
@@ -495,6 +514,11 @@
 					class="text-xs font-semibold px-1 py-0.5 rounded scale-70 mt-0.25"
 					style="background: {pColor.bg}; color: {pColor.text}; border: 1px solid {pColor.border};"
 				>P{task.priority}</span>
+			{/if}
+			{#if harness}
+				<span class="inline-flex scale-70 mt-0.25" title={harness}>
+					<ProviderLogo agentId={harness} size={12} />
+				</span>
 			{/if}
 
 			{#if isClosed}
@@ -642,6 +666,11 @@
 						class="text-xs font-semibold px-1 py-0.5 rounded scale-70 ml-2"
 						style="background: {pColor.bg}; color: {pColor.text}; border: 1px solid {pColor.border};"
 					>P{task.priority}</span>
+				{/if}
+				{#if harness}
+					<span class="inline-flex scale-70 ml-1" title={harness}>
+						<ProviderLogo agentId={harness} size={12} />
+					</span>
 				{/if}
 
 				{#if isClosed}

@@ -453,7 +453,8 @@ export async function GET({ url }) {
 						status: t.status,
 						priority: t.priority,
 						issue_type: t.issue_type,
-						depends_on: t.depends_on || []
+						depends_on: t.depends_on || [],
+						labels: t.labels || []
 					});
 				}
 			});

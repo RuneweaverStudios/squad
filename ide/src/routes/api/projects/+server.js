@@ -570,17 +570,18 @@ export async function GET({ url }) {
 			}));
 		}
 
-		// Sort by activity AND task count if stats included
-		// Priority: 1) Has recent activity + has tasks, 2) Has tasks, 3) Recency alone
+		// Sort by activity, agents, and task count if stats included
+		// Priority: 1) Has agents, 2) Has tasks, 3) Recency
 		if (includeStats) {
 			projects.sort((a, b) => {
-				// Get task counts (projects with no tasks should sort lower)
+				// @ts-ignore - stats exists when includeStats is true
+				const agentsA = a.stats?.agentCount || 0;
+				// @ts-ignore - stats exists when includeStats is true
+				const agentsB = b.stats?.agentCount || 0;
 				// @ts-ignore - stats exists when includeStats is true
 				const tasksA = a.stats?.openTaskCount || 0;
 				// @ts-ignore - stats exists when includeStats is true
 				const tasksB = b.stats?.openTaskCount || 0;
-				const hasTasksA = tasksA > 0;
-				const hasTasksB = tasksB > 0;
 
 				// Calculate activity score
 				// "now" < "3m" < "2h" < "4d"
@@ -599,24 +600,24 @@ export async function GET({ url }) {
 				// @ts-ignore - lastActivity exists when includeStats is true
 				const scoreB = getScore(b.lastActivity);
 
-				// Define "recent" as within the last week (7 days = 7000 in score)
-				const isRecentA = scoreA < 7000;
-				const isRecentB = scoreB < 7000;
+				// Assign a tier based on agents and tasks:
+				// Tier 0: Has active agents (most important - work is happening now)
+				// Tier 1: No agents but has open tasks (work available)
+				// Tier 2: No agents, no tasks (inactive)
+				const tierA = agentsA > 0 ? 0 : tasksA > 0 ? 1 : 2;
+				const tierB = agentsB > 0 ? 0 : tasksB > 0 ? 1 : 2;
 
-				// Sorting priority:
-				// 1. Projects with tasks AND recent activity (sort by recency among these)
-				// 2. Projects with tasks but older activity (sort by recency among these)
-				// 3. Projects without tasks but recent activity (sort by recency)
-				// 4. Projects without tasks and old activity (sort by recency)
+				// Different tiers: higher tier (lower number) wins
+				if (tierA !== tierB) return tierA - tierB;
 
-				// First: separate projects with tasks from those without
-				if (hasTasksA && !hasTasksB) return -1;
-				if (!hasTasksA && hasTasksB) return 1;
+				// Same tier: more agents wins
+				if (agentsA !== agentsB) return agentsB - agentsA;
 
-				// Within same task category, sort by activity score
-				if (scoreA !== scoreB) {
-					return scoreA - scoreB;
-				}
+				// Same agent count: more open tasks wins
+				if (tasksA !== tasksB) return tasksB - tasksA;
+
+				// Same task count: sort by activity recency
+				if (scoreA !== scoreB) return scoreA - scoreB;
 
 				// If both have same score (e.g., both "now" from running servers),
 				// use agent activity timestamp as tiebreaker (more recent wins)
