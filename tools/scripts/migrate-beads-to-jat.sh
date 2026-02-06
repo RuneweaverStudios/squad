@@ -11,27 +11,38 @@
 #   migrate-beads-to-jat.sh ~/code/chimaro     # Migrate a specific project
 #   migrate-beads-to-jat.sh --dry-run          # Show what would be migrated
 #   migrate-beads-to-jat.sh --dry-run ~/code/chimaro
+#   migrate-beads-to-jat.sh --merge             # Also merge into projects that already have jat tasks
+#   migrate-beads-to-jat.sh --merge ~/code/flush
 #
 
 set -e
 
 DRY_RUN=false
+MERGE=false
+AUTO_YES=false
 TARGET_PROJECT=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --dry-run|-n) DRY_RUN=true; shift ;;
+        --merge|-m) MERGE=true; shift ;;
+        --yes|-y) AUTO_YES=true; shift ;;
         --help|-h)
-            echo "Usage: migrate-beads-to-jat.sh [--dry-run] [project-path]"
+            echo "Usage: migrate-beads-to-jat.sh [--dry-run] [--merge] [--yes] [project-path]"
             echo ""
             echo "Migrates issues from .beads/beads.db to .jat/tasks.db"
             echo ""
             echo "Options:"
             echo "  --dry-run, -n   Show what would be migrated without making changes"
+            echo "  --merge, -m     Merge into projects that already have jat tasks (skips duplicates)"
+            echo "  --yes, -y       Skip confirmation prompt (for automated use)"
             echo "  --help, -h      Show this help message"
             echo ""
             echo "If no project-path is given, migrates all projects under ~/code/"
+            echo ""
+            echo "Without --merge, projects that already have tasks in .jat/ are skipped."
+            echo "With --merge, beads issues are imported alongside existing jat tasks (INSERT OR IGNORE)."
             exit 0
             ;;
         *) TARGET_PROJECT="$1"; shift ;;
@@ -102,7 +113,11 @@ for proj in "${PROJECTS[@]}"; do
 
     status_note=""
     if [[ "$jat_count" -gt 0 ]]; then
-        status_note=" (jat already has $jat_count tasks)"
+        if $MERGE; then
+            status_note=" (will merge with $jat_count existing jat tasks)"
+        else
+            status_note=" (SKIP - jat already has $jat_count tasks, use --merge to include)"
+        fi
     fi
 
     echo "  $name: $count issues ($open open)$status_note"
@@ -116,12 +131,14 @@ if $DRY_RUN; then
     exit 0
 fi
 
-# Confirm
-read -p "Proceed with migration? (y/N): " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Migration cancelled."
-    exit 0
+# Confirm (skip if --yes)
+if ! $AUTO_YES; then
+    read -p "Proceed with migration? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Migration cancelled."
+        exit 0
+    fi
 fi
 
 echo ""
@@ -144,14 +161,17 @@ for proj in "${PROJECTS[@]}"; do
         (cd "$proj" && jt init --quiet >/dev/null 2>&1)
     fi
 
-    # Check if jat already has tasks (skip if already migrated)
+    # Check if jat already has tasks
     jat_count=$(sqlite3 "$jat_db" "SELECT COUNT(*) FROM tasks" 2>/dev/null || echo "0")
-    if [[ "$jat_count" -gt 0 ]]; then
+    if [[ "$jat_count" -gt 0 ]] && ! $MERGE; then
         echo "  Skipping: .jat/tasks.db already has $jat_count tasks"
-        echo "  (Use a fresh .jat/tasks.db or manually merge)"
+        echo "  (Use --merge to import beads issues alongside existing tasks)"
         skipped_count=$((skipped_count + 1))
         echo ""
         continue
+    fi
+    if [[ "$jat_count" -gt 0 ]]; then
+        echo "  Merging with $jat_count existing tasks (duplicates will be skipped)..."
     fi
 
     # Create backup of jat db (even though it's empty, be safe)
@@ -216,7 +236,12 @@ EOSQL
         new_count=$(sqlite3 "$jat_db" "SELECT COUNT(*) FROM tasks")
         new_labels=$(sqlite3 "$jat_db" "SELECT COUNT(*) FROM labels")
         new_deps=$(sqlite3 "$jat_db" "SELECT COUNT(*) FROM dependencies")
-        echo "  Migrated: $new_count tasks, $new_labels labels, $new_deps dependencies"
+        added=$((new_count - jat_count))
+        if [[ "$jat_count" -gt 0 ]]; then
+            echo "  Result: $new_count total tasks ($added imported, $jat_count existing), $new_labels labels, $new_deps deps"
+        else
+            echo "  Migrated: $new_count tasks, $new_labels labels, $new_deps dependencies"
+        fi
         migrated_count=$((migrated_count + 1))
     else
         echo "  ERROR: Migration failed for $name"

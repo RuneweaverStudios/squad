@@ -26,6 +26,7 @@
 		buildEpicChildMap,
 		getParentEpicId,
 	} from "$lib/utils/projectUtils";
+	import { cleanupCollapsedEpics } from "$lib/stores/preferences.svelte";
 
 	interface TmuxSession {
 		name: string;
@@ -584,6 +585,11 @@
 			openTasks = tasks;
 			allTasks = tasks;
 			tasksError = null;
+
+			// Clean up stale collapsed epic IDs to prevent memory leak
+			// (removes IDs for tasks that no longer exist)
+			const existingIds = new Set(tasks.map((t: Task) => t.id));
+			cleanupCollapsedEpics(existingIds);
 		} catch (err) {
 			tasksError = err instanceof Error ? err.message : "Unknown error";
 		} finally {

@@ -1481,7 +1481,43 @@ EOF
 
 ensure_project_dbs() {
     local initialized=0
+    local migrated=0
+    local migrate_script="$JAT_SOURCE_DIR/tools/scripts/migrate-beads-to-jat.sh"
 
+    # Helper: attempt beads→jat migration for a project directory
+    migrate_beads_if_needed() {
+        local path="$1"
+        local name="$2"
+
+        # No beads data → nothing to do
+        [[ ! -f "$path/.beads/beads.db" ]] && return 1
+
+        # Check beads has actual issues
+        local beads_count
+        beads_count=$(sqlite3 "$path/.beads/beads.db" "SELECT COUNT(*) FROM issues" 2>/dev/null || echo "0")
+        [[ "$beads_count" -eq 0 ]] && return 1
+
+        # Check if .jat/ needs init
+        if [[ ! -d "$path/.jat" ]]; then
+            (cd "$path" && jt init --quiet) >/dev/null 2>&1 || return 1
+        fi
+
+        # Check if jat already has tasks (skip if non-empty)
+        local jat_count=0
+        if [[ -f "$path/.jat/tasks.db" ]]; then
+            jat_count=$(sqlite3 "$path/.jat/tasks.db" "SELECT COUNT(*) FROM tasks" 2>/dev/null || echo "0")
+        fi
+        [[ "$jat_count" -gt 0 ]] && return 1
+
+        # Run migration
+        echo -e "  ${GREEN}↗ Migrating beads→jat for $name ($beads_count issues)...${NC}"
+        if bash "$migrate_script" --yes --merge "$path" 2>/dev/null; then
+            return 0
+        fi
+        return 1
+    }
+
+    # Pass 1: Configured projects
     for project in $(list_projects 2>/dev/null); do
         local config path
         config=$(get_project_config "$project")
@@ -1493,6 +1529,14 @@ ensure_project_dbs() {
         [[ ! -d "$path" ]] && continue
         [[ ! -d "$path/.git" ]] && continue
 
+        # Try beads migration first (handles jt init internally)
+        if [[ ! -d "$path/.jat" ]] && [[ -f "$path/.beads/beads.db" ]] && [[ -f "$migrate_script" ]]; then
+            if migrate_beads_if_needed "$path" "$project"; then
+                migrated=$((migrated + 1))
+                continue
+            fi
+        fi
+
         # Skip if already initialized
         [[ -d "$path/.jat" ]] && continue
 
@@ -1502,8 +1546,47 @@ ensure_project_dbs() {
         echo -e "  ${GREEN}✓ Initialized .jat/ for $project${NC}"
     done
 
+    # Pass 2: Scan ~/code/*/ for non-configured projects with .beads/ but no .jat/
+    if [[ -f "$migrate_script" ]]; then
+        local configured_paths=()
+        for project in $(list_projects 2>/dev/null); do
+            local config
+            config=$(get_project_config "$project")
+            [[ -z "$config" ]] && continue
+            local p
+            p=$(echo "$config" | jq -r '.path' | sed "s|^~|$HOME|")
+            configured_paths+=("$p")
+        done
+
+        for dir in "$HOME"/code/*/; do
+            dir="${dir%/}"
+            [[ ! -d "$dir/.git" ]] && continue
+            [[ -d "$dir/.jat" ]] && continue
+            [[ ! -f "$dir/.beads/beads.db" ]] && continue
+
+            # Skip if already handled as a configured project
+            local already_configured=false
+            for cp in "${configured_paths[@]}"; do
+                if [[ "$cp" == "$dir" ]]; then
+                    already_configured=true
+                    break
+                fi
+            done
+            $already_configured && continue
+
+            local name
+            name=$(basename "$dir")
+            if migrate_beads_if_needed "$dir" "$name"; then
+                migrated=$((migrated + 1))
+            fi
+        done
+    fi
+
     if [[ $initialized -gt 0 ]]; then
         echo -e "  ${DIM}Initialized $initialized project database(s)${NC}"
+    fi
+    if [[ $migrated -gt 0 ]]; then
+        echo -e "  ${DIM}Migrated $migrated project(s) from beads→jat${NC}"
     fi
 }
 

@@ -523,6 +523,21 @@ export function clearCollapsedEpics(): void {
 	setCollapsedEpics([]);
 }
 
+/**
+ * Clean up collapsedEpics by removing IDs that no longer exist in the task list.
+ * Call this periodically (e.g., when tasks are fetched) to prevent memory leak.
+ *
+ * @param existingTaskIds - Set of all current task IDs
+ */
+export function cleanupCollapsedEpics(existingTaskIds: Set<string>): void {
+	const before = collapsedEpics.length;
+	const cleaned = collapsedEpics.filter(id => existingTaskIds.has(id));
+	if (cleaned.length !== before) {
+		setCollapsedEpics(cleaned);
+		console.log(`[preferences] Cleaned up ${before - cleaned.length} stale collapsed epic IDs`);
+	}
+}
+
 // ============================================================================
 // Active Project (currently selected project, consistent across pages)
 // ============================================================================
