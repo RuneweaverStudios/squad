@@ -379,8 +379,11 @@
 
 	// Load data on mount
 	onMount(async () => {
-		await Promise.all([loadCommands(), loadProjects()]);
-		isLoading = false;
+		try {
+			await Promise.all([loadCommands(), loadProjects()]);
+		} finally {
+			isLoading = false;
+		}
 	});
 </script>
 

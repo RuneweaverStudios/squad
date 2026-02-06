@@ -5,6 +5,7 @@
 	import PrerequisiteChecks from '$lib/components/onboarding/PrerequisiteChecks.svelte';
 	import AgentDetectStep from '$lib/components/onboarding/AgentDetectStep.svelte';
 	import FirstTaskPrompt from '$lib/components/onboarding/FirstTaskPrompt.svelte';
+	import AutonomousSetupStep from '$lib/components/onboarding/AutonomousSetupStep.svelte';
 	import { openProjectDrawer, projectCreatedSignal } from '$lib/stores/drawerStore';
 	import {
 		getPrerequisiteResults,
@@ -21,6 +22,7 @@
 	let hasAgents = $state(false);
 	let hasProjects = $state(false);
 	let hasTasks = $state(false);
+	let hasAutonomous = $state(false);
 	let firstProject = $state<string | null>(null);
 	let userName = $state('');
 
@@ -35,7 +37,9 @@
 
 	// Advance step when prior steps are complete
 	$effect(() => {
-		if (hasAgents && hasProjects && currentStep < 4) {
+		if (hasAgents && hasProjects && hasTasks && currentStep < 5) {
+			currentStep = 5;
+		} else if (hasAgents && hasProjects && currentStep < 4) {
 			currentStep = 4;
 		} else if (hasAgents && currentStep < 3) {
 			currentStep = 3;
@@ -137,8 +141,8 @@
 		}).catch(() => {});
 	});
 
-	// Derived: all done = agents configured + has projects + has tasks
-	const allDone = $derived(hasAgents && hasProjects && hasTasks);
+	// Derived: all done = agents configured + has projects + has tasks + autonomous configured (or skipped)
+	const allDone = $derived(hasAgents && hasProjects && hasTasks && hasAutonomous);
 </script>
 
 <svelte:head>
@@ -535,6 +539,50 @@
 					</button>
 				{:else}
 					<FirstTaskPrompt project={firstProject} disabled={currentStep < 4} />
+				{/if}
+			</div>
+
+			<!-- Step 5: Autonomous Mode -->
+			<div
+				class="rounded-xl p-5 space-y-4 transition-opacity duration-300"
+				style="
+					background: oklch(0.18 0.01 250);
+					border: 1px solid {currentStep === 5 ? 'oklch(0.45 0.12 45 / 0.4)' : 'oklch(0.30 0.02 250)'};
+					opacity: {currentStep >= 5 ? 1 : 0.4};
+				"
+			>
+				<div>
+					<div class="flex items-center gap-2">
+						<span
+							class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold font-mono"
+							style="background: {hasAutonomous ? 'oklch(0.35 0.15 145)' : 'oklch(0.30 0.10 45)'}; color: {hasAutonomous ? 'oklch(0.90 0.02 250)' : 'oklch(0.80 0.12 45)'};"
+						>
+							{#if hasAutonomous}
+								<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+								</svg>
+							{:else}
+								5
+							{/if}
+						</span>
+						<h2 class="text-sm font-semibold font-mono uppercase tracking-wider" style="color: oklch(0.70 0.02 250);">
+							Autonomous Mode
+						</h2>
+						<span class="text-[9px] font-mono px-1.5 py-0.5 rounded" style="background: oklch(0.25 0.02 250); color: oklch(0.55 0.02 250);">
+							recommended
+						</span>
+					</div>
+					<p class="text-[11px] ml-7 mt-1" style="color: oklch(0.50 0.02 250);">
+						Let agents run without permission prompts
+					</p>
+				</div>
+
+				{#if currentStep >= 5}
+					<AutonomousSetupStep onComplete={() => hasAutonomous = true} disabled={currentStep < 5} />
+				{:else}
+					<p class="text-xs font-mono" style="color: oklch(0.50 0.03 30);">
+						Complete the previous steps to continue.
+					</p>
 				{/if}
 			</div>
 		{/if}

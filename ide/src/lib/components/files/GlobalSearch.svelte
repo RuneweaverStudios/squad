@@ -408,7 +408,11 @@
 							>
 								<div class="result-header">
 									<span class="result-icon">{getFileIcon(result.file)}</span>
-									<span class="result-file">{result.file}</span>
+									{#if result.file.includes("/")}
+										<span class="result-dir">{result.file.slice(0, result.file.lastIndexOf("/") + 1)}</span><span class="result-file">{result.file.slice(result.file.lastIndexOf("/") + 1)}</span>
+									{:else}
+										<span class="result-file">{result.file}</span>
+									{/if}
 									<span class="result-line">:{result.line}</span>
 								</div>
 								<div class="result-content">
@@ -751,6 +755,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.375rem;
+		min-width: 0;
 	}
 
 	.result-icon {
@@ -758,19 +763,32 @@
 		flex-shrink: 0;
 	}
 
+	.result-dir {
+		font-size: 0.8125rem;
+		color: oklch(0.55 0.02 250);
+		font-family: ui-monospace, monospace;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		direction: rtl;
+		text-align: left;
+		flex-shrink: 1;
+		min-width: 0;
+	}
+
 	.result-file {
 		font-size: 0.8125rem;
 		color: oklch(0.75 0.12 220);
 		font-family: ui-monospace, monospace;
 		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
+		flex-shrink: 0;
 	}
 
 	.result-line {
 		font-size: 0.75rem;
 		color: oklch(0.55 0.02 250);
 		font-family: ui-monospace, monospace;
+		flex-shrink: 0;
 	}
 
 	.result-content {

@@ -5,7 +5,8 @@
 		{ num: 1, label: 'Prerequisites', subtitle: 'Required tools' },
 		{ num: 2, label: 'Agent Harness', subtitle: 'AI coding tools' },
 		{ num: 3, label: 'Add Project', subtitle: 'Your codebase' },
-		{ num: 4, label: 'First Task', subtitle: 'Ready to go' }
+		{ num: 4, label: 'First Task', subtitle: 'Something to do' },
+		{ num: 5, label: 'Autonomous', subtitle: 'YOLO mode' }
 	];
 </script>
 
@@ -51,7 +52,7 @@
 		<!-- Connector line between steps -->
 		{#if i < steps.length - 1}
 			<div
-				class="w-16 h-0.5 mt-[-1rem] mx-2 rounded transition-all duration-300"
+				class="w-10 h-0.5 mt-[-1rem] mx-1 rounded transition-all duration-300"
 				style="background: {isComplete ? 'oklch(0.50 0.15 145)' : 'oklch(0.30 0.02 250)'};"
 			></div>
 		{/if}

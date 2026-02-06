@@ -305,7 +305,7 @@
 		<div class="header-info">
 			<h2 class="section-title">User Templates</h2>
 			<p class="section-desc">
-				Custom templates stored in <code>~/.config/jat/templates/</code>
+				Reusable boilerplate for creating slash commands. When you create a new command in the <a href="/config?tab=commands" class="link-inline">Commands</a> tab, you pick a template, fill in its <code>{`{{variables}}`}</code>, and the template generates the command content. Stored in <code>~/.config/jat/templates/</code>.
 			</p>
 		</div>
 		<div class="header-actions">
@@ -643,6 +643,18 @@
 		padding: 0.125rem 0.375rem;
 		border-radius: 4px;
 		font-size: 0.75rem;
+	}
+
+	.section-desc :global(.link-inline) {
+		color: oklch(0.70 0.15 220);
+		text-decoration: underline;
+		text-decoration-color: oklch(0.70 0.15 220 / 0.3);
+		text-underline-offset: 2px;
+	}
+
+	.section-desc :global(.link-inline:hover) {
+		color: oklch(0.80 0.15 220);
+		text-decoration-color: oklch(0.80 0.15 220 / 0.6);
 	}
 
 	.header-actions {
