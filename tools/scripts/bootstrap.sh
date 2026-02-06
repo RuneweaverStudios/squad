@@ -52,7 +52,7 @@ fi
 INSTALL_DIR="${JAT_INSTALL_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/jat}"
 
 # Check for existing installation
-if [ -d "$INSTALL_DIR" ]; then
+if [ -d "$INSTALL_DIR/.git" ]; then
     echo -e "${BLUE}Existing installation found at: $INSTALL_DIR${NC}"
     echo ""
     echo "Options:"
@@ -115,6 +115,49 @@ if [ -d "$INSTALL_DIR" ]; then
         *)
             echo -e "${RED}Invalid choice: $choice${NC}"
             echo "Please enter 1, 2, or 3"
+            exit 1
+            ;;
+    esac
+elif [ -d "$INSTALL_DIR" ]; then
+    # Directory exists but is NOT a git repo (e.g. whisper data, partial install)
+    echo -e "${YELLOW}Directory exists but is not a JAT git clone: $INSTALL_DIR${NC}"
+    echo ""
+    echo "Options:"
+    echo "  1) Clone JAT into existing directory (preserves other files)"
+    echo "  2) Remove and fresh install"
+    echo "  3) Cancel"
+    echo ""
+
+    prompt_choice "Choose [1-3] (default: 1): " "1" "choice"
+
+    case "$choice" in
+        1)
+            echo ""
+            echo -e "${BLUE}Cloning JAT into existing directory...${NC}"
+            # Clone to temp, then move .git and files in
+            TMPDIR="$(mktemp -d)"
+            git clone https://github.com/joewinke/jat.git "$TMPDIR"
+            # Move git history and working tree into existing dir
+            mv "$TMPDIR/.git" "$INSTALL_DIR/.git"
+            # Checkout files (won't overwrite existing non-tracked files)
+            cd "$INSTALL_DIR"
+            git checkout -- . 2>/dev/null || true
+            rm -rf "$TMPDIR"
+            echo -e "${GREEN}✓ JAT cloned into $INSTALL_DIR${NC}"
+            ;;
+        2)
+            echo ""
+            echo -e "${YELLOW}Removing existing directory...${NC}"
+            rm -rf "$INSTALL_DIR"
+            echo -e "${BLUE}Cloning JAT...${NC}"
+            git clone https://github.com/joewinke/jat.git "$INSTALL_DIR"
+            ;;
+        3)
+            echo "Cancelled"
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}Invalid choice: $choice${NC}"
             exit 1
             ;;
     esac
