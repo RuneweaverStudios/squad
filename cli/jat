@@ -823,11 +823,9 @@ launch_ide() {
         echo -e "${GREEN}  ✓ Dependencies installed${NC}"
     fi
 
-    # Detect if HTTPS is enabled (certs exist in ide/certs/)
+    # Protocol is always HTTP unless --https is explicitly passed to vite
+    # (certs on disk alone don't enable HTTPS - vite requires the --https flag)
     local ide_protocol="http"
-    if [[ -f "$ide_path/certs/localhost.pem" ]] && [[ -f "$ide_path/certs/localhost-key.pem" ]]; then
-        ide_protocol="https"
-    fi
 
     # Use server-jat prefix so the /api/servers endpoint can find it
     local session_name="server-jat"

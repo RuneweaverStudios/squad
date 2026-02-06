@@ -35,9 +35,14 @@ const buildDate = new Date().toLocaleDateString('en-US', {
 	year: 'numeric'
 });
 
-// HTTPS configuration for dev:https mode
+// HTTPS configuration for dev:https mode only
 // Certificates are generated via: npm run certs:generate
+// Only returns config when --https flag is passed (npm run dev:https),
+// NOT when certs merely exist on disk (npm run dev should stay HTTP)
 function getHttpsConfig(): { key: Buffer; cert: Buffer } | undefined {
+	const wantsHttps = process.argv.includes('--https');
+	if (!wantsHttps) return undefined;
+
 	const certPath = resolve(__dirname, 'certs', 'localhost.pem');
 	const keyPath = resolve(__dirname, 'certs', 'localhost-key.pem');
 
