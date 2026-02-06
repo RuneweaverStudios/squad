@@ -243,8 +243,10 @@ export async function PATCH({ params, request }) {
 		if (updates.labels !== undefined) {
 			if (Array.isArray(updates.labels)) {
 				updateFields.labels = updates.labels.map((/** @type {string} */ l) => l.trim()).filter(Boolean);
-			} else if (typeof updates.labels === 'string' && updates.labels.trim()) {
-				updateFields.labels = updates.labels.split(',').map((/** @type {string} */ l) => l.trim()).filter(Boolean);
+			} else if (typeof updates.labels === 'string') {
+				updateFields.labels = updates.labels.trim()
+					? updates.labels.split(',').map((/** @type {string} */ l) => l.trim()).filter(Boolean)
+					: [];
 			}
 		}
 

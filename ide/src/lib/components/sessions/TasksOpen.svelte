@@ -320,33 +320,32 @@
 		const newLabels = agentId === 'claude-code'
 			? otherLabels
 			: [...otherLabels, `harness:${agentId}`];
-		await fetchWithTimeout(`/api/tasks/${taskId}`, {
-			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ labels: newLabels.join(',') })
-		});
+		try {
+			const resp = await fetchWithTimeout(`/api/tasks/${taskId}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ labels: newLabels.join(',') })
+			});
+			if (!resp.ok) {
+				console.error('Failed to update harness:', resp.status, await resp.text());
+			}
+		} catch (err) {
+			console.error('Failed to update harness:', err);
+		}
 		onRetry();
 	}
 
-	// Close single-task harness picker on click outside or Escape
+	// Close single-task harness picker on Escape key
 	$effect(() => {
 		if (!harnessPickerTaskId) return;
 
-		function handleClick() {
-			harnessPickerTaskId = null;
-		}
 		function handleKeyDown(e: KeyboardEvent) {
 			if (e.key === 'Escape') harnessPickerTaskId = null;
 		}
 
-		const timer = setTimeout(() => {
-			document.addEventListener('click', handleClick);
-			document.addEventListener('keydown', handleKeyDown);
-		}, 0);
+		document.addEventListener('keydown', handleKeyDown);
 
 		return () => {
-			clearTimeout(timer);
-			document.removeEventListener('click', handleClick);
 			document.removeEventListener('keydown', handleKeyDown);
 		};
 	});
