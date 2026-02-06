@@ -131,30 +131,17 @@
 			// Add custom Paste action to context menu
 			// Monaco's built-in context menu doesn't include Paste because the editor
 			// doesn't use native <input>/<textarea> elements, so browsers don't offer
-			// standard clipboard actions. We add it manually via the Clipboard API.
+			// standard clipboard actions. We use execCommand('paste') which triggers
+			// the native paste pathway without a clipboard permission prompt.
 			editorInstance.addAction({
 				id: 'editor.action.clipboardPasteAction',
 				label: 'Paste',
 				keybindings: [monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyV],
 				contextMenuGroupId: 'clipboard',
 				contextMenuOrder: 3,
-				run: async (ed: Monaco.editor.ICodeEditor) => {
-					try {
-						const text = await navigator.clipboard.readText();
-						if (text) {
-							const selection = ed.getSelection();
-							if (selection) {
-								ed.executeEdits('paste', [{
-									range: selection,
-									text: text,
-									forceMoveMarkers: true
-								}]);
-							}
-						}
-					} catch (err) {
-						// Clipboard access may be denied - fail silently
-						console.warn('Clipboard paste failed:', err);
-					}
+				run: (ed: Monaco.editor.ICodeEditor) => {
+					ed.focus();
+					document.execCommand('paste');
 				}
 			});
 
