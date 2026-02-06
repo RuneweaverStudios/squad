@@ -44,6 +44,17 @@ export interface TemplateVariable {
 	required?: boolean;
 }
 
+/** Template category for organizing templates by type */
+export type TemplateCategory = 'commands' | 'hooks' | 'tools' | 'subagents' | 'custom';
+
+/** Category metadata for display */
+export interface TemplateCategoryMeta {
+	id: TemplateCategory;
+	name: string;
+	icon: string;
+	description: string;
+}
+
 export interface CommandTemplate {
 	/** Unique identifier */
 	id: string;
@@ -66,7 +77,45 @@ export interface CommandTemplate {
 	useCase: string;
 	/** Template variables that can be replaced during application */
 	variables?: TemplateVariable[];
+	/** Category for grouping in the templates page */
+	category?: TemplateCategory;
 }
+
+/**
+ * Template categories with metadata for grouping in the UI.
+ */
+export const TEMPLATE_CATEGORIES: TemplateCategoryMeta[] = [
+	{
+		id: 'commands',
+		name: 'Slash Commands',
+		icon: 'M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z',
+		description: 'Skill files that agents execute as /commands'
+	},
+	{
+		id: 'hooks',
+		name: 'Hook Scripts',
+		icon: 'M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.686-2.467a4.5 4.5 0 00-6.364-6.364L4.5 8.257m10.5-1.247l4.182 4.182a2.25 2.25 0 010 3.182l-4.182 4.182',
+		description: 'PreToolUse/PostToolUse bash scripts for Claude Code'
+	},
+	{
+		id: 'tools',
+		name: 'CLI Tools',
+		icon: 'M11.42 15.17l-5.17-3.03M11.42 15.17l5.17-3.03M11.42 15.17V20.5m0-5.33V4.5m0 0L6.25 7.53m5.17-3.03l5.17 3.03',
+		description: 'Bash/Node scripts symlinked to ~/.local/bin/'
+	},
+	{
+		id: 'subagents',
+		name: 'Subagents',
+		icon: 'M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z',
+		description: 'Task tool agent definitions for specialized work'
+	},
+	{
+		id: 'custom',
+		name: 'Other',
+		icon: 'M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z',
+		description: 'Uncategorized templates'
+	}
+];
 
 /**
  * Basic Template
@@ -79,6 +128,7 @@ const basicTemplate: CommandTemplate = {
 	name: 'Basic',
 	description: 'Minimal structure with frontmatter and description',
 	icon: '📄',
+	category: 'commands',
 	useCase: 'Simple commands, quick utilities, documentation-style commands',
 	frontmatter: {
 		description: '',
@@ -170,6 +220,7 @@ const workflowTemplate: CommandTemplate = {
 	name: 'Workflow',
 	description: 'Step-by-step pattern with implementation sections',
 	icon: '⚡',
+	category: 'commands',
 	useCase: 'Multi-step processes, agent workflows, complex operations',
 	frontmatter: {
 		description: '',
@@ -287,6 +338,7 @@ const toolTemplate: CommandTemplate = {
 	name: 'Tool',
 	description: 'Bash tool wrapper with I/O documentation',
 	icon: '🔧',
+	category: 'tools',
 	useCase: 'CLI tool wrappers, database operations, system utilities',
 	frontmatter: {
 		description: '',
@@ -440,6 +492,7 @@ const agentTemplate: CommandTemplate = {
 	name: 'Agent',
 	description: 'Agent coordination with signals, mail, and JAT Tasks',
 	icon: '🤖',
+	category: 'commands',
 	useCase: 'Agent workflow commands, coordination, task management',
 	frontmatter: {
 		description: '',
@@ -605,6 +658,7 @@ const apiIntegrationTemplate: CommandTemplate = {
 	name: 'API Integration',
 	description: 'REST/GraphQL API endpoint integration with auth',
 	icon: '🔌',
+	category: 'commands',
 	useCase: 'API calls, webhooks, external service integration',
 	frontmatter: {
 		description: '',
@@ -786,6 +840,7 @@ const databaseOperationsTemplate: CommandTemplate = {
 	name: 'Database Operations',
 	description: 'SQL/ORM database queries and migrations',
 	icon: '🗃️',
+	category: 'commands',
 	useCase: 'Database queries, migrations, data operations',
 	frontmatter: {
 		description: '',
@@ -993,6 +1048,7 @@ const testingCommandsTemplate: CommandTemplate = {
 	name: 'Testing Commands',
 	description: 'Test runners, assertions, and coverage',
 	icon: '🧪',
+	category: 'commands',
 	useCase: 'Unit tests, integration tests, E2E tests, test automation',
 	frontmatter: {
 		description: '',
@@ -1232,6 +1288,267 @@ node --inspect-brk node_modules/.bin/{{testRunner}} run
 };
 
 /**
+ * Hook Script Template
+ *
+ * Bash script for Claude Code PreToolUse/PostToolUse hooks.
+ * Captures tool data, writes to temp files for IDE consumption.
+ */
+const hookScriptTemplate: CommandTemplate = {
+	id: 'hook-script',
+	name: 'Hook Script',
+	description: 'PreToolUse/PostToolUse bash hook for Claude Code',
+	icon: '🪝',
+	category: 'hooks',
+	useCase: 'Intercept tool calls, capture data for IDE, emit signals',
+	frontmatter: {
+		description: '',
+		author: '',
+		version: '1.0.0',
+		tags: 'hook, claude-code'
+	},
+	variables: [
+		{
+			name: 'hookType',
+			label: 'Hook Type',
+			placeholder: 'PreToolUse',
+			defaultValue: 'PreToolUse',
+			hint: 'PreToolUse (before execution) or PostToolUse (after execution)'
+		},
+		{
+			name: 'toolName',
+			label: 'Tool Name (matcher)',
+			placeholder: 'AskUserQuestion',
+			required: true,
+			hint: 'The tool to intercept: Bash, Edit, Write, AskUserQuestion, etc.'
+		},
+		{
+			name: 'hookDescription',
+			label: 'Description',
+			placeholder: 'Capture question data for IDE display',
+			hint: 'What this hook does'
+		}
+	],
+	content: `#!/usr/bin/env bash
+#
+# {{hookType}} hook for {{toolName}}
+#
+# {{hookDescription}}
+#
+# Hook type: {{hookType}}
+# Matcher: {{toolName}}
+#
+# Install in .claude/settings.json:
+# {
+#   "hooks": {
+#     "{{hookType}}": [
+#       {
+#         "matcher": "{{toolName}}",
+#         "hooks": [
+#           { "type": "command", "command": ".claude/hooks/this-script.sh" }
+#         ]
+#       }
+#     ]
+#   }
+# }
+
+set -euo pipefail
+
+# Read tool info from stdin (JSON with tool_input, session_id, etc.)
+TOOL_INFO=$(cat)
+
+# Extract session ID
+SESSION_ID=$(echo "$TOOL_INFO" | jq -r '.session_id // ""' 2>/dev/null || echo "")
+
+if [[ -z "$SESSION_ID" ]]; then
+    exit 0  # Can't determine session, skip
+fi
+
+# --- Resolve agent identity ---
+
+TMUX_SESSION=""
+AGENT_NAME=""
+
+# Method 1: From TMUX env var (may not be passed to hook subprocess)
+if [[ -n "\${TMUX:-}" ]]; then
+    TMUX_SESSION=$(tmux display-message -p '#S' 2>/dev/null || echo "")
+fi
+
+# Method 2: From agent session file (more reliable)
+if [[ -z "$TMUX_SESSION" ]]; then
+    AGENT_FILE=".claude/sessions/agent-\${SESSION_ID}.txt"
+    if [[ -f "$AGENT_FILE" ]]; then
+        AGENT_NAME=$(cat "$AGENT_FILE" 2>/dev/null | tr -d '\\n')
+        TMUX_SESSION="jat-\${AGENT_NAME}"
+    fi
+fi
+
+# --- Extract tool data ---
+
+# For PreToolUse: tool_input contains the planned arguments
+# For PostToolUse: output contains the result, tool_input has original args
+TOOL_INPUT=$(echo "$TOOL_INFO" | jq -c '.tool_input // {}' 2>/dev/null || echo "{}")
+
+# --- Write state for IDE ---
+
+# Build data JSON
+DATA=$(jq -n -c \\
+    --arg session_id "$SESSION_ID" \\
+    --arg tmux "$TMUX_SESSION" \\
+    --argjson tool_input "$TOOL_INPUT" \\
+    '{
+        session_id: $session_id,
+        tmux_session: $tmux,
+        timestamp: (now | todate),
+        tool_input: $tool_input
+    }' 2>/dev/null || echo "{}")
+
+# Write to temp file for IDE to poll
+OUTFILE="/tmp/claude-hook-\${SESSION_ID}.json"
+echo "$DATA" > "$OUTFILE" 2>/dev/null || true
+
+# Also write by tmux session name for easy lookup
+if [[ -n "$TMUX_SESSION" ]]; then
+    echo "$DATA" > "/tmp/claude-hook-tmux-\${TMUX_SESSION}.json" 2>/dev/null || true
+fi
+
+exit 0
+`
+};
+
+/**
+ * Subagent Template
+ *
+ * Task tool invocation pattern for defining specialized subagents.
+ * Based on the agent types available in the Task tool system.
+ */
+const subagentTemplate: CommandTemplate = {
+	id: 'subagent',
+	name: 'Subagent',
+	description: 'Task tool agent definition for specialized autonomous work',
+	icon: '🧠',
+	category: 'subagents',
+	useCase: 'Specialized research, code exploration, background tasks',
+	frontmatter: {
+		description: '',
+		author: '',
+		version: '1.0.0',
+		tags: 'subagent, task-tool'
+	},
+	variables: [
+		{
+			name: 'agentName',
+			label: 'Agent Name',
+			placeholder: 'code-reviewer',
+			required: true,
+			hint: 'Short identifier for this subagent type (kebab-case)'
+		},
+		{
+			name: 'agentDescription',
+			label: 'Description',
+			placeholder: 'Reviews code for bugs, security issues, and best practices',
+			required: true,
+			multiline: true,
+			hint: 'What this subagent specializes in'
+		},
+		{
+			name: 'agentTools',
+			label: 'Available Tools',
+			placeholder: 'Read, Grep, Glob, WebSearch',
+			defaultValue: 'Read, Grep, Glob',
+			hint: 'Comma-separated list of tools the subagent can use'
+		}
+	],
+	content: `---
+description: {{agentName}} subagent definition
+author:
+version: 1.0.0
+tags: subagent, task-tool
+---
+
+# {{agentName}} Subagent
+
+{{agentDescription}}
+
+## When to Use
+
+Launch this subagent when you need:
+- [Describe scenario 1]
+- [Describe scenario 2]
+- [Describe scenario 3]
+
+## Available Tools
+
+{{agentTools}}
+
+## Invocation Pattern
+
+Use the Task tool to launch this subagent:
+
+\`\`\`typescript
+// Launch the {{agentName}} subagent
+Task({
+  description: "{{agentName}}: [brief task description]",
+  prompt: \`
+    [Detailed instructions for the subagent]
+
+    Context:
+    - [Relevant context from the parent task]
+    - [File paths, function names, etc.]
+
+    Expected output:
+    - [What the subagent should return]
+  \`,
+  subagent_type: "general-purpose"
+})
+\`\`\`
+
+## Prompt Template
+
+\`\`\`
+You are a specialized {{agentName}} agent.
+
+{{agentDescription}}
+
+## Your Task
+
+[Task description provided at invocation time]
+
+## Guidelines
+
+1. Focus only on the specific request
+2. Return structured, actionable findings
+3. Include file paths and line numbers where relevant
+4. Be concise - the parent agent needs a summary, not a report
+
+## Output Format
+
+Return your findings as:
+- **Summary**: One-line overview
+- **Details**: Bulleted list of findings
+- **Recommendations**: Suggested next steps (if any)
+\`\`\`
+
+## Example Usage
+
+\`\`\`typescript
+// Example: Launch {{agentName}} for a specific task
+Task({
+  description: "{{agentName}}: analyze authentication module",
+  prompt: "Review src/auth/ for security vulnerabilities. Focus on token handling and session management. Return findings with file:line references.",
+  subagent_type: "general-purpose"
+})
+\`\`\`
+
+## Notes
+
+- Subagents run in isolation and cannot modify files unless given Edit/Write tools
+- Keep prompts focused - one clear objective per invocation
+- Subagents return results to the parent agent, not directly to the user
+- Use \`run_in_background: true\` for long-running investigations
+`
+};
+
+/**
  * All available command templates.
  */
 export const COMMAND_TEMPLATES: CommandTemplate[] = [
@@ -1241,7 +1558,9 @@ export const COMMAND_TEMPLATES: CommandTemplate[] = [
 	agentTemplate,
 	apiIntegrationTemplate,
 	databaseOperationsTemplate,
-	testingCommandsTemplate
+	testingCommandsTemplate,
+	hookScriptTemplate,
+	subagentTemplate
 ];
 
 /**

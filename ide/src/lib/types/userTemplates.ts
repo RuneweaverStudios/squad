@@ -8,7 +8,7 @@
  * which should only be imported in server-side code (+server.ts files).
  */
 
-import type { CommandTemplate, TemplateVariable } from '$lib/config/commandTemplates';
+import type { CommandTemplate, TemplateCategory, TemplateVariable } from '$lib/config/commandTemplates';
 
 /**
  * User template stored on disk
@@ -48,6 +48,8 @@ export interface TemplateFile {
 	useCase: string;
 	/** Template variables */
 	variables?: TemplateVariable[];
+	/** Category for grouping */
+	category?: TemplateCategory;
 	/** Creation timestamp */
 	createdAt?: string;
 	/** Last modified timestamp */

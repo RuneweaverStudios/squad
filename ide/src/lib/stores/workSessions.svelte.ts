@@ -774,6 +774,13 @@ export function stopPolling(): void {
 		pollingInterval = null;
 	}
 
+	// Abort any in-flight fetch request to prevent orphaned responses
+	if (fetchAbortController) {
+		fetchAbortController.abort();
+		fetchAbortController = null;
+	}
+	fetchInProgress = false;
+
 	// Also unsubscribe from WebSocket output updates
 	unsubscribeFromOutputUpdates();
 
@@ -985,6 +992,12 @@ export function stopActivityPolling(): void {
 		clearInterval(activityPollingInterval);
 		activityPollingInterval = null;
 	}
+	// Abort any in-flight activity fetch to prevent orphaned requests
+	if (activityAbortController) {
+		activityAbortController.abort();
+		activityAbortController = null;
+	}
+	activityFetchInFlight = false;
 }
 
 /**

@@ -8,8 +8,8 @@
 	},
 	"scripts": {
 		"postinstall": "cd .. && npm install --ignore-scripts",
-		"dev": "vite dev --host 127.0.0.1",
-		"dev:https": "vite dev --host 127.0.0.1 --https",
+		"dev": "svelte-kit sync && vite dev --host 127.0.0.1",
+		"dev:https": "svelte-kit sync && vite dev --host 127.0.0.1 --https",
 		"build": "vite build",
 		"preview": "vite preview",
 		"start": "node build/index.js",

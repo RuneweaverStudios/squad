@@ -226,6 +226,9 @@ let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_DELAY = 3000;
 
+// Cleanup function for automation trigger subscription (prevent leak on reconnect)
+let unsubAutomationCleanup: (() => void) | null = null;
+
 // ============================================================================
 // Auto-Kill Functions
 // ============================================================================
@@ -785,8 +788,14 @@ export function connectSessionEvents(): void {
 	// Initialize automation rules store (loads rules from localStorage)
 	initAutomationStore();
 
+	// Clean up any previous automation subscription (prevents leak on reconnect)
+	if (unsubAutomationCleanup) {
+		unsubAutomationCleanup();
+		unsubAutomationCleanup = null;
+	}
+
 	// Subscribe to automation triggers to update recovering state in workSessions
-	const unsubAutomation = onAutomationTrigger((sessionName, rule, match, results) => {
+	unsubAutomationCleanup = onAutomationTrigger((sessionName, rule, match, results) => {
 		// Only set recovering state for recovery category rules
 		if (rule.category === 'recovery') {
 			const sessionIndex = workSessionsState.sessions.findIndex(s => s.sessionName === sessionName);
@@ -900,6 +909,23 @@ export function disconnectSessionEvents(): void {
 		eventSource.close();
 		eventSource = null;
 	}
+
+	// Clean up automation trigger subscription (prevents leak across reconnects)
+	if (unsubAutomationCleanup) {
+		unsubAutomationCleanup();
+		unsubAutomationCleanup = null;
+	}
+
+	// Cancel all scheduled auto-kill timers (prevents orphaned timeouts/intervals)
+	for (const [sessionName, scheduled] of scheduledAutoKills) {
+		clearTimeout(scheduled.timeout);
+		clearInterval(scheduled.interval);
+	}
+	scheduledAutoKills.clear();
+	autoKillCountdowns.update(map => {
+		map.clear();
+		return map;
+	});
 
 	// Clear initialized sessions so a fresh connection acts like a new page load
 	initializedSessions.clear();
