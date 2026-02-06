@@ -128,15 +128,50 @@
 				isEditorFocused = false;
 			});
 
-			// Add custom Paste action to context menu
-			// Monaco's built-in context menu doesn't include Paste because the editor
-			// doesn't use native <input>/<textarea> elements, so browsers don't offer
-			// standard clipboard actions. We use execCommand('paste') which triggers
-			// the native paste pathway without a clipboard permission prompt.
+			// Add clipboard actions (Cut, Copy, Paste) to context menu
+			// Monaco's built-in context menu doesn't include clipboard actions because
+			// the editor doesn't use native <input>/<textarea> elements, so browsers
+			// don't offer standard clipboard actions automatically.
+			editorInstance.addAction({
+				id: 'editor.action.clipboardCopyAction',
+				label: 'Copy',
+				keybindings: [monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyC],
+				contextMenuGroupId: 'clipboard',
+				contextMenuOrder: 1,
+				run: (ed: Monaco.editor.ICodeEditor) => {
+					const selection = ed.getSelection();
+					const model = ed.getModel();
+					if (selection && !selection.isEmpty() && model) {
+						const text = model.getValueInRange(selection);
+						navigator.clipboard.writeText(text);
+					}
+				}
+			});
+
+			editorInstance.addAction({
+				id: 'editor.action.clipboardCutAction',
+				label: 'Cut',
+				keybindings: [monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyX],
+				contextMenuGroupId: 'clipboard',
+				contextMenuOrder: 2,
+				run: (ed: Monaco.editor.ICodeEditor) => {
+					const selection = ed.getSelection();
+					const model = ed.getModel();
+					if (selection && !selection.isEmpty() && model) {
+						const text = model.getValueInRange(selection);
+						navigator.clipboard.writeText(text);
+						ed.executeEdits('cut', [{
+							range: selection,
+							text: '',
+							forceMoveMarkers: true
+						}]);
+					}
+				}
+			});
+
 			editorInstance.addAction({
 				id: 'editor.action.clipboardPasteAction',
 				label: 'Paste',
-				keybindings: [monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyV],
 				contextMenuGroupId: 'clipboard',
 				contextMenuOrder: 3,
 				run: (ed: Monaco.editor.ICodeEditor) => {

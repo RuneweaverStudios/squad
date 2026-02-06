@@ -292,7 +292,8 @@ export async function saveProject(project: ProjectConfig): Promise<boolean> {
 				server_path: project.server_path,
 				database_url: project.database_url,
 				active_color: project.colors?.active,
-				inactive_color: project.colors?.inactive
+				inactive_color: project.colors?.inactive,
+				default_harness: project.default_harness
 			})
 		});
 

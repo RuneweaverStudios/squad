@@ -25,6 +25,8 @@
 	import CreateTemplate from './tasks/CreateTemplate.svelte';
 	import CreateGenerator from './tasks/CreateGenerator.svelte';
 	import CreatePlan from './tasks/CreatePlan.svelte';
+	import { AGENT_PRESETS } from '$lib/types/agentProgram';
+	import ProviderLogo from '$lib/components/agents/ProviderLogo.svelte';
 
 	// Type for pending attachments (before upload)
 	interface PendingAttachment {
@@ -95,6 +97,29 @@
 				formData.project = '';
 				projectSelectionRequired = true;
 			}
+		}
+	});
+
+	// Fetch project harness defaults when drawer opens
+	$effect(() => {
+		if (isOpen && Object.keys(projectHarnessMap).length === 0) {
+			fetch('/api/projects?visible=true')
+				.then(r => r.json())
+				.then(data => {
+					const map: Record<string, string> = {};
+					for (const p of data.projects || []) {
+						if (p.defaultHarness) map[p.name] = p.defaultHarness;
+					}
+					projectHarnessMap = map;
+				})
+				.catch(() => {});
+		}
+	});
+
+	// Update harness when project selection changes
+	$effect(() => {
+		if (formData.project) {
+			selectedHarness = projectHarnessMap[formData.project] || 'claude-code';
 		}
 	});
 
@@ -232,6 +257,11 @@
 	let drawerPanel: HTMLDivElement;
 	let projectDropdownOpen = $state(false);
 	let projectDropdownIndex = $state(0);
+
+	// Harness selection state
+	let selectedHarness = $state<string>('claude-code');
+	let harnessDropdownOpen = $state(false);
+	let projectHarnessMap = $state<Record<string, string>>({});
 
 	// AI suggestion state
 	let isLoadingSuggestions = $state(false);
@@ -881,6 +911,11 @@
 				labels.push('human-action');
 			}
 
+			// Add harness label if non-default harness selected
+			if (selectedHarness && selectedHarness !== 'claude-code') {
+				labels.push(`harness:${selectedHarness}`);
+			}
+
 			// Get dependencies from selected list
 			const dependencies = selectedDependencies.map(d => d.id);
 
@@ -1042,6 +1077,10 @@
 
 		// Reset human action toggle
 		isHumanAction = false;
+
+		// Reset harness selection
+		selectedHarness = 'claude-code';
+		harnessDropdownOpen = false;
 
 		// Reset review override
 		reviewOverride = null;
@@ -1378,6 +1417,41 @@
 								{/each}
 							</ul>
 						</div>
+
+					<!-- Harness Selector Badge -->
+					<div class="dropdown dropdown-end" class:dropdown-open={harnessDropdownOpen}>
+						<button type="button"
+							class="badge badge-lg gap-1.5 px-2 pt-0.5 font-mono text-xs cursor-pointer"
+							style="background: oklch(0.30 0.03 250); border-color: oklch(0.40 0.04 250); color: oklch(0.75 0.02 250);"
+							disabled={formDisabled || isSubmitting}
+							onclick={() => harnessDropdownOpen = !harnessDropdownOpen}
+						>
+							<ProviderLogo agentId={selectedHarness} size={14} />
+							<svg class="w-3 h-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+							</svg>
+						</button>
+						{#if harnessDropdownOpen}
+							<!-- svelte-ignore a11y_no_static_element_interactions -->
+							<ul class="dropdown-content menu bg-base-200 rounded-box z-50 w-48 p-2 shadow-lg border border-base-content/10" onclick={(e) => e.stopPropagation()}>
+								{#each AGENT_PRESETS as preset}
+									<li>
+										<button class="flex items-center gap-2 {selectedHarness === preset.id ? 'active' : ''}"
+											onclick={() => { selectedHarness = preset.id; harnessDropdownOpen = false; }}
+										>
+											<ProviderLogo agentId={preset.id} size={16} />
+											<span>{preset.config.name}</span>
+											{#if selectedHarness === preset.id}
+												<svg class="w-4 h-4 ml-auto text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+												</svg>
+											{/if}
+										</button>
+									</li>
+								{/each}
+							</ul>
+						{/if}
+					</div>
 					</div>
 					<p class="text-sm mt-1 {formDisabled ? 'text-warning' : 'text-base-content/70'}">
 						{#if formDisabled}

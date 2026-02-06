@@ -515,6 +515,7 @@ export async function GET({ url }) {
 					description: config.description || null,
 					notes: config.notes || null,
 					notesHeight: config.notes_height || null,
+					defaultHarness: config.default_harness || null,
 					hidden: hiddenProjects.has(key.toLowerCase()),
 					source: 'jat-config'
 				});
@@ -695,7 +696,7 @@ function validateProjectKey(key) {
 export async function PATCH({ request }) {
 	try {
 		const body = await request.json();
-		const { project, description, port, server_path, database_url, active_color, inactive_color, notes, notes_height } = body;
+		const { project, description, port, server_path, database_url, active_color, inactive_color, notes, notes_height, default_harness } = body;
 
 		if (!project) {
 			return json({ error: 'Project name required' }, { status: 400 });
@@ -747,6 +748,13 @@ export async function PATCH({ request }) {
 				delete jatConfig.projects[project].notes_height;
 			}
 		}
+		if (default_harness !== undefined) {
+			if (default_harness && default_harness !== 'claude-code') {
+				jatConfig.projects[project].default_harness = default_harness;
+			} else {
+				delete jatConfig.projects[project].default_harness;
+			}
+		}
 
 		const success = await writeJatConfig(jatConfig);
 		if (!success) {
@@ -766,7 +774,8 @@ export async function PATCH({ request }) {
 			active_color: jatConfig.projects[project].active_color,
 			inactive_color: jatConfig.projects[project].inactive_color,
 			notes: jatConfig.projects[project].notes,
-			notes_height: jatConfig.projects[project].notes_height
+			notes_height: jatConfig.projects[project].notes_height,
+			default_harness: jatConfig.projects[project].default_harness || null
 		});
 	} catch (error) {
 		console.error('Failed to update project:', error);
@@ -786,7 +795,7 @@ export async function POST({ request }) {
 
 		// Handle create action
 		if (body.action === 'create') {
-			const { key, path: projectPath, name, port, description, active_color, inactive_color, createDirectory } = body;
+			const { key, path: projectPath, name, port, description, active_color, inactive_color, default_harness, createDirectory } = body;
 
 			// Validate key format
 			const keyValidation = validateProjectKey(key);
@@ -864,6 +873,9 @@ export async function POST({ request }) {
 			}
 			if (inactive_color) {
 				jatConfig.projects[key].inactive_color = inactive_color;
+			}
+			if (default_harness && default_harness !== 'claude-code') {
+				jatConfig.projects[key].default_harness = default_harness;
 			}
 
 			// Save config

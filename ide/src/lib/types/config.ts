@@ -174,6 +174,8 @@ export interface ProjectConfig {
 	database_url?: string;
 	/** Whether to hide this project from default views (optional) */
 	hidden?: boolean;
+	/** Default agent harness for new tasks (optional, defaults to claude-code) */
+	default_harness?: string;
 	/** Project stats (optional, only when fetched with ?stats=true) */
 	stats?: ProjectStats;
 }

@@ -1134,13 +1134,15 @@
 							{:else if event.type === 'complete' && event.data}
 								<!-- Rich Completion Bundle UI -->
 								{@const bundle = event.data}
+								{@const bundleSummary = Array.isArray(bundle.summary) ? bundle.summary : (typeof bundle.summary === 'string' ? [bundle.summary] : [])}
+								{@const bundleQuality = bundle.quality || bundle.qualityChecks}
 								<div class="space-y-3">
 									<!-- Summary Section -->
-									{#if bundle.summary && bundle.summary.length > 0}
+									{#if bundleSummary.length > 0}
 										<div>
 											<div class="text-[10px] font-medium mb-1 text-base-content/50">CHANGES MADE</div>
 											<ul class="space-y-0.5">
-												{#each bundle.summary as item}
+												{#each bundleSummary as item}
 													<li class="flex items-start gap-2 text-xs text-base-content/70">
 														<span class="text-success">•</span>
 														<span>{item}</span>
@@ -1151,20 +1153,20 @@
 									{/if}
 
 									<!-- Quality Badges -->
-									{#if bundle.quality}
+									{#if bundleQuality}
 										<div class="flex flex-wrap gap-2">
-											{#if bundle.quality.tests}
-												<span class="badge badge-xs {bundle.quality.tests === 'passing' ? 'badge-success' : bundle.quality.tests === 'failing' ? 'badge-error' : 'badge-ghost'}">
-													Tests: {bundle.quality.tests}
+											{#if bundleQuality.tests}
+												<span class="badge badge-xs {bundleQuality.tests === 'passing' ? 'badge-success' : bundleQuality.tests === 'failing' ? 'badge-error' : 'badge-ghost'}">
+													Tests: {bundleQuality.tests}
 												</span>
 											{/if}
-											{#if bundle.quality.build}
-												<span class="badge badge-xs {bundle.quality.build === 'clean' ? 'badge-success' : bundle.quality.build === 'warnings' ? 'badge-warning' : 'badge-error'}">
-													Build: {bundle.quality.build}
+											{#if bundleQuality.build}
+												<span class="badge badge-xs {bundleQuality.build === 'clean' ? 'badge-success' : bundleQuality.build === 'warnings' ? 'badge-warning' : 'badge-error'}">
+													Build: {bundleQuality.build}
 												</span>
 											{/if}
-											{#if bundle.quality.preExisting}
-												<span class="badge badge-xs badge-ghost">ℹ️ {bundle.quality.preExisting}</span>
+											{#if bundleQuality.preExisting}
+												<span class="badge badge-xs badge-ghost">ℹ️ {bundleQuality.preExisting}</span>
 											{/if}
 										</div>
 									{/if}
@@ -1351,6 +1353,7 @@
 							{:else if (event.state === 'completed' || event.type === 'completed' || event.type === 'complete') && event.data}
 								<!-- Rich Completed Signal UI -->
 								{@const completedData = event.data}
+								{@const completedSummary = Array.isArray(completedData.summary) ? completedData.summary : (typeof completedData.summary === 'string' ? [completedData.summary] : [])}
 								<div class="space-y-3">
 									<!-- Outcome Badge -->
 									{#if completedData.outcome}
@@ -1363,11 +1366,11 @@
 									{/if}
 
 									<!-- Summary Section -->
-									{#if completedData.summary && completedData.summary.length > 0}
+									{#if completedSummary.length > 0}
 										<div>
 											<div class="text-[10px] font-medium mb-1 text-base-content/50">WHAT WAS DONE</div>
 											<ul class="space-y-0.5">
-												{#each completedData.summary as item}
+												{#each completedSummary as item}
 													<li class="flex items-start gap-2 text-xs text-base-content/70">
 														<span class="text-success">✓</span>
 														<span>{item}</span>
@@ -1613,15 +1616,17 @@
 									{:else if event.type === 'complete' && event.data}
 										<!-- Rich Completion Bundle UI -->
 										{@const bundle = event.data}
+										{@const popupBundleSummary = Array.isArray(bundle.summary) ? bundle.summary : (typeof bundle.summary === 'string' ? [bundle.summary] : [])}
+										{@const popupBundleQuality = bundle.quality || bundle.qualityChecks}
 										<div class="space-y-3">
 											<!-- Summary Section -->
-											{#if bundle.summary && bundle.summary.length > 0}
+											{#if popupBundleSummary.length > 0}
 												<div>
 													<div class="text-[10px] font-medium mb-1" style="color: oklch(0.55 0.02 250);">
 														CHANGES MADE
 													</div>
 													<ul class="space-y-0.5">
-														{#each bundle.summary as item}
+														{#each popupBundleSummary as item}
 															<li class="flex items-start gap-2 text-xs" style="color: oklch(0.75 0.02 250);">
 																<span style="color: oklch(0.50 0.15 145);">•</span>
 																<span>{item}</span>
@@ -1632,23 +1637,23 @@
 											{/if}
 
 											<!-- Quality Badges -->
-											{#if bundle.quality}
+											{#if popupBundleQuality}
 												<div class="flex flex-wrap gap-2">
-													{#if bundle.quality.tests}
-														{@const testColor = bundle.quality.tests === 'passing' ? 'oklch(0.65 0.18 145)' : bundle.quality.tests === 'failing' ? 'oklch(0.65 0.18 25)' : 'oklch(0.55 0.02 250)'}
+													{#if popupBundleQuality.tests}
+														{@const testColor = popupBundleQuality.tests === 'passing' ? 'oklch(0.65 0.18 145)' : popupBundleQuality.tests === 'failing' ? 'oklch(0.65 0.18 25)' : 'oklch(0.55 0.02 250)'}
 														<span class="px-2 py-0.5 rounded text-[10px] font-medium" style="background: oklch(0.20 0.03 250); color: {testColor};">
-															Tests: {bundle.quality.tests}
+															Tests: {popupBundleQuality.tests}
 														</span>
 													{/if}
-													{#if bundle.quality.build}
-														{@const buildColor = bundle.quality.build === 'clean' ? 'oklch(0.65 0.18 145)' : bundle.quality.build === 'warnings' ? 'oklch(0.65 0.15 85)' : 'oklch(0.65 0.18 25)'}
+													{#if popupBundleQuality.build}
+														{@const buildColor = popupBundleQuality.build === 'clean' ? 'oklch(0.65 0.18 145)' : popupBundleQuality.build === 'warnings' ? 'oklch(0.65 0.15 85)' : 'oklch(0.65 0.18 25)'}
 														<span class="px-2 py-0.5 rounded text-[10px] font-medium" style="background: oklch(0.20 0.03 250); color: {buildColor};">
-															Build: {bundle.quality.build}
+															Build: {popupBundleQuality.build}
 														</span>
 													{/if}
-													{#if bundle.quality.preExisting}
+													{#if popupBundleQuality.preExisting}
 														<span class="px-2 py-0.5 rounded text-[10px]" style="background: oklch(0.20 0.03 250); color: oklch(0.55 0.02 250);">
-															ℹ️ {bundle.quality.preExisting}
+															ℹ️ {popupBundleQuality.preExisting}
 														</span>
 													{/if}
 												</div>
@@ -1772,6 +1777,7 @@
 									{:else if (event.state === 'completed' || event.type === 'completed' || event.type === 'complete') && event.data}
 										<!-- Rich Completed Signal UI -->
 										{@const completedData = event.data}
+										{@const popupCompletedSummary = Array.isArray(completedData.summary) ? completedData.summary : (typeof completedData.summary === 'string' ? [completedData.summary] : [])}
 										<div class="space-y-3">
 											<!-- Outcome Badge -->
 											{#if completedData.outcome}
@@ -1787,13 +1793,13 @@
 											{/if}
 
 											<!-- Summary Section -->
-											{#if completedData.summary && completedData.summary.length > 0}
+											{#if popupCompletedSummary.length > 0}
 												<div>
 													<div class="text-[10px] font-medium mb-1" style="color: oklch(0.55 0.02 250);">
 														WHAT WAS DONE
 													</div>
 													<ul class="space-y-0.5">
-														{#each completedData.summary as item}
+														{#each popupCompletedSummary as item}
 															<li class="flex items-start gap-2 text-xs" style="color: oklch(0.75 0.02 250);">
 																<span style="color: oklch(0.50 0.15 145);">✓</span>
 																<span>{item}</span>

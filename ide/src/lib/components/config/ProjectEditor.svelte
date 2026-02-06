@@ -5,6 +5,8 @@
 	import { successToast, errorToast } from '$lib/stores/toasts.svelte';
 	import ProjectSecretsEditor from './ProjectSecretsEditor.svelte';
 	import SupabaseSetupWizard from './SupabaseSetupWizard.svelte';
+	import { AGENT_PRESETS } from '$lib/types/agentProgram';
+	import ProviderLogo from '$lib/components/agents/ProviderLogo.svelte';
 
 	interface Props {
 		isOpen: boolean;
@@ -65,6 +67,7 @@
 	let inactiveColor = $state('');
 	let databaseUrl = $state('');
 	let hidden = $state(false);
+	let defaultHarness = $state('');
 
 	// Validation state
 	let errors = $state<Record<string, string>>({});
@@ -120,6 +123,7 @@
 				inactiveColor = project.config.colors?.inactive || '';
 				databaseUrl = project.config.database_url || '';
 				hidden = project.config.hidden || false;
+				defaultHarness = project.config.default_harness || '';
 			} else {
 				// New project - reset all fields
 				key = '';
@@ -132,6 +136,7 @@
 				inactiveColor = '';
 				databaseUrl = '';
 				hidden = false;
+				defaultHarness = '';
 			}
 			errors = {};
 			touched = {};
@@ -265,6 +270,9 @@
 		}
 		if (databaseUrl.trim()) config.database_url = databaseUrl.trim();
 		if (hidden) config.hidden = true;
+		if (defaultHarness && defaultHarness !== 'claude-code') {
+			config.default_harness = defaultHarness;
+		}
 
 		onSave?.(key.trim(), config);
 		isOpen = false;
@@ -522,6 +530,30 @@
 					<label class="label cursor-pointer justify-start gap-3">
 						<input type="checkbox" class="toggle toggle-primary" bind:checked={hidden} />
 						<span class="label-text">Hide from project list</span>
+					</label>
+				</div>
+			</div>
+
+			<!-- Agent Defaults Section -->
+			<div class="space-y-4">
+				<h3 class="text-sm font-medium text-base-content/70 uppercase tracking-wide">Agent Defaults</h3>
+				<div class="form-control">
+					<label class="label" for="project-default-harness">
+						<span class="label-text">Default Harness</span>
+					</label>
+					<div class="flex items-center gap-2 flex-wrap">
+						{#each AGENT_PRESETS as preset}
+							<button type="button"
+								class="btn btn-sm gap-1.5 {defaultHarness === preset.id || (!defaultHarness && preset.id === 'claude-code') ? 'btn-primary' : 'btn-ghost'}"
+								onclick={() => defaultHarness = preset.id}
+							>
+								<ProviderLogo agentId={preset.id} size={16} />
+								<span class="text-xs">{preset.config.name}</span>
+							</button>
+						{/each}
+					</div>
+					<label class="label">
+						<span class="label-text-alt text-base-content/50">Agent program used when creating new tasks for this project</span>
 					</label>
 				</div>
 			</div>
