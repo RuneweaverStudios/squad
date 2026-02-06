@@ -223,6 +223,9 @@
 	let sessionOrder = $state<string[]>([]); // Tracks order for position preservation
 	let newSessionNames = $state<string[]>([]);
 	let exitingSessionNames = $state<Set<string>>(new Set());
+	// Snapshot task data for exiting sessions so avatar exit animation can play
+	// (agentTasks may lose the entry before the session exits the DOM)
+	let exitingTaskSnapshot = $state<Map<string, AgentTask>>(new Map());
 	// Track sessions that had task data when they first appeared (for text animation)
 	let sessionsWithTaskOnEntry = $state<Set<string>>(new Set());
 
@@ -322,14 +325,27 @@
 		}
 
 		if (exitNames.size > 0) {
+			// Snapshot task data for exiting sessions before it disappears from agentTasks
+			const newSnapshots = new Map(untrack(() => exitingTaskSnapshot));
+			for (const name of exitNames) {
+				const agentName = name.startsWith('jat-') ? name.slice(4) : name;
+				const task = agentTasks.get(agentName);
+				if (task) newSnapshots.set(name, task);
+			}
+			exitingTaskSnapshot = newSnapshots;
+
 			// Add new exiting sessions to the set
 			exitingSessionNames = new Set([...prevExiting, ...exitNames]);
-			// Clear them after animation completes
+			// Clear them after animation completes (250ms delay + 500ms row animation)
 			setTimeout(() => {
 				exitingSessionNames = new Set([...exitingSessionNames].filter(n => !exitNames.has(n)));
 				// Also remove from order after animation
 				sessionOrder = sessionOrder.filter(n => !exitNames.has(n));
-			}, 600);
+				// Clean up task snapshots
+				const cleaned = new Map(exitingTaskSnapshot);
+				for (const name of exitNames) cleaned.delete(name);
+				exitingTaskSnapshot = cleaned;
+			}, 850);
 		}
 
 		sessionOrder = newOrder;
@@ -953,7 +969,7 @@
 					{@const isExpanded = expandedSession === session.name}
 					{@const isCollapsing = collapsingSession === session.name}
 					{@const sessionAgentName = getAgentName(session.name)}
-					{@const sessionTask = agentTasks.get(sessionAgentName)}
+					{@const sessionTask = agentTasks.get(sessionAgentName) || (isExiting ? exitingTaskSnapshot.get(session.name) : null)}
 					{@const sessionInfo = agentSessionInfo.get(sessionAgentName)}
 					{@const activityState = sessionInfo?.activityState}
 					{@const effectiveState = optimisticStates.get(session.name) || activityState || 'idle'}
@@ -968,7 +984,7 @@
 					{@const elapsed = getElapsedFormatted(session.created)}
 					{@const isPlanning = effectiveState === 'planning'}
 					<tr
-						class="session-row {isNew ? 'animate-slide-in-fwd-center' : ''} {isExiting ? 'animate-slide-out-bck-center' : ''}"
+						class="session-row {isNew ? 'animate-slide-in-fwd-center' : ''} {isExiting ? 'animate-slide-out-bck-center exit-delayed' : ''}"
 						class:attached={session.attached}
 						class:expanded={isExpanded}
 						class:expandable={!isExiting}
@@ -2525,5 +2541,11 @@
 		padding: 0.375rem;
 		box-shadow: 0 10px 30px oklch(0.05 0 0 / 0.5);
 		animation: activeCtxIn 0.1s ease;
+	}
+
+	/* Delay row exit animation so avatar flip-out plays first */
+	.exit-delayed {
+		animation-delay: 0.25s;
+		animation-fill-mode: both;
 	}
 </style>

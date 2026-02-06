@@ -107,6 +107,12 @@
 	// Spawn loading state
 	let spawningTaskId = $state<string | null>(null);
 
+	// Project tab context menu state
+	let projectCtxProject = $state<string | null>(null);
+	let projectCtxX = $state(0);
+	let projectCtxY = $state(0);
+	let projectCtxVisible = $state(false);
+
 	// Selected project tab (instead of collapsed projects)
 	let selectedProject = $state<string | null>(null);
 
@@ -885,6 +891,108 @@
 		saveCollapseState();
 	}
 
+	// Project tab context menu handlers
+	function handleProjectTabClick(project: string, event: MouseEvent) {
+		if (selectedProject === project) {
+			// Already selected - show context menu
+			event.preventDefault();
+			event.stopPropagation();
+			openProjectContextMenu(project, event);
+		} else {
+			selectProject(project);
+		}
+	}
+
+	function openProjectContextMenu(project: string, event: MouseEvent) {
+		const menuWidth = 220;
+		const menuHeight = 320;
+		projectCtxProject = project;
+		projectCtxX = Math.min(event.clientX, window.innerWidth - menuWidth - 8);
+		projectCtxY = Math.min(event.clientY, window.innerHeight - menuHeight - 8);
+		projectCtxVisible = true;
+	}
+
+	function closeProjectContextMenu() {
+		projectCtxVisible = false;
+	}
+
+	// Close project context menu on click outside or Escape
+	$effect(() => {
+		if (!projectCtxVisible) return;
+
+		function handleClick() {
+			closeProjectContextMenu();
+		}
+		function handleKeyDown(e: KeyboardEvent) {
+			if (e.key === 'Escape') closeProjectContextMenu();
+		}
+
+		const timer = setTimeout(() => {
+			document.addEventListener('click', handleClick);
+			document.addEventListener('keydown', handleKeyDown);
+		}, 0);
+
+		return () => {
+			clearTimeout(timer);
+			document.removeEventListener('click', handleClick);
+			document.removeEventListener('keydown', handleKeyDown);
+		};
+	});
+
+	// Project context menu actions
+	function handleProjectMenuAction(action: string, project: string) {
+		closeProjectContextMenu();
+		switch (action) {
+			case 'create-task':
+				openTaskDrawer(project);
+				break;
+			case 'launch-agent':
+				spawnForProject(project);
+				break;
+			case 'open-editor':
+				openProjectInEditor(project);
+				break;
+			case 'settings':
+				goto(`/config?project=${encodeURIComponent(project)}`);
+				break;
+			case 'view-files':
+				goto(`/files?project=${encodeURIComponent(project)}`);
+				break;
+			case 'view-source':
+				goto(`/source?project=${encodeURIComponent(project)}`);
+				break;
+		}
+	}
+
+	async function spawnForProject(project: string) {
+		try {
+			const response = await fetch("/api/work/spawn", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ project, autoStart: true }),
+			});
+			if (!response.ok) {
+				const data = await response.json();
+				console.error("Failed to spawn for project:", data.error);
+			}
+			await fetchAllData();
+		} catch (err) {
+			console.error("Failed to spawn for project:", err);
+		}
+	}
+
+	async function openProjectInEditor(project: string) {
+		try {
+			await fetch("/api/open-folder", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ path: `~/code/${project}` }),
+			});
+		} catch (err) {
+			console.error("Failed to open project in editor:", err);
+		}
+	}
+
 	onMount(() => {
 		loadCollapseState();
 		fetchAllData();
@@ -1032,7 +1140,8 @@
 					class="project-tab"
 					class:active={isActive}
 					style="--project-color: {projectColor}"
-					onclick={() => selectProject(project)}
+					onclick={(e) => handleProjectTabClick(project, e)}
+					oncontextmenu={(e) => { e.preventDefault(); selectProject(project); openProjectContextMenu(project, e); }}
 				>
 					<span class="project-tab-name mt-1"
 						>{project.toUpperCase()}</span
@@ -1657,6 +1766,75 @@
 		{/if}
 	{/if}
 </div>
+
+<!-- Project Tab Context Menu -->
+{#if projectCtxProject}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div
+		class="project-context-menu"
+		class:project-context-menu-hidden={!projectCtxVisible}
+		style="left: {projectCtxX}px; top: {projectCtxY}px;"
+		onclick={(e) => e.stopPropagation()}
+	>
+		<!-- Header: project name -->
+		<div class="project-context-menu-header">{projectCtxProject.toUpperCase()}</div>
+		<div class="project-context-menu-divider"></div>
+
+		<!-- Create Task -->
+		<button class="project-context-menu-item" onclick={() => handleProjectMenuAction('create-task', projectCtxProject!)}>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+			</svg>
+			<span>Create Task</span>
+		</button>
+
+		<!-- Launch Agent -->
+		<button class="project-context-menu-item" onclick={() => handleProjectMenuAction('launch-agent', projectCtxProject!)}>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M12 2C12 2 8 6 8 12C8 15 9 17 10 18L10 21C10 21.5 10.5 22 11 22H13C13.5 22 14 21.5 14 21L14 18C15 17 16 15 16 12C16 6 12 2 12 2Z" />
+				<circle cx="12" cy="10" r="2" />
+			</svg>
+			<span>Launch Agent</span>
+		</button>
+
+		<div class="project-context-menu-divider"></div>
+
+		<!-- Open in Editor -->
+		<button class="project-context-menu-item" onclick={() => handleProjectMenuAction('open-editor', projectCtxProject!)}>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5" />
+			</svg>
+			<span>Open in Editor</span>
+		</button>
+
+		<!-- View Files -->
+		<button class="project-context-menu-item" onclick={() => handleProjectMenuAction('view-files', projectCtxProject!)}>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" />
+			</svg>
+			<span>View Files</span>
+		</button>
+
+		<!-- View Source (Git) -->
+		<button class="project-context-menu-item" onclick={() => handleProjectMenuAction('view-source', projectCtxProject!)}>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M6 3v12m0 0a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm0 0c0-3 6-3 6-6m6 3v6m0 0a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm0-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+			</svg>
+			<span>View Source</span>
+		</button>
+
+		<div class="project-context-menu-divider"></div>
+
+		<!-- Project Settings -->
+		<button class="project-context-menu-item" onclick={() => handleProjectMenuAction('settings', projectCtxProject!)}>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+				<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+			</svg>
+			<span>Project Settings</span>
+		</button>
+	</div>
+{/if}
 
 <style>
 	.tasks-page {
@@ -2320,5 +2498,72 @@
 
 	.error-state button:hover {
 		background: oklch(0.3 0.02 250);
+	}
+
+	/* Project Tab Context Menu */
+	.project-context-menu {
+		position: fixed;
+		z-index: 100;
+		min-width: 200px;
+		background: oklch(0.18 0.02 250);
+		border: 1px solid oklch(0.28 0.02 250);
+		border-radius: 0.5rem;
+		padding: 0.375rem;
+		box-shadow: 0 10px 30px oklch(0.05 0 0 / 0.5);
+		animation: projectCtxIn 0.1s ease;
+	}
+
+	.project-context-menu-hidden {
+		display: none;
+	}
+
+	@keyframes projectCtxIn {
+		from { opacity: 0; transform: scale(0.95); }
+		to { opacity: 1; transform: scale(1); }
+	}
+
+	.project-context-menu-header {
+		padding: 0.375rem 0.75rem;
+		font-size: 0.6875rem;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		color: oklch(0.55 0.02 250);
+	}
+
+	.project-context-menu-item {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		width: 100%;
+		padding: 0.5rem 0.75rem;
+		border: none;
+		background: transparent;
+		color: oklch(0.80 0.02 250);
+		font-size: 0.8125rem;
+		text-align: left;
+		border-radius: 0.375rem;
+		cursor: pointer;
+		transition: all 0.1s ease;
+	}
+
+	.project-context-menu-item:hover {
+		background: oklch(0.25 0.02 250);
+	}
+
+	.project-context-menu-item svg {
+		width: 14px;
+		height: 14px;
+		flex-shrink: 0;
+		color: oklch(0.60 0.02 250);
+	}
+
+	.project-context-menu-item:hover svg {
+		color: oklch(0.75 0.02 250);
+	}
+
+	.project-context-menu-divider {
+		height: 1px;
+		background: oklch(0.28 0.02 250);
+		margin: 0.375rem 0;
 	}
 </style>

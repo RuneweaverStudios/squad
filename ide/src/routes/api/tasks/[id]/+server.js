@@ -3,7 +3,7 @@
  * Provides individual task details including dependencies and enables
  */
 import { json } from '@sveltejs/kit';
-import { getTaskById, updateTask, closeTask, addDependency, removeDependency } from '$lib/server/jat-tasks.js';
+import { getTaskById, updateTask, deleteTask, addDependency, removeDependency } from '$lib/server/jat-tasks.js';
 import { readFile, writeFile, unlink } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
@@ -357,7 +357,7 @@ export async function PATCH({ params, request }) {
 }
 
 /**
- * Delete task (closes task in JAT)
+ * Delete task (hard delete from database)
  * @type {import('./$types').RequestHandler}
  */
 export async function DELETE({ params }) {
@@ -373,12 +373,11 @@ export async function DELETE({ params }) {
 			);
 		}
 
-		// Close the task directly using lib/tasks.js
-		// Note: We use "close" rather than "delete" to preserve task history
-		closeTask(taskId, 'Deleted via IDE', existingTask.project_path);
-
-		// Permanently delete attachments since this is a DELETE (not just close)
+		// Permanently delete attachments before removing the task row
 		await cleanupTaskAttachments(taskId);
+
+		// Hard delete: removes task row + cascades to deps, labels, comments
+		deleteTask(taskId, existingTask.project_path);
 
 		// Invalidate related caches (both apiCache and module-level task cache in agents endpoint)
 		invalidateCache.tasks();

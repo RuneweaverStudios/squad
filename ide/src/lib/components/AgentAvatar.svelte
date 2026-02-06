@@ -309,9 +309,9 @@
 		}
 	}
 
-	/* Flip-out exit animation (mirrors flip-in) */
+	/* Flip-out exit animation (mirrors flip-in) - fast so it plays before row exit */
 	.avatar-flip-out {
-		animation: avatarFlipOut 0.45s cubic-bezier(0.550, 0.085, 0.680, 0.530) forwards;
+		animation: avatarFlipOut 0.3s cubic-bezier(0.550, 0.085, 0.680, 0.530) forwards;
 		transform-style: preserve-3d;
 	}
 
@@ -329,9 +329,9 @@
 		}
 	}
 
-	/* Ring fade-out when exiting */
+	/* Ring fade-out when exiting - matches flip-out timing */
 	.avatar-ring-exit {
-		animation: avatarRingExit 0.45s cubic-bezier(0.550, 0.085, 0.680, 0.530) forwards;
+		animation: avatarRingExit 0.3s cubic-bezier(0.550, 0.085, 0.680, 0.530) forwards;
 	}
 
 	@keyframes avatarRingExit {
