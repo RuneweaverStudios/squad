@@ -12,6 +12,8 @@
 	import { getProjectColor } from '$lib/utils/projectColors';
 	import AgentSelector from '$lib/components/agents/AgentSelector.svelte';
 	import { bulkApiOperation, fetchWithTimeout, createDeleteRequest, handleApiError, formatBulkResultMessage } from '$lib/utils/bulkApiHelpers';
+	import { isHumanTask } from '$lib/utils/badgeHelpers';
+	import { openTaskDrawer } from '$lib/stores/drawerStore';
 	import { AGENT_PRESETS } from '$lib/types/agentProgram';
 	import ProviderLogo from '$lib/components/agents/ProviderLogo.svelte';
 
@@ -1022,6 +1024,17 @@
 							</td>
 							<td class="td-actions" style={isExiting ? 'background: transparent;' : ''}>
 								<div class="relative flex items-center justify-center">
+									{#if isHumanTask(task)}
+										<!-- Human task: show person icon (unclickable) instead of rocket -->
+										<div
+											class="w-7 h-7 flex items-center justify-center opacity-50 cursor-default"
+											title="Human task — complete manually"
+										>
+											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4" style="color: oklch(0.70 0.18 45);">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+											</svg>
+										</div>
+									{:else}
 									<!-- Agent picker dropdown (shown when Alt+click) -->
 									{#if agentPickerOpen && agentPickerTask?.id === task.id && agentPickerPosition}
 										<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -1100,6 +1113,7 @@
 											</div>
 										{/if}
 									</button>
+									{/if}
 								</div>
 							</td>
 						</tr>
@@ -1282,7 +1296,15 @@
 					{#if epicsLoading}
 						<div class="task-context-menu-loading">Loading...</div>
 					{:else if epics.length === 0}
-						<div class="task-context-menu-empty">No epics found</div>
+						<button
+							class="task-context-menu-item"
+							onclick={() => { const p = ctxTask ? getProjectFromTaskId(ctxTask.id) : ''; closeContextMenu(); openTaskDrawer(p, '', 'task', 'epic'); }}
+						>
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+							</svg>
+							<span>Create Epic</span>
+						</button>
 					{:else}
 						{#each epics as epic}
 							<button
@@ -1293,6 +1315,16 @@
 								<span class="task-epic-title">{epic.title}</span>
 							</button>
 						{/each}
+						<div class="task-context-menu-divider"></div>
+						<button
+							class="task-context-menu-item"
+							onclick={() => { const p = ctxTask ? getProjectFromTaskId(ctxTask.id) : ''; closeContextMenu(); openTaskDrawer(p, '', 'task', 'epic'); }}
+						>
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+							</svg>
+							<span>Create Epic</span>
+						</button>
 					{/if}
 				</div>
 			{/if}

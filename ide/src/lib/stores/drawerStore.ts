@@ -35,6 +35,9 @@ export const selectedDrawerProject = writable<string | null>(null);
 // Initial text to populate task drawer (parsed like paste: first line = title, rest = description)
 export const initialTaskText = writable<string | null>(null);
 
+// Initial issue type to pre-fill task drawer (e.g., 'epic' when creating from "Assign to Epic" menu)
+export const initialIssueType = writable<string | null>(null);
+
 // Creation mode for multi-mode task drawer (tabs: task, paste, template, generator, plan)
 export type DrawerCreationMode = 'task' | 'paste' | 'template' | 'generator' | 'plan';
 export const drawerCreationMode = writable<DrawerCreationMode>('task');
@@ -46,7 +49,7 @@ export const availableProjects = writable<string[]>([]);
 export const projectColorsStore = writable<Record<string, string>>({});
 
 // Helper functions
-export function openTaskDrawer(project?: string, text?: string, mode?: DrawerCreationMode) {
+export function openTaskDrawer(project?: string, text?: string, mode?: DrawerCreationMode, issueType?: string) {
 	if (project && project !== 'All Projects') {
 		selectedDrawerProject.set(project);
 	} else {
@@ -57,6 +60,7 @@ export function openTaskDrawer(project?: string, text?: string, mode?: DrawerCre
 	} else {
 		initialTaskText.set(null);
 	}
+	initialIssueType.set(issueType || null);
 	drawerCreationMode.set(mode || 'task');
 	isTaskDrawerOpen.set(true);
 }

@@ -396,6 +396,20 @@
 			grouped.get(epicId)!.push(task);
 		}
 
+		// Add open epics that have no open children to the standalone group
+		// so they remain visible and workable on the /tasks page
+		for (const task of projectTasks) {
+			if (task.issue_type === "epic" && task.status === "open") {
+				// Check if this epic already has a group (meaning it has open children)
+				if (!grouped.has(task.id)) {
+					if (!grouped.has(null)) {
+						grouped.set(null, []);
+					}
+					grouped.get(null)!.push(task);
+				}
+			}
+		}
+
 		return grouped;
 	}
 
@@ -879,10 +893,20 @@
 
 	function getProjectTaskCount(project: string): number {
 		const tasks = tasksByProject.get(project) || [];
-		// Only count open tasks (exclude epics and non-open status)
-		return tasks.filter(
+		// Count open non-epic tasks
+		let count = tasks.filter(
 			(t) => t.status === "open" && t.issue_type !== "epic",
 		).length;
+		// Also count open epics with no open children (they appear in standalone group)
+		for (const t of tasks) {
+			if (t.issue_type === "epic" && t.status === "open") {
+				const hasOpenChildren = tasks.some(
+					(child) => child.status === "open" && child.issue_type !== "epic" && getParentEpicId(child.id, epicChildMap) === t.id,
+				);
+				if (!hasOpenChildren) count++;
+			}
+		}
+		return count;
 	}
 
 	// Handle tab selection
@@ -894,10 +918,7 @@
 		const projectPausedSessions = getProjectPausedSessions(project);
 		const hasActiveSessions = projectSessions.length > 0;
 		const hasPausedSessions = projectPausedSessions.length > 0;
-		const hasOpenTasks =
-			projectTasks.filter(
-				(t) => t.status === "open" && t.issue_type !== "epic",
-			).length > 0;
+		const hasOpenTasks = getProjectTaskCount(project) > 0;
 
 		// Only apply default subsection collapse logic if this project doesn't have saved state
 		// This preserves user's manual collapse/expand choices

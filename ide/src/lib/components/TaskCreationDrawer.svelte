@@ -13,7 +13,7 @@
 
 	import { tick, onDestroy } from 'svelte';
 	import { get } from 'svelte/store';
-	import { isTaskDrawerOpen, selectedDrawerProject, availableProjects, initialTaskText, drawerCreationMode, type DrawerCreationMode } from '$lib/stores/drawerStore';
+	import { isTaskDrawerOpen, selectedDrawerProject, availableProjects, initialTaskText, initialIssueType, drawerCreationMode, type DrawerCreationMode } from '$lib/stores/drawerStore';
 	import { broadcastTaskEvent } from '$lib/stores/taskEvents';
 	import { broadcastSessionEvent } from '$lib/stores/sessionEvents';
 	import { playSuccessChime, playErrorSound, playAttachmentSound } from '$lib/utils/soundEffects';
@@ -193,6 +193,17 @@
 				if (titleLine && description) {
 					tick().then(() => fetchSuggestions());
 				}
+			}
+		}
+	});
+
+	// Pre-fill issue type when drawer opens (e.g., 'epic' from "Assign to Epic" context menu)
+	$effect(() => {
+		if (isOpen) {
+			const type = get(initialIssueType);
+			if (type) {
+				formData.type = type;
+				initialIssueType.set(null);
 			}
 		}
 	});

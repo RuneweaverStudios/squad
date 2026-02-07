@@ -5,6 +5,7 @@
 	import { successToast, errorToast } from '$lib/stores/toasts.svelte';
 	import AgentAvatar from '$lib/components/AgentAvatar.svelte';
 	import AgentSelector from '$lib/components/agents/AgentSelector.svelte';
+	import { isHumanTask } from '$lib/utils/badgeHelpers';
 
 	interface Task {
 		id: string;
@@ -131,6 +132,9 @@
 		taskAgent ? `jat-${taskAgent.name}` : null
 	);
 
+	// Check if this is a human task (shouldn't auto-spawn agents)
+	const isHuman = $derived(isHumanTask(task));
+
 	// Determine what action mode we're in
 	// Only show dropdown when there's an assignee (something to release)
 	// For blocked tasks without assignee, show disabled spawn button
@@ -253,7 +257,17 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="relative flex items-center justify-center" style="min-width: 28px; min-height: 28px;">
-	{#if actionMode === 'spawn'}
+	{#if actionMode === 'spawn' && isHuman}
+		<!-- Human task: show person icon (unclickable) instead of rocket -->
+		<div
+			class="w-7 h-7 flex items-center justify-center opacity-50 cursor-default"
+			title="Human task — complete manually"
+		>
+			<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4" style="color: oklch(0.70 0.18 45);">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+			</svg>
+		</div>
+	{:else if actionMode === 'spawn'}
 		<!-- Agent picker dropdown (shown when Alt+click or showAgentPicker) -->
 		{#if agentPickerOpen}
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
