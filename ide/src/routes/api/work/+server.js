@@ -114,7 +114,7 @@ function getCachedTasks() {
 			cachedTasks = getTasks({});
 			taskCacheTimestamp = now;
 		} catch (err) {
-			console.error('Failed to fetch tasks from Beads:', err);
+			console.error('Failed to fetch tasks:', err);
 			// Return stale cache on error
 		}
 	}
@@ -436,7 +436,7 @@ export async function GET({ url }) {
 		// Step 1b: Skip terminal resize - now handled at session creation time
 		// (Previously ran tmux resize-window for every session on every request, causing ~200ms overhead)
 
-		// Step 2: Get all tasks from Beads (for lookup) - uses cache to avoid expensive JSONL parsing
+		// Step 2: Get all tasks from JAT (for lookup) - uses cache to avoid expensive JSONL parsing
 		const allTasks = getCachedTasks();
 
 		// Create a map of agent -> in_progress task

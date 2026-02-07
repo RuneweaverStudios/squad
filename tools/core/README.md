@@ -201,12 +201,12 @@ jt-check-review --batch
 
 Two complementary tools for safe JAT task database backup and rollback:
 
-1. **backup-beads.sh** - Standalone backup utility
-2. **rollback-beads.sh** - Restore from backup
+1. **backup-jat.sh** - Standalone backup utility
+2. **rollback-jat.sh** - Restore from backup
 
 ---
 
-## backup-beads.sh
+## backup-jat.sh
 
 Standalone utility to create timestamped backups of JAT task and Agent Mail databases.
 
@@ -214,13 +214,13 @@ Standalone utility to create timestamped backups of JAT task and Agent Mail data
 
 ```bash
 # Basic backup
-./tools/backup-beads.sh --project ~/code/chimaro
+./tools/backup-jat.sh --project ~/code/chimaro
 
 # Labeled backup (for specific purpose)
-./tools/backup-beads.sh --project ~/code/chimaro --label "before-migration"
+./tools/backup-jat.sh --project ~/code/chimaro --label "before-migration"
 
 # Backup with integrity verification
-./tools/backup-beads.sh --project ~/code/chimaro --verify
+./tools/backup-jat.sh --project ~/code/chimaro --verify
 ```
 
 ### Features
@@ -254,7 +254,7 @@ Standalone utility to create timestamped backups of JAT task and Agent Mail data
 
 ---
 
-## rollback-beads.sh
+## rollback-jat.sh
 
 Restore JAT task and Agent Mail databases from a backup.
 
@@ -262,13 +262,13 @@ Restore JAT task and Agent Mail databases from a backup.
 
 ```bash
 # Restore with confirmation prompt
-./tools/rollback-beads.sh --backup ~/code/chimaro/.jat/backups/backup_20231124_123456
+./tools/rollback-jat.sh --backup ~/code/chimaro/.jat/backups/backup_20231124_123456
 
 # Restore with integrity verification
-./tools/rollback-beads.sh --backup <backup-dir> --verify
+./tools/rollback-jat.sh --backup <backup-dir> --verify
 
 # Restore without confirmation (automated)
-./tools/rollback-beads.sh --backup <backup-dir> --force
+./tools/rollback-jat.sh --backup <backup-dir> --force
 ```
 
 ### Safety Features

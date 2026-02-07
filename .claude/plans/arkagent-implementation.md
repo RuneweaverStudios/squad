@@ -91,11 +91,11 @@ ALTER TABLE profiles ADD COLUMN current_organization_id uuid REFERENCES organiza
 
 ---
 
-## Phase 3: Task System (Port from Beads/JAT)
+## Phase 3: Task System (Port from JAT)
 
 ### 3.1 Database Schema
 ```sql
--- Tasks table (from Beads schema)
+-- Tasks table (from JAT schema)
 CREATE TABLE tasks (
   id text PRIMARY KEY,  -- e.g., "ark-abc123"
   organization_id uuid REFERENCES organizations NOT NULL,
@@ -145,7 +145,7 @@ CREATE TABLE task_sequences (
 - [ ] Kanban board view (optional)
 - [ ] Epic tree view
 
-**Milestone:** Full task management working, parity with Beads
+**Milestone:** Full task management working, parity with JAT Tasks
 
 ---
 
@@ -306,4 +306,4 @@ arkagent/
 1. Clone CMSaasStarter → `~/code/arkagent`
 2. Create Supabase project
 3. Configure and deploy base template
-4. Create Beads epic in JAT for tracking
+4. Create epic in JAT for tracking

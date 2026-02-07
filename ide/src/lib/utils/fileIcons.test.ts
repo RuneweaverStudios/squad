@@ -524,7 +524,7 @@ describe('getFolderIcon', () => {
 			expect(getFolderIcon('migrations', false)).toBe('🔄');
 		});
 
-		it('should return beads for .jat', () => {
+		it('should return tasks icon for .jat', () => {
 			expect(getFolderIcon('.jat', true)).toBe('📿');
 			expect(getFolderIcon('.jat', false)).toBe('📿');
 		});

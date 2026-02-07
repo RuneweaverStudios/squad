@@ -171,7 +171,7 @@ require_json() {
         case "$signal_type" in
             working)
                 echo "Required fields:" >&2
-                echo "  - taskId: The Beads task ID (e.g., \"jat-abc\")" >&2
+                echo "  - taskId: The JAT task ID (e.g., \"jat-abc\")" >&2
                 echo "  - taskTitle: The task title" >&2
                 echo "" >&2
                 echo "Example:" >&2
@@ -179,7 +179,7 @@ require_json() {
                 ;;
             review)
                 echo "Required fields:" >&2
-                echo "  - taskId: The Beads task ID" >&2
+                echo "  - taskId: The JAT task ID" >&2
                 echo "  - taskTitle: The task title" >&2
                 echo "  - summary: Array of accomplishment strings" >&2
                 echo "" >&2
@@ -188,7 +188,7 @@ require_json() {
                 ;;
             needs_input)
                 echo "Required fields:" >&2
-                echo "  - taskId: The Beads task ID" >&2
+                echo "  - taskId: The JAT task ID" >&2
                 echo "  - question: The question being asked" >&2
                 echo "  - questionType: One of: choice, text, approval, clarification" >&2
                 echo "" >&2

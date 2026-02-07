@@ -21,8 +21,8 @@
 export interface FlywheelStageTokens {
   // Identity
   num: number;
-  id: string;           // Machine ID: 'plan', 'bead', 'swarm', etc.
-  title: string;        // Display title: 'PLAN', 'BEAD', etc.
+  id: string;           // Machine ID: 'plan', 'tasktree', 'swarm', etc.
+  title: string;        // Display title: 'PLAN', 'TASKTREE', etc.
   desc: string;         // Short description: 'Idea → PRD', '/jat:tasktree', etc.
 
   // Signal mapping (null for pre/post signal stages)
@@ -70,8 +70,8 @@ export const FLYWHEEL_STAGES: FlywheelStageTokens[] = [
   },
   {
     num: 2,
-    id: 'bead',
-    title: 'BEAD',
+    id: 'tasktree',
+    title: 'TASKTREE',
     desc: '/jat:tasktree',
     signalState: null,  // Pre-signal: task creation
     colors: {

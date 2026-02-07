@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 #
-# backup-beads.sh - JAT task database backup utility
+# backup-jat.sh - JAT task database backup utility
 #
 # Creates timestamped backups of the JAT task database (.jat/tasks.db)
 # and Agent Mail database (~/.agent-mail.db) with SHA256 checksums.
 #
 # Usage:
-#   ./backup-beads.sh --project PATH [--label LABEL] [--verify]
+#   ./backup-jat.sh --project PATH [--label LABEL] [--verify]
 #
 # Example:
-#   ./backup-beads.sh --project ~/code/chimaro --label "before-migration"
+#   ./backup-jat.sh --project ~/code/chimaro --label "before-migration"
 #
 
 set -euo pipefail
 
 # Script metadata
-SCRIPT_NAME="backup-beads.sh"
+SCRIPT_NAME="backup-jat.sh"
 VERSION="2.0.0"
 
 # Color output
@@ -65,7 +65,7 @@ EXAMPLES:
     $SCRIPT_NAME --project ~/code/chimaro --verify
 
 SEE ALSO:
-    rollback-beads.sh - Restore from backup
+    rollback-jat.sh - Restore from backup
 
 EOF
 }
@@ -158,4 +158,4 @@ if [[ "$VERIFY_MODE" == true ]]; then
 fi
 
 log_success "Backup created: $BACKUP_DIR"
-log_info "To restore: ./rollback-beads.sh --backup \"$BACKUP_DIR\""
+log_info "To restore: ./rollback-jat.sh --backup \"$BACKUP_DIR\""

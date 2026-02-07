@@ -47,7 +47,7 @@ Exit codes:
 
 Note: Deleting an agent does NOT delete:
   - Messages sent by the agent (preserved for audit trail)
-  - Task assignments in Beads (preserved)
+  - Task assignments in JAT Tasks (preserved)
   - Reservations are released automatically
 
 Note: Agents are globally unique across all projects.

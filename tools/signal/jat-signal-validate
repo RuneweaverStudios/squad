@@ -42,7 +42,7 @@ error_missing_field() {
     # Show example based on signal type and field
     case "${signal_type}:${field}" in
         working:taskId)
-            echo "  Expected: \"taskId\": \"jat-abc\" (your task ID from Beads)" >&2
+            echo "  Expected: \"taskId\": \"jat-abc\" (your JAT task ID)" >&2
             ;;
         working:taskTitle)
             echo "  Expected: \"taskTitle\": \"Fix authentication bug\"" >&2
@@ -122,7 +122,7 @@ show_required_fields() {
     case "$signal_type" in
         working)
             echo "Required fields for 'working' signal:" >&2
-            echo "  - taskId: The Beads task ID (e.g., \"jat-abc\")" >&2
+            echo "  - taskId: The JAT task ID (e.g., \"jat-abc\")" >&2
             echo "  - taskTitle: The task title" >&2
             echo "" >&2
             echo "Example:" >&2
@@ -130,7 +130,7 @@ show_required_fields() {
             ;;
         review)
             echo "Required fields for 'review' signal:" >&2
-            echo "  - taskId: The Beads task ID" >&2
+            echo "  - taskId: The JAT task ID" >&2
             echo "  - taskTitle: The task title" >&2
             echo "  - summary: Array of accomplishment strings" >&2
             echo "" >&2
@@ -139,7 +139,7 @@ show_required_fields() {
             ;;
         needs_input)
             echo "Required fields for 'needs_input' signal:" >&2
-            echo "  - taskId: The Beads task ID" >&2
+            echo "  - taskId: The JAT task ID" >&2
             echo "  - question: The question being asked" >&2
             echo "  - questionType: One of: choice, text, approval, clarification" >&2
             echo "" >&2
@@ -160,7 +160,7 @@ show_required_fields() {
             ;;
         completing)
             echo "Required fields for 'completing' signal:" >&2
-            echo "  - taskId: The Beads task ID" >&2
+            echo "  - taskId: The JAT task ID" >&2
             echo "  - currentStep: One of: verifying, committing, closing, releasing, announcing" >&2
             echo "" >&2
             echo "Example:" >&2

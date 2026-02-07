@@ -58,8 +58,8 @@ Database, monitoring, credentials, and task review tools.
 | `jt-review-rules` | Display review rules for project |
 | `jt-review-rules-loader` | Load/parse review rules from config |
 | `jt-set-review-override` | Set review override for a task |
-| `backup-beads.sh` | Backup task database |
-| `rollback-beads.sh` | Rollback task database to backup |
+| `backup-jat.sh` | Backup task database |
+| `rollback-jat.sh` | Rollback task database to backup |
 
 **jat-secret usage:**
 ```bash

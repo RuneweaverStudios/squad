@@ -82,7 +82,7 @@
 			</h2>
 
 			<p class="mb-6" style="color: oklch(0.70 0.02 250);">
-				JAT tracks tasks across your projects using <strong style="color: oklch(0.80 0.10 200);">Beads</strong> - a lightweight, git-friendly task system. To start, add a project from your <code class="px-1 py-0.5 rounded text-sm" style="background: oklch(0.25 0.02 250); color: oklch(0.80 0.02 250);">~/code/</code> directory.
+				JAT tracks tasks across your projects using <strong style="color: oklch(0.80 0.10 200);">JAT Tasks</strong> - a lightweight, git-friendly task system. To start, add a project from your <code class="px-1 py-0.5 rounded text-sm" style="background: oklch(0.25 0.02 250); color: oklch(0.80 0.02 250);">~/code/</code> directory.
 			</p>
 
 			<!-- What is a project? -->

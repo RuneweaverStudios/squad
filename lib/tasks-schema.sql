@@ -1,5 +1,5 @@
 -- JAT task database schema
--- Replaces Beads' 15+ tables with 4 clean tables
+-- Lightweight task tracking with 4 clean tables
 
 CREATE TABLE IF NOT EXISTS tasks (
     id TEXT PRIMARY KEY,

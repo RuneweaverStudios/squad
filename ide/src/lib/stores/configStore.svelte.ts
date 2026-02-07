@@ -236,7 +236,7 @@ export async function loadProjects(): Promise<void> {
 	state.projectsError = null;
 
 	try {
-		// Fetch with stats=true to get hasBeads, hasClaudeMd, etc.
+		// Fetch with stats=true to get hasJat, hasClaudeMd, etc.
 		const response = await fetch(`${PROJECTS_API}?stats=true`);
 		if (!response.ok) {
 			throw new Error(`Failed to load projects: ${response.statusText}`);
@@ -257,7 +257,7 @@ export async function loadProjects(): Promise<void> {
 			database_url: p.databaseUrl,
 			hidden: p.hidden,
 			stats: p.stats ? {
-				hasBeads: p.stats.hasBeads,
+				hasJat: p.stats.hasJat,
 				hasClaudeMd: p.stats.hasClaudeMd,
 				agentCount: p.stats.agentCount,
 				taskCount: p.stats.taskCount,

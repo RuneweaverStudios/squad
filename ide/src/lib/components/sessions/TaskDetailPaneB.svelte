@@ -435,7 +435,7 @@
 		return match ? match[1].toLowerCase() : 'jat';
 	}
 
-	// Create a suggested task in Beads
+	// Create a suggested task in JAT
 	async function createSuggestedTask(index: number, andStart = false) {
 		if (!summaryData?.suggestedTasks?.[index]) return;
 

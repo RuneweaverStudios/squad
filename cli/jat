@@ -1484,18 +1484,18 @@ ensure_project_dbs() {
     local migrated=0
     local migrate_script="$JAT_SOURCE_DIR/tools/scripts/migrate-beads-to-jat.sh"
 
-    # Helper: attempt beads→jat migration for a project directory
-    migrate_beads_if_needed() {
+    # Helper: attempt legacy .beads/ → .jat/ migration for a project directory
+    migrate_legacy_if_needed() {
         local path="$1"
         local name="$2"
 
-        # No beads data → nothing to do
+        # No legacy data → nothing to do
         [[ ! -f "$path/.beads/beads.db" ]] && return 1
 
-        # Check beads has actual issues
-        local beads_count
-        beads_count=$(sqlite3 "$path/.beads/beads.db" "SELECT COUNT(*) FROM issues" 2>/dev/null || echo "0")
-        [[ "$beads_count" -eq 0 ]] && return 1
+        # Check legacy DB has actual issues
+        local legacy_count
+        legacy_count=$(sqlite3 "$path/.beads/beads.db" "SELECT COUNT(*) FROM issues" 2>/dev/null || echo "0")
+        [[ "$legacy_count" -eq 0 ]] && return 1
 
         # Check if .jat/ needs init
         if [[ ! -d "$path/.jat" ]]; then
@@ -1510,7 +1510,7 @@ ensure_project_dbs() {
         [[ "$jat_count" -gt 0 ]] && return 1
 
         # Run migration
-        echo -e "  ${GREEN}↗ Migrating beads→jat for $name ($beads_count issues)...${NC}"
+        echo -e "  ${GREEN}↗ Migrating legacy data for $name ($legacy_count issues)...${NC}"
         if bash "$migrate_script" --yes --merge "$path" 2>/dev/null; then
             return 0
         fi
@@ -1529,9 +1529,9 @@ ensure_project_dbs() {
         [[ ! -d "$path" ]] && continue
         [[ ! -d "$path/.git" ]] && continue
 
-        # Try beads migration first (handles jt init internally)
+        # Try legacy migration first (handles jt init internally)
         if [[ ! -d "$path/.jat" ]] && [[ -f "$path/.beads/beads.db" ]] && [[ -f "$migrate_script" ]]; then
-            if migrate_beads_if_needed "$path" "$project"; then
+            if migrate_legacy_if_needed "$path" "$project"; then
                 migrated=$((migrated + 1))
                 continue
             fi
@@ -1546,7 +1546,7 @@ ensure_project_dbs() {
         echo -e "  ${GREEN}✓ Initialized .jat/ for $project${NC}"
     done
 
-    # Pass 2: Scan ~/code/*/ for non-configured projects with .beads/ but no .jat/
+    # Pass 2: Scan ~/code/*/ for non-configured projects with legacy .beads/ but no .jat/
     if [[ -f "$migrate_script" ]]; then
         local configured_paths=()
         for project in $(list_projects 2>/dev/null); do
@@ -1576,7 +1576,7 @@ ensure_project_dbs() {
 
             local name
             name=$(basename "$dir")
-            if migrate_beads_if_needed "$dir" "$name"; then
+            if migrate_legacy_if_needed "$dir" "$name"; then
                 migrated=$((migrated + 1))
             fi
         done
@@ -1586,7 +1586,7 @@ ensure_project_dbs() {
         echo -e "  ${DIM}Initialized $initialized project database(s)${NC}"
     fi
     if [[ $migrated -gt 0 ]]; then
-        echo -e "  ${DIM}Migrated $migrated project(s) from beads→jat${NC}"
+        echo -e "  ${DIM}Migrated $migrated project(s) from legacy format${NC}"
     fi
 }
 

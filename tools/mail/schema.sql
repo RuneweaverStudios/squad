@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id INTEGER NOT NULL,
     sender_id INTEGER NOT NULL,          -- Agent who sent the message
-    thread_id TEXT,                      -- Group related messages (use Beads task ID!)
+    thread_id TEXT,                      -- Group related messages (use JAT task ID!)
     subject TEXT NOT NULL,
     body_md TEXT NOT NULL,               -- Markdown content
     importance TEXT NOT NULL DEFAULT 'normal', -- normal | high | urgent
