@@ -184,6 +184,7 @@ function detectLanguage(filePath: string): string {
 	const name = basename(filePath).toLowerCase();
 
 	// Check special filenames
+	if (name === '.env' || name.startsWith('.env.')) return 'dotenv';
 	if (name === 'dockerfile' || name.startsWith('dockerfile.')) return 'dockerfile';
 	if (name === 'makefile' || name === 'gnumakefile') return 'makefile';
 	if (name === 'cmakelists.txt') return 'cmake';

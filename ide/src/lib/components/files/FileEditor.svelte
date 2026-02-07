@@ -212,6 +212,12 @@
 
 	// Get language from file extension for Monaco
 	function getLanguage(path: string): string {
+		const filename = path.split('/').pop()?.toLowerCase() || '';
+
+		// Special filename detection
+		if (filename === '.env' || filename.startsWith('.env.')) return 'dotenv';
+		if (filename === 'dockerfile' || filename.startsWith('dockerfile.')) return 'dockerfile';
+
 		const ext = path.split('.').pop()?.toLowerCase() || '';
 		const languageMap: Record<string, string> = {
 			ts: 'typescript',

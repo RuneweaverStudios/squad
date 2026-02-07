@@ -71,6 +71,53 @@
 			const monacoInstance = await loader.init();
 			monaco = monacoInstance;
 
+			// Register custom dotenv language if not already registered
+			const registeredLanguages = monacoInstance.languages.getLanguages();
+			if (!registeredLanguages.some((l: { id: string }) => l.id === 'dotenv')) {
+				monacoInstance.languages.register({
+					id: 'dotenv',
+					extensions: ['.env'],
+					aliases: ['dotenv', 'env', '.env'],
+					filenames: ['.env', '.env.local', '.env.development', '.env.production', '.env.test', '.env.staging']
+				});
+				monacoInstance.languages.setMonarchTokensProvider('dotenv', {
+					tokenizer: {
+						root: [
+							// Comments (# at start of line, with optional leading whitespace)
+							[/^\s*#.*$/, 'comment'],
+							// export KEY=  (three tokens: keyword, variable, delimiter)
+							[/^(export\s+)([A-Za-z_][A-Za-z0-9_]*)(=)/, ['keyword', 'variable', 'delimiter']],
+							// KEY=  (two tokens: variable, delimiter)
+							[/^([A-Za-z_][A-Za-z0-9_]*)(=)/, ['variable', 'delimiter']],
+							// Double-quoted string with interpolation support
+							[/"/, 'string', '@doubleQuoted'],
+							// Single-quoted string (literal, no interpolation)
+							[/'/, 'string', '@singleQuoted'],
+							// Variable interpolation in unquoted values
+							[/\$\{[^}]*\}/, 'variable.other'],
+							[/\$[A-Za-z_][A-Za-z0-9_]*/, 'variable.other'],
+							// Inline comment (space then #)
+							[/\s+#.*$/, 'comment'],
+							// Unquoted value text (everything else that's not special)
+							[/[^\s'"#$][^\s#$]*/, 'string'],
+							// Whitespace
+							[/\s+/, '']
+						],
+						doubleQuoted: [
+							[/\$\{[^}]*\}/, 'variable.other'],
+							[/\$[A-Za-z_][A-Za-z0-9_]*/, 'variable.other'],
+							[/\\./, 'string.escape'],
+							[/"/, 'string', '@pop'],
+							[/[^"\\$]+/, 'string']
+						],
+						singleQuoted: [
+							[/'/, 'string', '@pop'],
+							[/[^']+/, 'string']
+						]
+					}
+				});
+			}
+
 			// Create editor instance
 			const editorInstance = monacoInstance.editor.create(containerRef, {
 				value: value,
