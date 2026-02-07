@@ -94,6 +94,9 @@
 	let harnessPickerTaskId = $state<string | null>(null);
 	let harnessPickerPos = $state({ x: 0, y: 0 });
 
+	// === Hover-to-select (spacebar) ===
+	let hoveredTaskId = $state<string | null>(null);
+
 	const selectionCount = $derived(selectedTasks.size);
 	const allVisibleSelected = $derived.by(() => {
 		const visible = orderedTasks().filter(e => !e.isExiting);
@@ -377,6 +380,19 @@
 			window.removeEventListener('keyup', handleKeyUp);
 			window.removeEventListener('blur', handleBlur);
 		};
+	});
+
+	// Spacebar toggles selection on hovered task
+	$effect(() => {
+		function handleSpaceToggle(e: KeyboardEvent) {
+			if (e.key !== ' ' || !hoveredTaskId) return;
+			const tag = (e.target as HTMLElement)?.tagName;
+			if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+			e.preventDefault();
+			toggleTask(hoveredTaskId);
+		}
+		window.addEventListener('keydown', handleSpaceToggle);
+		return () => window.removeEventListener('keydown', handleSpaceToggle);
 	});
 
 	function handleSpawnClick(task: Task, event: MouseEvent) {
@@ -1014,6 +1030,8 @@
 							class="task-row {isBlocked && !isExiting ? 'opacity-70' : ''} {isNew ? 'animate-slide-in-fwd-center' : ''} {isExiting ? 'animate-slide-out-bck-center' : ''} {isSelected ? 'selected-row' : ''}"
 							style="{projectColor ? `border-left: 3px solid ${projectColor};` : ''}{isExiting ? ' pointer-events: none;' : ''}"
 							onclick={() => !isExiting && handleRowClick(task.id)}
+							onmouseenter={() => { hoveredTaskId = task.id; }}
+							onmouseleave={() => { if (hoveredTaskId === task.id) hoveredTaskId = null; }}
 							oncontextmenu={(e) => !isExiting && handleContextMenu(task, e)}
 						>
 							<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
