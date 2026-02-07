@@ -357,15 +357,12 @@
 									<circle cx="6" cy="18" r="3"></circle>
 									<path d="M18 9a9 9 0 0 1-9 9"></path>
 								</svg>
-								<span class="title-text">Source Control</span>
 							{:else}
 								<!-- Supabase logo (lightning bolt) -->
 								<svg class="panel-title-icon" viewBox="0 0 24 24" fill="currentColor">
 									<path d="M13.5 3L6 14h6l-1.5 7L18 10h-6l1.5-7z"/>
 								</svg>
-								<span class="title-text">Migrations</span>
 							{/if}
-							<span class="title-divider"></span>
 							<div class="project-selector-wrapper">
 								<ProjectSelector
 									projects={projectNames}
@@ -586,13 +583,6 @@
 		flex: 1;
 	}
 
-	.title-divider {
-		width: 1px;
-		height: 1rem;
-		background: oklch(0.30 0.02 250);
-		flex-shrink: 0;
-	}
-
 	.project-selector-wrapper {
 		flex: 1;
 		min-width: 0;
@@ -608,18 +598,6 @@
 		width: 1rem;
 		height: 1rem;
 		flex-shrink: 0;
-	}
-
-	.title-text {
-		white-space: nowrap;
-	}
-
-	/* Responsive: hide "Source Control" text first, then project selector */
-	@container git-panel (max-width: 320px) {
-		.title-text,
-		.title-divider {
-			display: none;
-		}
 	}
 
 	@container git-panel (max-width: 220px) {
