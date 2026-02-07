@@ -673,6 +673,31 @@ export async function POST({ request }) {
 			}
 		}
 
+		// Step 0a: Guard against duplicate spawns for the same task
+		// If task is already in_progress with an assigned agent that has an active tmux session,
+		// reject the spawn to prevent creating orphan "planning sessions"
+		if (task && task.status === 'in_progress' && task.assignee) {
+			const existingSessionName = `jat-${task.assignee}`;
+			try {
+				const { stdout } = await execAsync(`tmux has-session -t ${shellEscape(existingSessionName)} 2>/dev/null && echo "exists" || echo "none"`);
+				if (stdout.trim() === 'exists') {
+					console.log(`[spawn] Task ${taskId} already in_progress with agent ${task.assignee} (session ${existingSessionName} active)`);
+					return json({
+						error: 'Task already has an active agent',
+						message: `Task ${taskId} is already being worked on by agent ${task.assignee}`,
+						existingAgent: task.assignee,
+						existingSession: existingSessionName,
+						taskId
+					}, { status: 409 });
+				}
+				// Session doesn't exist - agent died, allow respawn
+				console.log(`[spawn] Task ${taskId} was in_progress with ${task.assignee} but session is gone, allowing respawn`);
+			} catch (err) {
+				// tmux check failed - allow spawn to proceed
+				console.warn(`[spawn] Could not check existing session for ${task.assignee}:`, err);
+			}
+		}
+
 		// Step 0b: Select agent and model based on routing rules or explicit params
 		const agentSelection = selectAgentAndModel({ agentId, model, task });
 		if ('error' in agentSelection) {
@@ -700,7 +725,7 @@ export async function POST({ request }) {
 		}
 		console.log(`[spawn] Registered agent ${agentName} in Agent Mail database (id: ${registerResult.agentId})`)
 
-		// Step 2: Assign task to new agent in Beads (if taskId provided)
+		// Step 2: Assign task to new agent in JAT (if taskId provided)
 		if (taskId) {
 			try {
 				await execAsync(`jt update "${taskId}" --status in_progress --assignee "${agentName}"`, {

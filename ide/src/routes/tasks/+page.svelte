@@ -850,6 +850,12 @@
 
 			if (!response.ok) {
 				const data = await response.json();
+				// If task already has an active agent, just refresh the view
+				if (response.status === 409 && data.existingAgent) {
+					console.log(`Task ${task.id} already active with agent ${data.existingAgent}`);
+					await fetchAllData();
+					return;
+				}
 				throw new Error(data.error || "Failed to spawn task");
 			}
 

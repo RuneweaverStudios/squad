@@ -1334,6 +1334,12 @@
 
 			if (!response.ok) {
 				const errorData = await response.json();
+				// If task already has an active agent, show info instead of error
+				if (response.status === 409 && errorData.existingAgent) {
+					showToast('info', `Task already active with agent ${errorData.existingAgent}`);
+					setTimeout(() => fetchTask(taskId!), 500);
+					return;
+				}
 				throw new Error(errorData.message || 'Failed to spawn agent');
 			}
 
