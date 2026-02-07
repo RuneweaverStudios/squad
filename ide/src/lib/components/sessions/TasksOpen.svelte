@@ -13,7 +13,6 @@
 	import AgentSelector from '$lib/components/agents/AgentSelector.svelte';
 	import { bulkApiOperation, fetchWithTimeout, createDeleteRequest, handleApiError, formatBulkResultMessage } from '$lib/utils/bulkApiHelpers';
 	import { isHumanTask } from '$lib/utils/badgeHelpers';
-	import { openTaskDrawer } from '$lib/stores/drawerStore';
 	import { AGENT_PRESETS } from '$lib/types/agentProgram';
 	import ProviderLogo from '$lib/components/agents/ProviderLogo.svelte';
 
@@ -724,6 +723,10 @@
 	let epicSubmenuOpen = $state(false);
 	let epics = $state<Epic[]>([]);
 	let epicsLoading = $state(false);
+	let showCreateEpic = $state(false);
+	let newEpicTitle = $state('');
+	let creatingEpic = $state(false);
+	let newEpicInput: HTMLInputElement;
 
 	function handleContextMenu(task: Task, event: MouseEvent) {
 		event.preventDefault();
@@ -745,6 +748,8 @@
 		ctxVisible = false;
 		statusSubmenuOpen = false;
 		epicSubmenuOpen = false;
+		showCreateEpic = false;
+		newEpicTitle = '';
 		// Note: ctxTask is intentionally NOT cleared so the DOM persists
 	}
 
@@ -840,6 +845,33 @@
 			}
 		} catch (err) {
 			console.error('Failed to link task to epic:', err);
+		}
+	}
+
+	async function handleCreateEpic() {
+		if (!ctxTask || creatingEpic || !newEpicTitle.trim()) return;
+		creatingEpic = true;
+		try {
+			const project = getProjectFromTaskId(ctxTask.id);
+			const response = await fetch('/api/epics', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					title: newEpicTitle.trim(),
+					project,
+					linkTaskId: ctxTask.id
+				})
+			});
+			if (response.ok) {
+				newEpicTitle = '';
+				showCreateEpic = false;
+				closeContextMenu();
+				onRetry();
+			}
+		} catch (err) {
+			console.error('Failed to create epic:', err);
+		} finally {
+			creatingEpic = false;
 		}
 	}
 
@@ -1295,16 +1327,10 @@
 				<div class="task-context-submenu task-context-submenu-epic">
 					{#if epicsLoading}
 						<div class="task-context-menu-loading">Loading...</div>
-					{:else if epics.length === 0}
-						<button
-							class="task-context-menu-item"
-							onclick={() => { const p = ctxTask ? getProjectFromTaskId(ctxTask.id) : ''; closeContextMenu(); openTaskDrawer(p, '', 'task', 'epic'); }}
-						>
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-								<line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-							</svg>
-							<span>Create Epic</span>
-						</button>
+					{:else if epics.length === 0 && !showCreateEpic}
+						<div class="task-context-menu-empty" style="padding: 0.25rem 0;">
+							<span style="opacity: 0.5; font-size: 0.75rem;">No epics found</span>
+						</div>
 					{:else}
 						{#each epics as epic}
 							<button
@@ -1315,16 +1341,40 @@
 								<span class="task-epic-title">{epic.title}</span>
 							</button>
 						{/each}
-						<div class="task-context-menu-divider"></div>
-						<button
-							class="task-context-menu-item"
-							onclick={() => { const p = ctxTask ? getProjectFromTaskId(ctxTask.id) : ''; closeContextMenu(); openTaskDrawer(p, '', 'task', 'epic'); }}
-						>
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-								<line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-							</svg>
-							<span>Create Epic</span>
-						</button>
+					{/if}
+					{#if !epicsLoading}
+						{#if showCreateEpic}
+							<div style="padding: 0.25rem 0.5rem; display: flex; gap: 0.25rem; align-items: center;">
+								<!-- svelte-ignore a11y_autofocus -->
+								<input
+									bind:this={newEpicInput}
+									bind:value={newEpicTitle}
+									onkeydown={(e) => { if (e.key === 'Enter' && newEpicTitle.trim()) { e.preventDefault(); handleCreateEpic(); } else if (e.key === 'Escape') { showCreateEpic = false; newEpicTitle = ''; } }}
+									placeholder="Epic title..."
+									disabled={creatingEpic}
+									autofocus
+									class="task-epic-create-input"
+								/>
+								<button
+									class="task-epic-create-btn"
+									onclick={handleCreateEpic}
+									disabled={creatingEpic || !newEpicTitle.trim()}
+								>
+									{#if creatingEpic}...{:else}+{/if}
+								</button>
+							</div>
+						{:else}
+							<div class="task-context-menu-divider"></div>
+							<button
+								class="task-context-menu-item"
+								onclick={() => { showCreateEpic = true; setTimeout(() => newEpicInput?.focus(), 50); }}
+							>
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+								</svg>
+								<span>Create Epic</span>
+							</button>
+						{/if}
 					{/if}
 				</div>
 			{/if}
@@ -1789,6 +1839,42 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+
+	.task-epic-create-input {
+		flex: 1;
+		background: oklch(0.14 0.01 250);
+		border: 1px solid oklch(0.30 0.02 250);
+		border-radius: 0.25rem;
+		padding: 0.25rem 0.375rem;
+		font-size: 0.75rem;
+		color: oklch(0.90 0.02 250);
+		outline: none;
+	}
+	.task-epic-create-input:focus {
+		border-color: oklch(0.55 0.15 250);
+	}
+	.task-epic-create-btn {
+		background: oklch(0.30 0.02 250);
+		border: 1px solid oklch(0.35 0.02 250);
+		border-radius: 0.25rem;
+		color: oklch(0.80 0.02 250);
+		font-size: 0.875rem;
+		width: 1.5rem;
+		height: 1.5rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		flex-shrink: 0;
+	}
+	.task-epic-create-btn:hover:not(:disabled) {
+		background: oklch(0.40 0.10 145);
+		border-color: oklch(0.50 0.12 145);
+	}
+	.task-epic-create-btn:disabled {
+		opacity: 0.4;
+		cursor: default;
 	}
 
 	/* Loading and empty states in submenu */
