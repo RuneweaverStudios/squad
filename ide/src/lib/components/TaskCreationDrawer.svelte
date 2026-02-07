@@ -2110,10 +2110,8 @@
 				class="p-6 bg-base-200 border-t border-base-content/30"
 			>
 				<div class="flex items-center justify-between">
-					<!-- Keyboard shortcuts hint -->
-					<div class="text-xs font-mono hidden sm:block text-base-content/50">
-						⌘↵ Start · ⌥↵ Save · ⌘⇧↵ New
-					</div>
+					<!-- Spacer (shortcuts shown in dropdown) -->
+					<div></div>
 
 					<div class="flex gap-3">
 						<button
@@ -2157,7 +2155,7 @@
 								</button>
 								<ul
 									tabindex="0"
-									class="dropdown-content menu rounded-box z-[1] w-56 p-2 shadow-lg bg-base-100 border border-base-content/30"
+									class="dropdown-content menu rounded-box z-[1] w-72 p-2 shadow-lg bg-base-100 border border-base-content/30"
 								>
 									<li>
 										<button
@@ -2167,14 +2165,14 @@
 											disabled={formDisabled || isSubmitting}
 										>
 											{#if defaultSaveAction === 'close'}
-												<svg class="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+												<svg class="w-4 h-4 mx-1 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
 												</svg>
 											{:else}
-												<span class="w-4"></span>
+												<span class="w-4 mx-1"></span>
 											{/if}
 											Save & Close
-											<span class="ml-auto text-xs text-base-content/60">⌥↵</span>
+											<kbd class="kbd kbd-xs ml-auto">Alt+Enter</kbd>
 										</button>
 									</li>
 									<li>
@@ -2185,14 +2183,14 @@
 											disabled={formDisabled || isSubmitting}
 										>
 											{#if defaultSaveAction === 'new'}
-												<svg class="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+												<svg class="w-4 h-4 mx-1 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
 												</svg>
 											{:else}
-												<span class="w-4"></span>
+												<span class="w-4 mx-1"></span>
 											{/if}
 											Save & New
-											<span class="ml-auto text-xs text-base-content/60">⌘⇧↵</span>
+											<kbd class="kbd kbd-xs ml-auto">Ctrl+Shift+Enter</kbd>
 										</button>
 									</li>
 									<li>
@@ -2203,14 +2201,14 @@
 											disabled={formDisabled || isSubmitting}
 										>
 											{#if defaultSaveAction === 'start'}
-												<svg class="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+												<svg class="w-4 h-4 mx-1 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
 												</svg>
 											{:else}
-												<span class="w-4"></span>
+												<span class="w-4 mx-1"></span>
 											{/if}
 											Save & Start
-											<span class="ml-auto text-xs text-base-content/60">⌘↵</span>
+											<kbd class="kbd kbd-xs ml-auto">Ctrl+Enter</kbd>
 										</button>
 									</li>
 								</ul>
