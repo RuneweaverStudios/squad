@@ -891,14 +891,22 @@
 
 	function startStatusPolling() {
 		if (statusPollInterval) return;
-		statusPollInterval = setInterval(() => {
+		let prevAhead = ahead;
+		let prevBehind = behind;
+		statusPollInterval = setInterval(async () => {
 			// Skip fetch when page is hidden to avoid Content-Length mismatch errors
 			if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
 				return;
 			}
 			// Only poll if not currently loading or performing an operation
 			if (!isLoading && !isCommitting && !isPushing && !isPulling && !isFetching) {
-				fetchStatus();
+				await fetchStatus();
+				// Refresh timeline when ahead/behind counts change (new commits pushed/pulled by agents)
+				if (ahead !== prevAhead || behind !== prevBehind) {
+					prevAhead = ahead;
+					prevBehind = behind;
+					fetchTimeline();
+				}
 			}
 		}, AUTO_REFRESH_INTERVAL);
 	}

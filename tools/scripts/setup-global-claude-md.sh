@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Setup Global Claude Configuration
+# - Creates ~/.claude/CLAUDE.md with universal tool docs (browser, media, db)
 # - Symlinks agent coordination commands from jat/commands/jat/ to ~/.claude/commands/jat/
 # - Source of truth: ~/code/jat/commands/jat/*.md
-# - No longer writes to ~/.claude/CLAUDE.md (imports handled per-project)
 
 set -e
 
@@ -21,6 +21,33 @@ mkdir -p ~/.claude
 mkdir -p ~/.claude/commands/jat
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+JAT_ROOT="$( cd "$SCRIPT_DIR/../.." && pwd )"
+
+# Create/update ~/.claude/CLAUDE.md with universal tool docs
+GLOBAL_CLAUDE_MD="$HOME/.claude/CLAUDE.md"
+GLOBAL_TOOLS_IMPORT="@~/code/jat/shared/global-tools.md"
+
+if [ ! -f "$GLOBAL_CLAUDE_MD" ]; then
+    echo "  → Creating global CLAUDE.md (universal tool docs)..."
+    cat > "$GLOBAL_CLAUDE_MD" << 'EOF'
+# Global Tools
+
+Tools available on PATH (`~/.local/bin/`) for image generation, browser automation, database queries, and credentials.
+
+@~/code/jat/shared/global-tools.md
+EOF
+    echo -e "${GREEN}  ✓ Created ~/.claude/CLAUDE.md${NC}"
+    echo ""
+elif ! grep -qF "$GLOBAL_TOOLS_IMPORT" "$GLOBAL_CLAUDE_MD"; then
+    echo "  → Adding global-tools import to existing CLAUDE.md..."
+    echo "" >> "$GLOBAL_CLAUDE_MD"
+    echo "$GLOBAL_TOOLS_IMPORT" >> "$GLOBAL_CLAUDE_MD"
+    echo -e "${GREEN}  ✓ Added global-tools import to ~/.claude/CLAUDE.md${NC}"
+    echo ""
+else
+    echo -e "${GREEN}  ✓${NC} Global CLAUDE.md already has tool docs"
+    echo ""
+fi
 # Resolve to absolute path (avoids /../ in symlinks)
 COMMANDS_SOURCE="$( cd "$SCRIPT_DIR/../../commands/jat" && pwd )"
 
@@ -84,6 +111,7 @@ fi
 
 echo -e "${GREEN}  ✓ Global configuration complete${NC}"
 echo ""
+echo "  Universal tools: ~/.claude/CLAUDE.md → shared/global-tools.md"
 echo "  Agent commands available via /jat:* namespace"
 echo "  Project-specific docs are imported via @~/code/jat/shared/*.md"
 echo ""
