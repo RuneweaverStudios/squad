@@ -13,6 +13,7 @@
 	import AgentSelector from '$lib/components/agents/AgentSelector.svelte';
 	import { bulkApiOperation, fetchWithTimeout, createDeleteRequest, handleApiError, formatBulkResultMessage } from '$lib/utils/bulkApiHelpers';
 	import { isHumanTask } from '$lib/utils/badgeHelpers';
+	import { addToast } from '$lib/stores/toasts.svelte';
 	import { AGENT_PRESETS } from '$lib/types/agentProgram';
 	import ProviderLogo from '$lib/components/agents/ProviderLogo.svelte';
 
@@ -857,10 +858,20 @@
 				body: JSON.stringify({ epicId })
 			});
 			if (response.ok) {
+				const data = await response.json();
+				if (data.epicReopened) {
+					addToast({ message: `Task linked to epic (epic was reopened)`, type: 'success' });
+				} else {
+					addToast({ message: `Task linked to epic`, type: 'success' });
+				}
 				onRetry(); // Refresh task list
+			} else {
+				const data = await response.json().catch(() => ({ error: 'Unknown error' }));
+				addToast({ message: data.error || 'Failed to link task to epic', type: 'error' });
 			}
 		} catch (err) {
 			console.error('Failed to link task to epic:', err);
+			addToast({ message: 'Failed to link task to epic', type: 'error' });
 		}
 	}
 
@@ -882,10 +893,15 @@
 				newEpicTitle = '';
 				showCreateEpic = false;
 				closeContextMenu();
+				addToast({ message: 'Epic created and task linked', type: 'success' });
 				onRetry();
+			} else {
+				const data = await response.json().catch(() => ({ error: 'Unknown error' }));
+				addToast({ message: data.error || 'Failed to create epic', type: 'error' });
 			}
 		} catch (err) {
 			console.error('Failed to create epic:', err);
+			addToast({ message: 'Failed to create epic', type: 'error' });
 		} finally {
 			creatingEpic = false;
 		}

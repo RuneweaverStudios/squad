@@ -76,6 +76,24 @@ function findParentEpics(taskId: string, projectPath?: string): string[] {
 }
 
 /**
+ * Check if a task has a backwards dependency on an epic (task depends on epic).
+ * This is the wrong direction - the correct direction is epic depends on task.
+ * Returns true if such a backwards dep exists for the given epicId.
+ */
+function hasBackwardsDependency(taskId: string, epicId: string, projectPath?: string): boolean {
+	try {
+		// getDependencyTree without reverse shows what this task depends ON
+		const result = getDependencyTree(taskId, { reverse: false, projectPath });
+		if (Array.isArray(result)) {
+			return result.some(item => item.id === epicId && item.depth === 1);
+		}
+		return false;
+	} catch {
+		return false;
+	}
+}
+
+/**
  * Remove a task from an epic (remove the epic->task dependency)
  */
 function unlinkFromEpic(taskId: string, epicId: string, projectPath?: string): boolean {
@@ -166,6 +184,17 @@ export const POST: RequestHandler = async ({ params, request }) => {
 			}
 		}
 
+		// Check for backwards dependency (task depends on epic - wrong direction from --parent flag)
+		// If found, auto-fix by removing the wrong dep before adding the correct one
+		if (hasBackwardsDependency(taskId, epicId, projectPath)) {
+			try {
+				removeDependency(taskId, epicId, projectPath);
+				console.log(`[task-epic] Fixed backwards dependency: removed ${taskId} -> ${epicId}`);
+			} catch (fixError) {
+				console.error(`[task-epic] Failed to remove backwards dependency:`, fixError);
+			}
+		}
+
 		// CRITICAL: Dependency direction is epic depends on child
 		// This makes child READY (can be worked on) and epic BLOCKED (until children complete)
 		try {
@@ -183,6 +212,15 @@ export const POST: RequestHandler = async ({ params, request }) => {
 					epicId,
 					alreadyLinked: true
 				});
+			}
+
+			// Handle cycle detection gracefully (409 Conflict, not 500)
+			if (errorMessage.includes('cycle')) {
+				console.warn(`[task-epic] Cycle detected: ${errorMessage}`);
+				return json(
+					{ success: false, error: `Cannot link: would create a circular dependency` },
+					{ status: 409 }
+				);
 			}
 
 			console.error('[task-epic] addDependency error:', errorMessage);
