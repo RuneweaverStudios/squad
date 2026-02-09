@@ -615,6 +615,8 @@
 	let otherInputValue = $state("");
 	// Suppress question fetching after answering (prevents race condition)
 	let suppressQuestionFetch = $state(false);
+	// Track when we last cleared question data (to ignore stale SSE data)
+	let lastQuestionClearTime = 0;
 
 	// SSE question data → instant apiQuestionData update (bypasses HTTP polling delay)
 	// The SSE server watches /tmp/claude-question-tmux-*.json and broadcasts within ~50ms
@@ -622,6 +624,9 @@
 	$effect(() => {
 		if (suppressQuestionFetch) return;
 		if (sseQuestionData?.active && sseQuestionData.questions?.length > 0) {
+			// Only accept SSE data that arrived after our last clear
+			// This prevents stale SSE data from re-showing an already-answered question
+			if (sseQuestionDataTimestamp && sseQuestionDataTimestamp <= lastQuestionClearTime) return;
 			// Reset selection state if this is a new question
 			const oldQuestion = apiQuestionData?.questions?.[0]?.question;
 			const newQuestion = sseQuestionData.questions[0]?.question;
@@ -779,6 +784,8 @@
 		// Suppress fetching to prevent race condition
 		suppressQuestionFetch = true;
 		apiQuestionData = null;
+		// Record clear time so stale SSE data won't re-show the answered question
+		lastQuestionClearTime = Date.now();
 		try {
 			await fetch(`/api/work/${encodeURIComponent(sessionName)}/question`, {
 				method: "DELETE",

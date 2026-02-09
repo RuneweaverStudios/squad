@@ -515,19 +515,32 @@ function handleSessionState(data: SessionEvent): void {
  * PERFORMANCE: Uses in-place mutation for fine-grained reactivity.
  */
 function handleSessionQuestion(data: SessionEvent): void {
-	const { sessionName, question } = data;
+	const { sessionName } = data;
 	if (!sessionName) return;
 
 	const sessionIndex = workSessionsState.sessions.findIndex(s => s.sessionName === sessionName);
 	if (sessionIndex === -1) return;
 
+	// Cast question from unknown - shape comes from PreToolUse hook's JSON output
+	const question = data.question as {
+		session_id?: string;
+		tmux_session?: string;
+		timestamp?: string;
+		questions?: Array<{
+			question: string;
+			header: string;
+			multiSelect: boolean;
+			options: Array<{ label: string; description: string }>;
+		}>;
+	} | undefined;
+
 	// Store question data directly for instant UI rendering
-	workSessionsState.sessions[sessionIndex]._questionData = question ? {
+	workSessionsState.sessions[sessionIndex]._questionData = question?.questions?.length ? {
 		active: true,
 		session_id: question.session_id,
 		tmux_session: question.tmux_session,
 		timestamp: question.timestamp,
-		questions: question.questions || []
+		questions: question.questions
 	} : undefined;
 	workSessionsState.sessions[sessionIndex]._questionDataTimestamp = data.timestamp || Date.now();
 }

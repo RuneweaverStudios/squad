@@ -128,6 +128,18 @@
 		_completionBundle?: CompletionBundle;
 		/** Timestamp when completion bundle was received */
 		_completionBundleTimestamp?: number;
+		/** Question data from SSE (instant, bypasses HTTP polling) */
+		_questionData?: {
+			active: boolean;
+			questions: Array<{
+				question: string;
+				header: string;
+				multiSelect: boolean;
+				options: Array<{ label: string; description: string }>;
+			}>;
+		};
+		/** Timestamp when question data was received via SSE */
+		_questionDataTimestamp?: number;
 	}
 
 	// Server session type - aligned with serverSessions.svelte.ts
@@ -478,6 +490,8 @@
 								signalSuggestedTasksTimestamp={session._signalSuggestedTasksTimestamp}
 								completionBundle={session._completionBundle}
 								completionBundleTimestamp={session._completionBundleTimestamp}
+								sseQuestionData={session._questionData}
+								sseQuestionDataTimestamp={session._questionDataTimestamp}
 								onKillSession={createKillHandler(session.sessionName)}
 								onInterrupt={createInterruptHandler(session.sessionName)}
 								onContinue={createContinueHandler(session.sessionName)}
