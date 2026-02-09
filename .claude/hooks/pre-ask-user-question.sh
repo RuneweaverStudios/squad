@@ -28,9 +28,20 @@ if [[ -n "${TMUX:-}" ]]; then
 fi
 # Method 2: From agent session file (more reliable)
 if [[ -z "$TMUX_SESSION" ]]; then
-    # Try multiple possible locations for agent file
-    # Check both .claude/agent-{id}.txt (legacy) and .claude/sessions/agent-{id}.txt (current)
-    for BASE_DIR in "." ~/code/*/; do
+    # Build list of directories to search: current dir + configured projects
+    SEARCH_DIRS="."
+    JAT_CONFIG="$HOME/.config/jat/projects.json"
+    if [[ -f "$JAT_CONFIG" ]]; then
+        PROJECT_PATHS=$(jq -r '.projects[].path // empty' "$JAT_CONFIG" 2>/dev/null | sed "s|^~|$HOME|g")
+        for PROJECT_PATH in $PROJECT_PATHS; do
+            if [[ -d "${PROJECT_PATH}/.claude" ]]; then
+                SEARCH_DIRS="$SEARCH_DIRS $PROJECT_PATH"
+            fi
+        done
+    fi
+
+    # Check both .claude/sessions/agent-{id}.txt (current) and .claude/agent-{id}.txt (legacy)
+    for BASE_DIR in $SEARCH_DIRS; do
         for SUBDIR in "sessions" ""; do
             if [[ -n "$SUBDIR" ]]; then
                 AGENT_FILE="${BASE_DIR}/.claude/${SUBDIR}/agent-${SESSION_ID}.txt"

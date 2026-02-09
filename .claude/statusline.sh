@@ -1,7 +1,6 @@
 #!/bin/bash
 #
 # Claude Code Global Statusline
-# Canonical source: ~/code/jat/.claude/statusline.sh
 # Installed to: ~/.claude/statusline.sh (global, works across all projects)
 #
 # Multi-line status display for agent orchestration workflows
@@ -663,11 +662,20 @@ status_line=""
 
 # Get ANSI avatar if available (cached .ansi file in avatars directory)
 # Multi-line avatar (6x3 chars) - each row prepended to corresponding status line
-AVATARS_DIR="/home/jw/code/jat/avatars"
+# Detect JAT install dir: env var → XDG standard → projects.json path
+AVATARS_DIR=""
+if [[ -n "${JAT_INSTALL_DIR:-}" ]] && [[ -d "${JAT_INSTALL_DIR}/avatars" ]]; then
+    AVATARS_DIR="${JAT_INSTALL_DIR}/avatars"
+elif [[ -d "${XDG_DATA_HOME:-$HOME/.local/share}/jat/avatars" ]]; then
+    AVATARS_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/jat/avatars"
+elif [[ -f "$HOME/.config/jat/projects.json" ]]; then
+    _jat_path=$(jq -r '.projects.jat.path // empty' "$HOME/.config/jat/projects.json" 2>/dev/null | sed "s|^~|$HOME|g")
+    [[ -n "$_jat_path" ]] && [[ -d "${_jat_path}/avatars" ]] && AVATARS_DIR="${_jat_path}/avatars"
+fi
 avatar_row1=""
 avatar_row2=""
 avatar_row3=""
-if [[ -n "$agent_name" ]] && [[ -f "${AVATARS_DIR}/${agent_name}.ansi" ]]; then
+if [[ -n "$agent_name" ]] && [[ -n "$AVATARS_DIR" ]] && [[ -f "${AVATARS_DIR}/${agent_name}.ansi" ]]; then
     # Read multi-line avatar and split into rows
     mapfile -t avatar_rows < "${AVATARS_DIR}/${agent_name}.ansi"
     avatar_row1="${avatar_rows[0]:-}"

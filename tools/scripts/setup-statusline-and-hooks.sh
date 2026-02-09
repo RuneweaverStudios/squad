@@ -22,18 +22,23 @@ echo ""
 if [ -n "$1" ]; then
     JAT_DIR="$1"
     echo -e "${BLUE}Using JAT directory: $JAT_DIR${NC}"
+elif [ -n "${JAT_INSTALL_DIR:-}" ] && [ -d "$JAT_INSTALL_DIR" ]; then
+    JAT_DIR="$JAT_INSTALL_DIR"
 elif [ -d "${XDG_DATA_HOME:-$HOME/.local/share}/jat" ]; then
     JAT_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/jat"
-elif [ -d "$HOME/code/jat" ]; then
-    JAT_DIR="$HOME/code/jat"
-elif [ -d "$HOME/code/jomarchy-agent-tools" ]; then
-    JAT_DIR="$HOME/code/jomarchy-agent-tools"
-else
+elif [ -f "$HOME/.config/jat/projects.json" ]; then
+    _jat_path=$(jq -r '.projects.jat.path // empty' "$HOME/.config/jat/projects.json" 2>/dev/null | sed "s|^~|$HOME|g")
+    if [ -n "$_jat_path" ] && [ -d "$_jat_path" ]; then
+        JAT_DIR="$_jat_path"
+    fi
+fi
+
+if [ -z "${JAT_DIR:-}" ]; then
     echo -e "${RED}ERROR: JAT installation not found${NC}"
     echo "Searched in:"
+    echo "  - \$JAT_INSTALL_DIR env var"
     echo "  - ${XDG_DATA_HOME:-$HOME/.local/share}/jat"
-    echo "  - ~/code/jat"
-    echo "  - ~/code/jomarchy-agent-tools"
+    echo "  - projects.json jat.path"
     exit 1
 fi
 

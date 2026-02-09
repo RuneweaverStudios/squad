@@ -21,12 +21,20 @@ echo -e "${BLUE}JAT Signal Hook Updater${NC}"
 echo ""
 
 # Find JAT installation
-if [ -d "$HOME/code/jat" ]; then
-    JAT_DIR="$HOME/code/jat"
-elif [ -d "$HOME/code/jomarchy-agent-tools" ]; then
-    JAT_DIR="$HOME/code/jomarchy-agent-tools"
-else
+if [ -n "${JAT_INSTALL_DIR:-}" ] && [ -d "$JAT_INSTALL_DIR" ]; then
+    JAT_DIR="$JAT_INSTALL_DIR"
+elif [ -d "${XDG_DATA_HOME:-$HOME/.local/share}/jat" ]; then
+    JAT_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/jat"
+elif [ -f "$HOME/.config/jat/projects.json" ]; then
+    _jat_path=$(jq -r '.projects.jat.path // empty' "$HOME/.config/jat/projects.json" 2>/dev/null | sed "s|^~|$HOME|g")
+    if [ -n "$_jat_path" ] && [ -d "$_jat_path" ]; then
+        JAT_DIR="$_jat_path"
+    fi
+fi
+
+if [ -z "${JAT_DIR:-}" ]; then
     echo -e "${RED}ERROR: JAT not found${NC}"
+    echo "Set \$JAT_INSTALL_DIR or add jat to ~/.config/jat/projects.json"
     exit 1
 fi
 

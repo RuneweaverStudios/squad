@@ -1,0 +1,9 @@
+{
+  "name": "jat-scheduler",
+  "version": "1.0.0",
+  "description": "Scheduled actions daemon for JAT - executes commands on time/cron/delay triggers",
+  "type": "module",
+  "dependencies": {
+    "better-sqlite3": "^11.10.0"
+  }
+}

@@ -21,26 +21,41 @@ echo "  jat Doctor Report"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
+# Find JAT installation directory
+JAT_DIR=""
+if [[ -n "${JAT_INSTALL_DIR:-}" ]] && [[ -d "$JAT_INSTALL_DIR" ]]; then
+    JAT_DIR="$JAT_INSTALL_DIR"
+elif [[ -d "${XDG_DATA_HOME:-$HOME/.local/share}/jat" ]]; then
+    JAT_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/jat"
+elif [[ -f "$HOME/.config/jat/projects.json" ]]; then
+    _jat_path=$(jq -r '.projects.jat.path // empty' "$HOME/.config/jat/projects.json" 2>/dev/null | sed "s|^~|$HOME|g")
+    [[ -n "$_jat_path" ]] && [[ -d "$_jat_path" ]] && JAT_DIR="$_jat_path"
+fi
+
 # 1. Check jat repo
-if [[ -d ~/code/jat ]]; then
-    pass "jat repo exists"
+if [[ -n "$JAT_DIR" ]] && [[ -d "$JAT_DIR" ]]; then
+    pass "jat repo exists ($JAT_DIR)"
 else
-    fail "jat repo missing - run: git clone https://github.com/joewinke/jat ~/code/jat"
+    fail "jat repo missing - set \$JAT_INSTALL_DIR or add jat to ~/.config/jat/projects.json"
 fi
 
 # 2. Check shared docs
-SHARED_COUNT=$(ls ~/code/jat/shared/*.md 2>/dev/null | wc -l)
-if [[ $SHARED_COUNT -ge 10 ]]; then
-    pass "$SHARED_COUNT shared docs found"
+if [[ -n "$JAT_DIR" ]]; then
+    SHARED_COUNT=$(ls "$JAT_DIR/shared/"*.md 2>/dev/null | wc -l)
+    if [[ $SHARED_COUNT -ge 10 ]]; then
+        pass "$SHARED_COUNT shared docs found"
+    else
+        fail "Only $SHARED_COUNT shared docs (expected 10+)"
+    fi
 else
-    fail "Only $SHARED_COUNT shared docs (expected 10+)"
+    fail "Cannot check shared docs - JAT dir not found"
 fi
 
 # 3. Check statusline
 if [[ -f ~/.claude/statusline.sh ]]; then
     pass "Statusline installed"
 else
-    fail "Statusline missing - run: cp ~/code/jat/.claude/statusline.sh ~/.claude/"
+    fail "Statusline missing - run: setup-statusline-and-hooks.sh"
 fi
 
 # 4. Check agent commands
@@ -53,12 +68,12 @@ if [[ -d ~/.claude/commands/jat ]]; then
         find ~/.claude/commands/jat -type l ! -exec test -e {} \; -print 2>/dev/null | while read f; do
             echo "      - $(basename "$f")"
         done
-        echo "    Fix: rm ~/.claude/commands/jat/*.md && cd ~/code/jat && ./install.sh"
+        echo "    Fix: rm ~/.claude/commands/jat/*.md && ./install.sh (from JAT dir)"
     else
         pass "$CMD_COUNT agent commands installed"
     fi
 else
-    fail "Agent commands not installed - run: cd ~/code/jat && ./install.sh"
+    fail "Agent commands not installed - run: ./install.sh (from JAT dir)"
 fi
 
 # 5. Check core tools
@@ -75,7 +90,7 @@ for tool in am-register am-inbox am-send jt jat-signal; do
 done
 
 if [[ "$TOOLS_OK" == "false" ]]; then
-    echo "    Fix: cd ~/code/jat && ./install.sh"
+    echo "    Fix: ./install.sh (from JAT dir)"
 fi
 
 # 6. Check tasks in current project
@@ -90,17 +105,13 @@ fi
 
 # 7. Check CLAUDE.md imports
 if [[ -f CLAUDE.md ]]; then
-    IMPORTS=$(grep -c "^@~/code/jat/shared/" CLAUDE.md 2>/dev/null || echo "0")
+    # Check for jat shared imports (any path format)
+    IMPORTS=$(grep -cE "^@.*/shared/" CLAUDE.md 2>/dev/null || echo "0")
     if [[ $IMPORTS -ge 5 ]]; then
         pass "CLAUDE.md has $IMPORTS jat imports"
     else
         warn "CLAUDE.md has only $IMPORTS jat imports (expected 5+)"
-        echo "    Add to CLAUDE.md:"
-        echo "      @~/code/jat/shared/overview.md"
-        echo "      @~/code/jat/shared/agent-mail.md"
-        echo "      @~/code/jat/shared/tasks.md"
-        echo "      @~/code/jat/shared/tools.md"
-        echo "      @~/code/jat/shared/workflow-commands.md"
+        echo "    Run setup-repos.sh to configure CLAUDE.md imports"
     fi
 else
     warn "No CLAUDE.md in current directory"
