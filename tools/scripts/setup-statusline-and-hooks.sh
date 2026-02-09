@@ -224,6 +224,16 @@ else
     echo -e "  ${YELLOW}⚠ monitor-output helper not found: $MONITOR_OUTPUT${NC}"
 fi
 
+# Copy log-tool-activity hook to global directory (logs tool usage to activity timeline)
+LOG_TOOL_HOOK="$JAT_DIR/.claude/hooks/log-tool-activity.sh"
+if [ -f "$LOG_TOOL_HOOK" ]; then
+    cp "$LOG_TOOL_HOOK" "$GLOBAL_HOOKS_DIR/log-tool-activity.sh"
+    chmod +x "$GLOBAL_HOOKS_DIR/log-tool-activity.sh"
+    echo -e "  ${GREEN}✓ Installed log-tool-activity.sh to ~/.claude/hooks/${NC}"
+else
+    echo -e "  ${YELLOW}⚠ log-tool-activity hook not found: $LOG_TOOL_HOOK${NC}"
+fi
+
 echo ""
 
 # ============================================================================
@@ -296,6 +306,39 @@ if grep -q '"SessionStart"' "$SETTINGS_LOCAL" 2>/dev/null; then
     else
         echo -e "  ${GREEN}✓${NC} UserPromptSubmit hook already configured"
     fi
+
+    # Add log-tool-activity PostToolUse hooks if missing (upgrade path)
+    if ! grep -q 'log-tool-activity' "$SETTINGS_LOCAL" 2>/dev/null; then
+        TEMP_SETTINGS=$(mktemp)
+        # Replace existing PostToolUse array with expanded version that includes
+        # log-tool-activity for both Bash and non-Bash tools
+        if jq '.hooks.PostToolUse = [
+            {
+                "matcher": "^Bash$",
+                "hooks": (
+                    [(.hooks.PostToolUse[]? | .hooks[]? | select(.command | test("log-tool-activity") | not))] +
+                    [{"type": "command", "command": "~/.claude/hooks/log-tool-activity.sh"}]
+                )
+            },
+            {
+                "matcher": "NONBASH_MATCHER_PLACEHOLDER",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "~/.claude/hooks/log-tool-activity.sh"
+                    }
+                ]
+            }
+        ]' "$SETTINGS_LOCAL" | sed 's/NONBASH_MATCHER_PLACEHOLDER/^(?!Bash$).*/' > "$TEMP_SETTINGS" 2>/dev/null; then
+            mv "$TEMP_SETTINGS" "$SETTINGS_LOCAL"
+            echo -e "  ${GREEN}✓ Added log-tool-activity PostToolUse hooks to settings.local.json${NC}"
+        else
+            echo -e "  ${YELLOW}⚠ Failed to add log-tool-activity hooks${NC}"
+            rm -f "$TEMP_SETTINGS"
+        fi
+    else
+        echo -e "  ${GREEN}✓${NC} log-tool-activity hooks already configured"
+    fi
 else
     # Add SessionStart and PostToolUse hooks to settings.local.json
     TEMP_SETTINGS=$(mktemp)
@@ -338,11 +381,24 @@ else
             ],
             "PostToolUse": [
                 {
-                    "matcher": "Bash",
+                    "matcher": "^Bash$",
                     "hooks": [
                         {
                             "type": "command",
                             "command": "~/.claude/hooks/post-bash-jat-signal.sh"
+                        },
+                        {
+                            "type": "command",
+                            "command": "~/.claude/hooks/log-tool-activity.sh"
+                        }
+                    ]
+                },
+                {
+                    "matcher": "NONBASH_MATCHER_PLACEHOLDER",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": "~/.claude/hooks/log-tool-activity.sh"
                         }
                     ]
                 }
@@ -360,7 +416,7 @@ else
                 }
             ]
         })
-    }' "$SETTINGS_LOCAL" > "$TEMP_SETTINGS" 2>/dev/null; then
+    }' "$SETTINGS_LOCAL" | sed 's/NONBASH_MATCHER_PLACEHOLDER/^(?!Bash$).*/' > "$TEMP_SETTINGS" 2>/dev/null; then
         mv "$TEMP_SETTINGS" "$SETTINGS_LOCAL"
         echo -e "  ${GREEN}✓ Added SessionStart, PreCompact, PostToolUse, and UserPromptSubmit hooks to settings.local.json${NC}"
     else
@@ -529,6 +585,7 @@ echo "    - ~/.claude/hooks/pre-ask-user-question.sh (PreToolUse)"
 echo "    - ~/.claude/hooks/pre-compact-save-agent.sh (PreCompact)"
 echo "    - ~/.claude/hooks/post-bash-agent-state-refresh.sh (PostToolUse)"
 echo "    - ~/.claude/hooks/post-bash-jat-signal.sh (PostToolUse)"
+echo "    - ~/.claude/hooks/log-tool-activity.sh (PostToolUse - activity timeline)"
 echo "    - ~/.claude/hooks/user-prompt-signal.sh (UserPromptSubmit)"
 echo "    - ~/.claude/hooks/monitor-output.sh (helper for user-prompt-signal)"
 echo ""

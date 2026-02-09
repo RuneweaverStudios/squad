@@ -97,8 +97,8 @@ else
 fi
 
 if [[ -z "$SESSION_ID" ]]; then
-    echo "Error: Could not determine session ID" >&2
-    exit 1
+    # Graceful exit - hooks should not fail when session ID unavailable
+    exit 0
 fi
 
 # Get agent name for this session (check sessions/ first, then legacy location)

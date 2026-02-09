@@ -2352,16 +2352,17 @@
 		background: transparent;
 		border: none;
 		cursor: pointer;
-		transition: background-color 0.15s ease;
-	}
-
-	.epic-header:hover {
-		background: oklch(0.19 0.01 250);
 	}
 
 	.epic-header-row {
 		display: flex;
 		align-items: center;
+		border-radius: 0.375rem;
+		transition: background-color 0.15s ease;
+	}
+
+	.epic-header-row:hover {
+		background: oklch(0.19 0.01 250);
 	}
 
 	.epic-header-row .epic-header {

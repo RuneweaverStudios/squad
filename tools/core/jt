@@ -91,6 +91,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     priority INTEGER NOT NULL DEFAULT 2,
     issue_type TEXT NOT NULL DEFAULT "task",
     assignee TEXT,
+    parent_id TEXT REFERENCES tasks(id),
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     closed_at TEXT,
@@ -149,6 +150,15 @@ cmd_init() {
   fi
 
   sqlite3 "$jat_dir/tasks.db" "PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; $SCHEMA"
+
+  # Migrate: add parent_id column if missing (for existing databases)
+  local has_parent_id
+  has_parent_id="$(sqlite3 "$jat_dir/tasks.db" "PRAGMA table_info(tasks);" | grep -c 'parent_id' || true)"
+  if [[ "$has_parent_id" == "0" ]]; then
+    sqlite3 "$jat_dir/tasks.db" "ALTER TABLE tasks ADD COLUMN parent_id TEXT REFERENCES tasks(id);"
+    $quiet || echo "Migrated: added parent_id column"
+  fi
+
   touch_sentinel
 
   $quiet || echo "Initialized .jat/ in $PROJECT_ROOT"
@@ -156,7 +166,7 @@ cmd_init() {
 
 cmd_create() {
   require_db
-  local title="" description="" type="task" priority=2 labels="" deps="" assignee="" json_out=false explicit_id=""
+  local title="" description="" type="task" priority=2 labels="" deps="" assignee="" json_out=false explicit_id="" parent_id=""
 
   # First positional arg is title
   if [[ $# -gt 0 && ! "$1" =~ ^-- ]]; then
@@ -172,14 +182,29 @@ cmd_create() {
       --deps)        deps="$2"; shift 2 ;;
       --assignee)    assignee="$2"; shift 2 ;;
       --id)          explicit_id="$2"; shift 2 ;;
+      --parent)      parent_id="$2"; shift 2 ;;
       --json)        json_out=true; shift ;;
       *)             [[ -z "$title" ]] && title="$1"; shift ;;
     esac
   done
 
-  [[ -n "$title" ]] || die "Usage: jt create \"title\" [--type X] [--priority N] [--description \"...\"] [--labels \"a,b\"] [--deps \"id1,id2\"] [--assignee \"X\"] [--json]"
+  [[ -n "$title" ]] || die "Usage: jt create \"title\" [--type X] [--priority N] [--description \"...\"] [--labels \"a,b\"] [--deps \"id1,id2\"] [--assignee \"X\"] [--parent EPIC_ID] [--json]"
 
   local id="${explicit_id:-$(gen_id)}"
+
+  # If --parent specified, generate hierarchical child ID and validate parent
+  if [[ -n "$parent_id" ]]; then
+    # Verify parent exists
+    local parent_exists
+    parent_exists="$(sql_json "SELECT id FROM tasks WHERE id = '$(sql_escape "$parent_id")';")"
+    [[ "$parent_exists" == "[]" || -z "$parent_exists" ]] && die "Parent task not found: $parent_id"
+
+    # Find next child number: query max existing child suffix
+    local max_child
+    max_child="$(sqlite3 "$DB" "SELECT COALESCE(MAX(CAST(SUBSTR(id, LENGTH('$(sql_escape "$parent_id")') + 2) AS INTEGER)), 0) FROM tasks WHERE id LIKE '$(sql_escape "$parent_id").%' AND id NOT LIKE '$(sql_escape "$parent_id").%.%';")"
+    local next_child=$(( max_child + 1 ))
+    id="${parent_id}.${next_child}"
+  fi
   local ts
   ts="$(now_ts)"
   local esc_title esc_desc esc_assignee
@@ -187,9 +212,17 @@ cmd_create() {
   esc_desc="$(sql_escape "$description")"
   esc_assignee="$(sql_escape "$assignee")"
 
+  local esc_parent_id
+  esc_parent_id="$(sql_escape "$parent_id")"
+
   sql_exec "PRAGMA foreign_keys=ON;
-    INSERT INTO tasks (id, title, description, status, priority, issue_type, assignee, created_at, updated_at)
-    VALUES ('$id', '$esc_title', '$esc_desc', 'open', $priority, '$type', $([ -n "$assignee" ] && echo "'$esc_assignee'" || echo "NULL"), '$ts', '$ts');"
+    INSERT INTO tasks (id, title, description, status, priority, issue_type, assignee, parent_id, created_at, updated_at)
+    VALUES ('$id', '$esc_title', '$esc_desc', 'open', $priority, '$type', $([ -n "$assignee" ] && echo "'$esc_assignee'" || echo "NULL"), $([ -n "$parent_id" ] && echo "'$esc_parent_id'" || echo "NULL"), '$ts', '$ts');"
+
+  # Auto-wire epic→child dependency: parent depends on child (child is READY, parent is BLOCKED)
+  if [[ -n "$parent_id" ]]; then
+    sql_exec "PRAGMA foreign_keys=ON; INSERT OR IGNORE INTO dependencies (issue_id, depends_on_id, type) VALUES ('$(sql_escape "$parent_id")', '$id', 'blocks');"
+  fi
 
   # Insert labels
   if [[ -n "$labels" ]]; then
@@ -335,7 +368,7 @@ _task_json() {
   sql_json "
     SELECT
       t.id, t.title, t.description, t.status, t.priority, t.issue_type,
-      t.assignee, t.created_at, t.updated_at, t.closed_at, t.close_reason,
+      t.assignee, t.parent_id, t.created_at, t.updated_at, t.closed_at, t.close_reason,
       COALESCE(
         (SELECT json_group_array(l.label) FROM labels l WHERE l.issue_id = t.id),
         '[]'
@@ -805,7 +838,8 @@ Usage: jt <command> [options]
 
 Commands:
   create  "title" [--type X] [--priority N] [--description "..."]
-                   [--labels "a,b"] [--deps "id1,id2"] [--assignee "X"] [--json]
+                   [--labels "a,b"] [--deps "id1,id2"] [--assignee "X"]
+                   [--parent EPIC_ID] [--json]
   update  TASK_ID  [--status X] [--priority N] [--assignee X] [--title X]
                    [--description "..."] [--notes "..."] [--labels "a,b"] [--json]
   close   TASK_ID  [--reason "..."] [--json]
