@@ -255,6 +255,7 @@
 			loadSparklineData();
 			loadAutoKillConfig(); // Load user's auto-kill settings for session cleanup
 			startGitStatusPolling(30000); // Poll git status every 30 seconds for push badge
+			checkIngestAutoStart(); // Auto-start ingest daemon if configured
 		}, 100);
 
 		// Phase 3: Expensive usage data (heavily deferred, runs after user has had time to interact)
@@ -614,6 +615,24 @@
 				configProjects = [];
 				configProjectsLoaded = true;
 			}
+		}
+	}
+
+	// Check ingest_autostart setting and start daemon if enabled and not already running
+	async function checkIngestAutoStart() {
+		try {
+			const resp = await fetch('/api/config/defaults');
+			const data = await resp.json();
+			if (data.success && data.defaults?.ingest_autostart === true) {
+				// Start the ingest service - /api/servers/start returns 409 if already running
+				await fetch('/api/servers/start', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ projectName: 'ingest' })
+				});
+			}
+		} catch {
+			// Silently fail - autostart is not critical
 		}
 	}
 

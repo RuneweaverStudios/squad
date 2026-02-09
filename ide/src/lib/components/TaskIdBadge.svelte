@@ -376,6 +376,16 @@
 				<!-- Avatar with status ring using AgentAvatar's built-in ring support -->
 				{#if agentName}
 					<AgentAvatar name={agentName} size={avatarSize - 4} showRing={true} ringColor={ringColor} showGlow={true} {exiting} />
+				{:else if isHuman && !isClosed}
+					<!-- Human task icon as avatar -->
+					<button
+						class="rounded-full shrink-0 flex items-center justify-center cursor-pointer hover:brightness-125 transition-all"
+						style="width: {avatarSize}px; height: {avatarSize}px; background: oklch(0.20 0.02 250); border: 2px solid oklch(0.45 0.15 45);"
+						onclick={(e) => { e.stopPropagation(); onHarnessClick?.(e); }}
+						title="Human task"
+					>
+						<ProviderLogo agentId="human" size={avatarSize - 10} />
+					</button>
 				{:else if harness}
 					<!-- Harness icon as avatar when no agent assigned -->
 					<button

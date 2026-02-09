@@ -116,9 +116,11 @@
 		}
 	});
 
-	// Update harness when project selection changes
+	// Update harness when project selection changes (only on actual project change)
+	let prevProject = $state<string>('');
 	$effect(() => {
-		if (formData.project) {
+		if (formData.project && formData.project !== prevProject) {
+			prevProject = formData.project;
 			selectedHarness = projectHarnessMap[formData.project] || 'claude-code';
 		}
 	});
@@ -1089,6 +1091,7 @@
 		// Reset harness selection
 		selectedHarness = 'claude-code';
 		harnessDropdownOpen = false;
+		prevProject = '';
 
 		// Reset review override
 		reviewOverride = null;
@@ -1335,16 +1338,19 @@
 				<div
 					class="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-primary to-primary/30"
 				></div>
-				<div class="flex-1 min-w-0">
+				<div class="flex-1 min-w-0 flex items-start justify-between gap-4">
 					<div class="flex items-center gap-3 flex-wrap">
 						<h2 id="drawer-title" class="text-xl font-bold font-mono uppercase tracking-wider text-base-content">Create New Task</h2>
+					</div>
+					<!-- Right-aligned stacked selectors: Project on top, Harness below -->
+					<div class="flex flex-col items-end gap-1.5 flex-shrink-0">
 						<!-- Project dropdown in header (Alt+P to open, arrows to navigate) -->
 						<div class="dropdown dropdown-end {projectDropdownOpen ? 'dropdown-open' : ''}">
 							<button
 								type="button"
 								tabindex="0"
 								bind:this={projectDropdownBtn}
-								class="ml-8 badge badge-lg gap-1.5 px-2.5 pt-1 font-mono text-sm transition-colors cursor-pointer"
+								class="badge badge-lg gap-1.5 px-2.5 pt-1 font-mono text-sm transition-colors cursor-pointer"
 								style={formData.project && selectedProjectColor
 									? `background: color-mix(in oklch, ${selectedProjectColor} 20%, transparent); border-color: color-mix(in oklch, ${selectedProjectColor} 50%, transparent); color: ${selectedProjectColor};`
 									: formData.project
@@ -1426,40 +1432,41 @@
 							</ul>
 						</div>
 
-					<!-- Harness Selector Badge -->
-					<div class="dropdown dropdown-end" class:dropdown-open={harnessDropdownOpen}>
-						<button type="button"
-							class="badge badge-lg gap-1.5 px-2 pt-0.5 font-mono text-xs cursor-pointer"
-							style="background: oklch(0.30 0.03 250); border-color: oklch(0.40 0.04 250); color: oklch(0.75 0.02 250);"
-							disabled={formDisabled || isSubmitting}
-							onclick={() => harnessDropdownOpen = !harnessDropdownOpen}
-						>
-							<ProviderLogo agentId={selectedHarness} size={14} />
-							<svg class="w-3 h-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-							</svg>
-						</button>
-						{#if harnessDropdownOpen}
-							<!-- svelte-ignore a11y_no_static_element_interactions -->
-							<ul class="dropdown-content menu bg-base-200 rounded-box z-50 w-48 p-2 shadow-lg border border-base-content/10" onclick={(e) => e.stopPropagation()}>
-								{#each AGENT_PRESETS as preset}
-									<li>
-										<button class="flex items-center gap-2 {selectedHarness === preset.id ? 'active' : ''}"
-											onclick={() => { selectedHarness = preset.id; harnessDropdownOpen = false; }}
-										>
-											<ProviderLogo agentId={preset.id} size={16} />
-											<span>{preset.config.name}</span>
-											{#if selectedHarness === preset.id}
-												<svg class="w-4 h-4 ml-auto text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-													<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-												</svg>
-											{/if}
-										</button>
-									</li>
-								{/each}
-							</ul>
-						{/if}
-					</div>
+						<!-- Harness Selector Badge -->
+						<div class="dropdown dropdown-end" class:dropdown-open={harnessDropdownOpen}>
+							<button type="button"
+								class="badge badge-lg gap-1.5 px-2 pt-0.5 font-mono text-xs cursor-pointer"
+								style="background: oklch(0.30 0.03 250); border-color: oklch(0.40 0.04 250); color: oklch(0.75 0.02 250);"
+								disabled={formDisabled || isSubmitting}
+								onclick={() => harnessDropdownOpen = !harnessDropdownOpen}
+							>
+								<ProviderLogo agentId={selectedHarness} size={14} />
+								<span>{AGENT_PRESETS.find(p => p.id === selectedHarness)?.config.name || selectedHarness}</span>
+								<svg class="w-3 h-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+								</svg>
+							</button>
+							{#if harnessDropdownOpen}
+								<!-- svelte-ignore a11y_no_static_element_interactions -->
+								<ul class="dropdown-content menu bg-base-200 rounded-box z-50 w-48 p-2 shadow-lg border border-base-content/10" onclick={(e) => e.stopPropagation()}>
+									{#each AGENT_PRESETS as preset}
+										<li>
+											<button class="flex items-center gap-2 {selectedHarness === preset.id ? 'active' : ''}"
+												onclick={() => { selectedHarness = preset.id; harnessDropdownOpen = false; }}
+											>
+												<ProviderLogo agentId={preset.id} size={16} />
+												<span>{preset.config.name}</span>
+												{#if selectedHarness === preset.id}
+													<svg class="w-4 h-4 ml-auto text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+														<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+													</svg>
+												{/if}
+											</button>
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</div>
 					</div>
 					<p class="text-sm mt-1 {formDisabled ? 'text-warning' : 'text-base-content/70'}">
 						{#if formDisabled}

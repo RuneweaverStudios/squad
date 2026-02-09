@@ -224,6 +224,10 @@
 			const data = await resp.json();
 			if (data.success) {
 				autoStart = newValue;
+				// When enabling autostart, also start the service immediately if not running
+				if (newValue && serviceStatus === 'stopped') {
+					await startService();
+				}
 			}
 		} catch {
 			error = 'Failed to update auto-start setting';
