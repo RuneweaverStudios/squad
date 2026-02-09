@@ -1340,8 +1340,15 @@
 				></div>
 				<div class="flex-1 min-w-0">
 					<div class="flex items-start justify-between gap-4">
-					<div class="flex items-center gap-3 flex-wrap">
+					<div class="flex flex-col gap-0.5">
 						<h2 id="drawer-title" class="text-xl font-bold font-mono uppercase tracking-wider text-base-content">Create New Task</h2>
+						<p class="text-sm {formDisabled ? 'text-warning' : 'text-base-content/70'}">
+							{#if formDisabled}
+								Select a project to continue
+							{:else}
+								Fill in the details below to create a new task
+							{/if}
+						</p>
 					</div>
 					<!-- Right-aligned stacked selectors: Project on top, Harness below -->
 					<div class="flex flex-col items-end gap-1.5 flex-shrink-0">
@@ -1470,13 +1477,6 @@
 						</div>
 					</div>
 					</div>
-					<p class="text-sm mt-1 {formDisabled ? 'text-warning' : 'text-base-content/70'}">
-						{#if formDisabled}
-							Select a project to continue
-						{:else}
-							Fill in the details below to create a new task
-						{/if}
-					</p>
 				</div>
 				<button
 					class="btn btn-sm btn-circle btn-ghost"

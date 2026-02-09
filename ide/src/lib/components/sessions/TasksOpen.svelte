@@ -321,10 +321,15 @@
 		harnessPickerTaskId = null;
 		const task = tasks.find(t => t.id === taskId);
 		if (!task) return;
-		const otherLabels = (task.labels || []).filter(l => !l.startsWith('harness:'));
+		// Remove harness: labels and human-related labels (human-action, human) when switching harness
+		const otherLabels = (task.labels || []).filter(l =>
+			!l.startsWith('harness:') && l !== 'human-action' && l !== 'human'
+		);
 		const newLabels = agentId === 'claude-code'
 			? otherLabels
-			: [...otherLabels, `harness:${agentId}`];
+			: agentId === 'human'
+				? [...otherLabels, `harness:${agentId}`, 'human-action']
+				: [...otherLabels, `harness:${agentId}`];
 		try {
 			const resp = await fetchWithTimeout(`/api/tasks/${taskId}`, {
 				method: 'PATCH',
