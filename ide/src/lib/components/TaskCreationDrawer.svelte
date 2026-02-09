@@ -219,6 +219,11 @@
 		type: string;
 		project: string;
 		labels: string;
+		command: string;
+		due_date: string;
+		schedule_type: 'none' | 'one-shot' | 'recurring';
+		schedule_cron: string;
+		next_run_at: string;
 	}
 
 	let formData = $state<FormData>({
@@ -228,7 +233,40 @@
 		priority: 1,
 		type: 'task',
 		project: '',
-		labels: ''
+		labels: '',
+		command: '/jat:start',
+		due_date: '',
+		schedule_type: 'none',
+		schedule_cron: '',
+		next_run_at: ''
+	});
+
+	// Command options for dropdown
+	const commandOptions = [
+		{ value: '/jat:start', label: '/jat:start' },
+		{ value: '/jat:verify', label: '/jat:verify' },
+		{ value: 'custom', label: 'Custom...' }
+	];
+	let customCommand = $state('');
+	let showCustomCommand = $derived(formData.command === 'custom');
+
+	// Model selection state (extends existing harness)
+	let selectedModel = $state<string>('');
+
+	// Derive available models from selected harness
+	const availableModels = $derived(() => {
+		const preset = AGENT_PRESETS.find(p => p.id === selectedHarness);
+		return preset?.config.models || [];
+	});
+
+	// Update selected model when harness changes
+	$effect(() => {
+		const preset = AGENT_PRESETS.find(p => p.id === selectedHarness);
+		if (preset) {
+			selectedModel = preset.config.defaultModel || '';
+		} else {
+			selectedModel = '';
+		}
 	});
 
 	// Derived: form fields should be disabled until project is selected (when required)
@@ -932,6 +970,22 @@
 			// Get dependencies from selected list
 			const dependencies = selectedDependencies.map(d => d.id);
 
+			// Resolve command value
+			const resolvedCommand = formData.command === 'custom' ? customCommand.trim() : formData.command;
+
+			// Resolve agent_program and model from harness selection
+			const agentProgram = selectedHarness && selectedHarness !== 'claude-code' ? selectedHarness : undefined;
+			const modelValue = selectedModel || undefined;
+
+			// Resolve scheduling fields
+			let scheduleCron: string | undefined;
+			let nextRunAt: string | undefined;
+			if (formData.schedule_type === 'recurring' && formData.schedule_cron.trim()) {
+				scheduleCron = formData.schedule_cron.trim();
+			} else if (formData.schedule_type === 'one-shot' && formData.next_run_at) {
+				nextRunAt = new Date(formData.next_run_at).toISOString();
+			}
+
 			// Prepare request body
 			const requestBody = {
 				title: formData.title.trim(),
@@ -942,7 +996,13 @@
 				project: formData.project.trim() || undefined,
 				labels: labels.length > 0 ? labels : undefined,
 				deps: dependencies.length > 0 ? dependencies : undefined,
-				review_override: reviewOverride || undefined
+				review_override: reviewOverride || undefined,
+				command: resolvedCommand !== '/jat:start' ? resolvedCommand : undefined,
+				agent_program: agentProgram,
+				model: modelValue,
+				schedule_cron: scheduleCron,
+				next_run_at: nextRunAt,
+				due_date: formData.due_date || undefined
 			};
 
 			// POST to API endpoint
@@ -1074,8 +1134,15 @@
 			priority: 1,
 			type: 'task',
 			project: '',
-			labels: ''
+			labels: '',
+			command: '/jat:start',
+			due_date: '',
+			schedule_type: 'none',
+			schedule_cron: '',
+			next_run_at: ''
 		};
+		customCommand = '';
+		selectedModel = '';
 		validationErrors = {};
 		submitError = null;
 		successMessage = null;
@@ -1440,7 +1507,7 @@
 							</ul>
 						</div>
 
-						<!-- Harness Selector Badge -->
+						<!-- Harness + Model Selector Badge -->
 						<div class="dropdown dropdown-end" class:dropdown-open={harnessDropdownOpen}>
 							<button type="button"
 								class="badge badge-lg gap-1.5 px-2 pt-0.5 font-mono text-xs cursor-pointer"
@@ -1449,30 +1516,54 @@
 								onclick={() => harnessDropdownOpen = !harnessDropdownOpen}
 							>
 								<ProviderLogo agentId={selectedHarness} size={14} />
-								<span>{AGENT_PRESETS.find(p => p.id === selectedHarness)?.config.name || selectedHarness}</span>
+								<span>{AGENT_PRESETS.find(p => p.id === selectedHarness)?.config.name || selectedHarness}{#if selectedModel && selectedHarness !== 'human'}<span class="opacity-50">/{selectedModel}</span>{/if}</span>
 								<svg class="w-3 h-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 									<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
 								</svg>
 							</button>
 							{#if harnessDropdownOpen}
 								<!-- svelte-ignore a11y_no_static_element_interactions -->
-								<ul class="dropdown-content menu bg-base-200 rounded-box z-50 w-48 p-2 shadow-lg border border-base-content/10" onclick={(e) => e.stopPropagation()}>
-									{#each AGENT_PRESETS as preset}
-										<li>
-											<button class="flex items-center gap-2 {selectedHarness === preset.id ? 'active' : ''}"
-												onclick={() => { selectedHarness = preset.id; harnessDropdownOpen = false; }}
-											>
-												<ProviderLogo agentId={preset.id} size={16} />
-												<span>{preset.config.name}</span>
-												{#if selectedHarness === preset.id}
-													<svg class="w-4 h-4 ml-auto text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-														<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-													</svg>
-												{/if}
-											</button>
-										</li>
-									{/each}
-								</ul>
+								<div class="dropdown-content bg-base-200 rounded-box z-50 w-56 p-2 shadow-lg border border-base-content/10" onclick={(e) => e.stopPropagation()}>
+									<!-- Agent programs -->
+									<ul class="menu p-0">
+										{#each AGENT_PRESETS as preset}
+											<li>
+												<button class="flex items-center gap-2 {selectedHarness === preset.id ? 'active' : ''}"
+													onclick={() => { selectedHarness = preset.id; if (preset.id === 'human') harnessDropdownOpen = false; }}
+												>
+													<ProviderLogo agentId={preset.id} size={16} />
+													<span>{preset.config.name}</span>
+													{#if selectedHarness === preset.id}
+														<svg class="w-4 h-4 ml-auto text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+															<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+														</svg>
+													{/if}
+												</button>
+											</li>
+										{/each}
+									</ul>
+									<!-- Model selector (when non-human harness is selected) -->
+									{#if selectedHarness !== 'human' && availableModels().length > 0}
+										<div class="divider my-1 text-xs text-base-content/40">MODEL</div>
+										<ul class="menu p-0">
+											{#each availableModels() as model}
+												<li>
+													<button class="flex items-center gap-2 text-xs {selectedModel === model.shortName ? 'active' : ''}"
+														onclick={() => { selectedModel = model.shortName; harnessDropdownOpen = false; }}
+													>
+														<span class="badge badge-xs {model.costTier === 'high' ? 'badge-warning' : model.costTier === 'medium' ? 'badge-info' : 'badge-ghost'}">{model.costTier?.[0]?.toUpperCase() || '?'}</span>
+														<span>{model.name}</span>
+														{#if selectedModel === model.shortName}
+															<svg class="w-3.5 h-3.5 ml-auto text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+																<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+															</svg>
+														{/if}
+													</button>
+												</li>
+											{/each}
+										</ul>
+									{/if}
+								</div>
 							{/if}
 						</div>
 					</div>
@@ -1767,6 +1858,148 @@
 					{#if validationErrors.type}
 						<div class="text-xs text-error -mt-2">{validationErrors.type}</div>
 					{/if}
+
+					<!-- Command / Due Date — 2-col grid -->
+					<div class="grid grid-cols-2 gap-3">
+						<!-- Command -->
+						<div class="form-control">
+							<label class="label py-0.5" for="task-command">
+								<span class="label-text text-xs font-semibold font-mono uppercase tracking-wider text-base-content/70">
+									Command
+								</span>
+							</label>
+							{#if showCustomCommand}
+								<div class="flex gap-1">
+									<input
+										id="task-command-custom"
+										type="text"
+										placeholder="e.g. npm run test"
+										class="input input-sm flex-1 font-mono bg-base-200 border-base-content/30 text-base-content {formDisabled ? 'opacity-50' : ''}"
+										bind:value={customCommand}
+										disabled={formDisabled || isSubmitting}
+									/>
+									<button
+										type="button"
+										class="btn btn-sm btn-ghost btn-square"
+										title="Back to presets"
+										onclick={() => { formData.command = '/jat:start'; customCommand = ''; }}
+										disabled={formDisabled || isSubmitting}
+									>
+										<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+										</svg>
+									</button>
+								</div>
+							{:else}
+								<select
+									id="task-command"
+									class="select select-sm w-full font-mono bg-base-200 border-base-content/30 text-base-content {formDisabled ? 'opacity-50' : ''}"
+									bind:value={formData.command}
+									disabled={formDisabled || isSubmitting}
+								>
+									{#each commandOptions as opt}
+										<option value={opt.value}>{opt.label}</option>
+									{/each}
+								</select>
+							{/if}
+						</div>
+
+						<!-- Due Date -->
+						<div class="form-control">
+							<label class="label py-0.5" for="task-due-date">
+								<span class="label-text text-xs font-semibold font-mono uppercase tracking-wider text-base-content/70">
+									Due Date
+								</span>
+							</label>
+							<input
+								id="task-due-date"
+								type="date"
+								class="input input-sm w-full font-mono bg-base-200 border-base-content/30 text-base-content {formDisabled ? 'opacity-50' : ''}"
+								bind:value={formData.due_date}
+								disabled={formDisabled || isSubmitting}
+							/>
+						</div>
+					</div>
+
+					<!-- Schedule (Optional) — collapsed disclosure -->
+					<details class="group">
+						<summary class="cursor-pointer list-none flex items-center gap-1.5 text-xs font-semibold font-mono uppercase tracking-wider text-base-content/70 py-1">
+							<svg class="w-3 h-3 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+							</svg>
+							Schedule
+							{#if formData.schedule_type !== 'none'}
+								<span class="badge badge-xs bg-primary/30 text-base-content ml-1">
+									{formData.schedule_type === 'one-shot' ? 'One-shot' : 'Recurring'}
+								</span>
+							{/if}
+						</summary>
+						<div class="mt-2 space-y-2">
+							<!-- Schedule type selection -->
+							<div class="join w-full">
+								<button
+									type="button"
+									class="join-item btn btn-sm flex-1 font-mono text-xs {formData.schedule_type === 'none' ? 'btn-active' : 'btn-ghost'}"
+									onclick={() => formData.schedule_type = 'none'}
+									disabled={formDisabled || isSubmitting}
+								>
+									None
+								</button>
+								<button
+									type="button"
+									class="join-item btn btn-sm flex-1 font-mono text-xs {formData.schedule_type === 'one-shot' ? 'btn-active btn-info' : 'btn-ghost'}"
+									onclick={() => formData.schedule_type = 'one-shot'}
+									disabled={formDisabled || isSubmitting}
+								>
+									One-shot
+								</button>
+								<button
+									type="button"
+									class="join-item btn btn-sm flex-1 font-mono text-xs {formData.schedule_type === 'recurring' ? 'btn-active btn-warning' : 'btn-ghost'}"
+									onclick={() => formData.schedule_type = 'recurring'}
+									disabled={formDisabled || isSubmitting}
+								>
+									Recurring
+								</button>
+							</div>
+
+							<!-- One-shot: datetime picker -->
+							{#if formData.schedule_type === 'one-shot'}
+								<div class="form-control">
+									<label class="label py-0.5" for="task-next-run">
+										<span class="label-text text-xs font-mono text-base-content/60">Run at</span>
+									</label>
+									<input
+										id="task-next-run"
+										type="datetime-local"
+										class="input input-sm w-full font-mono bg-base-200 border-base-content/30 text-base-content"
+										bind:value={formData.next_run_at}
+										disabled={formDisabled || isSubmitting}
+									/>
+								</div>
+							{/if}
+
+							<!-- Recurring: cron expression -->
+							{#if formData.schedule_type === 'recurring'}
+								<div class="form-control">
+									<label class="label py-0.5" for="task-cron">
+										<span class="label-text text-xs font-mono text-base-content/60">Cron expression</span>
+									</label>
+									<input
+										id="task-cron"
+										type="text"
+										placeholder="0 9 * * MON-FRI"
+										class="input input-sm w-full font-mono bg-base-200 border-base-content/30 text-base-content"
+										bind:value={formData.schedule_cron}
+										disabled={formDisabled || isSubmitting}
+									/>
+									<label class="label py-0">
+										<span class="label-text-alt text-base-content/40">min hour day month weekday</span>
+									</label>
+								</div>
+							{/if}
+						</div>
+					</details>
 
 					<!-- Attachments Dropzone - Industrial -->
 					<div class="form-control">

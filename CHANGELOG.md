@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Task scheduling fields** - Command dropdown (default `/jat:start`), agent/model selector, schedule section (one-shot/recurring/cron), and due date picker in TaskCreationDrawer
 - **Ingest feed system** - New `/ingest` page for managing RSS, Slack, and Telegram feed sources with guided setup wizard, poll history, manual poll trigger, last-polled timestamps, inline error indicators, and thread reply counts
 - **Ingest daemon** - Background Node.js service (`jat-ingest`) that polls configured feed sources on schedule, with adapter architecture for RSS/Slack/Telegram
 - **Slack channel detection** - Guided wizard flow for Slack source setup that auto-detects available channels via `conversations.list` API

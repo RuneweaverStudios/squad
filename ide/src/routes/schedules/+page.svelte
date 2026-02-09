@@ -245,14 +245,16 @@
 
 <!-- Schedule Edit Modal -->
 {#if editingTask}
-	<div class="modal-overlay" onclick={() => editingTask = null}>
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="modal-overlay" onclick={() => editingTask = null} role="dialog" aria-modal="true">
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div class="modal-panel" onclick={(e) => e.stopPropagation()}>
 			<div class="modal-header">
 				<h3 class="modal-title">Edit Schedule</h3>
 				<span class="modal-task-id">{editingTask.id}</span>
-				<button class="modal-close" onclick={() => editingTask = null}>
+				<button class="modal-close" onclick={() => editingTask = null} aria-label="Close">
 					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width:16px;height:16px">
 						<path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
 					</svg>
@@ -263,8 +265,9 @@
 				<p class="modal-task-title">{editingTask.title}</p>
 
 				<div class="form-group">
-					<label class="form-label">Cron Expression</label>
+					<label class="form-label" for="edit-cron">Cron Expression</label>
 					<input
+						id="edit-cron"
 						type="text"
 						class="form-input"
 						bind:value={editCron}
@@ -274,8 +277,9 @@
 				</div>
 
 				<div class="form-group">
-					<label class="form-label">Next Run At</label>
+					<label class="form-label" for="edit-next-run">Next Run At</label>
 					<input
+						id="edit-next-run"
 						type="datetime-local"
 						class="form-input"
 						bind:value={editNextRun}
@@ -284,8 +288,9 @@
 				</div>
 
 				<div class="form-group">
-					<label class="form-label">Command</label>
+					<label class="form-label" for="edit-command">Command</label>
 					<input
+						id="edit-command"
 						type="text"
 						class="form-input"
 						bind:value={editCommand}
@@ -295,8 +300,8 @@
 
 				<div class="form-row">
 					<div class="form-group flex-1">
-						<label class="form-label">Agent Program</label>
-						<select class="form-input" bind:value={editAgentProgram}>
+						<label class="form-label" for="edit-agent">Agent Program</label>
+						<select id="edit-agent" class="form-input" bind:value={editAgentProgram}>
 							<option value="">Default</option>
 							<option value="claude-code">Claude Code</option>
 							<option value="codex-cli">Codex CLI</option>
@@ -305,8 +310,8 @@
 						</select>
 					</div>
 					<div class="form-group flex-1">
-						<label class="form-label">Model</label>
-						<select class="form-input" bind:value={editModel}>
+						<label class="form-label" for="edit-model">Model</label>
+						<select id="edit-model" class="form-input" bind:value={editModel}>
 							<option value="">Default</option>
 							<option value="opus">Opus</option>
 							<option value="sonnet">Sonnet</option>
