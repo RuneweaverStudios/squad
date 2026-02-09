@@ -1083,34 +1083,18 @@
 	// Fetch available projects from the API
 	async function fetchProjects() {
 		try {
-			const response = await fetch('/api/sessions');
+			const response = await fetch('/api/projects');
 			if (response.ok) {
 				const data = await response.json();
-				// Extract unique projects from sessions
-				const projects = new Set<string>();
-				if (data.projects) {
-					data.projects.forEach((p: string) => projects.add(p));
-				}
-				// Also check task IDs for additional projects
-				if (data.tasks) {
-					data.tasks.forEach((t: any) => {
-						if (t.id) {
-							const prefix = t.id.split('-')[0];
-							if (prefix) projects.add(prefix);
-						}
-					});
-				}
-				// Fallback: if no projects found, use known defaults
-				if (projects.size === 0) {
-					projectOptions = ['jat', 'chimaro', 'jomarchy', 'flush', 'linux', 'steelbridge'];
+				if (data.projects && data.projects.length > 0) {
+					projectOptions = data.projects.map((p: any) => p.name).sort();
 				} else {
-					projectOptions = Array.from(projects).sort();
+					projectOptions = [];
 				}
 			}
 		} catch (error) {
 			console.error('Failed to fetch projects:', error);
-			// Use defaults on error
-			projectOptions = ['jat', 'chimaro', 'jomarchy'];
+			projectOptions = [];
 		}
 	}
 
