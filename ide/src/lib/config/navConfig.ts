@@ -10,6 +10,7 @@
  *   /source   - Source Control (git changes, diff viewer)
  *   /servers  - Servers (project server sessions)
  *   /integrations - Integrations (external source configuration)
+ *   /schedules - Schedules (scheduled task management, scheduler service controls)
  *   /config   - Config (JAT configuration, includes Projects tab)
  *   /history  - History (completed task history with streak calendar)
  *
@@ -84,6 +85,13 @@ export const unifiedNavConfig: UnifiedNavConfig = {
 			label: 'Integrations',
 			href: '/integrations',
 			icon: 'integrations',
+			category: 'main'
+		},
+		{
+			id: 'schedules',
+			label: 'Schedules',
+			href: '/schedules',
+			icon: 'schedules',
 			category: 'main'
 		},
 		{

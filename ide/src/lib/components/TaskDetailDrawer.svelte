@@ -48,6 +48,13 @@
 		blocked_by?: Array<{ id: string; title: string; status: string; priority: number }>;
 		created_at?: string;
 		updated_at?: string;
+		// Scheduling fields
+		command?: string | null;
+		agent_program?: string | null;
+		model?: string | null;
+		schedule_cron?: string | null;
+		next_run_at?: string | null;
+		due_date?: string | null;
 	}
 
 	// Agent interface for action state
@@ -373,6 +380,67 @@
 			}
 		});
 	}
+
+	// Helper: Format due date with relative time ('in 3 days', '2 days overdue')
+	function formatDueDate(dueDateStr: string | null | undefined): { text: string; isOverdue: boolean } | null {
+		if (!dueDateStr) return null;
+		const due = new Date(dueDateStr);
+		if (isNaN(due.getTime())) return null;
+
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+		const dueDay = new Date(due);
+		dueDay.setHours(0, 0, 0, 0);
+
+		const diffMs = dueDay.getTime() - today.getTime();
+		const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+		if (diffDays === 0) return { text: 'today', isOverdue: false };
+		if (diffDays === 1) return { text: 'tomorrow', isOverdue: false };
+		if (diffDays === -1) return { text: '1 day overdue', isOverdue: true };
+		if (diffDays > 1) return { text: `in ${diffDays} days`, isOverdue: false };
+		return { text: `${Math.abs(diffDays)} days overdue`, isOverdue: true };
+	}
+
+	// Helper: Convert cron expression to human-readable string
+	function describeCron(cron: string | null | undefined): string {
+		if (!cron) return '';
+		const parts = cron.trim().split(/\s+/);
+		if (parts.length < 5) return cron;
+
+		const [min, hour, dom, month, dow] = parts;
+
+		// Common patterns
+		if (min === '*' && hour === '*' && dom === '*' && month === '*' && dow === '*') return 'Every minute';
+		if (hour === '*' && dom === '*' && month === '*' && dow === '*') return `Every hour at :${min.padStart(2, '0')}`;
+		if (dom === '*' && month === '*' && dow === '*') return `Daily at ${hour}:${min.padStart(2, '0')}`;
+		if (dom === '*' && month === '*' && dow === '1-5') return `Weekdays at ${hour}:${min.padStart(2, '0')}`;
+		if (dom === '*' && month === '*' && dow === '0') return `Sundays at ${hour}:${min.padStart(2, '0')}`;
+		if (dom === '*' && month === '*' && dow === '1') return `Mondays at ${hour}:${min.padStart(2, '0')}`;
+		if (dom === '1' && month === '*' && dow === '*') return `Monthly on the 1st at ${hour}:${min.padStart(2, '0')}`;
+
+		// Interval patterns
+		if (min.startsWith('*/')) return `Every ${min.slice(2)} minutes`;
+		if (hour.startsWith('*/') && dom === '*' && month === '*' && dow === '*') return `Every ${hour.slice(2)} hours at :${min.padStart(2, '0')}`;
+
+		return cron; // Fallback to raw expression
+	}
+
+	// Derived: Has any scheduling fields set
+	const hasSchedulingFields = $derived(
+		!!(task?.command || task?.schedule_cron || task?.next_run_at || task?.due_date || task?.agent_program || task?.model)
+	);
+
+	// Derived: Due date info
+	const dueDateInfo = $derived(task?.due_date ? formatDueDate(task.due_date) : null);
+
+	// Editing states for scheduling fields
+	let editingCommand = $state(false);
+	let editingCron = $state(false);
+	let editingNextRun = $state(false);
+	let editingDueDate = $state(false);
+	let editingAgentProgram = $state(false);
+	let editingModel = $state(false);
 
 	// Timeline filter state
 	let timelineFilter = $state<'all' | 'tasks' | 'messages'>('all');
@@ -2254,6 +2322,235 @@
 								class="text-sm"
 							/>
 						</div>
+
+						<!-- Scheduling & Automation -->
+						{#if hasSchedulingFields}
+							<div>
+								<h4 class="text-xs font-semibold mb-2 font-mono uppercase tracking-wider text-base-content/60">Scheduling</h4>
+								<div class="flex flex-col gap-3">
+
+									<!-- Command -->
+									<div class="flex items-start gap-2">
+										<span class="text-xs text-base-content/50 w-20 shrink-0 pt-0.5">Command</span>
+										{#if editingCommand}
+											<input
+												type="text"
+												class="input input-sm flex-1 text-sm font-mono bg-base-200 border border-base-300 text-base-content"
+												value={task.command || ''}
+												placeholder="/jat:start"
+												onblur={async (e) => {
+													await autoSave('command', e.currentTarget.value || null);
+													editingCommand = false;
+												}}
+												onkeydown={(e) => {
+													if (e.key === 'Enter') e.currentTarget.blur();
+													else if (e.key === 'Escape') editingCommand = false;
+												}}
+												disabled={isSaving}
+												use:autofocusAction
+											/>
+										{:else}
+											<button
+												class="flex-1 text-left rounded px-2 py-0.5 transition-colors industrial-hover bg-base-200 min-h-6"
+												onclick={() => (editingCommand = true)}
+												type="button"
+											>
+												{#if task.command}
+													<span class="badge badge-sm badge-outline font-mono">{task.command}</span>
+												{:else}
+													<span class="text-sm text-base-content/40 italic">Not set</span>
+												{/if}
+											</button>
+										{/if}
+									</div>
+
+									<!-- Agent / Model Override -->
+									<div class="flex items-start gap-2">
+										<span class="text-xs text-base-content/50 w-20 shrink-0 pt-0.5">Agent</span>
+										<div class="flex-1 flex flex-wrap gap-1.5">
+											{#if editingAgentProgram}
+												<input
+													type="text"
+													class="input input-sm flex-1 text-sm font-mono bg-base-200 border border-base-300 text-base-content"
+													value={task.agent_program || ''}
+													placeholder="claude-code"
+													onblur={async (e) => {
+														await autoSave('agent_program', e.currentTarget.value || null);
+														editingAgentProgram = false;
+													}}
+													onkeydown={(e) => {
+														if (e.key === 'Enter') e.currentTarget.blur();
+														else if (e.key === 'Escape') editingAgentProgram = false;
+													}}
+													disabled={isSaving}
+													use:autofocusAction
+												/>
+											{:else}
+												<button
+													class="rounded px-2 py-0.5 transition-colors industrial-hover bg-base-200 min-h-6"
+													onclick={() => (editingAgentProgram = true)}
+													type="button"
+												>
+													{#if task.agent_program}
+														<span class="badge badge-sm badge-primary badge-outline font-mono">{task.agent_program}</span>
+													{:else}
+														<span class="text-sm text-base-content/40 italic">default</span>
+													{/if}
+												</button>
+											{/if}
+
+											<span class="text-base-content/20 self-center">/</span>
+
+											{#if editingModel}
+												<input
+													type="text"
+													class="input input-sm flex-1 text-sm font-mono bg-base-200 border border-base-300 text-base-content"
+													value={task.model || ''}
+													placeholder="opus"
+													onblur={async (e) => {
+														await autoSave('model', e.currentTarget.value || null);
+														editingModel = false;
+													}}
+													onkeydown={(e) => {
+														if (e.key === 'Enter') e.currentTarget.blur();
+														else if (e.key === 'Escape') editingModel = false;
+													}}
+													disabled={isSaving}
+													use:autofocusAction
+												/>
+											{:else}
+												<button
+													class="rounded px-2 py-0.5 transition-colors industrial-hover bg-base-200 min-h-6"
+													onclick={() => (editingModel = true)}
+													type="button"
+												>
+													{#if task.model}
+														<span class="badge badge-sm badge-secondary badge-outline font-mono">{task.model}</span>
+													{:else}
+														<span class="text-sm text-base-content/40 italic">default</span>
+													{/if}
+												</button>
+											{/if}
+										</div>
+									</div>
+
+									<!-- Schedule (Cron) -->
+									<div class="flex items-start gap-2">
+										<span class="text-xs text-base-content/50 w-20 shrink-0 pt-0.5">Schedule</span>
+										{#if editingCron}
+											<input
+												type="text"
+												class="input input-sm flex-1 text-sm font-mono bg-base-200 border border-base-300 text-base-content"
+												value={task.schedule_cron || ''}
+												placeholder="0 9 * * 1-5"
+												onblur={async (e) => {
+													await autoSave('schedule_cron', e.currentTarget.value || null);
+													editingCron = false;
+												}}
+												onkeydown={(e) => {
+													if (e.key === 'Enter') e.currentTarget.blur();
+													else if (e.key === 'Escape') editingCron = false;
+												}}
+												disabled={isSaving}
+												use:autofocusAction
+											/>
+										{:else}
+											<button
+												class="flex-1 text-left rounded px-2 py-0.5 transition-colors industrial-hover bg-base-200 min-h-6"
+												onclick={() => (editingCron = true)}
+												type="button"
+											>
+												{#if task.schedule_cron}
+													<span class="text-sm font-mono">{task.schedule_cron}</span>
+													<span class="text-xs text-base-content/50 ml-1.5">({describeCron(task.schedule_cron)})</span>
+												{:else}
+													<span class="text-sm text-base-content/40 italic">No schedule</span>
+												{/if}
+											</button>
+										{/if}
+									</div>
+
+									<!-- Next Run -->
+									{#if task.schedule_cron || task.next_run_at}
+										<div class="flex items-start gap-2">
+											<span class="text-xs text-base-content/50 w-20 shrink-0 pt-0.5">Next run</span>
+											{#if editingNextRun}
+												<input
+													type="datetime-local"
+													class="input input-sm flex-1 text-sm font-mono bg-base-200 border border-base-300 text-base-content"
+													value={task.next_run_at ? task.next_run_at.slice(0, 16) : ''}
+													onblur={async (e) => {
+														const val = e.currentTarget.value;
+														await autoSave('next_run_at', val ? new Date(val).toISOString() : null);
+														editingNextRun = false;
+													}}
+													onkeydown={(e) => {
+														if (e.key === 'Enter') e.currentTarget.blur();
+														else if (e.key === 'Escape') editingNextRun = false;
+													}}
+													disabled={isSaving}
+													use:autofocusAction
+												/>
+											{:else}
+												<button
+													class="flex-1 text-left rounded px-2 py-0.5 transition-colors industrial-hover bg-base-200 min-h-6"
+													onclick={() => (editingNextRun = true)}
+													type="button"
+												>
+													{#if task.next_run_at}
+														<span class="text-sm">{formatRelativeTimestamp(task.next_run_at)}</span>
+														<span class="text-xs text-base-content/40 ml-1">({formatDate(task.next_run_at)})</span>
+													{:else}
+														<span class="text-sm text-base-content/40 italic">Not scheduled</span>
+													{/if}
+												</button>
+											{/if}
+										</div>
+									{/if}
+
+									<!-- Due Date -->
+									<div class="flex items-start gap-2">
+										<span class="text-xs text-base-content/50 w-20 shrink-0 pt-0.5">Due date</span>
+										{#if editingDueDate}
+											<input
+												type="date"
+												class="input input-sm flex-1 text-sm font-mono bg-base-200 border border-base-300 text-base-content"
+												value={task.due_date ? task.due_date.slice(0, 10) : ''}
+												onblur={async (e) => {
+													const val = e.currentTarget.value;
+													await autoSave('due_date', val || null);
+													editingDueDate = false;
+												}}
+												onkeydown={(e) => {
+													if (e.key === 'Enter') e.currentTarget.blur();
+													else if (e.key === 'Escape') editingDueDate = false;
+												}}
+												disabled={isSaving}
+												use:autofocusAction
+											/>
+										{:else}
+											<button
+												class="flex-1 text-left rounded px-2 py-0.5 transition-colors industrial-hover bg-base-200 min-h-6"
+												onclick={() => (editingDueDate = true)}
+												type="button"
+											>
+												{#if task.due_date && dueDateInfo}
+													<span class="text-sm {dueDateInfo.isOverdue ? 'text-error font-medium' : ''}">
+														{dueDateInfo.text}
+													</span>
+													{#if dueDateInfo.isOverdue}
+														<span class="badge badge-xs badge-error ml-1.5">overdue</span>
+													{/if}
+													<span class="text-xs text-base-content/40 ml-1">({task.due_date.slice(0, 10)})</span>
+												{:else}
+													<span class="text-sm text-base-content/40 italic">No due date</span>
+												{/if}
+											</button>
+										{/if}
+									</div>
+								</div>
+							</div>
+						{/if}
 
 						<!-- Task Summary - Industrial -->
 						{#if task.status === 'closed' || summaryData}
