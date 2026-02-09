@@ -27,7 +27,8 @@ const STORAGE_KEYS = {
 	activeProject: 'active-project', // Currently selected project (used across pages)
 	notificationsEnabled: 'push-notifications-enabled', // Browser push notifications
 	faviconBadgeEnabled: 'favicon-badge-enabled', // Favicon badge with count
-	titleBadgeEnabled: 'title-badge-enabled' // Title prefix with count
+	titleBadgeEnabled: 'title-badge-enabled', // Title prefix with count
+	sidebarCollapsed: 'sidebar-collapsed' // Sidebar narrow/icon-only mode
 } as const;
 
 // Terminal font family options
@@ -97,7 +98,8 @@ const DEFAULTS = {
 	activeProject: null as string | null, // Currently selected project (consistent across pages)
 	notificationsEnabled: true, // Browser push notifications (requires permission)
 	faviconBadgeEnabled: true, // Show count on favicon when agents need attention
-	titleBadgeEnabled: true // Show count in document title when agents need attention
+	titleBadgeEnabled: true, // Show count in document title when agents need attention
+	sidebarCollapsed: false // Sidebar narrow/icon-only mode
 };
 
 // Types
@@ -129,6 +131,7 @@ let activeProject = $state<string | null>(DEFAULTS.activeProject);
 let notificationsEnabled = $state(DEFAULTS.notificationsEnabled);
 let faviconBadgeEnabled = $state(DEFAULTS.faviconBadgeEnabled);
 let titleBadgeEnabled = $state(DEFAULTS.titleBadgeEnabled);
+let sidebarCollapsed = $state(DEFAULTS.sidebarCollapsed);
 let initialized = $state(false);
 
 /**
@@ -220,6 +223,9 @@ export function initPreferences(): void {
 
 	const storedTitleBadgeEnabled = localStorage.getItem(STORAGE_KEYS.titleBadgeEnabled);
 	titleBadgeEnabled = storedTitleBadgeEnabled === null ? DEFAULTS.titleBadgeEnabled : storedTitleBadgeEnabled === 'true';
+
+	const storedSidebarCollapsed = localStorage.getItem(STORAGE_KEYS.sidebarCollapsed);
+	sidebarCollapsed = storedSidebarCollapsed === null ? DEFAULTS.sidebarCollapsed : storedSidebarCollapsed === 'true';
 
 	// Apply terminal font CSS variables to document
 	updateTerminalFontCSSVars();
@@ -615,6 +621,26 @@ export function setTitleBadgeEnabled(value: boolean): void {
 export function toggleTitleBadgeEnabled(): boolean {
 	setTitleBadgeEnabled(!titleBadgeEnabled);
 	return titleBadgeEnabled;
+}
+
+// ============================================================================
+// Sidebar Collapsed (narrow icon-only mode)
+// ============================================================================
+
+export function getSidebarCollapsed(): boolean {
+	return sidebarCollapsed;
+}
+
+export function setSidebarCollapsed(value: boolean): void {
+	sidebarCollapsed = value;
+	if (browser) {
+		localStorage.setItem(STORAGE_KEYS.sidebarCollapsed, String(value));
+	}
+}
+
+export function toggleSidebarCollapsed(): boolean {
+	setSidebarCollapsed(!sidebarCollapsed);
+	return sidebarCollapsed;
 }
 
 // ============================================================================

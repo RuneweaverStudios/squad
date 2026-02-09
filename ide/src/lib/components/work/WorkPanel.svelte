@@ -111,6 +111,18 @@
 		};
 		/** Timestamp when rich signal payload was last updated */
 		_richSignalPayloadTimestamp?: number;
+		/** Question data from SSE (instant, bypasses HTTP polling) */
+		_questionData?: {
+			active: boolean;
+			questions: Array<{
+				question: string;
+				header: string;
+				multiSelect: boolean;
+				options: Array<{ label: string; description: string }>;
+			}>;
+		};
+		/** Timestamp when question data was received via SSE */
+		_questionDataTimestamp?: number;
 	}
 
 	interface Props {
@@ -464,6 +476,8 @@
 							completionBundleTimestamp={session._completionBundleTimestamp}
 							richSignalPayload={session._richSignalPayload}
 							richSignalPayloadTimestamp={session._richSignalPayloadTimestamp}
+							sseQuestionData={session._questionData}
+							sseQuestionDataTimestamp={session._questionDataTimestamp}
 							onKillSession={createKillHandler(session.sessionName)}
 							onInterrupt={createInterruptHandler(session.sessionName)}
 							onContinue={createContinueHandler(session.sessionName)}

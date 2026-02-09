@@ -24,7 +24,7 @@
 	import { connectTaskEvents, disconnectTaskEvents, lastTaskEvent } from '$lib/stores/taskEvents';
 	import { connect as connectWebSocket, disconnect as disconnectWebSocket } from '$lib/stores/websocket.svelte';
 	import { registerConnection, unregisterConnection } from '$lib/utils/connectionManager';
-	import { availableProjects, projectColorsStore, openTaskDrawer, openProjectDrawer, isTaskDetailDrawerOpen, taskDetailDrawerTaskId, closeTaskDetailDrawer, isEpicSwarmModalOpen, epicSwarmModalEpicId, isStartDropdownOpen, openStartDropdownViaKeyboard, closeStartDropdown, isFilePreviewDrawerOpen, filePreviewDrawerPath, filePreviewDrawerProject, filePreviewDrawerLine, closeFilePreviewDrawer, toggleTerminalDrawer, isDiffPreviewDrawerOpen, diffPreviewDrawerPath, diffPreviewDrawerProject, diffPreviewDrawerIsStaged, diffPreviewDrawerCommitHash, closeDiffPreviewDrawer, setGitAheadCount, setGitChangesCount, setActiveSessionsCount, setRunningServersCount, setActiveAgentSessionsCount } from '$lib/stores/drawerStore';
+	import { availableProjects, projectColorsStore, openTaskDrawer, openProjectDrawer, isTaskDetailDrawerOpen, taskDetailDrawerTaskId, closeTaskDetailDrawer, isEpicSwarmModalOpen, epicSwarmModalEpicId, isStartDropdownOpen, openStartDropdownViaKeyboard, closeStartDropdown, isFilePreviewDrawerOpen, filePreviewDrawerPath, filePreviewDrawerProject, filePreviewDrawerLine, closeFilePreviewDrawer, toggleTerminalDrawer, isDiffPreviewDrawerOpen, diffPreviewDrawerPath, diffPreviewDrawerProject, diffPreviewDrawerIsStaged, diffPreviewDrawerCommitHash, closeDiffPreviewDrawer, setGitAheadCount, setGitChangesCount, setActiveSessionsCount, setRunningServersCount, setActiveAgentSessionsCount, syncSidebarFromPreferences } from '$lib/stores/drawerStore';
 	import { hoveredSessionName, triggerCompleteFlash, jumpToSession } from '$lib/stores/hoveredSession';
 	import { get } from 'svelte/store';
 	import { browser } from '$app/environment';
@@ -221,6 +221,7 @@
 	// Initialize theme-change, SSE, preferences, and load all tasks
 	onMount(async () => {
 		initPreferences(); // Initialize unified preferences store
+		syncSidebarFromPreferences(); // Restore sidebar collapsed state from localStorage
 		initKeyboardShortcuts(); // Initialize keyboard shortcuts from localStorage
 		initNotifications(); // Initialize push notification system (favicon badge, title badge)
 		themeChange(false);

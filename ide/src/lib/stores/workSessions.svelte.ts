@@ -220,6 +220,21 @@ export interface WorkSession {
 	_activityStateTimestamp?: number;
 	/** Whether session is exiting (triggers exit animation before removal) */
 	_isExiting?: boolean;
+	/** Question data from SSE session-question event (from PreToolUse hook) */
+	_questionData?: {
+		active: boolean;
+		session_id?: string;
+		tmux_session?: string;
+		timestamp?: string;
+		questions: Array<{
+			question: string;
+			header: string;
+			multiSelect: boolean;
+			options: Array<{ label: string; description: string }>;
+		}>;
+	};
+	/** Timestamp when question data was received via SSE */
+	_questionDataTimestamp?: number;
 }
 
 interface WorkSessionsState {

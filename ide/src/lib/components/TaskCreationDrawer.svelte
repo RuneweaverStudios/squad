@@ -418,8 +418,8 @@
 		{ value: 'chore', label: 'Chore', icon: '🔧' }
 	];
 
-	// Human action toggle - adds 'human-action' label when checked
-	let isHumanAction = $state(false);
+	// Human task detection - derived from harness selection
+	const isHumanAction = $derived(selectedHarness === 'human');
 
 	// Review override state: null = use project rules, 'always_review' = always require review, 'always_auto' = always auto-proceed
 	let reviewOverride = $state<'always_review' | 'always_auto' | null>(null);
@@ -911,14 +911,14 @@
 		isSubmitting = true;
 
 		try {
-			// Parse labels and add human-action if checkbox is checked
+			// Parse labels and add harness/human-action labels
 			const labels = formData.labels
 				.split(',')
 				.map((l) => l.trim())
 				.filter((l) => l.length > 0);
 
-			// Add human-action label if toggle is enabled
-			if (isHumanAction && !labels.includes('human-action')) {
+			// Add human-action label when human harness selected
+			if (selectedHarness === 'human' && !labels.includes('human-action')) {
 				labels.push('human-action');
 			}
 
@@ -1085,9 +1085,6 @@
 		selectedDependencies = [];
 		availableTasks = [];
 		showDependencyDropdown = false;
-
-		// Reset human action toggle
-		isHumanAction = false;
 
 		// Reset harness selection
 		selectedHarness = 'claude-code';
@@ -1512,19 +1509,6 @@
 								Title
 								<span class="text-error">*</span>
 							</span>
-							<!-- Human Action Toggle - subtle, right-aligned in title label -->
-							<label class="flex items-center gap-1.5 cursor-pointer" title="Mark as human action (not for agents)">
-								<input
-									type="checkbox"
-									class="toggle toggle-xs {isHumanAction ? 'toggle-warning' : ''}"
-									bind:checked={isHumanAction}
-									disabled={formDisabled || isSubmitting}
-								/>
-								<span class="flex items-center gap-1 text-xs {isHumanAction ? 'text-warning font-medium' : 'text-base-content/50'}">
-									<span style="font-size: 0.85rem;">🧑</span>
-									Human
-								</span>
-							</label>
 						</label>
 						<div class="flex items-center gap-2">
 							<input

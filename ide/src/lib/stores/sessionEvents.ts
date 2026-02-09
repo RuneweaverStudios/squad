@@ -507,13 +507,29 @@ function handleSessionState(data: SessionEvent): void {
 }
 
 /**
- * Handle session-question event: update question data for a session
- * Note: Question data is polled separately, this just notifies that new data is available
+ * Handle session-question event: store question data directly in workSessions state
+ * This provides instant question UI display without waiting for HTTP polling.
+ * The SSE server watches /tmp/claude-question-tmux-*.json files and broadcasts
+ * the question data within ~50ms of the PreToolUse hook writing it.
+ *
+ * PERFORMANCE: Uses in-place mutation for fine-grained reactivity.
  */
-function handleSessionQuestion(_data: SessionEvent): void {
-	// Question data is polled separately via /api/work/{sessionId}/question
-	// This event notifies components that new question data is available
-	// Components subscribed to lastSessionEvent can refetch if needed
+function handleSessionQuestion(data: SessionEvent): void {
+	const { sessionName, question } = data;
+	if (!sessionName) return;
+
+	const sessionIndex = workSessionsState.sessions.findIndex(s => s.sessionName === sessionName);
+	if (sessionIndex === -1) return;
+
+	// Store question data directly for instant UI rendering
+	workSessionsState.sessions[sessionIndex]._questionData = question ? {
+		active: true,
+		session_id: question.session_id,
+		tmux_session: question.tmux_session,
+		timestamp: question.timestamp,
+		questions: question.questions || []
+	} : undefined;
+	workSessionsState.sessions[sessionIndex]._questionDataTimestamp = data.timestamp || Date.now();
 }
 
 /**

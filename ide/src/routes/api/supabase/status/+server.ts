@@ -281,6 +281,19 @@ export const GET: RequestHandler = async ({ url }) => {
 	const serverPathForEnv = config.supabasePath ? dirname(config.supabasePath) : undefined;
 	const hasPassword = !!getDatabasePassword(projectName, projectPath, serverPathForEnv);
 
+	// Check if Supabase Management API is available (access token + project ref)
+	// This is the preferred auth method - same token as `supabase db push`
+	const hasAccessToken = !!(process.env.SUPABASE_ACCESS_TOKEN || (() => {
+		const tokenPath = join(process.env.HOME || '~', '.supabase', 'access-token');
+		if (existsSync(tokenPath)) {
+			try {
+				return readFileSync(tokenPath, 'utf-8').trim();
+			} catch { return null; }
+		}
+		return null;
+	})());
+	const hasManagementApi = hasAccessToken && !!config.projectRef;
+
 	return json({
 		hasSupabase: config.hasSupabase,
 		isLinked: config.isLinked,
@@ -292,6 +305,8 @@ export const GET: RequestHandler = async ({ url }) => {
 		effectivePath,
 		supabasePath: config.supabasePath,
 		hasPassword,
+		hasAccessToken,
+		hasManagementApi,
 		migrations,
 		migrationsError,
 		stats: {

@@ -4,21 +4,41 @@
  */
 
 import { writable, get } from 'svelte/store';
+import {
+	getSidebarCollapsed as getPrefSidebarCollapsed,
+	setSidebarCollapsed as setPrefSidebarCollapsed,
+	toggleSidebarCollapsed as togglePrefSidebarCollapsed,
+	isInitialized as isPrefsInitialized
+} from './preferences.svelte';
 
 // Sidebar collapsed state (for desktop - separate from DaisyUI drawer mechanism)
 // When collapsed: sidebar is narrow (w-14), shows tooltips on hover
 // When expanded: sidebar is wide (w-64), shows full labels
+// Delegates to preferences store for localStorage persistence
 export const isSidebarCollapsed = writable(false);
 
+/**
+ * Sync isSidebarCollapsed writable store from preferences.
+ * Call after initPreferences() in +layout.svelte onMount.
+ */
+export function syncSidebarFromPreferences(): void {
+	if (isPrefsInitialized()) {
+		isSidebarCollapsed.set(getPrefSidebarCollapsed());
+	}
+}
+
 export function toggleSidebar() {
-	isSidebarCollapsed.update(v => !v);
+	const newValue = togglePrefSidebarCollapsed();
+	isSidebarCollapsed.set(newValue);
 }
 
 export function collapseSidebar() {
+	setPrefSidebarCollapsed(true);
 	isSidebarCollapsed.set(true);
 }
 
 export function expandSidebar() {
+	setPrefSidebarCollapsed(false);
 	isSidebarCollapsed.set(false);
 }
 

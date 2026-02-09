@@ -432,18 +432,14 @@
 					style="background: {pColor.bg}; color: {pColor.text}; border: 1px solid {pColor.border};"
 				>P{task.priority}</span>
 			{/if}
-			{#if harness && agentName}
+			{#if isHuman && !isClosed}
+				<span class="inline-flex scale-75" title="Human task">
+					<ProviderLogo agentId="human" size={12} />
+				</span>
+			{:else if harness && agentName}
 				<span class="inline-flex scale-75" title={harness}>
 					<ProviderLogo agentId={harness} size={12} />
 				</span>
-			{/if}
-
-			{#if isHuman && !isClosed}
-				<span
-					class={size === 'xs' ? 'text-xs' : size === 'sm' ? 'text-sm' : 'text-base'}
-					title="Human action required"
-					style="color: oklch(0.70 0.18 45);"
-				>🧑</span>
 			{/if}
 			{#if resumed}
 				<span class="resumed-badge" title="Resumed from previous session">
@@ -515,7 +511,11 @@
 					style="background: {pColor.bg}; color: {pColor.text}; border: 1px solid {pColor.border};"
 				>P{task.priority}</span>
 			{/if}
-			{#if harness}
+			{#if isHuman && !isClosed}
+				<span class="inline-flex scale-70 mt-0.25" title="Human task">
+					<ProviderLogo agentId="human" size={12} />
+				</span>
+			{:else if harness}
 				<span class="inline-flex scale-70 mt-0.25" title={harness}>
 					<ProviderLogo agentId={harness} size={12} />
 				</span>
@@ -528,14 +528,6 @@
 				</svg>
 			{:else if showType && task.issue_type}
 				<span class={size === 'xs' ? 'text-xs' : size === 'sm' ? 'text-sm' : 'text-base'}>{typeVisual.icon}</span>
-			{/if}
-
-			{#if isHuman && !isClosed}
-				<span
-					class={size === 'xs' ? 'text-xs' : size === 'sm' ? 'text-sm' : 'text-base'}
-					title="Human action required"
-					style="color: oklch(0.70 0.18 45);"
-				>🧑</span>
 			{/if}
 
 			{#if showUnblocksCount && activeBlocks.length > 0 && !isClosed}
@@ -667,7 +659,11 @@
 						style="background: {pColor.bg}; color: {pColor.text}; border: 1px solid {pColor.border};"
 					>P{task.priority}</span>
 				{/if}
-				{#if harness}
+				{#if isHuman && !isClosed}
+					<span class="inline-flex scale-70 ml-1" title="Human task">
+						<ProviderLogo agentId="human" size={12} />
+					</span>
+				{:else if harness}
 					<span class="inline-flex scale-70 ml-1" title={harness}>
 						<ProviderLogo agentId={harness} size={12} />
 					</span>
@@ -679,14 +675,6 @@
 					</svg>
 				{:else if showType && task.issue_type}
 					<span class={size === 'xs' ? 'text-xs' : size === 'sm' ? 'text-sm' : 'text-base'}>{typeVisual.icon}</span>
-				{/if}
-
-				{#if isHuman && !isClosed}
-					<span
-						class={size === 'xs' ? 'text-xs' : size === 'sm' ? 'text-sm' : 'text-base'}
-						title="Human action required"
-						style="color: oklch(0.70 0.18 45);"
-					>🧑</span>
 				{/if}
 
 				{#if showUnblocksCount && activeBlocks.length > 0 && !isClosed}

@@ -122,6 +122,6 @@ export function isHumanTask(task: TaskWithLabels | null | undefined): boolean {
 	// Check labels
 	const labels = task.labels || [];
 	return labels.some(label =>
-		label === 'human-action' || label === 'human'
+		label === 'human-action' || label === 'human' || label === 'harness:human'
 	);
 }

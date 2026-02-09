@@ -288,6 +288,18 @@
 		isExiting?: boolean;
 		/** Whether session is entering (triggers slide-in-fwd-top animation) */
 		isEntering?: boolean;
+		/** Question data from SSE (instant, bypasses HTTP polling delay) */
+		sseQuestionData?: {
+			active: boolean;
+			questions: Array<{
+				question: string;
+				header: string;
+				multiSelect: boolean;
+				options: Array<{ label: string; description: string }>;
+			}>;
+		};
+		/** Timestamp when SSE question data was received */
+		sseQuestionDataTimestamp?: number;
 	}
 
 	let {
@@ -359,6 +371,9 @@
 		isExiting = false,
 		// Entrance animation state
 		isEntering = false,
+		// SSE question data (instant, bypasses HTTP polling)
+		sseQuestionData,
+		sseQuestionDataTimestamp,
 	}: Props = $props();
 
 	// Derived mode helpers
@@ -600,6 +615,27 @@
 	let otherInputValue = $state("");
 	// Suppress question fetching after answering (prevents race condition)
 	let suppressQuestionFetch = $state(false);
+
+	// SSE question data → instant apiQuestionData update (bypasses HTTP polling delay)
+	// The SSE server watches /tmp/claude-question-tmux-*.json and broadcasts within ~50ms
+	// of the PreToolUse hook writing it, vs the old 1.5s polling interval
+	$effect(() => {
+		if (suppressQuestionFetch) return;
+		if (sseQuestionData?.active && sseQuestionData.questions?.length > 0) {
+			// Reset selection state if this is a new question
+			const oldQuestion = apiQuestionData?.questions?.[0]?.question;
+			const newQuestion = sseQuestionData.questions[0]?.question;
+			if (oldQuestion !== newQuestion) {
+				selectedOptionIndices = new Set();
+				currentOptionIndex = 0;
+			}
+			apiQuestionData = {
+				active: true,
+				questions: sseQuestionData.questions
+			};
+		}
+	});
+
 	// Error state for failed message sends (timeout, network error)
 	// When set, shows error banner and preserves input text for retry
 	let sendInputError = $state<string | null>(null);

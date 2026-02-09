@@ -562,6 +562,21 @@ export const AGENT_PRESETS: AgentProgramPreset[] = [
 			flags: [],
 			taskInjection: 'argument'
 		}
+	},
+	{
+		id: 'human',
+		name: 'Human',
+		description: 'Manual task for human action (not for agents)',
+		config: {
+			id: 'human',
+			name: 'Human',
+			command: '',
+			models: [],
+			defaultModel: '',
+			authType: 'none',
+			flags: [],
+			taskInjection: 'prompt'
+		}
 	}
 ];
 

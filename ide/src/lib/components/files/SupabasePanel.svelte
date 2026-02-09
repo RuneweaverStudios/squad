@@ -33,6 +33,8 @@
 		cliInstalled: boolean;
 		cliVersion: string | null;
 		hasPassword?: boolean; // From credentials.json or .env
+		hasAccessToken?: boolean; // From SUPABASE_ACCESS_TOKEN or ~/.supabase/access-token
+		hasManagementApi?: boolean; // hasAccessToken && projectRef (preferred SQL auth)
 		migrations: MigrationStatus[];
 		stats: {
 			total: number;
@@ -461,12 +463,7 @@
 
 			if (!response.ok || !data.success) {
 				const errorMsg = data.error || 'Query failed';
-				// Detect auth errors and provide helpful message
-				if (errorMsg.includes('password authentication failed') || errorMsg.includes('FATAL:  password')) {
-					sqlError = 'Authentication failed. Enter your database password above (Supabase → Project Settings → Database).';
-				} else {
-					sqlError = errorMsg;
-				}
+				sqlError = errorMsg;
 				sqlResult = null;
 
 				// Add failed query to history
@@ -864,12 +861,19 @@
 								<span class="sql-auth-label">Authentication</span>
 								{#if sqlPassword}
 									<span class="sql-auth-status sql-auth-override">Using override</span>
+								{:else if status?.hasManagementApi}
+									<span class="sql-auth-status sql-auth-found">
+										<svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+										</svg>
+										Linked
+									</span>
 								{:else if status?.hasPassword}
 									<span class="sql-auth-status sql-auth-found">
 										<svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
 											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
 										</svg>
-										Configured
+										Password
 									</span>
 								{:else}
 									<span class="sql-auth-status sql-auth-missing">Not configured</span>
@@ -877,9 +881,18 @@
 							</div>
 							{#if showSqlHelp}
 								<div class="sql-help">
-									<div class="sql-help-section">
-										<strong>Automatic</strong> — Configure via <a href="/config?tab=secrets" class="sql-help-link">Settings → Project Secrets</a>, or add <code>SUPABASE_DB_PASSWORD=xxx</code> to your <code>.env</code> file.
-									</div>
+									{#if status?.hasManagementApi}
+										<div class="sql-help-section">
+											<strong>Connected</strong> — Using Supabase API (same auth as migrations push). No password needed.
+										</div>
+									{:else}
+										<div class="sql-help-section">
+											<strong>Recommended</strong> — Run <code>supabase login</code> in terminal. Uses the same auth as migrations push — no password needed.
+										</div>
+										<div class="sql-help-section">
+											<strong>Alternative</strong> — Configure a database password via <a href="/config?tab=secrets" class="sql-help-link">Settings → Project Secrets</a>, or add <code>SUPABASE_DB_PASSWORD=xxx</code> to your <code>.env</code> file.
+										</div>
+									{/if}
 									<div class="sql-help-section">
 										<strong>Manual override</strong> —
 										<button
@@ -889,9 +902,6 @@
 										>
 											{showPasswordOverride ? 'Hide' : 'Show'} password field
 										</button>
-									</div>
-									<div class="sql-help-section sql-help-hint">
-										Find your password in Supabase → Project Settings → Database
 									</div>
 								</div>
 							{/if}

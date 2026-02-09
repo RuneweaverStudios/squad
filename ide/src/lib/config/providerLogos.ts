@@ -114,6 +114,17 @@ export const PROVIDERS: Record<string, ProviderInfo> = {
 			'M6 7h12v2H6V7zm2 0v10h2V7H8zm6 0v10h2V7h-2z'
 	},
 
+	// Human - Manual/human tasks (not for agents)
+	human: {
+		id: 'human',
+		name: 'Human',
+		color: 'oklch(0.70 0.18 45)', // Warm orange matching existing human task styling
+		viewBox: '0 0 24 24',
+		// Person icon (upper body silhouette)
+		iconPath:
+			'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'
+	},
+
 	// Generic/fallback
 	generic: {
 		id: 'generic',
@@ -148,7 +159,8 @@ export function getProviderForAgent(
 		'gemini': 'gemini',
 		'opencode': 'opencode',
 		'aider': 'aider',
-		'pi': 'pi'
+		'pi': 'pi',
+		'human': 'human'
 	};
 
 	// Try agent ID mapping first

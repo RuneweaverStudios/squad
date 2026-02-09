@@ -2,12 +2,17 @@
  * POST /api/supabase/query
  *
  * Execute SQL queries against the linked Supabase database.
- * Uses the pooler-url cached by `supabase link` command.
+ *
+ * Uses a two-tier approach:
+ * 1. Supabase Management API (preferred) - uses the same OAuth token as `supabase db push`,
+ *    so if migrations push works, SQL execution works too. No database password needed.
+ * 2. psql via pooler-url (fallback) - requires database password, used when the Management
+ *    API isn't available (no access token, self-hosted, etc.)
  *
  * Request body:
  * - sql: SQL query to execute (required)
  * - limit: Optional LIMIT to add (default: 100 for SELECT queries)
- * - password: Database password (required - Supabase CLI doesn't store it)
+ * - password: Database password (only needed for psql fallback)
  *
  * Query parameters:
  * - project: Project name (required)
@@ -17,11 +22,11 @@
  * - rows: Array of result rows (for SELECT queries)
  * - rowCount: Number of affected rows (for mutations)
  * - command: SQL command type (SELECT, UPDATE, etc.)
+ * - method: 'management-api' | 'psql' (which execution method was used)
  * - error: Error message (if failed)
  *
  * Security notes:
  * - Only works on linked projects (requires `supabase link` to have been run)
- * - Uses transaction mode pooler connection (port 6543)
  * - Adds LIMIT protection for SELECT queries without explicit LIMIT
  * - Password is not logged or persisted
  */
@@ -41,6 +46,9 @@ const QUERY_TIMEOUT_MS = 30000;
 
 // Default limit for SELECT queries without explicit LIMIT
 const DEFAULT_SELECT_LIMIT = 100;
+
+// Supabase Management API base URL
+const SUPABASE_API_BASE = 'https://api.supabase.com';
 
 /**
  * Get project path from config
@@ -102,6 +110,126 @@ function findSupabasePath(projectPath: string): string | null {
 	}
 
 	return null;
+}
+
+/**
+ * Get the Supabase access token from environment or credentials
+ *
+ * Fallback chain:
+ * 1. SUPABASE_ACCESS_TOKEN env var (set by supabase login or CI)
+ * 2. ~/.supabase/access-token file (fallback storage from supabase login)
+ */
+function getAccessToken(): string | null {
+	// Check environment variable first
+	const envToken = process.env.SUPABASE_ACCESS_TOKEN;
+	if (envToken) {
+		return envToken;
+	}
+
+	// Check the file-based fallback from supabase login
+	const tokenPath = join(process.env.HOME || '~', '.supabase', 'access-token');
+	if (existsSync(tokenPath)) {
+		try {
+			const token = readFileSync(tokenPath, 'utf-8').trim();
+			if (token) return token;
+		} catch {
+			// Fall through
+		}
+	}
+
+	return null;
+}
+
+/**
+ * Get the project reference from supabase/.temp/project-ref
+ */
+function getProjectRef(supabasePath: string): string | null {
+	const projectRefPath = join(supabasePath, '.temp', 'project-ref');
+	if (!existsSync(projectRefPath)) {
+		return null;
+	}
+
+	try {
+		const ref = readFileSync(projectRefPath, 'utf-8').trim();
+		return ref || null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Execute SQL via the Supabase Management API
+ *
+ * POST https://api.supabase.com/v1/projects/{ref}/database/query
+ * Uses the same OAuth token as `supabase db push`.
+ *
+ * Returns JSON array of row objects for SELECT queries.
+ * Returns empty array for mutations.
+ */
+async function executeViaManagementApi(
+	projectRef: string,
+	accessToken: string,
+	sql: string,
+	commandType: string
+): Promise<{ success: boolean; rows?: Record<string, unknown>[]; rowCount?: number; command?: string; message?: string; error?: string }> {
+	const controller = new AbortController();
+	const timeout = setTimeout(() => controller.abort(), QUERY_TIMEOUT_MS);
+
+	try {
+		const response = await fetch(`${SUPABASE_API_BASE}/v1/projects/${projectRef}/database/query`, {
+			method: 'POST',
+			headers: {
+				'Authorization': `Bearer ${accessToken}`,
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({ query: sql }),
+			signal: controller.signal
+		});
+
+		if (!response.ok) {
+			const errorData = await response.json().catch(() => ({ message: `HTTP ${response.status}` }));
+			const errorMsg = (errorData as { message?: string }).message || `Management API error: ${response.status}`;
+			return { success: false, error: errorMsg };
+		}
+
+		const data = await response.json();
+
+		// Management API returns a JSON array for all queries
+		if (Array.isArray(data)) {
+			if (commandType === 'SELECT') {
+				return {
+					success: true,
+					rows: data as Record<string, unknown>[],
+					rowCount: data.length,
+					command: commandType
+				};
+			} else {
+				// For mutations, the API returns result rows (may be empty)
+				return {
+					success: true,
+					rowCount: data.length || 0,
+					command: commandType,
+					message: `${commandType} completed`
+				};
+			}
+		}
+
+		// Unexpected response format
+		return {
+			success: true,
+			rows: [],
+			rowCount: 0,
+			command: commandType,
+			message: typeof data === 'string' ? data : JSON.stringify(data)
+		};
+	} catch (err) {
+		if ((err as Error).name === 'AbortError') {
+			return { success: false, error: 'Query timed out (30 second limit)' };
+		}
+		return { success: false, error: (err as Error).message };
+	} finally {
+		clearTimeout(timeout);
+	}
 }
 
 /**
@@ -187,6 +315,67 @@ function getPoolerUrl(supabasePath: string, password?: string): string | null {
 }
 
 /**
+ * Execute SQL via psql (fallback method, requires database password)
+ */
+async function executeViaPsql(
+	poolerUrl: string,
+	sql: string,
+	commandType: string
+): Promise<{ success: boolean; rows?: Record<string, unknown>[]; rowCount?: number; command?: string; message?: string; error?: string }> {
+	const escapedSql = escapeSqlForShell(sql);
+
+	let psqlCommand: string;
+	if (commandType === 'SELECT') {
+		psqlCommand = `psql "${poolerUrl}" --csv -c '${escapedSql}'`;
+	} else {
+		psqlCommand = `psql "${poolerUrl}" -c '${escapedSql}'`;
+	}
+
+	try {
+		const { stdout, stderr } = await execAsync(psqlCommand, {
+			timeout: QUERY_TIMEOUT_MS,
+			maxBuffer: 10 * 1024 * 1024 // 10MB buffer for large results
+		});
+
+		if (stderr && !stderr.includes('NOTICE:') && !stderr.includes('WARNING:')) {
+			return { success: false, error: stderr.trim(), command: commandType };
+		}
+
+		if (commandType === 'SELECT') {
+			const lines = stdout.trim().split('\n').filter(line => line.length > 0);
+
+			if (lines.length === 0) {
+				return { success: true, rows: [], rowCount: 0, command: commandType };
+			}
+
+			const headers = parseCSVLine(lines[0]);
+			const rows = lines.slice(1).map(line => {
+				const values = parseCSVLine(line);
+				const row: Record<string, unknown> = {};
+				headers.forEach((header, i) => {
+					row[header] = parseValue(values[i]);
+				});
+				return row;
+			});
+
+			return { success: true, rows, rowCount: rows.length, command: commandType };
+		} else {
+			const match = stdout.match(/(?:INSERT|UPDATE|DELETE)\s+(?:\d+\s+)?(\d+)/i);
+			const rowCount = match ? parseInt(match[1], 10) : 0;
+			return { success: true, rowCount, command: commandType, message: stdout.trim() };
+		}
+	} catch (error) {
+		const err = error as Error & { stderr?: string; code?: number | string };
+
+		if (err.code === 'ETIMEDOUT' || err.message?.includes('timeout')) {
+			return { success: false, error: 'Query timed out (30 second limit)' };
+		}
+
+		return { success: false, error: err.stderr || err.message };
+	}
+}
+
+/**
  * Detect SQL command type from query
  */
 function detectCommandType(sql: string): string {
@@ -266,19 +455,6 @@ export const POST: RequestHandler = async ({ url, request }) => {
 		);
 	}
 
-	// Get password: prefer request body, fall back to credentials or .env file
-	const serverPath = dirname(supabasePath); // e.g., /home/jw/code/marduk/marketing
-	const effectivePassword = password || getDatabasePassword(projectName, projectPath, serverPath);
-
-	// Get pooler URL (with password)
-	const poolerUrl = getPoolerUrl(supabasePath, effectivePassword ?? undefined);
-	if (!poolerUrl) {
-		return json(
-			{ success: false, error: 'Project not linked to Supabase. Run `supabase link` in the project.' },
-			{ status: 400 }
-		);
-	}
-
 	// Detect command type
 	const commandType = detectCommandType(sql);
 
@@ -288,104 +464,88 @@ export const POST: RequestHandler = async ({ url, request }) => {
 		finalSql = `${finalSql} LIMIT ${limit}`;
 	}
 
-	// Remove trailing semicolon for psql -c (it adds one)
+	// Remove trailing semicolon (both methods handle this themselves)
 	finalSql = finalSql.replace(/;\s*$/, '');
 
-	try {
-		// Execute query using psql with JSON output
-		// Use --tuples-only and JSON aggregation for SELECT queries
-		const escapedSql = escapeSqlForShell(finalSql);
+	// Strategy 1: Try Supabase Management API (no password needed)
+	const accessToken = getAccessToken();
+	const projectRef = getProjectRef(supabasePath);
 
-		// For SELECT queries, wrap in JSON aggregation to get structured output
-		// For mutations, just run the query and get affected row count
-		let psqlCommand: string;
+	if (accessToken && projectRef) {
+		const result = await executeViaManagementApi(projectRef, accessToken, finalSql, commandType);
 
-		if (commandType === 'SELECT') {
-			// Use psql's CSV output (includes headers on line 1)
-			psqlCommand = `psql "${poolerUrl}" --csv -c '${escapedSql}'`;
-		} else {
-			// For mutations, use regular output to get row count
-			psqlCommand = `psql "${poolerUrl}" -c '${escapedSql}'`;
+		if (result.success) {
+			return json({ ...result, method: 'management-api' });
 		}
 
-		const { stdout, stderr } = await execAsync(psqlCommand, {
-			timeout: QUERY_TIMEOUT_MS,
-			maxBuffer: 10 * 1024 * 1024 // 10MB buffer for large results
-		});
-
-		if (stderr && !stderr.includes('NOTICE:') && !stderr.includes('WARNING:')) {
-			// Real errors (not notices/warnings)
+		// If it's a rate limit error or server error, don't fall through - report it
+		if (result.error?.includes('429') || result.error?.includes('rate limit')) {
 			return json({
 				success: false,
-				error: stderr.trim(),
-				command: commandType
-			});
-		}
-
-		// Parse results based on command type
-		if (commandType === 'SELECT') {
-			// Parse CSV output into rows
-			const lines = stdout.trim().split('\n').filter(line => line.length > 0);
-
-			if (lines.length === 0) {
-				return json({
-					success: true,
-					rows: [],
-					rowCount: 0,
-					command: commandType
-				});
-			}
-
-			// First line is headers
-			const headers = parseCSVLine(lines[0]);
-			const rows = lines.slice(1).map(line => {
-				const values = parseCSVLine(line);
-				const row: Record<string, unknown> = {};
-				headers.forEach((header, i) => {
-					row[header] = parseValue(values[i]);
-				});
-				return row;
-			});
-
-			return json({
-				success: true,
-				rows,
-				rowCount: rows.length,
-				command: commandType
-			});
-		} else {
-			// For mutations, parse affected row count from output
-			// Output looks like: "UPDATE 5" or "INSERT 0 5" or "DELETE 3"
-			const match = stdout.match(/(?:INSERT|UPDATE|DELETE)\s+(?:\d+\s+)?(\d+)/i);
-			const rowCount = match ? parseInt(match[1], 10) : 0;
-
-			return json({
-				success: true,
-				rowCount,
+				error: 'Supabase API rate limit reached. Please wait a moment and try again.',
 				command: commandType,
-				message: stdout.trim()
-			});
+				method: 'management-api'
+			}, { status: 429 });
 		}
-	} catch (error) {
-		const err = error as Error & { stderr?: string; code?: number | string };
 
-		// Handle timeout
-		if (err.code === 'ETIMEDOUT' || err.message?.includes('timeout')) {
+		// For auth errors on the Management API, fall through to psql
+		// For SQL errors (syntax, missing table, etc.), return the error directly
+		if (result.error && !result.error.includes('401') && !result.error.includes('403') && !result.error.includes('Unauthorized')) {
 			return json({
 				success: false,
-				error: 'Query timed out (30 second limit)',
-				command: commandType
-			}, { status: 408 });
+				error: result.error,
+				command: commandType,
+				method: 'management-api'
+			}, { status: 500 });
 		}
 
-		// Handle psql errors
-		const errorMessage = err.stderr || err.message;
+		// Auth error on Management API - fall through to psql
+	}
+
+	// Strategy 2: Fall back to psql with database password
+	const serverPath = dirname(supabasePath);
+	const effectivePassword = password || getDatabasePassword(projectName, projectPath, serverPath);
+
+	const poolerUrl = getPoolerUrl(supabasePath, effectivePassword ?? undefined);
+	if (!poolerUrl) {
+		return json(
+			{ success: false, error: 'Project not linked to Supabase. Run `supabase link` in the project.' },
+			{ status: 400 }
+		);
+	}
+
+	// If no Management API available and no password, give a clear error
+	if (!effectivePassword && !accessToken) {
 		return json({
 			success: false,
-			error: errorMessage,
+			error: 'No authentication available. Either run `supabase login` (recommended) or configure your database password in Settings → Project Secrets.',
 			command: commandType
-		}, { status: 500 });
+		}, { status: 401 });
 	}
+
+	const result = await executeViaPsql(poolerUrl, finalSql, commandType);
+
+	if (result.success) {
+		return json({ ...result, method: 'psql' });
+	}
+
+	// Enhance psql auth error messages
+	if (result.error && (result.error.includes('password authentication failed') || result.error.includes('FATAL:  password'))) {
+		return json({
+			success: false,
+			error: 'Database password authentication failed. Run `supabase login` to use the Management API (no password needed), or check your database password in Settings → Project Secrets.',
+			command: commandType,
+			method: 'psql'
+		}, { status: 401 });
+	}
+
+	const statusCode = result.error?.includes('timed out') ? 408 : 500;
+	return json({
+		success: false,
+		error: result.error,
+		command: commandType,
+		method: 'psql'
+	}, { status: statusCode });
 };
 
 /**
