@@ -1080,7 +1080,9 @@
 											{harness}
 											onHarnessClick={(e) => {
 												harnessPickerTaskId = task.id;
-												harnessPickerPos = { x: e.clientX, y: e.clientY };
+												const estimatedHeight = AGENT_PRESETS.length * 30 + 8;
+												const maxY = window.innerHeight - estimatedHeight - 8;
+												harnessPickerPos = { x: e.clientX, y: Math.min(e.clientY, maxY) };
 											}}
 										/>
 									</div>
@@ -1672,8 +1674,8 @@
 
 	/* Three-column layout widths to match TasksActive */
 	/* Task: fixed width for TaskIdBadge */
-	.th-task, .td-task { width: min-content; white-space: nowrap; text-align: center; }
-	.th-title, .td-title { width: auto; padding-right: 2rem; }
+	.th-task, .td-task { width: min-content; white-space: nowrap; padding-left: 0.25rem; padding-right: 0.25rem; }
+	.th-title, .td-title { width: auto; padding-left: 0.25rem; }
 	.th-actions, .td-actions { width: 80px; text-align: right; }
 
 	.tasks-table td {
@@ -1695,9 +1697,8 @@
 	.task-cell-content {
 		display: flex;
 		flex-direction: column;
-		align-items: center;
+		align-items: flex-start;
 		gap: 0.25rem;
-		width: 100%;
 	}
 
 	.agent-badge-row {
@@ -2265,6 +2266,8 @@
 		padding: 4px;
 		box-shadow: 0 8px 32px oklch(0 0 0 / 0.5);
 		min-width: 180px;
+		max-height: calc(100vh - 16px);
+		overflow-y: auto;
 		animation: contextMenuIn 0.1s ease;
 	}
 

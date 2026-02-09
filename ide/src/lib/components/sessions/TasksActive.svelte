@@ -1037,7 +1037,7 @@
 								<!-- Agent session: TaskIdBadge with avatar and status ring -->
 								<div class="task-cell-content">
 									{#if sessionTask}
-										<div class="agent-badge-row mx-2">
+										<div class="agent-badge-row">
 											<TaskIdBadge
 												task={sessionTask}
 												size="sm"
@@ -1055,7 +1055,7 @@
 									{:else}
 										<!-- No task - planning pill matching agentPill aesthetic -->
 										{@const planningColor = effectiveState === 'planning' ? 'oklch(0.68 0.20 270)' : (rowProjectColor || 'oklch(0.50 0.02 250)')}
-										<div class="inline-flex flex-col items-start mx-2">
+										<div class="inline-flex flex-col items-start">
 											<button
 												class="planning-pill {isNew ? 'tracking-in-expand' : ''}"
 												style="background: color-mix(in oklch, {planningColor} 12%, transparent); border: 1px solid color-mix(in oklch, {planningColor} 30%, transparent); color: {planningColor};{isNew ? ' animation-delay: 100ms;' : ''}"
@@ -2038,17 +2038,16 @@
 
 	/* Three-column layout widths */
 	/* Task: fixed width for TaskIdBadge, Agent: takes remaining space, Status: fixed width for StatusActionBadge */
-	.th-task, .td-task { width: min-content; white-space: nowrap; }
-	.th-agent, .td-agent { width: auto; padding-right: 2rem; }
+	.th-task, .td-task { width: min-content; white-space: nowrap; padding-left: 0.25rem; padding-right: 0.25rem; }
+	.th-agent, .td-agent { width: auto; padding-left: 0.25rem; }
 	.th-status, .td-status { width: 160px; text-align: right; }
 
 	/* Task column */
 	.task-cell-content {
 		display: flex;
 		flex-direction: column;
-		align-items: center;
+		align-items: flex-start;
 		gap: 0.25rem;
-		width: 100%;
 		min-width: 0;
 	}
 
@@ -2059,7 +2058,6 @@
 		gap: 0.25rem;
 		width: 100%;
 		min-width: 0;
-		margin-right: 1rem;
 	}
 
 	.no-agent-label {

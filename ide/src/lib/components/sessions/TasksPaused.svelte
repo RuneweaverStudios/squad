@@ -114,7 +114,7 @@
 						<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 						<td class="td-task" onclick={(e) => e.stopPropagation()}>
 							<div class="task-cell-content">
-								<div class="agent-badge-row mx-2">
+								<div class="agent-badge-row">
 									<TaskIdBadge
 										task={{ id: session.taskId, status: 'in_progress', priority: session.taskPriority }}
 										size="sm"
@@ -218,17 +218,16 @@
 	}
 
 	/* Column widths matching TasksActive - wider action column for stacked elapsed time */
-	.th-task, .td-task { width: min-content; white-space: nowrap; }
-	.th-title, .td-title { width: auto; padding-right: 2rem; }
+	.th-task, .td-task { width: min-content; white-space: nowrap; padding-left: 0.25rem; padding-right: 0.25rem; }
+	.th-title, .td-title { width: auto; padding-left: 0.25rem; }
 	.th-action, .td-action { width: 200px; text-align: right; overflow: hidden; }
 
 	/* Task cell content - matches TasksActive structure exactly */
 	.task-cell-content {
 		display: flex;
 		flex-direction: column;
-		align-items: center;
+		align-items: flex-start;
 		gap: 0.25rem;
-		width: 100%;
 		min-width: 0;
 	}
 
