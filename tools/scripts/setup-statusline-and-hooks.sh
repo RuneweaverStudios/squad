@@ -269,6 +269,33 @@ if grep -q '"SessionStart"' "$SETTINGS_LOCAL" 2>/dev/null; then
     else
         echo -e "  ${GREEN}✓${NC} PreCompact hook already configured"
     fi
+
+    # Add UserPromptSubmit if missing (upgrade path for older installs)
+    if ! grep -q '"UserPromptSubmit"' "$SETTINGS_LOCAL" 2>/dev/null; then
+        TEMP_SETTINGS=$(mktemp)
+        if jq '.hooks = (.hooks // {}) * {
+            "UserPromptSubmit": [
+                {
+                    "matcher": ".*",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": "~/.claude/hooks/user-prompt-signal.sh",
+                            "streamStdinJson": true
+                        }
+                    ]
+                }
+            ]
+        }' "$SETTINGS_LOCAL" > "$TEMP_SETTINGS" 2>/dev/null; then
+            mv "$TEMP_SETTINGS" "$SETTINGS_LOCAL"
+            echo -e "  ${GREEN}✓ Added UserPromptSubmit hook to settings.local.json${NC}"
+        else
+            echo -e "  ${YELLOW}⚠ Failed to add UserPromptSubmit hook${NC}"
+            rm -f "$TEMP_SETTINGS"
+        fi
+    else
+        echo -e "  ${GREEN}✓${NC} UserPromptSubmit hook already configured"
+    fi
 else
     # Add SessionStart and PostToolUse hooks to settings.local.json
     TEMP_SETTINGS=$(mktemp)

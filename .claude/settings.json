@@ -49,7 +49,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/session-start-restore-agent.sh",
+            "command": "~/.claude/hooks/session-start-agent-identity.sh",
             "statusMessage": "Restoring agent identity..."
           }
         ]

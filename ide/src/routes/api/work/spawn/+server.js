@@ -759,7 +759,7 @@ export async function POST({ request }) {
 		const sessionName = `jat-${agentName}`;
 
 		// Step 3a: Write agent identity file for session-start hook to restore
-		// The hook (session-start-restore-agent.sh) uses this to set up .claude/sessions/agent-{sessionId}.txt
+		// The hook (session-start-agent-identity.sh) uses this to set up .claude/sessions/agent-{sessionId}.txt
 		// We use tmux session name as the key since that's known before Claude starts
 		try {
 			const sessionsDir = `${projectPath}/.claude/sessions`;

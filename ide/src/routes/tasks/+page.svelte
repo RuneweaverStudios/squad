@@ -885,12 +885,14 @@
 		}
 	}
 
-	// Get launchable (non-blocked) task IDs for an epic
+	// Get launchable (non-blocked, non-human) task IDs for an epic
 	function getLaunchableTaskIds(epicId: string): Set<string> {
 		const projectTasks = tasksByProject.get(selectedProject!) || [];
 		const ids = new Set<string>();
 		for (const task of projectTasks) {
 			if (task.status !== "open" || task.issue_type === "epic") continue;
+			// Skip human tasks - can't be automated
+			if (task.issue_type === "human" || task.labels?.some(l => l === "human" || l.startsWith("human:"))) continue;
 			const parentEpic = getParentEpicId(task.id, epicChildMap);
 			if (parentEpic !== epicId) continue;
 			// Check if blocked
@@ -1822,7 +1824,13 @@
 												class:swarm-spawning={isSwarmSpawning}
 												disabled={isSwarmSpawning}
 												title={isSwarmSpawning ? `Spawning ${launchableCount} tasks...` : `Launch ${launchableCount} task${launchableCount > 1 ? 's' : ''}`}
-												onmouseenter={() => { swarmHoveredEpicId = epicId; }}
+												onmouseenter={() => {
+													swarmHoveredEpicId = epicId;
+													// Auto-expand epic to show highlighted tasks
+													if (!isEpicExpanded(selectedProject!, epicId)) {
+														toggleEpicCollapse(selectedProject!, epicId);
+													}
+												}}
 												onmouseleave={() => { if (swarmHoveredEpicId === epicId) swarmHoveredEpicId = null; }}
 												onclick={(e) => {
 													e.stopPropagation();
