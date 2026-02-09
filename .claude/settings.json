@@ -11,7 +11,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/code/jat/.claude/hooks/user-prompt-signal.sh",
+            "command": "~/.claude/hooks/user-prompt-signal.sh",
             "statusMessage": "",
             "streamStdinJson": true
           }
@@ -24,7 +24,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/code/jat/.claude/hooks/pre-ask-user-question.sh",
+            "command": "~/.claude/hooks/pre-ask-user-question.sh",
             "statusMessage": "",
             "streamStdinJson": true
           }
@@ -37,7 +37,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/code/jat/.claude/hooks/pre-compact-save-agent.sh",
+            "command": "~/.claude/hooks/pre-compact-save-agent.sh",
             "statusMessage": "Saving agent identity..."
           }
         ]
@@ -49,7 +49,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/code/jat/.claude/hooks/session-start-restore-agent.sh",
+            "command": "~/.claude/hooks/session-start-restore-agent.sh",
             "statusMessage": "Restoring agent identity..."
           }
         ]
@@ -61,19 +61,19 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/code/jat/.claude/hooks/post-bash-jat-signal.sh",
+            "command": "~/.claude/hooks/post-bash-jat-signal.sh",
             "statusMessage": "",
             "streamStdinJson": true
           },
           {
             "type": "command",
-            "command": "~/code/jat/.claude/hooks/post-bash-agent-state-refresh.sh",
+            "command": "~/.claude/hooks/post-bash-agent-state-refresh.sh",
             "statusMessage": "",
             "streamStdinJson": true
           },
           {
             "type": "command",
-            "command": "~/code/jat/.claude/hooks/log-tool-activity.sh",
+            "command": "~/.claude/hooks/log-tool-activity.sh",
             "statusMessage": "",
             "streamStdinJson": true
           }
@@ -84,7 +84,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/code/jat/.claude/hooks/log-tool-activity.sh",
+            "command": "~/.claude/hooks/log-tool-activity.sh",
             "statusMessage": "",
             "streamStdinJson": true
           }

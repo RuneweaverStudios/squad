@@ -180,6 +180,50 @@ else
     echo -e "  ${YELLOW}⚠ session-start hook not found: $SESSION_START_HOOK${NC}"
 fi
 
+# Copy pre-ask-user-question hook to global directory
+PRE_ASK_HOOK="$JAT_DIR/.claude/hooks/pre-ask-user-question.sh"
+if [ -f "$PRE_ASK_HOOK" ]; then
+    cp "$PRE_ASK_HOOK" "$GLOBAL_HOOKS_DIR/pre-ask-user-question.sh"
+    chmod +x "$GLOBAL_HOOKS_DIR/pre-ask-user-question.sh"
+    echo -e "  ${GREEN}✓ Installed pre-ask-user-question.sh to ~/.claude/hooks/${NC}"
+else
+    echo -e "  ${YELLOW}⚠ pre-ask-user-question hook not found: $PRE_ASK_HOOK${NC}"
+fi
+
+# Copy pre-compact-save-agent hook to global directory
+PRE_COMPACT_HOOK="$JAT_DIR/.claude/hooks/pre-compact-save-agent.sh"
+if [ -f "$PRE_COMPACT_HOOK" ]; then
+    cp "$PRE_COMPACT_HOOK" "$GLOBAL_HOOKS_DIR/pre-compact-save-agent.sh"
+    chmod +x "$GLOBAL_HOOKS_DIR/pre-compact-save-agent.sh"
+    echo -e "  ${GREEN}✓ Installed pre-compact-save-agent.sh to ~/.claude/hooks/${NC}"
+else
+    echo -e "  ${YELLOW}⚠ pre-compact-save-agent hook not found: $PRE_COMPACT_HOOK${NC}"
+fi
+
+# NOTE: session-start-restore-agent.sh is no longer needed separately.
+# Its features (WINDOWID fallback, workflow state injection, jt fallback)
+# are now merged into session-start-agent-identity.sh.
+
+# Copy user-prompt-signal hook to global directory
+USER_PROMPT_HOOK="$JAT_DIR/.claude/hooks/user-prompt-signal.sh"
+if [ -f "$USER_PROMPT_HOOK" ]; then
+    cp "$USER_PROMPT_HOOK" "$GLOBAL_HOOKS_DIR/user-prompt-signal.sh"
+    chmod +x "$GLOBAL_HOOKS_DIR/user-prompt-signal.sh"
+    echo -e "  ${GREEN}✓ Installed user-prompt-signal.sh to ~/.claude/hooks/${NC}"
+else
+    echo -e "  ${YELLOW}⚠ user-prompt-signal hook not found: $USER_PROMPT_HOOK${NC}"
+fi
+
+# Copy monitor-output helper to global directory (used by user-prompt-signal.sh via $SCRIPT_DIR)
+MONITOR_OUTPUT="$JAT_DIR/.claude/hooks/monitor-output.sh"
+if [ -f "$MONITOR_OUTPUT" ]; then
+    cp "$MONITOR_OUTPUT" "$GLOBAL_HOOKS_DIR/monitor-output.sh"
+    chmod +x "$GLOBAL_HOOKS_DIR/monitor-output.sh"
+    echo -e "  ${GREEN}✓ Installed monitor-output.sh to ~/.claude/hooks/${NC}"
+else
+    echo -e "  ${YELLOW}⚠ monitor-output helper not found: $MONITOR_OUTPUT${NC}"
+fi
+
 echo ""
 
 # ============================================================================
@@ -195,9 +239,36 @@ if [ ! -f "$SETTINGS_LOCAL" ]; then
     echo '{}' > "$SETTINGS_LOCAL"
 fi
 
-# Check if SessionStart hook is already configured
+# Check if hooks are already configured
 if grep -q '"SessionStart"' "$SETTINGS_LOCAL" 2>/dev/null; then
     echo -e "  ${GREEN}✓${NC} SessionStart hook already configured"
+
+    # Add PreCompact if missing (upgrade path for older installs)
+    if ! grep -q '"PreCompact"' "$SETTINGS_LOCAL" 2>/dev/null; then
+        TEMP_SETTINGS=$(mktemp)
+        if jq '.hooks = (.hooks // {}) * {
+            "PreCompact": [
+                {
+                    "matcher": ".*",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": "~/.claude/hooks/pre-compact-save-agent.sh",
+                            "statusMessage": "Saving agent identity..."
+                        }
+                    ]
+                }
+            ]
+        }' "$SETTINGS_LOCAL" > "$TEMP_SETTINGS" 2>/dev/null; then
+            mv "$TEMP_SETTINGS" "$SETTINGS_LOCAL"
+            echo -e "  ${GREEN}✓ Added PreCompact hook to settings.local.json${NC}"
+        else
+            echo -e "  ${YELLOW}⚠ Failed to add PreCompact hook${NC}"
+            rm -f "$TEMP_SETTINGS"
+        fi
+    else
+        echo -e "  ${GREEN}✓${NC} PreCompact hook already configured"
+    fi
 else
     # Add SessionStart and PostToolUse hooks to settings.local.json
     TEMP_SETTINGS=$(mktemp)
@@ -215,6 +286,29 @@ else
                     ]
                 }
             ],
+            "PreToolUse": [
+                {
+                    "matcher": "AskUserQuestion",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": "~/.claude/hooks/pre-ask-user-question.sh"
+                        }
+                    ]
+                }
+            ],
+            "PreCompact": [
+                {
+                    "matcher": ".*",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": "~/.claude/hooks/pre-compact-save-agent.sh",
+                            "statusMessage": "Saving agent identity..."
+                        }
+                    ]
+                }
+            ],
             "PostToolUse": [
                 {
                     "matcher": "Bash",
@@ -225,11 +319,23 @@ else
                         }
                     ]
                 }
+            ],
+            "UserPromptSubmit": [
+                {
+                    "matcher": ".*",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": "~/.claude/hooks/user-prompt-signal.sh",
+                            "streamStdinJson": true
+                        }
+                    ]
+                }
             ]
         })
     }' "$SETTINGS_LOCAL" > "$TEMP_SETTINGS" 2>/dev/null; then
         mv "$TEMP_SETTINGS" "$SETTINGS_LOCAL"
-        echo -e "  ${GREEN}✓ Added SessionStart and PostToolUse hooks to settings.local.json${NC}"
+        echo -e "  ${GREEN}✓ Added SessionStart, PreCompact, PostToolUse, and UserPromptSubmit hooks to settings.local.json${NC}"
     else
         echo -e "  ${YELLOW}⚠ Failed to update settings.local.json${NC}"
         rm -f "$TEMP_SETTINGS"
@@ -391,9 +497,13 @@ echo -e "${GREEN}=========================================${NC}"
 echo ""
 echo "  Global statusline: ~/.claude/statusline.sh"
 echo "  Global hooks:"
-echo "    - ~/.claude/hooks/session-start-agent-identity.sh (SessionStart)"
+echo "    - ~/.claude/hooks/session-start-agent-identity.sh (SessionStart - unified)"
+echo "    - ~/.claude/hooks/pre-ask-user-question.sh (PreToolUse)"
+echo "    - ~/.claude/hooks/pre-compact-save-agent.sh (PreCompact)"
 echo "    - ~/.claude/hooks/post-bash-agent-state-refresh.sh (PostToolUse)"
 echo "    - ~/.claude/hooks/post-bash-jat-signal.sh (PostToolUse)"
+echo "    - ~/.claude/hooks/user-prompt-signal.sh (UserPromptSubmit)"
+echo "    - ~/.claude/hooks/monitor-output.sh (helper for user-prompt-signal)"
 echo ""
 echo "  Total repos found: $REPOS_FOUND"
 echo "  Settings.json configured: $SETTINGS_CONFIGURED"

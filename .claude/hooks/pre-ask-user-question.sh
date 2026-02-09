@@ -30,7 +30,7 @@ fi
 if [[ -z "$TMUX_SESSION" ]]; then
     # Try multiple possible locations for agent file
     # Check both .claude/agent-{id}.txt (legacy) and .claude/sessions/agent-{id}.txt (current)
-    for BASE_DIR in "." "/home/jw/code/jat" "/home/jw/code/chimaro" "/home/jw/code/jomarchy"; do
+    for BASE_DIR in "." ~/code/*/; do
         for SUBDIR in "sessions" ""; do
             if [[ -n "$SUBDIR" ]]; then
                 AGENT_FILE="${BASE_DIR}/.claude/${SUBDIR}/agent-${SESSION_ID}.txt"

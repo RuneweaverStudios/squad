@@ -113,6 +113,10 @@
 	// Spawn loading state
 	let spawningTaskId = $state<string | null>(null);
 
+	// Swarm button state
+	let swarmHoveredEpicId = $state<string | null>(null);
+	let swarmSpawningEpicId = $state<string | null>(null);
+
 	// Project tab context menu state
 	let projectCtxProject = $state<string | null>(null);
 	let projectCtxX = $state(0);
@@ -878,6 +882,81 @@
 			console.error("Failed to spawn task:", err);
 		} finally {
 			spawningTaskId = null;
+		}
+	}
+
+	// Get launchable (non-blocked) task IDs for an epic
+	function getLaunchableTaskIds(epicId: string): Set<string> {
+		const projectTasks = tasksByProject.get(selectedProject!) || [];
+		const ids = new Set<string>();
+		for (const task of projectTasks) {
+			if (task.status !== "open" || task.issue_type === "epic") continue;
+			const parentEpic = getParentEpicId(task.id, epicChildMap);
+			if (parentEpic !== epicId) continue;
+			// Check if blocked
+			const hasBlockers = task.depends_on?.some((d: any) => d.status !== "closed");
+			if (!hasBlockers) {
+				ids.add(task.id);
+			}
+		}
+		return ids;
+	}
+
+	// Spawn all launchable tasks in an epic
+	async function swarmEpic(epicId: string) {
+		const launchableIds = getLaunchableTaskIds(epicId);
+		if (launchableIds.size === 0) return;
+
+		swarmSpawningEpicId = epicId;
+		const projectTasks = tasksByProject.get(selectedProject!) || [];
+		const tasksToSpawn = projectTasks.filter(t => launchableIds.has(t.id));
+
+		try {
+			for (let i = 0; i < tasksToSpawn.length; i++) {
+				const task = tasksToSpawn[i];
+				spawningTaskId = task.id;
+
+				const body: Record<string, any> = {
+					taskId: task.id,
+					autoStart: true,
+				};
+
+				// Use task's harness label if set
+				const harnessLabel = task.labels?.find((l: string) => l.startsWith('harness:'));
+				if (harnessLabel) {
+					body.agentId = harnessLabel.replace('harness:', '');
+				}
+
+				try {
+					const response = await fetch("/api/work/spawn", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify(body),
+					});
+
+					if (!response.ok) {
+						const data = await response.json();
+						if (response.status === 409 && data.existingAgent) {
+							// Already active, skip
+							continue;
+						}
+						console.error(`Failed to spawn ${task.id}:`, data.error);
+					}
+				} catch (err) {
+					console.error(`Failed to spawn ${task.id}:`, err);
+				}
+
+				// Stagger between spawns (except last)
+				if (i < tasksToSpawn.length - 1) {
+					await new Promise(resolve => setTimeout(resolve, 6000));
+				}
+			}
+
+			await fetchAllData();
+		} finally {
+			spawningTaskId = null;
+			swarmSpawningEpicId = null;
+			swarmHoveredEpicId = null;
 		}
 	}
 
@@ -1691,7 +1770,12 @@
 
 								{#if epicId && epicTasks.length > 0}
 									<!-- Epic Group - only show if there are open child tasks -->
+									{@const launchableIds = getLaunchableTaskIds(epicId)}
+									{@const launchableCount = launchableIds.size}
+									{@const isSwarmHovered = swarmHoveredEpicId === epicId}
+									{@const isSwarmSpawning = swarmSpawningEpicId === epicId}
 									<div class="epic-group">
+										<div class="epic-header-row">
 										<button
 											class="epic-header"
 											onclick={() =>
@@ -1732,6 +1816,32 @@
 												>{epicTasks.length} open</span
 											>
 										</button>
+										{#if launchableCount > 0}
+											<button
+												class="swarm-btn"
+												class:swarm-spawning={isSwarmSpawning}
+												disabled={isSwarmSpawning}
+												title={isSwarmSpawning ? `Spawning ${launchableCount} tasks...` : `Launch ${launchableCount} task${launchableCount > 1 ? 's' : ''}`}
+												onmouseenter={() => { swarmHoveredEpicId = epicId; }}
+												onmouseleave={() => { if (swarmHoveredEpicId === epicId) swarmHoveredEpicId = null; }}
+												onclick={(e) => {
+													e.stopPropagation();
+													swarmEpic(epicId);
+												}}
+											>
+												{#if isSwarmSpawning}
+													<svg class="swarm-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+														<path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke-linecap="round"/>
+													</svg>
+												{:else}
+													<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="swarm-icon">
+														<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+													</svg>
+												{/if}
+												<span class="swarm-count">{launchableCount}</span>
+											</button>
+										{/if}
+										</div>
 
 										{#if isExpanded}
 											<div
@@ -1746,6 +1856,7 @@
 													error={null}
 													{spawningTaskId}
 													{projectColors}
+													highlightedTaskIds={isSwarmHovered || isSwarmSpawning ? launchableIds : new Set()}
 													onSpawnTask={spawnTask as any}
 													onRetry={fetchTasks}
 													onTaskClick={(taskId) =>
@@ -2238,6 +2349,91 @@
 
 	.epic-header:hover {
 		background: oklch(0.19 0.01 250);
+	}
+
+	.epic-header-row {
+		display: flex;
+		align-items: center;
+	}
+
+	.epic-header-row .epic-header {
+		flex: 1;
+		min-width: 0;
+	}
+
+	/* Swarm Button */
+	.swarm-btn {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		padding: 0.25rem 0.5rem;
+		margin-right: 0.5rem;
+		border: 1px solid oklch(0.55 0.20 280 / 0.4);
+		border-radius: 0.375rem;
+		background: oklch(0.55 0.20 280 / 0.1);
+		color: oklch(0.80 0.15 280);
+		cursor: pointer;
+		font-size: 0.75rem;
+		font-weight: 600;
+		transition: all 0.2s ease;
+		white-space: nowrap;
+		animation: swarm-glow 2s ease-in-out infinite;
+	}
+
+	.swarm-btn:hover {
+		background: oklch(0.55 0.20 280 / 0.25);
+		border-color: oklch(0.65 0.20 280 / 0.7);
+		color: oklch(0.90 0.15 280);
+		box-shadow: 0 0 12px oklch(0.55 0.20 280 / 0.3), 0 0 24px oklch(0.55 0.20 280 / 0.15);
+	}
+
+	.swarm-btn:disabled {
+		cursor: not-allowed;
+		opacity: 0.8;
+	}
+
+	.swarm-btn.swarm-spawning {
+		animation: swarm-pulse 1s ease-in-out infinite;
+		background: oklch(0.55 0.20 280 / 0.2);
+		border-color: oklch(0.65 0.20 280 / 0.6);
+	}
+
+	.swarm-icon {
+		width: 0.875rem;
+		height: 0.875rem;
+	}
+
+	.swarm-spinner {
+		width: 0.875rem;
+		height: 0.875rem;
+		animation: spin 0.8s linear infinite;
+	}
+
+	.swarm-count {
+		font-variant-numeric: tabular-nums;
+	}
+
+	@keyframes swarm-glow {
+		0%, 100% {
+			box-shadow: 0 0 4px oklch(0.55 0.20 280 / 0.15);
+		}
+		50% {
+			box-shadow: 0 0 10px oklch(0.55 0.20 280 / 0.25), 0 0 20px oklch(0.55 0.20 280 / 0.1);
+		}
+	}
+
+	@keyframes swarm-pulse {
+		0%, 100% {
+			box-shadow: 0 0 8px oklch(0.55 0.20 280 / 0.3);
+		}
+		50% {
+			box-shadow: 0 0 16px oklch(0.55 0.20 280 / 0.5), 0 0 32px oklch(0.55 0.20 280 / 0.2);
+		}
+	}
+
+	@keyframes spin {
+		from { transform: rotate(0deg); }
+		to { transform: rotate(360deg); }
 	}
 
 	.collapse-icon {

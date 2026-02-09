@@ -1997,7 +1997,9 @@
 			/(?:review your answers|Do these.*look correct|Submit answers)/i.test(
 				recentOutput,
 			) ||
-			/Enter to (?:confirm|submit|proceed)/i.test(recentOutput);
+			/Enter to (?:confirm|submit|proceed)/i.test(recentOutput) ||
+			// Plan mode exit prompt (built-in Claude Code interaction, not AskUserQuestion)
+			/ctrl-g to edit in Nvim/i.test(recentOutput);
 		if (!hasQuestionUI) return null;
 
 		// Find the question text (line starting with "?")
@@ -2338,6 +2340,8 @@
 			/Enter to select.*Tab\/Arrow keys to navigate.*Esc to cancel/,
 			/\[ \].*\n.*\[ \]/, // Multiple checkbox options
 			/Type something\s*\n\s*Next/, // "Type something" option in questions
+			// Plan mode exit prompt (built-in interaction, not AskUserQuestion tool)
+			/ctrl-g to edit in Nvim/,
 		]);
 		const workingPos = findLastPos([/\[JAT:WORKING\s+task=/]);
 		const reviewPos = findLastPos([

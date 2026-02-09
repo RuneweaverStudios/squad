@@ -58,6 +58,7 @@
 		spawningTaskId = null,
 		projectColors = {},
 		showHeader = true,
+		highlightedTaskIds = new Set<string>(),
 		onSpawnTask = () => {},
 		onRetry = () => {},
 		onTaskClick = () => {},
@@ -69,6 +70,7 @@
 		spawningTaskId: string | null;
 		projectColors: Record<string, string>;
 		showHeader?: boolean;
+		highlightedTaskIds?: Set<string>;
 		onSpawnTask: (task: Task, selection?: AgentSelection) => void;
 		onRetry: () => void;
 		onTaskClick: (taskId: string) => void;
@@ -1047,8 +1049,9 @@
 						{@const blockedTasks = blockedByMap.get(task.id) || []}
 						{@const isSelected = selectedTasks.has(task.id)}
 						{@const harness = getTaskHarness(task)}
+						{@const isSwarmHighlighted = highlightedTaskIds.has(task.id)}
 						<tr
-							class="task-row {isBlocked && !isExiting ? 'opacity-70' : ''} {isNew ? 'animate-slide-in-fwd-center' : ''} {isExiting ? 'animate-slide-out-bck-center' : ''} {isSelected ? 'selected-row' : ''}"
+							class="task-row {isBlocked && !isExiting ? 'opacity-70' : ''} {isNew ? 'animate-slide-in-fwd-center' : ''} {isExiting ? 'animate-slide-out-bck-center' : ''} {isSelected ? 'selected-row' : ''} {isSwarmHighlighted ? 'swarm-highlight' : ''}"
 							style="{projectColor ? `border-left: 3px solid ${projectColor};` : ''}{isExiting ? ' pointer-events: none;' : ''}"
 							onclick={() => !isExiting && handleRowClick(task.id)}
 							onmouseenter={() => { hoveredTaskId = task.id; }}
@@ -1975,6 +1978,13 @@
 
 	.selected-row:hover {
 		background: oklch(0.70 0.18 240 / 0.12) !important;
+	}
+
+	/* Swarm hover highlight - launchable tasks glow when swarm button is hovered */
+	.swarm-highlight {
+		background: oklch(0.65 0.20 280 / 0.12) !important;
+		box-shadow: inset 0 0 20px oklch(0.65 0.20 280 / 0.08);
+		transition: background 0.2s ease, box-shadow 0.2s ease;
 	}
 
 	/* Selection count badge in header */

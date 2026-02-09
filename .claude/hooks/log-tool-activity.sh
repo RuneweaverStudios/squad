@@ -30,7 +30,7 @@ case "$TOOL_NAME" in
     Read)
         FILE_PATH=$(echo "$TOOL_INFO" | jq -r '.tool_input.file_path // ""' 2>/dev/null || echo "")
         PREVIEW="Reading $(basename "$FILE_PATH")"
-        ~/code/jat/tools/scripts/log-agent-activity \
+        log-agent-activity \
             --session "$SESSION_ID" \
             --type tool \
             --tool "Read" \
@@ -41,7 +41,7 @@ case "$TOOL_NAME" in
     Write)
         FILE_PATH=$(echo "$TOOL_INFO" | jq -r '.tool_input.file_path // ""' 2>/dev/null || echo "")
         PREVIEW="Writing $(basename "$FILE_PATH")"
-        ~/code/jat/tools/scripts/log-agent-activity \
+        log-agent-activity \
             --session "$SESSION_ID" \
             --type tool \
             --tool "Write" \
@@ -52,7 +52,7 @@ case "$TOOL_NAME" in
     Edit)
         FILE_PATH=$(echo "$TOOL_INFO" | jq -r '.tool_input.file_path // ""' 2>/dev/null || echo "")
         PREVIEW="Editing $(basename "$FILE_PATH")"
-        ~/code/jat/tools/scripts/log-agent-activity \
+        log-agent-activity \
             --session "$SESSION_ID" \
             --type tool \
             --tool "Edit" \
@@ -66,7 +66,7 @@ case "$TOOL_NAME" in
         SHORT_CMD=$(echo "$COMMAND" | head -c 50)
         [[ ${#COMMAND} -gt 50 ]] && SHORT_CMD="${SHORT_CMD}..."
         PREVIEW="Running: $SHORT_CMD"
-        ~/code/jat/tools/scripts/log-agent-activity \
+        log-agent-activity \
             --session "$SESSION_ID" \
             --type tool \
             --tool "Bash" \
@@ -76,7 +76,7 @@ case "$TOOL_NAME" in
     Grep|Glob)
         PATTERN=$(echo "$TOOL_INFO" | jq -r '.tool_input.pattern // ""' 2>/dev/null || echo "")
         PREVIEW="Searching: $PATTERN"
-        ~/code/jat/tools/scripts/log-agent-activity \
+        log-agent-activity \
             --session "$SESSION_ID" \
             --type tool \
             --tool "$TOOL_NAME" \
@@ -115,7 +115,7 @@ case "$TOOL_NAME" in
         SHORT_Q=$(echo "$FIRST_QUESTION" | head -c 40)
         [[ ${#FIRST_QUESTION} -gt 40 ]] && SHORT_Q="${SHORT_Q}..."
         PREVIEW="Asking: $SHORT_Q"
-        ~/code/jat/tools/scripts/log-agent-activity \
+        log-agent-activity \
             --session "$SESSION_ID" \
             --type tool \
             --tool "AskUserQuestion" \
@@ -125,7 +125,7 @@ case "$TOOL_NAME" in
     *)
         # Generic tool logging
         PREVIEW="Using tool: $TOOL_NAME"
-        ~/code/jat/tools/scripts/log-agent-activity \
+        log-agent-activity \
             --session "$SESSION_ID" \
             --type tool \
             --tool "$TOOL_NAME" \

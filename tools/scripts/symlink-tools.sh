@@ -239,6 +239,32 @@ else
 fi
 
 echo ""
+echo -e "${BLUE}Setting up log-agent-activity...${NC}"
+echo ""
+
+# Symlink log-agent-activity (tool activity logger for hooks)
+LOG_ACTIVITY_SOURCE="$PROJECT_ROOT/tools/scripts/log-agent-activity"
+LOG_ACTIVITY_TARGET="$HOME/.local/bin/log-agent-activity"
+
+if [ -f "$LOG_ACTIVITY_SOURCE" ]; then
+    if [ -L "$LOG_ACTIVITY_TARGET" ]; then
+        CURRENT_TARGET=$(readlink "$LOG_ACTIVITY_TARGET")
+        if [ "$CURRENT_TARGET" = "$LOG_ACTIVITY_SOURCE" ]; then
+            echo -e "  ${GREEN}✓${NC} log-agent-activity (already linked)"
+        else
+            echo -e "  ${YELLOW}↻${NC} log-agent-activity (updating link)"
+            rm "$LOG_ACTIVITY_TARGET"
+            ln -s "$LOG_ACTIVITY_SOURCE" "$LOG_ACTIVITY_TARGET"
+        fi
+    else
+        echo -e "  ${GREEN}+${NC} log-agent-activity (linked)"
+        ln -s "$LOG_ACTIVITY_SOURCE" "$LOG_ACTIVITY_TARGET"
+    fi
+else
+    echo -e "  ${YELLOW}⚠${NC} log-agent-activity not found at $LOG_ACTIVITY_SOURCE"
+fi
+
+echo ""
 echo -e "${BLUE}Setting up jat-demo...${NC}"
 echo ""
 
