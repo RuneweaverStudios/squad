@@ -1338,7 +1338,8 @@
 				<div
 					class="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-primary to-primary/30"
 				></div>
-				<div class="flex-1 min-w-0 flex items-start justify-between gap-4">
+				<div class="flex-1 min-w-0">
+					<div class="flex items-start justify-between gap-4">
 					<div class="flex items-center gap-3 flex-wrap">
 						<h2 id="drawer-title" class="text-xl font-bold font-mono uppercase tracking-wider text-base-content">Create New Task</h2>
 					</div>
@@ -1467,6 +1468,7 @@
 								</ul>
 							{/if}
 						</div>
+					</div>
 					</div>
 					<p class="text-sm mt-1 {formDisabled ? 'text-warning' : 'text-base-content/70'}">
 						{#if formDisabled}
