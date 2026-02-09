@@ -979,6 +979,20 @@ launch_project() {
         fi
     fi
 
+    # Auto-start scheduler daemon if configured
+    if jq -r '.defaults.scheduler_autostart // false' "$CONFIG_FILE" 2>/dev/null | grep -q true; then
+        if ! tmux has-session -t jat-scheduler 2>/dev/null; then
+            local scheduler_dir="$JAT_SOURCE_DIR/tools/scheduler"
+            if [[ -d "$scheduler_dir" ]]; then
+                echo -e "${DIM}  → Starting scheduler daemon...${NC}"
+                tmux new-session -d -s "jat-scheduler" -x 80 -y 40 -c "$scheduler_dir"
+                sleep 0.3
+                tmux send-keys -t "jat-scheduler" "bash run.sh" Enter
+                echo -e "${GREEN}  ✓ Scheduler daemon started${NC}"
+            fi
+        fi
+    fi
+
     # Apply Hyprland colors
     if [[ -n "$active_color" ]]; then
         (sleep 1.5 && apply_border_color "$name:" "$active_color" "$inactive_color") &
@@ -1457,6 +1471,13 @@ DEMO MODE:
     demo                   Launch demo with sample projects
     demo setup             Fresh setup (cleans & recreates)
     demo on/off            Toggle demo visibility
+
+SCHEDULER:
+    scheduler              Show scheduler status (default)
+    scheduler start        Start the scheduler daemon
+    scheduler stop         Stop the scheduler daemon
+    scheduler restart      Restart the scheduler daemon
+    scheduler logs         Attach to scheduler session
 
 SESSION MANAGEMENT:
     resume <agent>         Resume session by agent name (e.g., CrystalTundra)
@@ -2595,6 +2616,100 @@ demo_cmd() {
 }
 
 #------------------------------------------------------------------------------
+# Scheduler
+#------------------------------------------------------------------------------
+
+scheduler_cmd() {
+    local subcmd="${1:-status}"
+
+    local scheduler_dir="$JAT_SOURCE_DIR/tools/scheduler"
+    if [[ ! -d "$scheduler_dir" ]]; then
+        echo -e "${RED}Error: Scheduler not found at $scheduler_dir${NC}"
+        exit 1
+    fi
+
+    case "$subcmd" in
+        start)
+            if tmux has-session -t jat-scheduler 2>/dev/null; then
+                echo -e "${YELLOW}Scheduler is already running${NC}"
+                # Show status
+                scheduler_cmd status
+                return
+            fi
+            echo -e "${DIM}Starting scheduler daemon...${NC}"
+            tmux new-session -d -s "jat-scheduler" -x 80 -y 40 -c "$scheduler_dir"
+            sleep 0.3
+            tmux send-keys -t "jat-scheduler" "bash run.sh" Enter
+            echo -e "${GREEN}✓ Scheduler daemon started (tmux session: jat-scheduler)${NC}"
+            ;;
+        stop)
+            if ! tmux has-session -t jat-scheduler 2>/dev/null; then
+                echo -e "${YELLOW}Scheduler is not running${NC}"
+                return
+            fi
+            tmux kill-session -t jat-scheduler
+            echo -e "${GREEN}✓ Scheduler daemon stopped${NC}"
+            ;;
+        status)
+            if tmux has-session -t jat-scheduler 2>/dev/null; then
+                echo -e "${GREEN}●${NC} Scheduler is ${GREEN}running${NC} (tmux session: jat-scheduler)"
+                # Try to get status from HTTP API
+                local status
+                status=$(curl -s --connect-timeout 2 http://127.0.0.1:3334/status 2>/dev/null)
+                if [[ -n "$status" ]]; then
+                    local poll_count uptime_secs
+                    poll_count=$(echo "$status" | jq -r '.pollCount // 0')
+                    uptime_secs=$(echo "$status" | jq -r '.uptime // 0' | cut -d. -f1)
+                    local projects
+                    projects=$(echo "$status" | jq -r '.projectCount // 0')
+                    echo -e "  Polls: ${BOLD}$poll_count${NC}  Projects: ${BOLD}$projects${NC}  Uptime: ${BOLD}${uptime_secs}s${NC}"
+                fi
+                # Check auto-start config
+                if jq -r '.defaults.scheduler_autostart // false' "$CONFIG_FILE" 2>/dev/null | grep -q true; then
+                    echo -e "  Auto-start: ${GREEN}enabled${NC}"
+                else
+                    echo -e "  Auto-start: ${DIM}disabled${NC}"
+                fi
+            else
+                echo -e "${RED}●${NC} Scheduler is ${RED}stopped${NC}"
+                if jq -r '.defaults.scheduler_autostart // false' "$CONFIG_FILE" 2>/dev/null | grep -q true; then
+                    echo -e "  Auto-start: ${GREEN}enabled${NC} (will start on next IDE launch)"
+                else
+                    echo -e "  Auto-start: ${DIM}disabled${NC}"
+                fi
+                echo -e "  Run ${BOLD}jat scheduler start${NC} to start manually"
+            fi
+            ;;
+        restart)
+            scheduler_cmd stop
+            sleep 0.5
+            scheduler_cmd start
+            ;;
+        logs)
+            if ! tmux has-session -t jat-scheduler 2>/dev/null; then
+                echo -e "${YELLOW}Scheduler is not running${NC}"
+                return
+            fi
+            echo -e "${DIM}Attaching to scheduler logs (Ctrl+B D to detach)...${NC}"
+            tmux attach-session -t jat-scheduler
+            ;;
+        *)
+            echo "Usage: jat scheduler <start|stop|status|restart|logs>"
+            echo ""
+            echo "Commands:"
+            echo "  start     Start the scheduler daemon"
+            echo "  stop      Stop the scheduler daemon"
+            echo "  status    Show scheduler status (default)"
+            echo "  restart   Restart the scheduler daemon"
+            echo "  logs      Attach to scheduler tmux session"
+            echo ""
+            echo "Config: Set defaults.scheduler_autostart=true in projects.json"
+            echo "        to auto-start with IDE launch"
+            ;;
+    esac
+}
+
+#------------------------------------------------------------------------------
 # Main
 #------------------------------------------------------------------------------
 
@@ -2640,6 +2755,20 @@ main() {
         # Sweep zombie tasks (in_progress with no live tmux session)
         sweep_zombie_tasks
 
+        # Auto-start scheduler daemon if configured
+        if jq -r '.defaults.scheduler_autostart // false' "$CONFIG_FILE" 2>/dev/null | grep -q true; then
+            if ! tmux has-session -t jat-scheduler 2>/dev/null; then
+                local scheduler_dir="$JAT_SOURCE_DIR/tools/scheduler"
+                if [[ -d "$scheduler_dir" ]]; then
+                    echo -e "${DIM}  → Starting scheduler daemon...${NC}"
+                    tmux new-session -d -s "jat-scheduler" -x 80 -y 40 -c "$scheduler_dir"
+                    sleep 0.3
+                    tmux send-keys -t "jat-scheduler" "bash run.sh" Enter
+                    echo -e "${GREEN}  ✓ Scheduler daemon started${NC}"
+                fi
+            fi
+        fi
+
         launch_ide "JAT"
         exit 0
     fi
@@ -2683,6 +2812,9 @@ main() {
             ;;
         update)
             update_cmd "$@"
+            ;;
+        scheduler)
+            scheduler_cmd "$@"
             ;;
         # Hidden/advanced commands (kept for backwards compatibility)
         colors)

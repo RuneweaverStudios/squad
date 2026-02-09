@@ -90,6 +90,7 @@ export async function PUT({ params, request }) {
 		}
 
 		// Build update fields
+		/** @type {Record<string, any>} */
 		const updateFields = {};
 
 		if (updates.title !== undefined) {
@@ -236,6 +237,7 @@ export async function PATCH({ params, request }) {
 		}
 
 		// Build update fields
+		/** @type {Record<string, any>} */
 		const updateFields = {};
 		const projectPath = existingTask.project_path;
 

@@ -89,6 +89,12 @@ export interface Task {
 	labels: string[];
 	depends_on?: TaskDependency[];
 	blocked_by?: TaskDependency[];
+	command?: string | null;
+	agent_program?: string | null;
+	model?: string | null;
+	schedule_cron?: string | null;
+	next_run_at?: string | null;
+	due_date?: string | null;
 	created_ts?: string;
 	updated_ts?: string;
 }

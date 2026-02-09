@@ -224,6 +224,7 @@ export async function POST({ request }) {
 		}
 
 		// Build scheduling fields
+		/** @type {Record<string, any>} */
 		const schedulingFields = {};
 		if (body.command && typeof body.command === 'string') {
 			schedulingFields.command = body.command.trim();
