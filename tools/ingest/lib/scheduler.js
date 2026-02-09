@@ -1,7 +1,7 @@
 import { getEnabledSources, getConfig, getSecret } from './config.js';
 import { isDuplicate, recordItem, getAdapterState, setAdapterState, logPoll, registerThread, getActiveThreads, updateThreadCursor } from './dedup.js';
 import { downloadAttachments } from './downloader.js';
-import { createTask, appendToTask, registerTaskAttachments } from './taskCreator.js';
+import { createTask, appendToTask, registerTaskAttachments, applyAutomation } from './taskCreator.js';
 import { discoverPlugins } from './pluginLoader.js';
 import { applyFilter, resolveFilter } from './filterEngine.js';
 import * as logger from './logger.js';
@@ -162,6 +162,11 @@ async function pollSource(source) {
       // Register downloaded files as task attachments
       if (taskId && downloaded.length > 0) {
         registerTaskAttachments(taskId, downloaded, source.project);
+      }
+
+      // Apply automation (spawn agent, schedule, or delay)
+      if (taskId && source.automation) {
+        applyAutomation(taskId, source);
       }
 
       // Register thread for adapters that support replies

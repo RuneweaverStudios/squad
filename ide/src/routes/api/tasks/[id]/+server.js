@@ -110,6 +110,25 @@ export async function PUT({ params, request }) {
 		if (updates.notes !== undefined) {
 			updateFields.notes = updates.notes ? updates.notes.trim() : '';
 		}
+		// Handle scheduling fields in PUT
+		if (updates.command !== undefined) {
+			updateFields.command = updates.command ? updates.command.trim() : null;
+		}
+		if (updates.agent_program !== undefined) {
+			updateFields.agent_program = updates.agent_program ? updates.agent_program.trim() : null;
+		}
+		if (updates.model !== undefined) {
+			updateFields.model = updates.model ? updates.model.trim() : null;
+		}
+		if (updates.schedule_cron !== undefined) {
+			updateFields.schedule_cron = updates.schedule_cron ? updates.schedule_cron.trim() : null;
+		}
+		if (updates.next_run_at !== undefined) {
+			updateFields.next_run_at = updates.next_run_at ? updates.next_run_at.trim() : null;
+		}
+		if (updates.due_date !== undefined) {
+			updateFields.due_date = updates.due_date ? updates.due_date.trim() : null;
+		}
 
 		// Execute update if we have fields
 		if (Object.keys(updateFields).length > 0) {
@@ -237,6 +256,26 @@ export async function PATCH({ params, request }) {
 		}
 		if (updates.notes !== undefined) {
 			updateFields.notes = updates.notes ? updates.notes.trim() : '';
+		}
+
+		// Handle scheduling fields
+		if (updates.command !== undefined) {
+			updateFields.command = updates.command ? updates.command.trim() : null;
+		}
+		if (updates.agent_program !== undefined) {
+			updateFields.agent_program = updates.agent_program ? updates.agent_program.trim() : null;
+		}
+		if (updates.model !== undefined) {
+			updateFields.model = updates.model ? updates.model.trim() : null;
+		}
+		if (updates.schedule_cron !== undefined) {
+			updateFields.schedule_cron = updates.schedule_cron ? updates.schedule_cron.trim() : null;
+		}
+		if (updates.next_run_at !== undefined) {
+			updateFields.next_run_at = updates.next_run_at ? updates.next_run_at.trim() : null;
+		}
+		if (updates.due_date !== undefined) {
+			updateFields.due_date = updates.due_date ? updates.due_date.trim() : null;
 		}
 
 		// Update labels using lib/tasks.js (replaces all existing labels)

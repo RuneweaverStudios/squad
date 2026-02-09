@@ -9,6 +9,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const JAT_ROOT = join(__dirname, '..', '..', '..');
 const TASK_IMAGES_PATH = join(JAT_ROOT, '.jat', 'task-images.json');
 
+const IDE_BASE_URL = process.env.JAT_IDE_URL || 'http://127.0.0.1:3333';
+
 /**
  * Create a task via jt create CLI.
  * Returns the created task ID or null on failure.
@@ -201,6 +203,102 @@ export function registerTaskAttachments(taskId, downloadedFiles, project) {
   } catch { /* notes sync is secondary */ }
 
   logger.info(`registered ${downloadedFiles.length} attachment(s) for ${taskId}`, project);
+}
+
+/**
+ * Apply automation config from source after task creation.
+ * - 'immediate': call IDE spawn API to start an agent now
+ * - 'schedule': set next_run_at to next occurrence of scheduled time
+ * - 'delay': set next_run_at to now + delay
+ * Also sets the command column if automation specifies one.
+ */
+export function applyAutomation(taskId, source) {
+  const auto = source.automation;
+  if (!auto || auto.action === 'none') return;
+
+  const cwd = getProjectPath(source.project);
+  const command = auto.command || '/jat:start';
+
+  if (auto.action === 'immediate') {
+    // Set command on task, then fire-and-forget spawn API call
+    try {
+      execFileSync('jt', ['update', taskId, '--command', command], {
+        encoding: 'utf-8', timeout: 15000, cwd
+      });
+    } catch (err) {
+      logger.warn(`Failed to set command on ${taskId}: ${err.message}`, source.id);
+    }
+
+    spawnAgent(taskId, source.project, source.id);
+    return;
+  }
+
+  // For schedule/delay, compute next_run_at and set on the task
+  let nextRunAt;
+
+  if (auto.action === 'schedule' && auto.schedule) {
+    nextRunAt = computeNextScheduleTime(auto.schedule);
+  } else if (auto.action === 'delay') {
+    const delayMs = computeDelayMs(auto.delay || 0, auto.delayUnit || 'minutes');
+    nextRunAt = new Date(Date.now() + delayMs).toISOString();
+  }
+
+  if (!nextRunAt) return;
+
+  try {
+    const args = ['update', taskId, '--command', command, '--next-run-at', nextRunAt];
+    execFileSync('jt', args, { encoding: 'utf-8', timeout: 15000, cwd });
+    logger.info(`scheduled ${taskId} for ${nextRunAt} (${auto.action})`, source.id);
+  } catch (err) {
+    logger.error(`Failed to set schedule on ${taskId}: ${err.message}`, source.id);
+  }
+}
+
+/**
+ * Fire-and-forget call to IDE spawn API to start an agent for a task.
+ * Non-blocking: uses native fetch, logs result but doesn't block the poll loop.
+ */
+function spawnAgent(taskId, project, sourceId) {
+  fetch(`${IDE_BASE_URL}/api/work/spawn`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ taskId, project }),
+    signal: AbortSignal.timeout(30000)
+  }).then(res => {
+    if (res.ok) {
+      logger.info(`spawned agent for ${taskId}`, sourceId);
+    } else {
+      logger.warn(`Spawn API returned ${res.status} for ${taskId}`, sourceId);
+    }
+  }).catch(err => {
+    logger.warn(`Spawn API call failed for ${taskId} (IDE may be offline): ${err.message}`, sourceId);
+  });
+}
+
+/**
+ * Compute the next occurrence of a HH:MM time string.
+ * If the time has already passed today, returns tomorrow's time.
+ */
+function computeNextScheduleTime(timeStr) {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  const now = new Date();
+  const target = new Date(now);
+  target.setHours(hours, minutes, 0, 0);
+
+  // If time already passed today, schedule for tomorrow
+  if (target <= now) {
+    target.setDate(target.getDate() + 1);
+  }
+
+  return target.toISOString();
+}
+
+/**
+ * Convert delay + unit to milliseconds.
+ */
+function computeDelayMs(delay, unit) {
+  const multiplier = unit === 'hours' ? 3600000 : 60000;
+  return delay * multiplier;
 }
 
 export function getProjectPath(projectName) {

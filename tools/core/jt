@@ -97,6 +97,12 @@ CREATE TABLE IF NOT EXISTS tasks (
     issue_type TEXT NOT NULL DEFAULT "task",
     assignee TEXT,
     parent_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,
+    command TEXT DEFAULT "/jat:start",
+    agent_program TEXT,
+    model TEXT,
+    schedule_cron TEXT,
+    next_run_at TEXT,
+    due_date TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     closed_at TEXT,
@@ -164,6 +170,23 @@ cmd_init() {
     $quiet || echo "Migrated: added parent_id column"
   fi
 
+  # Migrate: add scheduling columns if missing
+  local has_command
+  has_command="$(sqlite3 "$jat_dir/tasks.db" "PRAGMA table_info(tasks);" | grep -c '|command|' || true)"
+  if [[ "$has_command" == "0" ]]; then
+    sqlite3 "$jat_dir/tasks.db" "
+      ALTER TABLE tasks ADD COLUMN command TEXT DEFAULT '/jat:start';
+      ALTER TABLE tasks ADD COLUMN agent_program TEXT;
+      ALTER TABLE tasks ADD COLUMN model TEXT;
+      ALTER TABLE tasks ADD COLUMN schedule_cron TEXT;
+      ALTER TABLE tasks ADD COLUMN next_run_at TEXT;
+      ALTER TABLE tasks ADD COLUMN due_date TEXT;
+      CREATE INDEX IF NOT EXISTS idx_tasks_next_run ON tasks(next_run_at);
+      CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
+    "
+    $quiet || echo "Migrated: added scheduling columns (command, agent_program, model, schedule_cron, next_run_at, due_date)"
+  fi
+
   touch_sentinel
 
   $quiet || echo "Initialized .jat/ in $PROJECT_ROOT"
@@ -172,6 +195,7 @@ cmd_init() {
 cmd_create() {
   require_db
   local title="" description="" type="task" priority=2 labels="" deps="" assignee="" json_out=false explicit_id="" parent_id=""
+  local command="" agent_program="" model="" schedule_cron="" next_run_at="" due_date=""
 
   # First positional arg is title
   if [[ $# -gt 0 && ! "$1" =~ ^-- ]]; then
@@ -180,20 +204,26 @@ cmd_create() {
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --type)        type="$2"; shift 2 ;;
-      --priority)    priority="$2"; shift 2 ;;
-      --description) description="$2"; shift 2 ;;
-      --labels)      labels="$2"; shift 2 ;;
-      --deps)        deps="$2"; shift 2 ;;
-      --assignee)    assignee="$2"; shift 2 ;;
-      --id)          explicit_id="$2"; shift 2 ;;
-      --parent)      parent_id="$2"; shift 2 ;;
-      --json)        json_out=true; shift ;;
-      *)             [[ -z "$title" ]] && title="$1"; shift ;;
+      --type)           type="$2"; shift 2 ;;
+      --priority)       priority="$2"; shift 2 ;;
+      --description)    description="$2"; shift 2 ;;
+      --labels)         labels="$2"; shift 2 ;;
+      --deps)           deps="$2"; shift 2 ;;
+      --assignee)       assignee="$2"; shift 2 ;;
+      --id)             explicit_id="$2"; shift 2 ;;
+      --parent)         parent_id="$2"; shift 2 ;;
+      --command)        command="$2"; shift 2 ;;
+      --agent-program)  agent_program="$2"; shift 2 ;;
+      --model)          model="$2"; shift 2 ;;
+      --schedule-cron)  schedule_cron="$2"; shift 2 ;;
+      --next-run-at)    next_run_at="$2"; shift 2 ;;
+      --due-date)       due_date="$2"; shift 2 ;;
+      --json)           json_out=true; shift ;;
+      *)                [[ -z "$title" ]] && title="$1"; shift ;;
     esac
   done
 
-  [[ -n "$title" ]] || die "Usage: jt create \"title\" [--type X] [--priority N] [--description \"...\"] [--labels \"a,b\"] [--deps \"id1,id2\"] [--assignee \"X\"] [--parent EPIC_ID] [--json]"
+  [[ -n "$title" ]] || die "Usage: jt create \"title\" [--type X] [--priority N] [--description \"...\"] [--labels \"a,b\"] [--deps \"id1,id2\"] [--assignee \"X\"] [--parent EPIC_ID] [--command CMD] [--agent-program X] [--model X] [--schedule-cron EXPR] [--next-run-at ISO] [--due-date ISO] [--json]"
 
   require_integer "$priority" "--priority"
   local id="${explicit_id:-$(gen_id)}"
@@ -224,9 +254,17 @@ cmd_create() {
   local esc_type
   esc_type="$(sql_escape "$type")"
 
+  local esc_command esc_agent_program esc_model esc_cron esc_next_run esc_due_date
+  esc_command="$(sql_escape "$command")"
+  esc_agent_program="$(sql_escape "$agent_program")"
+  esc_model="$(sql_escape "$model")"
+  esc_cron="$(sql_escape "$schedule_cron")"
+  esc_next_run="$(sql_escape "$next_run_at")"
+  esc_due_date="$(sql_escape "$due_date")"
+
   sql_exec "
-    INSERT INTO tasks (id, title, description, status, priority, issue_type, assignee, parent_id, created_at, updated_at)
-    VALUES ('$id', '$esc_title', '$esc_desc', 'open', $priority, '$esc_type', $([ -n "$assignee" ] && echo "'$esc_assignee'" || echo "NULL"), $([ -n "$parent_id" ] && echo "'$esc_parent_id'" || echo "NULL"), '$ts', '$ts');"
+    INSERT INTO tasks (id, title, description, status, priority, issue_type, assignee, parent_id, command, agent_program, model, schedule_cron, next_run_at, due_date, created_at, updated_at)
+    VALUES ('$id', '$esc_title', '$esc_desc', 'open', $priority, '$esc_type', $([ -n "$assignee" ] && echo "'$esc_assignee'" || echo "NULL"), $([ -n "$parent_id" ] && echo "'$esc_parent_id'" || echo "NULL"), $([ -n "$command" ] && echo "'$esc_command'" || echo "NULL"), $([ -n "$agent_program" ] && echo "'$esc_agent_program'" || echo "NULL"), $([ -n "$model" ] && echo "'$esc_model'" || echo "NULL"), $([ -n "$schedule_cron" ] && echo "'$esc_cron'" || echo "NULL"), $([ -n "$next_run_at" ] && echo "'$esc_next_run'" || echo "NULL"), $([ -n "$due_date" ] && echo "'$esc_due_date'" || echo "NULL"), '$ts', '$ts');"
 
   # Auto-wire epic→child dependency: parent depends on child (child is READY, parent is BLOCKED)
   if [[ -n "$parent_id" ]]; then
@@ -272,20 +310,26 @@ cmd_update() {
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --status)      sets+=("status = '$(sql_escape "$2")'"); shift 2 ;;
-      --priority)    require_integer "$2" "--priority"; sets+=("priority = $2"); shift 2 ;;
-      --title)       sets+=("title = '$(sql_escape "$2")'"); shift 2 ;;
-      --description) sets+=("description = '$(sql_escape "$2")'"); shift 2 ;;
-      --notes)       sets+=("notes = '$(sql_escape "$2")'"); shift 2 ;;
-      --type)        sets+=("issue_type = '$(sql_escape "$2")'"); shift 2 ;;
-      --assignee)    sets+=("assignee = '$(sql_escape "$2")'"); shift 2 ;;
-      --labels)      new_labels="$2"; shift 2 ;;
-      --json)        json_out=true; shift ;;
-      *)             [[ -z "$task_id" ]] && task_id="$1"; shift ;;
+      --status)         sets+=("status = '$(sql_escape "$2")'"); shift 2 ;;
+      --priority)       require_integer "$2" "--priority"; sets+=("priority = $2"); shift 2 ;;
+      --title)          sets+=("title = '$(sql_escape "$2")'"); shift 2 ;;
+      --description)    sets+=("description = '$(sql_escape "$2")'"); shift 2 ;;
+      --notes)          sets+=("notes = '$(sql_escape "$2")'"); shift 2 ;;
+      --type)           sets+=("issue_type = '$(sql_escape "$2")'"); shift 2 ;;
+      --assignee)       sets+=("assignee = '$(sql_escape "$2")'"); shift 2 ;;
+      --labels)         new_labels="$2"; shift 2 ;;
+      --command)        sets+=("command = '$(sql_escape "$2")'"); shift 2 ;;
+      --agent-program)  sets+=("agent_program = '$(sql_escape "$2")'"); shift 2 ;;
+      --model)          sets+=("model = '$(sql_escape "$2")'"); shift 2 ;;
+      --schedule-cron)  sets+=("schedule_cron = '$(sql_escape "$2")'"); shift 2 ;;
+      --next-run-at)    sets+=("next_run_at = '$(sql_escape "$2")'"); shift 2 ;;
+      --due-date)       sets+=("due_date = '$(sql_escape "$2")'"); shift 2 ;;
+      --json)           json_out=true; shift ;;
+      *)                [[ -z "$task_id" ]] && task_id="$1"; shift ;;
     esac
   done
 
-  [[ -n "$task_id" ]] || die "Usage: jt update TASK_ID [--status X] [--priority N] [--assignee X] [--title X] [--json]"
+  [[ -n "$task_id" ]] || die "Usage: jt update TASK_ID [--status X] [--priority N] [--assignee X] [--title X] [--command CMD] [--agent-program X] [--model X] [--schedule-cron EXPR] [--next-run-at ISO] [--due-date ISO] [--json]"
 
   # Check task exists
   local exists
@@ -378,7 +422,9 @@ _task_json() {
   sql_json "
     SELECT
       t.id, t.title, t.description, t.status, t.priority, t.issue_type,
-      t.assignee, t.parent_id, t.created_at, t.updated_at, t.closed_at, t.close_reason,
+      t.assignee, t.parent_id, t.command, t.agent_program, t.model,
+      t.schedule_cron, t.next_run_at, t.due_date,
+      t.created_at, t.updated_at, t.closed_at, t.close_reason,
       COALESCE(
         (SELECT json_group_array(l.label) FROM labels l WHERE l.issue_id = t.id),
         '[]'
@@ -484,6 +530,20 @@ for t in data:
     if t.get('description'):
         desc = t['description'][:200]
         print(f\"  Description: {desc}\")
+    if t.get('command') and t['command'] != '/jat:start':
+        print(f\"  Command: {t['command']}\")
+    if t.get('agent_program'):
+        model_str = f\" ({t['model']})\" if t.get('model') else ''
+        print(f\"  Agent: {t['agent_program']}{model_str}\")
+    elif t.get('model'):
+        print(f\"  Model: {t['model']}\")
+    if t.get('schedule_cron'):
+        next_run = f\" (next: {t['next_run_at']})\" if t.get('next_run_at') else ''
+        print(f\"  Schedule: {t['schedule_cron']}{next_run}\")
+    elif t.get('next_run_at'):
+        print(f\"  Next run: {t['next_run_at']}\")
+    if t.get('due_date'):
+        print(f\"  Due: {t['due_date']}\")
     labels = t.get('labels', [])
     if labels:
         print(f\"  Labels: {', '.join(labels)}\")
@@ -527,7 +587,9 @@ cmd_list() {
   result="$(sql_json "
     SELECT
       t.id, t.title, t.description, t.status, t.priority, t.issue_type,
-      t.assignee, t.created_at, t.updated_at, t.closed_at,
+      t.assignee, t.command, t.agent_program, t.model,
+      t.schedule_cron, t.next_run_at, t.due_date,
+      t.created_at, t.updated_at, t.closed_at,
       COALESCE(
         (SELECT json_group_array(l.label) FROM labels l WHERE l.issue_id = t.id),
         '[]'
@@ -582,7 +644,9 @@ cmd_ready() {
   result="$(sql_json "
     SELECT
       t.id, t.title, t.description, t.status, t.priority, t.issue_type,
-      t.assignee, t.created_at, t.updated_at,
+      t.assignee, t.command, t.agent_program, t.model,
+      t.schedule_cron, t.next_run_at, t.due_date,
+      t.created_at, t.updated_at,
       COALESCE(
         (SELECT json_group_array(l.label) FROM labels l WHERE l.issue_id = t.id),
         '[]'
@@ -591,6 +655,7 @@ cmd_ready() {
       (SELECT COUNT(*) FROM dependencies d WHERE d.depends_on_id = t.id) as dependent_count
     FROM tasks t
     WHERE t.status = 'open'
+      AND t.schedule_cron IS NULL
       AND NOT EXISTS (
         SELECT 1 FROM dependencies d
         JOIN tasks blocker ON d.depends_on_id = blocker.id

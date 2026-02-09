@@ -8,6 +8,7 @@ export {
 	getTasks,
 	getTaskById,
 	getReadyTasks,
+	getScheduledTasks,
 	searchTasks,
 	// Writes
 	createTask,

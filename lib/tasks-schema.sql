@@ -10,6 +10,13 @@ CREATE TABLE IF NOT EXISTS tasks (
     priority INTEGER NOT NULL DEFAULT 2,
     issue_type TEXT NOT NULL DEFAULT 'task',
     assignee TEXT,
+    parent_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,
+    command TEXT DEFAULT '/jat:start',
+    agent_program TEXT,
+    model TEXT,
+    schedule_cron TEXT,
+    next_run_at TEXT,
+    due_date TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     closed_at TEXT,
@@ -48,3 +55,5 @@ CREATE INDEX IF NOT EXISTS idx_deps_issue ON dependencies(issue_id);
 CREATE INDEX IF NOT EXISTS idx_deps_depends ON dependencies(depends_on_id);
 CREATE INDEX IF NOT EXISTS idx_labels_label ON labels(label);
 CREATE INDEX IF NOT EXISTS idx_comments_issue ON comments(issue_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_next_run ON tasks(next_run_at);
+CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);

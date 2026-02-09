@@ -1,9 +1,15 @@
 {
   "name": "jat-scheduler",
-  "version": "1.0.0",
-  "description": "Scheduled actions daemon for JAT - executes commands on time/cron/delay triggers",
+  "version": "0.1.0",
   "type": "module",
+  "description": "JAT task scheduler daemon - polls task databases and spawns agents on schedule",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js --verbose"
+  },
   "dependencies": {
-    "better-sqlite3": "^11.10.0"
+    "better-sqlite3": "^11.0.0",
+    "cron-parser": "^4.9.0"
   }
 }

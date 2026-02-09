@@ -3,7 +3,7 @@
  * Provides task data to the IDE
  */
 import { json } from '@sveltejs/kit';
-import { getTasks, getProjects, getTaskById, createTask, updateTask } from '$lib/server/jat-tasks.js';
+import { getTasks, getProjects, getTaskById, createTask, updateTask, getScheduledTasks } from '$lib/server/jat-tasks.js';
 import { invalidateCache } from '$lib/server/cache.js';
 import { _resetTaskCache } from '../../api/agents/+server.js';
 import { getProjectPath } from '$lib/server/projectPaths.js';
@@ -14,18 +14,25 @@ export async function GET({ url }) {
 	const status = url.searchParams.get('status');
 	const priority = url.searchParams.get('priority');
 	const search = url.searchParams.get('search');
+	const scheduled = url.searchParams.get('scheduled');
 
 	// Pagination parameters
 	const limit = url.searchParams.get('limit');
 	const offset = url.searchParams.get('offset');
 	const cursor = url.searchParams.get('cursor'); // For cursor-based pagination (task ID)
 
-	const filters = {};
-	if (project) filters.project = project;
-	if (status) filters.status = status;
-	if (priority !== null) filters.priority = parseInt(priority);
+	// If ?scheduled=true, return only tasks with schedule_cron or next_run_at
+	let tasks;
+	if (scheduled === 'true') {
+		tasks = getScheduledTasks({ projectName: project || undefined });
+	} else {
+		const filters = {};
+		if (project) filters.project = project;
+		if (status) filters.status = status;
+		if (priority !== null) filters.priority = parseInt(priority);
 
-	let tasks = getTasks(filters);
+		tasks = getTasks(filters);
+	}
 	const projects = getProjects();
 
 	// Apply search filter if provided
@@ -216,6 +223,27 @@ export async function POST({ request }) {
 			notes = notes ? `${notes}\n${overrideTag}` : overrideTag;
 		}
 
+		// Build scheduling fields
+		const schedulingFields = {};
+		if (body.command && typeof body.command === 'string') {
+			schedulingFields.command = body.command.trim();
+		}
+		if (body.agent_program && typeof body.agent_program === 'string') {
+			schedulingFields.agent_program = body.agent_program.trim();
+		}
+		if (body.model && typeof body.model === 'string') {
+			schedulingFields.model = body.model.trim();
+		}
+		if (body.schedule_cron && typeof body.schedule_cron === 'string') {
+			schedulingFields.schedule_cron = body.schedule_cron.trim();
+		}
+		if (body.next_run_at && typeof body.next_run_at === 'string') {
+			schedulingFields.next_run_at = body.next_run_at.trim();
+		}
+		if (body.due_date && typeof body.due_date === 'string') {
+			schedulingFields.due_date = body.due_date.trim();
+		}
+
 		// Create the task directly
 		const createdTask = createTask({
 			projectPath,
@@ -226,7 +254,8 @@ export async function POST({ request }) {
 			labels,
 			deps,
 			assignee: null,
-			notes
+			notes,
+			...schedulingFields
 		});
 
 		// Invalidate caches so subsequent fetches get fresh data

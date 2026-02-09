@@ -1,192 +1,162 @@
+/**
+ * Database functions for jat-scheduler.
+ * Reads per-project .jat/tasks.db files to find due tasks.
+ */
+
 import Database from 'better-sqlite3';
-import { readFileSync, mkdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const DB_PATH = join(process.env.HOME, '.local/share/jat/scheduler.db');
-const SCHEMA_PATH = join(__dirname, '..', 'schema.sql');
-
-let db = null;
-
-export function getDb() {
-  if (db) return db;
-  mkdirSync(dirname(DB_PATH), { recursive: true });
-  db = new Database(DB_PATH);
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
-  const schema = readFileSync(SCHEMA_PATH, 'utf-8');
-  db.exec(schema);
-  return db;
-}
-
-export function closeDb() {
-  if (db) {
-    db.close();
-    db = null;
-  }
-}
+import { existsSync, readdirSync, statSync, readFileSync } from 'node:fs';
+import { join, basename } from 'node:path';
+import { homedir } from 'node:os';
 
 /**
- * Create a new scheduled action.
- * @param {object} action
- * @param {string} [action.task_id]
- * @param {string} [action.source_id]
- * @param {string} action.project
- * @param {string} action.command
- * @param {string} action.schedule_type - 'once' | 'delay' | 'time' | 'cron'
- * @param {string} action.schedule_value - ISO time, delay seconds, or cron expression
- * @param {string} action.next_run_at - ISO datetime for next execution
- * @returns {object} The created action with id
+ * Discover all projects with .jat/tasks.db.
+ * Checks both ~/code/ directories and projects.json config.
+ * @returns {Array<{name: string, path: string, dbPath: string}>}
  */
-export function create(action) {
-  const stmt = getDb().prepare(
-    `INSERT INTO scheduled_actions (task_id, source_id, project, command, schedule_type, schedule_value, next_run_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  );
-  const result = stmt.run(
-    action.task_id || null,
-    action.source_id || null,
-    action.project,
-    action.command,
-    action.schedule_type,
-    action.schedule_value,
-    action.next_run_at
-  );
-  return get(result.lastInsertRowid);
-}
+export function discoverProjects() {
+  const projects = new Map(); // name -> {path, dbPath}
 
-/**
- * Get a single action by ID.
- * @param {number} id
- * @returns {object|undefined}
- */
-export function get(id) {
-  return getDb().prepare('SELECT * FROM scheduled_actions WHERE id = ?').get(id);
-}
-
-/**
- * List actions with optional filters.
- * @param {object} [filters]
- * @param {string} [filters.status]
- * @param {string} [filters.project]
- * @param {number} [filters.limit=100]
- * @returns {object[]}
- */
-export function list(filters = {}) {
-  const conditions = [];
-  const params = [];
-
-  if (filters.status) {
-    conditions.push('status = ?');
-    params.push(filters.status);
-  }
-  if (filters.project) {
-    conditions.push('project = ?');
-    params.push(filters.project);
-  }
-
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-  const limit = filters.limit || 100;
-  params.push(limit);
-
-  return getDb().prepare(
-    `SELECT * FROM scheduled_actions ${where} ORDER BY next_run_at ASC LIMIT ?`
-  ).all(...params);
-}
-
-/**
- * Update fields on an existing action.
- * @param {number} id
- * @param {object} updates - Fields to update (schedule_value, next_run_at, status, error, etc.)
- * @returns {object|undefined} Updated action
- */
-export function update(id, updates) {
-  const allowed = ['task_id', 'source_id', 'project', 'command', 'schedule_type', 'schedule_value', 'next_run_at', 'last_run_at', 'status', 'error'];
-  const sets = [];
-  const params = [];
-
-  for (const key of allowed) {
-    if (key in updates) {
-      sets.push(`${key} = ?`);
-      params.push(updates[key]);
+  // 1. Scan ~/code/ for directories with .jat/tasks.db
+  const codeDir = join(homedir(), 'code');
+  if (existsSync(codeDir)) {
+    for (const entry of readdirSync(codeDir)) {
+      const projPath = join(codeDir, entry);
+      const dbPath = join(projPath, '.jat', 'tasks.db');
+      try {
+        if (statSync(projPath).isDirectory() && existsSync(dbPath)) {
+          projects.set(entry, { path: projPath, dbPath });
+        }
+      } catch { /* skip inaccessible */ }
     }
   }
 
-  if (sets.length === 0) return get(id);
+  // 2. Also check projects.json for custom paths
+  try {
+    const configPath = join(homedir(), '.config/jat/projects.json');
+    if (existsSync(configPath)) {
+      const config = JSON.parse(readFileSync(configPath, 'utf-8'));
+      for (const [key, proj] of Object.entries(config.projects || {})) {
+        if (proj.hidden) continue;
+        const projPath = (proj.path || '').replace(/^~/, homedir());
+        const dbPath = join(projPath, '.jat', 'tasks.db');
+        if (existsSync(dbPath) && !projects.has(key)) {
+          projects.set(key, { path: projPath, dbPath });
+        }
+      }
+    }
+  } catch { /* ignore config errors */ }
 
-  sets.push("updated_at = datetime('now')");
-  params.push(id);
-
-  getDb().prepare(
-    `UPDATE scheduled_actions SET ${sets.join(', ')} WHERE id = ?`
-  ).run(...params);
-
-  return get(id);
+  return Array.from(projects.entries()).map(([name, info]) => ({
+    name,
+    ...info,
+  }));
 }
 
 /**
- * Cancel an action (set status to 'cancelled').
- * @param {number} id
- * @returns {object|undefined}
+ * Get tasks that are due to run now.
+ * Finds tasks where next_run_at <= now AND status = 'open'.
+ * @param {string} dbPath - Path to .jat/tasks.db
+ * @returns {Array<object>}
  */
-export function cancel(id) {
-  return update(id, { status: 'cancelled' });
-}
-
-/**
- * Get all actions that are due to run (next_run_at <= now, status is 'pending' or 'active').
- * @returns {object[]}
- */
-export function getDue() {
-  return getDb().prepare(
-    `SELECT * FROM scheduled_actions
-     WHERE next_run_at <= datetime('now')
-       AND status IN ('pending', 'active')
-     ORDER BY next_run_at ASC`
-  ).all();
-}
-
-/**
- * Mark an action as completed after successful execution.
- * For 'once' and 'delay' types, sets status to 'completed'.
- * For 'cron' and 'time' types, updates last_run_at and keeps status 'active'.
- * @param {number} id
- * @param {string} [nextRunAt] - Next run time for recurring actions
- * @returns {object|undefined}
- */
-export function markComplete(id, nextRunAt) {
-  const action = get(id);
-  if (!action) return undefined;
-
-  if (nextRunAt) {
-    // Recurring: update last_run_at, set next run, keep active
-    return update(id, {
-      last_run_at: new Date().toISOString().replace('T', ' ').slice(0, 19),
-      next_run_at: nextRunAt,
-      status: 'active',
-      error: null
-    });
-  } else {
-    // One-shot: mark completed
-    return update(id, {
-      last_run_at: new Date().toISOString().replace('T', ' ').slice(0, 19),
-      status: 'completed',
-      error: null
-    });
+export function getDueTasks(dbPath) {
+  let db;
+  try {
+    db = new Database(dbPath, { readonly: true });
+    const now = new Date().toISOString();
+    const rows = db.prepare(`
+      SELECT id, title, description, status, priority, issue_type,
+             command, agent_program, model, schedule_cron, next_run_at
+      FROM tasks
+      WHERE next_run_at IS NOT NULL
+        AND next_run_at <= ?
+        AND status = 'open'
+      ORDER BY priority ASC, next_run_at ASC
+    `).all(now);
+    return rows;
+  } catch (err) {
+    console.error(`[scheduler] Error reading ${dbPath}: ${err.message}`);
+    return [];
+  } finally {
+    if (db) db.close();
   }
 }
 
 /**
- * Mark an action as failed with an error message.
- * @param {number} id
- * @param {string} error
- * @returns {object|undefined}
+ * Update next_run_at for a task.
+ * @param {string} dbPath
+ * @param {string} taskId
+ * @param {string|null} nextRunAt - ISO datetime or null to clear
  */
-export function markFailed(id, error) {
-  return update(id, {
-    last_run_at: new Date().toISOString().replace('T', ' ').slice(0, 19),
-    status: 'failed',
-    error
-  });
+export function updateNextRun(dbPath, taskId, nextRunAt) {
+  let db;
+  try {
+    db = new Database(dbPath);
+    db.prepare(`
+      UPDATE tasks SET next_run_at = ?, updated_at = ? WHERE id = ?
+    `).run(nextRunAt, new Date().toISOString(), taskId);
+  } finally {
+    if (db) db.close();
+  }
+}
+
+/**
+ * Generate a short random ID for child tasks.
+ * @returns {string} 5-character alphanumeric ID
+ */
+function genId() {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let id = '';
+  for (let i = 0; i < 5; i++) {
+    id += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return id;
+}
+
+/**
+ * Create a child instance task from a recurring parent.
+ * Inherits command, agent_program, model from parent.
+ * @param {string} dbPath
+ * @param {object} parent - Parent task object
+ * @returns {string} ID of the created child task
+ */
+export function createChildTask(dbPath, parent) {
+  let db;
+  try {
+    db = new Database(dbPath);
+
+    // Extract project prefix from parent ID (e.g., "jat" from "jat-abc")
+    const prefix = parent.id.split('-')[0];
+    const childId = `${prefix}-${genId()}`;
+    const now = new Date().toISOString();
+    const title = `${parent.title} (${new Date().toLocaleDateString()})`;
+
+    db.prepare(`
+      INSERT INTO tasks (id, title, description, status, priority, issue_type,
+                         command, agent_program, model, parent_id, created_at, updated_at)
+      VALUES (?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      childId,
+      title,
+      parent.description || '',
+      parent.priority,
+      parent.issue_type,
+      parent.command || '/jat:start',
+      parent.agent_program || null,
+      parent.model || null,
+      parent.id,
+      now,
+      now,
+    );
+
+    // Copy labels from parent
+    const labels = db.prepare('SELECT label FROM labels WHERE issue_id = ?').all(parent.id);
+    const insertLabel = db.prepare('INSERT INTO labels (issue_id, label) VALUES (?, ?)');
+    for (const { label } of labels) {
+      insertLabel.run(childId, label);
+    }
+
+    return childId;
+  } finally {
+    if (db) db.close();
+  }
 }
