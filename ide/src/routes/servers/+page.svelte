@@ -323,8 +323,9 @@
 
 	// Handle ServerStatusBadge actions
 	async function handleServerAction(projectName: string, actionId: string) {
-		// Use fallback session name if not in store yet (server-{projectName} is the naming convention)
-		const sessionName = getServerSessionName(projectName) || `server-${projectName}`;
+		// Use fallback session name if not in store yet
+		const fallbackSessionName = `server-${projectName}`;
+		const sessionName = getServerSessionName(projectName) || fallbackSessionName;
 
 		switch (actionId) {
 			case 'start':

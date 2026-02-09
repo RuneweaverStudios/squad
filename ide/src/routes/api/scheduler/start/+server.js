@@ -17,7 +17,7 @@ import { homedir } from 'os';
 
 const execAsync = promisify(exec);
 
-const SCHEDULER_SESSION = 'jat-scheduler';
+const SCHEDULER_SESSION = 'server-scheduler';
 
 /** @type {import('./$types').RequestHandler} */
 export async function POST() {

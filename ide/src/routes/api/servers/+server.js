@@ -215,6 +215,7 @@ function detectCommand(output) {
  */
 function generateDisplayName(projectName) {
 	if (projectName === 'ingest') return 'Integrations';
+	if (projectName === 'scheduler') return 'Scheduler';
 	const capitalized = projectName.charAt(0).toUpperCase() + projectName.slice(1);
 	return `${capitalized} Dev Server`;
 }

@@ -981,13 +981,13 @@ launch_project() {
 
     # Auto-start scheduler daemon if configured
     if jq -r '.defaults.scheduler_autostart // false' "$CONFIG_FILE" 2>/dev/null | grep -q true; then
-        if ! tmux has-session -t jat-scheduler 2>/dev/null; then
+        if ! tmux has-session -t server-scheduler 2>/dev/null; then
             local scheduler_dir="$JAT_SOURCE_DIR/tools/scheduler"
             if [[ -d "$scheduler_dir" ]]; then
                 echo -e "${DIM}  → Starting scheduler daemon...${NC}"
-                tmux new-session -d -s "jat-scheduler" -x 80 -y 40 -c "$scheduler_dir"
+                tmux new-session -d -s "server-scheduler" -x 80 -y 40 -c "$scheduler_dir"
                 sleep 0.3
-                tmux send-keys -t "jat-scheduler" "bash run.sh" Enter
+                tmux send-keys -t "server-scheduler" "bash run.sh" Enter
                 echo -e "${GREEN}  ✓ Scheduler daemon started${NC}"
             fi
         fi
@@ -2630,29 +2630,29 @@ scheduler_cmd() {
 
     case "$subcmd" in
         start)
-            if tmux has-session -t jat-scheduler 2>/dev/null; then
+            if tmux has-session -t server-scheduler 2>/dev/null; then
                 echo -e "${YELLOW}Scheduler is already running${NC}"
                 # Show status
                 scheduler_cmd status
                 return
             fi
             echo -e "${DIM}Starting scheduler daemon...${NC}"
-            tmux new-session -d -s "jat-scheduler" -x 80 -y 40 -c "$scheduler_dir"
+            tmux new-session -d -s "server-scheduler" -x 80 -y 40 -c "$scheduler_dir"
             sleep 0.3
-            tmux send-keys -t "jat-scheduler" "bash run.sh" Enter
-            echo -e "${GREEN}✓ Scheduler daemon started (tmux session: jat-scheduler)${NC}"
+            tmux send-keys -t "server-scheduler" "bash run.sh" Enter
+            echo -e "${GREEN}✓ Scheduler daemon started (tmux session: server-scheduler)${NC}"
             ;;
         stop)
-            if ! tmux has-session -t jat-scheduler 2>/dev/null; then
+            if ! tmux has-session -t server-scheduler 2>/dev/null; then
                 echo -e "${YELLOW}Scheduler is not running${NC}"
                 return
             fi
-            tmux kill-session -t jat-scheduler
+            tmux kill-session -t server-scheduler
             echo -e "${GREEN}✓ Scheduler daemon stopped${NC}"
             ;;
         status)
-            if tmux has-session -t jat-scheduler 2>/dev/null; then
-                echo -e "${GREEN}●${NC} Scheduler is ${GREEN}running${NC} (tmux session: jat-scheduler)"
+            if tmux has-session -t server-scheduler 2>/dev/null; then
+                echo -e "${GREEN}●${NC} Scheduler is ${GREEN}running${NC} (tmux session: server-scheduler)"
                 # Try to get status from HTTP API
                 local status
                 status=$(curl -s --connect-timeout 2 http://127.0.0.1:3334/status 2>/dev/null)
@@ -2686,12 +2686,12 @@ scheduler_cmd() {
             scheduler_cmd start
             ;;
         logs)
-            if ! tmux has-session -t jat-scheduler 2>/dev/null; then
+            if ! tmux has-session -t server-scheduler 2>/dev/null; then
                 echo -e "${YELLOW}Scheduler is not running${NC}"
                 return
             fi
             echo -e "${DIM}Attaching to scheduler logs (Ctrl+B D to detach)...${NC}"
-            tmux attach-session -t jat-scheduler
+            tmux attach-session -t server-scheduler
             ;;
         *)
             echo "Usage: jat scheduler <start|stop|status|restart|logs>"
@@ -2757,13 +2757,13 @@ main() {
 
         # Auto-start scheduler daemon if configured
         if jq -r '.defaults.scheduler_autostart // false' "$CONFIG_FILE" 2>/dev/null | grep -q true; then
-            if ! tmux has-session -t jat-scheduler 2>/dev/null; then
+            if ! tmux has-session -t server-scheduler 2>/dev/null; then
                 local scheduler_dir="$JAT_SOURCE_DIR/tools/scheduler"
                 if [[ -d "$scheduler_dir" ]]; then
                     echo -e "${DIM}  → Starting scheduler daemon...${NC}"
-                    tmux new-session -d -s "jat-scheduler" -x 80 -y 40 -c "$scheduler_dir"
+                    tmux new-session -d -s "server-scheduler" -x 80 -y 40 -c "$scheduler_dir"
                     sleep 0.3
-                    tmux send-keys -t "jat-scheduler" "bash run.sh" Enter
+                    tmux send-keys -t "server-scheduler" "bash run.sh" Enter
                     echo -e "${GREEN}  ✓ Scheduler daemon started${NC}"
                 fi
             fi

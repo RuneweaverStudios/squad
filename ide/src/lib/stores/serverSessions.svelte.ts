@@ -206,6 +206,20 @@ export async function fetch(lines: number = 50): Promise<void> {
  */
 export async function start(projectName: string, command?: string): Promise<ServerSession | null> {
 	try {
+		// Route scheduler through its own API
+		if (projectName === 'scheduler') {
+			const response = await globalThis.fetch('/api/scheduler/start', { method: 'POST' });
+			const data = await response.json();
+
+			if (!response.ok && response.status !== 409) {
+				throw new Error(data.message || 'Failed to start scheduler');
+			}
+
+			// Refresh to pick up the new session
+			await fetch();
+			return getSessionByProject('scheduler') || null;
+		}
+
 		const response = await globalThis.fetch('/api/servers/start', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -237,6 +251,17 @@ export async function start(projectName: string, command?: string): Promise<Serv
  */
 export async function stop(sessionName: string): Promise<boolean> {
 	try {
+		// Route scheduler through its own API
+		if (sessionName === 'server-scheduler') {
+			const response = await globalThis.fetch('/api/scheduler/stop', { method: 'POST' });
+			if (!response.ok && response.status !== 404) {
+				const data = await response.json();
+				throw new Error(data.message || 'Failed to stop scheduler');
+			}
+			state.sessions = state.sessions.filter((s) => s.sessionName !== sessionName);
+			return true;
+		}
+
 		const response = await globalThis.fetch(`/api/servers/${sessionName}`, {
 			method: 'DELETE'
 		});
@@ -262,6 +287,20 @@ export async function stop(sessionName: string): Promise<boolean> {
  */
 export async function restart(sessionName: string): Promise<boolean> {
 	try {
+		// Route scheduler through its own APIs (stop then start)
+		if (sessionName === 'server-scheduler') {
+			await globalThis.fetch('/api/scheduler/stop', { method: 'POST' });
+			// Brief pause for tmux cleanup
+			await new Promise((r) => setTimeout(r, 500));
+			const startRes = await globalThis.fetch('/api/scheduler/start', { method: 'POST' });
+			if (!startRes.ok && startRes.status !== 409) {
+				const data = await startRes.json();
+				throw new Error(data.message || 'Failed to restart scheduler');
+			}
+			await fetch();
+			return true;
+		}
+
 		const response = await globalThis.fetch(`/api/servers/${sessionName}/restart`, {
 			method: 'POST'
 		});
