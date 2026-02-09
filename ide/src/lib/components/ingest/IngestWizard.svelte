@@ -4,12 +4,12 @@
 	 *
 	 * Multi-step drawer wizard for configuring an ingest source.
 	 * Steps vary by source type:
-	 *   RSS:      URL -> Project -> Options -> [Filters] -> Review
-	 *   Slack:    Secret -> Channel -> Project -> Options -> [Filters] -> Review
-	 *   Telegram: Secret -> Chat ID -> Project -> Options -> [Filters] -> Review
-	 *   Gmail:    App Password -> Settings -> Project -> Options -> [Filters] -> Review
-	 *   Custom:   Command -> Project -> Options -> [Filters] -> Review
-	 *   Plugin:   Configuration -> Project -> Options -> [Filters] -> Review
+	 *   RSS:      URL -> Project -> Options -> Automation -> [Filters] -> Review
+	 *   Slack:    Secret -> Channel -> Project -> Options -> Automation -> [Filters] -> Review
+	 *   Telegram: Secret -> Chat ID -> Project -> Options -> Automation -> [Filters] -> Review
+	 *   Gmail:    App Password -> Settings -> Project -> Options -> Automation -> [Filters] -> Review
+	 *   Custom:   Command -> Project -> Options -> Automation -> [Filters] -> Review
+	 *   Plugin:   Configuration -> Project -> Options -> Automation -> [Filters] -> Review
 	 *
 	 * [Filters] step appears when plugin metadata includes itemFields.
 	 * Plugin Configuration step uses DynamicConfigForm for dynamic field rendering.
@@ -93,6 +93,13 @@
 	// Filter conditions
 	let filterConditions = $state<Array<{ field: string; operator: string; value: any }>>([]);
 
+	// Automation fields
+	let autoAction = $state<'none' | 'immediate' | 'schedule' | 'delay'>('none');
+	let autoCommand = $state('/jat:start');
+	let autoSchedule = $state('08:00');
+	let autoDelay = $state(0);
+	let autoDelayUnit = $state<'minutes' | 'hours'>('minutes');
+
 	// Token auth state (shared by Slack and Telegram)
 	let secretStatus = $state<'checking' | 'found' | 'missing' | 'saving' | 'error'>('checking');
 	let secretMasked = $state('');
@@ -108,7 +115,7 @@
 	// Whether itemFields are available (enables Filters step)
 	const hasItemFields = $derived(pluginMetadata?.itemFields && pluginMetadata.itemFields.length > 0);
 
-	// Steps per type - Filters step added when itemFields available
+	// Steps per type - Automation + Filters steps added after Options
 	const builtinStepConfigs = $derived.by(() => {
 		const base: Record<string, string[]> = {
 			rss: ['Feed URL', 'Project', 'Options'],
@@ -117,17 +124,18 @@
 			gmail: ['App Password', 'Gmail Settings', 'Project', 'Options'],
 			custom: ['Command', 'Project', 'Options']
 		};
-		// Add Filters step before Review when itemFields are available
+		// Add Automation, optional Filters, then Review
 		for (const key of Object.keys(base)) {
+			base[key].push('Automation');
 			if (hasItemFields) base[key].push('Filters');
 			base[key].push('Review');
 		}
 		return base;
 	});
 
-	// For plugins: Configuration -> Project -> Options -> [Filters] -> Review
+	// For plugins: Configuration -> Project -> Options -> Automation -> [Filters] -> Review
 	const pluginSteps = $derived.by(() => {
-		const steps = ['Configuration', 'Project', 'Options'];
+		const steps = ['Configuration', 'Project', 'Options', 'Automation'];
 		if (hasItemFields) steps.push('Filters');
 		steps.push('Review');
 		return steps;
@@ -300,6 +308,11 @@
 		gmailFilterSubject = '';
 		gmailMarkAsRead = false;
 		customCommand = '';
+		autoAction = 'none';
+		autoCommand = '/jat:start';
+		autoSchedule = '08:00';
+		autoDelay = 0;
+		autoDelayUnit = 'minutes';
 	}
 
 	function populateFromEdit(src: any) {
@@ -323,6 +336,15 @@
 		gmailFilterSubject = src.filterSubject || '';
 		gmailMarkAsRead = src.markAsRead || false;
 		customCommand = src.command || '';
+
+		// Populate automation fields from edit source
+		if (src.automation) {
+			autoAction = src.automation.action || 'none';
+			autoCommand = src.automation.command || '/jat:start';
+			autoSchedule = src.automation.schedule || '08:00';
+			autoDelay = src.automation.delay || 0;
+			autoDelayUnit = src.automation.delayUnit || 'minutes';
+		}
 
 		// Populate plugin fields from edit source.
 		// Use untrack to avoid reading the reactive proxy as a dependency inside $effect.
@@ -786,6 +808,21 @@
 			source = { ...base, command: customCommand.trim() };
 		}
 
+		// Add automation config if not 'none'
+		if (autoAction !== 'none') {
+			source.automation = {
+				action: autoAction,
+				command: autoCommand
+			};
+			if (autoAction === 'schedule') {
+				source.automation.schedule = autoSchedule;
+			}
+			if (autoAction === 'delay') {
+				source.automation.delay = autoDelay;
+				source.automation.delayUnit = autoDelayUnit;
+			}
+		}
+
 		// Add filter conditions if any
 		if (filterConditions.length > 0) {
 			source.filter = filterConditions;
@@ -921,6 +958,10 @@
 						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
 							{@render optionsStep()}
 						</div>
+					{:else if steps[step] === 'Automation'}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render automationStep()}
+						</div>
 					{:else if steps[step] === 'Filters'}
 						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
 							{@render filtersStep()}
@@ -1053,6 +1094,10 @@
 					{:else if step === 3}
 						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
 							{@render optionsStep()}
+						</div>
+					{:else if steps[step] === 'Automation'}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render automationStep()}
 						</div>
 					{:else if steps[step] === 'Filters'}
 						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
@@ -1199,6 +1244,10 @@
 						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
 							{@render optionsStep()}
 						</div>
+					{:else if steps[step] === 'Automation'}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render automationStep()}
+						</div>
 					{:else if steps[step] === 'Filters'}
 						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
 							{@render filtersStep()}
@@ -1314,6 +1363,10 @@
 						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
 							{@render optionsStep()}
 						</div>
+					{:else if steps[step] === 'Automation'}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render automationStep()}
+						</div>
 					{:else if steps[step] === 'Filters'}
 						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
 							{@render filtersStep()}
@@ -1349,6 +1402,10 @@
 					{:else if step === 2}
 						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
 							{@render optionsStep()}
+						</div>
+					{:else if steps[step] === 'Automation'}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render automationStep()}
 						</div>
 					{:else if steps[step] === 'Filters'}
 						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
@@ -1455,6 +1512,10 @@
 					{:else if step === 2}
 						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
 							{@render optionsStep()}
+						</div>
+					{:else if steps[step] === 'Automation'}
+						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
+							{@render automationStep()}
 						</div>
 					{:else if steps[step] === 'Filters'}
 						<div class="space-y-4" transition:fly={{ x: 30, duration: 150 }}>
@@ -1851,6 +1912,115 @@
 	</div>
 {/snippet}
 
+{#snippet automationStep()}
+	<div class="space-y-4">
+		<div>
+			<h3 class="font-mono text-xs font-semibold mb-1" style="color: oklch(0.70 0.02 250);">Post-Ingest Action</h3>
+			<p class="font-mono text-[10px] mb-3" style="color: oklch(0.45 0.02 250);">
+				What should happen after a task is created from this source?
+			</p>
+		</div>
+
+		<!-- Action selector - radio style cards -->
+		<div class="space-y-2">
+			<button
+				type="button"
+				class="w-full text-left px-3.5 py-2.5 rounded-lg font-mono text-xs transition-all duration-150 cursor-pointer"
+				style="background: {autoAction === 'none' ? 'oklch(0.22 0.04 200 / 0.4)' : 'oklch(0.18 0.01 250)'}; border: 1px solid {autoAction === 'none' ? 'oklch(0.45 0.10 200)' : 'oklch(0.25 0.02 250)'}; color: {autoAction === 'none' ? 'oklch(0.85 0.08 200)' : 'oklch(0.55 0.02 250)'};"
+				onclick={() => { autoAction = 'none'; }}
+			>
+				<span class="font-semibold">Create task only</span>
+				<span class="block text-[10px] mt-0.5" style="color: oklch(0.45 0.02 250);">Task is added to the backlog. No agent is summoned.</span>
+			</button>
+
+			<button
+				type="button"
+				class="w-full text-left px-3.5 py-2.5 rounded-lg font-mono text-xs transition-all duration-150 cursor-pointer"
+				style="background: {autoAction === 'immediate' ? 'oklch(0.22 0.04 145 / 0.4)' : 'oklch(0.18 0.01 250)'}; border: 1px solid {autoAction === 'immediate' ? 'oklch(0.45 0.10 145)' : 'oklch(0.25 0.02 250)'}; color: {autoAction === 'immediate' ? 'oklch(0.85 0.08 145)' : 'oklch(0.55 0.02 250)'};"
+				onclick={() => { autoAction = 'immediate'; }}
+			>
+				<span class="font-semibold">Spawn agent immediately</span>
+				<span class="block text-[10px] mt-0.5" style="color: oklch(0.45 0.02 250);">Create task and summon an agent to work on it right away.</span>
+			</button>
+
+			<button
+				type="button"
+				class="w-full text-left px-3.5 py-2.5 rounded-lg font-mono text-xs transition-all duration-150 cursor-pointer"
+				style="background: {autoAction === 'schedule' ? 'oklch(0.22 0.04 60 / 0.4)' : 'oklch(0.18 0.01 250)'}; border: 1px solid {autoAction === 'schedule' ? 'oklch(0.45 0.10 60)' : 'oklch(0.25 0.02 250)'}; color: {autoAction === 'schedule' ? 'oklch(0.85 0.08 60)' : 'oklch(0.55 0.02 250)'};"
+				onclick={() => { autoAction = 'schedule'; }}
+			>
+				<span class="font-semibold">Spawn agent on schedule</span>
+				<span class="block text-[10px] mt-0.5" style="color: oklch(0.45 0.02 250);">Create task, then summon an agent at a scheduled time (e.g. 8am).</span>
+			</button>
+
+			<button
+				type="button"
+				class="w-full text-left px-3.5 py-2.5 rounded-lg font-mono text-xs transition-all duration-150 cursor-pointer"
+				style="background: {autoAction === 'delay' ? 'oklch(0.22 0.04 280 / 0.4)' : 'oklch(0.18 0.01 250)'}; border: 1px solid {autoAction === 'delay' ? 'oklch(0.45 0.10 280)' : 'oklch(0.25 0.02 250)'}; color: {autoAction === 'delay' ? 'oklch(0.85 0.08 280)' : 'oklch(0.55 0.02 250)'};"
+				onclick={() => { autoAction = 'delay'; }}
+			>
+				<span class="font-semibold">Spawn agent after delay</span>
+				<span class="block text-[10px] mt-0.5" style="color: oklch(0.45 0.02 250);">Create task, then summon an agent after a set delay.</span>
+			</button>
+		</div>
+
+		<!-- Conditional options based on action -->
+		{#if autoAction !== 'none'}
+			<div
+				class="rounded-lg px-3.5 py-3 space-y-3"
+				style="background: oklch(0.16 0.01 250); border: 1px solid oklch(0.25 0.02 250);"
+			>
+				<div>
+					<label class="font-mono text-xs font-semibold block mb-1.5" style="color: oklch(0.65 0.02 250);">Command to run</label>
+					<select class="select select-bordered w-full font-mono text-sm" bind:value={autoCommand}>
+						<option value="/jat:start">/jat:start — Begin working on task</option>
+						<option value="/jat:verify">/jat:verify — Browser verification</option>
+					</select>
+					<p class="font-mono text-[10px] mt-1" style="color: oklch(0.45 0.02 250);">
+						The command the spawned agent will execute.
+					</p>
+				</div>
+
+				{#if autoAction === 'schedule'}
+					<div>
+						<label class="font-mono text-xs font-semibold block mb-1.5" style="color: oklch(0.65 0.02 250);">Run at time</label>
+						<input
+							type="time"
+							class="input input-bordered w-full font-mono text-sm"
+							bind:value={autoSchedule}
+						/>
+						<p class="font-mono text-[10px] mt-1" style="color: oklch(0.45 0.02 250);">
+							Agent will be summoned at this time each day (local timezone).
+						</p>
+					</div>
+				{/if}
+
+				{#if autoAction === 'delay'}
+					<div>
+						<label class="font-mono text-xs font-semibold block mb-1.5" style="color: oklch(0.65 0.02 250);">Delay</label>
+						<div class="flex gap-2">
+							<input
+								type="number"
+								class="input input-bordered flex-1 font-mono text-sm"
+								min="0"
+								max="1440"
+								bind:value={autoDelay}
+							/>
+							<select class="select select-bordered font-mono text-sm w-28" bind:value={autoDelayUnit}>
+								<option value="minutes">minutes</option>
+								<option value="hours">hours</option>
+							</select>
+						</div>
+						<p class="font-mono text-[10px] mt-1" style="color: oklch(0.45 0.02 250);">
+							How long to wait after task creation before spawning agent.
+						</p>
+					</div>
+				{/if}
+			</div>
+		{/if}
+	</div>
+{/snippet}
+
 {#snippet reviewStep()}
 	<div class="space-y-3">
 		<h3 class="font-mono text-xs font-semibold" style="color: oklch(0.70 0.02 250);">Review Configuration</h3>
@@ -1867,6 +2037,7 @@
 			{@render reviewRow('Priority', `P${taskPriority}`)}
 			{@render reviewRow('Labels', taskLabels || '(none)')}
 			{@render reviewRow('Enabled', enabled ? 'Yes' : 'No')}
+			{@render reviewRow('Automation', autoAction === 'none' ? 'Create task only' : autoAction === 'immediate' ? `Spawn agent → ${autoCommand}` : autoAction === 'schedule' ? `Spawn at ${autoSchedule} → ${autoCommand}` : `Spawn after ${autoDelay} ${autoDelayUnit} → ${autoCommand}`)}
 
 			{#if sourceType === 'rss'}
 				{@render reviewRow('Feed URL', feedUrl)}
