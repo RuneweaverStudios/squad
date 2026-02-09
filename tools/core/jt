@@ -62,9 +62,9 @@ sql_json() {
   fi
 }
 
-# Run a query, no output expected
+# Run a query, no output expected (always enables foreign keys)
 sql_exec() {
-  sqlite3 "$DB" "$1"
+  sqlite3 "$DB" "PRAGMA foreign_keys=ON; $1"
 }
 
 # Ensure DB exists
@@ -75,6 +75,11 @@ require_db() {
 # Escape single quotes for SQL
 sql_escape() {
   echo "${1//\'/\'\'}"
+}
+
+# Validate integer input (prevents SQL injection via numeric fields)
+require_integer() {
+  [[ "$1" =~ ^-?[0-9]+$ ]] || die "$2 must be an integer, got: $1"
 }
 
 # ---------------------------------------------------------------------------
@@ -91,7 +96,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     priority INTEGER NOT NULL DEFAULT 2,
     issue_type TEXT NOT NULL DEFAULT "task",
     assignee TEXT,
-    parent_id TEXT REFERENCES tasks(id),
+    parent_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     closed_at TEXT,
@@ -190,6 +195,7 @@ cmd_create() {
 
   [[ -n "$title" ]] || die "Usage: jt create \"title\" [--type X] [--priority N] [--description \"...\"] [--labels \"a,b\"] [--deps \"id1,id2\"] [--assignee \"X\"] [--parent EPIC_ID] [--json]"
 
+  require_integer "$priority" "--priority"
   local id="${explicit_id:-$(gen_id)}"
 
   # If --parent specified, generate hierarchical child ID and validate parent
@@ -215,13 +221,16 @@ cmd_create() {
   local esc_parent_id
   esc_parent_id="$(sql_escape "$parent_id")"
 
-  sql_exec "PRAGMA foreign_keys=ON;
+  local esc_type
+  esc_type="$(sql_escape "$type")"
+
+  sql_exec "
     INSERT INTO tasks (id, title, description, status, priority, issue_type, assignee, parent_id, created_at, updated_at)
-    VALUES ('$id', '$esc_title', '$esc_desc', 'open', $priority, '$type', $([ -n "$assignee" ] && echo "'$esc_assignee'" || echo "NULL"), $([ -n "$parent_id" ] && echo "'$esc_parent_id'" || echo "NULL"), '$ts', '$ts');"
+    VALUES ('$id', '$esc_title', '$esc_desc', 'open', $priority, '$esc_type', $([ -n "$assignee" ] && echo "'$esc_assignee'" || echo "NULL"), $([ -n "$parent_id" ] && echo "'$esc_parent_id'" || echo "NULL"), '$ts', '$ts');"
 
   # Auto-wire epic→child dependency: parent depends on child (child is READY, parent is BLOCKED)
   if [[ -n "$parent_id" ]]; then
-    sql_exec "PRAGMA foreign_keys=ON; INSERT OR IGNORE INTO dependencies (issue_id, depends_on_id, type) VALUES ('$(sql_escape "$parent_id")', '$id', 'blocks');"
+    sql_exec "INSERT OR IGNORE INTO dependencies (issue_id, depends_on_id, type) VALUES ('$(sql_escape "$parent_id")', '$id', 'blocks');"
   fi
 
   # Insert labels
@@ -238,7 +247,7 @@ cmd_create() {
     IFS=',' read -ra DEP_ARR <<< "$deps"
     for dep_id in "${DEP_ARR[@]}"; do
       dep_id="$(echo "$dep_id" | xargs)"
-      [[ -n "$dep_id" ]] && sql_exec "PRAGMA foreign_keys=ON; INSERT OR IGNORE INTO dependencies (issue_id, depends_on_id, type) VALUES ('$id', '$(sql_escape "$dep_id")', 'blocks');"
+      [[ -n "$dep_id" ]] && sql_exec "INSERT OR IGNORE INTO dependencies (issue_id, depends_on_id, type) VALUES ('$id', '$(sql_escape "$dep_id")', 'blocks');"
     done
   fi
 
@@ -253,7 +262,7 @@ cmd_create() {
 
 cmd_update() {
   require_db
-  local task_id="" json_out=false
+  local task_id="" json_out=false new_labels=""
   local -a sets=()
 
   # First positional arg is task_id
@@ -264,22 +273,13 @@ cmd_update() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --status)      sets+=("status = '$(sql_escape "$2")'"); shift 2 ;;
-      --priority)    sets+=("priority = $2"); shift 2 ;;
+      --priority)    require_integer "$2" "--priority"; sets+=("priority = $2"); shift 2 ;;
       --title)       sets+=("title = '$(sql_escape "$2")'"); shift 2 ;;
       --description) sets+=("description = '$(sql_escape "$2")'"); shift 2 ;;
       --notes)       sets+=("notes = '$(sql_escape "$2")'"); shift 2 ;;
       --type)        sets+=("issue_type = '$(sql_escape "$2")'"); shift 2 ;;
       --assignee)    sets+=("assignee = '$(sql_escape "$2")'"); shift 2 ;;
-      --labels)
-        # Replace all labels
-        sql_exec "DELETE FROM labels WHERE issue_id = '$(sql_escape "$task_id")';"
-        IFS=',' read -ra LABEL_ARR <<< "$2"
-        for lbl in "${LABEL_ARR[@]}"; do
-          lbl="$(echo "$lbl" | xargs)"
-          [[ -n "$lbl" ]] && sql_exec "INSERT INTO labels (issue_id, label) VALUES ('$(sql_escape "$task_id")', '$(sql_escape "$lbl")');"
-        done
-        shift 2
-        ;;
+      --labels)      new_labels="$2"; shift 2 ;;
       --json)        json_out=true; shift ;;
       *)             [[ -z "$task_id" ]] && task_id="$1"; shift ;;
     esac
@@ -291,6 +291,16 @@ cmd_update() {
   local exists
   exists="$(sql_json "SELECT id FROM tasks WHERE id = '$(sql_escape "$task_id")';" 2>/dev/null)"
   [[ "$exists" == "[]" || -z "$exists" ]] && die "Task not found: $task_id"
+
+  # Replace labels (deferred to after existence check)
+  if [[ -n "$new_labels" ]]; then
+    sql_exec "DELETE FROM labels WHERE issue_id = '$(sql_escape "$task_id")';"
+    IFS=',' read -ra LABEL_ARR <<< "$new_labels"
+    for lbl in "${LABEL_ARR[@]}"; do
+      lbl="$(echo "$lbl" | xargs)"
+      [[ -n "$lbl" ]] && sql_exec "INSERT INTO labels (issue_id, label) VALUES ('$(sql_escape "$task_id")', '$(sql_escape "$lbl")');"
+    done
+  fi
 
   if [[ ${#sets[@]} -gt 0 ]]; then
     local ts
@@ -508,7 +518,10 @@ cmd_list() {
   [[ -n "$status" ]] && where="$where AND status = '$(sql_escape "$status")'"
   [[ -n "$type" ]]   && where="$where AND issue_type = '$(sql_escape "$type")'"
   local limit_clause=""
-  [[ -n "$limit" ]] && limit_clause="LIMIT $limit"
+  if [[ -n "$limit" ]]; then
+    require_integer "$limit" "--limit"
+    limit_clause="LIMIT $limit"
+  fi
 
   local result
   result="$(sql_json "
@@ -559,7 +572,10 @@ cmd_ready() {
   done
 
   local limit_clause=""
-  [[ -n "$limit" ]] && limit_clause="LIMIT $limit"
+  if [[ -n "$limit" ]]; then
+    require_integer "$limit" "--limit"
+    limit_clause="LIMIT $limit"
+  fi
 
   # Ready = open + no open/in_progress dependencies
   local result
@@ -622,6 +638,13 @@ cmd_dep_add() {
 
   [[ "$task_id" == "$depends_on" ]] && die "A task cannot depend on itself"
 
+  # Verify both tasks exist
+  local t1_exists t2_exists
+  t1_exists="$(sql_json "SELECT id FROM tasks WHERE id = '$(sql_escape "$task_id")';")"
+  [[ "$t1_exists" == "[]" || -z "$t1_exists" ]] && die "Task not found: $task_id"
+  t2_exists="$(sql_json "SELECT id FROM tasks WHERE id = '$(sql_escape "$depends_on")';")"
+  [[ "$t2_exists" == "[]" || -z "$t2_exists" ]] && die "Task not found: $depends_on"
+
   # Cycle detection
   local would_cycle
   would_cycle="$(sql_json "
@@ -636,7 +659,7 @@ cmd_dep_add() {
 
   [[ "$would_cycle" != "[]" && -n "$would_cycle" ]] && die "Adding dependency would create a cycle: $task_id -> $depends_on"
 
-  sql_exec "PRAGMA foreign_keys=ON; INSERT OR IGNORE INTO dependencies (issue_id, depends_on_id, type) VALUES ('$(sql_escape "$task_id")', '$(sql_escape "$depends_on")', 'blocks');"
+  sql_exec "INSERT OR IGNORE INTO dependencies (issue_id, depends_on_id, type) VALUES ('$(sql_escape "$task_id")', '$(sql_escape "$depends_on")', 'blocks');"
   touch_sentinel
   echo "Added: $task_id depends on $depends_on"
 }
@@ -774,6 +797,7 @@ cmd_search() {
 
   [[ -n "$query" ]] || die "Usage: jt search \"query\" [--updated-after DATE] [--limit N] [--json]"
 
+  require_integer "$limit" "--limit"
   local esc_query
   esc_query="$(sql_escape "$query")"
   local where="(title LIKE '%${esc_query}%' OR description LIKE '%${esc_query}%')"
@@ -825,7 +849,8 @@ cmd_delete() {
   exists="$(sql_json "SELECT id FROM tasks WHERE id = '$(sql_escape "$task_id")';" 2>/dev/null)"
   [[ "$exists" == "[]" || -z "$exists" ]] && die "Task not found: $task_id"
 
-  sql_exec "PRAGMA foreign_keys=ON; DELETE FROM tasks WHERE id = '$(sql_escape "$task_id")';"
+  # Clear parent_id references before delete (handles existing DBs without ON DELETE SET NULL)
+  sql_exec "UPDATE tasks SET parent_id = NULL WHERE parent_id = '$(sql_escape "$task_id")'; DELETE FROM tasks WHERE id = '$(sql_escape "$task_id")';"
   touch_sentinel
   echo "Deleted $task_id"
 }
