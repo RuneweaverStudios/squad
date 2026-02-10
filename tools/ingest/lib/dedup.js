@@ -18,7 +18,21 @@ export function getDb() {
   db.pragma('foreign_keys = ON');
   const schema = readFileSync(SCHEMA_PATH, 'utf-8');
   db.exec(schema);
+  migrateOriginColumns(db);
   return db;
+}
+
+function migrateOriginColumns(database) {
+  const cols = database.pragma('table_info(ingested_items)').map(c => c.name);
+  if (!cols.includes('origin_adapter_type')) {
+    database.exec(`
+      ALTER TABLE ingested_items ADD COLUMN origin_adapter_type TEXT;
+      ALTER TABLE ingested_items ADD COLUMN origin_channel_id TEXT;
+      ALTER TABLE ingested_items ADD COLUMN origin_sender_id TEXT;
+      ALTER TABLE ingested_items ADD COLUMN origin_thread_id TEXT;
+      ALTER TABLE ingested_items ADD COLUMN origin_metadata TEXT;
+    `);
+  }
 }
 
 export function closeDb() {
@@ -35,11 +49,37 @@ export function isDuplicate(sourceId, itemId) {
   return !!row;
 }
 
-export function recordItem(sourceId, itemId, itemHash, taskId, title) {
+export function recordItem(sourceId, itemId, itemHash, taskId, title, origin) {
   getDb().prepare(
-    `INSERT OR IGNORE INTO ingested_items (source_id, item_id, item_hash, task_id, title)
-     VALUES (?, ?, ?, ?, ?)`
-  ).run(sourceId, itemId, itemHash, taskId, title);
+    `INSERT OR IGNORE INTO ingested_items
+     (source_id, item_id, item_hash, task_id, title,
+      origin_adapter_type, origin_channel_id, origin_sender_id, origin_thread_id, origin_metadata)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    sourceId, itemId, itemHash, taskId, title,
+    origin?.adapterType || null,
+    origin?.channelId || null,
+    origin?.senderId || null,
+    origin?.threadId || null,
+    origin?.metadata ? JSON.stringify(origin.metadata) : null
+  );
+}
+
+export function getOriginByTaskId(taskId) {
+  const row = getDb().prepare(
+    `SELECT source_id, origin_adapter_type, origin_channel_id, origin_sender_id,
+            origin_thread_id, origin_metadata
+     FROM ingested_items WHERE task_id = ?`
+  ).get(taskId);
+  if (!row || !row.origin_adapter_type) return null;
+  return {
+    sourceId: row.source_id,
+    adapterType: row.origin_adapter_type,
+    channelId: row.origin_channel_id,
+    senderId: row.origin_sender_id,
+    threadId: row.origin_thread_id,
+    metadata: row.origin_metadata ? JSON.parse(row.origin_metadata) : null
+  };
 }
 
 export function getAdapterState(sourceId) {

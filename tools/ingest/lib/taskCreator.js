@@ -21,7 +21,7 @@ export function createTask(source, item, downloadedAttachments = []) {
   const priority = String(defaults.priority ?? 2);
   const labels = defaults.labels || [];
 
-  const description = buildDescription(item, downloadedAttachments);
+  let description = buildDescription(item, downloadedAttachments);
 
   const args = [
     'create',
@@ -49,6 +49,18 @@ export function createTask(source, item, downloadedAttachments = []) {
     const match = output.match(/^Created\s+(\S+):/);
     const taskId = match ? match[1] : output;
 
+    // Replace TASK_ID placeholder in description with actual task ID
+    if (item.origin && taskId) {
+      const realDesc = description.replace('TASK_ID', taskId);
+      if (realDesc !== description) {
+        try {
+          execFileSync('jt', ['update', taskId, '--description', realDesc], {
+            encoding: 'utf-8', timeout: 15000, cwd: getProjectPath(source.project)
+          });
+        } catch { /* description update is secondary */ }
+      }
+    }
+
     logger.info(`created task ${taskId}: ${item.title.slice(0, 60)}`, source.id);
     return taskId;
   } catch (err) {
@@ -62,6 +74,13 @@ function buildDescription(item, attachments) {
 
   if (item.author) {
     parts.push(`From: ${item.author}`);
+  }
+
+  if (item.origin) {
+    const o = item.origin;
+    const channel = o.channelId ? ` channel ${o.channelId}` : '';
+    parts.push(`Origin: ${o.adapterType}${channel}`);
+    parts.push(`Reply: \`jat-signal reply '{"taskId":"TASK_ID","message":"...","replyType":"ack"}'\``);
   }
 
   if (item.description) {

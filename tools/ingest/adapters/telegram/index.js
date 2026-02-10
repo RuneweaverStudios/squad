@@ -140,6 +140,31 @@ export default class TelegramAdapter extends BaseAdapter {
     };
   }
 
+  get supportsSend() {
+    return true;
+  }
+
+  async send(target, message, getSecret) {
+    const token = getSecret(target._secretName || 'telegram');
+    const body = {
+      chat_id: target.channelId,
+      text: message.text
+    };
+    if (target.threadId) {
+      body.reply_parameters = { message_id: Number(target.threadId) };
+    }
+    const resp = await fetch(`${API_BASE}${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(15000)
+    });
+    if (!resp.ok) {
+      const text = await resp.text();
+      throw new Error(`telegram: send() failed ${resp.status}: ${text}`);
+    }
+  }
+
   async test(source, getSecret) {
     const validation = this.validate(source);
     if (!validation.valid) {
@@ -197,7 +222,14 @@ async function messageToItem(msg, token) {
     hash: null,
     author,
     timestamp: new Date(msg.date * 1000).toISOString(),
-    attachments
+    attachments,
+    origin: {
+      adapterType: 'telegram',
+      channelId: String(msg.chat.id),
+      senderId: msg.from?.id ? String(msg.from.id) : null,
+      threadId: String(msg.message_id),
+      metadata: { chatType: msg.chat.type || 'private' }
+    }
   };
 }
 
@@ -226,7 +258,14 @@ async function mediaGroupToItem(group, token) {
     hash: null,
     author: formatAuthor(firstMsg.from),
     timestamp: new Date(firstMsg.date * 1000).toISOString(),
-    attachments
+    attachments,
+    origin: {
+      adapterType: 'telegram',
+      channelId: String(firstMsg.chat.id),
+      senderId: firstMsg.from?.id ? String(firstMsg.from.id) : null,
+      threadId: String(firstMsg.message_id),
+      metadata: { chatType: firstMsg.chat.type || 'private' }
+    }
   };
 }
 

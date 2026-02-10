@@ -295,6 +295,38 @@ export default class SlackAdapter extends BaseAdapter {
     return results;
   }
 
+  get supportsSend() {
+    return true;
+  }
+
+  async send(target, message, getSecret) {
+    const token = getSecret(target._secretName || 'slack');
+    const body = {
+      channel: target.channelId,
+      text: message.text
+    };
+    if (target.threadId) {
+      body.thread_ts = target.threadId;
+    }
+    const resp = await fetch(`${API_BASE}/chat.postMessage`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(15000)
+    });
+    if (!resp.ok) {
+      const text = await resp.text();
+      throw new Error(`slack: send() failed ${resp.status}: ${text}`);
+    }
+    const data = await resp.json();
+    if (!data.ok) {
+      throw new Error(`slack: send() API error: ${data.error}`);
+    }
+  }
+
   async test(source, getSecret) {
     const validation = this.validate(source);
     if (!validation.valid) {
@@ -380,6 +412,13 @@ function messageToItem(msg, source) {
     hash: null,
     author: msg.user || null,
     timestamp: new Date(parseFloat(msg.ts) * 1000).toISOString(),
-    attachments
+    attachments,
+    origin: {
+      adapterType: 'slack',
+      channelId: source.channel,
+      senderId: msg.user || null,
+      threadId: msg.ts,
+      metadata: { hasThread: !!(msg.thread_ts && msg.reply_count > 0) }
+    }
   };
 }

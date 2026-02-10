@@ -5,6 +5,11 @@ CREATE TABLE IF NOT EXISTS ingested_items (
   item_hash TEXT,
   task_id TEXT,
   title TEXT,
+  origin_adapter_type TEXT,
+  origin_channel_id TEXT,
+  origin_sender_id TEXT,
+  origin_thread_id TEXT,
+  origin_metadata TEXT,
   ingested_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE(source_id, item_id)
 );
