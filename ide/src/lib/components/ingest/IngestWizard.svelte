@@ -26,7 +26,7 @@
 		open: boolean;
 		sourceType: string | null;
 		editSource?: any | null;
-		pluginMetadata?: { configFields?: any[]; itemFields?: any[]; defaultFilter?: any[]; name?: string; type?: string } | null;
+		pluginMetadata?: { configFields?: any[]; itemFields?: any[]; defaultFilter?: any[]; name?: string; type?: string; capabilities?: { realtime?: boolean; send?: boolean; threads?: boolean } } | null;
 		onClose: () => void;
 		onSave: (source: any) => void;
 	}
@@ -50,6 +50,7 @@
 	let taskType = $state('task');
 	let taskPriority = $state(2);
 	let taskLabels = $state('');
+	let connectionMode = $state<'polling' | 'realtime'>('polling');
 
 	// RSS fields
 	let feedUrl = $state('');
@@ -308,6 +309,7 @@
 		gmailFilterSubject = '';
 		gmailMarkAsRead = false;
 		customCommand = '';
+		connectionMode = 'polling';
 		autoAction = 'none';
 		autoCommand = '/jat:start';
 		autoSchedule = '08:00';
@@ -336,6 +338,7 @@
 		gmailFilterSubject = src.filterSubject || '';
 		gmailMarkAsRead = src.markAsRead || false;
 		customCommand = src.command || '';
+		connectionMode = src.connectionMode || 'polling';
 
 		// Populate automation fields from edit source
 		if (src.automation) {
@@ -746,7 +749,7 @@
 			.map((l) => l.trim())
 			.filter(Boolean);
 
-		const base = {
+		const base: any = {
 			id,
 			type: sourceType,
 			enabled,
@@ -758,6 +761,11 @@
 				labels
 			}
 		};
+
+		// Include connectionMode if adapter supports realtime
+		if (pluginMetadata?.capabilities?.realtime && connectionMode === 'realtime') {
+			base.connectionMode = 'realtime';
+		}
 
 		let source: any;
 		if (sourceType === 'rss') {
@@ -1866,6 +1874,32 @@
 {/snippet}
 
 {#snippet optionsStep()}
+	{#if pluginMetadata?.capabilities?.realtime}
+		<div>
+			<label class="font-mono text-xs font-semibold block mb-1.5" style="color: oklch(0.65 0.02 250);">Connection Mode</label>
+			<div class="space-y-2">
+				<button
+					type="button"
+					class="w-full text-left px-3.5 py-2.5 rounded-lg font-mono text-xs transition-all duration-150 cursor-pointer"
+					style="background: {connectionMode === 'polling' ? 'oklch(0.22 0.04 250 / 0.4)' : 'oklch(0.18 0.01 250)'}; border: 1px solid {connectionMode === 'polling' ? 'oklch(0.45 0.06 250)' : 'oklch(0.25 0.02 250)'}; color: {connectionMode === 'polling' ? 'oklch(0.85 0.04 250)' : 'oklch(0.55 0.02 250)'};"
+					onclick={() => { connectionMode = 'polling'; }}
+				>
+					<span class="font-semibold">Polling</span>
+					<span class="block text-[10px] mt-0.5" style="color: oklch(0.45 0.02 250);">Check for new messages every N seconds. Simple and reliable.</span>
+				</button>
+				<button
+					type="button"
+					class="w-full text-left px-3.5 py-2.5 rounded-lg font-mono text-xs transition-all duration-150 cursor-pointer"
+					style="background: {connectionMode === 'realtime' ? 'oklch(0.22 0.04 200 / 0.4)' : 'oklch(0.18 0.01 250)'}; border: 1px solid {connectionMode === 'realtime' ? 'oklch(0.45 0.10 200)' : 'oklch(0.25 0.02 250)'}; color: {connectionMode === 'realtime' ? 'oklch(0.85 0.08 200)' : 'oklch(0.55 0.02 250)'};"
+					onclick={() => { connectionMode = 'realtime'; }}
+				>
+					<span class="font-semibold">Realtime</span>
+					<span class="block text-[10px] mt-0.5" style="color: oklch(0.45 0.02 250);">Maintain live connection, receive messages instantly. Uses more resources.</span>
+				</button>
+			</div>
+		</div>
+	{/if}
+	{#if connectionMode !== 'realtime'}
 	<div>
 		<label class="font-mono text-xs font-semibold block mb-1.5" style="color: oklch(0.65 0.02 250);">Poll Interval (seconds)</label>
 		<input
@@ -1876,6 +1910,7 @@
 			bind:value={pollInterval}
 		/>
 	</div>
+	{/if}
 	<div>
 		<label class="font-mono text-xs font-semibold block mb-1.5" style="color: oklch(0.65 0.02 250);">Task Type</label>
 		<select class="select select-bordered w-full font-mono text-sm" bind:value={taskType}>
@@ -2032,7 +2067,12 @@
 			{@render reviewRow('Type', getSourceLabel(sourceType))}
 			{@render reviewRow('Source Name', sourceId || generateId())}
 			{@render reviewRow('Project', project)}
-			{@render reviewRow('Poll Interval', `${pollInterval}s`)}
+			{#if pluginMetadata?.capabilities?.realtime}
+				{@render reviewRow('Connection Mode', connectionMode === 'realtime' ? 'Realtime' : 'Polling')}
+			{/if}
+			{#if connectionMode !== 'realtime'}
+				{@render reviewRow('Poll Interval', `${pollInterval}s`)}
+			{/if}
 			{@render reviewRow('Task Type', taskType)}
 			{@render reviewRow('Priority', `P${taskPriority}`)}
 			{@render reviewRow('Labels', taskLabels || '(none)')}

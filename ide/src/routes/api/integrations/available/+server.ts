@@ -26,6 +26,12 @@ function getBuiltinDir(): string {
 /** User plugins directory */
 const USER_PLUGINS_DIR = join(homedir(), '.config', 'jat', 'ingest-plugins');
 
+interface PluginCapabilities {
+	realtime?: boolean;
+	send?: boolean;
+	threads?: boolean;
+}
+
 interface PluginInfo {
 	type: string;
 	name: string;
@@ -39,6 +45,7 @@ interface PluginInfo {
 	itemFields?: any[];
 	defaultFilter?: any[];
 	icon?: { svg: string; viewBox: string; fill?: boolean; color?: string };
+	capabilities?: PluginCapabilities;
 }
 
 /**
@@ -95,6 +102,19 @@ async function probePlugin(pluginPath: string, isBuiltin: boolean): Promise<Plug
 			};
 		}
 
+		// Build capabilities from metadata declaration and adapter class getters
+		let capabilities: PluginCapabilities = { ...(metadata.capabilities || {}) };
+		try {
+			const AdapterClass = mod.default;
+			if (typeof AdapterClass === 'function') {
+				const instance = new AdapterClass({});
+				if (instance.supportsRealtime && !capabilities.realtime) capabilities.realtime = true;
+				if (instance.supportsSend && !capabilities.send) capabilities.send = true;
+			}
+		} catch {
+			// Adapter instantiation may fail without config — that's fine, use metadata only
+		}
+
 		return {
 			type: metadata.type || dirName,
 			name: metadata.name || dirName,
@@ -106,7 +126,8 @@ async function probePlugin(pluginPath: string, isBuiltin: boolean): Promise<Plug
 			configFields: metadata.configFields,
 			itemFields: metadata.itemFields,
 			defaultFilter: metadata.defaultFilter,
-			icon: metadata.icon
+			icon: metadata.icon,
+			capabilities: Object.keys(capabilities).length > 0 ? capabilities : undefined
 		};
 	} catch (err: any) {
 		return {

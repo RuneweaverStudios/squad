@@ -296,7 +296,7 @@
 		// Look up plugin metadata for itemFields/defaultFilter (even for built-in types)
 		if (!pluginsFetched) await fetchPlugins();
 		const plugin = plugins.find(p => p.type === type);
-		wizardPluginMetadata = plugin ? { configFields: plugin.configFields, itemFields: plugin.itemFields, defaultFilter: plugin.defaultFilter, name: plugin.name, type: plugin.type } : null;
+		wizardPluginMetadata = plugin ? { configFields: plugin.configFields, itemFields: plugin.itemFields, defaultFilter: plugin.defaultFilter, name: plugin.name, type: plugin.type, capabilities: plugin.capabilities } : null;
 		editSource = null;
 		wizardOpen = true;
 	}
@@ -305,7 +305,7 @@
 		wizardType = pluginType;
 		// Find the plugin metadata to pass to the wizard
 		const plugin = plugins.find(p => p.type === pluginType);
-		wizardPluginMetadata = plugin ? { configFields: plugin.configFields, itemFields: plugin.itemFields, defaultFilter: plugin.defaultFilter, name: plugin.name, type: plugin.type } : null;
+		wizardPluginMetadata = plugin ? { configFields: plugin.configFields, itemFields: plugin.itemFields, defaultFilter: plugin.defaultFilter, name: plugin.name, type: plugin.type, capabilities: plugin.capabilities } : null;
 		editSource = null;
 		wizardOpen = true;
 	}
@@ -315,7 +315,7 @@
 		// Look up plugin metadata for itemFields/defaultFilter (all types, including built-in)
 		if (!pluginsFetched) await fetchPlugins();
 		const plugin = plugins.find(p => p.type === source.type);
-		wizardPluginMetadata = plugin ? { configFields: plugin.configFields, itemFields: plugin.itemFields, defaultFilter: plugin.defaultFilter, name: plugin.name, type: plugin.type } : null;
+		wizardPluginMetadata = plugin ? { configFields: plugin.configFields, itemFields: plugin.itemFields, defaultFilter: plugin.defaultFilter, name: plugin.name, type: plugin.type, capabilities: plugin.capabilities } : null;
 		editSource = source;
 		wizardOpen = true;
 	}
@@ -759,6 +759,21 @@
 													disabled
 												</span>
 											{/if}
+											{#if source.connectionMode === 'realtime'}
+												<span
+													class="font-mono text-[8px] px-1.5 py-0.5 rounded"
+													style="background: oklch(0.22 0.06 200); color: oklch(0.65 0.12 200);"
+												>
+													Realtime
+												</span>
+											{:else}
+												<span
+													class="font-mono text-[8px] px-1.5 py-0.5 rounded"
+													style="background: oklch(0.20 0.03 250); color: oklch(0.50 0.03 250);"
+												>
+													Polling
+												</span>
+											{/if}
 										</div>
 										<span class="font-mono text-[10px]" style="color: oklch(0.45 0.02 250);">
 											{source.project}
@@ -771,7 +786,11 @@
 											{:else if source.imapUser}
 												&middot; {source.imapUser}{source.folder ? ` / ${source.folder}` : ''}
 											{/if}
-											&middot; {source.pollInterval || 60}s
+											{#if source.connectionMode === 'realtime'}
+												&middot; realtime
+											{:else}
+												&middot; {source.pollInterval || 60}s
+											{/if}
 										</span>
 									</div>
 
@@ -1259,6 +1278,31 @@
 												style="background: oklch(0.22 0.06 280); color: oklch(0.60 0.10 280);"
 											>
 												plugin
+											</span>
+										{/if}
+									</div>
+									<!-- Capability badges -->
+									<div class="flex items-center gap-1 mt-1">
+										<span
+											class="font-mono text-[8px] px-1.5 py-0.5 rounded"
+											style="background: oklch(0.20 0.04 250); color: oklch(0.55 0.04 250);"
+										>
+											Polling
+										</span>
+										{#if plugin.capabilities?.realtime}
+											<span
+												class="font-mono text-[8px] px-1.5 py-0.5 rounded"
+												style="background: oklch(0.22 0.06 200); color: oklch(0.65 0.12 200);"
+											>
+												Realtime
+											</span>
+										{/if}
+										{#if plugin.capabilities?.send}
+											<span
+												class="font-mono text-[8px] px-1.5 py-0.5 rounded"
+												style="background: oklch(0.22 0.06 145); color: oklch(0.65 0.12 145);"
+											>
+												Two-Way
 											</span>
 										{/if}
 									</div>

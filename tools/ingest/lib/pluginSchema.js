@@ -66,6 +66,19 @@ export function validateMetadata(metadata) {
     });
   }
 
+  // capabilities (optional, object with boolean flags)
+  if (metadata.capabilities !== undefined) {
+    if (typeof metadata.capabilities !== 'object' || Array.isArray(metadata.capabilities)) {
+      errors.push('metadata.capabilities must be an object if provided');
+    } else {
+      for (const key of ['realtime', 'send', 'threads']) {
+        if (metadata.capabilities[key] !== undefined && typeof metadata.capabilities[key] !== 'boolean') {
+          errors.push(`metadata.capabilities.${key} must be a boolean if provided`);
+        }
+      }
+    }
+  }
+
   // defaultFilter (optional, array)
   if (metadata.defaultFilter !== undefined) {
     if (!Array.isArray(metadata.defaultFilter)) {

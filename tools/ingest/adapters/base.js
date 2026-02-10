@@ -42,6 +42,15 @@
  */
 
 /**
+ * Optional capability flags declared in plugin metadata.
+ *
+ * @typedef {Object} PluginCapabilities
+ * @property {boolean} [realtime] - Adapter supports persistent realtime connections
+ * @property {boolean} [send] - Adapter supports sending/replying (two-way)
+ * @property {boolean} [threads] - Adapter supports threaded conversations
+ */
+
+/**
  * Plugin metadata. Every plugin must export this as `metadata`.
  *
  * @typedef {Object} PluginMetadata
@@ -53,6 +62,7 @@
  * @property {ConfigField[]} configFields - Source-specific configuration fields
  * @property {ItemField[]} itemFields - Filterable fields on ingested items
  * @property {FilterCondition[]} [defaultFilter] - Default filter conditions
+ * @property {PluginCapabilities} [capabilities] - Optional capability flags (realtime, send, threads)
  */
 
 // ─── Item Types ─────────────────────────────────────────────────────────────
