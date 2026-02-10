@@ -223,6 +223,9 @@ async function messageToItem(msg, token) {
     author,
     timestamp: new Date(msg.date * 1000).toISOString(),
     attachments,
+    replyTo: msg.reply_to_message
+      ? `tg-${msg.reply_to_message.message_id}-${msg.chat.id}`
+      : undefined,
     origin: {
       adapterType: 'telegram',
       channelId: String(msg.chat.id),

@@ -11,6 +11,7 @@
  *   /servers  - Servers (project server sessions)
  *   /integrations - Integrations (external source configuration)
  *   /schedules - Schedules (scheduled task management, scheduler service controls)
+ *   /quick-commands - Commands (single-turn quick commands + templates)
  *   /config   - Config (JAT configuration, includes Projects tab)
  *   /history  - History (completed task history with streak calendar)
  *
@@ -92,6 +93,13 @@ export const unifiedNavConfig: UnifiedNavConfig = {
 			label: 'Schedules',
 			href: '/schedules',
 			icon: 'schedules',
+			category: 'main'
+		},
+		{
+			id: 'quick-commands',
+			label: 'Commands',
+			href: '/quick-commands',
+			icon: 'terminal',
 			category: 'main'
 		},
 		{

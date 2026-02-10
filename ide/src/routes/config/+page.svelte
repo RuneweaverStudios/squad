@@ -51,6 +51,7 @@
 	import CredentialsEditor from '$lib/components/config/CredentialsEditor.svelte';
 	import LlmProviderEditor from '$lib/components/config/LlmProviderEditor.svelte';
 	import AgentProgramsEditor from '$lib/components/config/AgentProgramsEditor.svelte';
+	import SkillsEditor from '$lib/components/config/SkillsEditor.svelte';
 	import type { SlashCommand, ProjectConfig, HooksConfig } from '$lib/types/config';
 	import { successToast, errorToast } from '$lib/stores/toasts.svelte';
 
@@ -103,7 +104,7 @@
 	let selectedTool = $state<ToolFile | null>(null);
 
 	// Valid tabs for URL sync
-	const validTabs = ['commands', 'tools', 'projects', 'swarm', 'defaults', 'credentials', 'llm', 'agents', 'mcp', 'hooks', 'claude', 'docs', 'templates', 'actions', 'shortcuts', 'commit'];
+	const validTabs = ['commands', 'tools', 'projects', 'swarm', 'defaults', 'credentials', 'llm', 'agents', 'mcp', 'hooks', 'claude', 'docs', 'templates', 'actions', 'shortcuts', 'commit', 'skills'];
 
 	// Sync activeTab from URL query parameter
 	$effect(() => {
@@ -613,6 +614,16 @@
 						transition:fade={{ duration: 150 }}
 					>
 						<CommitMessageSettingsEditor />
+					</div>
+				{:else if activeTab === 'skills'}
+					<!-- Skills Tab -->
+					<div
+						role="tabpanel"
+						id="skills-panel"
+						aria-labelledby="skills-tab"
+						transition:fade={{ duration: 150 }}
+					>
+						<SkillsEditor />
 					</div>
 				{/if}
 			</div>

@@ -465,6 +465,13 @@ function envelopeToItem(envelope) {
     .update(`${source}:${data.timestamp}:${text}`)
     .digest('hex');
 
+  // Detect reply (quoted message)
+  const quote = data.quote;
+  let replyTo;
+  if (quote?.id && quote?.author) {
+    replyTo = `signal-${quote.author}-${quote.id}`;
+  }
+
   return {
     id: idBase,
     title,
@@ -473,6 +480,7 @@ function envelopeToItem(envelope) {
     author: sourceName || source,
     timestamp,
     attachments,
+    replyTo,
     fields: {
       sender: source,
       senderName: sourceName,
@@ -480,6 +488,13 @@ function envelopeToItem(envelope) {
       groupName: isGroup ? groupName : '',
       hasAttachment: hasAttachments,
       messageType
+    },
+    origin: {
+      adapterType: 'signal',
+      channelId: isGroup ? groupId : null,
+      senderId: source,
+      threadId: data.timestamp ? String(data.timestamp) : null,
+      metadata: { isGroup }
     }
   };
 }

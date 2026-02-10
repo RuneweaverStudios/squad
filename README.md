@@ -270,6 +270,7 @@ Build your own adapter with the plugin system. See [PLUGINS.md](./tools/ingest/P
 | **Task scheduling** | Cron-based recurring tasks and one-shot scheduled spawns |
 | **Error recovery** | Automatic retry patterns for failures |
 | **PRD → Tasks** | `/jat:tasktree` converts requirements to structured tasks |
+| **Skill marketplace** | Install community skills, auto-synced to all agents |
 
 Full Monaco editor and git integration included—but the magic is in agent orchestration.
 
@@ -289,6 +290,7 @@ Full Monaco editor and git integration included—but the magic is in agent orch
 | **Auto-proceed rules** | ✅ | ❌ | ❌ | ❌ |
 | **Code editor** | ✅ Monaco | ✅ VS Code | ✅ VS Code | ❌ |
 | **Git integration** | ✅ | ✅ | ✅ | Partial |
+| **Skill marketplace** | ✅ Install & auto-sync | ❌ | ❌ | ❌ |
 | **Supabase integration** | ✅ Migrations | ❌ | ❌ | ❌ |
 | **100% local** | ✅ | ❌ Cloud | ❌ Cloud | ✅ |
 | **Open source** | ✅ MIT | ❌ | ❌ | ✅ |

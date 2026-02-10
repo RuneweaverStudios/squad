@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Skill agent syncing** - Skills installed via `jat-skills install` are automatically discovered by all agent programs. Claude Code gets symlinks in `~/.claude/commands/`, Pi gets directory symlinks in `~/.pi/agent/skills/`, and non-native agents (Codex, Gemini, OpenCode, Aider) receive skill info via prompt injection at spawn time. New `jat-skills sync` command for manual repair.
 - **Task scheduling fields** - Command dropdown (default `/jat:start`), agent/model selector, schedule section (one-shot/recurring/cron), and due date picker in TaskCreationDrawer
 - **Ingest feed system** - New `/ingest` page for managing RSS, Slack, and Telegram feed sources with guided setup wizard, poll history, manual poll trigger, last-polled timestamps, inline error indicators, and thread reply counts
 - **Ingest daemon** - Background Node.js service (`jat-ingest`) that polls configured feed sources on schedule, with adapter architecture for RSS/Slack/Telegram

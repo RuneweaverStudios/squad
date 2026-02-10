@@ -138,6 +138,13 @@ export function getAllSourceStats() {
   ).all();
 }
 
+export function findThreadByParentItemId(sourceId, parentItemId) {
+  return getDb().prepare(
+    `SELECT task_id, parent_item_id FROM thread_replies
+     WHERE source_id = ? AND parent_item_id = ? AND active = 1`
+  ).get(sourceId, parentItemId) || null;
+}
+
 export function registerThread(sourceId, parentItemId, parentTs, taskId) {
   getDb().prepare(
     `INSERT OR IGNORE INTO thread_replies (source_id, parent_item_id, parent_ts, task_id)

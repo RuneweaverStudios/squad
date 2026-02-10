@@ -212,7 +212,18 @@ When spawning an agent for a task:
 3. **Select Agent** - Use matched rule or fallback
 4. **Validate** - Check agent is enabled and auth is available
 5. **Build Command** - Construct spawn command from config
-6. **Create Session** - Start tmux session with agent
+6. **Inject Skills** - For non-native agents (Codex, Gemini, OpenCode, Aider), append enabled skill summaries to the bootstrap prompt
+7. **Create Session** - Start tmux session with agent
+
+**Skill Discovery by Agent Type:**
+
+| Agent | Discovery | How |
+|-------|-----------|-----|
+| Claude Code | Native commands | Symlinks in `~/.claude/commands/{name}.md` (auto-synced by `jat-skills`) |
+| Pi | Native skills | Directory symlinks in `~/.pi/agent/skills/{id}/` (auto-synced by `jat-skills`) |
+| Codex, Gemini, OpenCode, Aider | Prompt injection | Skill names and descriptions injected into bootstrap prompt at spawn time |
+
+Native agents (Claude Code, Pi) discover skills through their own file-based mechanisms. Non-native agents receive a compact summary block listing available skills so they can read the full `SKILL.md` when needed.
 
 **Spawn API Request:**
 ```json

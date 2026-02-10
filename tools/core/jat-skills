@@ -12,6 +12,7 @@
 #   jat-skills disable <name>        # Disable an installed skill
 #   jat-skills uninstall <name>      # Remove an installed skill
 #   jat-skills update <name>         # Re-fetch skill from source
+#   jat-skills sync                  # Sync agent links (Claude commands, Pi skills)
 #   jat-skills refresh               # Force refresh the catalog cache
 #   jat-skills sources               # Show configured sources and status
 #   jat-skills --help                # Show this help
@@ -67,6 +68,7 @@ INSTALL & MANAGE:
     jat-skills disable <name>         Disable an installed skill
     jat-skills uninstall <name>       Remove an installed skill
     jat-skills update <name>          Re-fetch skill from source
+    jat-skills sync                   Sync agent links (repair manually)
 
 OPTIONS:
     jat-skills --json                 Output as JSON (combine with other commands)
@@ -93,6 +95,11 @@ SKILL DIRECTORIES (searched by agents):
 INSTALLED SKILLS:
     Skills stored in ~/.config/jat/skills/{name}/SKILL.md
     Registry at ~/.config/jat/skills/installed.json
+
+AGENT LINKS (auto-synced on install/enable/disable/uninstall/update):
+    Claude Code  ~/.claude/commands/{name}.md  → SKILL.md symlink
+    Pi           ~/.pi/agent/skills/{id}/      → skill dir symlink
+    Other agents receive skill info via prompt at spawn time
 EOF
 }
 
@@ -412,6 +419,152 @@ remove_installed_entry() {
     local tmp
     tmp=$(mktemp)
     jq --arg id "$skill_id" 'del(.skills[$id])' "$INSTALLED_FILE" > "$tmp" && mv "$tmp" "$INSTALLED_FILE"
+}
+
+# --- Agent link syncing ---
+
+# Directories for agent-specific symlinks
+CLAUDE_COMMANDS_DIR="$HOME/.claude/commands"
+PI_SKILLS_DIR="$HOME/.pi/agent/skills"
+
+# Sync symlinks into Claude Code commands dir and Pi skills dir
+# based on which skills are currently enabled in installed.json
+sync_agent_links() {
+    ensure_installed
+    local installed
+    installed=$(get_installed)
+
+    # Build set of enabled skill IDs and their invocation names
+    local enabled_claude_links=()  # pairs: "name skill_id"
+    local enabled_pi_links=()     # skill_ids
+
+    local ids
+    ids=$(echo "$installed" | jq -r 'keys[]' 2>/dev/null)
+    for skill_id in $ids; do
+        local enabled
+        enabled=$(echo "$installed" | jq -r --arg id "$skill_id" 'if .[$id].enabled == false then "false" else "true" end')
+        if [[ "$enabled" != "true" ]]; then
+            continue
+        fi
+
+        # Get invocation name from frontmatter
+        local skill_md="$SKILLS_DIR/$skill_id/SKILL.md"
+        if [[ ! -f "$skill_md" ]]; then
+            continue
+        fi
+        local invocation_name
+        invocation_name=$(extract_frontmatter_field "$(cat "$skill_md")" "name")
+        if [[ -z "$invocation_name" ]]; then
+            invocation_name="$skill_id"
+        fi
+
+        enabled_claude_links+=("$invocation_name:$skill_id")
+        enabled_pi_links+=("$skill_id")
+    done
+
+    # --- Claude Code: symlink SKILL.md as ~/.claude/commands/{name}.md ---
+    if [[ -d "$CLAUDE_COMMANDS_DIR" ]] || mkdir -p "$CLAUDE_COMMANDS_DIR" 2>/dev/null; then
+        # Create/verify links for enabled skills
+        for pair in "${enabled_claude_links[@]}"; do
+            local name="${pair%%:*}"
+            local sid="${pair#*:}"
+            local target="$CLAUDE_COMMANDS_DIR/${name}.md"
+            local source="$SKILLS_DIR/$sid/SKILL.md"
+
+            if [[ -L "$target" ]]; then
+                # Already a symlink - check if it points into our skills dir
+                local link_target
+                link_target=$(readlink -f "$target" 2>/dev/null || true)
+                if [[ "$link_target" == "$source" ]]; then
+                    continue  # Already correct
+                fi
+                # Points somewhere else in our skills dir - update it
+                if [[ "$link_target" == "$SKILLS_DIR"/* ]]; then
+                    ln -sf "$source" "$target"
+                fi
+                # Points elsewhere entirely - skip (user's own command)
+            elif [[ -e "$target" ]]; then
+                # Regular file/dir exists - don't overwrite user's own command
+                continue
+            else
+                ln -s "$source" "$target"
+            fi
+        done
+
+        # Orphan cleanup: remove symlinks that point into jat-skills but aren't enabled
+        local enabled_names=()
+        for pair in "${enabled_claude_links[@]}"; do
+            enabled_names+=("${pair%%:*}")
+        done
+
+        for link in "$CLAUDE_COMMANDS_DIR"/*.md; do
+            [[ -e "$link" || -L "$link" ]] || continue
+            [[ -L "$link" ]] || continue
+
+            local link_target
+            link_target=$(readlink -f "$link" 2>/dev/null || true)
+            # Only remove if it points into our skills dir
+            [[ "$link_target" == "$SKILLS_DIR"/* ]] || continue
+
+            local link_name
+            link_name=$(basename "$link" .md)
+            local is_enabled=false
+            for en in "${enabled_names[@]}"; do
+                if [[ "$en" == "$link_name" ]]; then
+                    is_enabled=true
+                    break
+                fi
+            done
+            if [[ "$is_enabled" == "false" ]]; then
+                rm -f "$link"
+            fi
+        done
+    fi
+
+    # --- Pi: symlink skill directory as ~/.pi/agent/skills/{id}/ ---
+    if [[ -d "$PI_SKILLS_DIR" ]] || mkdir -p "$PI_SKILLS_DIR" 2>/dev/null; then
+        # Create/verify links for enabled skills
+        for sid in "${enabled_pi_links[@]}"; do
+            local target="$PI_SKILLS_DIR/$sid"
+            local source="$SKILLS_DIR/$sid"
+
+            if [[ -L "$target" ]]; then
+                local link_target
+                link_target=$(readlink -f "$target" 2>/dev/null || true)
+                if [[ "$link_target" == "$source" ]]; then
+                    continue  # Already correct
+                fi
+                if [[ "$link_target" == "$SKILLS_DIR"/* ]]; then
+                    ln -sfn "$source" "$target"
+                fi
+            elif [[ -e "$target" ]]; then
+                continue  # Don't overwrite user's own skill
+            else
+                ln -s "$source" "$target"
+            fi
+        done
+
+        # Orphan cleanup: remove symlinks that point into jat-skills but aren't enabled
+        for link in "$PI_SKILLS_DIR"/*/; do
+            [[ -L "${link%/}" ]] || continue
+            local link_target
+            link_target=$(readlink -f "${link%/}" 2>/dev/null || true)
+            [[ "$link_target" == "$SKILLS_DIR"/* ]] || continue
+
+            local link_name
+            link_name=$(basename "${link%/}")
+            local is_enabled=false
+            for en in "${enabled_pi_links[@]}"; do
+                if [[ "$en" == "$link_name" ]]; then
+                    is_enabled=true
+                    break
+                fi
+            done
+            if [[ "$is_enabled" == "false" ]]; then
+                rm -f "${link%/}"
+            fi
+        done
+    fi
 }
 
 # Validate SKILL.md content - checks for frontmatter with name and description
@@ -897,6 +1050,7 @@ cmd_install() {
         }')
 
     save_installed_entry "$RESOLVED_ID" "$entry"
+    sync_agent_links
 
     if [[ "$JSON_OUTPUT" == "true" ]]; then
         jq -n --arg id "$RESOLVED_ID" --argjson entry "$entry" '{id: $id} + $entry'
@@ -981,6 +1135,7 @@ cmd_enable() {
     local updated
     updated=$(echo "$existing" | jq --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.enabled = true | .updatedAt = $now')
     save_installed_entry "$skill_id" "$updated"
+    sync_agent_links
 
     echo -e "${GREEN}Enabled:${NC} ${BOLD}$skill_id${NC}"
 }
@@ -1009,6 +1164,7 @@ cmd_disable() {
     local updated
     updated=$(echo "$existing" | jq --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.enabled = false | .updatedAt = $now')
     save_installed_entry "$skill_id" "$updated"
+    sync_agent_links
 
     echo -e "${YELLOW}Disabled:${NC} ${BOLD}$skill_id${NC}"
 }
@@ -1035,6 +1191,7 @@ cmd_uninstall() {
 
     # Remove from registry
     remove_installed_entry "$skill_id"
+    sync_agent_links
 
     if [[ "$JSON_OUTPUT" == "true" ]]; then
         jq -n --arg id "$skill_id" '{"id": $id, "uninstalled": true}'
@@ -1107,6 +1264,7 @@ cmd_update_skill() {
     local updated
     updated=$(echo "$existing" | jq --arg now "$now" --arg ver "$skill_version" '.updatedAt = $now | .version = $ver')
     save_installed_entry "$skill_id" "$updated"
+    sync_agent_links
 
     if [[ "$JSON_OUTPUT" == "true" ]]; then
         jq -n --arg id "$skill_id" --arg version "$skill_version" --arg updatedAt "$now" \
@@ -1171,6 +1329,10 @@ case "${1:-}" in
             # Bare 'update' with no arg → refresh cache (backward compat)
             cmd_refresh
         fi
+        ;;
+    sync)
+        sync_agent_links
+        echo -e "${GREEN}Agent links synced.${NC}"
         ;;
     refresh)
         cmd_refresh

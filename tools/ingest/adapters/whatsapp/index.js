@@ -314,6 +314,13 @@ export default class WhatsAppAdapter extends BaseAdapter {
 
     const hashInput = `${msg.key.id}${jid}${text.slice(0, 200)}`;
 
+    // Detect reply-to (quoted message)
+    const contextInfo = msgContent.extendedTextMessage?.contextInfo
+      || msgContent.imageMessage?.contextInfo
+      || msgContent.videoMessage?.contextInfo
+      || msgContent.documentMessage?.contextInfo;
+    const stanzaId = contextInfo?.stanzaId;
+
     return {
       id: `wa-${msg.key.id}`,
       title,
@@ -322,6 +329,7 @@ export default class WhatsAppAdapter extends BaseAdapter {
       author: senderName,
       timestamp,
       attachments,
+      replyTo: stanzaId ? `wa-${stanzaId}` : undefined,
       fields: {
         sender: sender.split('@')[0],
         senderName,
@@ -329,6 +337,13 @@ export default class WhatsAppAdapter extends BaseAdapter {
         groupName: isGroup ? (await this._getGroupName(jid)) : '',
         hasMedia: attachments.length > 0 || ['image', 'video', 'document', 'audio', 'sticker'].includes(messageType),
         messageType
+      },
+      origin: {
+        adapterType: 'whatsapp',
+        channelId: jid,
+        senderId: sender,
+        threadId: msg.key.id,
+        metadata: { isGroup }
       }
     };
   }

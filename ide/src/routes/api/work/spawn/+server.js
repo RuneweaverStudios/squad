@@ -23,7 +23,7 @@
 import { json } from '@sveltejs/kit';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import { homedir } from 'os';
 import Database from 'better-sqlite3';
@@ -117,6 +117,38 @@ function resolveProjectInput(value) {
 function shellEscape(str) {
 	if (!str) return "''";
 	return "'" + str.replace(/'/g, "'\\''") + "'";
+}
+
+/**
+ * Get a compact summary of enabled skills from jat-skills installed.json.
+ * Used to inject skill awareness into non-native agent prompts (Codex, Gemini, etc.)
+ * @returns {string} Multi-line text block listing available skills, or empty string
+ */
+function getEnabledSkillsSummary() {
+	const skillsDir = `${homedir()}/.config/jat/skills`;
+	const installedFile = `${skillsDir}/installed.json`;
+
+	if (!existsSync(installedFile)) return '';
+
+	try {
+		const data = JSON.parse(readFileSync(installedFile, 'utf-8'));
+		const skills = data.skills || {};
+		const lines = [];
+
+		for (const [id, entry] of Object.entries(skills)) {
+			if (/** @type {any} */ (entry).enabled === false) continue;
+			const e = /** @type {{ name?: string, description?: string }} */ (entry);
+			const name = e.name || id;
+			const desc = e.description || '';
+			lines.push(`- ${name}: ${desc}`);
+		}
+
+		if (lines.length === 0) return '';
+
+		return `Available skills (in ~/.config/jat/skills/):\n${lines.join('\n')}\nRead each skill's SKILL.md for full usage instructions.`;
+	} catch {
+		return '';
+	}
 }
 
 /**
@@ -519,6 +551,12 @@ function buildAgentCommand({ agent, model, projectPath, jatDefaults, agentName, 
 			promptParts.push('Read the CLAUDE.md file in the project root for JAT workflow instructions.');
 			promptParts.push('Start by understanding the task and implementing it.');
 
+			// Inject installed skills for non-native agents
+			const skillsSummary = getEnabledSkillsSummary();
+			if (skillsSummary) {
+				promptParts.push(skillsSummary);
+			}
+
 			const prompt = promptParts.join(' ');
 			// Escape double quotes for shell argument
 			const escapedPrompt = prompt.replace(/"/g, '\\"');
@@ -538,6 +576,12 @@ function buildAgentCommand({ agent, model, projectPath, jatDefaults, agentName, 
 			}
 			promptParts.push('Read the CLAUDE.md file in the project root for JAT workflow instructions.');
 			promptParts.push('Start by understanding the task and implementing it.');
+
+			// Inject installed skills for non-native agents
+			const skillsSummary = getEnabledSkillsSummary();
+			if (skillsSummary) {
+				promptParts.push(skillsSummary);
+			}
 
 			const prompt = promptParts.join(' ');
 			// Escape single quotes in prompt

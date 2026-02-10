@@ -10,6 +10,9 @@
 
 import { json } from '@sveltejs/kit';
 import { spawn } from 'child_process';
+import { readFile } from 'fs/promises';
+import { existsSync } from 'fs';
+import { join, normalize, relative } from 'path';
 import { getProjectPath } from '$lib/server/projectPaths.js';
 
 /**
@@ -27,6 +30,62 @@ function substituteVariables(prompt, variables) {
 		result = result.replace(new RegExp(`(?<!\\{)\\{${key}\\}(?!\\})`, 'g'), value);
 	}
 	return result;
+}
+
+// Resolve file references (e.g. @readme.md, @src/lib/utils.ts) in prompt.
+// Matches @path where path looks like a file (contains a dot or slash).
+// Files are injected as XML blocks with path attribute.
+/** @param {string} prompt */
+/** @param {string} projectPath */
+async function resolveFileReferences(prompt, projectPath) {
+	// Match @path patterns where path looks like a file path
+	// Requires at least one dot or slash to distinguish from plain words/emails
+	// Won't match emails because emails have @ followed by domain (no dot before the @-word ends)
+	const FILE_REF_PATTERN = /@([\w\-\.\/]+\.[\w\-\.\/]+)/g;
+	const files = [];
+	const errors = [];
+
+	// Collect all matches first
+	const matches = [];
+	let match;
+	while ((match = FILE_REF_PATTERN.exec(prompt)) !== null) {
+		matches.push({ full: match[0], path: match[1], index: match.index });
+	}
+
+	if (matches.length === 0) {
+		return { resolved: prompt, files, errors };
+	}
+
+	let resolved = prompt;
+	// Process in reverse order to preserve string indices
+	for (let i = matches.length - 1; i >= 0; i--) {
+		const m = matches[i];
+		const filePath = join(projectPath, m.path);
+		const normalizedPath = normalize(filePath);
+
+		// Security: ensure path stays within project
+		const rel = relative(projectPath, normalizedPath);
+		if (rel.startsWith('..') || rel.includes('..')) {
+			errors.push(`${m.path}: path traversal not allowed`);
+			continue;
+		}
+
+		if (!existsSync(normalizedPath)) {
+			errors.push(`${m.path}: file not found`);
+			continue;
+		}
+
+		try {
+			const content = await readFile(normalizedPath, 'utf-8');
+			const replacement = `<file path="${m.path}">\n${content}\n</file>`;
+			resolved = resolved.slice(0, m.index) + replacement + resolved.slice(m.index + m.full.length);
+			files.push({ path: m.path, size: content.length });
+		} catch (err) {
+			errors.push(`${m.path}: ${err.message}`);
+		}
+	}
+
+	return { resolved, files, errors };
 }
 
 /**
@@ -144,7 +203,22 @@ export async function POST({ request }) {
 		}
 
 		// Substitute variables in prompt
-		const resolvedPrompt = substituteVariables(prompt, variables);
+		let resolvedPrompt = substituteVariables(prompt, variables);
+
+		// Resolve @file references (inject file contents into prompt)
+		const fileResult = await resolveFileReferences(resolvedPrompt, projectInfo.path);
+		resolvedPrompt = fileResult.resolved;
+
+		if (fileResult.errors.length > 0) {
+			console.warn('[quick-command] File resolution warnings:', fileResult.errors);
+		}
+
+		if (fileResult.files.length > 0) {
+			console.log(
+				`[quick-command] Resolved ${fileResult.files.length} file(s):`,
+				fileResult.files.map((f) => f.path)
+			);
+		}
 
 		// Resolve model name
 		const resolvedModel = resolveModel(model);
@@ -171,7 +245,9 @@ export async function POST({ request }) {
 			result,
 			model: resolvedModel,
 			durationMs,
-			timestamp: new Date().toISOString()
+			timestamp: new Date().toISOString(),
+			resolvedFiles: fileResult.files,
+			fileErrors: fileResult.errors
 		});
 	} catch (error) {
 		const durationMs = Date.now() - startTime;

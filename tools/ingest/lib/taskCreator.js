@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { findThreadByParentItemId, updateThreadCursor } from './dedup.js';
 import * as logger from './logger.js';
 
 // Resolve jat root from this file's location (tools/ingest/lib/ → jat/)
@@ -166,6 +167,42 @@ export function appendToTask(taskId, replies, project) {
     logger.error(`jt update failed for ${taskId}: ${err.message}`);
     return false;
   }
+}
+
+/**
+ * Check if an item is a reply to a tracked thread and append it if so.
+ * Returns { handled: true, taskId } if the reply was routed, { handled: false } otherwise.
+ *
+ * @param {Object} source - Source config
+ * @param {Object} item - Ingested item (must have replyTo set)
+ * @param {Array} downloaded - Downloaded attachments
+ * @returns {{ handled: boolean, taskId?: string }}
+ */
+export function handleThreadReply(source, item, downloaded = []) {
+  if (!item.replyTo) return { handled: false };
+
+  const thread = findThreadByParentItemId(source.id, item.replyTo);
+  if (!thread) return { handled: false };
+
+  const taskId = thread.task_id;
+  const reply = {
+    text: item.description || item.title,
+    author: item.author || 'unknown',
+    timestamp: item.timestamp || new Date().toISOString(),
+    downloaded
+  };
+
+  const ok = appendToTask(taskId, [reply], source.project);
+  if (ok) {
+    updateThreadCursor(source.id, thread.parent_item_id, item.timestamp || new Date().toISOString());
+  }
+
+  if (taskId && downloaded.length > 0) {
+    registerTaskAttachments(taskId, downloaded, source.project);
+  }
+
+  logger.info(`Routed reply to thread → task ${taskId}`, source.id);
+  return { handled: true, taskId };
 }
 
 /**

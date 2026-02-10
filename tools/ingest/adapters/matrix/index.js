@@ -314,12 +314,22 @@ function eventToItem(event, roomId, roomName, hs, source) {
       hash: null,
       author: event.sender,
       timestamp: new Date(event.origin_server_ts).toISOString(),
+      replyTo: event.content?.['m.relates_to']?.['m.in_reply_to']?.event_id
+        ? `matrix-${event.content['m.relates_to']['m.in_reply_to'].event_id}`
+        : undefined,
       fields: {
         sender: event.sender,
         roomName,
         roomId,
         isEncrypted: true,
         hasMedia: false
+      },
+      origin: {
+        adapterType: 'matrix',
+        channelId: roomId,
+        senderId: event.sender,
+        threadId: event.event_id,
+        metadata: { homeserver: hs }
       }
     };
   }
@@ -354,12 +364,22 @@ function eventToItem(event, roomId, roomName, hs, source) {
     author: event.sender,
     timestamp: new Date(event.origin_server_ts).toISOString(),
     attachments,
+    replyTo: content['m.relates_to']?.['m.in_reply_to']?.event_id
+      ? `matrix-${content['m.relates_to']['m.in_reply_to'].event_id}`
+      : undefined,
     fields: {
       sender: event.sender,
       roomName,
       roomId,
       isEncrypted: false,
       hasMedia
+    },
+    origin: {
+      adapterType: 'matrix',
+      channelId: roomId,
+      senderId: event.sender,
+      threadId: event.event_id,
+      metadata: { homeserver: hs }
     }
   };
 }

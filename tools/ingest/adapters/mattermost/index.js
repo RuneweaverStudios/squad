@@ -298,11 +298,19 @@ export default class MattermostAdapter extends BaseAdapter {
       author: sender,
       timestamp: new Date(post.create_at).toISOString(),
       attachments,
+      replyTo: post.root_id ? `mattermost-${post.root_id}` : undefined,
       fields: {
         sender,
         channelName,
         hasFiles: attachments.length > 0,
         messageType: classifyMessageType(post.type)
+      },
+      origin: {
+        adapterType: 'mattermost',
+        channelId: post.channel_id,
+        senderId: post.user_id,
+        threadId: post.root_id || post.id,
+        metadata: { serverUrl }
       },
       // Internal tracking (stripped before returning from poll)
       _createAt: post.create_at

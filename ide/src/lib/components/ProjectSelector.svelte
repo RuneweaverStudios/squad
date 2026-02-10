@@ -43,12 +43,8 @@
 	}
 
 	let selectedColor = $derived(
-		selectedProject && selectedProject !== "All Projects"
-			? getColor(selectedProject)
-			: '#6b7280'
+		selectedProject ? getColor(selectedProject) : '#6b7280'
 	);
-
-	let isAllProjects = $derived(selectedProject === "All Projects");
 
 	function handleSelect(project: string) {
 		onProjectChange(project);
@@ -57,10 +53,6 @@
 
 	// Format project option with task count if available
 	function formatProjectOption(project: string): string {
-		if (project === "All Projects") {
-			return "All Projects";
-		}
-
 		if (taskCounts && taskCounts.has(project)) {
 			const count = taskCounts.get(project);
 			return `${project} (${count})`;
@@ -96,13 +88,10 @@
 		type="button"
 		class="trigger-chip"
 		class:compact
-		class:neutral={isAllProjects}
 		style="--project-color: {selectedColor};"
 		onclick={() => open = !open}
 	>
-		{#if !isAllProjects}
-			<span class="chip-dot"></span>
-		{/if}
+		<span class="chip-dot"></span>
 		<span class="chip-label">{formatProjectOption(selectedProject)}</span>
 		<svg class="chevron" class:open viewBox="0 0 16 16" fill="currentColor">
 			<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
@@ -112,7 +101,7 @@
 	{#if open}
 		<div class="dropdown-menu">
 			{#each projects as project}
-				{@const projColor = project !== "All Projects" ? getColor(project) : '#6b7280'}
+				{@const projColor = getColor(project)}
 				<button
 					type="button"
 					class="dropdown-item"

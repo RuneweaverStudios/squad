@@ -87,9 +87,24 @@ jat-skills enable <name>          # Enable an installed skill
 jat-skills disable <name>         # Disable an installed skill
 jat-skills uninstall <name>       # Remove an installed skill
 jat-skills update <name>          # Re-fetch from source
+jat-skills sync                   # Manually sync agent links
 
 jat-skills --json            # JSON output (combine with any command)
 ```
+
+**Agent link syncing:**
+
+When you install, enable, disable, uninstall, or update a skill, `jat-skills` automatically syncs agent links so all supported agent programs can discover the skill:
+
+| Agent | Discovery Method | Link Location |
+|-------|-----------------|---------------|
+| Claude Code | Symlink to SKILL.md | `~/.claude/commands/{name}.md` |
+| Pi | Directory symlink | `~/.pi/agent/skills/{id}/` |
+| Codex, Gemini, OpenCode, Aider | Prompt injection at spawn | Skill summary injected into bootstrap prompt |
+
+- Orphan symlinks (from uninstalled/disabled skills) are cleaned up automatically
+- Existing user commands/skills are never overwritten (conflict safety)
+- Run `jat-skills sync` to manually repair links if needed
 
 ---
 

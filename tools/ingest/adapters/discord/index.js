@@ -409,12 +409,22 @@ function messageToItem(msg, channelName) {
     author: authorName,
     timestamp: msg.timestamp,
     attachments,
+    replyTo: msg.message_reference?.message_id
+      ? `discord-${msg.message_reference.message_id}`
+      : undefined,
     fields: {
       author: authorName,
       channelName,
       hasAttachments: attachments.length > 0,
       isThread: false,
       messageType: isReply ? 'reply' : 'default'
+    },
+    origin: {
+      adapterType: 'discord',
+      channelId: msg.channel_id,
+      senderId: msg.author?.id || null,
+      threadId: msg.id,
+      metadata: { guildId: msg.guild_id || null }
     },
     // Internal tracking (stripped before returning from poll)
     _discordMessageId: msg.id,

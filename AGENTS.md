@@ -206,6 +206,13 @@ All tools are bash commands in `~/.local/bin/`. Every tool has `--help`.
 | `db-schema` | Show table structure |
 | `jat-secret` | Retrieve secrets |
 
+### Skills
+| Tool | Purpose |
+|------|---------|
+| `jat-skills` | Browse, install, and manage skills from the catalog |
+
+Skills installed via `jat-skills install` are automatically synced to your agent program. Claude Code gets them as commands in `~/.claude/commands/`, Pi gets them in `~/.pi/agent/skills/`, and other agents receive skill summaries via prompt injection at spawn.
+
 ## Commit Messages
 
 Use the task type as prefix:

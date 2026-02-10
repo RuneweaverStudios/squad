@@ -87,6 +87,7 @@
  * @property {string} timestamp - ISO 8601 timestamp
  * @property {Attachment[]} [attachments] - Attached media
  * @property {Record<string, string|number|boolean>} [fields] - Plugin-declared filterable fields
+ * @property {string} [replyTo] - Parent item ID if this message is a platform-native reply
  */
 
 /**

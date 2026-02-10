@@ -299,6 +299,13 @@ export default class LineAdapter extends BaseAdapter {
         isGroup,
         groupName,
         messageType
+      },
+      origin: {
+        adapterType: 'line',
+        channelId: isGroup ? (source.groupId || source.roomId) : senderId,
+        senderId,
+        threadId: msg.id,
+        metadata: { sourceType: source.type || 'user' }
       }
     };
   }

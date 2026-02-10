@@ -1,6 +1,6 @@
 import { isDuplicate, recordItem, getAdapterState, setAdapterState, registerThread } from './dedup.js';
 import { downloadAttachments } from './downloader.js';
-import { createTask, appendToTask, registerTaskAttachments, applyAutomation } from './taskCreator.js';
+import { createTask, appendToTask, registerTaskAttachments, applyAutomation, handleThreadReply } from './taskCreator.js';
 import { applyFilter, resolveFilter } from './filterEngine.js';
 import * as logger from './logger.js';
 
@@ -260,6 +260,14 @@ export class ConnectionManager {
       return;
     }
 
+    // Check if this is a reply to a tracked thread
+    const threadResult = handleThreadReply(source, item, downloaded);
+    if (threadResult.handled) {
+      recordItem(source.id, item.id, item.hash, threadResult.taskId, item.title, item.origin);
+      logger.info(`Realtime reply → task ${threadResult.taskId}: ${item.title.slice(0, 60)}`, source.id);
+      return;
+    }
+
     // Create task (immediate, no debounce)
     const taskId = createTask(source, item, downloaded);
 
@@ -276,13 +284,9 @@ export class ConnectionManager {
       applyAutomation(taskId, source);
     }
 
-    // Register thread for adapters that support replies
+    // Register thread for reply tracking
     if (taskId && source.trackReplies !== false) {
-      const prefix = `${source.type}-`;
-      if (item.id.startsWith(prefix)) {
-        const threadKey = item.id.slice(prefix.length);
-        registerThread(source.id, item.id, threadKey, taskId);
-      }
+      registerThread(source.id, item.id, item.origin?.threadId || item.id, taskId);
     }
 
     logger.info(`Realtime → task ${taskId}: ${item.title.slice(0, 60)}`, source.id);

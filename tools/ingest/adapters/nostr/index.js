@@ -368,6 +368,15 @@ function eventToItem(event) {
     description = eTag ? `Repost of event ${eTag[1]}` : 'Repost';
   }
 
+  // NIP-10: detect reply via 'e' tag with 'reply' marker (or last 'e' tag as fallback)
+  let replyTo;
+  const eTags = event.tags.filter(t => t[0] === 'e');
+  const replyTag = eTags.find(t => t[3] === 'reply');
+  const parentEventId = replyTag ? replyTag[1] : (eTags.length > 0 ? eTags[eTags.length - 1][1] : null);
+  if (parentEventId) {
+    replyTo = `nostr-${parentEventId}`;
+  }
+
   const hash = createHash('sha256')
     .update(`nostr-${event.id}`)
     .digest('hex')
@@ -381,11 +390,19 @@ function eventToItem(event) {
     author: authorName,
     timestamp: new Date(event.created_at * 1000).toISOString(),
     attachments: attachments.length > 0 ? attachments : undefined,
+    replyTo,
     fields: {
       author: authorName,
       authorPubkey: event.pubkey,
       kind: kindLabel,
       hasMedia
+    },
+    origin: {
+      adapterType: 'nostr',
+      channelId: null,
+      senderId: event.pubkey,
+      threadId: event.id,
+      metadata: null
     }
   };
 }

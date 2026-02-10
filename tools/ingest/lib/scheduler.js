@@ -1,7 +1,7 @@
 import { getEnabledSources, getConfig, getSecret } from './config.js';
 import { isDuplicate, recordItem, getAdapterState, setAdapterState, logPoll, registerThread, getActiveThreads, updateThreadCursor } from './dedup.js';
 import { downloadAttachments } from './downloader.js';
-import { createTask, appendToTask, registerTaskAttachments, applyAutomation } from './taskCreator.js';
+import { createTask, appendToTask, registerTaskAttachments, applyAutomation, handleThreadReply } from './taskCreator.js';
 import { discoverPlugins } from './pluginLoader.js';
 import { applyFilter, resolveFilter } from './filterEngine.js';
 import { ConnectionManager } from './connectionManager.js';
@@ -217,6 +217,13 @@ async function pollSource(source) {
         const key = getBufferKey(source.id, item);
         messageBuffer.add(key, { item, downloaded, source }, debounceMs);
       } else {
+        // Check if this is a reply to a tracked thread
+        const threadResult = handleThreadReply(source, item, downloaded);
+        if (threadResult.handled) {
+          recordItem(source.id, item.id, item.hash, threadResult.taskId, item.title, item.origin);
+          continue;
+        }
+
         // Immediate task creation (default behavior)
         const taskId = createTask(source, item, downloaded);
 
@@ -233,14 +240,9 @@ async function pollSource(source) {
           applyAutomation(taskId, source);
         }
 
-        // Register thread for adapters that support replies
+        // Register thread for reply tracking
         if (taskId && source.trackReplies !== false) {
-          // Extract thread key from item ID (e.g. "slack-1234.5678" → "1234.5678")
-          const prefix = `${source.type}-`;
-          if (item.id.startsWith(prefix)) {
-            const threadKey = item.id.slice(prefix.length);
-            registerThread(source.id, item.id, threadKey, taskId);
-          }
+          registerThread(source.id, item.id, item.origin?.threadId || item.id, taskId);
         }
       }
     }
@@ -489,12 +491,41 @@ function handleBufferFlush(key, entries) {
     };
   }
 
-  const allDownloaded = entries.flatMap(e => e.downloaded || []);
+  let allDownloaded = entries.flatMap(e => e.downloaded || []);
 
   if (dryRun) {
     logger.info(`[dry-run] would batch ${entries.length} → ${mergedItem.title.slice(0, 80)}`, source.id);
     return;
   }
+
+  // Check if any entry is a reply to a tracked thread
+  for (const entry of entries) {
+    const threadResult = handleThreadReply(source, entry.item, entry.downloaded || []);
+    if (threadResult.handled) {
+      recordItem(source.id, entry.item.id, entry.item.hash, threadResult.taskId, entry.item.title, entry.item.origin);
+      // Remove handled entries from the batch
+      const idx = entries.indexOf(entry);
+      entries.splice(idx, 1);
+    }
+  }
+
+  // If all entries were replies, nothing left to create
+  if (entries.length === 0) return;
+
+  // Rebuild merged item if entries changed
+  const finalFirst = entries[0].item;
+  if (entries.length === 1) {
+    mergedItem = finalFirst;
+  } else {
+    const descriptions = entries.map(e => e.item.description).filter(Boolean);
+    mergedItem = {
+      ...finalFirst,
+      title: `${finalFirst.title} (+${entries.length - 1} more)`,
+      description: descriptions.join('\n---\n'),
+      attachments: entries.flatMap(e => e.item.attachments || []),
+    };
+  }
+  allDownloaded = entries.flatMap(e => e.downloaded || []);
 
   // Create single task for the batch
   const taskId = createTask(source, mergedItem, allDownloaded);
@@ -516,12 +547,8 @@ function handleBufferFlush(key, entries) {
 
   // Register threads for all original items
   if (taskId && source.trackReplies !== false) {
-    const prefix = `${source.type}-`;
     for (const entry of entries) {
-      if (entry.item.id.startsWith(prefix)) {
-        const threadKey = entry.item.id.slice(prefix.length);
-        registerThread(source.id, entry.item.id, threadKey, taskId);
-      }
+      registerThread(source.id, entry.item.id, entry.item.origin?.threadId || entry.item.id, taskId);
     }
   }
 
