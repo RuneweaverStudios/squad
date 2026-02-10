@@ -1,12 +1,18 @@
 #!/bin/bash
 #
-# jat-skills - Skill catalog fetcher for the OpenClaw/Pi ecosystem
+# jat-skills - Skill catalog, installer, and local management
 #
 # Usage:
-#   jat-skills search <query>       # Search skills by keyword
-#   jat-skills list-available        # List all available skills
+#   jat-skills search <query>       # Search catalog by keyword
+#   jat-skills list-available        # List all catalog skills
 #   jat-skills info <skill-id>       # Show details of a specific skill
-#   jat-skills refresh               # Force refresh the cache
+#   jat-skills install <name-or-url> # Install a skill locally
+#   jat-skills list                  # List installed skills
+#   jat-skills enable <name>         # Enable an installed skill
+#   jat-skills disable <name>        # Disable an installed skill
+#   jat-skills uninstall <name>      # Remove an installed skill
+#   jat-skills update <name>         # Re-fetch skill from source
+#   jat-skills refresh               # Force refresh the catalog cache
 #   jat-skills sources               # Show configured sources and status
 #   jat-skills --help                # Show this help
 #
@@ -15,7 +21,9 @@
 #   2. GitHub search: repos with openclaw-skill / pi-skill topics
 #   3. ClawHub CLI (if installed)
 #
-# Cache: ~/.config/jat/cache/skills-catalog.json (24h TTL)
+# Installed skills: ~/.config/jat/skills/{name}/SKILL.md
+# Registry:         ~/.config/jat/skills/installed.json
+# Cache:            ~/.config/jat/cache/skills-catalog.json (24h TTL)
 #
 
 set -euo pipefail
@@ -25,6 +33,8 @@ CATALOG_FILE="$HOME/.config/jat/skill-catalog.json"
 CACHE_DIR="$HOME/.config/jat/cache"
 CACHE_FILE="$CACHE_DIR/skills-catalog.json"
 CACHE_TTL=86400  # 24 hours in seconds
+SKILLS_DIR="$HOME/.config/jat/skills"
+INSTALLED_FILE="$SKILLS_DIR/installed.json"
 # Resolve through symlinks to find the real script location
 REAL_SCRIPT="$(readlink -f "${BASH_SOURCE[0]}")"
 DEFAULT_CATALOG="$(cd "$(dirname "$REAL_SCRIPT")/../scripts" && pwd)/skill-catalog-default.json"
@@ -41,37 +51,48 @@ NC='\033[0m'
 
 show_help() {
     cat << 'EOF'
-jat-skills - Skill catalog fetcher (OpenClaw/Pi ecosystem)
+jat-skills - Skill catalog, installer, and local management
 
-USAGE:
-    jat-skills search <query>       Search skills by keyword
-    jat-skills list-available        List all available skills
-    jat-skills info <skill-id>       Show skill details
-    jat-skills refresh               Force refresh the cache
-    jat-skills sources               Show source status
-    jat-skills --json                Output as JSON (combine with other commands)
-    jat-skills --help                Show this help
+CATALOG:
+    jat-skills search <query>        Search catalog by keyword
+    jat-skills list-available         List all catalog skills
+    jat-skills info <skill-id>        Show skill details
+    jat-skills refresh                Force refresh the catalog cache
+    jat-skills sources                Show source status
+
+INSTALL & MANAGE:
+    jat-skills install <name-or-url>  Install a skill locally
+    jat-skills list                   List installed skills
+    jat-skills enable <name>          Enable an installed skill
+    jat-skills disable <name>         Disable an installed skill
+    jat-skills uninstall <name>       Remove an installed skill
+    jat-skills update <name>          Re-fetch skill from source
+
+OPTIONS:
+    jat-skills --json                 Output as JSON (combine with other commands)
+    jat-skills --help                 Show this help
 
 EXAMPLES:
-    jat-skills search github         # Find GitHub-related skills
-    jat-skills search "file manager" # Search by description
-    jat-skills list-available --json # Machine-readable output
-    jat-skills info git-commit       # Show details for a skill
-    jat-skills refresh               # Force re-fetch from all sources
+    jat-skills search github          # Find GitHub-related skills
+    jat-skills install git-commit     # Install from catalog by name
+    jat-skills install https://github.com/user/repo  # Install from URL
+    jat-skills list                   # Show installed + status
+    jat-skills disable git-commit     # Disable without removing
+    jat-skills update git-commit      # Re-fetch latest SKILL.md
 
-SOURCES (checked in priority order):
-    1. Curated catalog  ~/.config/jat/skill-catalog.json
-    2. GitHub API       Repos with openclaw-skill / pi-skill topics
-    3. ClawHub CLI      If 'clawhub' is installed
+INSTALL SOURCES:
+    - Catalog name     Looks up skillMdUrl from catalog
+    - GitHub repo URL  Fetches SKILL.md from repo root or subdirectory
+    - Raw URL          Fetches SKILL.md directly
 
-CACHE:
-    Results cached for 24h at ~/.config/jat/cache/skills-catalog.json
-    Use 'jat-skills refresh' to force update.
+SKILL DIRECTORIES (searched by agents):
+    1. Project-level   {project}/skills/
+    2. User-level      ~/.config/jat/skills/
+    3. JAT built-in    ~/code/jat/skills/
 
-SKILL FORMAT:
-    Each skill entry contains:
-      id, name, description, author, version, repoUrl,
-      skillMdUrl, tags, installCount, compatible
+INSTALLED SKILLS:
+    Skills stored in ~/.config/jat/skills/{name}/SKILL.md
+    Registry at ~/.config/jat/skills/installed.json
 EOF
 }
 
@@ -92,6 +113,7 @@ info() {
 ensure_dirs() {
     mkdir -p "$CACHE_DIR"
     mkdir -p "$(dirname "$CATALOG_FILE")"
+    mkdir -p "$SKILLS_DIR"
 }
 
 # Initialize curated catalog if it doesn't exist
