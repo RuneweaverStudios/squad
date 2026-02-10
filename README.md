@@ -13,11 +13,11 @@
 ╚───────────────────────────────────────────╝
 ```
 
-# JAT — The World's First Agentic IDE
+# JAT — Autonomous Agents, Supervised or Not
 
-**Agents ship, suggest, repeat. You supervise.**
+**Agents ship, suggest, repeat. You supervise — or they run on their own.**
 
-JAT is the complete, self-contained environment for agentic development. Task management, agent orchestration, code editor, git integration, terminal access—all unified in a single IDE. No plugins to install, no services to configure, no pieces to assemble. Just describe what you want and supervise the swarm.
+JAT is the complete, self-contained environment for agentic development. Task management, agent orchestration, code editor, git integration, terminal access—all unified in a single IDE. Connect RSS, Slack, Telegram, Gmail — events create tasks and spawn agents automatically. No plugins to install, no services to configure, no pieces to assemble. Supervise the swarm hands-on, or let it run autonomously while you sleep.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![Agents](https://img.shields.io/badge/Agents-20+-green)
@@ -35,12 +35,13 @@ JAT is the complete, self-contained environment for agentic development. Task ma
 ## The Paradigm Shift
 
 ```
-Traditional IDE:     You write code, tools assist
-Copilot IDE:         You write code, AI suggests completions
-Agentic IDE:         Agents write code, you supervise and approve
+Traditional IDE:       You write code, tools assist
+Copilot IDE:           You write code, AI suggests completions
+Agentic IDE:           Agents write code, you supervise and approve
+Autonomous Platform:   Events trigger agents, work ships while you sleep
 ```
 
-JAT is purpose-built for the third paradigm. Manage 20+ agents simultaneously while you review, guide, and approve.
+JAT supports all four. Manage 20+ agents hands-on, or connect external sources and let agents spawn themselves.
 
 ---
 
@@ -198,35 +199,47 @@ Full commit history and repository management:
 
 ---
 
-## Task Scheduling
+## Integrations & Autonomous Triggers
 
-JAT includes a built-in scheduler daemon that automatically spawns agents for due tasks — both recurring (cron-based) and one-shot scheduled tasks.
+JAT connects to external sources. When events arrive, tasks are created and agents spawn — no human in the loop required.
 
-```bash
-# Start the scheduler
-jat scheduler start
+### Built-in Integrations
 
-# Check status
-jat scheduler status
+| Integration | Source | Example |
+|-------------|--------|---------|
+| **Telegram** | Chat messages | DM your bot a request, agent acts instantly |
+| **Slack** | Channel messages | Team requests from #support spawn agents |
+| **RSS** | Any RSS/Atom feed | Monitor blogs, CI feeds, Hacker News |
+| **Gmail** | Email inbox | Forward client emails, agent processes them |
+| **Custom** | Plugin system | Any API or data source ([PLUGINS.md](./tools/ingest/PLUGINS.md)) |
 
-# Stop
-jat scheduler stop
+### Trigger Modes
+
+| Mode | When Agent Spawns | Use Case |
+|------|-------------------|----------|
+| **Immediate** | Instantly on event | Telegram: message JAT, agent starts now |
+| **Delay** | After N min/hours | Batch morning emails, start after lunch |
+| **Schedule** | At a specific time | "Process feed items at 9 AM" |
+| **Cron** | Recurring schedule | "Every weekday at 9 AM, review PRs" |
+
+### Example: Telegram to Shipped Code
+
+```
+1. You message your Telegram bot: "Add dark mode to the settings page"
+2. JAT ingest daemon receives the message
+3. Task created: "Add dark mode to the settings page" (P1, immediate trigger)
+4. Agent spawns automatically, picks up the task
+5. Agent writes code, commits, opens PR
+6. You wake up to a completed PR
 ```
 
-**Recurring tasks** use cron expressions. The scheduler creates child instance tasks on each firing and spawns agents automatically:
+### Task Scheduler
 
-```
-Parent: "Daily Code Review" (schedule_cron: "0 9 * * *")
-  ├─ Child: "Daily Code Review (2/9/2026)" → agent spawned
-  ├─ Child: "Daily Code Review (2/10/2026)" → next occurrence
-  └─ ...repeats indefinitely
-```
+The built-in scheduler daemon (`jat scheduler start`) handles cron and one-shot triggers. It polls task databases, spawns agents for due tasks, and manages recurring schedules automatically. See [scheduler docs](./shared/scheduler.md).
 
-**One-shot tasks** fire once at a scheduled time, then stop.
+### Custom Integrations
 
-The scheduler runs in a tmux session (`server-scheduler`) and appears on the `/servers` page with start/stop controls, uptime counter, and next-run countdown. Configure auto-start with `scheduler_autostart: true` in your projects.json defaults.
-
-See [shared/scheduler.md](./shared/scheduler.md) for full documentation.
+Build your own adapter with the plugin system. See [PLUGINS.md](./tools/ingest/PLUGINS.md) for the adapter interface.
 
 ---
 
@@ -237,6 +250,7 @@ See [shared/scheduler.md](./shared/scheduler.md) for full documentation.
 | `/tasks` | Agent sessions, task management, epics, questions, state tracking |
 | `/files` | Monaco editor, file tree, staged/unstaged changes |
 | `/source` | Full commit history, cherry-pick, revert, diffs |
+| `/integrations` | External source connections (RSS, Slack, Telegram, Gmail) |
 | `/servers` | Dev server controls, task scheduler management |
 | `/config` | API keys, project secrets, automation rules, shortcuts |
 
@@ -251,6 +265,8 @@ See [shared/scheduler.md](./shared/scheduler.md) for full documentation.
 | **Smart question UI** | Agent questions become clickable buttons |
 | **Epic Swarm** | Spawn parallel agents on subtasks |
 | **Auto-proceed rules** | Configure auto-completion by type/priority |
+| **External integrations** | RSS, Slack, Telegram, Gmail feed events into tasks |
+| **Autonomous triggers** | Events spawn agents automatically (immediate/delay/schedule/cron) |
 | **Task scheduling** | Cron-based recurring tasks and one-shot scheduled spawns |
 | **Error recovery** | Automatic retry patterns for failures |
 | **PRD → Tasks** | `/jat:tasktree` converts requirements to structured tasks |
@@ -268,6 +284,8 @@ Full Monaco editor and git integration included—but the magic is in agent orch
 | **Task management** | ✅ Built-in | ❌ | ❌ | ❌ |
 | **Epic Swarm (parallel)** | ✅ | ❌ | ❌ | ❌ |
 | **Agent coordination** | ✅ Agent Mail | ❌ | ❌ | ❌ |
+| **External integrations** | ✅ RSS, Slack, Telegram, Gmail | ❌ | ❌ | ❌ |
+| **Autonomous triggers** | ✅ | ❌ | ❌ | ❌ |
 | **Auto-proceed rules** | ✅ | ❌ | ❌ | ❌ |
 | **Code editor** | ✅ Monaco | ✅ VS Code | ✅ VS Code | ❌ |
 | **Git integration** | ✅ | ✅ | ✅ | Partial |
@@ -275,7 +293,7 @@ Full Monaco editor and git integration included—but the magic is in agent orch
 | **100% local** | ✅ | ❌ Cloud | ❌ Cloud | ✅ |
 | **Open source** | ✅ MIT | ❌ | ❌ | ✅ |
 
-JAT isn't trying to replace your editor—it's the control tower for your agent swarm.
+JAT isn't trying to replace your editor — it's the control tower for your agent swarm, whether you're at the controls or asleep.
 
 ---
 
@@ -285,16 +303,18 @@ JAT isn't trying to replace your editor—it's the control tower for your agent 
 ~/code/jat/
 ├── ide/          # SvelteKit app (the IDE)
 │   └── src/
-│       ├── routes/     # /tasks, /files, /source, /servers, /config
+│       ├── routes/     # /tasks, /files, /source, /integrations, /servers, /config
 │       └── lib/
 │           ├── components/files/   # FileTree, GitPanel, Editor
 │           ├── components/work/    # SessionCard, WorkPanel
 │           ├── components/source/  # CommitHistory, DiffViewer
+│           ├── components/ingest/  # Integration management UI
 │           └── stores/             # State management
 ├── tools/              # 50+ CLI tools
 │   ├── core/           # Database, monitoring
 │   ├── mail/           # Agent coordination (am-*)
 │   ├── browser/        # Browser automation
+│   ├── ingest/         # Feed ingest daemon (RSS, Slack, Telegram, Gmail)
 │   ├── scheduler/      # Task scheduling daemon (cron + one-shot)
 │   └── signal/         # State sync
 ├── commands/           # /jat:start, /jat:complete, /jat:tasktree
@@ -393,6 +413,7 @@ IDE settings at `/config`:
 | [CLAUDE.md](./CLAUDE.md) | Full technical reference |
 | [ide/CLAUDE.md](./ide/CLAUDE.md) | IDE dev guide |
 | [shared/scheduler.md](./shared/scheduler.md) | Scheduler daemon reference |
+| [tools/ingest/PLUGINS.md](./tools/ingest/PLUGINS.md) | Custom integration plugin guide |
 | [shared/](./shared/) | Agent documentation |
 
 ---
@@ -407,6 +428,9 @@ Tested with 20+. Limited by your machine and API limits, not JAT.
 
 **Can I use existing projects?**
 Yes. Run `jt init` in any git repo to initialize task tracking, then add the project via `/config` → Projects tab, or use the "Add Project" button on the Tasks page.
+
+**Can JAT act on Slack/Telegram messages?**
+Yes. The ingest daemon connects to Telegram bots, Slack channels, RSS feeds, and Gmail. Incoming events create tasks and spawn agents automatically — immediately, on a delay, at a scheduled time, or on a cron. See [Integrations](#integrations--autonomous-triggers).
 
 **Can I schedule recurring tasks?**
 Yes. Set a cron expression on any task and the scheduler daemon will spawn agents automatically. See [scheduler docs](./shared/scheduler.md).
@@ -473,6 +497,6 @@ MIT - This is my gift to all the great's who haved gifted so much to all of us. 
 [![Star History Chart](https://api.star-history.com/svg?repos=joewinke/jat&type=timeline&legend=top-left)](https://www.star-history.com/#joewinke/jat&type=timeline&legend=top-left)
 
 ---
-**JAT: Supervise the swarm. Ship continuously.**
+**JAT: Supervise the swarm — or let it run autonomously.**
 
 [Install](#quick-start) | [Docs](./QUICKSTART.md) | [Discord](https://discord.gg/AFJf93p7Bx) | [Issues](https://github.com/joewinke/jat/issues)
