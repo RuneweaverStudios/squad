@@ -130,8 +130,8 @@
 			title="Refresh status"
 			disabled={loading}
 		>
-			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="action-icon" class:animate-spin={loading}>
-				<path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H4.614a.75.75 0 00-.75.75v3.618a.75.75 0 001.5 0v-2.033l.31.31A7 7 0 0016.712 10.5a.75.75 0 10-1.4-.576zm-8.624-3.25a.75.75 0 10-1.4.575A7 7 0 0016.326 14.6l.31.31v-2.034a.75.75 0 011.5 0v3.619a.75.75 0 01-.75.75h-3.619a.75.75 0 010-1.5h2.434l-.312-.312a5.5 5.5 0 01-9.201-2.46z" clip-rule="evenodd" />
+			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="action-icon" class:animate-spin={loading}>
+				<path d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.992 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182M21.015 4.353v4.992" />
 			</svg>
 		</button>
 
