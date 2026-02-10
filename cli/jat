@@ -514,7 +514,7 @@ interactive_update_check() {
     # Check for updates (this does a git fetch)
     # Returns: 0 = updates available, 1 = up to date, 2 = fetch failed
     local check_result
-    check_for_updates; check_result=$?
+    check_for_updates && check_result=$? || check_result=$?
 
     if [[ $check_result -eq 2 ]]; then
         # Fetch failed - don't write timestamp so we retry next launch
@@ -558,7 +558,7 @@ update_cmd() {
             # Just check, don't update
             echo -e "${DIM}Checking for updates...${NC}"
             local check_result
-            check_for_updates; check_result=$?
+            check_for_updates && check_result=$? || check_result=$?
             if [[ $check_result -eq 0 ]]; then
                 local commits_behind
                 commits_behind=$(get_commits_behind)
