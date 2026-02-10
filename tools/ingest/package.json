@@ -9,6 +9,7 @@
     "imapflow": "^1.2.8",
     "mailparser": "^3.9.3",
     "nostr-tools": "^2.23.0",
-    "rss-parser": "^3.13.0"
+    "rss-parser": "^3.13.0",
+    "tmi.js": "^1.8.5"
   }
 }
