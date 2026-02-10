@@ -1,0 +1,15 @@
+{
+  "name": "jat-memory",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "JAT memory indexer - chunk, embed, and store agent memory for search",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js index",
+    "dev": "node index.js index --verbose"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0",
+    "sqlite-vec": "^0.1.7-alpha.2"
+  }
+}
