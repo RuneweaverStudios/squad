@@ -766,7 +766,7 @@
 					class="text-[10px] font-mono cursor-default text-base-content/50"
 					title="Build version"
 				>
-					v{getVersionString()}
+					{getVersionString()}
 				</div>
 				<button
 					onclick={handleUpdate}
