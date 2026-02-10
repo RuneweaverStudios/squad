@@ -1004,27 +1004,14 @@
 		// Only apply default subsection collapse logic if this project doesn't have saved state
 		// This preserves user's manual collapse/expand choices
 		if (!collapsedSubsections.has(project)) {
-			// Auto-expand appropriate subsection based on what's available
-			// Priority: Active > Paused > Open for default expansion
-			// Paused section is ALWAYS expanded if there are paused sessions
+			// All sections expanded by default. Only auto-collapse "paused" when empty.
 			const projectSubsections = new Set<SubsectionType>();
 
-			if (hasActiveSessions) {
-				// Expand Active Tasks (sessions not in collapsed set)
-				// Collapse Open Tasks to focus on active work
-				projectSubsections.add("tasks");
-				// Keep paused expanded if there are paused sessions
-				if (!hasPausedSessions) {
-					projectSubsections.add("paused");
-				}
-			} else if (hasPausedSessions) {
-				// No active sessions but have paused - expand paused, collapse open
-				projectSubsections.add("tasks");
-			} else if (hasOpenTasks) {
-				// No active or paused sessions, so expand Open Tasks
+			if (!hasPausedSessions) {
 				projectSubsections.add("paused");
 			}
-			// If nothing has content, sections simply won't render
+			// Active Tasks and Open Tasks are always visible by default
+			// so users can see both in-progress work and available tasks/epics
 
 			collapsedSubsections.set(project, projectSubsections);
 			collapsedSubsections = new Map(collapsedSubsections);
