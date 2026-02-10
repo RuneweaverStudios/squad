@@ -1,12 +1,13 @@
 {
   "name": "jat-ingest",
   "version": "1.0.0",
-  "description": "Content ingestion daemon for JAT - watches Telegram, Slack, RSS and creates tasks",
+  "description": "Content ingestion daemon for JAT - watches Telegram, Slack, RSS, WhatsApp and creates tasks",
   "type": "module",
   "dependencies": {
     "better-sqlite3": "^11.10.0",
     "imapflow": "^1.2.8",
     "mailparser": "^3.9.3",
+    "@whiskeysockets/baileys": "^6.7.16",
     "rss-parser": "^3.13.0"
   }
 }

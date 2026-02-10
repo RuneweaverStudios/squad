@@ -4,17 +4,21 @@ import { downloadAttachments } from './downloader.js';
 import { createTask, appendToTask, registerTaskAttachments, applyAutomation } from './taskCreator.js';
 import { discoverPlugins } from './pluginLoader.js';
 import { applyFilter, resolveFilter } from './filterEngine.js';
+import { ConnectionManager } from './connectionManager.js';
 import * as logger from './logger.js';
 
 const STAGGER_MS = 2000;
 const CONFIG_CHECK_INTERVAL = 30000;
 const MAX_BACKOFF_MS = 3600000; // 1 hour
 
-// Track per-source backoff and timers
+// Track per-source backoff and timers (poll mode only)
 const sourceState = new Map();
 
 /** @type {Map<string, import('./pluginLoader.js').LoadedPlugin>} */
 let plugins = new Map();
+
+/** @type {ConnectionManager|null} */
+let connectionManager = null;
 
 let running = false;
 let configCheckTimer = null;
@@ -32,6 +36,10 @@ export async function start(opts = {}) {
     logger.info(`Discovered ${plugins.size} plugin(s): ${[...plugins.keys()].join(', ')}`);
   }
 
+  // Initialize connection manager for realtime sources
+  connectionManager = new ConnectionManager({ plugins, getSecret, dryRun });
+  connectionManager.startHealthMonitor();
+
   const sources = opts.sourceId
     ? getEnabledSources().filter(s => s.id === opts.sourceId)
     : getEnabledSources();
@@ -43,11 +51,12 @@ export async function start(opts = {}) {
 
   logger.ready(sources.length);
 
-  // Stagger source startup
+  // Stagger source startup, routing by mode
   sources.forEach((source, i) => {
     const delay = i * STAGGER_MS;
     setTimeout(() => {
-      if (running) schedulePoll(source, true);
+      if (!running) return;
+      startSource(source);
     }, delay);
   });
 
@@ -63,7 +72,7 @@ export async function start(opts = {}) {
   }, CONFIG_CHECK_INTERVAL);
 }
 
-export function stop() {
+export async function stop() {
   running = false;
   logger.shutting();
 
@@ -72,6 +81,7 @@ export function stop() {
     configCheckTimer = null;
   }
 
+  // Stop all poll timers
   for (const [id, state] of sourceState) {
     if (state.timer) {
       clearTimeout(state.timer);
@@ -79,6 +89,35 @@ export function stop() {
     }
   }
   sourceState.clear();
+
+  // Disconnect all realtime connections
+  if (connectionManager) {
+    await connectionManager.stopAll();
+    connectionManager = null;
+  }
+}
+
+/**
+ * Start a source in the appropriate mode (poll or realtime).
+ * @param {Object} source - Source config
+ */
+function startSource(source) {
+  const plugin = plugins.get(source.type);
+  if (!plugin) {
+    logger.error(`No plugin for type: ${source.type}`, source.id);
+    return;
+  }
+
+  const mode = ConnectionManager.resolveMode(source, plugin);
+
+  if (mode === 'realtime') {
+    logger.info(`Starting in realtime mode`, source.id);
+    connectionManager.startConnection(source).catch(err => {
+      logger.error(`Failed to start realtime connection: ${err.message}`, source.id);
+    });
+  } else {
+    schedulePoll(source, true);
+  }
 }
 
 function schedulePoll(source, immediate = false) {
@@ -265,20 +304,34 @@ function getAuthHeaders(source) {
 function reconcileSources(freshSources) {
   const freshIds = new Set(freshSources.map(s => s.id));
 
-  // Stop removed/disabled sources
+  // Stop removed/disabled poll sources
   for (const [id, state] of sourceState) {
     if (!freshIds.has(id)) {
-      logger.info(`Source removed/disabled, stopping`, id);
+      logger.info(`Source removed/disabled, stopping poll`, id);
       if (state.timer) clearTimeout(state.timer);
       sourceState.delete(id);
     }
   }
 
-  // Start new sources
+  // Stop removed/disabled realtime sources
+  if (connectionManager) {
+    for (const [id] of connectionManager.connections) {
+      if (!freshIds.has(id)) {
+        logger.info(`Source removed/disabled, stopping realtime`, id);
+        connectionManager.stopConnection(id).catch(err => {
+          logger.warn(`Failed to stop realtime connection: ${err.message}`, id);
+        });
+      }
+    }
+  }
+
+  // Start new sources (route by mode)
   for (const source of freshSources) {
-    if (!sourceState.has(source.id)) {
+    const isPolling = sourceState.has(source.id);
+    const isRealtime = connectionManager?.hasConnection(source.id);
+    if (!isPolling && !isRealtime) {
       logger.info(`New source detected, starting`, source.id);
-      schedulePoll(source);
+      startSource(source);
     }
   }
 }

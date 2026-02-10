@@ -53,14 +53,14 @@ try {
 }
 
 // Graceful shutdown
-function shutdown() {
-  stop();
+async function shutdown() {
+  await stop();
   closeDb();
   process.exit(0);
 }
 
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+process.on('SIGINT', () => shutdown());
+process.on('SIGTERM', () => shutdown());
 
 // Start the daemon (async: discovers plugins before polling)
 await start({ sourceId, dryRun: dryRunMode });
