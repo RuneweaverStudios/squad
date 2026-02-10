@@ -501,8 +501,32 @@
 	// Handle file selection for import
 	async function handleImportFile(event: Event) {
 		const input = event.target as HTMLInputElement;
-		const file = input.files?.[0];
-		if (!file) return;
+		const files = input.files;
+		if (!files || files.length === 0) return;
+
+		// Check if any files are .md - route through namespace picker
+		const mdFiles = Array.from(files).filter(
+			(f) => f.name.endsWith('.md') || f.type === 'text/markdown'
+		);
+		const jsonFiles = Array.from(files).filter(
+			(f) => f.name.endsWith('.json') || f.type === 'application/json'
+		);
+
+		// Handle .md files via namespace picker (same as drag-and-drop)
+		if (mdFiles.length > 0) {
+			pendingDropFiles = mdFiles;
+			showNamespacePicker = true;
+			newNamespaceInput = '';
+			input.value = '';
+			return;
+		}
+
+		// Handle JSON import (existing behavior)
+		const file = jsonFiles[0];
+		if (!file) {
+			input.value = '';
+			return;
+		}
 
 		isImporting = true;
 		importMessage = null;
@@ -712,7 +736,7 @@
 				class="import-btn"
 				onclick={triggerImport}
 				disabled={isImporting}
-				title="Import commands from JSON file"
+				title="Import commands (.md or .json)"
 				aria-label="Import commands"
 			>
 				{#if isImporting}
@@ -727,7 +751,8 @@
 			<input
 				bind:this={importFileInput}
 				type="file"
-				accept=".json"
+				accept=".json,.md"
+				multiple
 				onchange={handleImportFile}
 				class="hidden-file-input"
 			/>
@@ -989,6 +1014,7 @@
 	.commands-list {
 		display: flex;
 		flex-direction: column;
+		position: relative;
 		background: oklch(0.14 0.02 250);
 		border: 1px solid oklch(0.28 0.02 250);
 		border-radius: 10px;
@@ -1628,10 +1654,6 @@
 	}
 
 	/* Drag-and-drop styles */
-	.commands-list {
-		position: relative;
-	}
-
 	.drag-over {
 		outline: 2px dashed oklch(0.60 0.15 200);
 		outline-offset: -2px;

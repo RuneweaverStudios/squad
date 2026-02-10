@@ -79,7 +79,7 @@
 </script>
 
 <!-- Industrial/Terminal Sidebar -->
-<div class="drawer-side {$isSidebarCollapsed ? 'overflow-visible' : ''}">
+<div class="drawer-side {$isSidebarCollapsed ? 'overflow-visible' : 'overflow-x-hidden'}">
 	<!-- Drawer overlay -->
 	<label for="main-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
 
@@ -124,7 +124,7 @@
 		</div>
 
 		<!-- Main navigation items -->
-		<nav class="flex-1 px-2 py-3 space-y-1 overflow-y-auto">
+		<nav class="flex-1 px-2 py-3 space-y-1 overflow-y-auto overflow-x-hidden">
 			<!-- MAIN: Core workflow -->
 			{#each mainItems as navItem, index}
 				{@const active = isActive(navItem.href)}

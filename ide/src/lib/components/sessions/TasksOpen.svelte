@@ -1692,8 +1692,10 @@
 	.task-cell-content {
 		display: flex;
 		flex-direction: column;
-		align-items: flex-start;
+		align-items: stretch;
 		gap: 0.25rem;
+		min-width: 0;
+		width: 100%;
 	}
 
 	.agent-badge-row {
@@ -1701,6 +1703,7 @@
 		align-items: center;
 		gap: 0.5rem;
 		min-width: 0;
+		width: 100%;
 	}
 
 	/* Task info */

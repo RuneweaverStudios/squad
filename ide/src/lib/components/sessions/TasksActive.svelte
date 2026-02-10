@@ -1255,7 +1255,7 @@
 						{@const expandedTask = agentTasks.get(expandedAgentName)}
 						{@const expandedSessionInfo = agentSessionInfo.get(expandedAgentName)}
 						<tr class="expanded-row {isExiting ? 'animate-slide-out-bck-top' : ''}" style={isExiting ? 'pointer-events: none;' : ''}>
-							<td colspan="3" class="expanded-content">
+							<td colspan="2" class="expanded-content">
 								<!-- svelte-ignore a11y_no_static_element_interactions -->
 								<div
 									class="expanded-session-wrapper"
@@ -2032,9 +2032,10 @@
 	.task-cell-content {
 		display: flex;
 		flex-direction: column;
-		align-items: flex-start;
+		align-items: stretch;
 		gap: 0.25rem;
 		min-width: 0;
+		width: 100%;
 	}
 
 	/* Status column */
@@ -2138,7 +2139,6 @@
 		white-space: nowrap;
 		flex: 1;
 		min-width: 0;
-		max-width: calc(100% - 2rem);
 	}
 
 	.task-description {
@@ -2148,8 +2148,7 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-		width: calc(100% - 2rem);
-		max-width: calc(100% - 2rem);
+		padding-left: 2rem;
 	}
 
 	.agent-badge-row {
@@ -2157,6 +2156,7 @@
 		align-items: center;
 		gap: 0.5rem;
 		min-width: 0;
+		width: 100%;
 	}
 
 	.agent-name-inline {
