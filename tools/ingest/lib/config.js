@@ -96,6 +96,12 @@ function validate(config) {
     if (src.type === 'gmail' && !src.folder) {
       throw new Error(`Gmail source ${src.id} must have a "folder" (Gmail label name)`);
     }
+    if (src.debounceMs !== undefined && src.debounceMs !== true && src.debounceMs !== false) {
+      const ms = Number(src.debounceMs);
+      if (isNaN(ms) || ms < 0) {
+        throw new Error(`Source ${src.id}: debounceMs must be a non-negative number, true, or false`);
+      }
+    }
   }
 }
 

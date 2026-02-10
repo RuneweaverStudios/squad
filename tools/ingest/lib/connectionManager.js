@@ -29,10 +29,11 @@ export class ConnectionManager {
    * @param {(name: string) => string} opts.getSecret
    * @param {boolean} [opts.dryRun=false]
    */
-  constructor({ plugins, getSecret, dryRun = false }) {
+  constructor({ plugins, getSecret, dryRun = false, messageBuffer = null }) {
     this.plugins = plugins;
     this.getSecret = getSecret;
     this.dryRun = dryRun;
+    this.messageBuffer = messageBuffer;
     /** @type {Map<string, ConnectionState>} */
     this.connections = new Map();
     this.healthTimer = null;
@@ -251,11 +252,19 @@ export class ConnectionManager {
       }
     }
 
-    // Create task
+    // Check if debouncing is enabled for this source
+    const debounceMs = _getDebounceMs(source);
+    if (debounceMs > 0 && this.messageBuffer) {
+      const key = _getBufferKey(source.id, item);
+      this.messageBuffer.add(key, { item, downloaded, source }, debounceMs);
+      return;
+    }
+
+    // Create task (immediate, no debounce)
     const taskId = createTask(source, item, downloaded);
 
-    // Record to dedup db
-    recordItem(source.id, item.id, item.hash, taskId, item.title);
+    // Record to dedup db (with origin for two-way reply routing)
+    recordItem(source.id, item.id, item.hash, taskId, item.title, item.origin);
 
     // Register downloaded files as task attachments
     if (taskId && downloaded.length > 0) {
@@ -403,4 +412,21 @@ function _getAuthHeaders(source, getSecret) {
     } catch { /* fallthrough */ }
   }
   return {};
+}
+
+/** Default debounce window when source.debounceMs is true */
+const _DEFAULT_DEBOUNCE_MS = 30000;
+
+function _getDebounceMs(source) {
+  if (source.debounceMs === undefined || source.debounceMs === null || source.debounceMs === false) return 0;
+  if (source.debounceMs === true) return _DEFAULT_DEBOUNCE_MS;
+  const ms = Number(source.debounceMs);
+  return ms > 0 ? ms : 0;
+}
+
+function _getBufferKey(sourceId, item) {
+  if (item.threadTs) return `${sourceId}:thread:${item.threadTs}`;
+  const channel = item.fields?.channel || item.fields?.chatId || '';
+  const sender = item.author || '';
+  return `${sourceId}:${channel}:${sender}`;
 }

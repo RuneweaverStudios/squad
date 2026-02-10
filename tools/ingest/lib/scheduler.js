@@ -10,6 +10,8 @@ import * as logger from './logger.js';
 const STAGGER_MS = 2000;
 const CONFIG_CHECK_INTERVAL = 30000;
 const MAX_BACKOFF_MS = 3600000; // 1 hour
+const DEFAULT_DEBOUNCE_MS = 30000; // 30 seconds
+const MAX_BUFFER_SIZE = 10;
 
 // Track per-source backoff and timers (poll mode only)
 const sourceState = new Map();
@@ -24,9 +26,15 @@ let running = false;
 let configCheckTimer = null;
 let dryRun = false;
 
+/** @type {MessageBuffer|null} */
+let messageBuffer = null;
+
 export async function start(opts = {}) {
   running = true;
   dryRun = opts.dryRun || false;
+
+  // Initialize message buffer for debouncing per-sender messages
+  messageBuffer = new MessageBuffer({ onFlush: handleBufferFlush });
 
   // Discover plugins dynamically instead of hardcoded imports
   plugins = await discoverPlugins();
@@ -37,7 +45,7 @@ export async function start(opts = {}) {
   }
 
   // Initialize connection manager for realtime sources
-  connectionManager = new ConnectionManager({ plugins, getSecret, dryRun });
+  connectionManager = new ConnectionManager({ plugins, getSecret, dryRun, messageBuffer });
   connectionManager.startHealthMonitor();
 
   const sources = opts.sourceId
@@ -75,6 +83,16 @@ export async function start(opts = {}) {
 export async function stop() {
   running = false;
   logger.shutting();
+
+  // Flush pending message buffers before stopping
+  if (messageBuffer) {
+    const pending = messageBuffer.pendingCount;
+    if (pending > 0) {
+      logger.info(`Flushing ${pending} buffered message(s)`);
+    }
+    messageBuffer.flushAll();
+    messageBuffer = null;
+  }
 
   if (configCheckTimer) {
     clearInterval(configCheckTimer);
@@ -192,29 +210,37 @@ async function pollSource(source) {
         }
       }
 
-      // Create task
-      const taskId = createTask(source, item, downloaded);
+      // Check if debouncing is enabled for this source
+      const debounceMs = getSourceDebounceMs(source);
+      if (debounceMs > 0 && messageBuffer) {
+        // Buffer for batched task creation
+        const key = getBufferKey(source.id, item);
+        messageBuffer.add(key, { item, downloaded, source }, debounceMs);
+      } else {
+        // Immediate task creation (default behavior)
+        const taskId = createTask(source, item, downloaded);
 
-      // Record to dedup db
-      recordItem(source.id, item.id, item.hash, taskId, item.title);
+        // Record to dedup db (with origin for two-way reply routing)
+        recordItem(source.id, item.id, item.hash, taskId, item.title, item.origin);
 
-      // Register downloaded files as task attachments
-      if (taskId && downloaded.length > 0) {
-        registerTaskAttachments(taskId, downloaded, source.project);
-      }
+        // Register downloaded files as task attachments
+        if (taskId && downloaded.length > 0) {
+          registerTaskAttachments(taskId, downloaded, source.project);
+        }
 
-      // Apply automation (spawn agent, schedule, or delay)
-      if (taskId && source.automation) {
-        applyAutomation(taskId, source);
-      }
+        // Apply automation (spawn agent, schedule, or delay)
+        if (taskId && source.automation) {
+          applyAutomation(taskId, source);
+        }
 
-      // Register thread for adapters that support replies
-      if (taskId && source.trackReplies !== false) {
-        // Extract thread key from item ID (e.g. "slack-1234.5678" → "1234.5678")
-        const prefix = `${source.type}-`;
-        if (item.id.startsWith(prefix)) {
-          const threadKey = item.id.slice(prefix.length);
-          registerThread(source.id, item.id, threadKey, taskId);
+        // Register thread for adapters that support replies
+        if (taskId && source.trackReplies !== false) {
+          // Extract thread key from item ID (e.g. "slack-1234.5678" → "1234.5678")
+          const prefix = `${source.type}-`;
+          if (item.id.startsWith(prefix)) {
+            const threadKey = item.id.slice(prefix.length);
+            registerThread(source.id, item.id, threadKey, taskId);
+          }
         }
       }
     }
@@ -333,5 +359,173 @@ function reconcileSources(freshSources) {
       logger.info(`New source detected, starting`, source.id);
       startSource(source);
     }
+  }
+}
+
+// ─── Message Debouncing ────────────────────────────────────────────────────
+
+/**
+ * Per-sender message buffer that batches rapid messages into single tasks.
+ * Buffer key groups messages by source + channel + sender (or thread).
+ * Flushes when the debounce window expires or max buffer count is reached.
+ */
+class MessageBuffer {
+  /**
+   * @param {Object} opts
+   * @param {(key: string, entries: Array<{item: Object, downloaded: Array, source: Object}>) => void} opts.onFlush
+   */
+  constructor({ onFlush }) {
+    this.onFlush = onFlush;
+    /** @type {Map<string, {items: Array, timer: ReturnType<typeof setTimeout>|null}>} */
+    this.buffers = new Map();
+  }
+
+  /**
+   * Add an item to the buffer. Resets the debounce timer (sliding window).
+   * @param {string} key - Buffer key (sourceId:channel:sender)
+   * @param {{item: Object, downloaded: Array, source: Object}} entry
+   * @param {number} debounceMs - Debounce window in milliseconds
+   */
+  add(key, entry, debounceMs) {
+    if (!this.buffers.has(key)) {
+      this.buffers.set(key, { items: [], timer: null });
+    }
+
+    const buf = this.buffers.get(key);
+    buf.items.push(entry);
+
+    // Reset timer on each new item (sliding window)
+    if (buf.timer) clearTimeout(buf.timer);
+
+    // Flush immediately if max buffer size reached
+    if (buf.items.length >= MAX_BUFFER_SIZE) {
+      this._flush(key);
+      return;
+    }
+
+    buf.timer = setTimeout(() => this._flush(key), debounceMs);
+  }
+
+  _flush(key) {
+    const buf = this.buffers.get(key);
+    if (!buf || buf.items.length === 0) return;
+
+    if (buf.timer) clearTimeout(buf.timer);
+
+    const entries = [...buf.items];
+    this.buffers.delete(key);
+
+    try {
+      this.onFlush(key, entries);
+    } catch (err) {
+      logger.error(`Buffer flush failed for ${key}: ${err.message}`);
+    }
+  }
+
+  /** Flush all pending buffers (called on shutdown). */
+  flushAll() {
+    for (const key of [...this.buffers.keys()]) {
+      this._flush(key);
+    }
+  }
+
+  /** Total number of items across all pending buffers. */
+  get pendingCount() {
+    let count = 0;
+    for (const buf of this.buffers.values()) count += buf.items.length;
+    return count;
+  }
+}
+
+/**
+ * Compute buffer key for grouping messages.
+ * Slack threads: sourceId:thread:threadTs
+ * General: sourceId:channelId:senderId
+ */
+function getBufferKey(sourceId, item) {
+  if (item.threadTs) {
+    return `${sourceId}:thread:${item.threadTs}`;
+  }
+  const channel = item.fields?.channel || item.fields?.chatId || '';
+  const sender = item.author || '';
+  return `${sourceId}:${channel}:${sender}`;
+}
+
+/**
+ * Get effective debounce window for a source.
+ * Returns 0 if debouncing is disabled (default).
+ */
+function getSourceDebounceMs(source) {
+  if (source.debounceMs === undefined || source.debounceMs === null || source.debounceMs === false) {
+    return 0;
+  }
+  if (source.debounceMs === true) return DEFAULT_DEBOUNCE_MS;
+  const ms = Number(source.debounceMs);
+  return ms > 0 ? ms : 0;
+}
+
+/**
+ * Handle flushed buffer entries: merge items into a single task.
+ * Called by MessageBuffer when debounce window expires or max count reached.
+ */
+function handleBufferFlush(key, entries) {
+  if (entries.length === 0) return;
+
+  const { source } = entries[0];
+
+  // Merge items: first title (with count suffix), concatenated descriptions
+  const firstItem = entries[0].item;
+  let mergedItem;
+
+  if (entries.length === 1) {
+    mergedItem = firstItem;
+  } else {
+    const descriptions = entries.map(e => e.item.description).filter(Boolean);
+    mergedItem = {
+      ...firstItem,
+      title: `${firstItem.title} (+${entries.length - 1} more)`,
+      description: descriptions.join('\n---\n'),
+      attachments: entries.flatMap(e => e.item.attachments || []),
+    };
+  }
+
+  const allDownloaded = entries.flatMap(e => e.downloaded || []);
+
+  if (dryRun) {
+    logger.info(`[dry-run] would batch ${entries.length} → ${mergedItem.title.slice(0, 80)}`, source.id);
+    return;
+  }
+
+  // Create single task for the batch
+  const taskId = createTask(source, mergedItem, allDownloaded);
+
+  // Record ALL original items in dedup db (first item's origin used for reply routing)
+  for (const entry of entries) {
+    recordItem(source.id, entry.item.id, entry.item.hash, taskId, entry.item.title, entry.item.origin);
+  }
+
+  // Register attachments
+  if (taskId && allDownloaded.length > 0) {
+    registerTaskAttachments(taskId, allDownloaded, source.project);
+  }
+
+  // Apply automation
+  if (taskId && source.automation) {
+    applyAutomation(taskId, source);
+  }
+
+  // Register threads for all original items
+  if (taskId && source.trackReplies !== false) {
+    const prefix = `${source.type}-`;
+    for (const entry of entries) {
+      if (entry.item.id.startsWith(prefix)) {
+        const threadKey = entry.item.id.slice(prefix.length);
+        registerThread(source.id, entry.item.id, threadKey, taskId);
+      }
+    }
+  }
+
+  if (entries.length > 1) {
+    logger.info(`Batched ${entries.length} message(s) → task ${taskId}`, source.id);
   }
 }
