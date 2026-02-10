@@ -6,7 +6,7 @@
 
 ```
 tools/
-├── core/         # Database, monitoring, credentials, task review (17 tools)
+├── core/         # Database, monitoring, credentials, task review, skills (18 tools)
 ├── mail/         # Agent Mail coordination (14 tools)
 ├── browser/      # Browser automation via CDP (12 tools)
 ├── media/        # Image generation with Gemini (7 tools)
@@ -61,6 +61,7 @@ Database, monitoring, credentials, and task review tools.
 | `jt-set-review-override` | Set review override for a task |
 | `backup-jat.sh` | Backup task database |
 | `rollback-jat.sh` | Rollback task database to backup |
+| `jat-skills` | Skill catalog fetcher (OpenClaw/Pi ecosystem) |
 
 **jat-secret usage:**
 ```bash
@@ -68,6 +69,16 @@ jat-secret <name>       # Get secret value
 jat-secret --list       # List all secrets
 jat-secret --export     # Output export statements
 jat-secret --env <name> # Get env var name for a key
+```
+
+**jat-skills usage:**
+```bash
+jat-skills search <query>   # Search skills by keyword
+jat-skills list-available    # List all available skills
+jat-skills info <skill-id>   # Show skill details
+jat-skills refresh           # Force refresh cache
+jat-skills sources           # Show source status
+jat-skills --json            # JSON output (combine with any command)
 ```
 
 ---
