@@ -104,6 +104,15 @@ error_missing_field() {
         question:questionType)
             echo "  Expected: \"questionType\": \"choice\" (one of: choice, confirm, input)" >&2
             ;;
+        reply:taskId)
+            echo "  Expected: \"taskId\": \"jat-abc\" (task that originated from a channel message)" >&2
+            ;;
+        reply:message)
+            echo "  Expected: \"message\": \"Got it, working on the login fix\"" >&2
+            ;;
+        reply:replyType)
+            echo "  Expected: \"replyType\": \"ack\" (one of: ack, progress, question, completion)" >&2
+            ;;
         *)
             if [[ -n "$example" ]]; then
                 echo "  Expected: \"${field}\": ${example}" >&2
@@ -188,6 +197,15 @@ show_required_fields() {
             echo "" >&2
             echo "Example:" >&2
             echo "  jat-signal question '{\"question\":\"Continue?\",\"questionType\":\"confirm\"}'" >&2
+            ;;
+        reply)
+            echo "Required fields for 'reply' signal:" >&2
+            echo "  - taskId: The JAT task ID (must originate from a channel message)" >&2
+            echo "  - message: Text to send to the originating channel" >&2
+            echo "  - replyType: One of: ack, progress, question, completion" >&2
+            echo "" >&2
+            echo "Example:" >&2
+            echo "  jat-signal reply '{\"taskId\":\"jat-abc\",\"message\":\"Working on it\",\"replyType\":\"ack\"}'" >&2
             ;;
     esac
 }
@@ -307,6 +325,7 @@ show_usage() {
     echo "  starting    - Validate rich starting signal"
     echo "  compacting  - Validate rich compacting signal"
     echo "  question    - Validate question signal for IDE"
+    echo "  reply       - Validate reply signal for two-way routing"
     echo ""
     echo "Examples:"
     echo "  jat-signal-validate complete '{\"taskId\":\"jat-abc\",\"agentName\":\"Agent\"}'"
@@ -1199,6 +1218,49 @@ validate_question() {
     return 0
 }
 
+validate_reply() {
+    local payload="$1"
+
+    # Must be an object
+    if ! echo "$payload" | jq -e 'type == "object"' >/dev/null 2>&1; then
+        echo "Error: reply signal must be a JSON object" >&2
+        show_required_fields "reply"
+        return 1
+    fi
+
+    # Required: taskId (string, non-empty)
+    require_string_field "$payload" "reply" "taskId" || return 1
+
+    # Required: message (string, non-empty)
+    require_string_field "$payload" "reply" "message" || return 1
+
+    # Required: replyType (must be valid enum value)
+    if ! echo "$payload" | jq -e 'has("replyType")' >/dev/null 2>&1; then
+        error_missing_field "reply" "replyType"
+        show_required_fields "reply"
+        return 1
+    fi
+
+    local reply_type
+    reply_type=$(echo "$payload" | jq -r '.replyType // ""')
+    case "$reply_type" in
+        ack|progress|question|completion) ;;
+        "")
+            echo "Error: reply.replyType cannot be empty" >&2
+            echo "  Expected: \"replyType\": \"ack\" (one of: ack, progress, question, completion)" >&2
+            show_required_fields "reply"
+            return 1
+            ;;
+        *)
+            echo "Error: reply.replyType must be one of: ack, progress, question, completion" >&2
+            echo "  Got: \"$reply_type\"" >&2
+            return 1
+            ;;
+    esac
+
+    return 0
+}
+
 # =============================================================================
 # Data Signal Validators (existing)
 # =============================================================================
@@ -1450,9 +1512,12 @@ case "$SIGNAL_TYPE" in
     question)
         validate_question "$PAYLOAD"
         ;;
+    reply)
+        validate_reply "$PAYLOAD"
+        ;;
     *)
         echo "Error: Unknown signal type '$SIGNAL_TYPE'" >&2
-        echo "Valid types: complete, working, review, needs_input, idle, completing, starting, compacting, question" >&2
+        echo "Valid types: complete, working, review, needs_input, idle, completing, starting, compacting, question, reply" >&2
         exit 2
         ;;
 esac

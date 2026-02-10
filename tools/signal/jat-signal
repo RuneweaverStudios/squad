@@ -56,6 +56,7 @@ show_usage() {
     echo "  compacting '{...}'    - Summarizing context"
     echo "  paused '{...}'        - Session paused (resumable)"
     echo "  question '{...}'      - Structured question for IDE"
+    echo "  reply '{...}'         - Reply to originating channel (two-way)"
     echo ""
     echo "Completion Signal (USE jat-complete-bundle TO GENERATE):"
     echo "  complete '{...}'      - Full completion bundle (see below)"
@@ -85,6 +86,7 @@ show_usage() {
     echo "  compacting:  reason, contextSizeBefore"
     echo "  paused:      taskId, resumable"
     echo "  question:    question, questionType"
+    echo "  reply:       taskId, message, replyType"
     echo "  complete:    (use jat-complete-bundle, do not construct manually)"
 }
 
@@ -368,6 +370,26 @@ case "$SIGNAL_TYPE" in
         [[ ${#QUESTION_TEXT} -gt 50 ]] && QUESTION_SHORT="${QUESTION_SHORT}..."
         echo "Signal: question (type: ${QUESTION_TYPE}, options: ${OPTIONS_COUNT})"
         echo "[JAT-SIGNAL:question] $SIGNAL_DATA"
+        ;;
+
+    reply)
+        require_json "reply" "$SIGNAL_DATA"
+        # Compact JSON to single line for hook parsing
+        SIGNAL_DATA=$(echo "$SIGNAL_DATA" | jq -c .)
+        validate_payload "reply" "$SIGNAL_DATA"
+        TASK_ID=$(echo "$SIGNAL_DATA" | jq -r '.taskId // ""')
+        REPLY_TYPE=$(echo "$SIGNAL_DATA" | jq -r '.replyType // "progress"')
+        MESSAGE=$(echo "$SIGNAL_DATA" | jq -r '.message // ""')
+        MESSAGE_SHORT="${MESSAGE:0:60}"
+        [[ ${#MESSAGE} -gt 60 ]] && MESSAGE_SHORT="${MESSAGE_SHORT}..."
+        echo "Signal: reply (task: ${TASK_ID}, type: ${REPLY_TYPE})"
+        echo "[JAT-SIGNAL:reply] $SIGNAL_DATA"
+        # Route the reply to the originating channel in the background
+        SCRIPT_DIR_ABS="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")")" && pwd)"
+        ROUTER="$(dirname "$SCRIPT_DIR_ABS")/ingest/jat-reply-router"
+        if [[ -x "$ROUTER" ]]; then
+            "$ROUTER" --task-id "$TASK_ID" --message "$MESSAGE" --type "$REPLY_TYPE" &
+        fi
         ;;
 
     complete)

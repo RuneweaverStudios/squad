@@ -5,8 +5,13 @@
   "definitions": {
     "signalState": {
       "type": "string",
-      "enum": ["working", "review", "idle", "needs_input", "starting", "compacting", "completing"],
+      "enum": ["working", "review", "idle", "needs_input", "starting", "compacting", "completing", "reply"],
       "description": "Valid state signal values"
+    },
+    "replyType": {
+      "type": "string",
+      "enum": ["ack", "progress", "question", "completion"],
+      "description": "Type of reply to originating channel"
     },
     "estimatedScope": {
       "type": "string",
@@ -795,6 +800,26 @@
           "type": "array",
           "items": { "type": "string" },
           "description": "Key context items being preserved"
+        }
+      }
+    },
+    "replySignal": {
+      "type": "object",
+      "description": "Reply signal for routing messages back to originating channel",
+      "required": ["taskId", "message", "replyType"],
+      "additionalProperties": false,
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "description": "Task ID that originated from a channel message"
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 4000,
+          "description": "Message text to send to the originating channel"
+        },
+        "replyType": {
+          "$ref": "#/definitions/replyType"
         }
       }
     },
