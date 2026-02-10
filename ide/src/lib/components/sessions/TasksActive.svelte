@@ -1033,11 +1033,11 @@
 									<span class="session-name">{session.name}</span>
 								</div>
 							{:else}
-								<!-- Agent session: TaskIdBadge with title inline -->
+								<!-- Agent session: TaskIdBadge with title/desc column -->
 								<div class="task-cell-content">
 									{#if sessionTask}
 										{@const animateText = isNew && hadTaskOnEntry}
-										<div class="agent-badge-row">
+										<div class="badge-and-text">
 											<TaskIdBadge
 												task={sessionTask}
 												size="sm"
@@ -1051,15 +1051,17 @@
 												exiting={isExiting}
 												harness={getTaskHarness(sessionTask)}
 											/>
-											<span class="task-title {animateText ? 'tracking-in-expand' : ''}" style={animateText ? 'animation-delay: 100ms;' : ''} title={sessionTask.title}>
-												{sessionTask.title || sessionTask.id}
-											</span>
-										</div>
-										{#if sessionTask.description}
-											<div class="task-description {animateText ? 'tracking-in-expand' : ''}" style={animateText ? 'animation-delay: 100ms;' : ''}>
-												{sessionTask.description}
+											<div class="text-column">
+												<span class="task-title {animateText ? 'tracking-in-expand' : ''}" style={animateText ? 'animation-delay: 100ms;' : ''} title={sessionTask.title}>
+													{sessionTask.title || sessionTask.id}
+												</span>
+												{#if sessionTask.description}
+													<div class="task-description {animateText ? 'tracking-in-expand' : ''}" style={animateText ? 'animation-delay: 100ms;' : ''}>
+														{sessionTask.description}
+													</div>
+												{/if}
 											</div>
-										{/if}
+										</div>
 									{:else}
 										<!-- No task - planning pill matching agentPill aesthetic -->
 										{@const planningColor = effectiveState === 'planning' ? 'oklch(0.68 0.20 270)' : (rowProjectColor || 'oklch(0.50 0.02 250)')}
@@ -2032,10 +2034,28 @@
 	.task-cell-content {
 		display: flex;
 		flex-direction: column;
-		align-items: stretch;
+		align-items: flex-start;
 		gap: 0.25rem;
 		min-width: 0;
 		width: 100%;
+	}
+
+	/* Badge + text side by side */
+	.badge-and-text {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.625rem;
+		min-width: 0;
+		width: 100%;
+	}
+
+	.text-column {
+		display: flex;
+		flex-direction: column;
+		gap: 0.125rem;
+		min-width: 0;
+		flex: 1;
+		padding-top: 0.125rem;
 	}
 
 	/* Status column */
@@ -2144,11 +2164,9 @@
 	.task-description {
 		font-size: 0.75rem;
 		color: oklch(0.65 0.05 200);
-		margin-top: 0.125rem;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-		padding-left: 2rem;
 	}
 
 	.agent-badge-row {
@@ -2156,7 +2174,6 @@
 		align-items: center;
 		gap: 0.5rem;
 		min-width: 0;
-		width: 100%;
 	}
 
 	.agent-name-inline {

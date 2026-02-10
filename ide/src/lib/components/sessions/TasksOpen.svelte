@@ -1069,7 +1069,7 @@
 							<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 							<td class="td-task" style={isExiting ? 'background: transparent;' : ''} onclick={(e) => e.stopPropagation()}>
 								<div class="task-cell-content">
-									<div class="agent-badge-row">
+									<div class="badge-and-text">
 										<TaskIdBadge
 											{task}
 											size="sm"
@@ -1084,15 +1084,17 @@
 												harnessPickerPos = { x: e.clientX, y: Math.min(e.clientY, maxY) };
 											}}
 										/>
-										<span class="task-title {isNew ? 'tracking-in-expand' : ''}" style={isNew ? 'animation-delay: 100ms;' : ''} title={task.title}>
-											{task.title}
-										</span>
-									</div>
-									{#if task.description}
-										<div class="task-description {isNew ? 'tracking-in-expand' : ''}" style={isNew ? 'animation-delay: 100ms;' : ''}>
-											{task.description}
+										<div class="text-column">
+											<span class="task-title {isNew ? 'tracking-in-expand' : ''}" style={isNew ? 'animation-delay: 100ms;' : ''} title={task.title}>
+												{task.title}
+											</span>
+											{#if task.description}
+												<div class="task-description {isNew ? 'tracking-in-expand' : ''}" style={isNew ? 'animation-delay: 100ms;' : ''}>
+													{task.description}
+												</div>
+											{/if}
 										</div>
-									{/if}
+									</div>
 								</div>
 							</td>
 							<td class="td-actions" style={isExiting ? 'background: transparent;' : ''}>
@@ -1692,18 +1694,28 @@
 	.task-cell-content {
 		display: flex;
 		flex-direction: column;
-		align-items: stretch;
+		align-items: flex-start;
 		gap: 0.25rem;
 		min-width: 0;
 		width: 100%;
 	}
 
-	.agent-badge-row {
+	/* Badge + text side by side */
+	.badge-and-text {
 		display: flex;
-		align-items: center;
-		gap: 0.5rem;
+		align-items: flex-start;
+		gap: 0.625rem;
 		min-width: 0;
 		width: 100%;
+	}
+
+	.text-column {
+		display: flex;
+		flex-direction: column;
+		gap: 0.125rem;
+		min-width: 0;
+		flex: 1;
+		padding-top: 0.125rem;
 	}
 
 	/* Task info */

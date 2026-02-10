@@ -102,7 +102,7 @@
 						<!-- Column 1: TaskIdBadge + Title + Description -->
 						<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 						<td class="td-task" onclick={(e) => e.stopPropagation()}>
-							<div class="badge-wrapper">
+							<div class="badge-and-text">
 								<TaskIdBadge
 									{task}
 									size="sm"
@@ -113,15 +113,17 @@
 									animate={row.isNew}
 									onClick={() => onViewTask?.(row.taskId)}
 								/>
-								<span class="task-title" title={row.taskTitle}>
-									{row.taskTitle || row.taskId}
-								</span>
-							</div>
-							{#if row.taskDescription}
-								<div class="task-description">
-									{row.taskDescription}
+								<div class="text-column">
+									<span class="task-title" title={row.taskTitle}>
+										{row.taskTitle || row.taskId}
+									</span>
+									{#if row.taskDescription}
+										<div class="task-description">
+											{row.taskDescription}
+										</div>
+									{/if}
 								</div>
-							{/if}
+							</div>
 						</td>
 
 						<!-- Column 3: Action (StatusActionBadge) -->
@@ -213,12 +215,22 @@
 	.th-task, .td-task { width: auto; }
 	.th-action, .td-action { width: 160px; text-align: right; }
 
-	/* Badge + title row */
-	.badge-wrapper {
+	/* Badge + text side by side */
+	.badge-and-text {
 		display: flex;
-		align-items: center;
-		gap: 0.5rem;
+		align-items: flex-start;
+		gap: 0.625rem;
+		min-width: 0;
 		width: 100%;
+	}
+
+	.text-column {
+		display: flex;
+		flex-direction: column;
+		gap: 0.125rem;
+		min-width: 0;
+		flex: 1;
+		padding-top: 0.125rem;
 	}
 
 	.task-title {
@@ -238,7 +250,6 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-		max-width: calc(100% - 2rem);
 	}
 
 	/* Action content */

@@ -581,16 +581,14 @@
 	role="region"
 	aria-label="Slash commands"
 >
-	<!-- Drag overlay -->
+	<!-- Drag banner (top bar instead of full overlay) -->
 	{#if isDragOver}
-		<div class="drag-overlay" transition:fade={{ duration: 100 }}>
-			<div class="drag-overlay-content">
-				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="drag-icon">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12l-3-3m0 0l-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-				</svg>
-				<span class="drag-text">Drop .md files to import commands</span>
-				<span class="drag-hint">Drop on a namespace header to target that namespace</span>
-			</div>
+		<div class="drag-banner" transition:slide={{ duration: 100, axis: 'y' }}>
+			<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="drag-banner-icon">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12l-3-3m0 0l-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+			</svg>
+			<span class="drag-banner-text">Drop .md files here</span>
+			<span class="drag-banner-hint">Drop on a namespace header, or anywhere to choose</span>
 		</div>
 	{/if}
 
@@ -947,6 +945,7 @@
 					<button
 						class="namespace-header"
 						class:namespace-drop-target={dragOverNamespace === group.namespace}
+						class:namespace-drag-hint={isDragOver && dragOverNamespace !== group.namespace}
 						onclick={() => toggleNamespace(group.namespace)}
 						ondragenter={(e) => handleNamespaceDragEnter(e, group.namespace)}
 						ondragleave={handleNamespaceDragLeave}
@@ -1659,48 +1658,48 @@
 		outline-offset: -2px;
 	}
 
-	.drag-overlay {
-		position: absolute;
-		inset: 0;
-		z-index: 50;
+	/* Top banner during drag (replaces opaque overlay) */
+	.drag-banner {
 		display: flex;
 		align-items: center;
-		justify-content: center;
-		background: oklch(0.12 0.04 200 / 0.92);
-		border-radius: 10px;
+		gap: 0.5rem;
+		padding: 0.5rem 1rem;
+		background: oklch(0.18 0.06 200);
+		border-bottom: 1px solid oklch(0.35 0.12 200);
+		color: oklch(0.80 0.10 200);
 		pointer-events: none;
 	}
 
-	.drag-overlay-content {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 0.75rem;
-		padding: 2rem;
-	}
-
-	.drag-icon {
-		width: 48px;
-		height: 48px;
+	.drag-banner-icon {
+		width: 20px;
+		height: 20px;
 		color: oklch(0.70 0.15 200);
+		flex-shrink: 0;
 	}
 
-	.drag-text {
-		font-size: 1rem;
+	.drag-banner-text {
+		font-size: 0.8rem;
 		font-weight: 600;
-		color: oklch(0.85 0.10 200);
 		font-family: ui-monospace, monospace;
 	}
 
-	.drag-hint {
-		font-size: 0.75rem;
-		color: oklch(0.60 0.08 200);
+	.drag-banner-hint {
+		font-size: 0.7rem;
+		color: oklch(0.55 0.08 200);
+		margin-left: 0.25rem;
 	}
 
-	/* Namespace drop target highlight */
+	/* Namespace headers glow during drag to show they're drop targets */
+	.namespace-drag-hint {
+		background: oklch(0.19 0.04 200) !important;
+		box-shadow: inset 0 0 0 1px oklch(0.40 0.10 200 / 0.4);
+		transition: background 0.15s ease, box-shadow 0.15s ease;
+	}
+
+	/* Active namespace drop target highlight (mouse is over it) */
 	.namespace-drop-target {
-		background: oklch(0.22 0.08 200) !important;
-		box-shadow: inset 0 0 0 2px oklch(0.55 0.15 200);
+		background: oklch(0.24 0.10 200) !important;
+		box-shadow: inset 0 0 0 2px oklch(0.55 0.15 200), 0 0 12px oklch(0.55 0.15 200 / 0.3);
 	}
 
 	/* Processing bar */

@@ -113,7 +113,7 @@
 						<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 						<td class="td-task" onclick={(e) => e.stopPropagation()}>
 							<div class="task-cell-content">
-								<div class="agent-badge-row">
+								<div class="badge-and-text">
 									<TaskIdBadge
 										task={{ id: session.taskId, status: 'in_progress', priority: session.taskPriority }}
 										size="sm"
@@ -121,15 +121,17 @@
 										agentName={session.agentName}
 										onClick={() => onViewTask?.(session.taskId)}
 									/>
-									<span class="task-title" title={session.taskTitle}>
-										{session.taskTitle || session.taskId}
-									</span>
-								</div>
-								{#if session.taskDescription}
-									<div class="task-description">
-										{session.taskDescription}
+									<div class="text-column">
+										<span class="task-title" title={session.taskTitle}>
+											{session.taskTitle || session.taskId}
+										</span>
+										{#if session.taskDescription}
+											<div class="task-description">
+												{session.taskDescription}
+											</div>
+										{/if}
 									</div>
-								{/if}
+								</div>
 							</div>
 						</td>
 						<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
@@ -220,18 +222,28 @@
 	.task-cell-content {
 		display: flex;
 		flex-direction: column;
-		align-items: stretch;
+		align-items: flex-start;
 		gap: 0.25rem;
 		min-width: 0;
 		width: 100%;
 	}
 
-	.agent-badge-row {
+	/* Badge + text side by side */
+	.badge-and-text {
 		display: flex;
-		align-items: center;
-		gap: 0.5rem;
+		align-items: flex-start;
+		gap: 0.625rem;
 		min-width: 0;
 		width: 100%;
+	}
+
+	.text-column {
+		display: flex;
+		flex-direction: column;
+		gap: 0.125rem;
+		min-width: 0;
+		flex: 1;
+		padding-top: 0.125rem;
 	}
 
 	.task-title {
@@ -251,6 +263,5 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-		max-width: calc(100% - 2rem);
 	}
 </style>
