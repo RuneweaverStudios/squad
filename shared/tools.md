@@ -61,7 +61,7 @@ Database, monitoring, credentials, and task review tools.
 | `jt-set-review-override` | Set review override for a task |
 | `backup-jat.sh` | Backup task database |
 | `rollback-jat.sh` | Rollback task database to backup |
-| `jat-skills` | Skill catalog fetcher (OpenClaw/Pi ecosystem) |
+| `jat-skills` | Skill catalog, installer, and local management |
 
 **jat-secret usage:**
 ```bash
@@ -73,11 +73,21 @@ jat-secret --env <name> # Get env var name for a key
 
 **jat-skills usage:**
 ```bash
+# Catalog (browse remote skills)
 jat-skills search <query>   # Search skills by keyword
-jat-skills list-available    # List all available skills
+jat-skills list-available    # List all catalog skills
 jat-skills info <skill-id>   # Show skill details
 jat-skills refresh           # Force refresh cache
 jat-skills sources           # Show source status
+
+# Install & manage (local skills)
+jat-skills install <name-or-url>  # Install from catalog or URL
+jat-skills list                   # List installed skills
+jat-skills enable <name>          # Enable an installed skill
+jat-skills disable <name>         # Disable an installed skill
+jat-skills uninstall <name>       # Remove an installed skill
+jat-skills update <name>          # Re-fetch from source
+
 jat-skills --json            # JSON output (combine with any command)
 ```
 

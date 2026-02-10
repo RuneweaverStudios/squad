@@ -378,6 +378,186 @@ check_compatibility() {
     fi
 }
 
+# --- Install management helpers ---
+
+# Ensure installed.json exists and is valid
+ensure_installed() {
+    ensure_dirs
+    if [[ ! -f "$INSTALLED_FILE" ]] || [[ ! -s "$INSTALLED_FILE" ]]; then
+        echo '{"skills":{}}' > "$INSTALLED_FILE"
+    fi
+}
+
+# Get installed skills JSON object
+get_installed() {
+    ensure_installed
+    jq -r '.skills // {}' "$INSTALLED_FILE" 2>/dev/null || echo '{}'
+}
+
+# Save an entry to installed.json
+save_installed_entry() {
+    local skill_id="$1"
+    local entry_json="$2"
+    ensure_installed
+    local tmp
+    tmp=$(mktemp)
+    jq --arg id "$skill_id" --argjson entry "$entry_json" \
+        '.skills[$id] = $entry' "$INSTALLED_FILE" > "$tmp" && mv "$tmp" "$INSTALLED_FILE"
+}
+
+# Remove an entry from installed.json
+remove_installed_entry() {
+    local skill_id="$1"
+    ensure_installed
+    local tmp
+    tmp=$(mktemp)
+    jq --arg id "$skill_id" 'del(.skills[$id])' "$INSTALLED_FILE" > "$tmp" && mv "$tmp" "$INSTALLED_FILE"
+}
+
+# Validate SKILL.md content - checks for frontmatter with name and description
+validate_skill_md() {
+    local content="$1"
+
+    # Must start with ---
+    if ! echo "$content" | head -1 | grep -q '^---'; then
+        echo "Missing YAML frontmatter (must start with ---)"
+        return 1
+    fi
+
+    # Must have closing ---
+    if ! echo "$content" | tail -n +2 | grep -q '^---'; then
+        echo "Missing closing frontmatter delimiter (---)"
+        return 1
+    fi
+
+    # Extract frontmatter (between first and second ---)
+    local frontmatter
+    frontmatter=$(echo "$content" | sed -n '2,/^---$/p' | head -n -1)
+
+    # Must have name field
+    if ! echo "$frontmatter" | grep -q '^name:'; then
+        echo "Missing required 'name' field in frontmatter"
+        return 1
+    fi
+
+    # Must have description field
+    if ! echo "$frontmatter" | grep -q '^description:'; then
+        echo "Missing required 'description' field in frontmatter"
+        return 1
+    fi
+
+    # Must have content after frontmatter
+    local body
+    body=$(echo "$content" | awk 'BEGIN{c=0} /^---$/{c++;next} c>=2{print}')
+    if [[ -z "$(echo "$body" | tr -d '[:space:]')" ]]; then
+        echo "No content after frontmatter"
+        return 1
+    fi
+
+    return 0
+}
+
+# Extract a frontmatter field value from SKILL.md content
+extract_frontmatter_field() {
+    local content="$1"
+    local field="$2"
+    echo "$content" | sed -n '2,/^---$/p' | head -n -1 | grep "^${field}:" | sed "s/^${field}:[[:space:]]*//" | sed 's/^["'"'"']\(.*\)["'"'"']$/\1/'
+}
+
+# Convert a GitHub blob URL to raw URL
+github_to_raw_url() {
+    local url="$1"
+    # https://github.com/user/repo/blob/main/path/SKILL.md
+    # → https://raw.githubusercontent.com/user/repo/main/path/SKILL.md
+    echo "$url" | sed 's|github\.com/\([^/]*/[^/]*\)/blob/|raw.githubusercontent.com/\1/|'
+}
+
+# Resolve a skill name or URL to a fetchable SKILL.md URL and skill ID
+# Sets: RESOLVED_URL, RESOLVED_ID, RESOLVED_SOURCE
+resolve_skill_source() {
+    local input="$1"
+    RESOLVED_URL=""
+    RESOLVED_ID=""
+    RESOLVED_SOURCE=""
+
+    if [[ "$input" =~ ^https?:// ]]; then
+        # It's a URL
+        if [[ "$input" =~ github\.com/([^/]+)/([^/]+)/?$ ]]; then
+            # Bare GitHub repo URL → try SKILL.md in root
+            local user="${BASH_REMATCH[1]}"
+            local repo="${BASH_REMATCH[2]}"
+            repo="${repo%.git}"
+            RESOLVED_URL="https://raw.githubusercontent.com/${user}/${repo}/main/SKILL.md"
+            RESOLVED_ID="$repo"
+            RESOLVED_SOURCE="$input"
+        elif [[ "$input" =~ github\.com/.*/blob/ ]]; then
+            # GitHub blob URL → convert to raw
+            RESOLVED_URL=$(github_to_raw_url "$input")
+            # Extract skill name from path (last dir before SKILL.md, or repo name)
+            local path_part
+            path_part=$(echo "$input" | sed 's|.*/blob/[^/]*/||' | sed 's|/SKILL\.md$||')
+            if [[ -n "$path_part" && "$path_part" != "SKILL.md" ]]; then
+                RESOLVED_ID=$(basename "$path_part")
+            else
+                RESOLVED_ID=$(echo "$input" | sed 's|.*/\([^/]*/[^/]*\)/blob/.*|\1|' | sed 's|.*/||')
+            fi
+            RESOLVED_SOURCE="$input"
+        elif [[ "$input" =~ raw\.githubusercontent\.com/ ]]; then
+            # Already a raw URL
+            RESOLVED_URL="$input"
+            local path_part
+            path_part=$(echo "$input" | sed 's|.*/main/||; s|/SKILL\.md$||')
+            if [[ -n "$path_part" && "$path_part" != "SKILL.md" ]]; then
+                RESOLVED_ID=$(basename "$path_part")
+            else
+                RESOLVED_ID=$(echo "$input" | sed 's|.*/\([^/]*/[^/]*\)/main/.*|\1|' | sed 's|.*/||')
+            fi
+            RESOLVED_SOURCE="$input"
+        else
+            # Generic URL - assume it points to SKILL.md directly
+            RESOLVED_URL="$input"
+            RESOLVED_ID=$(basename "$(dirname "$input")" 2>/dev/null || echo "unknown-skill")
+            if [[ "$RESOLVED_ID" == "." || "$RESOLVED_ID" == "/" ]]; then
+                RESOLVED_ID="unknown-skill"
+            fi
+            RESOLVED_SOURCE="$input"
+        fi
+    else
+        # It's a catalog name - look up in catalog
+        local skills
+        skills=$(get_skills)
+
+        local skill
+        skill=$(echo "$skills" | jq --arg id "$input" '[.[] | select(.id == $id)] | .[0] // empty')
+
+        if [[ -z "$skill" || "$skill" == "null" ]]; then
+            # Try fuzzy match
+            skill=$(echo "$skills" | jq --arg id "$input" '[
+                .[] | select(.id | ascii_downcase | contains($id | ascii_downcase))
+            ] | .[0] // empty')
+        fi
+
+        if [[ -z "$skill" || "$skill" == "null" ]]; then
+            error "Skill '$input' not found in catalog.\nUse 'jat-skills search $input' to find similar skills,\nor provide a direct URL to install."
+        fi
+
+        local skill_md_url
+        skill_md_url=$(echo "$skill" | jq -r '.skillMdUrl // empty')
+        if [[ -z "$skill_md_url" ]]; then
+            error "No SKILL.md URL found for '$input' in catalog"
+        fi
+
+        # Convert GitHub blob URLs to raw
+        if [[ "$skill_md_url" =~ github\.com/.*/blob/ ]]; then
+            RESOLVED_URL=$(github_to_raw_url "$skill_md_url")
+        else
+            RESOLVED_URL="$skill_md_url"
+        fi
+        RESOLVED_ID=$(echo "$skill" | jq -r '.id')
+        RESOLVED_SOURCE="catalog:${RESOLVED_ID}"
+    fi
+}
+
 # Format a single skill for display
 format_skill() {
     local skill="$1"
@@ -606,6 +786,337 @@ cmd_sources() {
     fi
 }
 
+# --- Install & Management Commands ---
+
+cmd_install() {
+    local input="${1:-}"
+    if [[ -z "$input" ]]; then
+        error "Usage: jat-skills install <name-or-url>\n\nExamples:\n  jat-skills install git-commit\n  jat-skills install https://github.com/user/repo"
+    fi
+
+    ensure_dirs
+
+    # For non-URL inputs, check if already installed before catalog lookup
+    if [[ ! "$input" =~ ^https?:// ]]; then
+        local existing
+        existing=$(get_installed | jq --arg id "$input" '.[$id] // empty')
+        if [[ -n "$existing" && "$existing" != "null" ]]; then
+            warn "Skill '$input' is already installed. Use 'jat-skills update $input' to re-fetch."
+            return 1
+        fi
+    fi
+
+    # Resolve source
+    resolve_skill_source "$input"
+
+    if [[ -z "$RESOLVED_URL" || -z "$RESOLVED_ID" ]]; then
+        error "Could not resolve skill source for '$input'"
+    fi
+
+    # Check if already installed (for URL-based installs, check after resolving ID)
+    if [[ "$input" =~ ^https?:// ]]; then
+        local existing
+        existing=$(get_installed | jq --arg id "$RESOLVED_ID" '.[$id] // empty')
+        if [[ -n "$existing" && "$existing" != "null" ]]; then
+            warn "Skill '$RESOLVED_ID' is already installed. Use 'jat-skills update $RESOLVED_ID' to re-fetch."
+            return 1
+        fi
+    fi
+
+    info "Fetching SKILL.md from $RESOLVED_URL ..."
+
+    local content
+    content=$(curl -sf --max-time 15 "$RESOLVED_URL" 2>/dev/null) || true
+
+    if [[ -z "$content" ]]; then
+        # If bare repo URL, try HEAD branch too
+        if [[ "$RESOLVED_URL" =~ raw\.githubusercontent\.com/([^/]+)/([^/]+)/main/SKILL\.md$ ]]; then
+            local user="${BASH_REMATCH[1]}"
+            local repo="${BASH_REMATCH[2]}"
+            local alt_url="https://raw.githubusercontent.com/${user}/${repo}/master/SKILL.md"
+            info "Trying master branch..."
+            content=$(curl -sf --max-time 15 "$alt_url" 2>/dev/null) || true
+            if [[ -n "$content" ]]; then
+                RESOLVED_URL="$alt_url"
+            fi
+        fi
+    fi
+
+    if [[ -z "$content" ]]; then
+        error "Failed to fetch SKILL.md from: $RESOLVED_URL"
+    fi
+
+    # Validate
+    local validation_error
+    validation_error=$(validate_skill_md "$content" 2>&1) || {
+        error "Invalid SKILL.md: $validation_error"
+    }
+
+    # Extract metadata from frontmatter
+    local skill_name skill_desc skill_version skill_author
+    skill_name=$(extract_frontmatter_field "$content" "name")
+    skill_desc=$(extract_frontmatter_field "$content" "description")
+    # Try to get version from metadata block (indented under metadata:)
+    skill_version=$(echo "$content" | sed -n '2,/^---$/p' | head -n -1 | grep '  version:' | sed 's/.*version:[[:space:]]*//' | sed 's/^["'"'"']\(.*\)["'"'"']$/\1/' || true)
+    if [[ -z "$skill_version" ]]; then
+        skill_version="latest"
+    fi
+    skill_author=$(echo "$content" | sed -n '2,/^---$/p' | head -n -1 | grep '  author:' | sed 's/.*author:[[:space:]]*//' | sed 's/^["'"'"']\(.*\)["'"'"']$/\1/' || true)
+    if [[ -z "$skill_author" ]]; then
+        skill_author="unknown"
+    fi
+
+    # Create skill directory and write SKILL.md
+    local skill_dir="$SKILLS_DIR/$RESOLVED_ID"
+    mkdir -p "$skill_dir"
+    echo "$content" > "$skill_dir/SKILL.md"
+
+    # Record in installed.json
+    local now
+    now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    local entry
+    entry=$(jq -n \
+        --arg name "$skill_name" \
+        --arg description "$skill_desc" \
+        --arg version "$skill_version" \
+        --arg author "$skill_author" \
+        --arg source "$RESOLVED_SOURCE" \
+        --arg sourceUrl "$RESOLVED_URL" \
+        --arg installedAt "$now" \
+        --arg updatedAt "$now" \
+        '{
+            name: $name,
+            description: $description,
+            version: $version,
+            author: $author,
+            source: $source,
+            sourceUrl: $sourceUrl,
+            installedAt: $installedAt,
+            updatedAt: $updatedAt,
+            enabled: true
+        }')
+
+    save_installed_entry "$RESOLVED_ID" "$entry"
+
+    if [[ "$JSON_OUTPUT" == "true" ]]; then
+        jq -n --arg id "$RESOLVED_ID" --argjson entry "$entry" '{id: $id} + $entry'
+        return
+    fi
+
+    echo -e "${GREEN}Installed:${NC} ${BOLD}${CYAN}$RESOLVED_ID${NC}"
+    echo -e "  ${DIM}Name:${NC}    $skill_name"
+    echo -e "  ${DIM}Version:${NC} $skill_version"
+    echo -e "  ${DIM}Author:${NC}  $skill_author"
+    echo -e "  ${DIM}Source:${NC}  $RESOLVED_SOURCE"
+    echo -e "  ${DIM}Path:${NC}    $skill_dir/SKILL.md"
+}
+
+cmd_list_installed() {
+    ensure_installed
+    local installed
+    installed=$(get_installed)
+
+    local count
+    count=$(echo "$installed" | jq 'length')
+
+    if [[ "$JSON_OUTPUT" == "true" ]]; then
+        echo "$installed" | jq '[to_entries[] | {id: .key} + .value]'
+        return
+    fi
+
+    if [[ "$count" -eq 0 ]]; then
+        echo -e "No skills installed."
+        echo -e "${DIM}Use 'jat-skills install <name>' to install from catalog${NC}"
+        echo -e "${DIM}Use 'jat-skills list-available' to browse the catalog${NC}"
+        return
+    fi
+
+    echo -e "${BOLD}Installed skills ($count):${NC}"
+    echo ""
+
+    echo "$installed" | jq -c 'to_entries[]' | while IFS= read -r entry; do
+        local id name version author enabled source
+        id=$(echo "$entry" | jq -r '.key')
+        name=$(echo "$entry" | jq -r '.value.name // .key')
+        version=$(echo "$entry" | jq -r '.value.version // "latest"')
+        author=$(echo "$entry" | jq -r '.value.author // "unknown"')
+        enabled=$(echo "$entry" | jq -r 'if .value.enabled == false then "false" else "true" end')
+        source=$(echo "$entry" | jq -r '.value.source // "unknown"')
+
+        local status_badge
+        if [[ "$enabled" == "false" ]]; then
+            status_badge="${YELLOW}disabled${NC}"
+        else
+            status_badge="${GREEN}enabled${NC}"
+        fi
+
+        echo -e "  ${BOLD}${CYAN}$id${NC} ${DIM}v$version${NC} ${DIM}by${NC} $author  $status_badge"
+        echo -e "    ${DIM}$name${NC}"
+        echo -e "    ${DIM}source:${NC} $source"
+        echo ""
+    done
+}
+
+cmd_enable() {
+    local skill_id="${1:-}"
+    if [[ -z "$skill_id" ]]; then
+        error "Usage: jat-skills enable <name>"
+    fi
+
+    ensure_installed
+    local existing
+    existing=$(get_installed | jq --arg id "$skill_id" '.[$id] // empty')
+
+    if [[ -z "$existing" || "$existing" == "null" ]]; then
+        error "Skill '$skill_id' is not installed.\nUse 'jat-skills list' to see installed skills."
+    fi
+
+    local already_enabled
+    already_enabled=$(echo "$existing" | jq -r 'if .enabled == false then "false" else "true" end')
+    if [[ "$already_enabled" == "true" ]]; then
+        echo -e "Skill ${BOLD}$skill_id${NC} is already enabled."
+        return
+    fi
+
+    local updated
+    updated=$(echo "$existing" | jq --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.enabled = true | .updatedAt = $now')
+    save_installed_entry "$skill_id" "$updated"
+
+    echo -e "${GREEN}Enabled:${NC} ${BOLD}$skill_id${NC}"
+}
+
+cmd_disable() {
+    local skill_id="${1:-}"
+    if [[ -z "$skill_id" ]]; then
+        error "Usage: jat-skills disable <name>"
+    fi
+
+    ensure_installed
+    local existing
+    existing=$(get_installed | jq --arg id "$skill_id" '.[$id] // empty')
+
+    if [[ -z "$existing" || "$existing" == "null" ]]; then
+        error "Skill '$skill_id' is not installed.\nUse 'jat-skills list' to see installed skills."
+    fi
+
+    local already_disabled
+    already_disabled=$(echo "$existing" | jq -r 'if .enabled == false then "false" else "true" end')
+    if [[ "$already_disabled" == "false" ]]; then
+        echo -e "Skill ${BOLD}$skill_id${NC} is already disabled."
+        return
+    fi
+
+    local updated
+    updated=$(echo "$existing" | jq --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.enabled = false | .updatedAt = $now')
+    save_installed_entry "$skill_id" "$updated"
+
+    echo -e "${YELLOW}Disabled:${NC} ${BOLD}$skill_id${NC}"
+}
+
+cmd_uninstall() {
+    local skill_id="${1:-}"
+    if [[ -z "$skill_id" ]]; then
+        error "Usage: jat-skills uninstall <name>"
+    fi
+
+    ensure_installed
+    local existing
+    existing=$(get_installed | jq --arg id "$skill_id" '.[$id] // empty')
+
+    if [[ -z "$existing" || "$existing" == "null" ]]; then
+        error "Skill '$skill_id' is not installed.\nUse 'jat-skills list' to see installed skills."
+    fi
+
+    # Remove skill directory
+    local skill_dir="$SKILLS_DIR/$skill_id"
+    if [[ -d "$skill_dir" ]]; then
+        rm -rf "$skill_dir"
+    fi
+
+    # Remove from registry
+    remove_installed_entry "$skill_id"
+
+    if [[ "$JSON_OUTPUT" == "true" ]]; then
+        jq -n --arg id "$skill_id" '{"id": $id, "uninstalled": true}'
+        return
+    fi
+
+    echo -e "${GREEN}Uninstalled:${NC} ${BOLD}$skill_id${NC}"
+}
+
+cmd_update_skill() {
+    local skill_id="${1:-}"
+    if [[ -z "$skill_id" ]]; then
+        error "Usage: jat-skills update <name>\n\nTo refresh the catalog cache, use 'jat-skills refresh'"
+    fi
+
+    ensure_installed
+    local existing
+    existing=$(get_installed | jq --arg id "$skill_id" '.[$id] // empty')
+
+    if [[ -z "$existing" || "$existing" == "null" ]]; then
+        error "Skill '$skill_id' is not installed.\nUse 'jat-skills list' to see installed skills."
+    fi
+
+    local source_url
+    source_url=$(echo "$existing" | jq -r '.sourceUrl // empty')
+
+    if [[ -z "$source_url" ]]; then
+        # Try to resolve from catalog
+        local source
+        source=$(echo "$existing" | jq -r '.source // empty')
+        if [[ "$source" =~ ^catalog: ]]; then
+            resolve_skill_source "$skill_id"
+            source_url="$RESOLVED_URL"
+        fi
+    fi
+
+    if [[ -z "$source_url" ]]; then
+        error "No source URL recorded for '$skill_id'. Cannot update.\nUninstall and reinstall with a URL."
+    fi
+
+    info "Fetching SKILL.md from $source_url ..."
+
+    local content
+    content=$(curl -sf --max-time 15 "$source_url" 2>/dev/null) || true
+
+    if [[ -z "$content" ]]; then
+        error "Failed to fetch SKILL.md from: $source_url"
+    fi
+
+    # Validate
+    local validation_error
+    validation_error=$(validate_skill_md "$content" 2>&1) || {
+        error "Invalid SKILL.md: $validation_error"
+    }
+
+    # Write updated SKILL.md
+    local skill_dir="$SKILLS_DIR/$skill_id"
+    mkdir -p "$skill_dir"
+    echo "$content" > "$skill_dir/SKILL.md"
+
+    # Update metadata
+    local skill_version
+    skill_version=$(echo "$content" | sed -n '2,/^---$/p' | head -n -1 | grep '  version:' | sed 's/.*version:[[:space:]]*//' | sed 's/^["'"'"']\(.*\)["'"'"']$/\1/' || true)
+    if [[ -z "$skill_version" ]]; then
+        skill_version="latest"
+    fi
+
+    local now
+    now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    local updated
+    updated=$(echo "$existing" | jq --arg now "$now" --arg ver "$skill_version" '.updatedAt = $now | .version = $ver')
+    save_installed_entry "$skill_id" "$updated"
+
+    if [[ "$JSON_OUTPUT" == "true" ]]; then
+        jq -n --arg id "$skill_id" --arg version "$skill_version" --arg updatedAt "$now" \
+            '{id: $id, version: $version, updatedAt: $updatedAt, updated: true}'
+        return
+    fi
+
+    echo -e "${GREEN}Updated:${NC} ${BOLD}${CYAN}$skill_id${NC} ${DIM}v$skill_version${NC}"
+}
+
 # --- Main ---
 
 JSON_OUTPUT="false"
@@ -626,14 +1137,42 @@ case "${1:-}" in
         shift
         cmd_search "${1:-}"
         ;;
-    list-available|list|ls)
+    list-available)
         cmd_list
+        ;;
+    list|ls)
+        cmd_list_installed
         ;;
     info|show)
         shift
         cmd_info "${1:-}"
         ;;
-    refresh|update)
+    install)
+        shift
+        cmd_install "${1:-}"
+        ;;
+    enable)
+        shift
+        cmd_enable "${1:-}"
+        ;;
+    disable)
+        shift
+        cmd_disable "${1:-}"
+        ;;
+    uninstall|remove)
+        shift
+        cmd_uninstall "${1:-}"
+        ;;
+    update)
+        shift
+        if [[ -n "${1:-}" ]]; then
+            cmd_update_skill "$1"
+        else
+            # Bare 'update' with no arg → refresh cache (backward compat)
+            cmd_refresh
+        fi
+        ;;
+    refresh)
         cmd_refresh
         ;;
     sources|status)
@@ -643,7 +1182,7 @@ case "${1:-}" in
         show_help
         ;;
     --version|-v)
-        echo "jat-skills 1.0.0"
+        echo "jat-skills 2.0.0"
         ;;
     "")
         show_help
