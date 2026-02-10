@@ -104,6 +104,35 @@
  * @property {IngestItem[]} [sampleItems]
  */
 
+// ─── Realtime Types ─────────────────────────────────────────────────────────
+
+/**
+ * Callbacks passed to connect() for realtime adapters.
+ *
+ * @typedef {Object} RealtimeCallbacks
+ * @property {(item: IngestItem) => void} onMessage - Called when a new message arrives
+ * @property {(err: Error) => void} onError - Called on connection error
+ * @property {(reason: string) => void} onDisconnect - Called when connection drops
+ */
+
+/**
+ * Target for an outbound message via send().
+ *
+ * @typedef {Object} SendTarget
+ * @property {string} [channelId] - Channel/chat/room ID
+ * @property {string} [threadId] - Thread/topic ID for threaded replies
+ * @property {string} [userId] - Direct message target user
+ */
+
+/**
+ * Outbound message payload for send().
+ *
+ * @typedef {Object} OutboundMessage
+ * @property {string} text - Message body text
+ * @property {Attachment[]} [attachments] - Optional attachments
+ * @property {Record<string, *>} [metadata] - Adapter-specific extra fields
+ */
+
 // ─── Base Adapter ───────────────────────────────────────────────────────────
 
 /**
@@ -120,6 +149,9 @@
  * Optional overrides:
  * - validate(sourceConfig) -> ValidateResult
  * - pollReplies(source, threads, getSecret) -> replies[]
+ * - connect(sourceConfig, getSecret, callbacks) -> void (realtime adapters)
+ * - disconnect() -> void (realtime adapters)
+ * - send(target, message, getSecret) -> void (two-way adapters)
  */
 export class BaseAdapter {
   /** @param {string} type - Adapter type identifier */
@@ -170,6 +202,67 @@ export class BaseAdapter {
    */
   async pollReplies(_source, _threads, _getSecret) {
     return [];
+  }
+
+  // ─── Realtime Interface (optional) ──────────────────────────────────────
+
+  /**
+   * Whether this adapter supports persistent realtime connections.
+   * Override to return true in adapters that implement connect/disconnect.
+   *
+   * @returns {boolean}
+   */
+  get supportsRealtime() {
+    return false;
+  }
+
+  /**
+   * Whether this adapter can send outbound messages.
+   * Override to return true in adapters that implement send().
+   *
+   * @returns {boolean}
+   */
+  get supportsSend() {
+    return false;
+  }
+
+  /**
+   * Establish a persistent realtime connection.
+   * Override in adapters that support streaming/websocket connections.
+   * Default: no-op (poll-only adapters ignore this).
+   *
+   * @param {Object} sourceConfig - Source configuration
+   * @param {(name: string) => string} getSecret - Retrieve a secret by name
+   * @param {RealtimeCallbacks} callbacks - Event callbacks for incoming data
+   * @returns {Promise<void>}
+   */
+  async connect(_sourceConfig, _getSecret, _callbacks) {
+    // no-op for poll-only adapters
+  }
+
+  /**
+   * Tear down the realtime connection.
+   * Override in adapters that implement connect().
+   * Default: no-op.
+   *
+   * @returns {Promise<void>}
+   */
+  async disconnect() {
+    // no-op for poll-only adapters
+  }
+
+  /**
+   * Send an outbound message through this adapter.
+   * Override in adapters that support two-way communication.
+   * Default: throws "not supported".
+   *
+   * @param {SendTarget} target - Where to send the message
+   * @param {OutboundMessage} message - The message to send
+   * @param {(name: string) => string} getSecret - Retrieve a secret by name
+   * @returns {Promise<void>}
+   */
+  async send(_target, _message, _getSecret) {
+    throw new Error(`${this.type}: send() not supported`);
   }
 }
 
