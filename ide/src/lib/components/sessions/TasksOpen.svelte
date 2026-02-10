@@ -1036,7 +1036,6 @@
 							/>
 						</th>
 						<th class="th-task">Task</th>
-						<th class="th-title">Title</th>
 						<th class="th-actions">Actions</th>
 					</tr>
 				</thead>
@@ -1085,18 +1084,16 @@
 												harnessPickerPos = { x: e.clientX, y: Math.min(e.clientY, maxY) };
 											}}
 										/>
+										<span class="task-title {isNew ? 'tracking-in-expand' : ''}" style={isNew ? 'animation-delay: 100ms;' : ''} title={task.title}>
+											{task.title}
+										</span>
 									</div>
+									{#if task.description}
+										<div class="task-description {isNew ? 'tracking-in-expand' : ''}" style={isNew ? 'animation-delay: 100ms;' : ''}>
+											{task.description}
+										</div>
+									{/if}
 								</div>
-							</td>
-							<td class="td-title" style={isExiting ? 'background: transparent;' : ''}>
-								<span class="task-title {isNew ? 'tracking-in-expand' : ''}" style={isNew ? 'animation-delay: 100ms;' : ''} title={task.title}>
-									{task.title}
-								</span>
-								{#if task.description}
-									<div class="task-description {isNew ? 'tracking-in-expand' : ''}" style={isNew ? 'animation-delay: 100ms;' : ''}>
-										{task.description}
-									</div>
-								{/if}
 							</td>
 							<td class="td-actions" style={isExiting ? 'background: transparent;' : ''}>
 								<div class="relative flex items-center justify-center">
@@ -1672,10 +1669,8 @@
 		border-bottom: 1px solid oklch(0.25 0.02 250);
 	}
 
-	/* Three-column layout widths to match TasksActive */
-	/* Task: fixed width for TaskIdBadge */
-	.th-task, .td-task { width: min-content; white-space: nowrap; padding-left: 0.25rem; padding-right: 0.25rem; }
-	.th-title, .td-title { width: auto; padding-left: 0.25rem; }
+	/* Two-column layout widths (badge + title merged into task column) */
+	.th-task, .td-task { width: auto; padding-left: 0.25rem; padding-right: 0.25rem; }
 	.th-actions, .td-actions { width: 80px; text-align: right; }
 
 	.tasks-table td {
@@ -1705,6 +1700,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
+		min-width: 0;
 	}
 
 	/* Task info */
@@ -1721,6 +1717,8 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+		flex: 1;
+		min-width: 0;
 	}
 
 	.task-description {

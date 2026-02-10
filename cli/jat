@@ -373,13 +373,16 @@ list_projects() {
 #------------------------------------------------------------------------------
 
 # Check if updates are available (origin/master has commits we don't have)
+# Returns: 0 = updates available, 1 = up to date, 2 = fetch failed
 check_for_updates() {
     if [[ ! -d "$JAT_SOURCE_DIR/.git" ]]; then
-        return 1  # Not a git repo
+        return 2  # Not a git repo
     fi
 
     # Fetch latest from remote (quietly)
-    git -C "$JAT_SOURCE_DIR" fetch origin master --quiet 2>/dev/null || return 1
+    if ! git -C "$JAT_SOURCE_DIR" fetch origin master --quiet 2>/dev/null; then
+        return 2  # Fetch failed (network issue, no remote, etc.)
+    fi
 
     # Check if origin/master has commits that HEAD doesn't have
     # This correctly handles the case where local is ahead of origin
@@ -451,7 +454,7 @@ do_update() {
     fi
 
     # Update the check timestamp
-    date +%s > "$UPDATE_CHECK_FILE"
+    date +%s > "$UPDATE_CHECK_FILE" 2>/dev/null || true
 
     # Show what was updated
     local new_version
@@ -478,6 +481,12 @@ should_check_for_updates() {
 
     local last_check now diff
     last_check=$(cat "$UPDATE_CHECK_FILE" 2>/dev/null || echo "0")
+
+    # Validate stored timestamp is numeric (corrupted file → force check)
+    if ! [[ "$last_check" =~ ^[0-9]+$ ]]; then
+        return 0  # Invalid value, force check
+    fi
+
     now=$(date +%s)
     diff=$((now - last_check))
 
@@ -494,18 +503,29 @@ interactive_update_check() {
     # Only run if we should check (respects auto_update setting and 24h throttle)
     should_check_for_updates || return 0
 
-    # Update timestamp to prevent repeated checks
-    date +%s > "$UPDATE_CHECK_FILE"
-
-    # Check if JAT source exists
+    # Check if JAT source exists (don't write timestamp if source is missing)
     if [[ ! -d "$JAT_SOURCE_DIR/.git" ]]; then
+        echo -e "${DIM}JAT source not found at $JAT_SOURCE_DIR (update check skipped)${NC}"
         return 0
     fi
 
     echo -e "${DIM}Checking for updates...${NC}"
 
     # Check for updates (this does a git fetch)
-    if check_for_updates; then
+    # Returns: 0 = updates available, 1 = up to date, 2 = fetch failed
+    local check_result
+    check_for_updates; check_result=$?
+
+    if [[ $check_result -eq 2 ]]; then
+        # Fetch failed - don't write timestamp so we retry next launch
+        echo -e "${DIM}Could not check for updates (run 'jat update' to update manually)${NC}"
+        return 0
+    fi
+
+    # Fetch succeeded - write timestamp (won't check again for 24 hours)
+    date +%s > "$UPDATE_CHECK_FILE" 2>/dev/null || true
+
+    if [[ $check_result -eq 0 ]]; then
         local commits_behind
         commits_behind=$(get_commits_behind)
 
@@ -513,9 +533,9 @@ interactive_update_check() {
             echo ""
             echo -e "${YELLOW}JAT update available (${commits_behind} new commit(s)).${NC} Update now? [y/N] \c"
 
-            # Read with timeout (5 seconds)
+            # Read with timeout (10 seconds)
             local response
-            read -t 5 -r response || response=""
+            read -t 10 -r response || response=""
 
             if [[ "$response" =~ ^[Yy]$ ]]; then
                 do_update
@@ -525,7 +545,6 @@ interactive_update_check() {
             fi
         fi
     else
-        # Clear the "checking" message
         echo -e "${DIM}Up to date.${NC}"
     fi
 }
@@ -538,12 +557,17 @@ update_cmd() {
         --check|-c)
             # Just check, don't update
             echo -e "${DIM}Checking for updates...${NC}"
-            if check_for_updates; then
+            local check_result
+            check_for_updates; check_result=$?
+            if [[ $check_result -eq 0 ]]; then
                 local commits_behind
                 commits_behind=$(get_commits_behind)
                 echo -e "${GREEN}Update available: $commits_behind new commit(s)${NC}"
                 echo ""
                 echo "Run 'jat update' to update."
+            elif [[ $check_result -eq 2 ]]; then
+                echo -e "${YELLOW}Could not check for updates (network issue or missing remote)${NC}"
+                echo "Check your internet connection and try again."
             else
                 echo -e "${GREEN}✓ JAT is up to date${NC}"
             fi

@@ -102,7 +102,6 @@
 			<thead>
 				<tr>
 					<th class="th-task">Task</th>
-					<th class="th-title">Title</th>
 					<th class="th-action">Action</th>
 				</tr>
 			</thead>
@@ -122,14 +121,10 @@
 										agentName={session.agentName}
 										onClick={() => onViewTask?.(session.taskId)}
 									/>
+									<span class="task-title" title={session.taskTitle}>
+										{session.taskTitle || session.taskId}
+									</span>
 								</div>
-							</div>
-						</td>
-						<td class="td-title">
-							<div class="title-cell">
-								<span class="task-title" title={session.taskTitle}>
-									{session.taskTitle || session.taskId}
-								</span>
 								{#if session.taskDescription}
 									<div class="task-description">
 										{session.taskDescription}
@@ -218,8 +213,7 @@
 	}
 
 	/* Column widths matching TasksActive - wider action column for stacked elapsed time */
-	.th-task, .td-task { width: min-content; white-space: nowrap; padding-left: 0.25rem; padding-right: 0.25rem; }
-	.th-title, .td-title { width: auto; padding-left: 0.25rem; }
+	.th-task, .td-task { width: auto; padding-left: 0.25rem; padding-right: 0.25rem; }
 	.th-action, .td-action { width: 200px; text-align: right; overflow: hidden; }
 
 	/* Task cell content - matches TasksActive structure exactly */
@@ -235,16 +229,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-	}
-
-	/* Title cell styling matching TasksActive */
-	.title-cell {
-		display: flex;
-		flex-direction: column;
-		gap: 0.125rem;
 		min-width: 0;
-		width: 100%;
-		margin-right: 1rem;
 	}
 
 	.task-title {
@@ -254,7 +239,8 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-		max-width: calc(100% - 2rem);
+		flex: 1;
+		min-width: 0;
 	}
 
 	.task-description {

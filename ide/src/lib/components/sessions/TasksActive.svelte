@@ -976,7 +976,6 @@
 			<thead>
 				<tr>
 					<th class="th-task">Task</th>
-					<th class="th-agent">Agent</th>
 					<th class="th-status">Status</th>
 				</tr>
 			</thead>
@@ -1010,7 +1009,7 @@
 						onclick={() => !isExiting && toggleExpanded(session.name)}
 						oncontextmenu={(e) => !isExiting && handleContextMenu(session, e)}
 					>
-						<!-- Column 1: TaskIdBadge + Agent -->
+						<!-- Column 1: TaskIdBadge + Title + Description (merged) -->
 						<td class="td-task">
 							{#if session.type === 'server'}
 								<!-- Server session display -->
@@ -1034,9 +1033,10 @@
 									<span class="session-name">{session.name}</span>
 								</div>
 							{:else}
-								<!-- Agent session: TaskIdBadge with avatar and status ring -->
+								<!-- Agent session: TaskIdBadge with title inline -->
 								<div class="task-cell-content">
 									{#if sessionTask}
+										{@const animateText = isNew && hadTaskOnEntry}
 										<div class="agent-badge-row">
 											<TaskIdBadge
 												task={sessionTask}
@@ -1051,7 +1051,15 @@
 												exiting={isExiting}
 												harness={getTaskHarness(sessionTask)}
 											/>
+											<span class="task-title {animateText ? 'tracking-in-expand' : ''}" style={animateText ? 'animation-delay: 100ms;' : ''} title={sessionTask.title}>
+												{sessionTask.title || sessionTask.id}
+											</span>
 										</div>
+										{#if sessionTask.description}
+											<div class="task-description {animateText ? 'tracking-in-expand' : ''}" style={animateText ? 'animation-delay: 100ms;' : ''}>
+												{sessionTask.description}
+											</div>
+										{/if}
 									{:else}
 										<!-- No task - planning pill matching agentPill aesthetic -->
 										{@const planningColor = effectiveState === 'planning' ? 'oklch(0.68 0.20 270)' : (rowProjectColor || 'oklch(0.50 0.02 250)')}
@@ -1075,25 +1083,6 @@
 												</div>
 											{/if}
 										</div>
-									{/if}
-								</div>
-							{/if}
-						</td>
-						<!-- Column 2: Task Title + Description -->
-						<td class="td-agent">
-							{#if session.type === 'agent'}
-								<div class="agent-cell-content">
-									{#if sessionTask}
-										{@const animateText = isNew && hadTaskOnEntry}
-										<span class="task-title {animateText ? 'tracking-in-expand' : ''}" style={animateText ? 'animation-delay: 100ms;' : ''} title={sessionTask.title}>
-											{sessionTask.title || sessionTask.id}
-										</span>
-										{#if sessionTask.description}
-											<div class="task-description {animateText ? 'tracking-in-expand' : ''}" style={animateText ? 'animation-delay: 100ms;' : ''}>
-												{sessionTask.description}
-											</div>
-										{/if}
-									{:else}
 										{#if effectiveState === 'planning'}
 											<span class="planning-title">Planning session</span>
 											<div class="planning-description">Interactive brainstorming — no task assigned</div>
@@ -1102,8 +1091,6 @@
 										{/if}
 									{/if}
 								</div>
-							{:else}
-								<span class="no-agent-label">Server</span>
 							{/if}
 						</td>
 						<!-- Column 3: Status (StatusActionBadge) -->
@@ -2036,10 +2023,9 @@
 		vertical-align: middle;
 	}
 
-	/* Three-column layout widths */
-	/* Task: fixed width for TaskIdBadge, Agent: takes remaining space, Status: fixed width for StatusActionBadge */
-	.th-task, .td-task { width: min-content; white-space: nowrap; padding-left: 0.25rem; padding-right: 0.25rem; }
-	.th-agent, .td-agent { width: auto; padding-left: 0.25rem; }
+	/* Two-column layout widths */
+	/* Task: takes remaining space (badge + title inline), Status: fixed width for StatusActionBadge */
+	.th-task, .td-task { width: auto; padding-left: 0.25rem; padding-right: 0.25rem; }
 	.th-status, .td-status { width: 160px; text-align: right; }
 
 	/* Task column */
@@ -2049,21 +2035,6 @@
 		align-items: flex-start;
 		gap: 0.25rem;
 		min-width: 0;
-	}
-
-	/* Agent column */
-	.agent-cell-content {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
-		width: 100%;
-		min-width: 0;
-	}
-
-	.no-agent-label {
-		font-size: 0.75rem;
-		color: oklch(0.50 0.02 250);
-		font-style: italic;
 	}
 
 	/* Status column */
@@ -2185,6 +2156,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
+		min-width: 0;
 	}
 
 	.agent-name-inline {

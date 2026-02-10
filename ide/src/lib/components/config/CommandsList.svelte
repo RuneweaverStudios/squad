@@ -7,6 +7,7 @@
 	 * - Collapsible sections per namespace
 	 * - Search/filter by name, invocation, or namespace
 	 * - Import/Export functionality
+	 * - Drag-and-drop .md file import (drop on namespace header or general area)
 	 * - New Command button
 	 * - Loading and error states
 	 *
@@ -53,6 +54,176 @@
 	let exportDropdownOpen = $state(false);
 	let selectedExportNamespaces = $state<Set<string>>(new Set()); // Empty = all namespaces
 	let exportDropdownRef: HTMLDivElement;
+
+	// Drag-and-drop state
+	let isDragOver = $state(false);
+	let dragOverNamespace = $state<string | null>(null);
+	let isProcessingDrop = $state(false);
+	let showNamespacePicker = $state(false);
+	let pendingDropFiles = $state<File[]>([]);
+	let newNamespaceInput = $state('');
+
+	// Drag-and-drop handlers
+	function handleDragEnter(e: DragEvent) {
+		e.preventDefault();
+		if (e.dataTransfer?.types.includes('Files')) {
+			isDragOver = true;
+		}
+	}
+
+	function handleDragOver(e: DragEvent) {
+		e.preventDefault();
+		if (e.dataTransfer) {
+			e.dataTransfer.dropEffect = 'copy';
+		}
+	}
+
+	function handleDragLeave(e: DragEvent) {
+		// Only reset if leaving the container entirely
+		const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+		const x = e.clientX;
+		const y = e.clientY;
+		if (x <= rect.left || x >= rect.right || y <= rect.top || y >= rect.bottom) {
+			isDragOver = false;
+			dragOverNamespace = null;
+		}
+	}
+
+	function handleNamespaceDragEnter(e: DragEvent, namespace: string) {
+		e.preventDefault();
+		e.stopPropagation();
+		dragOverNamespace = namespace;
+	}
+
+	function handleNamespaceDragLeave(e: DragEvent) {
+		// Check if we're still within the namespace header
+		const target = e.currentTarget as HTMLElement;
+		const related = e.relatedTarget as HTMLElement | null;
+		if (!related || !target.contains(related)) {
+			dragOverNamespace = null;
+		}
+	}
+
+	function getMdFiles(dataTransfer: DataTransfer): File[] {
+		return Array.from(dataTransfer.files).filter(
+			(f) => f.name.endsWith('.md') || f.type === 'text/markdown'
+		);
+	}
+
+	async function handleDrop(e: DragEvent) {
+		e.preventDefault();
+		isDragOver = false;
+		dragOverNamespace = null;
+
+		if (!e.dataTransfer) return;
+
+		const mdFiles = getMdFiles(e.dataTransfer);
+		if (mdFiles.length === 0) {
+			errorToast('No .md files found', 'Drag and drop .md (Markdown) command files');
+			return;
+		}
+
+		// If dropped on general area, show namespace picker
+		pendingDropFiles = mdFiles;
+		showNamespacePicker = true;
+		newNamespaceInput = '';
+	}
+
+	async function handleNamespaceDrop(e: DragEvent, namespace: string) {
+		e.preventDefault();
+		e.stopPropagation();
+		isDragOver = false;
+		dragOverNamespace = null;
+
+		if (!e.dataTransfer) return;
+
+		const mdFiles = getMdFiles(e.dataTransfer);
+		if (mdFiles.length === 0) {
+			errorToast('No .md files found', 'Drag and drop .md (Markdown) command files');
+			return;
+		}
+
+		await processDroppedFiles(mdFiles, namespace);
+	}
+
+	async function handleNamespacePickerSubmit(namespace: string) {
+		showNamespacePicker = false;
+		if (pendingDropFiles.length > 0) {
+			await processDroppedFiles(pendingDropFiles, namespace);
+			pendingDropFiles = [];
+		}
+	}
+
+	function handleNamespacePickerCancel() {
+		showNamespacePicker = false;
+		pendingDropFiles = [];
+	}
+
+	async function processDroppedFiles(files: File[], namespace: string) {
+		isProcessingDrop = true;
+		let created = 0;
+		let errors = 0;
+		const errorMessages: string[] = [];
+
+		for (const file of files) {
+			const name = file.name.replace(/\.md$/, '');
+			try {
+				const content = await file.text();
+				const response = await fetch('/api/commands', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ namespace, name, content })
+				});
+
+				if (response.ok) {
+					created++;
+				} else {
+					const result = await response.json();
+					errors++;
+					// 409 = already exists, offer update
+					if (response.status === 409) {
+						// Try PUT to update existing
+						const updateResp = await fetch(`/api/commands/${namespace}/${name}`, {
+							method: 'PUT',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({ content })
+						});
+						if (updateResp.ok) {
+							errors--;
+							created++;
+						} else {
+							errorMessages.push(`${file.name}: ${result.message || 'Already exists'}`);
+						}
+					} else {
+						errorMessages.push(`${file.name}: ${result.message || response.statusText}`);
+					}
+				}
+			} catch (err) {
+				errors++;
+				errorMessages.push(`${file.name}: ${(err as Error).message}`);
+			}
+		}
+
+		isProcessingDrop = false;
+
+		if (created > 0) {
+			await loadCommands();
+			successToast(
+				`Imported ${created} command${created !== 1 ? 's' : ''}`,
+				`Added to "${namespace}" namespace`
+			);
+			// Expand the target namespace
+			const newSet = new Set(expandedNamespaces);
+			newSet.add(namespace);
+			expandedNamespaces = newSet;
+		}
+		if (errors > 0) {
+			errorToast(
+				`${errors} file${errors !== 1 ? 's' : ''} failed`,
+				errorMessages.slice(0, 3).join('; ')
+			);
+		}
+	}
 
 	// Close dropdown when clicking outside
 	function handleClickOutside(event: MouseEvent) {
@@ -376,7 +547,100 @@
 	}
 </script>
 
-<div class="commands-list {className}">
+<div
+	class="commands-list {className}"
+	class:drag-over={isDragOver}
+	ondragenter={handleDragEnter}
+	ondragover={handleDragOver}
+	ondragleave={handleDragLeave}
+	ondrop={handleDrop}
+	role="region"
+	aria-label="Slash commands"
+>
+	<!-- Drag overlay -->
+	{#if isDragOver}
+		<div class="drag-overlay" transition:fade={{ duration: 100 }}>
+			<div class="drag-overlay-content">
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="drag-icon">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12l-3-3m0 0l-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+				</svg>
+				<span class="drag-text">Drop .md files to import commands</span>
+				<span class="drag-hint">Drop on a namespace header to target that namespace</span>
+			</div>
+		</div>
+	{/if}
+
+	<!-- Namespace picker modal (for drops on general area) -->
+	{#if showNamespacePicker}
+		<div class="namespace-picker-overlay" transition:fade={{ duration: 100 }}>
+			<div class="namespace-picker-modal" transition:slide={{ duration: 150, axis: 'y' }}>
+				<h3 class="picker-title">Choose namespace for {pendingDropFiles.length} file{pendingDropFiles.length !== 1 ? 's' : ''}</h3>
+				<p class="picker-hint">Select an existing namespace or create a new one</p>
+
+				<div class="picker-options">
+					{#each availableNamespaces as namespace}
+						<button
+							class="picker-option"
+							onclick={() => handleNamespacePickerSubmit(namespace)}
+						>
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke-width="1.5"
+								stroke="currentColor"
+								class="picker-icon"
+								style="color: {getNamespaceColor(namespace)}"
+							>
+								<path stroke-linecap="round" stroke-linejoin="round" d={getNamespaceIcon(namespace)} />
+							</svg>
+							<span class="picker-label">{namespace}</span>
+							<span class="picker-count">{commandGroups.find(g => g.namespace === namespace)?.commands.length || 0}</span>
+						</button>
+					{/each}
+
+					<!-- New namespace option -->
+					<div class="picker-new">
+						<input
+							type="text"
+							placeholder="New namespace..."
+							class="picker-new-input"
+							bind:value={newNamespaceInput}
+							onkeydown={(e) => {
+								if (e.key === 'Enter' && newNamespaceInput.trim()) {
+									handleNamespacePickerSubmit(newNamespaceInput.trim());
+								}
+							}}
+						/>
+						<button
+							class="picker-new-btn"
+							disabled={!newNamespaceInput.trim()}
+							onclick={() => {
+								if (newNamespaceInput.trim()) {
+									handleNamespacePickerSubmit(newNamespaceInput.trim());
+								}
+							}}
+						>
+							Create
+						</button>
+					</div>
+				</div>
+
+				<button class="picker-cancel" onclick={handleNamespacePickerCancel}>
+					Cancel
+				</button>
+			</div>
+		</div>
+	{/if}
+
+	<!-- Processing indicator -->
+	{#if isProcessingDrop}
+		<div class="processing-bar" transition:slide={{ duration: 150, axis: 'y' }}>
+			<div class="btn-spinner"></div>
+			<span>Importing commands...</span>
+		</div>
+	{/if}
+
 	<!-- Header -->
 	<header class="list-header">
 		<div class="header-left">
@@ -654,10 +918,15 @@
 			<!-- Commands grouped by namespace -->
 			{#each filteredCommandGroups as group (group.namespace)}
 				<div class="namespace-group" transition:slide={{ duration: 200, axis: 'y' }}>
-					<!-- Namespace header (collapsible) -->
+					<!-- Namespace header (collapsible + drop target) -->
 					<button
 						class="namespace-header"
+						class:namespace-drop-target={dragOverNamespace === group.namespace}
 						onclick={() => toggleNamespace(group.namespace)}
+						ondragenter={(e) => handleNamespaceDragEnter(e, group.namespace)}
+						ondragleave={handleNamespaceDragLeave}
+						ondragover={handleDragOver}
+						ondrop={(e) => handleNamespaceDrop(e, group.namespace)}
 						aria-expanded={isExpanded(group.namespace)}
 					>
 						<svg
@@ -1357,4 +1626,226 @@
 		height: 12px;
 		border-width: 1.5px;
 	}
+
+	/* Drag-and-drop styles */
+	.commands-list {
+		position: relative;
+	}
+
+	.drag-over {
+		outline: 2px dashed oklch(0.60 0.15 200);
+		outline-offset: -2px;
+	}
+
+	.drag-overlay {
+		position: absolute;
+		inset: 0;
+		z-index: 50;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: oklch(0.12 0.04 200 / 0.92);
+		border-radius: 10px;
+		pointer-events: none;
+	}
+
+	.drag-overlay-content {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 2rem;
+	}
+
+	.drag-icon {
+		width: 48px;
+		height: 48px;
+		color: oklch(0.70 0.15 200);
+	}
+
+	.drag-text {
+		font-size: 1rem;
+		font-weight: 600;
+		color: oklch(0.85 0.10 200);
+		font-family: ui-monospace, monospace;
+	}
+
+	.drag-hint {
+		font-size: 0.75rem;
+		color: oklch(0.60 0.08 200);
+	}
+
+	/* Namespace drop target highlight */
+	.namespace-drop-target {
+		background: oklch(0.22 0.08 200) !important;
+		box-shadow: inset 0 0 0 2px oklch(0.55 0.15 200);
+	}
+
+	/* Processing bar */
+	.processing-bar {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.625rem 1rem;
+		font-size: 0.8rem;
+		font-family: ui-monospace, monospace;
+		background: oklch(0.18 0.04 200);
+		color: oklch(0.75 0.10 200);
+		border-bottom: 1px solid oklch(0.28 0.04 200);
+	}
+
+	/* Namespace picker overlay */
+	.namespace-picker-overlay {
+		position: absolute;
+		inset: 0;
+		z-index: 50;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: oklch(0 0 0 / 0.6);
+		border-radius: 10px;
+	}
+
+	.namespace-picker-modal {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		padding: 1.25rem;
+		background: oklch(0.16 0.02 250);
+		border: 1px solid oklch(0.30 0.02 250);
+		border-radius: 10px;
+		box-shadow: 0 8px 32px oklch(0 0 0 / 0.4);
+		min-width: 280px;
+		max-width: 360px;
+	}
+
+	.picker-title {
+		font-size: 0.9rem;
+		font-weight: 600;
+		color: oklch(0.85 0.02 250);
+		font-family: ui-monospace, monospace;
+		margin: 0;
+	}
+
+	.picker-hint {
+		font-size: 0.7rem;
+		color: oklch(0.50 0.02 250);
+		margin: 0;
+	}
+
+	.picker-options {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.picker-option {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.5rem 0.75rem;
+		background: oklch(0.20 0.02 250);
+		border: 1px solid oklch(0.28 0.02 250);
+		border-radius: 6px;
+		cursor: pointer;
+		transition: all 0.15s ease;
+		font-family: ui-monospace, monospace;
+	}
+
+	.picker-option:hover {
+		background: oklch(0.25 0.04 200);
+		border-color: oklch(0.40 0.10 200);
+	}
+
+	.picker-icon {
+		width: 16px;
+		height: 16px;
+		flex-shrink: 0;
+	}
+
+	.picker-label {
+		font-size: 0.8rem;
+		font-weight: 500;
+		color: oklch(0.80 0.02 250);
+		flex: 1;
+	}
+
+	.picker-count {
+		font-size: 0.65rem;
+		color: oklch(0.50 0.02 250);
+		background: oklch(0.22 0.02 250);
+		padding: 0.125rem 0.375rem;
+		border-radius: 8px;
+	}
+
+	.picker-new {
+		display: flex;
+		gap: 0.375rem;
+		padding-top: 0.375rem;
+		border-top: 1px solid oklch(0.25 0.02 250);
+		margin-top: 0.25rem;
+	}
+
+	.picker-new-input {
+		flex: 1;
+		padding: 0.375rem 0.625rem;
+		font-size: 0.75rem;
+		font-family: ui-monospace, monospace;
+		background: oklch(0.18 0.02 250);
+		border: 1px solid oklch(0.30 0.02 250);
+		border-radius: 5px;
+		color: oklch(0.85 0.02 250);
+		outline: none;
+	}
+
+	.picker-new-input:focus {
+		border-color: oklch(0.50 0.10 200);
+		box-shadow: 0 0 0 2px oklch(0.50 0.10 200 / 0.2);
+	}
+
+	.picker-new-input::placeholder {
+		color: oklch(0.45 0.02 250);
+	}
+
+	.picker-new-btn {
+		padding: 0.375rem 0.75rem;
+		font-size: 0.75rem;
+		font-weight: 500;
+		background: oklch(0.35 0.10 200);
+		border: 1px solid oklch(0.45 0.12 200);
+		border-radius: 5px;
+		color: oklch(0.90 0.08 200);
+		cursor: pointer;
+		transition: all 0.15s ease;
+		font-family: ui-monospace, monospace;
+	}
+
+	.picker-new-btn:hover:not(:disabled) {
+		background: oklch(0.40 0.12 200);
+	}
+
+	.picker-new-btn:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
+
+	.picker-cancel {
+		padding: 0.375rem 0.75rem;
+		font-size: 0.75rem;
+		font-weight: 500;
+		background: transparent;
+		border: 1px solid oklch(0.30 0.02 250);
+		border-radius: 5px;
+		color: oklch(0.60 0.02 250);
+		cursor: pointer;
+		transition: all 0.15s ease;
+		font-family: ui-monospace, monospace;
+		align-self: flex-end;
+	}
+
+	.picker-cancel:hover {
+		background: oklch(0.22 0.02 250);
+		color: oklch(0.80 0.02 250);
+	}
+
 </style>

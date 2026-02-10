@@ -1055,7 +1055,7 @@
 												{project.name}
 											</span>
 											{#if isServerOnly}
-												<span class="text-base-content/40 font-mono text-[9px] px-1 py-0.5 rounded bg-base-content/8 leading-none">server</span>
+												<span class="text-warning/70 font-mono text-[9px] px-1.5 py-0.5 rounded bg-warning/10 border border-warning/20 leading-none">session only</span>
 											{/if}
 										</div>
 										{#if project.path}
@@ -1416,9 +1416,24 @@
 									{/if}
 								</td>
 
-								<!-- Visibility toggle (diminished, hidden for server-only entries) -->
+								<!-- Visibility toggle / Stop button for server-only entries -->
 								<td class="px-2 py-3 text-center">
-									{#if !isServerOnly}
+									{#if isServerOnly}
+									<!-- Stop button kills the tmux session, removing this entry -->
+									<button
+										class="text-error/60 hover:text-error transition-colors cursor-pointer p-0.5 rounded hover:bg-error/10"
+										onclick={(e) => {
+											e.stopPropagation();
+											const sessionName = `server-${project.name}`;
+											stopServerSession(sessionName);
+										}}
+										title="Stop session (removes from list)"
+									>
+										<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+										</svg>
+									</button>
+									{:else}
 									<button
 										class="relative w-7 h-3.5 rounded-full transition-all cursor-pointer opacity-60 hover:opacity-100 {project.hidden ? 'bg-base-content/25' : 'bg-success/45'}"
 										onclick={(e) => { e.stopPropagation(); toggleVisibility(project); }}

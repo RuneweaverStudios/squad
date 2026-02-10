@@ -84,7 +84,6 @@
 			<thead>
 				<tr>
 					<th class="th-task">Task</th>
-					<th class="th-title">Title</th>
 					<th class="th-action">Action</th>
 				</tr>
 			</thead>
@@ -100,7 +99,7 @@
 						style="--project-color: {projectColor}; border-left: 3px solid {projectColor};"
 						onclick={() => handleRowClick(row)}
 					>
-						<!-- Column 1: TaskIdBadge -->
+						<!-- Column 1: TaskIdBadge + Title + Description -->
 						<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 						<td class="td-task" onclick={(e) => e.stopPropagation()}>
 							<div class="badge-wrapper">
@@ -114,21 +113,15 @@
 									animate={row.isNew}
 									onClick={() => onViewTask?.(row.taskId)}
 								/>
-							</div>
-						</td>
-
-						<!-- Column 2: Title + Description -->
-						<td class="td-title">
-							<div class="title-content">
 								<span class="task-title" title={row.taskTitle}>
 									{row.taskTitle || row.taskId}
 								</span>
-								{#if row.taskDescription}
-									<div class="task-description">
-										{row.taskDescription}
-									</div>
-								{/if}
 							</div>
+							{#if row.taskDescription}
+								<div class="task-description">
+									{row.taskDescription}
+								</div>
+							{/if}
 						</td>
 
 						<!-- Column 3: Action (StatusActionBadge) -->
@@ -217,22 +210,14 @@
 	}
 
 	/* Column widths */
-	.th-task, .td-task { width: min-content; white-space: nowrap; }
-	.th-title, .td-title { width: auto; padding-right: 2rem; }
+	.th-task, .td-task { width: auto; }
 	.th-action, .td-action { width: 160px; text-align: right; }
 
-	/* Badge wrapper */
+	/* Badge + title row */
 	.badge-wrapper {
-		display: inline-block;
-		margin: 0 0.5rem;
-	}
-
-	/* Title content */
-	.title-content {
 		display: flex;
-		flex-direction: column;
-		gap: 0.125rem;
-		min-width: 0;
+		align-items: center;
+		gap: 0.5rem;
 	}
 
 	.task-title {
@@ -242,7 +227,8 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-		max-width: calc(100% - 2rem);
+		flex: 1;
+		min-width: 0;
 	}
 
 	.task-description {
