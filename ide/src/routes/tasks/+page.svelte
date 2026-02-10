@@ -221,9 +221,9 @@
 			projects.add(project);
 		}
 
-		// Add projects from sessions
+		// Add projects from agent sessions only (server sessions are not task projects)
 		for (const session of sessions) {
-			if (session.project) {
+			if (session.type === "agent" && session.project) {
 				projects.add(session.project);
 			}
 		}

@@ -10,6 +10,7 @@ tools/
 ├── mail/         # Agent Mail coordination (14 tools)
 ├── browser/      # Browser automation via CDP (12 tools)
 ├── media/        # Image generation with Gemini (7 tools)
+├── scheduler/    # Task scheduling daemon (cron + one-shot spawning)
 ├── scripts/      # Installation and setup (33 scripts)
 └── signal/       # JAT signal emission (3 tools)
 ```

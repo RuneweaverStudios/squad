@@ -11,6 +11,7 @@ Lightweight bash tools for agent orchestration, database operations, monitoring,
 @~/code/jat/shared/automation.md
 @~/code/jat/shared/architecture.md
 @~/code/jat/shared/agent-programs.md
+@~/code/jat/shared/scheduler.md
 
 <!-- NOTE: Agent-execution docs (signals.md, workflow-commands.md, statusline.md,
      suggested-tasks.md) are NOT imported here. They're embedded in the command
@@ -30,6 +31,7 @@ jat/
 │   ├── media/           # Image generation tools (gemini-*, avatar-*)
 │   ├── signal/          # JAT signal tools (jat-signal, jat-signal-validate)
 │   ├── ingest/          # Feed ingest daemon (RSS, Slack, Telegram)
+│   ├── scheduler/       # Task scheduling daemon (cron + one-shot)
 │   └── scripts/         # Installation and setup scripts
 ├── skills/              # Pi agent skills (SKILL.md format)
 │   ├── jat-start/       # Begin working on a task

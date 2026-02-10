@@ -198,6 +198,38 @@ Full commit history and repository management:
 
 ---
 
+## Task Scheduling
+
+JAT includes a built-in scheduler daemon that automatically spawns agents for due tasks — both recurring (cron-based) and one-shot scheduled tasks.
+
+```bash
+# Start the scheduler
+jat scheduler start
+
+# Check status
+jat scheduler status
+
+# Stop
+jat scheduler stop
+```
+
+**Recurring tasks** use cron expressions. The scheduler creates child instance tasks on each firing and spawns agents automatically:
+
+```
+Parent: "Daily Code Review" (schedule_cron: "0 9 * * *")
+  ├─ Child: "Daily Code Review (2/9/2026)" → agent spawned
+  ├─ Child: "Daily Code Review (2/10/2026)" → next occurrence
+  └─ ...repeats indefinitely
+```
+
+**One-shot tasks** fire once at a scheduled time, then stop.
+
+The scheduler runs in a tmux session (`server-scheduler`) and appears on the `/servers` page with start/stop controls, uptime counter, and next-run countdown. Configure auto-start with `scheduler_autostart: true` in your projects.json defaults.
+
+See [shared/scheduler.md](./shared/scheduler.md) for full documentation.
+
+---
+
 ## Routes
 
 | Route | Purpose |
@@ -205,7 +237,7 @@ Full commit history and repository management:
 | `/tasks` | Agent sessions, task management, epics, questions, state tracking |
 | `/files` | Monaco editor, file tree, staged/unstaged changes |
 | `/source` | Full commit history, cherry-pick, revert, diffs |
-| `/servers` | Dev server controls (npm start/stop) |
+| `/servers` | Dev server controls, task scheduler management |
 | `/config` | API keys, project secrets, automation rules, shortcuts |
 
 ---
@@ -219,6 +251,7 @@ Full commit history and repository management:
 | **Smart question UI** | Agent questions become clickable buttons |
 | **Epic Swarm** | Spawn parallel agents on subtasks |
 | **Auto-proceed rules** | Configure auto-completion by type/priority |
+| **Task scheduling** | Cron-based recurring tasks and one-shot scheduled spawns |
 | **Error recovery** | Automatic retry patterns for failures |
 | **PRD → Tasks** | `/jat:tasktree` converts requirements to structured tasks |
 
@@ -262,6 +295,7 @@ JAT isn't trying to replace your editor—it's the control tower for your agent 
 │   ├── core/           # Database, monitoring
 │   ├── mail/           # Agent coordination (am-*)
 │   ├── browser/        # Browser automation
+│   ├── scheduler/      # Task scheduling daemon (cron + one-shot)
 │   └── signal/         # State sync
 ├── commands/           # /jat:start, /jat:complete, /jat:tasktree
 └── shared/             # Agent documentation
@@ -313,7 +347,9 @@ If you have Claude Code installed and authenticated, AI features work out of the
   },
   "defaults": {
     "max_sessions": 12,
-    "model": "opus"
+    "model": "opus",
+    "scheduler_autostart": true,
+    "timezone": "America/New_York"
   }
 }
 ```
@@ -356,6 +392,7 @@ IDE settings at `/config`:
 | [QUICKSTART.md](./QUICKSTART.md) | 5-minute tutorial |
 | [CLAUDE.md](./CLAUDE.md) | Full technical reference |
 | [ide/CLAUDE.md](./ide/CLAUDE.md) | IDE dev guide |
+| [shared/scheduler.md](./shared/scheduler.md) | Scheduler daemon reference |
 | [shared/](./shared/) | Agent documentation |
 
 ---
@@ -370,6 +407,9 @@ Tested with 20+. Limited by your machine and API limits, not JAT.
 
 **Can I use existing projects?**
 Yes. Run `jt init` in any git repo to initialize task tracking, then add the project via `/config` → Projects tab, or use the "Add Project" button on the Tasks page.
+
+**Can I schedule recurring tasks?**
+Yes. Set a cron expression on any task and the scheduler daemon will spawn agents automatically. See [scheduler docs](./shared/scheduler.md).
 
 **Is there a hosted version?**
 No. JAT runs 100% locally. Code never leaves your machine.
