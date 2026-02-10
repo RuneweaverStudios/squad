@@ -1,0 +1,636 @@
+#!/bin/bash
+#
+# jat-skills - Skill catalog fetcher for the OpenClaw/Pi ecosystem
+#
+# Usage:
+#   jat-skills search <query>       # Search skills by keyword
+#   jat-skills list-available        # List all available skills
+#   jat-skills info <skill-id>       # Show details of a specific skill
+#   jat-skills refresh               # Force refresh the cache
+#   jat-skills sources               # Show configured sources and status
+#   jat-skills --help                # Show this help
+#
+# Sources (priority order):
+#   1. Curated list: ~/.config/jat/skill-catalog.json
+#   2. GitHub search: repos with openclaw-skill / pi-skill topics
+#   3. ClawHub CLI (if installed)
+#
+# Cache: ~/.config/jat/cache/skills-catalog.json (24h TTL)
+#
+
+set -euo pipefail
+
+# Config
+CATALOG_FILE="$HOME/.config/jat/skill-catalog.json"
+CACHE_DIR="$HOME/.config/jat/cache"
+CACHE_FILE="$CACHE_DIR/skills-catalog.json"
+CACHE_TTL=86400  # 24 hours in seconds
+# Resolve through symlinks to find the real script location
+REAL_SCRIPT="$(readlink -f "${BASH_SOURCE[0]}")"
+DEFAULT_CATALOG="$(cd "$(dirname "$REAL_SCRIPT")/../scripts" && pwd)/skill-catalog-default.json"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+DIM='\033[2m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+show_help() {
+    cat << 'EOF'
+jat-skills - Skill catalog fetcher (OpenClaw/Pi ecosystem)
+
+USAGE:
+    jat-skills search <query>       Search skills by keyword
+    jat-skills list-available        List all available skills
+    jat-skills info <skill-id>       Show skill details
+    jat-skills refresh               Force refresh the cache
+    jat-skills sources               Show source status
+    jat-skills --json                Output as JSON (combine with other commands)
+    jat-skills --help                Show this help
+
+EXAMPLES:
+    jat-skills search github         # Find GitHub-related skills
+    jat-skills search "file manager" # Search by description
+    jat-skills list-available --json # Machine-readable output
+    jat-skills info git-commit       # Show details for a skill
+    jat-skills refresh               # Force re-fetch from all sources
+
+SOURCES (checked in priority order):
+    1. Curated catalog  ~/.config/jat/skill-catalog.json
+    2. GitHub API       Repos with openclaw-skill / pi-skill topics
+    3. ClawHub CLI      If 'clawhub' is installed
+
+CACHE:
+    Results cached for 24h at ~/.config/jat/cache/skills-catalog.json
+    Use 'jat-skills refresh' to force update.
+
+SKILL FORMAT:
+    Each skill entry contains:
+      id, name, description, author, version, repoUrl,
+      skillMdUrl, tags, installCount, compatible
+EOF
+}
+
+error() {
+    echo -e "${RED}error:${NC} $1" >&2
+    exit 1
+}
+
+warn() {
+    echo -e "${YELLOW}warn:${NC} $1" >&2
+}
+
+info() {
+    echo -e "${DIM}$1${NC}" >&2
+}
+
+# Ensure config dirs exist
+ensure_dirs() {
+    mkdir -p "$CACHE_DIR"
+    mkdir -p "$(dirname "$CATALOG_FILE")"
+}
+
+# Initialize curated catalog if it doesn't exist
+ensure_catalog() {
+    if [[ ! -f "$CATALOG_FILE" ]]; then
+        if [[ -f "$DEFAULT_CATALOG" ]]; then
+            cp "$DEFAULT_CATALOG" "$CATALOG_FILE"
+            info "Initialized curated catalog from defaults"
+        else
+            # Write minimal catalog
+            echo '{"skills":[],"updatedAt":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' > "$CATALOG_FILE"
+            warn "No default catalog found. Created empty catalog at $CATALOG_FILE"
+        fi
+    fi
+}
+
+# Check if cache is still valid
+cache_valid() {
+    if [[ ! -f "$CACHE_FILE" ]]; then
+        return 1
+    fi
+
+    local now file_mtime age
+    now=$(date +%s)
+
+    # Cross-platform stat
+    if [[ "$(uname)" == "Darwin" ]]; then
+        file_mtime=$(stat -f %m "$CACHE_FILE")
+    else
+        file_mtime=$(stat -c %Y "$CACHE_FILE")
+    fi
+
+    age=$((now - file_mtime))
+    [[ $age -lt $CACHE_TTL ]]
+}
+
+# Source 1: Read curated catalog
+fetch_curated() {
+    ensure_catalog
+    if [[ -f "$CATALOG_FILE" ]]; then
+        jq -r '.skills // []' "$CATALOG_FILE" 2>/dev/null || echo '[]'
+    else
+        echo '[]'
+    fi
+}
+
+# Source 2: GitHub API search
+fetch_github() {
+    local github_token="${GITHUB_TOKEN:-}"
+    local auth_header=""
+    if [[ -n "$github_token" ]]; then
+        auth_header="-H \"Authorization: token $github_token\""
+    fi
+
+    local results='[]'
+
+    # Search for repos with openclaw-skill topic
+    local openclaw_results
+    openclaw_results=$(curl -sf \
+        -H "Accept: application/vnd.github+json" \
+        ${github_token:+-H "Authorization: token $github_token"} \
+        "https://api.github.com/search/repositories?q=topic:openclaw-skill&sort=stars&order=desc&per_page=30" \
+        2>/dev/null) || true
+
+    if [[ -n "$openclaw_results" ]]; then
+        local parsed
+        parsed=$(echo "$openclaw_results" | jq '[.items // [] | .[] | {
+            id: .name,
+            name: (.name | gsub("-"; " ") | gsub("openclaw-skill-"; "") | gsub("skill-"; "")),
+            description: (.description // "No description"),
+            author: .owner.login,
+            version: "latest",
+            repoUrl: .html_url,
+            skillMdUrl: (.html_url + "/blob/main/SKILL.md"),
+            tags: [.topics[]? | select(. != "openclaw-skill")],
+            installCount: .stargazers_count,
+            compatible: true,
+            source: "github-openclaw"
+        }]' 2>/dev/null) || true
+
+        if [[ -n "$parsed" && "$parsed" != "null" ]]; then
+            results=$(echo "$results" "$parsed" | jq -s '.[0] + .[1]')
+        fi
+    fi
+
+    # Search for repos with pi-skill topic
+    local pi_results
+    pi_results=$(curl -sf \
+        -H "Accept: application/vnd.github+json" \
+        ${github_token:+-H "Authorization: token $github_token"} \
+        "https://api.github.com/search/repositories?q=topic:pi-skill&sort=stars&order=desc&per_page=20" \
+        2>/dev/null) || true
+
+    if [[ -n "$pi_results" ]]; then
+        local parsed
+        parsed=$(echo "$pi_results" | jq '[.items // [] | .[] | {
+            id: .name,
+            name: (.name | gsub("-"; " ") | gsub("pi-skill-"; "") | gsub("skill-"; "")),
+            description: (.description // "No description"),
+            author: .owner.login,
+            version: "latest",
+            repoUrl: .html_url,
+            skillMdUrl: (.html_url + "/blob/main/SKILL.md"),
+            tags: [.topics[]? | select(. != "pi-skill")],
+            installCount: .stargazers_count,
+            compatible: true,
+            source: "github-pi"
+        }]' 2>/dev/null) || true
+
+        if [[ -n "$parsed" && "$parsed" != "null" ]]; then
+            results=$(echo "$results" "$parsed" | jq -s '.[0] + .[1]')
+        fi
+    fi
+
+    # Also search for agent-skill repos
+    local agent_results
+    agent_results=$(curl -sf \
+        -H "Accept: application/vnd.github+json" \
+        ${github_token:+-H "Authorization: token $github_token"} \
+        "https://api.github.com/search/repositories?q=topic:agent-skill+SKILL.md+in:name&sort=stars&order=desc&per_page=20" \
+        2>/dev/null) || true
+
+    if [[ -n "$agent_results" ]]; then
+        local parsed
+        parsed=$(echo "$agent_results" | jq '[.items // [] | .[] | {
+            id: .name,
+            name: (.name | gsub("-"; " ") | gsub("agent-skill-"; "") | gsub("skill-"; "")),
+            description: (.description // "No description"),
+            author: .owner.login,
+            version: "latest",
+            repoUrl: .html_url,
+            skillMdUrl: (.html_url + "/blob/main/SKILL.md"),
+            tags: [.topics[]? | select(. != "agent-skill")],
+            installCount: .stargazers_count,
+            compatible: true,
+            source: "github-agent"
+        }]' 2>/dev/null) || true
+
+        if [[ -n "$parsed" && "$parsed" != "null" ]]; then
+            results=$(echo "$results" "$parsed" | jq -s '.[0] + .[1]')
+        fi
+    fi
+
+    echo "$results"
+}
+
+# Source 3: ClawHub CLI
+fetch_clawhub() {
+    if ! command -v clawhub &>/dev/null; then
+        echo '[]'
+        return
+    fi
+
+    local raw_results
+    raw_results=$(clawhub search "" --json --limit 50 2>/dev/null) || true
+
+    if [[ -z "$raw_results" ]]; then
+        echo '[]'
+        return
+    fi
+
+    # Parse clawhub output into our format
+    echo "$raw_results" | jq '[.[] | {
+        id: (.slug // .name),
+        name: .name,
+        description: (.description // "No description"),
+        author: (.author // .owner // "unknown"),
+        version: (.version // "latest"),
+        repoUrl: (.repoUrl // .repository // ""),
+        skillMdUrl: ((.repoUrl // .repository // "") + "/blob/main/SKILL.md"),
+        tags: (.tags // .categories // []),
+        installCount: (.downloads // .installs // 0),
+        compatible: true,
+        source: "clawhub"
+    }]' 2>/dev/null || echo '[]'
+}
+
+# Merge results from all sources, deduplicate by id
+merge_results() {
+    local curated="$1"
+    local github="$2"
+    local clawhub="$3"
+
+    # Curated entries take priority, then clawhub, then github
+    # Deduplicate by id (first occurrence wins)
+    echo "$curated" "$clawhub" "$github" | jq -s '
+        [.[0][], .[1][], .[2][]] |
+        group_by(.id) |
+        map(.[0]) |
+        sort_by(-.installCount)
+    ' 2>/dev/null || echo '[]'
+}
+
+# Build the full cache
+build_cache() {
+    info "Fetching from curated catalog..."
+    local curated
+    curated=$(fetch_curated)
+
+    info "Fetching from GitHub API..."
+    local github
+    github=$(fetch_github)
+
+    local clawhub='[]'
+    if command -v clawhub &>/dev/null; then
+        info "Fetching from ClawHub..."
+        clawhub=$(fetch_clawhub)
+    fi
+
+    info "Merging results..."
+    local merged
+    merged=$(merge_results "$curated" "$github" "$clawhub")
+
+    local count
+    count=$(echo "$merged" | jq 'length')
+
+    # Write cache
+    jq -n \
+        --argjson skills "$merged" \
+        --arg updatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        --arg curatedCount "$(echo "$curated" | jq 'length')" \
+        --arg githubCount "$(echo "$github" | jq 'length')" \
+        --arg clawhubCount "$(echo "$clawhub" | jq 'length')" \
+        '{
+            skills: $skills,
+            updatedAt: $updatedAt,
+            sources: {
+                curated: ($curatedCount | tonumber),
+                github: ($githubCount | tonumber),
+                clawhub: ($clawhubCount | tonumber)
+            },
+            totalCount: ($skills | length)
+        }' > "$CACHE_FILE"
+
+    info "Cached $count skills from all sources"
+}
+
+# Get cached or fresh results
+get_skills() {
+    ensure_dirs
+
+    if ! cache_valid; then
+        build_cache
+    fi
+
+    jq -r '.skills' "$CACHE_FILE" 2>/dev/null || echo '[]'
+}
+
+# Check SKILL.md compatibility
+check_compatibility() {
+    local skill_md_url="$1"
+
+    # Try to fetch SKILL.md and check for OpenClaw-specific tools
+    local content
+    content=$(curl -sf "$skill_md_url" 2>/dev/null) || return 0  # assume compatible if can't fetch
+
+    # Check for OpenClaw-specific patterns
+    if echo "$content" | grep -qi "openclaw\.\|requires:.*openclaw\|primaryEnv.*OPENCLAW"; then
+        echo "false"
+    else
+        echo "true"
+    fi
+}
+
+# Format a single skill for display
+format_skill() {
+    local skill="$1"
+    local id name desc author version tags compat source stars
+
+    id=$(echo "$skill" | jq -r '.id')
+    name=$(echo "$skill" | jq -r '.name')
+    desc=$(echo "$skill" | jq -r '.description // "No description"')
+    author=$(echo "$skill" | jq -r '.author // "unknown"')
+    version=$(echo "$skill" | jq -r '.version // "latest"')
+    tags=$(echo "$skill" | jq -r '.tags // [] | join(", ")')
+    compat=$(echo "$skill" | jq -r '.compatible')
+    source=$(echo "$skill" | jq -r '.source // "curated"')
+    stars=$(echo "$skill" | jq -r '.installCount // 0')
+
+    local compat_badge
+    if [[ "$compat" == "true" ]]; then
+        compat_badge="${GREEN}compatible${NC}"
+    else
+        compat_badge="${YELLOW}check required${NC}"
+    fi
+
+    echo -e "  ${BOLD}${CYAN}$id${NC} ${DIM}v$version${NC} ${DIM}by${NC} $author"
+    echo -e "    $desc"
+    if [[ -n "$tags" ]]; then
+        echo -e "    ${DIM}tags:${NC} $tags"
+    fi
+    echo -e "    ${DIM}source:${NC} $source  ${DIM}stars:${NC} $stars  $compat_badge"
+    echo ""
+}
+
+# --- Commands ---
+
+cmd_search() {
+    local query="${1:-}"
+    if [[ -z "$query" ]]; then
+        error "Usage: jat-skills search <query>"
+    fi
+
+    local skills
+    skills=$(get_skills)
+
+    local query_lower
+    query_lower=$(echo "$query" | tr '[:upper:]' '[:lower:]')
+
+    local results
+    results=$(echo "$skills" | jq --arg q "$query_lower" '[
+        .[] | select(
+            (.id | ascii_downcase | contains($q)) or
+            (.name | ascii_downcase | contains($q)) or
+            (.description | ascii_downcase | contains($q)) or
+            (.tags // [] | map(ascii_downcase) | any(contains($q))) or
+            (.author | ascii_downcase | contains($q))
+        )
+    ]')
+
+    local count
+    count=$(echo "$results" | jq 'length')
+
+    if [[ "$JSON_OUTPUT" == "true" ]]; then
+        echo "$results"
+        return
+    fi
+
+    if [[ "$count" -eq 0 ]]; then
+        echo -e "No skills found matching ${BOLD}$query${NC}"
+        echo -e "${DIM}Try a broader search term or run 'jat-skills refresh'${NC}"
+        return
+    fi
+
+    echo -e "${BOLD}Found $count skill(s) matching \"$query\":${NC}"
+    echo ""
+
+    echo "$results" | jq -c '.[]' | while IFS= read -r skill; do
+        format_skill "$skill"
+    done
+}
+
+cmd_list() {
+    local skills
+    skills=$(get_skills)
+
+    local count
+    count=$(echo "$skills" | jq 'length')
+
+    if [[ "$JSON_OUTPUT" == "true" ]]; then
+        echo "$skills"
+        return
+    fi
+
+    echo -e "${BOLD}Available skills ($count):${NC}"
+    echo ""
+
+    echo "$skills" | jq -c '.[]' | while IFS= read -r skill; do
+        format_skill "$skill"
+    done
+
+    # Show cache info
+    if [[ -f "$CACHE_FILE" ]]; then
+        local updated sources
+        updated=$(jq -r '.updatedAt' "$CACHE_FILE")
+        sources=$(jq -r '.sources | to_entries | map("\(.key): \(.value)") | join(", ")' "$CACHE_FILE")
+        echo -e "${DIM}Last updated: $updated${NC}"
+        echo -e "${DIM}Sources: $sources${NC}"
+    fi
+}
+
+cmd_info() {
+    local skill_id="${1:-}"
+    if [[ -z "$skill_id" ]]; then
+        error "Usage: jat-skills info <skill-id>"
+    fi
+
+    local skills
+    skills=$(get_skills)
+
+    local skill
+    skill=$(echo "$skills" | jq --arg id "$skill_id" '[.[] | select(.id == $id)] | .[0] // empty')
+
+    if [[ -z "$skill" || "$skill" == "null" ]]; then
+        # Try fuzzy match
+        skill=$(echo "$skills" | jq --arg id "$skill_id" '[
+            .[] | select(.id | ascii_downcase | contains($id | ascii_downcase))
+        ] | .[0] // empty')
+    fi
+
+    if [[ -z "$skill" || "$skill" == "null" ]]; then
+        error "Skill not found: $skill_id\nUse 'jat-skills search $skill_id' to find similar skills"
+    fi
+
+    if [[ "$JSON_OUTPUT" == "true" ]]; then
+        echo "$skill"
+        return
+    fi
+
+    local id name desc author version tags compat source stars repo skill_md
+    id=$(echo "$skill" | jq -r '.id')
+    name=$(echo "$skill" | jq -r '.name')
+    desc=$(echo "$skill" | jq -r '.description // "No description"')
+    author=$(echo "$skill" | jq -r '.author // "unknown"')
+    version=$(echo "$skill" | jq -r '.version // "latest"')
+    tags=$(echo "$skill" | jq -r '.tags // [] | join(", ")')
+    compat=$(echo "$skill" | jq -r '.compatible')
+    source=$(echo "$skill" | jq -r '.source // "curated"')
+    stars=$(echo "$skill" | jq -r '.installCount // 0')
+    repo=$(echo "$skill" | jq -r '.repoUrl // "N/A"')
+    skill_md=$(echo "$skill" | jq -r '.skillMdUrl // "N/A"')
+
+    local compat_text
+    if [[ "$compat" == "true" ]]; then
+        compat_text="${GREEN}Yes - compatible with JAT${NC}"
+    else
+        compat_text="${YELLOW}Check required - may use OpenClaw-specific features${NC}"
+    fi
+
+    echo -e "${BOLD}${CYAN}$id${NC}"
+    echo -e "  ${BOLD}Name:${NC}         $name"
+    echo -e "  ${BOLD}Description:${NC}  $desc"
+    echo -e "  ${BOLD}Author:${NC}       $author"
+    echo -e "  ${BOLD}Version:${NC}      $version"
+    echo -e "  ${BOLD}Source:${NC}       $source"
+    echo -e "  ${BOLD}Stars:${NC}        $stars"
+    echo -e "  ${BOLD}Tags:${NC}         ${tags:-none}"
+    echo -e "  ${BOLD}Compatible:${NC}   $compat_text"
+    echo -e "  ${BOLD}Repository:${NC}   $repo"
+    echo -e "  ${BOLD}SKILL.md:${NC}     $skill_md"
+}
+
+cmd_refresh() {
+    ensure_dirs
+    info "Forcing cache refresh..."
+    rm -f "$CACHE_FILE"
+    build_cache
+    local count
+    count=$(jq -r '.totalCount' "$CACHE_FILE")
+    echo -e "${GREEN}Cache refreshed:${NC} $count skills from all sources"
+}
+
+cmd_sources() {
+    echo -e "${BOLD}Skill Catalog Sources:${NC}"
+    echo ""
+
+    # Source 1: Curated
+    if [[ -f "$CATALOG_FILE" ]]; then
+        local curated_count
+        curated_count=$(jq '.skills | length' "$CATALOG_FILE" 2>/dev/null || echo "0")
+        echo -e "  ${GREEN}1.${NC} ${BOLD}Curated Catalog${NC} - $curated_count skills"
+        echo -e "     ${DIM}$CATALOG_FILE${NC}"
+    else
+        echo -e "  ${YELLOW}1.${NC} ${BOLD}Curated Catalog${NC} - not initialized"
+        echo -e "     ${DIM}Run any command to initialize from defaults${NC}"
+    fi
+
+    echo ""
+
+    # Source 2: GitHub
+    local gh_status="${GREEN}available${NC}"
+    if [[ -z "${GITHUB_TOKEN:-}" ]]; then
+        gh_status="${YELLOW}no token (rate-limited to 10 req/min)${NC}"
+    fi
+    echo -e "  ${GREEN}2.${NC} ${BOLD}GitHub API${NC} - $gh_status"
+    echo -e "     ${DIM}Topics: openclaw-skill, pi-skill, agent-skill${NC}"
+
+    echo ""
+
+    # Source 3: ClawHub
+    if command -v clawhub &>/dev/null; then
+        echo -e "  ${GREEN}3.${NC} ${BOLD}ClawHub CLI${NC} - installed"
+        echo -e "     ${DIM}$(clawhub --version 2>/dev/null || echo "version unknown")${NC}"
+    else
+        echo -e "  ${DIM}3.${NC} ${BOLD}ClawHub CLI${NC} - ${DIM}not installed (optional)${NC}"
+        echo -e "     ${DIM}Install: npm install -g clawhub${NC}"
+    fi
+
+    echo ""
+
+    # Cache status
+    if [[ -f "$CACHE_FILE" ]]; then
+        local updated total
+        updated=$(jq -r '.updatedAt' "$CACHE_FILE")
+        total=$(jq -r '.totalCount' "$CACHE_FILE")
+        echo -e "  ${BOLD}Cache:${NC} $total skills, last updated $updated"
+        echo -e "  ${DIM}$CACHE_FILE${NC}"
+    else
+        echo -e "  ${BOLD}Cache:${NC} empty"
+    fi
+}
+
+# --- Main ---
+
+JSON_OUTPUT="false"
+
+# Parse global flags
+args=()
+for arg in "$@"; do
+    case "$arg" in
+        --json) JSON_OUTPUT="true" ;;
+        *) args+=("$arg") ;;
+    esac
+done
+
+set -- "${args[@]+"${args[@]}"}"
+
+case "${1:-}" in
+    search)
+        shift
+        cmd_search "${1:-}"
+        ;;
+    list-available|list|ls)
+        cmd_list
+        ;;
+    info|show)
+        shift
+        cmd_info "${1:-}"
+        ;;
+    refresh|update)
+        cmd_refresh
+        ;;
+    sources|status)
+        cmd_sources
+        ;;
+    --help|-h|help)
+        show_help
+        ;;
+    --version|-v)
+        echo "jat-skills 1.0.0"
+        ;;
+    "")
+        show_help
+        ;;
+    -*)
+        error "Unknown option: $1\nUse --help for usage"
+        ;;
+    *)
+        # If not a command, treat as a search query
+        cmd_search "$1"
+        ;;
+esac

@@ -163,24 +163,38 @@ jt create "Second subtask" \
 - TaskTable can group by parent for better organization
 - Easy to see progress on an epic by its children's status
 
-**Step 5C: Close the Epic (IMPORTANT)**
+**Step 5C: Verify Epic Dependencies (IMPORTANT)**
 
-After creating all child tasks, **immediately close the epic**:
+After creating all child tasks, verify the epic is **blocked by its children** (NOT the other way around):
 
 ```bash
-jt close jat-a3f8 --reason "Epic container - work via child tasks jat-a3f8.1 through jat-a3f8.N"
+jt show jat-a3f8
+# Should show: "Dependencies: -> jat-a3f8.1, -> jat-a3f8.2, ..." (epic depends on children)
+# Children should be: open/ready (not blocked by epic)
 ```
 
-**Why close the epic?**
-- Epics are **containers for organization**, not workable tasks
-- If left open, `jt ready` shows the epic as a pickable task
-- An agent picking the epic would try to do "everything" - defeating the breakdown
-- Closing removes it from the work queue while preserving hierarchy
+If `--parent` set up wrong dependency direction (children blocked by epic), fix it:
+```bash
+# For each child, flip the dependency:
+jt dep remove jat-a3f8.1 jat-a3f8    # Remove child → parent (wrong)
+jt dep add jat-a3f8 jat-a3f8.1       # Add parent → child (correct)
+# Or use the helper: jt-epic-child jat-a3f8 jat-a3f8.1
+```
 
-**The epic still provides:**
-- Hierarchical child IDs (jat-a3f8.1, .2, .3)
-- Grouping in `jt list` output
-- Reference for what the children accomplish together
+**⚠️ Do NOT close the epic!** Leave it open.
+
+**Why leave the epic open?**
+- The epic is **blocked by its children** — it won't appear in `jt ready` until all children complete
+- When all children complete, the epic **becomes ready** as a verification/UAT task
+- An agent picks up the now-unblocked epic to verify integration and close it
+- Closing the epic immediately loses this verification step and shows confusing "complete" status in the IDE
+
+**The epic lifecycle:**
+1. Created → **open, blocked** (children are open dependencies)
+2. Children get picked up by agents → epic stays blocked
+3. All children complete → **epic becomes ready**
+4. Agent picks epic → verifies all work, runs integration tests
+5. Agent closes epic via `/jat:complete`
 
 ### For Standalone Tasks (No Epic Needed)
 
@@ -332,8 +346,10 @@ jt create "Create users table with RLS" --parent jat-auth --priority 0 --type ta
 
 # ... continue for all tasks ...
 
-# IMPORTANT: Close the epic after all children created
-jt close jat-auth --reason "Epic container - work via child tasks jat-auth.1 through jat-auth.9"
+# IMPORTANT: Verify epic is blocked by children (do NOT close it!)
+jt show jat-auth
+# Should show Dependencies: -> jat-auth.1, -> jat-auth.2, ... (epic blocked by children)
+# Children should be open/ready, epic should be blocked
 ```
 
 **Execution:**
@@ -347,7 +363,7 @@ jt close jat-auth --reason "Epic container - work via child tasks jat-auth.1 thr
 
 1. **⚠️ ALWAYS use `--parent` for child tasks** - This is the #1 mistake! Without `--parent`, you get random IDs instead of hierarchical ones (jat-abc.1, jat-abc.2)
 2. **Use epics for multi-task features** - Create epic first, then children with `--parent`
-3. **Always close epics after creating children** - Epics are containers, not workable tasks
+3. **⚠️ NEVER close epics after creating children** - Leave them open+blocked. They become ready when all children complete, serving as a verification task. Closing them prematurely shows confusing "complete" status.
 4. **Right-size tasks** - 2-8 hours, not too big or small
 5. **Set dependencies correctly** - enables parallel work
 6. **Prioritize thoughtfully** - P0 = foundation, P1 = core, P2 = nice-to-have
