@@ -10,7 +10,7 @@
 	import { openTaskDrawer } from '$lib/stores/drawerStore';
 
 	// --- Types ---
-	type OutputAction = 'display' | 'clipboard' | 'write_file' | 'create_task' | 'send_mail';
+	type OutputAction = 'display' | 'clipboard' | 'write_file' | 'create_task';
 
 	interface TemplateVariable {
 		name: string;
@@ -114,9 +114,10 @@
 	}
 
 	const PROVIDER_CATEGORIES: ProviderCategory[] = [
+		{ prefix: 'file:', label: 'File', icon: '📄', description: 'Attach a project file by path' },
 		{ prefix: 'task:', label: 'Task', icon: '📋', description: 'Inject task details by ID' },
 		{ prefix: 'git:', label: 'Git', icon: '🔀', description: 'Inject git diff, log, or branch info' },
-		{ prefix: 'mail:', label: 'Mail', icon: '📧', description: 'Inject Agent Mail thread' },
+		{ prefix: 'memory:', label: 'Memory', icon: '🧠', description: 'Search project memory for context' },
 		{ prefix: 'url:', label: 'URL', icon: '🔗', description: 'Fetch and inject URL content' }
 	];
 
@@ -131,13 +132,6 @@
 	let writeFileError = $state('');
 	let pendingWriteResult = $state<ExecutionResult | null>(null);
 
-	// Send-mail modal state
-	let showSendMailModal = $state(false);
-	let mailTo = $state('');
-	let mailSubject = $state('');
-	let sendingMail = $state(false);
-	let sendMailError = $state('');
-	let pendingSendResult = $state<ExecutionResult | null>(null);
 
 	// Active tab
 	let activeTab = $state<'templates' | 'history'>('templates');
@@ -147,7 +141,6 @@
 		{ id: 'clipboard', label: 'Clipboard', icon: 'M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184', desc: 'Copy to clipboard' },
 		{ id: 'write_file', label: 'Write File', icon: 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z', desc: 'Save result to file' },
 		{ id: 'create_task', label: 'Create Task', icon: 'M12 4.5v15m7.5-7.5h-15', desc: 'Create task from result' },
-		{ id: 'send_mail', label: 'Send Mail', icon: 'M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75', desc: 'Send as Agent Mail' },
 	];
 
 	const MODELS = [
@@ -304,13 +297,6 @@
 			case 'create_task':
 				openTaskDrawer(entry.project, entry.result);
 				break;
-			case 'send_mail':
-				pendingSendResult = entry;
-				mailTo = '';
-				mailSubject = entry.templateName ? `[Quick Command] ${entry.templateName}` : '[Quick Command] Result';
-				sendMailError = '';
-				showSendMailModal = true;
-				break;
 			case 'display':
 			default:
 				break;
@@ -342,33 +328,6 @@
 			writeFileError = e.message || 'Failed to write file';
 		} finally {
 			writingFile = false;
-		}
-	}
-
-	async function confirmSendMail() {
-		if (!mailTo.trim() || !pendingSendResult) return;
-		sendingMail = true;
-		sendMailError = '';
-		try {
-			const res = await fetch(`/api/agents/${encodeURIComponent(mailTo.trim())}/message`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					subject: mailSubject.trim() || '[Quick Command] Result',
-					body: pendingSendResult.result
-				})
-			});
-			if (!res.ok) {
-				const data = await res.json();
-				sendMailError = data.error || data.message || 'Failed to send mail';
-				return;
-			}
-			showSendMailModal = false;
-			pendingSendResult = null;
-		} catch (e: any) {
-			sendMailError = e.message || 'Failed to send mail';
-		} finally {
-			sendingMail = false;
 		}
 	}
 
@@ -582,9 +541,15 @@
 	/** Determine autocomplete mode from text before cursor */
 	function detectAutocompleteMode(beforeCursor: string): { mode: AutocompleteMode; provider: string | null; query: string } | null {
 		// Check for provider pattern: @provider:query
-		const providerMatch = beforeCursor.match(/@(task|git|mail|url):([\w\-\.\/:]*)$/);
+		const providerMatch = beforeCursor.match(/@(task|git|memory|url):([\w\-\.\/:%?&#=+~]*)$/);
 		if (providerMatch) {
 			return { mode: 'provider-search', provider: providerMatch[1], query: providerMatch[2] };
+		}
+
+		// Check for @file: shortcut — treat as file search
+		const fileProviderMatch = beforeCursor.match(/@file:([\w\-\.\/]*)$/);
+		if (fileProviderMatch) {
+			return { mode: 'file', provider: null, query: fileProviderMatch[1] };
 		}
 
 		// Check for bare @ with optional text (could be file or start of provider)
@@ -737,6 +702,36 @@
 			return;
 		}
 
+		// Auto-create chip for @url: when user presses Space, Tab, or Enter
+		if (target === 'command' && activeProvider === 'url' && (e.key === ' ' || e.key === 'Tab' || e.key === 'Enter')) {
+			if (textareaRef) {
+				const sel = window.getSelection();
+				if (sel && sel.rangeCount > 0) {
+					const range = sel.getRangeAt(0);
+					let textNode: Node = range.startContainer;
+					let cursorPos = range.startOffset;
+					if (textNode.nodeType !== Node.TEXT_NODE) {
+						const children = Array.from(textNode.childNodes);
+						const prev = children[cursorPos - 1];
+						if (prev && prev.nodeType === Node.TEXT_NODE) {
+							textNode = prev;
+							cursorPos = (prev.textContent || '').length;
+						}
+					}
+					if (textNode.nodeType === Node.TEXT_NODE) {
+						const text = textNode.textContent || '';
+						const beforeCursor = text.slice(0, cursorPos);
+						const urlMatch = beforeCursor.match(/@url:(https?:\/\/\S+)$/);
+						if (urlMatch) {
+							e.preventDefault();
+							selectProviderResult({ value: urlMatch[1], label: urlMatch[1] });
+							return;
+						}
+					}
+				}
+			}
+		}
+
 		// Handle autocomplete navigation
 		if (showFileAutocomplete) {
 			const totalItems = getAutocompleteItemCount();
@@ -820,6 +815,34 @@
 
 	/** Select a provider category — replaces @query with @provider: and continues autocomplete */
 	function selectProviderCategory(category: ProviderCategory) {
+		// file: is special — switch to file search mode (no prefix inserted)
+		if (category.prefix === 'file:') {
+			autocompleteMode = 'file';
+			activeProvider = null;
+			fileSearchQuery = '';
+			providerSearchResults = [];
+			fileAutocompleteIndex = 0;
+
+			if (activeAutocompleteTarget === 'editor') {
+				const ref = editorTextareaRef;
+				if (!ref) return;
+				// Keep @, position cursor right after it
+				const before = editorPrompt.slice(0, atTriggerPosition);
+				const after = editorPrompt.slice(ref.selectionStart);
+				editorPrompt = before + '@' + after;
+				requestAnimationFrame(() => {
+					if (ref) {
+						const newPos = before.length + 1;
+						ref.focus();
+						ref.setSelectionRange(newPos, newPos);
+					}
+				});
+			}
+			// For contenteditable: the @ is already in place, just switch mode
+			// File results will appear as the user types after @
+			return;
+		}
+
 		if (activeAutocompleteTarget === 'editor') {
 			const ref = editorTextareaRef;
 			if (!ref) return;
@@ -955,7 +978,7 @@
 
 		const text = textNode.textContent || '';
 		const beforeCursor = text.slice(0, cursorPos);
-		const atMatch = beforeCursor.match(/@[\w\-\.\/:]*/);
+		const atMatch = beforeCursor.match(/@[\w\-\.\/:%?&#=+~]*/);
 		if (!atMatch) return;
 
 		const atPos = cursorPos - atMatch[0].length;
@@ -974,7 +997,7 @@
 		chip.dataset.providerRef = fullRef;
 		chip.className = 'inline-provider-chip';
 
-		const providerIcons: Record<string, string> = { task: '📋', git: '🔀', mail: '📧', url: '🔗' };
+		const providerIcons: Record<string, string> = { task: '📋', git: '🔀', memory: '🧠', url: '🔗' };
 		const icon = providerIcons[activeProvider || ''] || '📎';
 		chip.textContent = `${icon} ${fullRef.slice(1)}`; // Remove leading @
 
@@ -1257,7 +1280,7 @@
 						<span style="color: oklch(0.40 0.01 250);">—</span>
 						<code style="background: oklch(0.25 0.02 250); padding: 1px 4px; border-radius: 3px; color: oklch(0.55 0.08 145);">@task:</code>
 						<code style="background: oklch(0.25 0.02 250); padding: 1px 4px; border-radius: 3px; color: oklch(0.55 0.08 145);">@git:</code>
-						<code style="background: oklch(0.25 0.02 250); padding: 1px 4px; border-radius: 3px; color: oklch(0.55 0.08 145);">@mail:</code>
+						<code style="background: oklch(0.25 0.02 250); padding: 1px 4px; border-radius: 3px; color: oklch(0.55 0.08 145);">@memory:</code>
 						<code style="background: oklch(0.25 0.02 250); padding: 1px 4px; border-radius: 3px; color: oklch(0.55 0.08 145);">@url:</code>
 					</span>
 				</div>
@@ -1282,7 +1305,7 @@
 							class="absolute top-0 left-0 px-3 py-2 text-sm pointer-events-none"
 							style="color: oklch(0.40 0.01 250);"
 						>
-							Enter a prompt... Use @ for files, @task: @git: @mail: @url: for context
+							Enter a prompt... Use @ to attach files and context
 						</div>
 					{/if}
 
@@ -1346,7 +1369,7 @@
 								<div class="px-3 py-1.5 text-xs" style="color: oklch(0.50 0.01 250); border-bottom: 1px solid oklch(0.25 0.02 250);">
 									@{activeProvider}: {fileSearchQuery || '(all)'}
 								</div>
-								{#each providerSearchResults as result, i (result.value)}
+								{#each providerSearchResults as result, i (`${result.value}-${i}`)}
 									<button
 										class="w-full text-left px-3 py-2 flex items-center gap-2 transition-colors"
 										style="
@@ -1450,7 +1473,7 @@
 						{#if showOutputActionMenu}
 							<!-- svelte-ignore a11y_no_static_element_interactions -->
 							<div
-								class="absolute bottom-full right-0 mb-1 w-52 rounded-lg overflow-hidden animate-scale-in z-40"
+								class="absolute top-full right-0 mt-1 w-52 rounded-lg overflow-hidden animate-scale-in z-40"
 								style="background: oklch(0.20 0.02 250); border: 1px solid oklch(0.30 0.03 250); box-shadow: 0 8px 24px oklch(0 0 0 / 0.4);"
 								onmouseleave={() => (showOutputActionMenu = false)}
 							>
@@ -1587,7 +1610,7 @@
 						<div class="px-4 py-1.5 flex flex-wrap gap-1.5" style="background: oklch(0.17 0.02 200); border-bottom: 1px solid oklch(0.25 0.03 200 / 0.3);">
 							{#if executionResult.resolvedProviders && executionResult.resolvedProviders.length > 0}
 								{#each executionResult.resolvedProviders as provider}
-									{@const providerIcon = provider.type === 'task' ? '📋' : provider.type === 'git' ? '🔀' : provider.type === 'mail' ? '📧' : provider.type === 'url' ? '🔗' : '📎'}
+									{@const providerIcon = provider.type === 'task' ? '📋' : provider.type === 'git' ? '🔀' : provider.type === 'memory' ? '🧠' : provider.type === 'url' ? '🔗' : '📎'}
 									<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs" style="background: oklch(0.22 0.04 145 / 0.5); color: oklch(0.75 0.08 145);">
 										<span class="text-[10px]">{providerIcon}</span>
 										@{provider.type}:{provider.ref}
@@ -2186,79 +2209,6 @@
 	</div>
 {/if}
 
-<!-- Send Mail Modal -->
-{#if showSendMailModal}
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div
-		class="fixed inset-0 z-50 flex items-center justify-center"
-		style="background: oklch(0.10 0.01 250 / 0.7);"
-		onclick={(e) => {
-			if (e.target === e.currentTarget) {
-				showSendMailModal = false;
-				pendingSendResult = null;
-			}
-		}}
-	>
-		<div
-			class="rounded-xl w-full max-w-md p-5 animate-scale-in"
-			style="background: oklch(0.20 0.01 250); border: 1px solid oklch(0.30 0.02 250);"
-		>
-			<h2 class="text-base font-semibold mb-3" style="color: oklch(0.90 0.01 250);">Send Result as Agent Mail</h2>
-			<div class="flex flex-col gap-3 mb-3">
-				<div>
-					<label class="block text-xs mb-1 font-medium" style="color: oklch(0.65 0.01 250);">To (Agent Name)</label>
-					<input
-						type="text"
-						bind:value={mailTo}
-						placeholder="e.g. @active or AgentName"
-						class="w-full rounded-md px-3 py-2 text-sm"
-						style="background: oklch(0.14 0.01 250); border: 1px solid oklch(0.30 0.02 250); color: oklch(0.90 0.01 250);"
-					/>
-				</div>
-				<div>
-					<label class="block text-xs mb-1 font-medium" style="color: oklch(0.65 0.01 250);">Subject</label>
-					<input
-						type="text"
-						bind:value={mailSubject}
-						class="w-full rounded-md px-3 py-2 text-sm"
-						style="background: oklch(0.14 0.01 250); border: 1px solid oklch(0.30 0.02 250); color: oklch(0.90 0.01 250);"
-						onkeydown={(e) => {
-							if (e.key === 'Enter') confirmSendMail();
-						}}
-					/>
-				</div>
-			</div>
-			{#if sendMailError}
-				<div class="text-xs p-2 rounded mb-3" style="background: oklch(0.25 0.05 30); color: oklch(0.75 0.15 30);">
-					{sendMailError}
-				</div>
-			{/if}
-			<div class="flex items-center justify-end gap-2">
-				<button
-					onclick={() => {
-						showSendMailModal = false;
-						pendingSendResult = null;
-					}}
-					class="px-3 py-1.5 rounded-md text-sm"
-					style="color: oklch(0.60 0.01 250);"
-				>
-					Cancel
-				</button>
-				<button
-					onclick={confirmSendMail}
-					disabled={!mailTo.trim() || sendingMail}
-					class="px-4 py-1.5 rounded-md text-sm font-medium"
-					style="
-						background: {!mailTo.trim() || sendingMail ? 'oklch(0.25 0.02 250)' : 'oklch(0.50 0.15 200)'};
-						color: {!mailTo.trim() || sendingMail ? 'oklch(0.50 0.01 250)' : 'oklch(0.98 0.01 200)'};
-					"
-				>
-					{sendingMail ? 'Sending...' : 'Send Mail'}
-				</button>
-			</div>
-		</div>
-	</div>
-{/if}
 
 <style>
 	/* :global needed because chips are created via DOM manipulation, not Svelte templates */

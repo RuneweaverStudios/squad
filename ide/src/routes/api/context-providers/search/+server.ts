@@ -7,7 +7,7 @@
  * Providers:
  * - task: Search tasks by ID or title
  * - git: List available git subcommands
- * - mail: Search Agent Mail threads
+ * - memory: Search project memory entries
  * - url: No autocomplete (returns empty)
  */
 
@@ -72,38 +72,25 @@ function getGitSubcommands(): ProviderResult[] {
 	];
 }
 
-async function searchMailThreads(query: string, cwd: string): Promise<ProviderResult[]> {
+async function searchMemory(query: string, cwd: string): Promise<ProviderResult[]> {
 	try {
-		if (query) {
-			const stdout = await execCommand('am-search', [query, '--limit', '10', '--json'], cwd);
-			const messages = JSON.parse(stdout);
-			// Extract unique thread IDs
-			const threads = new Map<string, string>();
-			for (const m of messages) {
-				if (m.thread_id && !threads.has(m.thread_id)) {
-					threads.set(m.thread_id, m.subject || m.thread_id);
-				}
-			}
-			return Array.from(threads.entries()).map(([id, subject]) => ({
-				value: id,
-				label: id,
-				description: subject
-			}));
-		}
-		// If no query, show recent threads from inbox
-		const stdout = await execCommand('am-inbox', ['@all', '--json'], cwd);
-		const messages = JSON.parse(stdout);
-		const threads = new Map<string, string>();
-		for (const m of messages) {
-			if (m.thread_id && !threads.has(m.thread_id)) {
-				threads.set(m.thread_id, m.subject || m.thread_id);
-			}
-		}
-		return Array.from(threads.entries()).slice(0, 10).map(([id, subject]) => ({
-			value: id,
-			label: id,
-			description: subject
-		}));
+		const searchQuery = query || '*';
+		const stdout = await execCommand('jat-memory', ['search', searchQuery, '--limit', '10', '--json'], cwd, 15000);
+		const results = JSON.parse(stdout);
+		if (!Array.isArray(results)) return [];
+		// Deduplicate by value (same taskId can appear in multiple sections)
+		const seen = new Set<string>();
+		return results
+			.map((r: { taskId?: string; path?: string; section?: string; snippet?: string; score?: number }) => ({
+				value: r.taskId || r.path || '',
+				label: r.taskId || r.path || '',
+				description: r.snippet ? r.snippet.slice(0, 80) : (r.section || '')
+			}))
+			.filter(r => {
+				if (!r.value || seen.has(r.value)) return false;
+				seen.add(r.value);
+				return true;
+			});
 	} catch {
 		return [];
 	}
@@ -138,8 +125,8 @@ export const GET: RequestHandler = async ({ url }) => {
 				!query || cmd.value.toLowerCase().includes(query.toLowerCase())
 			);
 			break;
-		case 'mail':
-			results = await searchMailThreads(query, cwd);
+		case 'memory':
+			results = await searchMemory(query, cwd);
 			break;
 		case 'url':
 			// No autocomplete for URLs

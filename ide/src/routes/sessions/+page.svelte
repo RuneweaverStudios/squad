@@ -1007,6 +1007,97 @@
 			return true;
 		})
 	);
+
+	// === Context Menu ===
+	interface CtxSession {
+		session: TmuxSession;
+		task?: AgentTask;
+		agentName: string;
+		activityState: string;
+	}
+
+	let ctxData = $state<CtxSession | null>(null);
+	let ctxX = $state(0);
+	let ctxY = $state(0);
+	let ctxVisible = $state(false);
+	let ctxStatusSubmenuOpen = $state(false);
+
+	function handleContextMenu(session: TmuxSession, event: MouseEvent) {
+		event.preventDefault();
+		event.stopPropagation();
+
+		const menuWidth = 200;
+		const menuHeight = 340;
+		const agentName = getAgentName(session.name);
+		const task = agentTasks.get(agentName);
+		const info = agentSessionInfo.get(agentName);
+
+		ctxData = {
+			session,
+			task,
+			agentName,
+			activityState: optimisticStates.get(session.name) || info?.activityState || 'idle'
+		};
+
+		ctxX = Math.min(event.clientX, window.innerWidth - menuWidth - 8);
+		ctxY = Math.min(event.clientY, window.innerHeight - menuHeight - 8);
+		ctxVisible = true;
+		ctxStatusSubmenuOpen = false;
+	}
+
+	function closeCtxMenu() {
+		ctxVisible = false;
+		ctxStatusSubmenuOpen = false;
+	}
+
+	// Auto-close on click outside or Escape
+	$effect(() => {
+		if (!ctxVisible) return;
+		function handleClick() { closeCtxMenu(); }
+		function handleKeyDown(e: KeyboardEvent) { if (e.key === 'Escape') closeCtxMenu(); }
+		const timer = setTimeout(() => {
+			document.addEventListener('click', handleClick);
+			document.addEventListener('keydown', handleKeyDown);
+		}, 0);
+		return () => {
+			clearTimeout(timer);
+			document.removeEventListener('click', handleClick);
+			document.removeEventListener('keydown', handleKeyDown);
+		};
+	});
+
+	async function ctxChangeStatus(taskId: string, newStatus: string) {
+		closeCtxMenu();
+		try {
+			await fetch(`/api/tasks/${taskId}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ status: newStatus })
+			});
+		} catch (err) {
+			console.error('Failed to update task status:', err);
+		}
+	}
+
+	async function ctxDuplicateTask(task: AgentTask) {
+		closeCtxMenu();
+		const project = task.id.split('-')[0];
+		try {
+			await fetch('/api/tasks', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					title: `${task.title || task.id} (copy)`,
+					type: task.issue_type || 'task',
+					priority: task.priority ?? 2,
+					description: task.description || '',
+					project
+				})
+			});
+		} catch (err) {
+			console.error('Failed to duplicate task:', err);
+		}
+	}
 </script>
 
 <svelte:head>
@@ -1120,28 +1211,36 @@
 								class:expanded={isExpanded}
 								class:expandable={true}
 								onclick={() => toggleExpanded(session.name)}
+								oncontextmenu={(e) => handleContextMenu(session, e)}
 							>
 								<td class="td-task">
 									{#if session.type === 'server'}
 										<!-- Server session display -->
-										<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-										<div class="server-row" onclick={(e) => e.stopPropagation()}>
-											<ServerSessionBadge
-												sessionName={session.name}
-												project={session.project}
-												status="running"
-												created={session.created}
-												size="xs"
-												variant="projectPill"
-												onAction={async (actionId) => {
-													if (actionId === 'stop') {
-														await killSession(session.name);
-													} else if (actionId === 'restart') {
-														await killSession(session.name);
-													}
-												}}
-											/>
-											<span class="session-name">{session.name}</span>
+										<div class="task-cell-content">
+											<div class="badge-and-text">
+												<ServerSessionBadge
+													sessionName={session.name}
+													project={session.project}
+													status="running"
+													created={session.created}
+													size="sm"
+													variant="projectPill"
+													class="min-w-[120px]"
+													onAction={async (actionId) => {
+														if (actionId === 'stop') {
+															await killSession(session.name);
+														} else if (actionId === 'restart') {
+															await killSession(session.name);
+														}
+													}}
+												/>
+												<div class="text-column">
+													<span class="task-title">{session.name}</span>
+													{#if session.project}
+														<div class="task-description">{session.project} dev server</div>
+													{/if}
+												</div>
+											</div>
 										</div>
 									{:else}
 										<!-- Agent session: TaskIdBadge with agentPill + title/desc -->
@@ -1320,32 +1419,23 @@
 											/>
 										</div>
 									{:else}
-										<!-- Non-agent sessions: simple buttons -->
-										<div class="action-buttons">
-											<button
-												class="action-btn attach"
-												onclick={() => attachSession(session.name)}
-												disabled={actionLoading === session.name}
-												title="Open in terminal"
-											>
-												{#if actionLoading === session.name}
-													<span class="loading loading-spinner loading-xs"></span>
-												{:else}
-													<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="action-icon">
-														<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-													</svg>
-												{/if}
-											</button>
-											<button
-												class="action-btn kill"
-												onclick={() => killSession(session.name)}
-												disabled={actionLoading === session.name}
-												title="Kill session"
-											>
-												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="action-icon">
-													<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-												</svg>
-											</button>
+										<!-- Server sessions: ServerStatusBadge -->
+										<div class="status-cell-content">
+											<ServerStatusBadge
+												serverStatus="running"
+												sessionName={session.name}
+												alignRight={true}
+												class="pr-2 pb-1 [&>button]:min-w-[150px] [&>button]:text-[13px] [&>button]:text-center [&>button]:pt-1.5 [&>button]:pb-1"
+												onAction={async (actionId) => {
+													if (actionId === 'stop') {
+														await killSession(session.name);
+													} else if (actionId === 'restart') {
+														await killSession(session.name);
+													} else if (actionId === 'attach') {
+														await attachSession(session.name);
+													}
+												}}
+											/>
 										</div>
 									{/if}
 								</td>
@@ -1758,6 +1848,221 @@
 	{/if}
 </div>
 
+<!-- Context Menu -->
+{#if ctxData}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div
+		class="ctx-menu"
+		class:ctx-menu-hidden={!ctxVisible}
+		style="left: {ctxX}px; top: {ctxY}px;"
+		onclick={(e) => e.stopPropagation()}
+	>
+		<!-- View Details (agent sessions with task) -->
+		{#if ctxData.task}
+			<button class="ctx-item" onmouseenter={() => { ctxStatusSubmenuOpen = false; }} onclick={() => {
+				const t = ctxData!.task!;
+				closeCtxMenu();
+				expandedTaskId = t.id;
+				taskDetailOpen = true;
+			}}>
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+					<circle cx="12" cy="12" r="3" />
+				</svg>
+				<span>View Details</span>
+			</button>
+		{/if}
+
+		<!-- Attach Terminal -->
+		<button class="ctx-item" onmouseenter={() => { ctxStatusSubmenuOpen = false; }} onclick={() => {
+			const name = ctxData!.session.name;
+			closeCtxMenu();
+			ctxData = null;
+			attachSession(name);
+		}}>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<polyline points="4 17 10 11 4 5" />
+				<line x1="12" y1="19" x2="20" y2="19" />
+			</svg>
+			<span>Attach Terminal</span>
+		</button>
+
+		<div class="ctx-divider"></div>
+
+		<!-- Change Status (submenu) - agent sessions with task -->
+		{#if ctxData.task}
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div
+				class="ctx-submenu-container"
+				onmouseenter={() => { ctxStatusSubmenuOpen = true; }}
+				onmouseleave={() => { ctxStatusSubmenuOpen = false; }}
+			>
+				<button class="ctx-item ctx-item-has-submenu">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+						<polyline points="22 4 12 14.01 9 11.01" />
+					</svg>
+					<span>Change Status</span>
+					<svg class="ctx-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<polyline points="9 18 15 12 9 6" />
+					</svg>
+				</button>
+				{#if ctxStatusSubmenuOpen}
+					<div class="ctx-submenu">
+						{#each [
+							{ value: 'open', label: 'Open', color: 'oklch(0.70 0.15 220)' },
+							{ value: 'in_progress', label: 'In Progress', color: 'oklch(0.75 0.15 85)' },
+							{ value: 'blocked', label: 'Blocked', color: 'oklch(0.65 0.18 30)' },
+							{ value: 'closed', label: 'Closed', color: 'oklch(0.65 0.18 145)' }
+						] as status}
+							<button
+								class="ctx-item {ctxData!.task!.status === status.value ? 'ctx-item-active' : ''}"
+								onclick={() => ctxChangeStatus(ctxData!.task!.id, status.value)}
+							>
+								<span class="ctx-status-dot" style="background: {status.color};"></span>
+								<span>{status.label}</span>
+								{#if ctxData!.task!.status === status.value}
+									<svg class="ctx-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+										<polyline points="20 6 9 17 4 12" />
+									</svg>
+								{/if}
+							</button>
+						{/each}
+					</div>
+				{/if}
+			</div>
+		{/if}
+
+		<!-- Duplicate (agent with task) -->
+		{#if ctxData.task}
+			<button class="ctx-item" onmouseenter={() => { ctxStatusSubmenuOpen = false; }} onclick={() => ctxDuplicateTask(ctxData!.task!)}>
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+					<path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+				</svg>
+				<span>Duplicate</span>
+			</button>
+		{/if}
+
+		<div class="ctx-divider"></div>
+
+		<!-- Interrupt (agent sessions) -->
+		{#if ctxData.session.type === 'agent'}
+			<button class="ctx-item" onmouseenter={() => { ctxStatusSubmenuOpen = false; }} onclick={async () => {
+				const name = ctxData!.session.name;
+				closeCtxMenu();
+				ctxData = null;
+				await fetch(`/api/work/${encodeURIComponent(name)}/input`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ type: 'ctrl-c' })
+				});
+			}}>
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<circle cx="12" cy="12" r="10" />
+					<rect x="9" y="9" width="6" height="6" rx="1" />
+				</svg>
+				<span>Interrupt</span>
+			</button>
+		{/if}
+
+		<!-- Pause (agent with task) -->
+		{#if ctxData.task}
+			<button class="ctx-item" onmouseenter={() => { ctxStatusSubmenuOpen = false; }} onclick={async () => {
+				const d = ctxData!;
+				closeCtxMenu();
+				ctxData = null;
+				optimisticStates.set(d.session.name, 'paused');
+				optimisticStates = new Map(optimisticStates);
+				if (d.task) {
+					await fetch(`/api/sessions/${encodeURIComponent(d.session.name)}/pause`, {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							taskId: d.task.id,
+							taskTitle: d.task.title,
+							reason: 'Paused via context menu',
+							killSession: true,
+							agentName: d.agentName,
+							project: d.session.project
+						})
+					});
+				}
+			}}>
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<circle cx="12" cy="12" r="10" />
+					<line x1="10" y1="15" x2="10" y2="9" />
+					<line x1="14" y1="15" x2="14" y2="9" />
+				</svg>
+				<span>Pause</span>
+			</button>
+		{/if}
+
+		<!-- Complete (agent with task) -->
+		{#if ctxData.task}
+			<button class="ctx-item ctx-item-success" onmouseenter={() => { ctxStatusSubmenuOpen = false; }} onclick={async () => {
+				const d = ctxData!;
+				closeCtxMenu();
+				ctxData = null;
+				optimisticStates.set(d.session.name, 'completing');
+				optimisticStates = new Map(optimisticStates);
+				if (d.task) {
+					try {
+						await fetch(`/api/sessions/${encodeURIComponent(d.session.name)}/signal`, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({
+								type: 'completing',
+								data: {
+									taskId: d.task.id,
+									taskTitle: d.task.title,
+									currentStep: 'verifying',
+									progress: 0,
+									stepsCompleted: [],
+									stepsRemaining: ['verifying', 'committing', 'closing', 'releasing']
+								}
+							})
+						});
+					} catch (_) { /* ignore */ }
+				}
+				await sendWorkflowCommand(d.session.name, '/jat:complete');
+			}}>
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+					<polyline points="22 4 12 14.01 9 11.01" />
+				</svg>
+				<span>Complete</span>
+			</button>
+		{/if}
+
+		<div class="ctx-divider"></div>
+
+		<!-- Kill Session (all session types) -->
+		<button class="ctx-item ctx-item-danger" onmouseenter={() => { ctxStatusSubmenuOpen = false; }} onclick={async () => {
+			const d = ctxData!;
+			closeCtxMenu();
+			ctxData = null;
+			if (d.task) {
+				try {
+					await fetch(`/api/tasks/${encodeURIComponent(d.task.id)}/close`, {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ reason: 'Closed via context menu' })
+					});
+				} catch (_) { /* ignore */ }
+			}
+			await killSession(d.session.name);
+		}}>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<circle cx="12" cy="12" r="10" />
+				<line x1="15" y1="9" x2="9" y2="15" />
+				<line x1="9" y1="9" x2="15" y2="15" />
+			</svg>
+			<span>{ctxData.task ? 'Close & Kill' : 'Kill Session'}</span>
+		</button>
+	</div>
+{/if}
+
 <style>
 	.tmux-page {
 		min-height: 100vh;
@@ -2148,21 +2453,6 @@
 		color: oklch(0.50 0.02 250);
 	}
 
-	.server-row {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		width: 100%;
-		min-width: 0; /* Allow flex children to shrink */
-	}
-
-	.server-name {
-		display: flex;
-		align-items: center;
-		gap: 0.375rem;
-		margin-top: 0.25rem;
-	}
-
 	.task-title {
 		font-size: 0.8rem;
 		font-weight: 500;
@@ -2183,54 +2473,6 @@
 		white-space: nowrap;
 		width: 100%;
 		max-width: 100%;
-	}
-
-	/* Actions */
-	.action-buttons {
-		display: flex;
-		gap: 0.375rem;
-	}
-
-	.action-btn {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 28px;
-		height: 28px;
-		padding: 0;
-		background: oklch(0.22 0.02 250);
-		border: 1px solid oklch(0.30 0.02 250);
-		border-radius: 4px;
-		color: oklch(0.65 0.02 250);
-		cursor: pointer;
-		transition: all 0.15s;
-	}
-
-	.action-btn:hover:not(:disabled) {
-		background: oklch(0.28 0.02 250);
-		color: oklch(0.80 0.02 250);
-	}
-
-	.action-btn:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-	}
-
-	.action-btn.attach:hover:not(:disabled) {
-		background: oklch(0.65 0.15 200 / 0.2);
-		border-color: oklch(0.65 0.15 200 / 0.4);
-		color: oklch(0.75 0.15 200);
-	}
-
-	.action-btn.kill:hover:not(:disabled) {
-		background: oklch(0.65 0.15 30 / 0.2);
-		border-color: oklch(0.65 0.15 30 / 0.4);
-		color: oklch(0.75 0.15 30);
-	}
-
-	.action-icon {
-		width: 14px;
-		height: 14px;
 	}
 
 	/* Command hint */
@@ -2875,5 +3117,121 @@
 			right: 1rem;
 			bottom: 1rem;
 		}
+	}
+
+	/* === Context Menu === */
+	.ctx-menu {
+		position: fixed;
+		z-index: 100;
+		min-width: 180px;
+		background: oklch(0.18 0.02 250);
+		border: 1px solid oklch(0.28 0.02 250);
+		border-radius: 0.5rem;
+		padding: 0.375rem;
+		box-shadow: 0 10px 30px oklch(0.05 0 0 / 0.5);
+		animation: ctxIn 0.1s ease;
+	}
+
+	.ctx-menu-hidden {
+		display: none;
+	}
+
+	@keyframes ctxIn {
+		from { opacity: 0; transform: scale(0.95); }
+		to { opacity: 1; transform: scale(1); }
+	}
+
+	.ctx-item {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		width: 100%;
+		padding: 0.375rem 0.625rem;
+		border: none;
+		background: transparent;
+		color: oklch(0.80 0.02 250);
+		font-size: 0.8125rem;
+		border-radius: 0.375rem;
+		cursor: pointer;
+		transition: background 0.1s ease;
+		white-space: nowrap;
+	}
+
+	.ctx-item:hover {
+		background: oklch(0.25 0.03 250);
+	}
+
+	.ctx-item svg {
+		width: 14px;
+		height: 14px;
+		flex-shrink: 0;
+		opacity: 0.7;
+	}
+
+	.ctx-item-has-submenu {
+		position: relative;
+	}
+
+	.ctx-item-active {
+		color: oklch(0.85 0.10 200);
+	}
+
+	.ctx-item-danger {
+		color: oklch(0.75 0.15 25);
+	}
+
+	.ctx-item-danger:hover {
+		background: oklch(0.25 0.06 25);
+	}
+
+	.ctx-item-success {
+		color: oklch(0.75 0.15 145);
+	}
+
+	.ctx-item-success:hover {
+		background: oklch(0.25 0.06 145);
+	}
+
+	.ctx-divider {
+		height: 1px;
+		margin: 0.25rem 0.375rem;
+		background: oklch(0.28 0.02 250);
+	}
+
+	.ctx-chevron {
+		width: 12px;
+		height: 12px;
+		margin-left: auto;
+		opacity: 0.5;
+	}
+
+	.ctx-check {
+		width: 14px;
+		height: 14px;
+		margin-left: auto;
+	}
+
+	.ctx-status-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		flex-shrink: 0;
+	}
+
+	.ctx-submenu-container {
+		position: relative;
+	}
+
+	.ctx-submenu {
+		position: absolute;
+		left: 100%;
+		top: -0.375rem;
+		min-width: 150px;
+		background: oklch(0.18 0.02 250);
+		border: 1px solid oklch(0.28 0.02 250);
+		border-radius: 0.5rem;
+		padding: 0.375rem;
+		box-shadow: 0 10px 30px oklch(0.05 0 0 / 0.5);
+		animation: ctxIn 0.1s ease;
 	}
 </style>

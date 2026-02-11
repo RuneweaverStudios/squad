@@ -2747,7 +2747,7 @@
 									<span class="text-sm font-medium text-success">Drop files to attach</span>
 								</div>
 							{:else if attachments.length > 0}
-								<div class="grid grid-cols-3 gap-3 p-3 rounded overflow-visible bg-base-200">
+								<div class="grid grid-cols-2 gap-3 p-3 rounded overflow-visible bg-base-200">
 									{#each attachments as attachment (attachment.id)}
 										<div class="relative group">
 											<a
@@ -2759,7 +2759,7 @@
 												<img
 													src={`/api/work/image${attachment.path}`}
 													alt="Task attachment"
-													class="w-full h-20 object-cover rounded border border-base-300 cursor-pointer hover:border-primary transition-colors"
+													class="w-full h-90 object-cover rounded border border-base-300 cursor-pointer hover:border-primary transition-colors"
 												/>
 											</a>
 											<!-- Delete button -->
@@ -2785,7 +2785,7 @@
 										</div>
 									{/each}
 									<!-- Add more hint when attachments exist -->
-									<div class="flex items-center justify-center h-20 rounded border-2 border-dashed border-base-300 opacity-50 hover:opacity-80 transition-opacity cursor-default">
+									<div class="flex items-center justify-center h-90 rounded border-2 border-dashed border-base-300 opacity-50 hover:opacity-80 transition-opacity cursor-default">
 										<span class="text-[10px] text-center px-1 text-base-content/50">Drop to add more</span>
 									</div>
 								</div>

@@ -2044,48 +2044,41 @@
 
 						<!-- Attached Files List -->
 						{#if pendingAttachments.length > 0}
-							<div class="mt-3 space-y-2">
+							<div class="mt-3 flex flex-wrap gap-3">
 								{#each pendingAttachments as att (att.id)}
-									<div
-										class="flex items-center gap-3 p-2 rounded-lg bg-base-100 border border-base-content/20"
-									>
+									<div class="relative group">
 										<!-- Preview/Icon -->
 										{#if att.category === 'image' && att.preview}
 											<img
 												src={att.preview}
 												alt={att.file.name}
-												class="w-10 h-10 object-cover rounded"
+												class="w-44 h-44 object-cover rounded border border-base-content/20"
 											/>
 										{:else}
 											<div
-												class="w-10 h-10 flex items-center justify-center rounded bg-base-200"
+												class="w-44 h-44 flex items-center justify-center rounded bg-base-200 border border-base-content/20"
 											>
-												<svg class="w-5 h-5" style="color: {att.iconColor};" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+												<svg class="w-22 h-22" style="color: {att.iconColor};" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
 													<path stroke-linecap="round" stroke-linejoin="round" d={att.icon} />
 												</svg>
 											</div>
 										{/if}
 
-										<!-- File info -->
-										<div class="flex-1 min-w-0">
-											<p class="font-mono text-sm truncate text-base-content">
-												{att.file.name}
-											</p>
-											<p class="font-mono text-xs text-base-content/60">
-												{formatFileSize(att.file.size)}
-											</p>
+										<!-- Filename overlay at bottom -->
+										<div class="absolute bottom-0 left-0 right-0 px-1 py-0.5 text-[10px] font-mono truncate rounded-b bg-base-100/90 text-base-content/70" title={att.file.name}>
+											{att.file.name}
 										</div>
 
 										<!-- Remove button -->
 										<button
 											type="button"
-											class="btn btn-ghost btn-sm btn-circle"
+											class="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 bg-error text-error-content"
 											onclick={(e) => { e.stopPropagation(); removeAttachment(att.id); }}
 											disabled={isSubmitting}
 											aria-label="Remove attachment"
 										>
-											<svg class="w-4 h-4 text-error/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+											<svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+												<path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
 											</svg>
 										</button>
 									</div>

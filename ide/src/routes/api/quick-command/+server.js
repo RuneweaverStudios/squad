@@ -106,7 +106,7 @@ async function resolveFileReferences(prompt, projectPath) {
 }
 
 // --- Context Providers ---
-// Resolve @task:ID, @git:diff, @git:log:N, @git:branch, @mail:THREAD, @url:URL
+// Resolve @task:ID, @git:diff, @git:log:N, @git:branch, @memory:QUERY, @url:URL
 // Must run BEFORE resolveFileReferences to avoid pattern overlap.
 
 /** @type {Array<{pattern: RegExp, type: string, resolve: (match: RegExpMatchArray, cwd: string) => Promise<{content: string, ref: string}>}>} */
@@ -180,18 +180,18 @@ const CONTEXT_PROVIDERS = [
 		}
 	},
 	{
-		// @mail:THREAD - inject Agent Mail thread messages
-		pattern: /@mail:([\w\-\.]+)/g,
-		type: 'mail',
+		// @memory:QUERY - search project memory for relevant context
+		pattern: /@memory:([\w\-\.]+)/g,
+		type: 'memory',
 		resolve: async (match, cwd) => {
-			const thread = match[1];
-			const stdout = await execCommand('am-inbox', ['--thread', thread, '--json', '@all'], cwd);
-			const messages = JSON.parse(stdout);
-			if (!messages || messages.length === 0) return { content: '(no messages in thread)', ref: thread };
-			const formatted = messages.map(m =>
-				`[${m.created_at || m.timestamp}] ${m.from_agent} → ${m.to_agent}: ${m.subject}\n${m.body}`
+			const query = match[1].trim();
+			const stdout = await execCommand('jat-memory', ['search', query, '--limit', '5', '--json'], cwd, 15000);
+			const results = JSON.parse(stdout);
+			if (!results || results.length === 0) return { content: '(no matching memories)', ref: query };
+			const formatted = results.map(r =>
+				`[${r.section}] ${r.path} (score: ${r.score?.toFixed(2) || '?'})\n${r.snippet}`
 			).join('\n---\n');
-			return { content: formatted, ref: thread };
+			return { content: formatted, ref: query };
 		}
 	},
 	{
