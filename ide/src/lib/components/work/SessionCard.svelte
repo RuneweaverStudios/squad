@@ -214,11 +214,11 @@
 		cardWidth?: number;
 		/** Called when user drags the resize handle */
 		onWidthChange?: (newWidth: number) => void;
-		/** Real-time state from SSE (if available, used instead of output parsing) */
+		/** Real-time state from WS (if available, used instead of output parsing) */
 		sseState?: string;
-		/** Timestamp when SSE state was last updated */
+		/** Timestamp when WS state was last updated */
 		sseStateTimestamp?: number;
-		/** Suggested tasks from jat-signal (via SSE session-signal event) */
+		/** Suggested tasks from jat-signal (via WS session-signal event) */
 		signalSuggestedTasks?: Array<{
 			id?: string;
 			type: string;
@@ -232,7 +232,7 @@
 		}>;
 		/** Timestamp when signal suggested tasks were last updated */
 		signalSuggestedTasksTimestamp?: number;
-		/** Completion bundle from jat-signal complete (via SSE session-complete event) */
+		/** Completion bundle from jat-signal complete (via WS session-complete event) */
 		completionBundle?: {
 			taskId: string;
 			agentName: string;
@@ -275,7 +275,7 @@
 		};
 		/** Timestamp when completion bundle was received */
 		completionBundleTimestamp?: number;
-		/** Rich signal payload from SSE (for working, review, needs_input, completing states) */
+		/** Rich signal payload from WS (for working, review, needs_input, completing states) */
 		richSignalPayload?: {
 			type: string;
 			[key: string]: unknown;
@@ -288,7 +288,7 @@
 		isExiting?: boolean;
 		/** Whether session is entering (triggers slide-in-fwd-top animation) */
 		isEntering?: boolean;
-		/** Question data from SSE (instant, bypasses HTTP polling delay) */
+		/** Question data from WS (instant, bypasses HTTP polling delay) */
 		sseQuestionData?: {
 			active: boolean;
 			questions: Array<{
@@ -298,7 +298,7 @@
 				options: Array<{ label: string; description: string }>;
 			}>;
 		};
-		/** Timestamp when SSE question data was received */
+		/** Timestamp when WS question data was received */
 		sseQuestionDataTimestamp?: number;
 	}
 
@@ -353,16 +353,16 @@
 		isHighlighted = false,
 		cardWidth,
 		onWidthChange,
-		// SSE real-time state
+		// WS real-time state
 		sseState,
 		sseStateTimestamp,
-		// Signal data (from jat-signal via SSE)
+		// Signal data (from jat-signal via WS)
 		signalSuggestedTasks,
 		signalSuggestedTasksTimestamp,
-		// Completion bundle (from jat-signal complete via SSE)
+		// Completion bundle (from jat-signal complete via WS)
 		completionBundle,
 		completionBundleTimestamp,
-		// Rich signal payload (from SSE session-state events)
+		// Rich signal payload (from WS session-state events)
 		richSignalPayload,
 		richSignalPayloadTimestamp,
 		// Automation recovering state
@@ -371,7 +371,7 @@
 		isExiting = false,
 		// Entrance animation state
 		isEntering = false,
-		// SSE question data (instant, bypasses HTTP polling)
+		// WS question data (instant, bypasses HTTP polling)
 		sseQuestionData,
 		sseQuestionDataTimestamp,
 	}: Props = $props();
@@ -473,12 +473,12 @@
 	});
 
 	const completedSignal = $derived.by(() => {
-		// First check if we have a completed state signal from SSE
+		// First check if we have a completed state signal from WS
 		if (richSignalPayload?.type === "completed") {
 			return richSignalPayload as unknown as CompletedSignalType;
 		}
 		// Also check if we have a completion bundle (from complete data signal)
-		// and SSE state is completed - construct a CompletedSignal from it
+		// and WS state is completed - construct a CompletedSignal from it
 		const BUNDLE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 		const bundleIsValid =
 			completionBundle &&
@@ -615,17 +615,17 @@
 	let otherInputValue = $state("");
 	// Suppress question fetching after answering (prevents race condition)
 	let suppressQuestionFetch = $state(false);
-	// Track when we last cleared question data (to ignore stale SSE data)
+	// Track when we last cleared question data (to ignore stale WS data)
 	let lastQuestionClearTime = 0;
 
-	// SSE question data → instant apiQuestionData update (bypasses HTTP polling delay)
-	// The SSE server watches /tmp/claude-question-tmux-*.json and broadcasts within ~50ms
+	// WS question data → instant apiQuestionData update (bypasses HTTP polling delay)
+	// The WS server watches /tmp/claude-question-tmux-*.json and broadcasts within ~50ms
 	// of the PreToolUse hook writing it, vs the old 1.5s polling interval
 	$effect(() => {
 		if (suppressQuestionFetch) return;
 		if (sseQuestionData?.active && sseQuestionData.questions?.length > 0) {
-			// Only accept SSE data that arrived after our last clear
-			// This prevents stale SSE data from re-showing an already-answered question
+			// Only accept WS data that arrived after our last clear
+			// This prevents stale WS data from re-showing an already-answered question
 			if (sseQuestionDataTimestamp && sseQuestionDataTimestamp <= lastQuestionClearTime) return;
 			// Reset selection state if this is a new question
 			const oldQuestion = apiQuestionData?.questions?.[0]?.question;
@@ -784,7 +784,7 @@
 		// Suppress fetching to prevent race condition
 		suppressQuestionFetch = true;
 		apiQuestionData = null;
-		// Record clear time so stale SSE data won't re-show the answered question
+		// Record clear time so stale WS data won't re-show the answered question
 		lastQuestionClearTime = Date.now();
 		try {
 			await fetch(`/api/work/${encodeURIComponent(sessionName)}/question`, {
@@ -2283,7 +2283,7 @@
 			}
 		}
 
-		// If we have an SSE state, check if it should be used
+		// If we have a WS state, check if it should be used
 		// "completed" state persists until task changes (no TTL) - this ensures completion UI stays visible
 		// Other states use 5-second TTL for real-time responsiveness
 		const SSE_STATE_TTL_MS = 5000;
@@ -2676,7 +2676,7 @@
 	// ==========================================================================
 	// Suggested Tasks Detection
 	// ==========================================================================
-	// Suggested tasks are delivered via the jat-signal hook system (SSE).
+	// Suggested tasks are delivered via the jat-signal hook system (WS).
 	// See shared/signals.md for signal system documentation.
 
 	/** Extended SuggestedTask with local UI state for selection and editing */
@@ -2709,7 +2709,7 @@
 	);
 
 	/**
-	 * Process SUGGESTED_TASKS from signal data (via SSE).
+	 * Process SUGGESTED_TASKS from signal data (via WS).
 	 * Signal data comes directly from the jat-signal hook without terminal parsing.
 	 */
 	const detectedSuggestedTasks = $derived.by((): SuggestedTaskWithState[] => {

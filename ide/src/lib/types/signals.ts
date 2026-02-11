@@ -17,7 +17,7 @@
  * Agents can suggest follow-up tasks via the 'complete' signal's suggestedTasks field:
  *   jat-signal complete '{"taskId":"...","suggestedTasks":[{"type":"feature","title":"..."}]}'
  *
- * The IDE receives this data via SSE and displays it in the SessionCard.
+ * The IDE receives this data via WebSocket and displays it in the SessionCard.
  */
 export interface SuggestedTask {
 	/** Optional ID if this references an existing task */

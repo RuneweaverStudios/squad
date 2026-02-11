@@ -51,7 +51,7 @@ const initializedSessions = new Set<string>();
 // Store for auto-kill countdown state (sessionName -> seconds remaining)
 export const autoKillCountdowns = writable<Map<string, number>>(new Map());
 
-// Event types: original cross-tab events + new SSE events
+// Event types: original cross-tab events + new WS events
 export type SessionEventType =
 	| 'session-killed'
 	| 'session-spawned'
@@ -185,7 +185,7 @@ export interface SessionEvent {
 	sessionName?: string;
 	agentName?: string;
 	timestamp: number;
-	// SSE event-specific fields
+	// WS event-specific fields
 	output?: string;
 	lineCount?: number;
 	state?: string;
@@ -215,7 +215,7 @@ export interface SessionEvent {
 // Store for reactive updates - components can subscribe to this
 export const lastSessionEvent = writable<SessionEvent | null>(null);
 
-// SSE connection state
+// WS connection state
 export const sessionEventsConnected = writable(false);
 
 // ============================================================================
@@ -360,7 +360,7 @@ function handleSessionOutput(data: SessionEvent): void {
 	let sessionIndex = workSessionsState.sessions.findIndex(s => s.sessionName === sessionName);
 
 	// Create session on-the-fly if it doesn't exist
-	// This ensures automation works for sessions that were running before SSE connected
+	// This ensures automation works for sessions that were running before WS connected
 	if (sessionIndex === -1) {
 		const newSession: WorkSession = {
 			sessionName,
@@ -511,7 +511,7 @@ function handleSessionState(data: SessionEvent): void {
 /**
  * Handle session-question event: store question data directly in workSessions state
  * This provides instant question UI display without waiting for HTTP polling.
- * The SSE server watches /tmp/claude-question-tmux-*.json files and broadcasts
+ * The WS server watches /tmp/claude-question-tmux-*.json files and broadcasts
  * the question data within ~50ms of the PreToolUse hook writing it.
  *
  * PERFORMANCE: Uses in-place mutation for fine-grained reactivity.
@@ -594,7 +594,7 @@ function handleSessionComplete(data: SessionEvent): void {
 		workSessionsState.sessions[sessionIndex]._richSignalPayloadTimestamp = undefined;
 	}
 
-	// Also update SSE state to 'completed' if not already
+	// Also update WS state to 'completed' if not already
 	if (workSessionsState.sessions[sessionIndex]._sseState !== 'completed') {
 		workSessionsState.sessions[sessionIndex]._sseState = 'completed';
 		workSessionsState.sessions[sessionIndex]._sseStateTimestamp = data.timestamp;
@@ -791,7 +791,7 @@ async function handleAutoProceed(data: SessionEvent): Promise<void> {
 
 		if (result.success) {
 			console.log(`[SessionEvents] Spawned next session: ${result.sessionName} for epic task ${result.nextTaskId}`);
-			// The new session will appear via session-created SSE event
+			// The new session will appear via session-created WS event
 			// The old session will be removed when tmux session is killed
 		} else {
 			console.warn(`[SessionEvents] Failed to spawn epic task: ${result.reason}`);

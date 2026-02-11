@@ -50,13 +50,13 @@
 		contextPercent?: number | null;
 		created: string;
 		attached: boolean;
-		/** Real-time state from SSE (working, needs-input, ready-for-review, etc.) */
+		/** Real-time state from WS (working, needs-input, ready-for-review, etc.) */
 		_sseState?: string;
-		/** Timestamp when SSE state was last updated */
+		/** Timestamp when WS state was last updated */
 		_sseStateTimestamp?: number;
 		/** Whether session is in recovering state (automation rule triggered recovery) */
 		_isRecovering?: boolean;
-		/** Suggested tasks from jat-signal (via SSE session-signal event) */
+		/** Suggested tasks from jat-signal (via WS session-signal event) */
 		_signalSuggestedTasks?: Array<{
 			id?: string;
 			type: string;
@@ -70,7 +70,7 @@
 		}>;
 		/** Timestamp when signal suggested tasks were last updated */
 		_signalSuggestedTasksTimestamp?: number;
-		/** Completion bundle from jat-signal complete (via SSE session-complete event) */
+		/** Completion bundle from jat-signal complete (via WS session-complete event) */
 		_completionBundle?: {
 			taskId: string;
 			agentName: string;
@@ -104,14 +104,14 @@
 		};
 		/** Timestamp when completion bundle was received */
 		_completionBundleTimestamp?: number;
-		/** Rich signal payload from SSE (for working, review, needs_input, completing states) */
+		/** Rich signal payload from WS (for working, review, needs_input, completing states) */
 		_richSignalPayload?: {
 			type: string;
 			[key: string]: unknown;
 		};
 		/** Timestamp when rich signal payload was last updated */
 		_richSignalPayloadTimestamp?: number;
-		/** Question data from SSE (instant, bypasses HTTP polling) */
+		/** Question data from WS (instant, bypasses HTTP polling) */
 		_questionData?: {
 			active: boolean;
 			questions: Array<{
@@ -121,7 +121,7 @@
 				options: Array<{ label: string; description: string }>;
 			}>;
 		};
-		/** Timestamp when question data was received via SSE */
+		/** Timestamp when question data was received via WS */
 		_questionDataTimestamp?: number;
 	}
 
@@ -266,7 +266,7 @@
 	// State priority for sorting (lower = more attention needed):
 	// 0 = needs-input, 1 = review, 2 = working, 3 = starting, 4 = completed, 5 = idle
 	function getSessionState(session: WorkSession): number {
-		// Use SSE state if available and recent (within 5 seconds)
+		// Use WS state if available and recent (within 5 seconds)
 		const SSE_STATE_TTL_MS = 5000;
 		if (session._sseState && session._sseStateTimestamp && (Date.now() - session._sseStateTimestamp) < SSE_STATE_TTL_MS) {
 			const stateMap: Record<string, number> = {

@@ -231,10 +231,10 @@
 	// Track sessions that had task data when they first appeared (for text animation)
 	let sessionsWithTaskOnEntry = $state<Set<string>>(new Set());
 
-	// Optimistic state overrides - for instant UI feedback before SSE catches up
+	// Optimistic state overrides - for instant UI feedback before WS catches up
 	let optimisticStates = $state<Map<string, string>>(new Map());
 
-	// Clear optimistic states when SSE catches up
+	// Clear optimistic states when WS catches up
 	$effect(() => {
 		if (optimisticStates.size === 0) return;
 
@@ -245,7 +245,7 @@
 			const agentName = sessionName.startsWith('jat-') ? sessionName.slice(4) : sessionName;
 			const sseState = agentSessionInfo.get(agentName)?.activityState;
 
-			// Clear optimistic state if SSE reports same state or a "later" state
+			// Clear optimistic state if WS reports same state or a "later" state
 			if (sseState === optimisticState ||
 				(optimisticState === 'completing' && (sseState === 'completed' || sseState === 'idle'))) {
 				newOptimistic.delete(sessionName);

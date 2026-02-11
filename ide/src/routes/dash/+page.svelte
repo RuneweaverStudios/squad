@@ -264,7 +264,7 @@
 			let cmp = 0;
 			switch (sortBy) {
 				case 'state': {
-					// Sort by SSE state: working > needs-input > review > idle > starting
+					// Sort by signal state: working > needs-input > review > idle > starting
 					const stateOrder: Record<string, number> = {
 						'working': 0, 'needs_input': 1, 'review': 2, 'idle': 3, 'starting': 4, 'completed': 5
 					};

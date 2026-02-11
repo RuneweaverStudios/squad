@@ -16,44 +16,11 @@ import type { RequestHandler } from './$types';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
+import type { IntegrationSource, IntegrationsConfig } from '$lib/types/integration';
 
 const CONFIG_DIR = join(homedir(), '.config/jat');
 const INTEGRATIONS_PATH = join(CONFIG_DIR, 'integrations.json');
 const LEGACY_PATH = join(CONFIG_DIR, 'feeds.json');
-
-interface IntegrationSource {
-	id: string;
-	type: string;
-	enabled: boolean;
-	project: string;
-	pollInterval: number;
-	taskDefaults: {
-		type: string;
-		priority: number;
-		labels: string[];
-	};
-	// Type-specific fields
-	feedUrl?: string;
-	secretName?: string;
-	channel?: string;
-	includeBots?: boolean;
-	trackReplies?: boolean;
-	maxTrackedThreads?: number;
-	chatId?: string;
-	imapUser?: string;
-	folder?: string;
-	filterFrom?: string;
-	filterSubject?: string;
-	markAsRead?: boolean;
-	command?: string;
-	filter?: any;
-	[key: string]: any;
-}
-
-interface IntegrationsConfig {
-	version: number;
-	sources: IntegrationSource[];
-}
 
 /**
  * Resolve config path, auto-migrating feeds.json → integrations.json if needed.

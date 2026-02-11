@@ -13,6 +13,7 @@ import { readdirSync, existsSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import type { PluginInfo, PluginCapabilities } from '$lib/types/integration';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -25,28 +26,6 @@ function getBuiltinDir(): string {
 
 /** User plugins directory */
 const USER_PLUGINS_DIR = join(homedir(), '.config', 'jat', 'ingest-plugins');
-
-interface PluginCapabilities {
-	realtime?: boolean;
-	send?: boolean;
-	threads?: boolean;
-}
-
-interface PluginInfo {
-	type: string;
-	name: string;
-	description: string;
-	version: string;
-	path: string;
-	isBuiltin: boolean;
-	enabled: boolean;
-	error?: string;
-	configFields?: any[];
-	itemFields?: any[];
-	defaultFilter?: any[];
-	icon?: { svg: string; viewBox: string; fill?: boolean; color?: string };
-	capabilities?: PluginCapabilities;
-}
 
 /**
  * List subdirectories in a directory. Returns empty array if directory doesn't exist.

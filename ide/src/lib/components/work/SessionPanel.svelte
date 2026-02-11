@@ -112,23 +112,23 @@
 		contextPercent?: number | null;
 		created: string;
 		attached: boolean;
-		/** Real-time state from SSE (working, needs-input, ready-for-review, etc.) */
+		/** Real-time state from WS (working, needs-input, ready-for-review, etc.) */
 		_sseState?: string;
-		/** Timestamp when SSE state was last updated */
+		/** Timestamp when WS state was last updated */
 		_sseStateTimestamp?: number;
-		/** Suggested tasks from jat-signal (via SSE session-signal event) */
+		/** Suggested tasks from jat-signal (via WS session-signal event) */
 		_signalSuggestedTasks?: SuggestedTask[];
 		/** Timestamp when signal suggested tasks were last updated */
 		_signalSuggestedTasksTimestamp?: number;
-		/** Human action from jat-signal (via SSE session-signal event) */
+		/** Human action from jat-signal (via WS session-signal event) */
 		_signalAction?: SignalAction;
 		/** Timestamp when signal action was last updated */
 		_signalActionTimestamp?: number;
-		/** Completion bundle from jat-signal complete (via SSE session-complete event) */
+		/** Completion bundle from jat-signal complete (via WS session-complete event) */
 		_completionBundle?: CompletionBundle;
 		/** Timestamp when completion bundle was received */
 		_completionBundleTimestamp?: number;
-		/** Question data from SSE (instant, bypasses HTTP polling) */
+		/** Question data from WS (instant, bypasses HTTP polling) */
 		_questionData?: {
 			active: boolean;
 			questions: Array<{
@@ -138,7 +138,7 @@
 				options: Array<{ label: string; description: string }>;
 			}>;
 		};
-		/** Timestamp when question data was received via SSE */
+		/** Timestamp when question data was received via WS */
 		_questionDataTimestamp?: number;
 	}
 

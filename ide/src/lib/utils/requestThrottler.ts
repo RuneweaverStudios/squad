@@ -11,7 +11,7 @@
  * - Firefox: 6 concurrent connections per domain
  * - Safari: 6 concurrent connections per domain
  *
- * We limit to 4 to leave headroom for other requests (SSE, WebSocket, etc.)
+ * We limit to 4 to leave headroom for other requests (WebSocket, etc.)
  */
 
 const MAX_CONCURRENT_REQUESTS = 4;

@@ -2,7 +2,7 @@
  * File Watchers for WebSocket Event Broadcasting
  *
  * Watches key files and broadcasts changes to WebSocket subscribers.
- * This replaces/complements the existing SSE implementation.
+ * This replaces the previous SSE implementation.
  *
  * Watched sources:
  * - .jat/last-touched - Task mutation sentinel (written by lib/tasks.js on every write)
@@ -116,7 +116,7 @@ const OUTPUT_POLL_INTERVAL = 2000; // Poll every 2 seconds (was 250ms - caused m
 const OUTPUT_LINES = 100; // Number of lines to capture per session
 const EXEC_TIMEOUT_MS = 5000; // Timeout for exec commands
 
-// Session lifecycle polling (matches SSE endpoint interval)
+// Session lifecycle polling interval
 const SESSION_LIFECYCLE_POLL_INTERVAL = 1000; // 1 second
 
 // Guard against overlapping polls

@@ -78,9 +78,9 @@ export interface WorkSession {
 	contextPercent?: number | null;
 	created: string;
 	attached: boolean;
-	/** Real-time state from SSE (working, needs-input, ready-for-review, etc.) */
+	/** Real-time state from WS (working, needs-input, ready-for-review, etc.) */
 	_sseState?: string;
-	/** Timestamp when SSE state was last updated */
+	/** Timestamp when WS state was last updated */
 	_sseStateTimestamp?: number;
 	/** Whether session is in recovering state (automation rule triggered recovery) */
 	_isRecovering?: boolean;
@@ -92,7 +92,7 @@ export interface WorkSession {
 	_autoProceedNextTaskId?: string;
 	/** Next task title for auto-proceed display */
 	_autoProceedNextTaskTitle?: string;
-	/** Suggested tasks from jat-signal (via SSE session-signal event) */
+	/** Suggested tasks from jat-signal (via WS session-signal event) */
 	_signalSuggestedTasks?: Array<{
 		id?: string;
 		type: string;
@@ -106,7 +106,7 @@ export interface WorkSession {
 	}>;
 	/** Timestamp when signal suggested tasks were last updated */
 	_signalSuggestedTasksTimestamp?: number;
-	/** Human action from jat-signal (via SSE session-signal event) */
+	/** Human action from jat-signal (via WS session-signal event) */
 	_signalAction?: {
 		action?: string;
 		title?: string;
@@ -117,7 +117,7 @@ export interface WorkSession {
 	};
 	/** Timestamp when signal action was last updated */
 	_signalActionTimestamp?: number;
-	/** Completion bundle from jat-signal complete (via SSE session-complete event) */
+	/** Completion bundle from jat-signal complete (via WS session-complete event) */
 	_completionBundle?: {
 		taskId: string;
 		agentName: string;
@@ -220,7 +220,7 @@ export interface WorkSession {
 	_activityStateTimestamp?: number;
 	/** Whether session is exiting (triggers exit animation before removal) */
 	_isExiting?: boolean;
-	/** Question data from SSE session-question event (from PreToolUse hook) */
+	/** Question data from WS session-question event (from PreToolUse hook) */
 	_questionData?: {
 		active: boolean;
 		session_id?: string;
@@ -233,7 +233,7 @@ export interface WorkSession {
 			options: Array<{ label: string; description: string }>;
 		}>;
 	};
-	/** Timestamp when question data was received via SSE */
+	/** Timestamp when question data was received via WS */
 	_questionDataTimestamp?: number;
 }
 
@@ -346,7 +346,7 @@ export async function fetch(includeUsage: boolean = false, bustCache: boolean = 
 		const newSessions: WorkSession[] = (data.sessions || []).map((session: WorkSession & { sessionState?: string }) => ({
 			...session,
 			// Map sessionState from HTTP API to _sseState for SessionCard consumption
-			// This ensures completion state from signal files is displayed even without SSE events
+			// This ensures completion state from signal files is displayed even without WS events
 			_sseState: session.sessionState || session._sseState,
 			_sseStateTimestamp: session.sessionState ? Date.now() : session._sseStateTimestamp
 		}));
@@ -1024,7 +1024,7 @@ export function getActivityState(sessionName: string): 'generating' | 'thinking'
 }
 
 /**
- * Get the SSE state for a specific session
+ * Get the WS state for a specific session
  */
 export function getSseState(sessionName: string): string | undefined {
 	const session = state.sessions.find((s) => s.sessionName === sessionName);

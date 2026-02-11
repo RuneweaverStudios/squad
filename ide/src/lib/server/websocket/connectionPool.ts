@@ -676,7 +676,7 @@ export function broadcastNewMessage(
 
 /**
  * Broadcast session state change (high priority - state changes are important)
- * Used by watchers.ts to push session state over WS instead of SSE
+ * Used by watchers.ts to push session state over WS
  */
 export function broadcastSessionState(
 	sessionName: string,

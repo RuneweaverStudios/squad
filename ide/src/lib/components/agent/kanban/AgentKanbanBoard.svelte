@@ -43,11 +43,11 @@
 		sparklineData?: SparklineDataPoint[];
 		created: string;
 		attached: boolean;
-		/** Real-time state from SSE (working, needs-input, ready-for-review, etc.) */
+		/** Real-time state from WS (working, needs-input, ready-for-review, etc.) */
 		_sseState?: string;
-		/** Timestamp when SSE state was last updated */
+		/** Timestamp when WS state was last updated */
 		_sseStateTimestamp?: number;
-		/** Suggested tasks from jat-signal (via SSE session-signal event) */
+		/** Suggested tasks from jat-signal (via WS session-signal event) */
 		_signalSuggestedTasks?: Array<{
 			id?: string;
 			type: string;
@@ -61,7 +61,7 @@
 		}>;
 		/** Timestamp when signal suggested tasks were last updated */
 		_signalSuggestedTasksTimestamp?: number;
-		/** Completion bundle from jat-signal complete (via SSE session-complete event) */
+		/** Completion bundle from jat-signal complete (via WS session-complete event) */
 		_completionBundle?: {
 			taskId: string;
 			agentName: string;

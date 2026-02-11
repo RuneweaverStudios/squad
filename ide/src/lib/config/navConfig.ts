@@ -10,21 +10,22 @@
  *   /source   - Source Control (git changes, diff viewer)
  *   /servers  - Servers (project server sessions)
  *   /integrations - Integrations (external source configuration)
- *   /schedules - Schedules (scheduled task management, scheduler service controls)
- *   /quick-commands - Commands (single-turn quick commands + templates)
- *   /config   - Config (JAT configuration, includes Projects tab)
+ *   /automation - Automation rules configuration
+ *   /memory   - Memory (agent persistent memory browser and search)
  *   /history  - History (completed task history with streak calendar)
+ *   /config   - Config (JAT configuration, includes Projects tab)
  *
  * VIEWS (alternative visualizations):
  *   /dash     - Dash (multi-project sessions view with terminal output)
- *   /sessions - Sessions (all tmux sessions: agents, servers, other)
  *   /graph    - Dependency visualization
  *   /timeline - Historical view
  *   /kanban   - Agent kanban (sessions grouped by activity state)
  *
- * LABS (experimental, not production-ready):
- *   /automation - Automation rules configuration
- *   /swarm    - Swarm attack interface (experimental)
+ * LABS (experimental):
+ *   /sessions - Sessions (all tmux sessions: agents, servers, other)
+ *   /quick-commands - Commands (single-turn quick commands + templates)
+ *   /schedules - Schedules (scheduled task management, scheduler service controls)
+ *   /swarm    - Swarm attack interface
  */
 
 export interface NavItem {
@@ -89,24 +90,17 @@ export const unifiedNavConfig: UnifiedNavConfig = {
 			category: 'main'
 		},
 		{
-			id: 'schedules',
-			label: 'Schedules',
-			href: '/schedules',
-			icon: 'schedules',
+			id: 'automation',
+			label: 'Automation',
+			href: '/automation',
+			icon: 'automation',
 			category: 'main'
 		},
 		{
-			id: 'quick-commands',
-			label: 'Commands',
-			href: '/quick-commands',
-			icon: 'terminal',
-			category: 'main'
-		},
-		{
-			id: 'config',
-			label: 'Config',
-			href: '/config',
-			icon: 'settings',
+			id: 'memory',
+			label: 'Memory',
+			href: '/memory',
+			icon: 'memory',
 			category: 'main'
 		},
 		{
@@ -116,19 +110,19 @@ export const unifiedNavConfig: UnifiedNavConfig = {
 			icon: 'history',
 			category: 'main'
 		},
+		{
+			id: 'config',
+			label: 'Config',
+			href: '/config',
+			icon: 'settings',
+			category: 'main'
+		},
 		// VIEWS: Alternative visualizations
 		{
 			id: 'dash',
 			label: 'Dash',
 			href: '/dash',
 			icon: 'dashboard',
-			category: 'views'
-		},
-		{
-			id: 'sessions',
-			label: 'Sessions',
-			href: '/sessions',
-			icon: 'tmux',
 			category: 'views'
 		},
 		{
@@ -152,19 +146,26 @@ export const unifiedNavConfig: UnifiedNavConfig = {
 			icon: 'columns',
 			category: 'views'
 		},
+		// LABS: Experimental features
 		{
-			id: 'memory',
-			label: 'Memory',
-			href: '/memory',
-			icon: 'memory',
-			category: 'views'
+			id: 'sessions',
+			label: 'Sessions',
+			href: '/sessions',
+			icon: 'tmux',
+			category: 'labs'
 		},
-		// LABS: Experimental features (not production-ready)
 		{
-			id: 'automation',
-			label: 'Automation',
-			href: '/automation',
-			icon: 'automation',
+			id: 'quick-commands',
+			label: 'Commands',
+			href: '/quick-commands',
+			icon: 'terminal',
+			category: 'labs'
+		},
+		{
+			id: 'schedules',
+			label: 'Schedules',
+			href: '/schedules',
+			icon: 'schedules',
 			category: 'labs'
 		},
 		{

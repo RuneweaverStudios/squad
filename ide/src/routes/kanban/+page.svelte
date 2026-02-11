@@ -98,7 +98,7 @@
 		drawerOpen = true;
 	}
 
-	// Initial fetch on mount - SSE handles all real-time updates
+	// Initial fetch on mount - WS handles all real-time updates
 	onMount(async () => {
 		// Phase 1: Fast initial fetch (no usage data)
 		await fetchSessions();
@@ -107,7 +107,7 @@
 		setTimeout(() => fetchSessionUsage(), 5000);
 	});
 
-	// No polling needed - SSE via sessionEvents provides real-time updates
+	// No polling needed - WS via sessionEvents provides real-time updates
 </script>
 
 <svelte:head>
