@@ -37,7 +37,7 @@ jt dep tree jat-abc --reverse # Show what depends on abc
 jt dep cycles                 # Find circular dependencies
 ```
 
-## am-* (Agent Mail)
+## am-* (Agent Registry)
 
 ```bash
 # Identity
@@ -45,20 +45,13 @@ am-register --name AgentName --program claude-code --model sonnet-4.5
 am-whoami
 am-agents
 
-# Messaging
-am-send "Subject" "Body" --from Agent1 --to Agent2 --thread jat-abc
-am-reply MSG_ID "Reply text" --agent AgentName
-am-inbox AgentName --unread --hide-acked
-am-ack MSG_ID --agent AgentName
-am-search "query" --thread jat-abc
-
 # File reservations
 am-reserve "src/**/*.ts" --agent AgentName --ttl 3600 --exclusive --reason "jat-abc"
 am-release "src/**/*.ts" --agent AgentName
 am-reservations --agent AgentName
 ```
 
-Broadcast recipients: `@active` (last 60min), `@recent` (24h), `@all`, `@project:name`.
+Messaging tools (`am-send`, `am-inbox`, `am-reply`, `am-ack`, `am-search`) are available but not used in standard workflows. Agent memory (`.jat/memory/`) handles cross-session context instead.
 
 ## jat-signal (state tracking)
 
@@ -119,7 +112,7 @@ jt-epic-child jat-abc jat-def              # Set epic->child dependency
 
 | Category | Tool Count | Prefix |
 |----------|-----------|--------|
-| Agent Mail | 14 | `am-*` |
+| Agent Registry | 14 | `am-*` |
 | Task CLI | 5 | `jt*` |
 | Browser | 12 | `browser-*` |
 | Database | 4 | `db-*` |
@@ -132,4 +125,4 @@ jt-epic-child jat-abc jat-def              # Set epic->child dependency
 - [Browser Automation](/docs/browser-automation/) - Detailed browser tool guide
 - [Database Tools](/docs/database-tools/) - Query and schema tools
 - [Media Tools](/docs/media-tools/) - Image generation
-- [Agent Mail](/docs/agent-mail/) - Messaging system
+- [Agent Registry](/docs/agent-registry/) - Identity and file locks

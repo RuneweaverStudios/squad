@@ -97,7 +97,7 @@ jat my-project 4 --auto     # 4 agents that auto-pick tasks
 Each agent:
 - Gets assigned different tasks (no conflicts)
 - Reserves files to prevent collisions
-- Coordinates via Agent Mail
+- Coordinates via Agent Registry (file reservations)
 - Reports status to IDE
 
 ---

@@ -60,9 +60,9 @@ If launcher functions arent installed:
 source ~/.bashrc
 ```
 
-## Agent Mail "not registered"
+## Agent Registry "not registered"
 
-This happens when an agent tries to send messages or check mail before registering. The quickest fix is to run `/jat:start`, which auto-registers the agent.
+This happens when an agent tries to reserve files or check identity before registering. The quickest fix is to run `/jat:start`, which auto-registers the agent.
 
 Manual registration:
 

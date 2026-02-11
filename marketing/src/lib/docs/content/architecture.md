@@ -9,7 +9,7 @@ JAT is built on two distinct layers. The first layer works with any CLI agent wi
 │                                                                     │
 │   LAYER 2: Agent Orchestration (JAT-specific)                      │
 │   ┌─────────────────────────────────────────────────────────────┐  │
-│   │  Agent Mail (coordination)                                   │  │
+│   │  Agent Registry (identity + file locks)                       │  │
 │   │  JAT Tasks (task management)                                     │  │
 │   │  CLAUDE.md (agent instructions)                              │  │
 │   │  Workflow commands (/jat:start, /jat:complete)              │  │
@@ -80,15 +80,15 @@ The agent never knew it was talking to a web UI. It just asked a question and go
 
 ## Layer 2: Explicit coordination
 
-The agent actively participates in the system. It reads `CLAUDE.md` for instructions, uses Agent Mail for coordination, and follows JAT Tasks for task management.
+The agent actively participates in the system. It reads `CLAUDE.md` for instructions, uses the Agent Registry for identity and file locks, and follows JAT Tasks for task management.
 
 ### Components
 
-**Agent Mail** is an async messaging system built on SQLite. Agents register identities, send and receive messages, and reserve files to prevent edit conflicts. All communication happens through lightweight bash tools (`am-send`, `am-inbox`, `am-reserve`).
+**Agent Registry** is a coordination layer built on SQLite (`~/.agent-mail.db`). Agents register identities, reserve files to prevent edit conflicts, and look up other active agents. Core tools: `am-register`, `am-whoami`, `am-reserve`, `am-release`, `am-reservations`. Messaging tools (`am-send`, `am-inbox`) are available but not used in standard workflows — agent memory (`.jat/memory/`) handles cross-session context instead.
 
 **JAT Tasks** is a dependency-aware task database. Each project has a `.jat/` directory with a SQLite database. The `jt` CLI handles task creation, status updates, dependency tracking, and priority-based work selection.
 
-**Workflow commands** (`/jat:start`, `/jat:complete`, `/jat:pause`) are JAT-specific slash commands that handle the full lifecycle: registration, mail checking, task selection, file reservations, status signals, and completion protocols.
+**Workflow commands** (`/jat:start`, `/jat:complete`, `/jat:pause`) are JAT-specific slash commands that handle the full lifecycle: registration, memory search, task selection, file reservations, status signals, and completion protocols.
 
 **Signals** are JSON payloads that agents emit at state transitions (`starting`, `working`, `needs_input`, `review`, `completing`, `complete`). The IDE reads these signals to display accurate session state.
 
@@ -101,15 +101,11 @@ The agent actively participates in the system. It reads `CLAUDE.md` for instruct
 # 2. Agent reserves files
 am-reserve "src/**/*.ts" --agent CalmMeadow --ttl 3600 --reason "myproject-abc"
 
-# 3. Agent announces start
-am-send "[myproject-abc] Starting" "Working on settings page" \
-  --from CalmMeadow --to @active --thread myproject-abc
+# 3. Agent works on the task...
 
-# 4. Agent works on the task...
-
-# 5. Agent completes
+# 4. Agent completes
 /jat:complete
-# --> commits, closes task, releases reservations, announces
+# --> commits, closes task, releases reservations
 ```
 
 ## Why this split matters
@@ -130,5 +126,5 @@ am-send "[myproject-abc] Starting" "Working on settings page" \
 ## Next steps
 
 - [Sessions & Agents](/docs/sessions/) - How the session lifecycle works
-- [Agent Mail](/docs/agent-mail/) - Coordination between agents
+- [Agent Registry](/docs/agent-registry/) - Identity and file locks
 - [Signals](/docs/signals/) - The state tracking system

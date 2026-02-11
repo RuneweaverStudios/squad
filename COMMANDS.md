@@ -258,9 +258,9 @@
 - `/jat:complete` runs verification automatically
 
 **Coordination:**
-- All commands acknowledge Agent Mail (stay synchronized)
-- All commands announce completion (team visibility)
+- All commands use Agent Registry for identity and file locks
 - File reservations prevent conflicts automatically
+- Memory system transfers context between sessions
 
 ---
 

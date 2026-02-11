@@ -1,6 +1,6 @@
 # Database tools
 
-JAT ships four database tools for querying, inspecting schemas, and testing connections. They work with the Agent Mail SQLite database and can be configured for project-specific databases.
+JAT ships four database tools for querying, inspecting schemas, and testing connections. They work with the Agent Registry SQLite database and can be configured for project-specific databases.
 
 ## Tools overview
 
@@ -41,7 +41,7 @@ Shows the structure of all tables in the database. Useful when you need to under
 db-schema
 ```
 
-This outputs CREATE TABLE statements for every table in the Agent Mail database, including `agents`, `messages`, `projects`, `file_reservations` and others.
+This outputs CREATE TABLE statements for every table in the Agent Registry database, including `agents`, `messages`, `projects`, `file_reservations` and others.
 
 ## db-sessions
 
@@ -59,9 +59,9 @@ Quick connectivity check. Returns a pass/fail result thats useful in setup scrip
 db-connection-test
 ```
 
-If the Agent Mail database at `~/.agent-mail.db` is accessible and valid, this returns success. Otherwise it reports what went wrong.
+If the Agent Registry database at `~/.agent-mail.db` is accessible and valid, this returns success. Otherwise it reports what went wrong.
 
-## The Agent Mail database
+## The Agent Registry database
 
 The primary database is `~/.agent-mail.db`, a SQLite file created during installation. It stores:
 
@@ -97,6 +97,6 @@ Or set project secrets in the IDE under Settings > Project Secrets.
 
 ## See also
 
-- [Agent Mail](/docs/agent-mail/) - How the messaging system uses the database
+- [Agent Registry](/docs/agent-registry/) - How the registry uses the database
 - [CLI Reference](/docs/cli-reference/) - Full command reference
 - [Credentials & Secrets](/docs/credentials/) - Database password management

@@ -146,10 +146,9 @@ These tools emit progress signals automatically:
 
 ```bash
 jat-step verifying --task ID --title TITLE --agent NAME    # 0%
-jat-step committing --task ID --title TITLE --agent NAME   # 20%
-jat-step closing --task ID --title TITLE --agent NAME      # 40%
-jat-step releasing --task ID --title TITLE --agent NAME    # 60%
-jat-step announcing --task ID --title TITLE --agent NAME   # 80%
+jat-step committing --task ID --title TITLE --agent NAME   # 25%
+jat-step closing --task ID --title TITLE --agent NAME      # 50%
+jat-step releasing --task ID --title TITLE --agent NAME    # 75%
 jat-step complete --task ID --title TITLE --agent NAME     # 100%
 ```
 

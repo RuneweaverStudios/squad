@@ -205,7 +205,7 @@ export interface WorkSession {
 		timeoutAction?: string;
 		timeoutMinutes?: number;
 		// Completing signal fields
-		currentStep?: 'verifying' | 'committing' | 'closing' | 'releasing' | 'announcing';
+		currentStep?: 'verifying' | 'committing' | 'closing' | 'releasing';
 		stepsCompleted?: string[];
 		stepsRemaining?: string[];
 		progress?: number;

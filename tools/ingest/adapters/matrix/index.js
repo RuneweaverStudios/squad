@@ -234,6 +234,15 @@ export default class MatrixAdapter extends BaseAdapter {
 
     const body = { msgtype: 'm.text', body: message.text };
 
+    // Reply threading via m.relates_to
+    if (target.threadId) {
+      body['m.relates_to'] = {
+        'm.in_reply_to': {
+          event_id: target.threadId
+        }
+      };
+    }
+
     const resp = await fetch(
       `${hs}/_matrix/client/v3/rooms/${roomId}/send/m.room.message/${txnId}`,
       {

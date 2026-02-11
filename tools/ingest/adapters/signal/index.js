@@ -290,6 +290,14 @@ export default class SignalAdapter extends BaseAdapter {
       throw new Error('signal: send() requires target.channelId (group) or target.userId (number)');
     }
 
+    // Quote support for threaded replies
+    if (target.threadId) {
+      params.quoteTimestamp = Number(target.threadId);
+      if (target.senderId) {
+        params.quoteAuthor = target.senderId;
+      }
+    }
+
     if (message.attachments?.length) {
       params.attachments = message.attachments
         .filter(a => a.localPath)

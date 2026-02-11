@@ -59,7 +59,6 @@ Create well-organized commits with automatic code cleanup and documentation upda
 2. **Determine scope based on parameter:**
    - **If `$1` is empty or "session"**: Filter to session work only
      - Check file reservations for context
-     - Check Agent Mail for task context
      - Look for JAT task ID if in agent workflow
      - Identify files YOU modified (not other developers)
 
@@ -117,7 +116,6 @@ For each identified change group:
 3. **Determine commit context:**
    - Check if part of agent workflow:
      - File reservations → extract task context
-     - Agent Mail thread → extract task ID
      - JAT task → get task ID and description
    - Extract feature/fix description
    - Identify impacted areas
@@ -242,7 +240,6 @@ The command will automatically:
 
 1. **Extract task context:**
    - Check for active file reservations → get task ID
-   - Check Agent Mail thread → get task description
    - Check JAT task → get full context
 
 2. **Include in commit messages:**
@@ -260,16 +257,11 @@ The command will automatically:
    Co-Authored-By: Claude <noreply@anthropic.com>
    ```
 
-3. **Update Agent Mail:**
-   - If commits relate to active task, send update to thread
-   - Include commit hashes for reference
-
 **If NOT in agent workflow:**
 
 The command works standalone:
 - No task ID references
 - Standard commit messages
-- No Agent Mail integration
 
 ---
 
@@ -430,7 +422,6 @@ git status shows:
 /git/commit all
   → Commits all changes
   → Includes task ID from file reservation
-  → Updates Agent Mail thread
   → Clean source control
 ```
 

@@ -23,7 +23,7 @@ brew install tmux sqlite jq node
 
 **Why these?**
 - `tmux` - Agent sessions run here (IDE tracks them)
-- `sqlite3` - Agent Mail database (coordination)
+- `sqlite3` - Agent Registry database (coordination)
 - `jq` - JSON processing (tool outputs)
 - `node/npm` - IDE and browser automation
 
@@ -38,7 +38,7 @@ curl -fsSL https://raw.githubusercontent.com/joewinke/jat/master/install.sh | ba
 
 **This symlinks all tools to `~/.local/bin/`:**
 - `jt-*` - JAT Tasks CLI
-- `am-*` - Agent Mail (13 commands)
+- `am-*` - Agent Registry (13 commands)
 - `browser-*` - Browser automation (11 commands)
 - `db-*` - Database tools (4 commands)
 - `jat-*` - JAT signals and launchers

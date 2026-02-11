@@ -87,7 +87,7 @@ error_missing_field() {
             echo "  Expected: \"taskId\": \"jat-abc\" (the task being completed)" >&2
             ;;
         completing:currentStep)
-            echo "  Expected: \"currentStep\": \"committing\" (one of: verifying, committing, closing, releasing, announcing)" >&2
+            echo "  Expected: \"currentStep\": \"committing\" (one of: verifying, committing, closing, releasing)" >&2
             ;;
         compacting:reason)
             echo "  Expected: \"reason\": \"Context window approaching limit\"" >&2
@@ -170,7 +170,7 @@ show_required_fields() {
         completing)
             echo "Required fields for 'completing' signal:" >&2
             echo "  - taskId: The JAT task ID" >&2
-            echo "  - currentStep: One of: verifying, committing, closing, releasing, announcing" >&2
+            echo "  - currentStep: One of: verifying, committing, closing, releasing" >&2
             echo "" >&2
             echo "Example:" >&2
             echo "  jat-signal completing '{\"taskId\":\"jat-abc\",\"currentStep\":\"committing\"}'" >&2
@@ -956,15 +956,15 @@ validate_completing() {
     local current_step
     current_step=$(echo "$payload" | jq -r '.currentStep // ""')
     case "$current_step" in
-        verifying|committing|closing|releasing|announcing) ;;
+        verifying|committing|closing|releasing) ;;
         "")
             echo "Error: completing.currentStep cannot be empty" >&2
-            echo "  Expected: \"currentStep\": \"committing\" (one of: verifying, committing, closing, releasing, announcing)" >&2
+            echo "  Expected: \"currentStep\": \"committing\" (one of: verifying, committing, closing, releasing)" >&2
             show_required_fields "completing"
             return 1
             ;;
         *)
-            echo "Error: completing.currentStep must be one of: verifying, committing, closing, releasing, announcing" >&2
+            echo "Error: completing.currentStep must be one of: verifying, committing, closing, releasing" >&2
             echo "  Got: \"$current_step\"" >&2
             return 1
             ;;

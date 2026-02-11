@@ -21,14 +21,14 @@ This feels different from how most people use AI coding assistants. Normally you
 
 ## Agent registration
 
-Agents get registered in the Agent Mail database when they start. There are two paths to registration depending on how the session was launched.
+Agents get registered in the Agent Registry database when they start. There are two paths to registration depending on how the session was launched.
 
 ### IDE-spawned agents
 
 When you click "Spawn" in the IDE or use `jat myproject 4 --auto`, the spawn API:
 
 1. Generates an agent name
-2. Registers it in the Agent Mail database
+2. Registers it in the Agent Registry database
 3. Creates a tmux session named `jat-{AgentName}`
 4. Writes a pre-registration file for the agent to find
 
@@ -81,7 +81,7 @@ Every session moves through a defined set of states. The IDE tracks these states
 
 ```
   ┌──────────┐
-  │ STARTING │  Agent registered, checking mail, selecting task
+  │ STARTING │  Agent registered, searching memory, selecting task
   └────┬─────┘
        |
        v
@@ -107,11 +107,11 @@ Every session moves through a defined set of states. The IDE tracks these states
 
 | State | Signal | What is happening |
 |-------|--------|-------------------|
-| Starting | `jat-signal starting` | Agent registered, reading mail, picking task |
+| Starting | `jat-signal starting` | Agent registered, searching memory, picking task |
 | Working | `jat-signal working` | Actively coding, testing, iterating |
 | Needs Input | `jat-signal needs_input` | Waiting for user clarification or decision |
 | Review | `jat-signal review` | Work finished, presenting summary |
-| Completing | `jat-step *` | Running commit, close, release, announce steps |
+| Completing | `jat-step *` | Running verify, commit, close, release steps |
 | Complete | `jat-step complete` | Everything done, completion bundle generated |
 
 ## tmux session naming
@@ -152,5 +152,5 @@ The IDE provides two ways to interact with sessions from the UI:
 ## Next steps
 
 - [Task Management](/docs/task-management/) - How JAT Tasks tracks work
-- [Agent Mail](/docs/agent-mail/) - Coordination between agents
+- [Agent Registry](/docs/agent-registry/) - Identity and file locks
 - [Workflow Commands](/docs/workflow-commands/) - /jat:start, /jat:complete in detail

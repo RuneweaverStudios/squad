@@ -172,7 +172,7 @@ export interface RichSignalPayload {
 	timeoutAction?: string;
 	timeoutMinutes?: number;
 	// Completing signal fields
-	currentStep?: 'verifying' | 'committing' | 'closing' | 'releasing' | 'announcing';
+	currentStep?: 'verifying' | 'committing' | 'closing' | 'releasing';
 	stepsCompleted?: string[];
 	stepsRemaining?: string[];
 	progress?: number;
@@ -586,7 +586,7 @@ function handleSessionComplete(data: SessionEvent): void {
 	workSessionsState.sessions[sessionIndex]._completionBundleTimestamp = data.timestamp;
 
 	// Clear the rich signal payload only if it's a "completing" type
-	// (the signal that shows the announcing progress bar)
+	// (the signal that shows the completion progress bar)
 	// This allows the CompletedSignalCard to render instead
 	const currentPayload = workSessionsState.sessions[sessionIndex]._richSignalPayload;
 	if (currentPayload?.type === 'completing') {

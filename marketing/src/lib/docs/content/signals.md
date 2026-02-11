@@ -147,10 +147,9 @@ The `completing` signal is unique in that it tracks progress through multiple st
 | Step | Progress | Signal emitted by |
 |------|----------|-------------------|
 | Verifying | 0% | `jat-step verifying` |
-| Committing | 20% | `jat-step committing` |
-| Closing | 40% | `jat-step closing` |
-| Releasing | 60% | `jat-step releasing` |
-| Announcing | 80% | `jat-step announcing` |
+| Committing | 25% | `jat-step committing` |
+| Closing | 50% | `jat-step closing` |
+| Releasing | 75% | `jat-step releasing` |
 | Complete | 100% | `jat-step complete` |
 
 Each `jat-step` call emits the signal automatically. The agent doesn't need to call `jat-signal` manually during the completion flow.

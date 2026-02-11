@@ -269,7 +269,7 @@ export interface NeedsInputSignal {
 /**
  * Completion step identifier.
  */
-export type CompletionStep = 'verifying' | 'committing' | 'closing' | 'releasing' | 'announcing';
+export type CompletionStep = 'verifying' | 'committing' | 'closing' | 'releasing';
 
 /**
  * Rich completing signal emitted during completion steps.

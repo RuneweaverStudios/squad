@@ -1143,7 +1143,7 @@
 																	currentStep: 'verifying',
 																	progress: 0,
 																	stepsCompleted: [],
-																	stepsRemaining: ['verifying', 'committing', 'closing', 'releasing', 'announcing']
+																	stepsRemaining: ['verifying', 'committing', 'closing', 'releasing']
 																}
 															})
 														});
@@ -1840,7 +1840,7 @@
 									currentStep: 'verifying',
 									progress: 0,
 									stepsCompleted: [],
-									stepsRemaining: ['verifying', 'committing', 'closing', 'releasing', 'announcing']
+									stepsRemaining: ['verifying', 'committing', 'closing', 'releasing']
 								}
 							})
 						});

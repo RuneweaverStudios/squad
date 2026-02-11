@@ -284,7 +284,7 @@ Full Monaco editor and git integration included—but the magic is in agent orch
 | **Visual IDE** | ✅ | ❌ | ❌ | ❌ |
 | **Task management** | ✅ Built-in | ❌ | ❌ | ❌ |
 | **Epic Swarm (parallel)** | ✅ | ❌ | ❌ | ❌ |
-| **Agent coordination** | ✅ Agent Mail | ❌ | ❌ | ❌ |
+| **Agent coordination** | ✅ Agent Registry | ❌ | ❌ | ❌ |
 | **External integrations** | ✅ RSS, Slack, Telegram, Gmail | ❌ | ❌ | ❌ |
 | **Autonomous triggers** | ✅ | ❌ | ❌ | ❌ |
 | **Auto-proceed rules** | ✅ | ❌ | ❌ | ❌ |
@@ -468,7 +468,7 @@ Open a PR against `master`. All contributions are licensed under MIT.
 ## Credits
 
 - **[Joe Winke](https://x.com/joewinke)** — Creator [Github](https://github.com/joewinke)
-- **Agent Mail** — Original Agent Comms inspiration ([Dicklesworthstone/mcp_agent_mail](https://github.com/Dicklesworthstone/mcp_agent_mail))
+- **Agent Registry** — Original Agent Comms inspiration ([Dicklesworthstone/mcp_agent_mail](https://github.com/Dicklesworthstone/mcp_agent_mail))
 - **Beads** — Original task management inspiration ([steveyegge/beads](https://github.com/steveyegge/beads))
 - **Mario Zechner** — Think different about Agents ([What if you don't need MCP?](https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/))
 - **Andrej Karpathy** - Naming the Problem ([Some Powerful Alien Tool](https://x.com/karpathy/status/2004607146781278521?s=20))

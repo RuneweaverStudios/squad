@@ -100,9 +100,9 @@ The detection order is:
 3. Project review rules (`.jat/review-rules.json`)
 4. Default: review required
 
-## Coordination via Agent Mail
+## Coordination via Agent Registry
 
-When multiple agents work in the same repository, Agent Mail prevents conflicts.
+When multiple agents work in the same repository, the Agent Registry prevents conflicts.
 
 **File reservations** lock file patterns before editing:
 
@@ -112,23 +112,14 @@ am-reserve "src/lib/cache/**" --agent FairBay --ttl 3600 --reason "jat-def"
 
 If another agent tries to reserve overlapping files, it gets a `FILE_RESERVATION_CONFLICT` error and picks a different task.
 
-**Broadcast messages** keep agents informed:
+**Identity tracking** lets agents discover each other:
 
 ```bash
-am-send "[jat-def] Starting: Add cache layer" "Working on Redis integration" \
-  --from FairBay --to @active --thread jat-def
+am-agents    # List all registered agents
+am-whoami    # Check current agent identity
 ```
 
-The `@active` recipient sends to all agents that checked in within the last 60 minutes. Other broadcast targets include `@recent` (24 hours), `@all`, and `@project:name`.
-
-**Completion announcements** let other agents know when files are released:
-
-```bash
-am-send "[jat-def] Completed" "Cache layer done, files released" \
-  --from FairBay --to @active --thread jat-def
-```
-
-Agents check their inbox at the start and end of every task. Messages that say "stop" or "requirements changed" halt work before completion. This prevents agents from committing work that's already been superseded.
+**Memory** transfers context between sessions. When an agent completes a task, it writes a memory entry to `.jat/memory/` with lessons, gotchas, and patterns. The next agent working on related code picks this up automatically during `/jat:start`.
 
 ## Agent routing
 

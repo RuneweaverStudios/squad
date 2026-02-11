@@ -285,6 +285,12 @@ export default class LineAdapter extends BaseAdapter {
     const hashInput = `${msg.id}:${senderId}:${text.slice(0, 200)}`;
     const hash = createHash('sha256').update(hashInput).digest('hex').slice(0, 16);
 
+    // Detect quoted reply (LINE Messaging API v3 quotedMessageId)
+    let replyTo;
+    if (msg.quotedMessageId) {
+      replyTo = { id: `line-${msg.quotedMessageId}`, platform: 'line' };
+    }
+
     return {
       id: `line-${msg.id}`,
       title,
@@ -293,6 +299,7 @@ export default class LineAdapter extends BaseAdapter {
       author: senderName || senderId,
       timestamp,
       attachments,
+      replyTo,
       fields: {
         sender: senderId,
         senderName: senderName || '',
@@ -479,9 +486,13 @@ export default class LineAdapter extends BaseAdapter {
 
     const messages = [];
 
-    // Text message
+    // Text message (with optional quote reply)
     if (message.text) {
-      messages.push({ type: 'text', text: message.text });
+      const textMsg = { type: 'text', text: message.text };
+      if (target.threadId) {
+        textMsg.quoteToken = target.threadId;
+      }
+      messages.push(textMsg);
     }
 
     // Attachment messages

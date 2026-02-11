@@ -8,7 +8,7 @@ JAT sits on top of your existing AI coding tools (Claude Code, Codex CLI, Gemini
 
 - **A visual IDE** for monitoring agent sessions in real-time
 - **Task management** with dependency tracking (JAT Tasks)
-- **Agent coordination** via async messaging (Agent Mail)
+- **Agent coordination** via identity registry and file reservations
 - **Browser automation** for testing and verification
 - **Multi-project support** with unified views
 
@@ -27,12 +27,12 @@ JAT provides a two-layer architecture:
 
 **Layer 1: Transparent Enhancement** — Works with any CLI agent. Hooks capture tool calls, temp files share state, tmux manages sessions. The agent doesn't know the IDE exists.
 
-**Layer 2: Explicit Coordination** — Agents participate in the system via workflow commands, Agent Mail messaging, and JAT task management.
+**Layer 2: Explicit Coordination** — Agents participate in the system via workflow commands, the Agent Registry, and JAT task management.
 
 ```
 ┌─────────────────────────────────────────────────────┐
 │  Layer 2: Agent Orchestration (JAT-specific)        │
-│  • Agent Mail • JAT Tasks • Workflow Commands          │
+│  • Agent Registry • JAT Tasks • Workflow Commands   │
 ├─────────────────────────────────────────────────────┤
 │  Layer 1: Transparent Enhancement (agent-agnostic)  │
 │  • PostToolUse Hooks • tmux • Temp Files • SSE      │
@@ -43,7 +43,7 @@ JAT provides a two-layer architecture:
 
 1. **One agent = one session = one task** — Each session handles exactly one task
 2. **File reservations prevent conflicts** — Agents lock files before editing
-3. **Messages coordinate work** — Check mail before starting, announce completions
+3. **Memory coordinates work** — Past session context surfaces via `.jat/memory/`
 4. **JAT Tasks is the task queue** — Pick from ready work, update status, close when done
 
 ## Supported Agents

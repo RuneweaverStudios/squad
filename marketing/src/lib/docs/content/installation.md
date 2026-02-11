@@ -9,7 +9,7 @@ You need three tools installed before running the JAT installer.
 | Tool | Purpose | Required |
 |------|---------|----------|
 | `tmux` | Terminal multiplexer for session management | Yes |
-| `sqlite3` | Database engine for Agent Mail | Yes |
+| `sqlite3` | Database engine for Agent Registry | Yes |
 | `jq` | JSON processing in bash tools | Yes |
 | `node` / `npm` | IDE and browser automation tools | Recommended |
 | `gum` | Interactive prompts during install | Optional |
@@ -50,7 +50,7 @@ cd ~/code/jat
 
 The installer creates symlinks in `~/.local/bin/` pointing to the actual tool scripts. It also sets up:
 
-- Agent Mail database at `~/.agent-mail.db`
+- Agent Registry database at `~/.agent-mail.db`
 - Claude Code hooks in `~/.claude/hooks/`
 - Statusline script at `~/.claude/statusline.sh`
 - Task CLI (`jt` command)
@@ -71,7 +71,7 @@ tmux -V              # Should print tmux 3.x
 sqlite3 --version    # Should print 3.x.x
 jq --version         # Should print jq-1.x
 
-# Agent Mail
+# Agent Registry
 am-whoami            # Should print "Not registered" or an agent name
 am-agents            # Lists all registered agents
 

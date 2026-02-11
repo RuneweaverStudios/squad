@@ -141,7 +141,7 @@ The IDE writes this signal directly to the timeline file when a user sends input
 | `completing` | ⏳ COMPLETING | Progress bar with current step |
 | `complete` | ✅ COMPLETED | Completion summary, quality badges, suggested tasks |
 
-> **Note:** The `completing` signal is emitted at each step during `/jat:complete` to show progress (verifying → committing → closing → releasing → announcing). The final `complete` signal is emitted once all steps finish.
+> **Note:** The `completing` signal is emitted at each step during `/jat:complete` to show progress (verifying → committing → closing → releasing). The final `complete` signal is emitted once all steps finish.
 
 ### Signal Schemas (Full Field Reference)
 
@@ -198,7 +198,7 @@ The IDE writes this signal directly to the timeline file when a user sends input
 |-------|----------|------|-------------|
 | taskId | **Yes** | string | Task ID being completed |
 | taskTitle | **Yes** | string | Task title |
-| currentStep | **Yes** | enum | `"verifying"` / `"committing"` / `"closing"` / `"releasing"` / `"announcing"` |
+| currentStep | **Yes** | enum | `"verifying"` / `"committing"` / `"closing"` / `"releasing"` |
 | stepsCompleted | **Yes** | string[] | Steps that have been completed |
 | stepsRemaining | **Yes** | string[] | Steps remaining to be done |
 | progress | **Yes** | number | Overall progress percentage (0-100) |
@@ -669,10 +669,7 @@ jat-step closing --task jat-abc --title "Add auth flow" --agent FairBay
 # → emits completing (40%) + jt close
 
 jat-step releasing --task jat-abc --title "Add auth flow" --agent FairBay
-# → emits completing (60%) + am-release all
-
-jat-step announcing --task jat-abc --title "Add auth flow" --agent FairBay
-# → emits completing (80%) + am-send
+# → emits completing (75%) + am-release all
 
 # Final completion bundle (100%) - generates + emits in one call
 jat-complete-bundle --task jat-abc --agent FairBay --emit

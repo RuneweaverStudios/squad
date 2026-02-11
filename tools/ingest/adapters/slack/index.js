@@ -180,8 +180,6 @@ export default class SlackAdapter extends BaseAdapter {
     let newestTs = oldest;
 
     for (const msg of messages) {
-      // Skip thread replies (only parent messages)
-      if (msg.thread_ts && msg.thread_ts !== msg.ts) continue;
       // Skip bot messages unless explicitly included
       if (msg.subtype === 'bot_message' && !source.includeBots) continue;
       // Skip join/leave messages
@@ -413,6 +411,9 @@ function messageToItem(msg, source) {
     author: msg.user || null,
     timestamp: new Date(parseFloat(msg.ts) * 1000).toISOString(),
     attachments,
+    replyTo: (msg.thread_ts && msg.thread_ts !== msg.ts)
+      ? { id: `slack-${msg.thread_ts}`, platform: 'slack' }
+      : undefined,
     origin: {
       adapterType: 'slack',
       channelId: source.channel,

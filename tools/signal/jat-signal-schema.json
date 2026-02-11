@@ -30,7 +30,7 @@
     },
     "completionStep": {
       "type": "string",
-      "enum": ["verifying", "committing", "closing", "releasing", "announcing"],
+      "enum": ["verifying", "committing", "closing", "releasing"],
       "description": "Step in completion workflow"
     },
     "gitStatus": {

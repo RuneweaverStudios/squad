@@ -2,6 +2,7 @@ import { BaseAdapter } from '../base.js';
 import { createHash } from 'node:crypto';
 import { SimplePool } from 'nostr-tools/pool';
 import { decode as nip19Decode } from 'nostr-tools/nip19';
+import { finalizeEvent, getPublicKey } from 'nostr-tools/pure';
 
 // Nostr event kind constants
 const KIND_TEXT_NOTE = 1;
@@ -70,6 +71,14 @@ export const metadata = {
       required: false,
       placeholder: 'bitcoin, nostr, tech',
       helpText: 'Comma-separated hashtags to filter by (without #)'
+    },
+    {
+      key: 'nsec',
+      label: 'Private Key (nsec)',
+      type: 'secret',
+      required: false,
+      placeholder: 'nsec1...',
+      helpText: 'Nostr private key for sending replies (nsec format). Required for two-way communication.'
     }
   ],
   itemFields: [
@@ -94,6 +103,7 @@ export default class NostrAdapter extends BaseAdapter {
     this._pool = null;
     this._running = false;
     this._subscriptions = [];
+    this._sourceConfig = null;
   }
 
   get supportsRealtime() {
@@ -126,6 +136,7 @@ export default class NostrAdapter extends BaseAdapter {
   }
 
   async poll(source, adapterState, _getSecret) {
+    this._sourceConfig = source;
     const relays = parseRelays(source.relays);
     const filter = buildFilter(source);
     const since = adapterState.since || null;
@@ -205,6 +216,7 @@ export default class NostrAdapter extends BaseAdapter {
   }
 
   async connect(sourceConfig, _getSecret, callbacks) {
+    this._sourceConfig = sourceConfig;
     const relays = parseRelays(sourceConfig.relays);
     const filter = buildFilter(sourceConfig);
     // Only get events from now onwards for realtime
@@ -247,6 +259,7 @@ export default class NostrAdapter extends BaseAdapter {
 
   async disconnect() {
     this._running = false;
+    this._sourceConfig = null;
     for (const sub of this._subscriptions) {
       try { sub.close(); } catch { /* ignore */ }
     }
@@ -257,6 +270,57 @@ export default class NostrAdapter extends BaseAdapter {
         if (relays.length > 0) this._pool.close(relays);
       } catch { /* ignore */ }
       this._pool = null;
+    }
+  }
+
+  get supportsSend() {
+    return !!this._sourceConfig?.nsec;
+  }
+
+  async send(target, message, _getSecret) {
+    const source = this._sourceConfig;
+    if (!source?.nsec) {
+      throw new Error('nostr: send() requires nsec private key in config');
+    }
+
+    // Decode nsec to get secret key bytes
+    const decoded = nip19Decode(source.nsec);
+    if (decoded.type !== 'nsec') {
+      throw new Error('nostr: invalid nsec key format');
+    }
+    const secretKey = decoded.data;
+
+    // Build unsigned event
+    const event = {
+      kind: KIND_TEXT_NOTE,
+      content: message.text,
+      tags: [],
+      created_at: Math.floor(Date.now() / 1000)
+    };
+
+    // NIP-10: Add reply tags if replying to a thread
+    if (target.threadId) {
+      // threadId is the nostr event ID being replied to
+      event.tags.push(['e', target.threadId, '', 'reply']);
+      // Tag the original author so they get notified
+      if (target.senderId) {
+        event.tags.push(['p', target.senderId]);
+      }
+    }
+
+    // Sign and finalize the event
+    const signed = finalizeEvent(event, secretKey);
+
+    // Publish to relays
+    const relays = parseRelays(source.relays);
+    const pool = this._pool || new SimplePool();
+    const ownPool = !this._pool;
+
+    try {
+      await Promise.any(pool.publish(relays, signed));
+      return { messageId: signed.id };
+    } finally {
+      if (ownPool) pool.close(relays);
     }
   }
 }

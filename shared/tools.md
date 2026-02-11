@@ -251,6 +251,6 @@ am-release "src/**/*.ts" --agent $AGENT_NAME
 
 Every tool has `--help`:
 ```bash
-am-send --help
+am-register --help
 browser-eval.js --help
 ```
