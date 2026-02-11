@@ -736,7 +736,7 @@
 		<!-- Global File Search Button -->
 		{#if onGlobalSearchOpen}
 			<button
-				class="h-7 px-2 py-1 rounded text-xs font-mono flex items-center gap-1.5 transition-all hover:scale-105"
+				class="group h-7 px-2 rounded text-xs font-mono flex items-center transition-all duration-200"
 				style="
 					background: oklch(0.18 0.01 250);
 					border: 1px solid oklch(0.35 0.02 250);
@@ -752,7 +752,7 @@
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
 					stroke="currentColor"
-					class="w-3 h-3"
+					class="w-3 h-3 flex-shrink-0"
 					style="color: oklch(0.55 0.02 250);"
 				>
 					<path
@@ -761,7 +761,7 @@
 						d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
 					/>
 				</svg>
-				<span class="hidden lg:inline pt-0.5">Ctrl+Shift+F</span>
+				<span class="inline-block max-w-0 overflow-hidden whitespace-nowrap opacity-0 group-hover:max-w-28 group-hover:opacity-100 transition-all duration-200 pl-1.5 pt-0.5">Ctrl+Shift+F</span>
 			</button>
 		{/if}
 	</div>

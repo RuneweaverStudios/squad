@@ -897,14 +897,17 @@ export async function POST({ request }) {
 			console.warn('[spawn] Failed to write starting signal:', err);
 		}
 
-		// Step 4: Wait for Claude to initialize, then send /jat:start {agentName} [taskId]
-		// Pass the agent name explicitly so /jat:start resumes the existing agent
+		// Step 4: Wait for Claude to initialize, then send the task's command
+		// Use the task's command field if set (e.g., /jat:chat for integration messages),
+		// otherwise default to /jat:start
+		// Pass the agent name explicitly so the command resumes the existing agent
 		// instead of creating a new one with a different name
 		// If taskId provided, include BOTH agent name and task ID so the agent:
 		// 1. Uses the pre-created agent name (no duplicate creation)
 		// 2. Starts working on the specific task immediately
+		const taskCommand = task?.command || '/jat:start';
 		const initialPrompt = taskId
-			? `/jat:start ${agentName} ${taskId}`  // Agent name + task (prevents duplicate agent)
+			? `${taskCommand} ${agentName} ${taskId}`  // Agent name + task (prevents duplicate agent)
 			: `/jat:start ${agentName}`;  // Planning mode - just register agent
 
 		// Wait for agent to initialize with verification

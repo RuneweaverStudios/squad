@@ -240,7 +240,10 @@
 	$effect(() => {
 		const projectParam = $page.url.searchParams.get('project');
 		const projects = allProjects;
-		if (projectParam && projects.includes(projectParam)) {
+		// Trust URL param unconditionally - it's set by the layout which already validates it.
+		// Don't gate on projects.includes() because allProjects depends on configuredProjects
+		// which loads in Phase 2 (~1.5s delay), causing a temporary mismatch with the TopBar.
+		if (projectParam) {
 			if (selectedProject !== projectParam) {
 				selectProject(projectParam);
 			}
@@ -380,25 +383,35 @@
 		const key = epicId
 			? `${subsection}-${epicId}`
 			: `${subsection}-standalone`;
-		let expanded = expandedEpicsByProject.get(project);
+		const existing = expandedEpicsByProject.get(project);
 
-		if (!expanded) {
-			// Initialize with default state: standalone tasks expanded, epic groups collapsed
+		// Create a NEW Set (not mutate in place) to ensure Svelte 5 reactivity
+		let expanded: Set<string>;
+		if (!existing) {
+			// First interaction - initialize with defaults matching isEpicExpanded
 			expanded = new Set<string>();
 			expanded.add("sessions-standalone");
 			expanded.add("tasks-standalone");
+			// All session epic groups expanded by default
+			const projectSessions = sessionsByProject.get(project) || [];
+			const sessionsByEpicLocal = getSessionsByEpic(projectSessions);
+			for (const [eid] of sessionsByEpicLocal) {
+				if (eid) expanded.add(`sessions-${eid}`);
+			}
+		} else {
+			expanded = new Set(existing);
 		}
 
 		if (expanded.has(key)) {
-			// Currently expanded, collapse it
 			expanded.delete(key);
 		} else {
-			// Currently collapsed, expand it
 			expanded.add(key);
 		}
 
-		expandedEpicsByProject.set(project, expanded);
-		expandedEpicsByProject = new Map(expandedEpicsByProject);
+		// Create new Map with new Set for clean reactivity
+		const newMap = new Map(expandedEpicsByProject);
+		newMap.set(project, expanded);
+		expandedEpicsByProject = newMap;
 	}
 
 	function isEpicExpanded(
@@ -412,8 +425,13 @@
 			: `${subsection}-standalone`;
 		const expanded = expandedEpicsByProject.get(project);
 		if (!expanded) {
-			// Default: standalone tasks are expanded, epic groups are collapsed
-			return epicId === null;
+			// No explicit state yet - use smart defaults:
+			// Standalone groups: always expanded
+			// Session epic groups: always expanded (agents should be visible)
+			// Task epic groups: collapsed
+			if (epicId === null) return true;
+			if (subsection === "sessions") return true;
+			return false;
 		}
 		return expanded.has(key);
 	}
@@ -954,28 +972,11 @@
 			collapsedSubsections = new Map(collapsedSubsections);
 		}
 
-		// Also expand groups within the appropriate subsection
-		// (expandedEpicsByProject is not persisted, so always apply defaults)
-		if (!expandedEpicsByProject.has(project)) {
-			const epicExpanded = new Set<string>();
-			if (hasActiveSessions) {
-				// Expand standalone tasks in Active Tasks section
-				epicExpanded.add("sessions-standalone");
-				// Also expand epic groups that have active sessions
-				// so agents are always visible (not hidden behind collapsed headers)
-				const sessionsByEpic = getSessionsByEpic(projectSessions);
-				for (const [epicId, epicSessions] of sessionsByEpic) {
-					if (epicId && epicSessions.length > 0) {
-						epicExpanded.add(`sessions-${epicId}`);
-					}
-				}
-			} else if (hasOpenTasks) {
-				// Expand standalone tasks in Open Tasks section
-				epicExpanded.add("tasks-standalone");
-			}
-			expandedEpicsByProject.set(project, epicExpanded);
-			expandedEpicsByProject = new Map(expandedEpicsByProject);
-		}
+		// Epic expand/collapse state is NOT initialized here.
+		// isEpicExpanded() returns smart defaults when no explicit state exists,
+		// and toggleEpicCollapse() lazy-initializes on first user interaction.
+		// This avoids the timing bug where selectProject() runs before data loads,
+		// creating an empty Set that overrides the defaults.
 
 		saveCollapseState();
 	}

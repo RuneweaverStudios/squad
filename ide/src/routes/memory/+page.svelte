@@ -10,9 +10,13 @@
 	 */
 
 	import { onMount } from 'svelte';
+	import { page } from '$app/stores';
 
 	// --- State ---
-	let activeTab = $state<'search' | 'browse' | 'status'>('search');
+	let activeTab = $state<'search' | 'browse' | 'status'>('status');
+
+	// Project filter from URL (set by TopBar ProjectSelector)
+	let filterProject = $state('');
 
 	// Search state
 	let searchQuery = $state('');
@@ -45,9 +49,11 @@
 			const res = await fetch('/api/memory?action=status');
 			const data = await res.json();
 			projectStatuses = data.projects || [];
-			// Set default browse project
+			// Set default browse project (prefer filtered project)
 			if (!browseProject && projectStatuses.length > 0) {
-				browseProject = projectStatuses[0].project;
+				browseProject = filterProject && filterProject !== 'All Projects'
+					? filterProject
+					: projectStatuses[0].project;
 			}
 		} catch (err) {
 			console.error('Failed to fetch memory status:', err);
@@ -62,6 +68,9 @@
 		searchError = '';
 		try {
 			const params = new URLSearchParams({ action: 'search', q: searchQuery, limit: '20' });
+			if (filterProject && filterProject !== 'All Projects') {
+				params.set('project', filterProject);
+			}
 			const res = await fetch(`/api/memory?${params}`);
 			const data = await res.json();
 			if (data.error) {
@@ -152,10 +161,29 @@
 		return `${(bytes / 1024).toFixed(1)}KB`;
 	}
 
-	// Total stats
-	let totalFiles = $derived(projectStatuses.reduce((sum, p) => sum + (p.fileCount || 0), 0));
-	let totalChunks = $derived(projectStatuses.reduce((sum, p) => sum + (p.chunkCount || 0), 0));
-	let indexedProjects = $derived(projectStatuses.filter((p) => p.hasIndex).length);
+	// Filtered project statuses based on URL project param
+	let filteredStatuses = $derived(
+		filterProject && filterProject !== 'All Projects'
+			? projectStatuses.filter((p) => p.project === filterProject)
+			: projectStatuses
+	);
+
+	// Total stats (based on filtered view)
+	let totalFiles = $derived(filteredStatuses.reduce((sum, p) => sum + (p.fileCount || 0), 0));
+	let totalChunks = $derived(filteredStatuses.reduce((sum, p) => sum + (p.chunkCount || 0), 0));
+	let indexedProjects = $derived(filteredStatuses.filter((p) => p.hasIndex).length);
+
+	// Sync project filter from URL
+	$effect(() => {
+		const projectParam = $page.url.searchParams.get('project');
+		if (projectParam) {
+			filterProject = projectParam;
+			// Auto-set browse project to match
+			if (!browseProject || browseProject !== projectParam) {
+				browseProject = projectParam;
+			}
+		}
+	});
 
 	// Fetch on browse project change
 	$effect(() => {
@@ -233,9 +261,8 @@
 	<!-- Tab bar -->
 	<div class="flex gap-1 px-6 py-2 border-b shrink-0" style="border-color: oklch(0.22 0.02 250); background: oklch(0.16 0.01 250);">
 		{#each [
-			{ id: 'search', label: 'Search', icon: 'M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z' },
-			{ id: 'browse', label: 'Browse', icon: 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z' },
-			{ id: 'status', label: 'Status', icon: 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z' }
+			{ id: 'status', label: 'Status', icon: 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z' },
+			{ id: 'browse', label: 'Browse', icon: 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z' }
 		] as tab}
 			<button
 				class="flex items-center gap-2 px-3 py-1.5 rounded font-mono text-xs transition-all"
@@ -256,115 +283,6 @@
 
 	<!-- Content area -->
 	<div class="flex-1 overflow-y-auto">
-		<!-- SEARCH TAB -->
-		{#if activeTab === 'search'}
-			<div class="p-6 max-w-5xl mx-auto space-y-6">
-				<!-- Search bar -->
-				<div class="flex gap-3">
-					<div class="flex-1 relative">
-						<input
-							type="text"
-							bind:value={searchQuery}
-							onkeydown={handleSearchKeydown}
-							placeholder="Search memory entries..."
-							class="w-full px-4 py-3 rounded-lg font-mono text-sm outline-none transition-all"
-							style="
-								background: oklch(0.20 0.01 250);
-								border: 1px solid oklch(0.30 0.02 250);
-								color: oklch(0.85 0.05 250);
-							"
-						/>
-						{#if searchLoading}
-							<span class="loading loading-spinner loading-sm absolute right-3 top-3.5" style="color: oklch(0.65 0.15 280);"></span>
-						{/if}
-					</div>
-					<button
-						class="px-5 py-3 rounded-lg font-mono text-sm font-bold transition-all"
-						style="
-							background: oklch(0.55 0.15 280 / 0.2);
-							border: 1px solid oklch(0.55 0.15 280 / 0.4);
-							color: oklch(0.80 0.12 280);
-						"
-						disabled={searchLoading || !searchQuery.trim()}
-						onclick={handleSearch}
-					>
-						Search
-					</button>
-				</div>
-
-				<!-- Search results -->
-				{#if searchError}
-					<div class="px-4 py-3 rounded-lg font-mono text-sm" style="background: oklch(0.50 0.15 30 / 0.15); border: 1px solid oklch(0.50 0.15 30 / 0.3); color: oklch(0.75 0.12 30);">
-						{searchError}
-					</div>
-				{/if}
-
-				{#if searchResults.length > 0}
-					<div class="space-y-3">
-						<div class="font-mono text-xs" style="color: oklch(0.55 0.02 250);">
-							{searchResults.length} result{searchResults.length !== 1 ? 's' : ''} for "{lastSearchQuery}"
-						</div>
-						{#each searchResults as result}
-							<button
-								class="w-full text-left p-4 rounded-lg transition-all hover:scale-[1.005]"
-								style="
-									background: oklch(0.18 0.01 250);
-									border: 1px solid oklch(0.25 0.02 250);
-								"
-								onclick={() => {
-									const filename = result.path?.split('/').pop();
-									if (filename && result.project) viewFile(result.project, filename);
-								}}
-							>
-								<div class="flex items-center gap-2 mb-2">
-									<span class="font-mono text-xs px-1.5 py-0.5 rounded" style="background: oklch(0.55 0.15 280 / 0.15); color: oklch(0.75 0.12 280);">
-										{result.project}
-									</span>
-									{#if result.taskId}
-										<span class="font-mono text-xs px-1.5 py-0.5 rounded" style="background: oklch(0.55 0.15 200 / 0.15); color: oklch(0.75 0.12 200);">
-											{result.taskId}
-										</span>
-									{/if}
-									{#if result.section}
-										<span class="font-mono text-xs" style="color: oklch(0.50 0.02 250);">
-											{result.section}
-										</span>
-									{/if}
-									<span class="ml-auto font-mono text-xs" style="color: oklch(0.50 0.02 250);">
-										score: {result.score?.toFixed(4)}
-									</span>
-								</div>
-								<div class="font-mono text-sm whitespace-pre-wrap line-clamp-3" style="color: oklch(0.75 0.03 250);">
-									{result.snippet}
-								</div>
-								{#if result.source}
-									<div class="mt-2 font-mono text-[10px]" style="color: oklch(0.45 0.02 250);">
-										via {result.source} | lines {result.startLine}-{result.endLine}
-									</div>
-								{/if}
-							</button>
-						{/each}
-					</div>
-				{:else if lastSearchQuery && !searchLoading && !searchError}
-					<div class="text-center py-12 font-mono text-sm" style="color: oklch(0.50 0.02 250);">
-						No results found for "{lastSearchQuery}"
-					</div>
-				{:else if !lastSearchQuery && !searchLoading}
-					<div class="text-center py-16 space-y-4">
-						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" class="w-16 h-16 mx-auto" style="color: oklch(0.35 0.02 250);">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
-						</svg>
-						<p class="font-mono text-sm" style="color: oklch(0.50 0.02 250);">
-							Search agent memory across all projects
-						</p>
-						<p class="font-mono text-xs" style="color: oklch(0.40 0.02 250);">
-							Hybrid search: full-text (BM25) + vector (cosine) with reciprocal rank fusion
-						</p>
-					</div>
-				{/if}
-			</div>
-		{/if}
-
 		<!-- BROWSE TAB -->
 		{#if activeTab === 'browse'}
 			<div class="p-6 max-w-5xl mx-auto space-y-4">
@@ -376,7 +294,7 @@
 						class="px-3 py-1.5 rounded font-mono text-sm outline-none"
 						style="background: oklch(0.20 0.01 250); border: 1px solid oklch(0.30 0.02 250); color: oklch(0.80 0.05 250);"
 					>
-						{#each projectStatuses as proj}
+						{#each filteredStatuses as proj}
 							<option value={proj.project}>{proj.project} ({proj.fileCount} files)</option>
 						{/each}
 					</select>
@@ -462,7 +380,7 @@
 						<span class="loading loading-spinner loading-sm" style="color: oklch(0.65 0.15 280);"></span>
 						<span class="font-mono text-sm" style="color: oklch(0.55 0.02 250);">Loading status...</span>
 					</div>
-				{:else if projectStatuses.length === 0}
+				{:else if filteredStatuses.length === 0}
 					<div class="text-center py-12 space-y-3">
 						<p class="font-mono text-sm" style="color: oklch(0.50 0.02 250);">
 							No projects with memory directories found
@@ -486,7 +404,7 @@
 
 					<!-- Project cards -->
 					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-						{#each projectStatuses as proj}
+						{#each filteredStatuses as proj}
 							<div
 								class="p-4 rounded-lg"
 								style="
@@ -552,6 +470,101 @@
 						</div>
 					</div>
 				{/if}
+
+				<!-- Search section -->
+				<div class="pt-2">
+					<div class="font-mono text-xs font-bold uppercase tracking-wider mb-3" style="color: oklch(0.50 0.02 250);">Search Memory</div>
+					<div class="flex gap-3">
+						<div class="flex-1 relative">
+							<input
+								type="text"
+								bind:value={searchQuery}
+								onkeydown={handleSearchKeydown}
+								placeholder="Search memory entries..."
+								class="w-full px-4 py-2.5 rounded-lg font-mono text-sm outline-none transition-all"
+								style="
+									background: oklch(0.20 0.01 250);
+									border: 1px solid oklch(0.30 0.02 250);
+									color: oklch(0.85 0.05 250);
+								"
+							/>
+							{#if searchLoading}
+								<span class="loading loading-spinner loading-sm absolute right-3 top-3" style="color: oklch(0.65 0.15 280);"></span>
+							{/if}
+						</div>
+						<button
+							class="px-4 py-2.5 rounded-lg font-mono text-sm font-bold transition-all"
+							style="
+								background: oklch(0.55 0.15 280 / 0.2);
+								border: 1px solid oklch(0.55 0.15 280 / 0.4);
+								color: oklch(0.80 0.12 280);
+							"
+							disabled={searchLoading || !searchQuery.trim()}
+							onclick={handleSearch}
+						>
+							Search
+						</button>
+					</div>
+
+					<!-- Search results -->
+					{#if searchError}
+						<div class="mt-3 px-4 py-3 rounded-lg font-mono text-sm" style="background: oklch(0.50 0.15 30 / 0.15); border: 1px solid oklch(0.50 0.15 30 / 0.3); color: oklch(0.75 0.12 30);">
+							{searchError}
+						</div>
+					{/if}
+
+					{#if searchResults.length > 0}
+						<div class="mt-4 space-y-3">
+							<div class="font-mono text-xs" style="color: oklch(0.55 0.02 250);">
+								{searchResults.length} result{searchResults.length !== 1 ? 's' : ''} for "{lastSearchQuery}"
+							</div>
+							{#each searchResults as result}
+								<button
+									class="w-full text-left p-4 rounded-lg transition-all hover:scale-[1.005]"
+									style="
+										background: oklch(0.18 0.01 250);
+										border: 1px solid oklch(0.25 0.02 250);
+									"
+									onclick={() => {
+										const filename = result.path?.split('/').pop();
+										if (filename && result.project) viewFile(result.project, filename);
+									}}
+								>
+									<div class="flex items-center gap-2 mb-2">
+										<span class="font-mono text-xs px-1.5 py-0.5 rounded" style="background: oklch(0.55 0.15 280 / 0.15); color: oklch(0.75 0.12 280);">
+											{result.project}
+										</span>
+										{#if result.taskId}
+											<span class="font-mono text-xs px-1.5 py-0.5 rounded" style="background: oklch(0.55 0.15 200 / 0.15); color: oklch(0.75 0.12 200);">
+												{result.taskId}
+											</span>
+										{/if}
+										{#if result.section}
+											<span class="font-mono text-xs" style="color: oklch(0.50 0.02 250);">
+												{result.section}
+											</span>
+										{/if}
+										<span class="ml-auto font-mono text-xs" style="color: oklch(0.50 0.02 250);">
+											score: {result.score?.toFixed(4)}
+										</span>
+									</div>
+									<div class="font-mono text-sm whitespace-pre-wrap line-clamp-3" style="color: oklch(0.75 0.03 250);">
+										{result.snippet}
+									</div>
+									{#if result.source}
+										<div class="mt-2 font-mono text-[10px]" style="color: oklch(0.45 0.02 250);">
+											via {result.source} | lines {result.startLine}-{result.endLine}
+										</div>
+									{/if}
+								</button>
+							{/each}
+						</div>
+					{:else if lastSearchQuery && !searchLoading && !searchError}
+						<div class="text-center py-8 font-mono text-sm" style="color: oklch(0.50 0.02 250);">
+							No results found for "{lastSearchQuery}"
+						</div>
+					{/if}
+				</div>
 			</div>
 		{/if}
 	</div>

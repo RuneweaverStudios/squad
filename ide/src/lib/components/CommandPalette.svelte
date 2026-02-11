@@ -491,7 +491,7 @@
 
 <!-- Quick Actions Button (visible in navbar) - Industrial -->
 <button
-	class="h-7 px-2 py-1 rounded text-xs font-mono flex items-center gap-1.5 transition-all hover:scale-105"
+	class="group h-7 px-2 rounded text-xs font-mono flex items-center transition-all duration-200"
 	style="
 		background: oklch(0.18 0.01 250);
 		border: 1px solid oklch(0.35 0.02 250);
@@ -507,7 +507,7 @@
 		viewBox="0 0 24 24"
 		stroke-width="1.5"
 		stroke="currentColor"
-		class="w-3 h-3"
+		class="w-3 h-3 flex-shrink-0"
 		style="color: oklch(0.55 0.02 250);"
 	>
 		<path
@@ -516,7 +516,7 @@
 			d="m6.75 7.5 3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0 0 21 18V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v12a2.25 2.25 0 0 0 2.25 2.25Z"
 		/>
 	</svg>
-	<span class="hidden md:inline pt-0.5">Ctrl+K</span>
+	<span class="inline-block max-w-0 overflow-hidden whitespace-nowrap opacity-0 group-hover:max-w-16 group-hover:opacity-100 transition-all duration-200 pl-1.5 pt-0.5">Ctrl+K</span>
 </button>
 
 <!-- Modal (stays in DOM, toggle modal-open class) - Industrial -->

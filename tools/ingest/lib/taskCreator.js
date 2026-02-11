@@ -245,7 +245,7 @@ export async function resumeSession(taskId, replyText, project) {
 
   const escapedText = replyText.replace(/'/g, "'\\''");
   try {
-    execFileSync('tmux', ['send-keys', '-t', sessionName, `The user replied: ${escapedText}`, 'Enter'], {
+    execFileSync('tmux', ['send-keys', '-t', sessionName, `The user replied on the originating channel (e.g. Telegram). You MUST send your response back using jat-signal reply (not just text output). Their message: ${escapedText}`, 'Enter'], {
       timeout: 10000
     });
   } catch (err) {
