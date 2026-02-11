@@ -24,7 +24,9 @@
 	import SessionsTabs from '$lib/components/sessions/SessionsTabs.svelte';
 	import AnimatedDigits from '$lib/components/AnimatedDigits.svelte';
 	import StatusActionBadge from '$lib/components/work/StatusActionBadge.svelte';
-	import type { SessionState } from '$lib/config/statusColors';
+	import { getSessionStateVisual, type SessionState } from '$lib/config/statusColors';
+	import { getReviewRules } from '$lib/stores/reviewRules.svelte';
+	import { computeReviewStatus } from '$lib/utils/reviewStatusUtils';
 	import SortDropdown from '$lib/components/SortDropdown.svelte';
 
 	interface TmuxSession {
@@ -67,6 +69,10 @@
 	// Container width for sessions table (resizable)
 	let containerWidth = $state(1200); // Default max-width in pixels
 	let isContainerResizing = $state(false);
+
+	// Optimistic state and auto-complete tracking (matching TasksActive)
+	let optimisticStates = $state<Map<string, string>>(new Map());
+	let autoCompleteDisabledMap = $state<Map<string, boolean>>(new Map());
 
 	// Task detail panel state (inline, not drawer overlay)
 	let expandedTaskId = $state<string | null>(null);
@@ -793,6 +799,37 @@
 		return sessionName;
 	}
 
+	function getTaskHarness(task: any): string {
+		if (!task?.labels) return 'claude-code';
+		const harnessLabel = task.labels.find((l: string) => l.startsWith('harness:'));
+		return harnessLabel ? harnessLabel.replace('harness:', '') : 'claude-code';
+	}
+
+	async function sendWorkflowCommand(sessionName: string, command: string) {
+		const sessionId = encodeURIComponent(sessionName);
+		try {
+			await fetch(`/api/work/${sessionId}/input`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ type: 'ctrl-u' })
+			});
+			await new Promise(r => setTimeout(r, 50));
+			await fetch(`/api/work/${sessionId}/input`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ input: command, type: 'text' })
+			});
+			await new Promise(r => setTimeout(r, 100));
+			await fetch(`/api/work/${sessionId}/input`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ type: 'enter' })
+			});
+		} catch (err) {
+			console.error('[Sessions] sendWorkflowCommand ERROR:', err);
+		}
+	}
+
 	// Tick for elapsed time updates
 	let tick = $state(0);
 
@@ -1052,8 +1089,8 @@
 				<table class="sessions-table">
 					<thead>
 						<tr>
-							<th class="th-name">Session</th>
-							<th class="th-actions">Agent</th>
+							<th class="th-task">Task</th>
+							<th class="th-status">Status</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -1065,24 +1102,8 @@
 							{@const sessionTask = agentTasks.get(sessionAgentName)}
 							{@const sessionInfo = agentSessionInfo.get(sessionAgentName)}
 							{@const activityState = sessionInfo?.activityState}
-							{@const statusDotColor = activityState === 'working'
-								? 'oklch(0.70 0.18 250)' // Indigo/blue for working
-								: activityState === 'compacting'
-								? 'oklch(0.65 0.15 280)' // Purple for compacting
-								: activityState === 'needs-input'
-								? 'oklch(0.75 0.20 45)' // Orange for needs input
-								: activityState === 'ready-for-review'
-								? 'oklch(0.70 0.20 85)' // Amber/yellow for review
-								: activityState === 'completing'
-								? 'oklch(0.65 0.15 175)' // Teal for completing
-								: activityState === 'completed'
-								? 'oklch(0.70 0.20 145)' // Green for completed
-								: activityState === 'starting'
-								? 'oklch(0.75 0.15 200)' // Blue for starting
-								: activityState === 'recovering'
-								? 'oklch(0.70 0.20 190)' // Cyan for recovering
-								: 'oklch(0.55 0.05 250)' // Grey for idle/unknown
-							}
+							{@const effectiveState = optimisticStates.get(session.name) || activityState || 'idle'}
+							{@const statusDotColor = getSessionStateVisual(effectiveState).accent}
 							{@const derivedProject = agentProjects.get(sessionAgentName) || session.project || null}
 							{@const rowProjectColor = sessionTask?.id
 								? getProjectColorReactive(sessionTask.id)
@@ -1100,7 +1121,7 @@
 								class:expandable={true}
 								onclick={() => toggleExpanded(session.name)}
 							>
-								<td class="td-name">
+								<td class="td-task">
 									{#if session.type === 'server'}
 										<!-- Server session display -->
 										<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
@@ -1120,77 +1141,87 @@
 													}
 												}}
 											/>
-										</div>
-										<div class="server-name">
 											<span class="session-name">{session.name}</span>
 										</div>
 									{:else}
-										<!-- Agent session display -->
-										<!-- Row 1: Project pill + Task title -->
-										<div class="task-row">
+										<!-- Agent session: TaskIdBadge with agentPill + title/desc -->
+										<div class="task-cell-content">
 											{#if sessionTask}
-												<TaskIdBadge
-													task={sessionTask}
-													size="xs"
-													variant="projectPill"
-													showType={true}
-													{statusDotColor}
-												/>
-												<span class="task-title" title={sessionTask.title}>
-													{sessionTask.title || sessionTask.id}
-												</span>
+												<div class="badge-and-text">
+													<TaskIdBadge
+														task={sessionTask}
+														size="sm"
+														variant="agentPill"
+														agentName={sessionAgentName}
+														showType={true}
+														{statusDotColor}
+														resumed={session.resumed}
+														attached={session.attached}
+														harness={getTaskHarness(sessionTask)}
+													/>
+													<div class="text-column">
+														<span class="task-title" title={sessionTask.title}>
+															{sessionTask.title || sessionTask.id}
+														</span>
+														{#if sessionTask.description}
+															<div class="task-description">
+																{sessionTask.description}
+															</div>
+														{/if}
+													</div>
+												</div>
 											{:else}
-												<!-- No task - show project badge if known, otherwise session name -->
-												{#if derivedProject}
-													<span
-														class="project-badge"
-														style="background: {rowProjectColor ? `color-mix(in oklch, ${rowProjectColor} 25%, transparent)` : 'oklch(0.25 0.02 250)'}; border-color: {rowProjectColor || 'oklch(0.35 0.02 250)'}; color: {rowProjectColor || 'oklch(0.75 0.02 250)'};"
-													>
-														{derivedProject}
-													</span>
-												{:else}
-													<span class="session-name-pill">{session.name}</span>
-												{/if}
-												<span class="no-task-label">{activityState === 'planning' ? 'Planning session' : 'No active task'}</span>
+												<!-- No task - show agent pill with project -->
+												{@const planningColor = effectiveState === 'planning' ? 'oklch(0.68 0.20 270)' : (rowProjectColor || 'oklch(0.50 0.02 250)')}
+												<div class="badge-and-text">
+													<div class="inline-flex flex-col items-start flex-shrink-0">
+														<button
+															class="planning-pill"
+															style="background: color-mix(in oklch, {planningColor} 12%, transparent); border: 1px solid color-mix(in oklch, {planningColor} 30%, transparent); color: {planningColor};"
+															onclick={(e) => e.stopPropagation()}
+														>
+															<AgentAvatar name={sessionAgentName} size={20} showRing={true} sessionState={effectiveState} showGlow={true} />
+															<span>{sessionAgentName}</span>
+														</button>
+														{#if derivedProject}
+															<div class="flex items-center gap-1 mt-0.5 ml-8">
+																<span
+																	class="planning-project-tag"
+																	style="color: {rowProjectColor || 'oklch(0.55 0.02 250)'};"
+																>
+																	{derivedProject}
+																</span>
+															</div>
+														{/if}
+													</div>
+													<div class="text-column">
+														{#if effectiveState === 'planning'}
+															<span class="planning-title">Planning session</span>
+															<div class="planning-description">Interactive brainstorming — no task assigned</div>
+														{:else}
+															<span class="no-task-label">No active task</span>
+														{/if}
+													</div>
+												</div>
 											{/if}
 										</div>
-										<!-- Row 2: Task description (truncated) -->
-										{#if sessionTask?.description}
-											<div class="task-description">
-												{sessionTask.description}
-											</div>
-										{/if}
 									{/if}
 								</td>
-									<td class="td-actions" onclick={(e) => e.stopPropagation()}>
+								<td class="td-status" onclick={(e) => e.stopPropagation()}>
 									{#if session.type === 'agent'}
-										<!-- Two-row layout: Agent info row, then StatusActionBadge with timer -->
-										<div class="agent-column">
-											<!-- Row 1: Avatar + Name + Attached indicator -->
-											<div class="agent-info-row">
-												<AgentAvatar name={sessionAgentName} size={16} />
-												<span class="agent-name">{sessionAgentName}</span>
-												{#if session.resumed}
-													<span class="resumed-badge" title="Resumed from previous session">
-														<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="resumed-icon">
-															<path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-														</svg>
-													</span>
-												{/if}
-												{#if session.attached}
-													<span class="attached-indicator" title="Terminal attached">
-														<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="attached-icon">
-															<path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
-														</svg>
-													</span>
-												{/if}
-											</div>
-											<!-- Row 2: Status action badge with elapsed time -->
+										{@const reviewStatus = sessionTask ? computeReviewStatus(sessionTask, getReviewRules()) : null}
+										{@const reviewBasedDefault = reviewStatus?.action !== 'auto'}
+										{@const autoCompleteDisabled = autoCompleteDisabledMap.get(session.name) ?? reviewBasedDefault}
+										<div class="status-cell-content">
 											<StatusActionBadge
-												sessionState={(activityState || 'idle') as SessionState}
+												sessionState={(effectiveState) as SessionState}
 												{elapsed}
+												stacked={true}
 												sessionName={session.name}
 												alignRight={true}
+												showCommands={true}
+												showEpic={true}
+												onCommand={(cmd) => sendWorkflowCommand(session.name, cmd)}
 												onAction={async (actionId) => {
 													if (actionId === 'attach') {
 														await attachSession(session.name);
@@ -1198,62 +1229,80 @@
 														await killSession(session.name);
 													} else if (actionId === 'view-task' && sessionTask) {
 														window.location.href = `/tasks?task=${sessionTask.id}`;
-													} else if (actionId === 'complete') {
-														// Send /jat:complete command to session
-														// Claude Code slash commands need: Ctrl+U clear, text, extra Enter
-														const sessionId = encodeURIComponent(session.name);
-														await fetch(`/api/work/${sessionId}/input`, {
-															method: 'POST',
-															headers: { 'Content-Type': 'application/json' },
-															body: JSON.stringify({ type: 'ctrl-u' })
-														});
-														await new Promise(r => setTimeout(r, 50));
-														await fetch(`/api/work/${sessionId}/input`, {
-															method: 'POST',
-															headers: { 'Content-Type': 'application/json' },
-															body: JSON.stringify({ input: '/jat:complete', type: 'text' })
-														});
-														await new Promise(r => setTimeout(r, 100));
-														await fetch(`/api/work/${sessionId}/input`, {
-															method: 'POST',
-															headers: { 'Content-Type': 'application/json' },
-															body: JSON.stringify({ type: 'enter' })
-														});
-													} else if (actionId === 'complete-kill') {
-														// Send /jat:complete --kill command to session
-														// Claude Code slash commands need: Ctrl+U clear, text, extra Enter
-														const sessionId = encodeURIComponent(session.name);
-														await fetch(`/api/work/${sessionId}/input`, {
-															method: 'POST',
-															headers: { 'Content-Type': 'application/json' },
-															body: JSON.stringify({ type: 'ctrl-u' })
-														});
-														await new Promise(r => setTimeout(r, 50));
-														await fetch(`/api/work/${sessionId}/input`, {
-															method: 'POST',
-															headers: { 'Content-Type': 'application/json' },
-															body: JSON.stringify({ input: '/jat:complete --kill', type: 'text' })
-														});
-														await new Promise(r => setTimeout(r, 100));
-														await fetch(`/api/work/${sessionId}/input`, {
-															method: 'POST',
-															headers: { 'Content-Type': 'application/json' },
-															body: JSON.stringify({ type: 'enter' })
-														});
+													} else if (actionId === 'complete' || actionId === 'complete-kill') {
+														optimisticStates.set(session.name, 'completing');
+														optimisticStates = new Map(optimisticStates);
+														if (sessionTask) {
+															try {
+																await fetch(`/api/sessions/${encodeURIComponent(session.name)}/signal`, {
+																	method: 'POST',
+																	headers: { 'Content-Type': 'application/json' },
+																	body: JSON.stringify({
+																		type: 'completing',
+																		data: {
+																			taskId: sessionTask.id,
+																			taskTitle: sessionTask.title,
+																			currentStep: 'verifying',
+																			progress: 0,
+																			stepsCompleted: [],
+																			stepsRemaining: ['verifying', 'committing', 'closing', 'releasing']
+																		}
+																	})
+																});
+															} catch (e) {
+																console.warn('[Sessions] Failed to write completing signal:', e);
+															}
+														}
+														const cmd = actionId === 'complete-kill' ? '/jat:complete --kill' : '/jat:complete';
+														await sendWorkflowCommand(session.name, cmd);
 													} else if (actionId === 'interrupt') {
-														// Send Ctrl+C to session
 														await fetch(`/api/work/${encodeURIComponent(session.name)}/input`, {
 															method: 'POST',
 															headers: { 'Content-Type': 'application/json' },
 															body: JSON.stringify({ type: 'ctrl-c' })
 														});
 													} else if (actionId === 'escape') {
-														// Send Escape key to session
 														await fetch(`/api/work/${encodeURIComponent(session.name)}/input`, {
 															method: 'POST',
 															headers: { 'Content-Type': 'application/json' },
 															body: JSON.stringify({ type: 'escape' })
 														});
+													} else if (actionId === 'close-kill') {
+														if (sessionTask) {
+															try {
+																await fetch(`/api/tasks/${encodeURIComponent(sessionTask.id)}/close`, {
+																	method: 'POST',
+																	headers: { 'Content-Type': 'application/json' },
+																	body: JSON.stringify({ reason: 'Abandoned via Close & Kill' })
+																});
+															} catch (e) {
+																console.warn('[Sessions] Failed to close task:', e);
+															}
+														}
+														await killSession(session.name);
+													} else if (actionId === 'pause') {
+														optimisticStates.set(session.name, 'paused');
+														optimisticStates = new Map(optimisticStates);
+														if (sessionTask) {
+															try {
+																await fetch(`/api/sessions/${encodeURIComponent(session.name)}/pause`, {
+																	method: 'POST',
+																	headers: { 'Content-Type': 'application/json' },
+																	body: JSON.stringify({
+																		taskId: sessionTask.id,
+																		taskTitle: sessionTask.title,
+																		reason: 'Paused via StatusActionBadge',
+																		killSession: true,
+																		agentName: sessionAgentName,
+																		project: session.project
+																	})
+																});
+															} catch (e) {
+																console.warn('[Sessions] Failed to pause session:', e);
+															}
+														} else {
+															await killSession(session.name);
+														}
 													}
 												}}
 												task={sessionTask ? { id: sessionTask.id, issue_type: sessionTask.issue_type, priority: sessionTask.priority } : null}
@@ -1261,6 +1310,13 @@
 												onViewEpic={(epicId) => {
 													window.location.href = `/tasks?task=${epicId}`;
 												}}
+												autoCompleteEnabled={!autoCompleteDisabled}
+												onAutoCompleteToggle={() => {
+													const newMap = new Map(autoCompleteDisabledMap);
+													newMap.set(session.name, !autoCompleteDisabled);
+													autoCompleteDisabledMap = newMap;
+												}}
+												reviewReason={reviewStatus?.reason ?? null}
 											/>
 										</div>
 									{:else}
@@ -1984,17 +2040,45 @@
 		color: oklch(0.75 0.02 250);
 	}
 
-	/* Column widths - fixed second column, first column gets remainder */
-	.th-actions, .td-actions { width: 260px; min-width: 260px; max-width: 260px; }
+	/* Two-column layout widths: Task (auto) | Status (fixed 160px) */
+	.th-task, .td-task { width: auto; padding-left: 0.25rem; padding-right: 0.25rem; }
+	.th-status, .td-status { width: 160px; text-align: right; }
 
-	/* Session name */
-	.td-name {
+	/* Task column */
+	.task-cell-content {
 		display: flex;
 		flex-direction: column;
 		align-items: flex-start;
+		gap: 0.25rem;
+		min-width: 0;
+		width: 100%;
+	}
+
+	/* Badge + text side by side */
+	.badge-and-text {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.625rem;
+		min-width: 0;
+		width: 100%;
+	}
+
+	.text-column {
+		display: flex;
+		flex-direction: column;
 		gap: 0.125rem;
-		min-width: 0; /* Allow column to shrink below content width */
-		max-width: 100%;
+		min-width: 0;
+		flex: 1;
+		padding-top: 0.125rem;
+	}
+
+	/* Status column */
+	.status-cell-content {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 0.375rem;
+		justify-content: center;
 	}
 
 	.session-name {
@@ -2030,12 +2114,38 @@
 		font-style: italic;
 	}
 
-	.task-row {
-		display: flex;
+	/* Planning session pill - mirrors TaskIdBadge agentPill */
+	.planning-pill {
+		display: inline-flex;
 		align-items: center;
 		gap: 0.5rem;
-		width: 100%;
-		min-width: 0; /* Allow flex children to shrink */
+		font-family: ui-monospace, monospace;
+		font-weight: 500;
+		font-size: 0.875rem;
+		padding: 0.125rem 0.625rem 0.125rem 0.125rem;
+		border-radius: 9999px;
+		cursor: default;
+		white-space: nowrap;
+	}
+
+	.planning-project-tag {
+		font-size: 0.6875rem;
+		font-weight: 500;
+		font-family: ui-monospace, monospace;
+		opacity: 0.7;
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+	}
+
+	.planning-title {
+		font-size: 0.8rem;
+		font-weight: 500;
+		color: oklch(0.75 0.15 270);
+	}
+
+	.planning-description {
+		font-size: 0.7rem;
+		color: oklch(0.50 0.02 250);
 	}
 
 	.server-row {
@@ -2073,54 +2183,6 @@
 		white-space: nowrap;
 		width: 100%;
 		max-width: 100%;
-	}
-
-	/* Agent column layout (two rows: info row + badge) */
-	.agent-column {
-		display: flex;
-		flex-direction: column;
-		gap: 0.375rem;
-	}
-
-	.agent-info-row {
-		display: flex;
-		align-items: center;
-		gap: 0.375rem;
-	}
-
-	.agent-name {
-		font-size: 0.7rem;
-		font-weight: 500;
-		color: oklch(0.75 0.02 250);
-		white-space: nowrap;
-	}
-
-	/* Attached indicator */
-	.attached-indicator {
-		display: flex;
-		align-items: center;
-		margin-left: 0.25rem;
-	}
-
-	.attached-icon {
-		width: 12px;
-		height: 12px;
-		color: oklch(0.70 0.18 145);
-		filter: drop-shadow(0 0 3px oklch(0.65 0.18 145 / 0.6));
-	}
-
-	/* Resumed session indicator */
-	.resumed-badge {
-		display: flex;
-		align-items: center;
-		margin-left: 0.25rem;
-	}
-
-	.resumed-icon {
-		width: 12px;
-		height: 12px;
-		color: oklch(0.70 0.15 200);
-		filter: drop-shadow(0 0 3px oklch(0.65 0.15 200 / 0.6));
 	}
 
 	/* Actions */

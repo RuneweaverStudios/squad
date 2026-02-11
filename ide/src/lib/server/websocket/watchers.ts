@@ -127,7 +127,7 @@ let isLifecyclePolling = false;
 let knownSessions = new Set<string>();
 
 // Signal file watcher state
-const signalFileStates = new Map<string, { state: string | null; completeHash: string | null }>();
+const signalFileStates = new Map<string, { state: string | null; completeHash: string | null; payloadHash: string | null }>();
 const signalDebounceTimers = new Map<string, NodeJS.Timeout>();
 const SIGNAL_DEBOUNCE_MS = 50;
 
@@ -468,19 +468,28 @@ function processSignalFileChange(sessionName: string): void {
 	const signal = readSignalFile(sessionName);
 	if (!signal) return;
 
-	const prevFileState = signalFileStates.get(sessionName) || { state: null, completeHash: null };
-	const currentFileState = { state: prevFileState.state, completeHash: prevFileState.completeHash };
+	const prevFileState = signalFileStates.get(sessionName) || { state: null, completeHash: null, payloadHash: null };
+	const currentFileState = { state: prevFileState.state, completeHash: prevFileState.completeHash, payloadHash: prevFileState.payloadHash };
 
 	// Handle state signals (working, review, needs_input, etc.)
 	if (signal.type === 'state' && signal.state) {
 		const mappedState = SIGNAL_STATE_MAP[signal.state] || signal.state;
-		if (mappedState !== prevFileState.state) {
+		const newPayloadHash = signal.data ? simpleHash(JSON.stringify(signal.data)) : null;
+		const stateChanged = mappedState !== prevFileState.state;
+		const payloadChanged = newPayloadHash !== prevFileState.payloadHash;
+
+		if (stateChanged || payloadChanged) {
 			currentFileState.state = mappedState;
+			currentFileState.payloadHash = newPayloadHash;
 			broadcastSessionState(sessionName, mappedState, {
 				previousState: prevFileState.state,
 				signalPayload: signal.data ? { type: signal.state, ...signal.data as object } : undefined
 			});
-			console.log(`[WS Watcher] Signal state change for ${sessionName}: ${prevFileState.state} -> ${mappedState}${signal.data ? ' (with payload)' : ''}`);
+			if (stateChanged) {
+				console.log(`[WS Watcher] Signal state change for ${sessionName}: ${prevFileState.state} -> ${mappedState}${signal.data ? ' (with payload)' : ''}`);
+			} else {
+				console.log(`[WS Watcher] Signal payload update for ${sessionName}: ${mappedState} (data changed)`);
+			}
 		}
 	}
 
