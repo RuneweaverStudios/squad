@@ -119,17 +119,17 @@ export const unifiedNavConfig: UnifiedNavConfig = {
 		},
 		// VIEWS: Alternative visualizations
 		{
-			id: 'dash',
-			label: 'Dash',
-			href: '/dash',
-			icon: 'dashboard',
-			category: 'views'
-		},
-		{
 			id: 'sessions',
 			label: 'Sessions',
 			href: '/sessions',
 			icon: 'tmux',
+			category: 'views'
+		},
+		{
+			id: 'dash',
+			label: 'Dash',
+			href: '/dash',
+			icon: 'dashboard',
 			category: 'views'
 		},
 		{
