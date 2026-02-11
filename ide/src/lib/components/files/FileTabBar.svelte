@@ -81,20 +81,12 @@
 		draggedIndex = index;
 		e.dataTransfer.effectAllowed = 'move';
 		e.dataTransfer.setData('text/plain', index.toString());
-		// Add a slight delay to show drag styling
-		requestAnimationFrame(() => {
-			if (e.target instanceof HTMLElement) {
-				e.target.classList.add('dragging');
-			}
-		});
+		// Drag styling is handled reactively via class:dragging={draggedIndex === index}
 	}
 
 	function handleDragEnd(e: DragEvent) {
 		draggedIndex = null;
 		dragOverIndex = null;
-		if (e.target instanceof HTMLElement) {
-			e.target.classList.remove('dragging');
-		}
 	}
 
 	function handleDragOver(e: DragEvent, index: number) {
@@ -128,15 +120,16 @@
 <div class="file-tab-bar">
 	<div class="tabs-container">
 		{#each openFiles as file, index (file.path)}
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
 				class="file-tab"
 				class:active={activeFilePath === file.path}
 				class:dirty={file.dirty}
 				class:drag-over={dragOverIndex === index}
+				class:dragging={draggedIndex === index}
 				class:drag-over-left={dragOverIndex === index && draggedIndex !== null && draggedIndex > index}
 				class:drag-over-right={dragOverIndex === index && draggedIndex !== null && draggedIndex < index}
 				onclick={() => handleTabClick(file.path)}
+				onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTabClick(file.path); } }}
 				onmousedown={(e) => handleMouseDown(e, file.path)}
 				draggable="true"
 				ondragstart={(e) => handleDragStart(e, index)}

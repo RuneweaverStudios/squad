@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 /**
- * jat-memory - Memory indexer CLI.
+ * jat-memory - Memory indexer and search CLI.
  *
  * Reads .jat/memory/*.md files, chunks them, generates embeddings,
  * and stores in SQLite with vector search + FTS5 support.
  *
  * Usage:
  *   jat-memory index [--force] [--project path] [--skip-embeddings] [--verbose]
+ *   jat-memory search 'query' [--project path] [--limit N] [--min-score 0.5]
  *   jat-memory status [--project path] [--json]
  *   jat-memory providers
  *   jat-memory --help
@@ -15,6 +16,7 @@
 import { existsSync } from 'node:fs';
 import { resolve, basename } from 'node:path';
 import { indexProject } from './lib/indexer.js';
+import { search } from './lib/search.js';
 import { openDb, getStats, getConfig } from './lib/db.js';
 import { listProviders } from './lib/embeddings.js';
 
@@ -51,13 +53,14 @@ function resolveProjectPath() {
 }
 
 function printHelp() {
-  console.log(`jat-memory - Agent memory indexer
+  console.log(`jat-memory - Agent memory indexer and search
 
 Usage:
-  jat-memory index [options]     Index memory files (chunk, embed, store)
-  jat-memory status [options]    Show index statistics
-  jat-memory providers           List available embedding providers
-  jat-memory --help              Show this help
+  jat-memory index [options]         Index memory files (chunk, embed, store)
+  jat-memory search 'query' [opts]   Hybrid search over memory index
+  jat-memory status [options]        Show index statistics
+  jat-memory providers               List available embedding providers
+  jat-memory --help                  Show this help
 
 Index Options:
   --project <path>      Project path (default: current directory)
@@ -67,6 +70,13 @@ Index Options:
   --overlap-tokens <n>  Overlap between chunks (default: 50)
   --verbose             Verbose output
   --json                Output results as JSON
+
+Search Options:
+  --project <path>      Project path (default: current directory)
+  --limit <n>           Max results to return (default: 5)
+  --min-score <f>       Minimum RRF score to include (default: 0)
+  --candidates <n>      Candidates per search method (default: 20)
+  --verbose             Verbose output (debug info to stderr)
 
 Status Options:
   --project <path>      Project path (default: current directory)
@@ -171,6 +181,42 @@ function cmdStatus() {
   }
 }
 
+async function cmdSearch() {
+  const projectPath = resolveProjectPath();
+  const verbose = hasFlag('verbose');
+  const limit = parseInt(getArg('limit', '5'), 10);
+  const minScore = parseFloat(getArg('min-score', '0'));
+  const candidates = parseInt(getArg('candidates', '20'), 10);
+
+  // Query is the first non-flag argument after 'search'
+  const query = args.slice(1).find(a => !a.startsWith('--') && args[args.indexOf(a) - 1]?.startsWith('--') === false)
+    ?? args.find((a, i) => i > 0 && !a.startsWith('--') && !args[i - 1]?.startsWith('--'));
+
+  if (!query) {
+    console.error('Error: Search query required.');
+    console.error('Usage: jat-memory search "your query here" [--limit 5] [--min-score 0]');
+    process.exit(1);
+  }
+
+  const dbPath = `${projectPath}/.jat/memory.db`;
+  if (!existsSync(dbPath)) {
+    console.error('No memory index found. Run: jat-memory index');
+    process.exit(1);
+  }
+
+  const results = await search({
+    projectPath,
+    query,
+    limit,
+    minScore,
+    candidates,
+    verbose,
+  });
+
+  // Always output JSON (designed for agent consumption)
+  console.log(JSON.stringify(results, null, 2));
+}
+
 function cmdProviders() {
   const providers = listProviders();
   const jsonOutput = hasFlag('json');
@@ -201,6 +247,12 @@ if (hasFlag('help') || hasFlag('h') || command === 'help' || !command) {
 switch (command) {
   case 'index':
     cmdIndex().catch(err => {
+      console.error(`Fatal: ${err.message}`);
+      process.exit(1);
+    });
+    break;
+  case 'search':
+    cmdSearch().catch(err => {
       console.error(`Fatal: ${err.message}`);
       process.exit(1);
     });

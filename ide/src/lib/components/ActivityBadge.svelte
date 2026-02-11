@@ -436,7 +436,7 @@
 	onmouseleave={handleMouseLeave}
 >
 	<span
-		class="px-2 py-0.5 rounded text-xs font-mono flex items-center gap-2 transition-all duration-300 cursor-pointer"
+		class="h-7 px-2 py-0.5 rounded text-xs font-mono flex items-center gap-2 transition-all duration-300 cursor-pointer"
 		class:badge-pop={justIncremented}
 		class:badge-milestone={hitMilestone}
 		style="

@@ -355,7 +355,7 @@
 		border-radius: 0.5rem;
 		border: 1px solid oklch(0.30 0.02 250);
 		overflow: visible;
-		height: 2rem;
+		height: 1.75rem;
 	}
 
 	.segment-wrapper {

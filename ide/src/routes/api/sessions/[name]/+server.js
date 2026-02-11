@@ -199,8 +199,10 @@ export async function PATCH({ params, request }) {
 
 /** @type {import('./$types').RequestHandler} */
 export async function DELETE({ params }) {
+	const t0 = Date.now();
 	try {
 		const { agentName, sessionName } = resolveSessionName(params.name);
+		console.log(`[Session DELETE] Starting cleanup for ${sessionName} (agent: ${agentName})`);
 
 		if (!agentName) {
 			return json({
@@ -212,17 +214,20 @@ export async function DELETE({ params }) {
 		// IMPORTANT: Capture scrollback BEFORE killing the session
 		// This preserves the session history in the unified log
 		let logCaptured = null;
+		const t1 = Date.now();
 		try {
 			logCaptured = await captureSessionLog(sessionName, 'killed');
 		} catch (err) {
 			console.error('Failed to capture session log before kill:', err);
 			// Non-fatal - continue with kill
 		}
+		console.log(`[Session DELETE] captureSessionLog took ${Date.now() - t1}ms (captured: ${!!logCaptured})`);
 
 		// Kill the tmux session (with jat- prefix)
 		const killCommand = `tmux kill-session -t "${sessionName}" 2>&1`;
 		let sessionKilled = false;
 
+		const t2 = Date.now();
 		try {
 			await execAsync(killCommand);
 			sessionKilled = true;
@@ -240,24 +245,29 @@ export async function DELETE({ params }) {
 				}, { status: 500 });
 			}
 		}
+		console.log(`[Session DELETE] tmux kill-session took ${Date.now() - t2}ms (killed: ${sessionKilled})`);
 
 		// Release the task assigned to this agent (search across ALL projects)
 		// Find tasks where assignee = agentName and status = in_progress, set back to open with no assignee
 		let taskReleased = false;
 		let releasedTaskId = null;
 
+		const t3 = Date.now();
 		try {
 			// Use jat-tasks.js to find tasks across all projects
 			const allTasks = getTasks({ status: 'in_progress' });
 			const agentTask = allTasks.find(t => t.assignee === agentName);
+			console.log(`[Session DELETE] getTasks scan took ${Date.now() - t3}ms (found ${allTasks.length} in_progress tasks, match: ${agentTask?.id || 'none'})`);
 
 			if (agentTask) {
+				const t4 = Date.now();
 				// Release the task: set status back to open and clear assignee
 				// Run jt update in the task's project directory
 				await execAsync(`jt update "${agentTask.id}" --status open --assignee ""`, {
 					cwd: agentTask.project_path,
 					timeout: 10000
 				});
+				console.log(`[Session DELETE] jt update (release task) took ${Date.now() - t4}ms`);
 				taskReleased = true;
 				releasedTaskId = agentTask.id;
 			}
@@ -265,6 +275,8 @@ export async function DELETE({ params }) {
 			// Non-fatal - session is killed, task release just failed
 			console.error('Failed to release task:', err);
 		}
+
+		console.log(`[Session DELETE] Total: ${Date.now() - t0}ms for ${sessionName} (log:${!!logCaptured} kill:${sessionKilled} release:${releasedTaskId || 'none'})`);
 
 		if (!sessionKilled && !taskReleased) {
 			return json({

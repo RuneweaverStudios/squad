@@ -12,6 +12,7 @@
 
 	import { slide } from 'svelte/transition';
 	import { GIT_STATUS_VISUALS, type GitFileStatus } from './types';
+	import FileTreeNode from './FileTreeNode.svelte';
 
 	interface DirectoryEntry {
 		name: string;
@@ -303,7 +304,7 @@
 	{#if isFolder && isExpanded && children.length > 0}
 		<div class="children" transition:slide={{ duration: 150 }}>
 			{#each visibleChildren() as child (child.path)}
-				<svelte:self
+				<FileTreeNode
 					entry={child}
 					{project}
 					{selectedPath}

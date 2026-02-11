@@ -1,17 +1,15 @@
 <script lang="ts">
 	/**
-	 * Tasks3 Page
+	 * Tasks Page
 	 *
-	 * Enhanced tasks view with project tabs instead of accordions.
-	 * - Shows projects as clickable tabs in a horizontal bar
-	 * - Only one project visible at a time (no accordion collapse)
+	 * Tasks view with project selection via TopBar global selector.
+	 * - Only one project visible at a time (selected via TopBar)
 	 * - Within each project, groups by epic (accordion behavior)
-	 * - Maintains the aesthetic of /tasks2 while simplifying navigation
 	 */
 
-	import { onMount, onDestroy, untrack } from "svelte";
+	import { onMount, onDestroy } from "svelte";
 	import { slide } from "svelte/transition";
-	import { goto } from "$app/navigation";
+	import { page } from "$app/stores";
 	import SortDropdown from "$lib/components/SortDropdown.svelte";
 	import TasksActive from "$lib/components/sessions/TasksActive.svelte";
 	import TasksPaused from "$lib/components/sessions/TasksPaused.svelte";
@@ -83,11 +81,6 @@
 	let agentTasks = $state<Map<string, AgentTask>>(new Map());
 	let agentSessionInfo = $state<Map<string, AgentSessionInfo>>(new Map());
 
-	// Track exiting agent sessions for project tabs (avatar exit animation)
-	let prevProjectSessionNames = $state<Set<string>>(new Set());
-	let cachedSessionObjects = $state<Map<string, TmuxSession>>(new Map());
-	let exitingAgentSessions = $state<Map<string, TmuxSession>>(new Map());
-
 	// Project colors
 	let projectColors = $state<Record<string, string>>({});
 
@@ -117,13 +110,7 @@
 	let swarmHoveredEpicId = $state<string | null>(null);
 	let swarmSpawningEpicId = $state<string | null>(null);
 
-	// Project tab context menu state
-	let projectCtxProject = $state<string | null>(null);
-	let projectCtxX = $state(0);
-	let projectCtxY = $state(0);
-	let projectCtxVisible = $state(false);
-
-	// Selected project tab (instead of collapsed projects)
+	// Selected project (synced from URL ?project= param, managed by TopBar)
 	let selectedProject = $state<string | null>(null);
 
 	// Subsection collapse state per project (sessions/paused/tasks)
@@ -247,19 +234,23 @@
 		});
 	});
 
-	// Auto-select first project when projects change
+	// Sync selectedProject from URL ?project= param (managed by TopBar/layout)
 	// NOTE: All smart defaults for subsections are handled in selectProject() to avoid
 	// infinite effect loops. Do NOT add a separate effect for subsection defaults.
 	$effect(() => {
+		const projectParam = $page.url.searchParams.get('project');
 		const projects = allProjects;
-		if (projects.length > 0 && !selectedProject) {
+		if (projectParam && projects.includes(projectParam)) {
+			if (selectedProject !== projectParam) {
+				selectProject(projectParam);
+			}
+		} else if (projects.length > 0 && !selectedProject) {
 			selectProject(projects[0]);
 		} else if (
 			projects.length > 0 &&
 			selectedProject &&
 			!projects.includes(selectedProject)
 		) {
-			// Selected project no longer exists, select first
 			selectProject(projects[0]);
 		}
 	});
@@ -298,49 +289,6 @@
 		return grouped;
 	});
 
-	// Detect exiting agent sessions for project tab avatar exit animations
-	$effect(() => {
-		const agentSessions = sessions.filter(s => s.type === 'agent');
-		const currentNames = new Set(agentSessions.map(s => s.name));
-		const prev = untrack(() => prevProjectSessionNames);
-		const prevExiting = untrack(() => exitingAgentSessions);
-		const cache = untrack(() => cachedSessionObjects);
-
-		// Always update session object cache with current data
-		const updatedCache = new Map(cache);
-		for (const s of agentSessions) {
-			updatedCache.set(s.name, s);
-		}
-		cachedSessionObjects = updatedCache;
-
-		// Find sessions that just disappeared
-		const newExiting = new Map(prevExiting);
-		let hasNew = false;
-		for (const name of prev) {
-			if (!currentNames.has(name) && !prevExiting.has(name)) {
-				const cached = updatedCache.get(name);
-				if (cached) {
-					newExiting.set(name, cached);
-					hasNew = true;
-				}
-			}
-		}
-
-		if (hasNew) {
-			exitingAgentSessions = newExiting;
-			const exitNames = [...newExiting.keys()].filter(n => !prevExiting.has(n));
-			setTimeout(() => {
-				const cleaned = new Map(exitingAgentSessions);
-				for (const name of exitNames) {
-					cleaned.delete(name);
-					cachedSessionObjects.delete(name);
-				}
-				exitingAgentSessions = cleaned;
-			}, 600);
-		}
-
-		prevProjectSessionNames = currentNames;
-	});
 
 	// Group sessions by epic within a project
 	function getSessionsByEpic(
@@ -497,13 +445,6 @@
 	// Persist collapse state
 	function saveCollapseState() {
 		try {
-			// Save selected project tab
-			if (selectedProject) {
-				localStorage.setItem(
-					"tasks3-selected-project",
-					selectedProject,
-				);
-			}
 			// Save subsection collapse state
 			const subsectionData: Record<string, string[]> = {};
 			for (const [project, subsections] of collapsedSubsections) {
@@ -520,13 +461,6 @@
 
 	function loadCollapseState() {
 		try {
-			// Load selected project tab
-			const savedProject = localStorage.getItem(
-				"tasks3-selected-project",
-			);
-			if (savedProject) {
-				selectedProject = savedProject;
-			}
 			// Load subsection collapse state
 			const subsectionSaved = localStorage.getItem(
 				"tasks3-collapsed-subsections",
@@ -721,13 +655,6 @@
 		} catch {
 			// Silent fail
 		}
-	}
-
-	// Get recoverable session count for a project
-	function getProjectRecoverableCount(project: string): number {
-		return recoverableSessions.filter(
-			(s) => s.project.toLowerCase() === project.toLowerCase(),
-		).length;
 	}
 
 	// Get paused sessions for a project
@@ -968,10 +895,6 @@
 	}
 
 	// Count helpers
-	function getProjectSessionCount(project: string): number {
-		return sessionsByProject.get(project)?.length || 0;
-	}
-
 	function getProjectTaskCount(project: string): number {
 		const tasks = tasksByProject.get(project) || [];
 		// Count open non-epic tasks
@@ -1043,108 +966,6 @@
 		saveCollapseState();
 	}
 
-	// Project tab context menu handlers
-	function handleProjectTabClick(project: string, event: MouseEvent) {
-		if (selectedProject === project) {
-			// Already selected - show context menu
-			event.preventDefault();
-			event.stopPropagation();
-			openProjectContextMenu(project, event);
-		} else {
-			selectProject(project);
-		}
-	}
-
-	function openProjectContextMenu(project: string, event: MouseEvent) {
-		const menuWidth = 220;
-		const menuHeight = 320;
-		projectCtxProject = project;
-		projectCtxX = Math.min(event.clientX, window.innerWidth - menuWidth - 8);
-		projectCtxY = Math.min(event.clientY, window.innerHeight - menuHeight - 8);
-		projectCtxVisible = true;
-	}
-
-	function closeProjectContextMenu() {
-		projectCtxVisible = false;
-	}
-
-	// Close project context menu on click outside or Escape
-	$effect(() => {
-		if (!projectCtxVisible) return;
-
-		function handleClick() {
-			closeProjectContextMenu();
-		}
-		function handleKeyDown(e: KeyboardEvent) {
-			if (e.key === 'Escape') closeProjectContextMenu();
-		}
-
-		const timer = setTimeout(() => {
-			document.addEventListener('click', handleClick);
-			document.addEventListener('keydown', handleKeyDown);
-		}, 0);
-
-		return () => {
-			clearTimeout(timer);
-			document.removeEventListener('click', handleClick);
-			document.removeEventListener('keydown', handleKeyDown);
-		};
-	});
-
-	// Project context menu actions
-	function handleProjectMenuAction(action: string, project: string) {
-		closeProjectContextMenu();
-		switch (action) {
-			case 'create-task':
-				openTaskDrawer(project);
-				break;
-			case 'launch-agent':
-				spawnForProject(project);
-				break;
-			case 'open-editor':
-				openProjectInEditor(project);
-				break;
-			case 'settings':
-				goto(`/config?project=${encodeURIComponent(project)}`);
-				break;
-			case 'view-files':
-				goto(`/files?project=${encodeURIComponent(project)}`);
-				break;
-			case 'view-source':
-				goto(`/source?project=${encodeURIComponent(project)}`);
-				break;
-		}
-	}
-
-	async function spawnForProject(project: string) {
-		try {
-			const response = await fetch("/api/work/spawn", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ project, autoStart: true }),
-			});
-			if (!response.ok) {
-				const data = await response.json();
-				console.error("Failed to spawn for project:", data.error);
-			}
-			await fetchAllData();
-		} catch (err) {
-			console.error("Failed to spawn for project:", err);
-		}
-	}
-
-	async function openProjectInEditor(project: string) {
-		try {
-			await fetch("/api/open-folder", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ path: `~/code/${project}` }),
-			});
-		} catch (err) {
-			console.error("Failed to open project in editor:", err);
-		}
-	}
-
 	onMount(() => {
 		loadCollapseState();
 		fetchAllData();
@@ -1195,19 +1016,6 @@
 	<!-- Loading State -->
 	{#if sessionsLoading && tasksLoading && sessions.length === 0 && openTasks.length === 0}
 		<div class="loading-container">
-			<!-- Project Tabs Skeleton -->
-			<div class="project-tabs-skeleton">
-				{#each [1, 2, 3] as _}
-					<div class="skeleton-tab">
-						<div class="skeleton h-4 w-16 rounded mb-2"></div>
-						<div class="flex gap-1">
-							<div class="skeleton h-5 w-5 rounded-full"></div>
-							<div class="skeleton h-5 w-5 rounded-full"></div>
-						</div>
-					</div>
-				{/each}
-			</div>
-
 			<!-- Active Tasks Section Skeleton -->
 			<div class="section-skeleton">
 				<div class="skeleton-section-header">
@@ -1277,93 +1085,6 @@
 			<span>No projects with active sessions or open tasks</span>
 		</div>
 	{:else}
-		<!-- Project Tabs -->
-		<div class="project-tabs">
-			{#each allProjects as project (project)}
-				{@const projectColor =
-					projectColors[project] || "oklch(0.70 0.15 200)"}
-				{@const isActive = selectedProject === project}
-				{@const sessionCount = getProjectSessionCount(project)}
-				{@const taskCount = getProjectTaskCount(project)}
-				{@const recoverableCount = getProjectRecoverableCount(project)}
-				{@const projectAgentSessions =
-					sessionsByProject.get(project) || []}
-				{@const exitingSessions = [...exitingAgentSessions.values()].filter(s => (s.project || 'Unknown') === project)}
-				<button
-					class="project-tab"
-					class:active={isActive}
-					style="--project-color: {projectColor}"
-					onclick={(e) => handleProjectTabClick(project, e)}
-					oncontextmenu={(e) => { e.preventDefault(); selectProject(project); openProjectContextMenu(project, e); }}
-				>
-					<span class="project-tab-name mt-1"
-						>{project.toUpperCase()}</span
-					>
-					{#if projectAgentSessions.length > 0 || exitingSessions.length > 0}
-						<div class="project-tab-agents mt-2.5">
-							{#each projectAgentSessions as session (session.name)}
-								{@const agentName = getAgentName(session.name)}
-								<WorkingAgentBadge
-									name={agentName}
-									size={20}
-									variant="avatar"
-									isWorking={true}
-									sessionState={agentSessionInfo.get(agentName)?.activityState}
-								/>
-							{/each}
-							{#each exitingSessions as session (session.name)}
-								{@const agentName = getAgentName(session.name)}
-								<WorkingAgentBadge
-									name={agentName}
-									size={20}
-									variant="avatar"
-									isWorking={true}
-									sessionState={agentSessionInfo.get(agentName)?.activityState}
-									exiting={true}
-								/>
-							{/each}
-						</div>
-					{/if}
-					<div class="project-tab-counts mt-1.5">
-						{#if recoverableCount > 0}
-							<span
-								class="tab-count paused"
-								title="{recoverableCount} paused session{recoverableCount !==
-								1
-									? 's'
-									: ''}">{recoverableCount} paused</span
-							>
-						{/if}
-						{#if taskCount > 0}
-							<span class="tab-count tasks">{taskCount} open</span
-							>
-						{/if}
-					</div>
-				</button>
-			{/each}
-			<!-- Add Project Button -->
-			<button
-				class="add-project-tab"
-				onclick={() => openProjectDrawer()}
-				title="Add new project"
-			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					fill="none"
-					viewBox="0 0 24 24"
-					stroke-width="2"
-					stroke="currentColor"
-					class="add-project-icon"
-				>
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						d="M12 4.5v15m7.5-7.5h-15"
-					/>
-				</svg>
-			</button>
-		</div>
-
 		<!-- Selected Project Content -->
 		{#if selectedProject}
 			{@const projectSessions =
@@ -1969,75 +1690,6 @@
 	{/if}
 </div>
 
-<!-- Project Tab Context Menu -->
-{#if projectCtxProject}
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div
-		class="project-context-menu"
-		class:project-context-menu-hidden={!projectCtxVisible}
-		style="left: {projectCtxX}px; top: {projectCtxY}px;"
-		onclick={(e) => e.stopPropagation()}
-	>
-		<!-- Header: project name -->
-		<div class="project-context-menu-header">{projectCtxProject.toUpperCase()}</div>
-		<div class="project-context-menu-divider"></div>
-
-		<!-- Create Task -->
-		<button class="project-context-menu-item" onclick={() => handleProjectMenuAction('create-task', projectCtxProject!)}>
-			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-			</svg>
-			<span>Create Task</span>
-		</button>
-
-		<!-- Launch Agent -->
-		<button class="project-context-menu-item" onclick={() => handleProjectMenuAction('launch-agent', projectCtxProject!)}>
-			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-				<path d="M12 2C12 2 8 6 8 12C8 15 9 17 10 18L10 21C10 21.5 10.5 22 11 22H13C13.5 22 14 21.5 14 21L14 18C15 17 16 15 16 12C16 6 12 2 12 2Z" />
-				<circle cx="12" cy="10" r="2" />
-			</svg>
-			<span>Launch Agent</span>
-		</button>
-
-		<div class="project-context-menu-divider"></div>
-
-		<!-- Open in Editor -->
-		<button class="project-context-menu-item" onclick={() => handleProjectMenuAction('open-editor', projectCtxProject!)}>
-			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5" />
-			</svg>
-			<span>Open in Editor</span>
-		</button>
-
-		<!-- View Files -->
-		<button class="project-context-menu-item" onclick={() => handleProjectMenuAction('view-files', projectCtxProject!)}>
-			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" />
-			</svg>
-			<span>View Files</span>
-		</button>
-
-		<!-- View Source (Git) -->
-		<button class="project-context-menu-item" onclick={() => handleProjectMenuAction('view-source', projectCtxProject!)}>
-			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M6 3v12m0 0a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm0 0c0-3 6-3 6-6m6 3v6m0 0a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm0-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
-			</svg>
-			<span>View Source</span>
-		</button>
-
-		<div class="project-context-menu-divider"></div>
-
-		<!-- Project Settings -->
-		<button class="project-context-menu-item" onclick={() => handleProjectMenuAction('settings', projectCtxProject!)}>
-			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
-				<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-			</svg>
-			<span>Project Settings</span>
-		</button>
-	</div>
-{/if}
-
 <style>
 	.tasks-page {
 		min-height: 100vh;
@@ -2079,183 +1731,6 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-	}
-
-	/* Project Tabs */
-	.project-tabs {
-		display: flex;
-		flex-wrap: nowrap;
-		gap: 0.5rem;
-		margin-bottom: 1rem;
-		padding: 0.5rem;
-		background: oklch(0.16 0.01 250);
-		border-radius: 0.75rem;
-		border: 1px solid oklch(0.25 0.02 250);
-		/* Sticky positioning so tabs stay visible when scrolling */
-		position: sticky;
-		top: 0;
-		z-index: 10;
-		/* Horizontal scroll instead of wrapping */
-		overflow-x: auto;
-		overflow-y: hidden;
-		/* Custom scrollbar styling */
-		scrollbar-width: thin;
-		scrollbar-color: oklch(0.35 0.02 250) transparent;
-	}
-
-	.project-tabs::-webkit-scrollbar {
-		height: 6px;
-	}
-
-	.project-tabs::-webkit-scrollbar-track {
-		background: transparent;
-	}
-
-	.project-tabs::-webkit-scrollbar-thumb {
-		background: oklch(0.35 0.02 250);
-		border-radius: 3px;
-	}
-
-	.project-tabs::-webkit-scrollbar-thumb:hover {
-		background: oklch(0.45 0.02 250);
-	}
-
-	.project-tab {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 0.25rem;
-		padding: 0.625rem 1rem;
-		background: oklch(0.18 0.01 250);
-		border: 2px solid transparent;
-		border-radius: 0.5rem;
-		cursor: pointer;
-		transition: all 0.15s ease;
-		min-width: 100px;
-		/* Prevent shrinking when scrolling */
-		flex-shrink: 0;
-	}
-
-	.project-tab:hover {
-		background: oklch(0.22 0.01 250);
-		border-color: oklch(0.35 0.02 250);
-	}
-
-	.project-tab.active {
-		background: color-mix(
-			in oklch,
-			var(--project-color) 15%,
-			oklch(0.18 0.01 250)
-		);
-		border-color: var(--project-color);
-		box-shadow: 0 0 12px
-			color-mix(in oklch, var(--project-color) 30%, transparent);
-	}
-
-	.project-tab-name {
-		font-size: 0.9375rem;
-		font-weight: 600;
-		font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-			monospace;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		padding: 0.375rem 0.75rem;
-		border-radius: 0.375rem;
-		/* Use CSS custom property for project color */
-		background: color-mix(in oklch, var(--project-color) 15%, transparent);
-		border: 1px solid
-			color-mix(in oklch, var(--project-color) 35%, transparent);
-		color: var(--project-color);
-		transition: all 0.15s ease;
-	}
-
-	.project-tab:hover .project-tab-name {
-		background: color-mix(in oklch, var(--project-color) 25%, transparent);
-		border-color: color-mix(
-			in oklch,
-			var(--project-color) 50%,
-			transparent
-		);
-	}
-
-	.project-tab.active .project-tab-name {
-		background: color-mix(in oklch, var(--project-color) 30%, transparent);
-		border-color: color-mix(
-			in oklch,
-			var(--project-color) 60%,
-			transparent
-		);
-		box-shadow: 0 0 8px
-			color-mix(in oklch, var(--project-color) 30%, transparent);
-	}
-
-	.project-tab-agents {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 0.25rem;
-		flex-wrap: wrap;
-		max-width: 120px;
-	}
-
-	.project-tab-counts {
-		display: flex;
-		align-items: center;
-		gap: 0.375rem;
-	}
-
-	.tab-count {
-		font-size: 0.6875rem;
-		font-weight: 500;
-		padding: 0.0625rem 0.375rem;
-		border-radius: 9999px;
-	}
-
-	.tab-count.sessions {
-		background: oklch(0.55 0.15 145 / 0.2);
-		color: oklch(0.75 0.15 145);
-	}
-
-	.tab-count.tasks {
-		background: oklch(0.55 0.15 200 / 0.2);
-		color: oklch(0.75 0.15 200);
-	}
-
-	.tab-count.paused {
-		background: oklch(0.55 0.18 55 / 0.25);
-		color: oklch(0.8 0.15 55);
-		border: 1px solid oklch(0.55 0.18 55 / 0.4);
-	}
-
-	/* Add Project Button */
-	.add-project-tab {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: 0.625rem 1rem;
-		min-width: 60px;
-		background: oklch(0.16 0.01 250);
-		border: 2px dashed oklch(0.30 0.02 250);
-		border-radius: 0.5rem;
-		cursor: pointer;
-		transition: all 0.15s ease;
-		flex-shrink: 0;
-	}
-
-	.add-project-tab:hover {
-		background: oklch(0.20 0.01 250);
-		border-color: oklch(0.45 0.02 250);
-	}
-
-	.add-project-tab:hover .add-project-icon {
-		color: oklch(0.75 0.15 200);
-	}
-
-	.add-project-icon {
-		width: 1.5rem;
-		height: 1.5rem;
-		color: oklch(0.45 0.02 250);
-		transition: color 0.15s ease;
 	}
 
 	/* Project Content Area */
@@ -2631,26 +2106,6 @@
 		gap: 1rem;
 	}
 
-	/* Project Tabs Skeleton */
-	.project-tabs-skeleton {
-		display: flex;
-		gap: 0.5rem;
-		padding: 0.5rem;
-		background: oklch(0.16 0.01 250);
-		border-radius: 0.5rem;
-		border: 1px solid oklch(0.22 0.02 250);
-	}
-
-	.skeleton-tab {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 0.375rem;
-		padding: 0.5rem 1rem;
-		background: oklch(0.18 0.01 250);
-		border-radius: 0.375rem;
-	}
-
 	/* Section Skeleton */
 	.section-skeleton {
 		background: oklch(0.14 0.01 250);
@@ -2732,7 +2187,7 @@
 		gap: 1.5rem;
 	}
 
-	/* Add task button for empty state - matches add-project-tab pattern */
+	/* Add task button for empty state */
 	.add-task-empty-btn {
 		display: flex;
 		flex-direction: column;
@@ -2788,70 +2243,4 @@
 		background: oklch(0.3 0.02 250);
 	}
 
-	/* Project Tab Context Menu */
-	.project-context-menu {
-		position: fixed;
-		z-index: 100;
-		min-width: 200px;
-		background: oklch(0.18 0.02 250);
-		border: 1px solid oklch(0.28 0.02 250);
-		border-radius: 0.5rem;
-		padding: 0.375rem;
-		box-shadow: 0 10px 30px oklch(0.05 0 0 / 0.5);
-		animation: projectCtxIn 0.1s ease;
-	}
-
-	.project-context-menu-hidden {
-		display: none;
-	}
-
-	@keyframes projectCtxIn {
-		from { opacity: 0; transform: scale(0.95); }
-		to { opacity: 1; transform: scale(1); }
-	}
-
-	.project-context-menu-header {
-		padding: 0.375rem 0.75rem;
-		font-size: 0.6875rem;
-		font-weight: 700;
-		letter-spacing: 0.08em;
-		color: oklch(0.55 0.02 250);
-	}
-
-	.project-context-menu-item {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		width: 100%;
-		padding: 0.5rem 0.75rem;
-		border: none;
-		background: transparent;
-		color: oklch(0.80 0.02 250);
-		font-size: 0.8125rem;
-		text-align: left;
-		border-radius: 0.375rem;
-		cursor: pointer;
-		transition: all 0.1s ease;
-	}
-
-	.project-context-menu-item:hover {
-		background: oklch(0.25 0.02 250);
-	}
-
-	.project-context-menu-item svg {
-		width: 14px;
-		height: 14px;
-		flex-shrink: 0;
-		color: oklch(0.60 0.02 250);
-	}
-
-	.project-context-menu-item:hover svg {
-		color: oklch(0.75 0.02 250);
-	}
-
-	.project-context-menu-divider {
-		height: 1px;
-		background: oklch(0.28 0.02 250);
-		margin: 0.375rem 0;
-	}
 </style>

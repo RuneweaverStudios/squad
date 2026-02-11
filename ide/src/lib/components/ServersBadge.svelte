@@ -308,7 +308,7 @@
 	onmouseleave={handleMouseLeave}
 >
 	<span
-		class="px-2 py-0.5 rounded text-xs font-mono flex items-center gap-1.5 transition-all duration-300 cursor-pointer"
+		class="h-7 px-2 py-0.5 rounded text-xs font-mono flex items-center gap-1.5 transition-all duration-300 cursor-pointer"
 		style="
 			background: oklch(0.18 0.01 250);
 			border: 1px solid {runningCount > 0

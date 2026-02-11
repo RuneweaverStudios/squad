@@ -1065,32 +1065,36 @@
 									{:else}
 										<!-- No task - planning pill matching agentPill aesthetic -->
 										{@const planningColor = effectiveState === 'planning' ? 'oklch(0.68 0.20 270)' : (rowProjectColor || 'oklch(0.50 0.02 250)')}
-										<div class="inline-flex flex-col items-start">
-											<button
-												class="planning-pill {isNew ? 'tracking-in-expand' : ''}"
-												style="background: color-mix(in oklch, {planningColor} 12%, transparent); border: 1px solid color-mix(in oklch, {planningColor} 30%, transparent); color: {planningColor};{isNew ? ' animation-delay: 100ms;' : ''}"
-												onclick={(e) => e.stopPropagation()}
-											>
-												<AgentAvatar name={sessionAgentName} size={20} showRing={true} sessionState={effectiveState} showGlow={true} exiting={isExiting} />
-												<span>{sessionAgentName}</span>
-											</button>
-											{#if derivedProject}
-												<div class="flex items-center gap-1 mt-0.5 ml-8">
-													<span
-														class="planning-project-tag"
-														style="color: {rowProjectColor || 'oklch(0.55 0.02 250)'};"
-													>
-														{derivedProject}
-													</span>
-												</div>
-											{/if}
+										<div class="badge-and-text">
+											<div class="inline-flex flex-col items-start flex-shrink-0">
+												<button
+													class="planning-pill {isNew ? 'tracking-in-expand' : ''}"
+													style="background: color-mix(in oklch, {planningColor} 12%, transparent); border: 1px solid color-mix(in oklch, {planningColor} 30%, transparent); color: {planningColor};{isNew ? ' animation-delay: 100ms;' : ''}"
+													onclick={(e) => e.stopPropagation()}
+												>
+													<AgentAvatar name={sessionAgentName} size={20} showRing={true} sessionState={effectiveState} showGlow={true} exiting={isExiting} />
+													<span>{sessionAgentName}</span>
+												</button>
+												{#if derivedProject}
+													<div class="flex items-center gap-1 mt-0.5 ml-8">
+														<span
+															class="planning-project-tag"
+															style="color: {rowProjectColor || 'oklch(0.55 0.02 250)'};"
+														>
+															{derivedProject}
+														</span>
+													</div>
+												{/if}
+											</div>
+											<div class="text-column">
+												{#if effectiveState === 'planning'}
+													<span class="planning-title">Planning session</span>
+													<div class="planning-description">Interactive brainstorming — no task assigned</div>
+												{:else}
+													<span class="no-task-label">No active task</span>
+												{/if}
+											</div>
 										</div>
-										{#if effectiveState === 'planning'}
-											<span class="planning-title">Planning session</span>
-											<div class="planning-description">Interactive brainstorming — no task assigned</div>
-										{:else}
-											<span class="no-task-label">No active task</span>
-										{/if}
 									{/if}
 								</div>
 							{/if}

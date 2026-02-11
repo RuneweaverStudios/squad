@@ -491,7 +491,7 @@
 
 <!-- Quick Actions Button (visible in navbar) - Industrial -->
 <button
-	class="px-2 py-1 rounded text-xs font-mono flex items-center gap-1.5 transition-all hover:scale-105"
+	class="h-7 px-2 py-1 rounded text-xs font-mono flex items-center gap-1.5 transition-all hover:scale-105"
 	style="
 		background: oklch(0.18 0.01 250);
 		border: 1px solid oklch(0.35 0.02 250);

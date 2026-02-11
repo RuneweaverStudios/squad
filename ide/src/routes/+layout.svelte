@@ -247,21 +247,14 @@
 		initKeyboardShortcuts(); // Initialize keyboard shortcuts from localStorage
 		initNotifications(); // Initialize push notification system (favicon badge, title badge)
 		themeChange(false);
-		initProjectColors(); // Pre-fetch project colors for consistent task ID coloring
 		initSessionEvents(); // Initialize cross-page session events (BroadcastChannel)
-
-		// Register persistent connections with the connection manager
-		// The manager handles visibility-based connect/disconnect to avoid exhausting
-		// the browser's connection limit (6 per domain) when multiple tabs are open.
-		// Priority determines connection order when tab becomes visible (lower = first)
-		connectionIds = [
-			registerConnection('websocket', connectWebSocket, disconnectWebSocket, 5),
-			registerConnection('session-events-sse', connectSessionEvents, disconnectSessionEvents, 10),
-			registerConnection('task-events-sse', connectTaskEvents, disconnectTaskEvents, 15)
-		];
 
 		// Phase 1: Critical data for initial render (fast, no usage data)
 		// Use loadAllTasksFast instead of loadAllTasks to avoid 2-4s token aggregation
+		// IMPORTANT: Load data BEFORE registering persistent connections.
+		// Firefox limits HTTP/1.1 to 6 connections per origin. SSE (2) + WebSocket (1)
+		// consume 3 slots permanently, leaving only 3 for fetches. By loading data first
+		// we use all 6 slots for fast parallel fetches, then open persistent connections.
 		await Promise.all([
 			loadAllTasksFast(),
 			loadReadyTaskCount(),
@@ -269,33 +262,47 @@
 			loadStateCounts()
 		]);
 
-		// Phase 2: Non-critical data (deferred, doesn't block render)
-		// These can load in background after page is interactive
+		// Phase 1.5: Register persistent connections AFTER critical data is loaded
+		// These occupy 3 of Firefox's 6 HTTP/1.1 connection slots permanently.
+		// By deferring them we ensure Phase 1 fetches complete without contention.
+		connectionIds = [
+			registerConnection('websocket', connectWebSocket, disconnectWebSocket, 5),
+			registerConnection('session-events-sse', connectSessionEvents, disconnectSessionEvents, 10),
+			registerConnection('task-events-sse', connectTaskEvents, disconnectTaskEvents, 15)
+		];
+
+		// Phase 2: Non-critical data (deferred 2s to let page render + components settle)
+		// IMPORTANT: 100ms delay is effectively zero — components also mount during onMount
+		// and fire their own fetches (TopBar, ActivityBadge, UserProfile, VoiceInput, etc.)
+		// A 2s delay ensures Phase 1 + SSE connections are fully established before
+		// Phase 2 adds more requests to the connection queue.
 		setTimeout(() => {
+			initProjectColors(); // Deferred - fires /api/projects/colors fetch
 			loadEpicsWithReady();
 			loadReviewRules();
 			loadSparklineData();
-			loadAutoKillConfig(); // Load user's auto-kill settings for session cleanup
-			startGitStatusPolling(30000); // Poll git status every 30 seconds for push badge
-			checkIngestAutoStart(); // Auto-start ingest daemon if configured
-		}, 100);
+			loadAutoKillConfig();
+			startGitStatusPolling(30000);
+			checkIngestAutoStart();
+		}, 2000);
 
-		// Phase 3: Expensive usage data (heavily deferred, runs after user has had time to interact)
-		// loadAllTasks parses ~40K lines of JSONL files and takes 7+ seconds
+		// Phase 3: Expensive usage data (heavily deferred)
 		setTimeout(() => {
-			loadAllTasks(); // Full data with usage (expensive, background)
+			loadAllTasks();
 		}, 30000);
 
-		// Load sessions for activity polling
-		fetchWorkSessions(); // Don't await - page can render without it
+		// Phase 2b: Session/server counts for sidebar badges (3s delay)
+		// These compete with component-initiated fetches for connection slots
+		setTimeout(() => {
+			fetchWorkSessions();
+			loadSessionsCount();
+			loadServersCount();
+			loadAgentSessionsCount();
+		}, 3000);
 
-		// Load sessions and servers count for sidebar badges
-		loadSessionsCount();
-		loadServersCount();
-		loadAgentSessionsCount();
-
-		// Activity polling - 500ms is responsive enough, 200ms was too aggressive
-		startActivityPolling(500);
+		// Activity polling (deferred 1s) - 500ms interval, 200ms was too aggressive
+		// Fires an immediate fetch on start, so delay to avoid competing with Phase 1
+		setTimeout(() => startActivityPolling(500), 1000);
 
 	});
 

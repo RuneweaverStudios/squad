@@ -208,102 +208,53 @@ async function initializeJat(projectPath) {
 }
 
 /**
- * Get task counts for a project from lib/tasks.js
- * @param {string} projectPath
+ * Get task counts AND agent counts grouped by project in a SINGLE pass.
+ * Avoids the N+1 problem of calling getTasks() per project (which opens all DBs each time).
+ * Previously: 24 projects × getTasks() each opening 24 DBs = 576 DB opens + OOM.
+ * Now: 1 × getTasks() opening 24 DBs = 24 DB opens total.
+ *
+ * @returns {{ taskCounts: Map<string, {open: number, total: number}>, agentCounts: Map<string, {active: number, total: number}> }}
  */
-function getProjectTaskCounts(projectPath) {
+function getAllProjectStats() {
+	/** @type {Map<string, {open: number, total: number}>} */
+	const taskCounts = new Map();
+	/** @type {Map<string, {active: number, total: number}>} */
+	const agentCounts = new Map();
+
 	try {
-		// Extract project name from path for filtering by task ID prefix
-		const projectName = projectPath.split('/').pop();
-		const tasks = getTasks({ projectName });
-		const open = tasks.filter((/** @type {{status: string}} */ t) => t.status === 'open' || t.status === 'in_progress').length;
-		const total = tasks.length;
-		return { open, total };
-	} catch (err) {
-		console.error(`[getProjectTaskCounts] Error for ${projectPath}:`, /** @type {Error} */ (err).message);
-		return { open: 0, total: 0 };
-	}
-}
+		const allTasks = getTasks({});
+		for (const task of allTasks) {
+			// Extract project prefix from task ID (e.g., "jat-abc123" -> "jat")
+			const match = task.id?.match(/^([a-zA-Z0-9_-]+?)-([a-zA-Z0-9.]+)$/);
+			const projectName = match ? match[1] : (task.project || 'unknown');
 
-/**
- * Get agent count for a project
- * @param {string} projectPath
- */
-async function getProjectAgentCount(projectPath) {
-	try {
-		// Get project name from path (e.g., /home/jw/code/jat -> jat)
-		const projectName = projectPath.split('/').pop();
-
-		// Count active tmux sessions with jat-* prefix for this project
-		// Sessions are named jat-{AgentName}, and we need to check which ones
-		// are working on this project
-		let active = 0;
-
-		try {
-			const { stdout } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null', { timeout: 2000 });
-			const sessions = stdout.trim().split('\n').filter(s => s.startsWith('jat-'));
-
-			// For each session, check if it's working on this project by reading its agent file
-			for (const sessionName of sessions) {
-				const agentName = sessionName.replace('jat-', '');
-				// Check if this agent has an agent file in this project's .claude/sessions/
-				const sessionsDir = join(projectPath, '.claude', 'sessions');
-				const claudeDir = join(projectPath, '.claude');
-
-				// Look for any agent file containing this agent name
-				let foundInProject = false;
-
-				// Check sessions directory
-				if (existsSync(sessionsDir)) {
-					const entries = await readdir(sessionsDir);
-					for (const file of entries.filter(f => f.startsWith('agent-') && f.endsWith('.txt'))) {
-						const content = await readFile(join(sessionsDir, file), 'utf-8');
-						if (content.trim() === agentName) {
-							foundInProject = true;
-							break;
-						}
-					}
-				}
-
-				// Check legacy location if not found
-				if (!foundInProject && existsSync(claudeDir)) {
-					const entries = await readdir(claudeDir);
-					for (const file of entries.filter(f => f.startsWith('agent-') && f.endsWith('.txt'))) {
-						const content = await readFile(join(claudeDir, file), 'utf-8');
-						if (content.trim() === agentName) {
-							foundInProject = true;
-							break;
-						}
-					}
-				}
-
-				if (foundInProject) {
-					active++;
-				}
+			// Task counts
+			let taskEntry = taskCounts.get(projectName);
+			if (!taskEntry) {
+				taskEntry = { open: 0, total: 0 };
+				taskCounts.set(projectName, taskEntry);
 			}
-		} catch {
-			// tmux not available or no sessions
+			taskEntry.total++;
+			if (task.status === 'open' || task.status === 'in_progress') {
+				taskEntry.open++;
+			}
+
+			// Agent counts (from in_progress tasks with assignees)
+			if (task.status === 'in_progress' && task.assignee) {
+				let agentEntry = agentCounts.get(projectName);
+				if (!agentEntry) {
+					agentEntry = { active: 0, total: 0 };
+					agentCounts.set(projectName, agentEntry);
+				}
+				agentEntry.active++;
+				agentEntry.total++;
+			}
 		}
-
-		// Count total registered agents (all agent files)
-		let total = 0;
-		const sessionsDir = join(projectPath, '.claude', 'sessions');
-		const claudeDir = join(projectPath, '.claude');
-
-		if (existsSync(sessionsDir)) {
-			const entries = await readdir(sessionsDir);
-			total += entries.filter(f => f.startsWith('agent-') && f.endsWith('.txt')).length;
-		}
-
-		if (existsSync(claudeDir)) {
-			const entries = await readdir(claudeDir);
-			total += entries.filter(f => f.startsWith('agent-') && f.endsWith('.txt')).length;
-		}
-
-		return { active, total };
-	} catch {
-		return { active: 0, total: 0 };
+	} catch (err) {
+		console.error(`[getAllProjectStats] Error:`, /** @type {Error} */ (err).message);
 	}
+
+	return { taskCounts, agentCounts };
 }
 
 /**
@@ -380,39 +331,36 @@ async function getLastActivity(projectPath) {
 	let mostRecentMs = 0;
 	let agentActivityMs = 0;
 
-	// Check .jat/issues.jsonl first (most meaningful for task activity)
+	// Check .jat/tasks.db first (most meaningful for task activity)
 	try {
-		const jatFile = join(projectPath, '.jat', 'issues.jsonl');
-		if (existsSync(jatFile)) {
-			const stats = await stat(jatFile);
-			if (stats.mtimeMs > mostRecentMs) {
-				mostRecentMs = stats.mtimeMs;
+		const jatDb = join(projectPath, '.jat', 'tasks.db');
+		if (existsSync(jatDb)) {
+			const dbStats = await stat(jatDb);
+			if (dbStats.mtimeMs > mostRecentMs) {
+				mostRecentMs = dbStats.mtimeMs;
 			}
 		}
 	} catch {
-		// Ignore errors checking jat file
+		// Ignore errors checking task db
 	}
 
-	// Check .claude/sessions/agent-*.txt files (agent session activity)
-	// Only check sessions/ subdirectory (legacy .claude/agent-*.txt is deprecated)
+	// Check .claude/sessions/ DIRECTORY mtime for agent activity
+	// Previously stat'd every agent-*.txt file (570+ files in large projects = OOM risk).
+	// The directory mtime updates when any file inside is created/modified, so it's
+	// a reliable proxy for "most recent agent activity" with a single stat call.
 	const sessionsDir = join(projectPath, '.claude', 'sessions');
 	try {
 		if (existsSync(sessionsDir)) {
-			const entries = await readdir(sessionsDir);
-			const agentFiles = entries.filter(f => f.startsWith('agent-') && f.endsWith('.txt'));
-			for (const file of agentFiles) {
-				const stats = await stat(join(sessionsDir, file));
-				if (stats.mtimeMs > mostRecentMs) {
-					mostRecentMs = stats.mtimeMs;
-				}
-				// Track agent activity separately (for sorting when servers are running)
-				if (stats.mtimeMs > agentActivityMs) {
-					agentActivityMs = stats.mtimeMs;
-				}
+			const dirStats = await stat(sessionsDir);
+			if (dirStats.mtimeMs > mostRecentMs) {
+				mostRecentMs = dirStats.mtimeMs;
+			}
+			if (dirStats.mtimeMs > agentActivityMs) {
+				agentActivityMs = dirStats.mtimeMs;
 			}
 		}
 	} catch {
-		// Ignore errors checking agent files
+		// Ignore errors checking sessions directory
 	}
 
 	// Check git commit time
@@ -532,7 +480,13 @@ export async function GET({ url }) {
 		}
 
 		// Add stats if requested
+		// PERFORMANCE: Compute task/agent counts in a SINGLE pass instead of per-project.
+		// Previously called getTasks() per project (24x), each opening all 24 DBs = 576 DB opens.
+		// Now calls getTasks() once, groups by project = 24 DB opens total.
 		if (includeStats) {
+			// Single-pass: get all task counts and agent counts from one getTasks() call
+			const { taskCounts: taskCountsByProject, agentCounts: agentCountsByProject } = getAllProjectStats();
+
 			projects = await Promise.all(projects.map(async (project) => {
 				// Check if .jat/ directory exists
 				const jatDir = join(project.path, '.jat');
@@ -542,9 +496,11 @@ export async function GET({ url }) {
 				const hasClaudeMd = existsSync(join(project.path, 'CLAUDE.md')) ||
 					existsSync(join(project.path, 'AGENTS.md'));
 
-				const [tasks, agents, status, activityData] = await Promise.all([
-					getProjectTaskCounts(project.path),
-					getProjectAgentCount(project.path),
+				// Look up pre-computed counts (key is project name from config)
+				const tasks = taskCountsByProject.get(project.name) || { open: 0, total: 0 };
+				const agents = agentCountsByProject.get(project.name) || { active: 0, total: 0 };
+
+				const [status, activityData] = await Promise.all([
 					getServerStatus(project.name, project.port),
 					getLastActivity(project.path)
 				]);

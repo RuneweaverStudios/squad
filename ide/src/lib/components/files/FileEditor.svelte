@@ -625,9 +625,9 @@
 
 <!-- Unsaved Changes Confirmation Dialog -->
 {#if confirmClose}
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div class="confirm-overlay" onclick={handleCancelClose}>
-		<div class="confirm-dialog" onclick={(e) => e.stopPropagation()}>
+	<!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
+	<div class="confirm-overlay" onclick={handleCancelClose} onkeydown={(e) => { if (e.key === 'Escape') handleCancelClose(); }} role="presentation">
+		<div class="confirm-dialog" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()} role="dialog" tabindex="-1">
 			<div class="confirm-icon">
 				<svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -786,7 +786,7 @@
 				<button class="btn btn-sm" onclick={toggleHelp}>Close</button>
 			</div>
 		</div>
-		<div class="modal-backdrop bg-black/50" onclick={toggleHelp}></div>
+		<div class="modal-backdrop bg-black/50" onclick={toggleHelp} onkeydown={(e) => { if (e.key === 'Escape') toggleHelp(); }} role="presentation"></div>
 	</div>
 {/if}
 

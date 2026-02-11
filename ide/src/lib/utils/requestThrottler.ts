@@ -157,14 +157,17 @@ export async function throttledFetch(url: string, options?: RequestInit): Promis
 	// Track GET requests for deduplication
 	if (method === 'GET') {
 		inFlightRequests.set(cacheKey, requestPromise);
-		// Add no-op catch to prevent "Uncaught (in promise)" browser warnings
-		// The actual error handling is done by the caller - this just silences
-		// the warning that occurs when a Promise rejects before the caller
-		// has attached their catch handler (e.g., during abort)
-		requestPromise.catch(() => {});
-		requestPromise.finally(() => {
-			inFlightRequests.delete(cacheKey);
-		});
+		// Chain catch → finally to prevent "Uncaught (in promise)" browser warnings.
+		// IMPORTANT: These must be chained (not branched off requestPromise separately)
+		// because .finally() creates a new promise that re-rejects with the original
+		// error — if branched directly off requestPromise, that rejection is unhandled.
+		// Chaining ensures .catch() swallows the rejection before .finally() sees it.
+		// The actual error handling is done by the caller via the returned requestPromise.
+		requestPromise
+			.catch(() => {})
+			.finally(() => {
+				inFlightRequests.delete(cacheKey);
+			});
 	}
 
 	return requestPromise;

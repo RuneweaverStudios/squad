@@ -2442,11 +2442,6 @@
 		color: oklch(0.55 0.02 250);
 	}
 
-	.path-value {
-		color: oklch(0.70 0.02 250);
-		font-family: ui-monospace, monospace;
-	}
-
 	/* FilePathPicker modal adjustments */
 	.modal-dialog-picker {
 		min-width: 380px;

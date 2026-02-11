@@ -1484,6 +1484,9 @@
 
 		try {
 			// Use throttledFetch to prevent overwhelming server when multiple cards mount
+			// Short 5s timeout - resize is a UX enhancement, not critical.
+			// The default 30s timeout in throttledFetch can block HTTP connection slots,
+			// causing subsequent critical requests (like send input) to time out.
 			const response = await throttledFetch(
 				`/api/work/${encodeURIComponent(sessionName)}/resize`,
 				{
@@ -1493,6 +1496,7 @@
 						width: columns,
 						height: tmuxHeight,
 					}),
+					signal: AbortSignal.timeout(5000),
 				},
 			);
 

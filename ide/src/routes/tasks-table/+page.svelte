@@ -44,6 +44,7 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let pollInterval: ReturnType<typeof setInterval> | null = null;
+	let taskTablePollInterval: ReturnType<typeof setInterval> | null = null;
 	let selectedSession = $state<string | null>(null);
 	let actionLoading = $state<string | null>(null);
 	let copiedCmd = $state<string | null>(null);
@@ -947,7 +948,7 @@
 			tick++;
 		}, 3000);
 		// Poll every 10 seconds for TaskTable data (less frequent)
-		setInterval(() => {
+		taskTablePollInterval = setInterval(() => {
 			fetchAllTaskTableData();
 		}, 10000);
 	});
@@ -955,6 +956,9 @@
 	onDestroy(() => {
 		if (pollInterval) {
 			clearInterval(pollInterval);
+		}
+		if (taskTablePollInterval) {
+			clearInterval(taskTablePollInterval);
 		}
 		if (outputPollInterval) {
 			clearInterval(outputPollInterval);

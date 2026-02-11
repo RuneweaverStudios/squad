@@ -206,9 +206,9 @@
 <svelte:window onkeydown={handleKeyDown} />
 
 {#if isOpen}
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div class="finder-overlay" onclick={onClose}>
-		<div class="finder-container" onclick={(e) => e.stopPropagation()}>
+	<!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
+	<div class="finder-overlay" onclick={onClose} onkeydown={(e) => { if (e.key === 'Escape') onClose(); }} role="presentation">
+		<div class="finder-container" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()} role="dialog" tabindex="-1">
 			<!-- Search Input -->
 			<div class="finder-input-container">
 				<svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
