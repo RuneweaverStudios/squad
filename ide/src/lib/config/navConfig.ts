@@ -16,13 +16,13 @@
  *   /config   - Config (JAT configuration, includes Projects tab)
  *
  * VIEWS (alternative visualizations):
+ *   /sessions - Sessions (all tmux sessions: agents, servers, other)
  *   /dash     - Dash (multi-project sessions view with terminal output)
  *   /graph    - Dependency visualization
  *   /timeline - Historical view
  *   /kanban   - Agent kanban (sessions grouped by activity state)
  *
  * LABS (experimental):
- *   /sessions - Sessions (all tmux sessions: agents, servers, other)
  *   /quick-commands - Commands (single-turn quick commands + templates)
  *   /schedules - Schedules (scheduled task management, scheduler service controls)
  *   /swarm    - Swarm attack interface
@@ -126,6 +126,13 @@ export const unifiedNavConfig: UnifiedNavConfig = {
 			category: 'views'
 		},
 		{
+			id: 'sessions',
+			label: 'Sessions',
+			href: '/sessions',
+			icon: 'tmux',
+			category: 'views'
+		},
+		{
 			id: 'graph',
 			label: 'Graph',
 			href: '/graph',
@@ -147,13 +154,6 @@ export const unifiedNavConfig: UnifiedNavConfig = {
 			category: 'views'
 		},
 		// LABS: Experimental features
-		{
-			id: 'sessions',
-			label: 'Sessions',
-			href: '/sessions',
-			icon: 'tmux',
-			category: 'labs'
-		},
 		{
 			id: 'quick-commands',
 			label: 'Commands',
