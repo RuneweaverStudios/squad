@@ -309,6 +309,7 @@
 		background: color-mix(in oklch, var(--project-color) 35%, transparent);
 		border-color: color-mix(in oklch, var(--project-color) 65%, transparent);
 		box-shadow: 0 0 10px color-mix(in oklch, var(--project-color) 25%, transparent);
+		transform: scale(1.15);
 	}
 
 	/* Main trigger button */

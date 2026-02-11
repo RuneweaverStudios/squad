@@ -66,6 +66,9 @@
 	let wizardPluginMetadata = $state<any>(null);
 	let editSource = $state<any>(null);
 
+	// Create Your Own - language toggle
+	let exampleLang = $state<'js' | 'ts'>('js');
+
 	// Template card definitions
 	const templates = [
 		{
