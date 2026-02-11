@@ -2,8 +2,8 @@
  * Connection Manager - Manages persistent connections based on page visibility
  *
  * Problem: Browsers limit concurrent connections per domain (typically 6 for HTTP/1.1).
- * Each browser tab creates multiple persistent connections (SSE, WebSocket).
- * With 3+ tabs open, connections exceed the limit and queue up, blocking HTTP requests.
+ * Each browser tab creates persistent WebSocket connections.
+ * With 3+ tabs open, connections can pile up and interfere with HTTP requests.
  *
  * Solution: Use the Page Visibility API to pause connections in background tabs.
  * Only the visible/focused tab maintains active connections.
@@ -12,7 +12,7 @@
  *   import { registerConnection, unregisterConnection, isPageVisible } from '$lib/utils/connectionManager';
  *
  *   // Register a connection with connect/disconnect callbacks
- *   const id = registerConnection('session-events', connectSSE, disconnectSSE);
+ *   const id = registerConnection('websocket', connectWS, disconnectWS);
  *
  *   // On cleanup
  *   unregisterConnection(id);

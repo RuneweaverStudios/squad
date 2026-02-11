@@ -325,7 +325,7 @@ export const AUTOMATION_PRESETS: AutomationPreset[] = [
 			name: 'Auto-Pause After Reply',
 			description:
 				'Detects when an agent emits a reply signal and pauses the session so it can be resumed when the user responds',
-			enabled: false,
+			enabled: true,
 			patterns: [
 				{
 					pattern: 'jat-signal reply',

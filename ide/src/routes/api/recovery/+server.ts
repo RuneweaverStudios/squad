@@ -19,6 +19,7 @@ import { json } from '@sveltejs/kit';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
+import { readdir, readFile, stat } from 'fs/promises';
 import { join } from 'path';
 import type { RequestHandler } from './$types';
 
@@ -143,8 +144,10 @@ async function getInProgressTasks(projectPath: string): Promise<Task[]> {
 
 /**
  * Build a map of agent name -> session ID from .claude/sessions/agent-*.txt files
+ * Uses async I/O to avoid blocking the event loop (583+ files in large projects).
+ * Only looks up specific agent names to avoid reading all files.
  */
-function buildAgentSessionMap(projectPath: string): Map<string, { sessionId: string; lastActivity: string }> {
+async function buildAgentSessionMap(projectPath: string, agentNames?: Set<string>): Promise<Map<string, { sessionId: string; lastActivity: string }>> {
 	const sessionsDir = join(projectPath, '.claude', 'sessions');
 	const map = new Map<string, { sessionId: string; lastActivity: string }>();
 
@@ -153,28 +156,41 @@ function buildAgentSessionMap(projectPath: string): Map<string, { sessionId: str
 	}
 
 	try {
-		const files = readdirSync(sessionsDir);
-		for (const file of files) {
-			// Match agent-{sessionId}.txt but not agent-*-activity.jsonl
-			const match = file.match(/^agent-([a-f0-9-]+)\.txt$/);
-			if (!match) continue;
+		const files = await readdir(sessionsDir);
+		const agentFiles = files.filter(f => /^agent-[a-f0-9-]+\.txt$/.test(f));
 
-			const sessionId = match[1];
-			const filePath = join(sessionsDir, file);
+		// Process files in parallel batches to avoid overwhelming the event loop
+		const BATCH_SIZE = 50;
+		for (let i = 0; i < agentFiles.length; i += BATCH_SIZE) {
+			const batch = agentFiles.slice(i, i + BATCH_SIZE);
+			await Promise.all(batch.map(async (file) => {
+				const match = file.match(/^agent-([a-f0-9-]+)\.txt$/);
+				if (!match) return;
 
-			try {
-				const agentName = readFileSync(filePath, 'utf-8').trim();
-				const stats = statSync(filePath);
-				const lastActivity = stats.mtime.toISOString();
+				const sessionId = match[1];
+				const filePath = join(sessionsDir, file);
 
-				// Keep the most recent session for each agent
-				const existing = map.get(agentName);
-				if (!existing || new Date(lastActivity) > new Date(existing.lastActivity)) {
-					map.set(agentName, { sessionId, lastActivity });
+				try {
+					const agentName = (await readFile(filePath, 'utf-8')).trim();
+
+					// If we only need specific agents, skip the rest
+					if (agentNames && !agentNames.has(agentName)) return;
+
+					const stats = await stat(filePath);
+					const lastActivity = stats.mtime.toISOString();
+
+					// Keep the most recent session for each agent
+					const existing = map.get(agentName);
+					if (!existing || new Date(lastActivity) > new Date(existing.lastActivity)) {
+						map.set(agentName, { sessionId, lastActivity });
+					}
+				} catch {
+					// Skip unreadable files
 				}
-			} catch {
-				// Skip unreadable files
-			}
+			}));
+
+			// If we've found all requested agents, stop early
+			if (agentNames && map.size >= agentNames.size) break;
 		}
 	} catch {
 		// Directory read error
@@ -242,53 +258,60 @@ export const GET: RequestHandler = async ({ url }) => {
 			? [singleProject]
 			: getConfiguredProjects();
 
-		// Get active tmux sessions
+		// Get active tmux sessions (fast, single exec call)
 		const activeSessions = await getActiveTmuxSessions();
 
-		// Find recoverable sessions across ALL projects
+		// Process ALL projects in parallel (was sequential — 19 projects × ~700ms each = 13s)
+		const projectResults = await Promise.all(
+			projectPaths.map(async (projectPath) => {
+				// Get in_progress tasks with assignees for this project
+				const inProgressTasks = await getInProgressTasks(projectPath);
+
+				// Filter to only agents without active tmux sessions
+				const needsRecovery = inProgressTasks.filter(
+					(t) => t.assignee && !activeSessions.has(t.assignee)
+				);
+
+				if (needsRecovery.length === 0) {
+					return { projectPath, tasks: inProgressTasks, recoverable: [] as RecoverableSession[] };
+				}
+
+				// Only build session map for agents that actually need recovery
+				// (targeted lookup avoids reading all 583+ agent files)
+				const neededAgents = new Set(needsRecovery.map((t) => t.assignee!));
+				const agentSessionMap = await buildAgentSessionMap(projectPath, neededAgents);
+
+				const recoverable: RecoverableSession[] = needsRecovery.map((task) => {
+					const agentName = task.assignee!;
+					const sessionInfo = agentSessionMap.get(agentName);
+
+					// Skip expensive JSONL fallback — agent-*.txt files are the authoritative source.
+					// If no .txt file exists, mark as orphaned (resumable=false) instead of scanning GBs of JSONL.
+
+					return {
+						agentName,
+						sessionId: sessionInfo?.sessionId || null,
+						resumable: !!sessionInfo,
+						taskId: task.id,
+						taskTitle: task.title,
+						taskPriority: task.priority,
+						project: getProjectFromTaskId(task.id),
+						projectPath,
+						lastActivity: sessionInfo?.lastActivity || new Date().toISOString()
+					};
+				});
+
+				return { projectPath, tasks: inProgressTasks, recoverable };
+			})
+		);
+
+		// Aggregate results
 		const recoverable: RecoverableSession[] = [];
 		let totalInProgressTasks = 0;
 
-		for (const projectPath of projectPaths) {
-			// Get in_progress tasks with assignees for this project
-			const inProgressTasks = await getInProgressTasks(projectPath);
-			totalInProgressTasks += inProgressTasks.length;
-
-			// Build agent -> session mapping for this project
-			const agentSessionMap = buildAgentSessionMap(projectPath);
-
-			// Find recoverable sessions:
-			// - Task is in_progress with an assignee
-			// - Agent session file exists (we have the session ID) OR can find via JSONL
-			// - No active tmux session for this agent
-			for (const task of inProgressTasks) {
-				const agentName = task.assignee;
-				if (!agentName) continue;
-
-				// Check if tmux session is NOT active
-				if (activeSessions.has(agentName)) continue;
-
-				// Check if we have a session ID for this agent (from agent-*.txt files)
-				let sessionInfo = agentSessionMap.get(agentName);
-
-				// Fallback: search JSONL files if no agent-*.txt mapping exists
-				if (!sessionInfo) {
-					sessionInfo = findSessionIdFromJsonl(agentName, projectPath) || undefined;
-				}
-
-				// Include task even without session ID - it's still "paused" (orphaned)
-				recoverable.push({
-					agentName,
-					sessionId: sessionInfo?.sessionId || null,
-					resumable: !!sessionInfo,
-					taskId: task.id,
-					taskTitle: task.title,
-					taskPriority: task.priority,
-					project: getProjectFromTaskId(task.id),
-					projectPath,
-					lastActivity: sessionInfo?.lastActivity || new Date().toISOString()
-				});
-			}
+		for (const result of projectResults) {
+			totalInProgressTasks += result.tasks.length;
+			recoverable.push(...result.recoverable);
 		}
 
 		// Sort by priority (lower = higher priority), then by last activity (most recent first)
@@ -336,7 +359,12 @@ export const POST: RequestHandler = async ({ request, url, fetch }) => {
 
 		for (const projectPath of projectPaths) {
 			const inProgressTasks = await getInProgressTasks(projectPath);
-			const agentSessionMap = buildAgentSessionMap(projectPath);
+			const neededAgents = new Set(
+				inProgressTasks
+					.filter((t) => t.assignee && !activeSessions.has(t.assignee))
+					.map((t) => t.assignee!)
+			);
+			const agentSessionMap = await buildAgentSessionMap(projectPath, neededAgents);
 
 			for (const task of inProgressTasks) {
 				const agentName = task.assignee;
@@ -344,12 +372,7 @@ export const POST: RequestHandler = async ({ request, url, fetch }) => {
 				if (activeSessions.has(agentName)) continue;
 
 				// Check if we have a session ID for this agent (from agent-*.txt files)
-				let sessionInfo = agentSessionMap.get(agentName);
-
-				// Fallback: search JSONL files if no agent-*.txt mapping exists
-				if (!sessionInfo) {
-					sessionInfo = findSessionIdFromJsonl(agentName, projectPath) || undefined;
-				}
+				const sessionInfo = agentSessionMap.get(agentName);
 
 				// If specific sessions requested, filter
 				if (specificSessions && !specificSessions.includes(agentName)) continue;

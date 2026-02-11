@@ -664,15 +664,29 @@
 		);
 	}
 
-	async function fetchAllData() {
+	// Critical data for initial render (tasks + sessions clear the loading skeleton)
+	async function fetchCriticalData() {
+		await Promise.all([
+			fetchTasks(),
+			fetchSessions(),
+			fetchAgentProjects(),
+		]);
+	}
+
+	// Non-critical data (colors, notes, project order, recovery)
+	async function fetchSupplementalData() {
 		await Promise.all([
 			fetchProjectOrder(),
-			fetchAgentProjects(),
 			fetchProjectColors(),
 			fetchProjectNotes(),
-			fetchTasks(),
-			fetchRecoverableSessions(),
-			fetchSessions(),
+		]);
+	}
+
+	// Full refresh (used by actions that change state, NOT for polling)
+	async function fetchAllData() {
+		await Promise.all([
+			fetchCriticalData(),
+			fetchSupplementalData(),
 		]);
 	}
 
@@ -968,7 +982,19 @@
 
 	onMount(() => {
 		loadCollapseState();
-		fetchAllData();
+
+		// Phase 1: Critical data for initial render (clears loading skeleton ASAP)
+		fetchCriticalData();
+
+		// Phase 2: Non-critical data after a short delay (reduces server contention)
+		setTimeout(() => {
+			fetchSupplementalData();
+		}, 1500);
+
+		// Phase 3: Recovery data (expensive, 12+ seconds) — load once after initial render
+		setTimeout(() => {
+			fetchRecoverableSessions();
+		}, 5000);
 
 		// Auto-open drawer for new users from /setup
 		const params = new URL(window.location.href).searchParams;
@@ -979,11 +1005,13 @@
 			history.replaceState({}, '', '/tasks');
 		}
 
+		// Poll critical data only (not recovery or supplemental) at a relaxed interval.
+		// WebSocket events already trigger refreshes for session/task changes.
 		pollInterval = setInterval(() => {
 			// Skip fetch when page is hidden to avoid Content-Length mismatch errors
 			if (document.visibilityState === 'hidden') return;
-			fetchAllData();
-		}, 5000);
+			fetchCriticalData();
+		}, 15000);
 	});
 
 	onDestroy(() => {

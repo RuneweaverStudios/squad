@@ -118,7 +118,7 @@
 	let multiProjectData = $state<MultiProjectDataPoint[]>([]);
 	let projectColors = $state<Record<string, string>>({});
 
-	// React to real-time task events from SSE (plays sound and refreshes data instantly)
+	// React to real-time task events from WS (plays sound and refreshes data instantly)
 	$effect(() => {
 		const event = $lastTaskEvent;
 		if (!event) return;
@@ -249,20 +249,13 @@
 		themeChange(false);
 		initSessionEvents(); // Initialize cross-page session events (BroadcastChannel)
 
-		// Phase 1: Critical data for initial render (fast, no usage data)
-		// Use loadAllTasksFast instead of loadAllTasks to avoid 2-4s token aggregation
-		// IMPORTANT: Load data BEFORE registering the persistent WebSocket connection.
-		// Firefox limits HTTP/1.1 to 6 connections per origin. The single WebSocket
-		// consumes 1 slot permanently (session/task events are now WS channel subscriptions,
-		// not separate SSE connections). Loading data first maximizes available slots.
-		await Promise.all([
-			loadAllTasksFast(),
-			loadReadyTaskCount(),
-			loadConfigProjects(),
-			loadStateCounts()
-		]);
+		// Phase 1: Only load config projects (needed for route guard + redirect).
+		// Keep this minimal — the root +page.svelte also fetches projects for redirect,
+		// and the tasks page loads its own data. Fewer concurrent requests = faster first paint.
+		// Skip stats=true here (can take 2+ seconds on cold start) — refresh with stats later.
+		await loadConfigProjects(3, false);
 
-		// Phase 1.5: Register persistent WebSocket connection AFTER critical data is loaded.
+		// Phase 1.5: Register persistent WebSocket connection AFTER config is loaded.
 		// Session events and task events now subscribe to WS channels (no separate HTTP connections),
 		// so they connect/disconnect alongside the WebSocket rather than as separate managed connections.
 		connectionIds = [
@@ -277,12 +270,17 @@
 			}, 5)
 		];
 
-		// Phase 2: Non-critical data (deferred 2s to let page render + components settle)
-		// IMPORTANT: 100ms delay is effectively zero — components also mount during onMount
-		// and fire their own fetches (TopBar, ActivityBadge, UserProfile, VoiceInput, etc.)
-		// A 2s delay ensures Phase 1 + SSE connections are fully established before
-		// Phase 2 adds more requests to the connection queue.
+		// Phase 2: Layout data needed for TopBar/sidebar (after redirect completes).
+		// Stagger to avoid contending with the tasks page's initial fetches.
 		setTimeout(() => {
+			loadAllTasksFast();
+			loadReadyTaskCount();
+			loadStateCounts();
+		}, 1500);
+
+		// Phase 3: Non-critical data (colors, sparkline, epics, etc.)
+		setTimeout(() => {
+			loadConfigProjects(1, true); // Re-fetch with stats for activity-based sorting
 			initProjectColors(); // Deferred - fires /api/projects/colors fetch
 			loadEpicsWithReady();
 			loadReviewRules();
@@ -290,25 +288,24 @@
 			loadAutoKillConfig();
 			startGitStatusPolling(30000);
 			checkIngestAutoStart();
-		}, 2000);
+		}, 4000);
 
-		// Phase 3: Expensive usage data (heavily deferred)
+		// Phase 4: Expensive usage data (heavily deferred)
 		setTimeout(() => {
 			loadAllTasks();
 		}, 30000);
 
-		// Phase 2b: Session/server counts for sidebar badges (3s delay)
-		// These compete with component-initiated fetches for connection slots
+		// Phase 3b: Session/server counts for sidebar badges
 		setTimeout(() => {
 			fetchWorkSessions();
 			loadSessionsCount();
 			loadServersCount();
 			loadAgentSessionsCount();
-		}, 3000);
+		}, 5000);
 
-		// Activity polling (deferred 1s) - 500ms interval, 200ms was too aggressive
-		// Fires an immediate fetch on start, so delay to avoid competing with Phase 1
-		setTimeout(() => startActivityPolling(500), 1000);
+		// Activity polling (deferred until after initial data settles)
+		// 500ms interval for responsive UI, but delayed start to not compete with initial loads
+		setTimeout(() => startActivityPolling(500), 3000);
 
 	});
 
@@ -621,12 +618,13 @@
 
 	// Fetch visible projects from JAT config (with stats for sorting by activity)
 	// Retries on failure since network may not be ready during page load
-	async function loadConfigProjects(retries = 3) {
+	async function loadConfigProjects(retries = 3, withStats = false) {
 		try {
-			const response = await fetch('/api/projects?visible=true&stats=true');
+			const url = withStats ? '/api/projects?visible=true&stats=true' : '/api/projects?visible=true';
+			const response = await fetch(url);
 			const data = await response.json();
 			const projectsArray = data.projects || [];
-			// Extract project names from the config (already sorted by last activity)
+			// Extract project names from the config (sorted by last activity when stats=true)
 			configProjects = projectsArray.map((p: { name: string }) => p.name);
 
 			// Populate the projects cache for fileLinks.ts localhost URL utilities
@@ -645,7 +643,7 @@
 			console.error('Failed to fetch config projects:', error);
 			if (retries > 0) {
 				// Retry after a short delay (network may still be connecting)
-				setTimeout(() => loadConfigProjects(retries - 1), 1000);
+				setTimeout(() => loadConfigProjects(retries - 1, withStats), 1000);
 			} else {
 				configProjects = [];
 				configProjectsLoaded = true;
