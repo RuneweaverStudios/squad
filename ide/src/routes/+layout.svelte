@@ -22,8 +22,9 @@
 	import { successToast } from '$lib/stores/toasts.svelte';
 	import { initSessionEvents, closeSessionEvents, connectSessionEvents, disconnectSessionEvents, lastSessionEvent } from '$lib/stores/sessionEvents';
 	import { connectTaskEvents, disconnectTaskEvents, lastTaskEvent } from '$lib/stores/taskEvents';
-	import { connect as connectWebSocket, disconnect as disconnectWebSocket } from '$lib/stores/websocket.svelte';
-	import { registerConnection, unregisterConnection } from '$lib/utils/connectionManager';
+	import { connect as connectWebSocket, disconnect as disconnectWebSocket, subscribe as wsSubscribe, unsubscribe as wsUnsubscribe, setMessageRelay, setSubscriptionRouter, injectMessage, setFollowerConnected, subscribeDirect, unsubscribeDirect, type Channel } from '$lib/stores/websocket.svelte';
+	import { initLeaderElection, destroyLeaderElection, setWsCallbacks, relayToFollowers, onRelayedMessage, requestSubscribe, requestUnsubscribe, onRoleChange } from '$lib/utils/wsLeaderElection';
+	import { getExtraChannelsForRoute } from '$lib/config/wsChannelMap';
 	import { availableProjects, projectColorsStore, openTaskDrawer, openProjectDrawer, isTaskDetailDrawerOpen, taskDetailDrawerTaskId, closeTaskDetailDrawer, isEpicSwarmModalOpen, epicSwarmModalEpicId, isStartDropdownOpen, openStartDropdownViaKeyboard, closeStartDropdown, isFilePreviewDrawerOpen, filePreviewDrawerPath, filePreviewDrawerProject, filePreviewDrawerLine, closeFilePreviewDrawer, toggleTerminalDrawer, isDiffPreviewDrawerOpen, diffPreviewDrawerPath, diffPreviewDrawerProject, diffPreviewDrawerIsStaged, diffPreviewDrawerCommitHash, closeDiffPreviewDrawer, setGitAheadCount, setGitChangesCount, setActiveSessionsCount, setRunningServersCount, setActiveAgentSessionsCount, syncSidebarFromPreferences } from '$lib/stores/drawerStore';
 	import { hoveredSessionName, triggerCompleteFlash, jumpToSession } from '$lib/stores/hoveredSession';
 	import { get } from 'svelte/store';
@@ -237,8 +238,9 @@
 		}
 	}
 
-	// Track connection manager registrations for cleanup
-	let connectionIds: string[] = [];
+
+	// Track current route-specific channel subscriptions for selective subscribe/unsubscribe
+	let currentExtraChannels: Channel[] = [];
 
 	// Initialize theme-change, WebSocket, preferences, and load all tasks
 	onMount(async () => {
@@ -255,20 +257,49 @@
 		// Skip stats=true here (can take 2+ seconds on cold start) — refresh with stats later.
 		await loadConfigProjects(3, false);
 
-		// Phase 1.5: Register persistent WebSocket connection AFTER config is loaded.
-		// Session events and task events now subscribe to WS channels (no separate HTTP connections),
-		// so they connect/disconnect alongside the WebSocket rather than as separate managed connections.
-		connectionIds = [
-			registerConnection('websocket', () => {
-				connectWebSocket();
-				connectSessionEvents();
-				connectTaskEvents();
-			}, () => {
-				disconnectSessionEvents();
-				disconnectTaskEvents();
-				disconnectWebSocket();
-			}, 5)
-		];
+		// Phase 1.5: Initialize WebSocket with leader election.
+		// Only one browser tab holds the actual WS connection (the leader).
+		// Follower tabs receive messages via BroadcastChannel relay.
+		// Subscriptions are aggregated across all tabs by the leader.
+
+		// Wire WS control callbacks so leader election can manage the connection
+		setWsCallbacks({
+			connect: connectWebSocket,
+			disconnect: disconnectWebSocket,
+			subscribe: subscribeDirect,
+			unsubscribe: unsubscribeDirect
+		});
+
+		// Wire message relay: leader broadcasts received WS messages to followers
+		setMessageRelay(relayToFollowers);
+
+		// Wire subscription routing: subscribe/unsubscribe goes through leader election
+		setSubscriptionRouter((channels, action) => {
+			if (action === 'subscribe') requestSubscribe(channels);
+			else requestUnsubscribe(channels);
+		});
+
+		// Wire follower message injection: BroadcastChannel messages → local WS handlers
+		onRelayedMessage(injectMessage);
+
+		// Handle role transitions (leader ↔ follower)
+		onRoleChange((role, _previousRole) => {
+			setFollowerConnected(role === 'follower');
+		});
+
+		// Start leader election — leader tab calls connectWebSocket() automatically
+		initLeaderElection();
+
+		// Register message handlers for session and task events.
+		// These call subscribe() internally which routes through leader election.
+		connectSessionEvents();
+		connectTaskEvents();
+
+		// Subscribe to route-specific channels (e.g., 'output' on /work, /tasks)
+		currentExtraChannels = getExtraChannelsForRoute($page.url.pathname);
+		if (currentExtraChannels.length > 0) {
+			wsSubscribe(currentExtraChannels);
+		}
 
 		// Phase 2: Layout data needed for TopBar/sidebar (after redirect completes).
 		// Stagger to avoid contending with the tasks page's initial fetches.
@@ -311,11 +342,33 @@
 
 	onDestroy(() => {
 		closeSessionEvents(); // Close cross-page BroadcastChannel
-		// Unregister all connections from the manager (handles disconnect)
-		connectionIds.forEach(id => unregisterConnection(id));
+		disconnectSessionEvents(); // Remove WS channel handlers
+		disconnectTaskEvents(); // Remove WS channel handlers
+		destroyLeaderElection(); // Resign leadership, close BroadcastChannel, disconnect WS
 		stopActivityPolling(); // Stop activity polling
 		stopGitStatusPolling(); // Stop git status polling for Files badge
 		clearAllBadges(); // Clear favicon and title badges on unmount
+	});
+
+	// Selective channel subscriptions: subscribe/unsubscribe 'output' channel on route changes.
+	// The 'output' channel is HIGH volume (~1 message/2s per session) and only needed on /work, /tasks.
+	$effect(() => {
+		const pathname = $page.url.pathname;
+		const newExtra = getExtraChannelsForRoute(pathname);
+
+		// Unsubscribe from channels no longer needed
+		const toUnsub = currentExtraChannels.filter(ch => !newExtra.includes(ch));
+		if (toUnsub.length > 0) {
+			wsUnsubscribe(toUnsub);
+		}
+
+		// Subscribe to newly needed channels
+		const toSub = newExtra.filter(ch => !currentExtraChannels.includes(ch));
+		if (toSub.length > 0) {
+			wsSubscribe(toSub);
+		}
+
+		currentExtraChannels = newExtra;
 	});
 
 	// React to session events from other pages/tabs (e.g., session killed on /work)

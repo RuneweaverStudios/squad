@@ -121,6 +121,8 @@
 	let collapsedSubsections = $state<Map<string, Set<SubsectionType>>>(
 		new Map(),
 	);
+	// Track subsections the user has manually toggled (prevents auto-expand from fighting user intent)
+	let userToggledSubsections = new Set<string>(); // keys: "project:subsection"
 
 	// Epic collapse state (independent: each group can be expanded/collapsed separately)
 	// Uses Set of epic keys per project. "standalone" key used for tasks without an epic.
@@ -444,6 +446,7 @@
 		project: string,
 		subsection: SubsectionType,
 	) {
+		userToggledSubsections.add(`${project}:${subsection}`);
 		const projectSubsections =
 			collapsedSubsections.get(project) || new Set();
 		if (projectSubsections.has(subsection)) {
@@ -987,6 +990,43 @@
 
 		saveCollapseState();
 	}
+
+	// Reactively auto-expand paused/conversations subsections when data arrives.
+	// Fixes: selectProject() runs before recovery data loads, marking empty sections as collapsed.
+	// When data arrives later, the section stays collapsed even though it now has content.
+	// Respects user intent: if user manually toggled a section, don't override it.
+	// Resets the user-touched flag when a section empties (so it auto-expands on reappear).
+	$effect(() => {
+		if (!selectedProject) return;
+		const projectCollapsed = collapsedSubsections.get(selectedProject);
+		if (!projectCollapsed) return;
+
+		const paused = getProjectPausedSessions(selectedProject);
+		const hasWork = paused.some(s => s.taskType !== 'chat');
+		const hasChat = paused.some(s => s.taskType === 'chat');
+		let changed = false;
+
+		const chatKey = `${selectedProject}:conversations`;
+		const pausedKey = `${selectedProject}:paused`;
+
+		// Auto-expand when content appears (only if user hasn't manually toggled)
+		if (hasChat && projectCollapsed.has("conversations") && !userToggledSubsections.has(chatKey)) {
+			projectCollapsed.delete("conversations");
+			changed = true;
+		}
+		if (hasWork && projectCollapsed.has("paused") && !userToggledSubsections.has(pausedKey)) {
+			projectCollapsed.delete("paused");
+			changed = true;
+		}
+
+		// Reset user-touched flag when section empties (so it auto-expands if it reappears)
+		if (!hasChat) userToggledSubsections.delete(chatKey);
+		if (!hasWork) userToggledSubsections.delete(pausedKey);
+
+		if (changed) {
+			collapsedSubsections = new Map(collapsedSubsections);
+		}
+	});
 
 	onMount(() => {
 		loadCollapseState();

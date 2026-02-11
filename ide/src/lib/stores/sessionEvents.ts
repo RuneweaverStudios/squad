@@ -978,10 +978,13 @@ export function connectSessionEvents(): void {
 		}
 	});
 
-	console.log('[SessionEvents] Subscribing to WS channels: sessions, output');
+	console.log('[SessionEvents] Subscribing to WS channel: sessions');
 
-	// Subscribe to WS channels (queued if WS not yet connected)
-	subscribe(['sessions', 'output']);
+	// Subscribe to 'sessions' WS channel (queued if WS not yet connected).
+	// NOTE: 'output' channel subscription is managed by +layout.svelte based on
+	// current route (selective subscriptions). Output handlers are still registered
+	// here but only fire when the layout subscribes to 'output'.
+	subscribe(['sessions']);
 
 	// Register message handlers
 	unsubSessionsChannel = onMessage('sessions', handleWebSocketSessionMessage);
@@ -996,7 +999,7 @@ export function connectSessionEvents(): void {
  */
 export function disconnectSessionEvents(): void {
 	// Unsubscribe from WS channels
-	unsubscribe(['sessions', 'output']);
+	unsubscribe(['sessions']);
 
 	// Remove message handlers
 	if (unsubSessionsChannel) {

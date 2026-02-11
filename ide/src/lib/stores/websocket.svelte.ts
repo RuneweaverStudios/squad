@@ -5,6 +5,12 @@
  * Provides reactive state for connection status and channel subscriptions.
  * Handles automatic reconnection with exponential backoff.
  *
+ * Leader Election Integration:
+ *   When leader election is active (via setSubscriptionRouter + setMessageRelay),
+ *   only the leader tab holds the actual WS connection. Follower tabs receive
+ *   messages via BroadcastChannel relay through injectMessage().
+ *   subscribe()/unsubscribe() transparently route through leader election.
+ *
  * Usage:
  *   import { connect, subscribe, disconnect, getConnectionState } from '$lib/stores/websocket.svelte';
  *
@@ -82,6 +88,53 @@ let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 
 // Channels to resubscribe after reconnection
 let pendingSubscriptions: Channel[] = [];
+
+// ============================================================================
+// Leader Election Integration
+// ============================================================================
+
+/** Callback to relay messages to follower tabs (set by leader election) */
+let messageRelay: ((message: WebSocketMessage) => void) | null = null;
+
+/** Callback to route subscriptions through leader election */
+let subscriptionRouter: ((channels: Channel[], action: 'subscribe' | 'unsubscribe') => void) | null = null;
+
+/**
+ * Set a function to relay incoming WS messages to follower tabs.
+ * Called by layout when wiring up leader election.
+ * The relay function is called for every received WS message.
+ */
+export function setMessageRelay(relay: (message: WebSocketMessage) => void): void {
+	messageRelay = relay;
+}
+
+/**
+ * Set a function to route subscribe/unsubscribe through leader election.
+ * When set, subscribe() and unsubscribe() delegate to this function
+ * instead of sending directly over the WebSocket.
+ */
+export function setSubscriptionRouter(router: (channels: Channel[], action: 'subscribe' | 'unsubscribe') => void): void {
+	subscriptionRouter = router;
+}
+
+/**
+ * Inject a message into the handler pipeline without a real WS connection.
+ * Used by follower tabs to dispatch messages relayed via BroadcastChannel.
+ */
+export function injectMessage(message: WebSocketMessage): void {
+	state.lastMessageTime = new Date();
+
+	const channelHandlers = handlers.get(message.channel);
+	if (channelHandlers) {
+		channelHandlers.forEach(handler => {
+			try {
+				handler(message);
+			} catch (error) {
+				console.error(`[WS Client] Handler error for ${message.channel}:`, error);
+			}
+		});
+	}
+}
 
 // ============================================================================
 // Connection Management
@@ -163,9 +216,9 @@ function handleOpen(): void {
 	state.reconnectAttempts = 0;
 	state.lastError = null;
 
-	// Resubscribe to pending channels
+	// Resubscribe to pending channels (use raw subscribe, not routed)
 	if (pendingSubscriptions.length > 0) {
-		subscribe(pendingSubscriptions);
+		subscribeDirect(pendingSubscriptions);
 		pendingSubscriptions = [];
 	}
 }
@@ -177,6 +230,9 @@ function handleMessage(event: MessageEvent): void {
 	try {
 		const message: WebSocketMessage = JSON.parse(event.data);
 		state.lastMessageTime = new Date();
+
+		// Relay to follower tabs if leader election is active
+		messageRelay?.(message);
 
 		// Route to channel handlers
 		const channelHandlers = handlers.get(message.channel);
@@ -257,13 +313,12 @@ function scheduleReconnect(): void {
 // ============================================================================
 
 /**
- * Subscribe to channels
+ * Raw subscribe - sends directly over the WebSocket wire.
+ * Used internally and by leader election for aggregated subscriptions.
+ * Exported as subscribeDirect for leader election to call bypassing the router.
  */
-export function subscribe(channels: Channel[]): void {
-	if (!browser) return;
-
+export function subscribeDirect(channels: Channel[]): void {
 	if (!ws || ws.readyState !== WebSocket.OPEN) {
-		// Store for later when connected
 		pendingSubscriptions = [...new Set([...pendingSubscriptions, ...channels])];
 		console.log('[WS Client] Queued subscription for:', channels);
 		return;
@@ -280,11 +335,11 @@ export function subscribe(channels: Channel[]): void {
 }
 
 /**
- * Unsubscribe from channels
+ * Raw unsubscribe - sends directly over the WebSocket wire.
+ * Used internally and by leader election for aggregated subscriptions.
+ * Exported as unsubscribeDirect for leader election to call bypassing the router.
  */
-export function unsubscribe(channels: Channel[]): void {
-	if (!browser) return;
-
+export function unsubscribeDirect(channels: Channel[]): void {
 	if (!ws || ws.readyState !== WebSocket.OPEN) {
 		return;
 	}
@@ -297,6 +352,41 @@ export function unsubscribe(channels: Channel[]): void {
 	ws.send(JSON.stringify(message));
 	channels.forEach(ch => state.subscribedChannels.delete(ch));
 	console.log('[WS Client] Unsubscribed from:', channels);
+}
+
+/**
+ * Subscribe to channels.
+ * When leader election is active, routes through the leader for aggregation.
+ * Otherwise, sends directly over the WebSocket.
+ */
+export function subscribe(channels: Channel[]): void {
+	if (!browser) return;
+
+	if (subscriptionRouter) {
+		subscriptionRouter(channels, 'subscribe');
+		// Track locally for reactive state
+		channels.forEach(ch => state.subscribedChannels.add(ch));
+		return;
+	}
+
+	subscribeDirect(channels);
+}
+
+/**
+ * Unsubscribe from channels.
+ * When leader election is active, routes through the leader for aggregation.
+ * Otherwise, sends directly over the WebSocket.
+ */
+export function unsubscribe(channels: Channel[]): void {
+	if (!browser) return;
+
+	if (subscriptionRouter) {
+		subscriptionRouter(channels, 'unsubscribe');
+		channels.forEach(ch => state.subscribedChannels.delete(ch));
+		return;
+	}
+
+	unsubscribeDirect(channels);
 }
 
 // ============================================================================
@@ -372,17 +462,26 @@ export function isConnected(): boolean {
 	return state.connectionState === 'connected';
 }
 
+/**
+ * Mark state as connected (for follower tabs that receive data via relay).
+ * Follower tabs don't have a real WS but should appear "connected" since
+ * they receive messages through the leader.
+ */
+export function setFollowerConnected(connected: boolean): void {
+	state.connectionState = connected ? 'connected' : 'disconnected';
+}
+
 // Export state for direct reactive access
 export { state as websocketState };
 
 // ============================================================================
-// Auto-connect DISABLED - now managed by +layout.svelte via connectionManager
+// Auto-connect DISABLED - now managed by leader election + connectionManager
 // ============================================================================
 
-// Previously auto-connected on module import, but this caused issues with multiple tabs.
-// Each tab would create a WebSocket connection immediately, exhausting the browser's
-// connection limit (typically 6 per domain). Now managed centrally via connectionManager
-// which only connects when the tab is visible.
+// Connection lifecycle is managed by:
+// 1. Leader election (wsLeaderElection.ts) - determines WHICH tab connects
+// 2. ConnectionManager (connectionManager.ts) - handles visibility (legacy fallback)
+// 3. +layout.svelte - wires everything together
 //
-// Connection is initiated in +layout.svelte:
-//   registerConnection('websocket', connect, disconnect, 5);
+// Connection is initiated in +layout.svelte via leader election:
+//   initLeaderElection() → leader tab calls connect() automatically
