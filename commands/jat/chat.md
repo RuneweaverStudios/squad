@@ -121,11 +121,13 @@ jat-signal reply '{
 }'
 ```
 
-**Reply types:**
+**Reply types (use exactly ONE per response):**
 - `ack` - Acknowledgment (received, will look into it)
 - `answer` - Direct answer to a question
 - `progress` - Status update on ongoing work
-- `completion` - Final response, task is done
+- `completion` - Final response, task is done (then run `/jat:complete` instead of pausing)
+
+**IMPORTANT:** Send only ONE `jat-signal reply` per response. Do NOT send multiple signals with different replyTypes for the same message.
 
 ### STEP 7: Pause Session
 
@@ -168,8 +170,9 @@ This creates a conversational loop that continues until the task is closed.
 ## Completing a Chat Task
 
 If the conversation reaches a natural end (user says thanks, question answered, etc.):
-- Use `jat-signal reply` with `replyType: "completion"` for the final message
+- Use `jat-signal reply` with `replyType: "completion"` for the final message (ONE signal only)
 - Then run `/jat:complete` instead of pausing
+- Do NOT send an `answer` signal AND a `completion` signal — pick one based on whether the conversation is ending
 
 ---
 

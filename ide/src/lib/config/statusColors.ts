@@ -385,6 +385,12 @@ const ISSUE_TYPE_VISUALS: Record<string, IssueTypeVisual> = {
 		label: 'PERF',
 		accent: 'oklch(0.78 0.18 70)',      // Electric yellow
 		bgTint: 'oklch(0.78 0.18 70 / 0.08)'
+	},
+	chat: {
+		icon: '💬',
+		label: 'CHAT',
+		accent: 'oklch(0.72 0.16 200)',     // Conversational blue
+		bgTint: 'oklch(0.72 0.16 200 / 0.08)'
 	}
 };
 

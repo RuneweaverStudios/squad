@@ -96,6 +96,8 @@ interface RecoverableSession {
 	taskId: string;
 	taskTitle: string;
 	taskPriority: number;
+	taskType?: string;
+	taskDescription?: string;
 	project: string;
 	projectPath: string;
 	lastActivity: string;
@@ -104,9 +106,11 @@ interface RecoverableSession {
 interface Task {
 	id: string;
 	title: string;
+	description?: string;
 	status: string;
 	priority: number;
 	assignee?: string;
+	issue_type?: string;
 }
 
 /**
@@ -295,6 +299,8 @@ export const GET: RequestHandler = async ({ url }) => {
 						taskId: task.id,
 						taskTitle: task.title,
 						taskPriority: task.priority,
+						taskType: task.issue_type,
+						taskDescription: task.description,
 						project: getProjectFromTaskId(task.id),
 						projectPath,
 						lastActivity: sessionInfo?.lastActivity || new Date().toISOString()
@@ -385,6 +391,8 @@ export const POST: RequestHandler = async ({ request, url, fetch }) => {
 					taskId: task.id,
 					taskTitle: task.title,
 					taskPriority: task.priority,
+					taskType: task.issue_type,
+					taskDescription: task.description,
 					project: getProjectFromTaskId(task.id),
 					projectPath,
 					lastActivity: sessionInfo?.lastActivity || new Date().toISOString()

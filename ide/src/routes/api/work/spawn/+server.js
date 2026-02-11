@@ -488,8 +488,13 @@ function buildAgentCommand({ agent, model, projectPath, jatDefaults, agentName, 
 
 		let agentFlags = agent.flags ?? [];
 
-		// For plan mode, filter out permission-bypass flags (--permission-mode plan takes precedence)
-		if (mode === 'plan' && agent.command === 'claude') {
+		// For plan mode WITHOUT autonomous mode, filter out permission-bypass flags
+		// (--permission-mode plan takes precedence for non-autonomous sessions)
+		// When autonomous mode is enabled (via agent flags or JAT config), keep the flag
+		// so plan sessions can transition to implementation without permission prompts
+		const wantsAutonomous = jatDefaults.skip_permissions ||
+			(agent.flags ?? []).includes('--dangerously-skip-permissions');
+		if (mode === 'plan' && agent.command === 'claude' && !wantsAutonomous) {
 			agentFlags = agentFlags.filter(f => f !== '--dangerously-skip-permissions');
 		}
 
@@ -499,8 +504,7 @@ function buildAgentCommand({ agent, model, projectPath, jatDefaults, agentName, 
 		}
 
 		// For Claude Code specifically, handle skip_permissions from JAT config
-		// Skip this for plan mode since --permission-mode plan takes precedence
-		if (agent.command === 'claude' && jatDefaults.skip_permissions && mode !== 'plan') {
+		if (agent.command === 'claude' && jatDefaults.skip_permissions) {
 			// Only add if not already in flags
 			if (!agentFlags.includes('--dangerously-skip-permissions')) {
 				agentCmd += ' --dangerously-skip-permissions';
@@ -1065,8 +1069,17 @@ export async function POST({ request }) {
 						} else {
 							// Command was likely received, just taking time to show "is running"
 							// DO NOT send Ctrl-C - it will interrupt in-flight bash commands
-							console.log(`[spawn] Attempt ${attempt}: Command likely in progress, waiting...`);
-							await new Promise(resolve => setTimeout(resolve, 2000));
+							if (taskCommand === '/jat:start') {
+								// /jat:start is idempotent - safe to retry if needed
+								console.log(`[spawn] Attempt ${attempt}: Command likely in progress, waiting...`);
+								await new Promise(resolve => setTimeout(resolve, 2000));
+							} else {
+								// Custom commands (e.g. /jat:chat) may NOT be idempotent
+								// Re-sending would cause duplicate processing (triple replies, etc.)
+								// Treat as sent since it's no longer in the input buffer
+								commandSent = true;
+								console.log(`[spawn] Attempt ${attempt}: Custom command no longer in input buffer - treating as sent (no retry for non-idempotent commands)`);
+							}
 						}
 					}
 				} catch (err) {

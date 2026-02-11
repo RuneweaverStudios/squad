@@ -18,6 +18,7 @@
 		taskId: string;
 		taskTitle: string;
 		taskPriority: number;
+		taskType?: string;
 		taskDescription?: string;
 		project: string;
 		lastActivity?: string;
@@ -108,14 +109,15 @@
 			<tbody>
 				{#each sessions as session (session.taskId)}
 					{@const projectColor = projectColors[session.project] || 'oklch(0.70 0.15 200)'}
+					{@const isChat = session.taskType === 'chat'}
 					<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
-					<tr class="paused-row clickable" style="--project-color: {projectColor}" onclick={() => onViewTask?.(session.taskId)}>
+					<tr class="paused-row clickable" class:chat-row={isChat} style="--project-color: {projectColor}" onclick={() => onViewTask?.(session.taskId)}>
 						<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 						<td class="td-task" onclick={(e) => e.stopPropagation()}>
 							<div class="task-cell-content">
 								<div class="badge-and-text">
 									<TaskIdBadge
-										task={{ id: session.taskId, status: 'in_progress', priority: session.taskPriority }}
+										task={{ id: session.taskId, status: 'in_progress', priority: session.taskPriority, issue_type: session.taskType }}
 										size="sm"
 										variant="agentPill"
 										agentName={session.agentName}
@@ -212,6 +214,16 @@
 
 	.paused-row:hover {
 		background: linear-gradient(90deg, oklch(0.65 0.18 300 / 0.12), oklch(0.20 0.01 250 / 0.3) 50%);
+	}
+
+	/* Chat rows use conversational blue instead of purple */
+	.paused-row.chat-row {
+		background: linear-gradient(90deg, oklch(0.72 0.16 200 / 0.06), transparent 50%);
+		border-left: 3px solid oklch(0.72 0.16 200 / 0.5);
+	}
+
+	.paused-row.chat-row:hover {
+		background: linear-gradient(90deg, oklch(0.72 0.16 200 / 0.12), oklch(0.20 0.01 250 / 0.3) 50%);
 	}
 
 	/* Column widths matching TasksActive - wider action column for stacked elapsed time */

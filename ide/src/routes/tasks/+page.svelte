@@ -99,7 +99,10 @@
 		taskId: string;
 		taskTitle: string;
 		taskPriority: number;
+		taskType?: string;
+		taskDescription?: string;
 		project: string;
+		lastActivity?: string;
 	}
 	let recoverableSessions = $state<RecoverableSession[]>([]);
 
@@ -113,8 +116,8 @@
 	// Selected project (synced from URL ?project= param, managed by TopBar)
 	let selectedProject = $state<string | null>(null);
 
-	// Subsection collapse state per project (sessions/paused/tasks)
-	type SubsectionType = "sessions" | "paused" | "tasks";
+	// Subsection collapse state per project (sessions/paused/conversations/tasks)
+	type SubsectionType = "sessions" | "paused" | "conversations" | "tasks";
 	let collapsedSubsections = $state<Map<string, Set<SubsectionType>>>(
 		new Map(),
 	);
@@ -953,17 +956,21 @@
 		const projectTasks = tasksByProject.get(project) || [];
 		const projectPausedSessions = getProjectPausedSessions(project);
 		const hasActiveSessions = projectSessions.length > 0;
-		const hasPausedSessions = projectPausedSessions.length > 0;
+		const hasPausedSessions = projectPausedSessions.filter(s => s.taskType !== 'chat').length > 0;
+		const hasChatSessions = projectPausedSessions.filter(s => s.taskType === 'chat').length > 0;
 		const hasOpenTasks = getProjectTaskCount(project) > 0;
 
 		// Only apply default subsection collapse logic if this project doesn't have saved state
 		// This preserves user's manual collapse/expand choices
 		if (!collapsedSubsections.has(project)) {
-			// All sections expanded by default. Only auto-collapse "paused" when empty.
+			// All sections expanded by default. Only auto-collapse when empty.
 			const projectSubsections = new Set<SubsectionType>();
 
 			if (!hasPausedSessions) {
 				projectSubsections.add("paused");
+			}
+			if (!hasChatSessions) {
+				projectSubsections.add("conversations");
 			}
 			// Active Tasks and Open Tasks are always visible by default
 			// so users can see both in-progress work and available tasks/epics
@@ -1119,8 +1126,10 @@
 			{@const projectSessions =
 				sessionsByProject.get(selectedProject) || []}
 			{@const projectTasks = tasksByProject.get(selectedProject) || []}
-			{@const projectPausedSessions =
+			{@const allPausedSessions =
 				getProjectPausedSessions(selectedProject)}
+			{@const projectPausedSessions = allPausedSessions.filter(s => s.taskType !== 'chat')}
+			{@const projectChatSessions = allPausedSessions.filter(s => s.taskType === 'chat')}
 			{@const sessionsByEpic = getSessionsByEpic(projectSessions)}
 			{@const tasksByEpic = getTasksByEpic(projectTasks)}
 			{@const projectColor =
@@ -1434,6 +1443,76 @@
 					</div>
 				{/if}
 
+				<!-- Conversations Section (chat-type paused sessions) -->
+				{#if projectChatSessions.length > 0}
+					<div class="subsection conversations-subsection">
+						<button
+							class="subsection-header"
+							onclick={() =>
+								toggleSubsectionCollapse(
+									selectedProject!,
+									"conversations",
+								)}
+							aria-expanded={!isSubsectionCollapsed(
+								selectedProject!,
+								"conversations",
+							)}
+						>
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke-width="2"
+								stroke="currentColor"
+								class="subsection-collapse-icon"
+								class:collapsed={isSubsectionCollapsed(
+									selectedProject!,
+									"conversations",
+								)}
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									d="M19 9l-7 7-7-7"
+								/>
+							</svg>
+							<span>Conversations</span>
+							<div class="subsection-right">
+								<div class="paused-agents">
+									{#each projectChatSessions as session}
+										<WorkingAgentBadge
+											name={session.agentName}
+											size={18}
+											variant="avatar"
+											isWorking={false}
+										/>
+									{/each}
+								</div>
+								<span class="subsection-count-inline"
+									>{projectChatSessions.length}</span
+								>
+							</div>
+						</button>
+
+						{#if !isSubsectionCollapsed(selectedProject!, "conversations")}
+							<div
+								class="paused-content"
+								transition:slide={{ duration: 200 }}
+							>
+								<TasksPaused
+									sessions={projectChatSessions}
+									{projectColors}
+									onResumeSession={resumeSession}
+									onRestartTask={restartTask}
+									onUnassignTask={unassignTask}
+									onViewTask={(taskId) =>
+										openTaskDetailDrawer(taskId)}
+								/>
+							</div>
+						{/if}
+					</div>
+				{/if}
+
 				<!-- Open Tasks Section -->
 				{#if tasksByEpic.size > 0}
 					<div class="subsection">
@@ -1680,7 +1759,7 @@
 				{/if}
 
 				<!-- Empty state for selected project -->
-				{#if projectSessions.length === 0 && tasksByEpic.size === 0 && projectPausedSessions.length === 0}
+				{#if projectSessions.length === 0 && tasksByEpic.size === 0 && projectPausedSessions.length === 0 && projectChatSessions.length === 0}
 					<div class="project-empty-state">
 						<span
 							>No active sessions or open tasks for {selectedProject}</span
@@ -2067,8 +2146,9 @@
 		background: oklch(0.18 0.01 250);
 	}
 
-	/* Paused subsection - indent to align with epic-group content */
-	.paused-subsection {
+	/* Paused/Conversations subsections - indent to align with epic-group content */
+	.paused-subsection,
+	.conversations-subsection {
 		margin-left: 0.75rem;
 		margin-right: 0.75rem;
 		max-width: calc(100% - 1.5rem); /* Constrain width accounting for margins */

@@ -143,15 +143,41 @@ function discoverAllCommands(projectPath?: string, includeFrontmatter: boolean =
 	const home = homedir();
 
 	// 1. Discover global namespaced commands from ~/.claude/commands/{namespace}/
+	//    Also picks up root-level .md files (skills) as namespace "global"
 	const globalCommandsDir = join(home, '.claude', 'commands');
 	if (existsSync(globalCommandsDir)) {
 		try {
-			const namespaces = readdirSync(globalCommandsDir, { withFileTypes: true });
-			for (const ns of namespaces) {
-				if (ns.isDirectory()) {
-					const nsPath = join(globalCommandsDir, ns.name);
-					const nsCommands = discoverCommands(nsPath, ns.name, ns.name, includeFrontmatter);
+			const entries = readdirSync(globalCommandsDir, { withFileTypes: true });
+			for (const entry of entries) {
+				if (entry.isDirectory()) {
+					// Namespaced commands: ~/.claude/commands/jat/*.md
+					const nsPath = join(globalCommandsDir, entry.name);
+					const nsCommands = discoverCommands(nsPath, entry.name, entry.name, includeFrontmatter);
 					allCommands.push(...nsCommands);
+				} else if (entry.name.endsWith('.md') && (entry.isFile() || entry.isSymbolicLink())) {
+					// Root-level commands/skills: ~/.claude/commands/clipit.md
+					const fullPath = join(globalCommandsDir, entry.name);
+					if (isFileOrSymlinkToFile(fullPath)) {
+						const name = basename(entry.name, '.md');
+						const command: SlashCommand = {
+							name,
+							invocation: `/${name}`,
+							namespace: 'skills',
+							path: fullPath
+						};
+						if (includeFrontmatter) {
+							try {
+								const content = readFileSync(fullPath, 'utf-8');
+								const frontmatter = parseCommandFrontmatter(content);
+								if (frontmatter) {
+									command.frontmatter = frontmatter;
+								}
+							} catch (readErr) {
+								console.error(`Error reading frontmatter from ${fullPath}:`, readErr);
+							}
+						}
+						allCommands.push(command);
+					}
 				}
 			}
 		} catch (error) {

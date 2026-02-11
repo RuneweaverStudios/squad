@@ -18,7 +18,9 @@ const IDE_BASE_URL = process.env.JAT_IDE_URL || 'http://127.0.0.1:3333';
  */
 export function createTask(source, item, downloadedAttachments = []) {
   const defaults = source.taskDefaults || {};
-  const type = defaults.type || 'task';
+  // Auto-set type to 'chat' for conversational integrations (/jat:chat automation)
+  const isChat = source.automation?.command === '/jat:chat';
+  const type = isChat ? 'chat' : (defaults.type || 'task');
   const priority = String(defaults.priority ?? 2);
   const labels = defaults.labels || [];
 
