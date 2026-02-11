@@ -2009,6 +2009,7 @@
 					<label class="font-mono text-xs font-semibold block mb-1.5" style="color: oklch(0.65 0.02 250);">Command to run</label>
 					<select class="select select-bordered w-full font-mono text-sm" bind:value={autoCommand}>
 						<option value="/jat:start">/jat:start — Begin working on task</option>
+						<option value="/jat:chat">/jat:chat — Conversational chat mode</option>
 						<option value="/jat:verify">/jat:verify — Browser verification</option>
 					</select>
 					<p class="font-mono text-[10px] mt-1" style="color: oklch(0.45 0.02 250);">
