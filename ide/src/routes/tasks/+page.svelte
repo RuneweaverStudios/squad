@@ -1256,12 +1256,7 @@
 									</div>
 								{:else if epicSessions.length > 0}
 									<!-- Standalone Sessions (no epic) - collapsible group like epics -->
-									{@const isStandaloneExpanded =
-										isEpicExpanded(
-											selectedProject!,
-											null,
-											"sessions",
-										)}
+									<!-- Uses isExpanded from outer {#each} scope (epicId=null) -->
 									<div class="epic-group standalone">
 										<button
 											class="epic-header"
@@ -1271,7 +1266,7 @@
 													null,
 													"sessions",
 												)}
-											aria-expanded={isStandaloneExpanded}
+											aria-expanded={isExpanded}
 										>
 											<svg
 												xmlns="http://www.w3.org/2000/svg"
@@ -1280,7 +1275,7 @@
 												stroke-width="2"
 												stroke="currentColor"
 												class="collapse-icon small"
-												class:collapsed={!isStandaloneExpanded}
+												class:collapsed={!isExpanded}
 											>
 												<path
 													stroke-linecap="round"
@@ -1311,7 +1306,7 @@
 											>
 										</button>
 
-										{#if isStandaloneExpanded}
+										{#if isExpanded}
 											<div
 												class="epic-content"
 												transition:slide={{
@@ -1587,8 +1582,7 @@
 									</div>
 								{:else if epicTasks.length > 0}
 									<!-- Standalone Tasks (no epic) - collapsible group like epics -->
-									{@const isStandaloneExpanded =
-										isEpicExpanded(selectedProject!, null)}
+									<!-- Uses isExpanded from outer {#each} scope (epicId=null) -->
 									<div class="epic-group standalone">
 										<button
 											class="epic-header"
@@ -1597,7 +1591,7 @@
 													selectedProject!,
 													null,
 												)}
-											aria-expanded={isStandaloneExpanded}
+											aria-expanded={isExpanded}
 										>
 											<svg
 												xmlns="http://www.w3.org/2000/svg"
@@ -1606,7 +1600,7 @@
 												stroke-width="2"
 												stroke="currentColor"
 												class="collapse-icon small"
-												class:collapsed={!isStandaloneExpanded}
+												class:collapsed={!isExpanded}
 											>
 												<path
 													stroke-linecap="round"
@@ -1625,7 +1619,7 @@
 											>
 										</button>
 
-										{#if isStandaloneExpanded}
+										{#if isExpanded}
 											<div
 												class="epic-content"
 												transition:slide={{

@@ -23,7 +23,7 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { broadcastTaskChange, broadcastAgentState, broadcastOutput, isInitialized, getChannelSubscriberCount } from './connectionPool.js';
+import { broadcastTaskChange, broadcastTaskUpdate, broadcastAgentState, broadcastOutput, isInitialized, getChannelSubscriberCount } from './connectionPool.js';
 // NOTE: Must use relative import (not $lib alias) because this file is transitively
 // imported by vite.config.ts via vitePlugin.ts, and $lib isn't available at config time.
 import { getTasks } from '../jat-tasks.js';
@@ -50,7 +50,16 @@ let taskWatcher: FSWatcher | null = null;
 let sessionsWatcher: FSWatcher | null = null;
 let outputPollingInterval: NodeJS.Timeout | null = null;
 let debounceTimers: Map<string, NodeJS.Timeout> = new Map();
-let previousTaskIds = new Set<string>();
+
+/** Task snapshot for field-level change detection */
+interface TaskSnapshot {
+	id: string;
+	status: string;
+	assignee: string | null;
+	priority: number;
+}
+
+let previousTaskSnapshots = new Map<string, TaskSnapshot>();
 let previousOutputHashes = new Map<string, string>();
 let isWatching = false;
 
@@ -67,47 +76,94 @@ let isPolling = false;
 // ============================================================================
 
 /**
- * Get current task IDs via lib/tasks.js (reads from SQLite)
+ * Get current task snapshots via lib/tasks.js (reads from SQLite)
+ * Returns a map of task ID → snapshot with tracked fields
  */
-function getTaskIds(): Set<string> {
+function getTaskSnapshots(): Map<string, TaskSnapshot> {
 	try {
 		const tasks = getTasks({});
-		return new Set(tasks.map((t: any) => t.id));
+		const snapshots = new Map<string, TaskSnapshot>();
+		for (const t of tasks as any[]) {
+			snapshots.set(t.id, {
+				id: t.id,
+				status: t.status || 'open',
+				assignee: t.assignee || null,
+				priority: t.priority ?? 999
+			});
+		}
+		return snapshots;
 	} catch {
-		return new Set();
+		return new Map();
 	}
 }
 
 /**
  * Check for task changes and broadcast if any
+ * Detects three types of changes:
+ * - New tasks (ID didn't exist before) → broadcastTaskChange
+ * - Removed tasks (ID no longer exists) → broadcastTaskChange
+ * - Updated tasks (field changed on existing task) → broadcastTaskUpdate
+ *
+ * A task is never broadcast as both new AND updated (no duplicates).
  */
 function checkTaskChanges(): void {
 	if (!isInitialized()) return;
 
-	const currentIds = getTaskIds();
+	const currentSnapshots = getTaskSnapshots();
 
 	// Find new tasks
 	const newTasks: string[] = [];
-	for (const id of currentIds) {
-		if (!previousTaskIds.has(id)) {
+	for (const id of currentSnapshots.keys()) {
+		if (!previousTaskSnapshots.has(id)) {
 			newTasks.push(id);
 		}
 	}
 
 	// Find removed tasks
 	const removedTasks: string[] = [];
-	for (const id of previousTaskIds) {
-		if (!currentIds.has(id)) {
+	for (const id of previousTaskSnapshots.keys()) {
+		if (!currentSnapshots.has(id)) {
 			removedTasks.push(id);
 		}
 	}
 
-	previousTaskIds = currentIds;
+	// Find updated tasks (field changes on tasks that already existed and aren't new)
+	const updatedTasks: Array<{ id: string; changes: Record<string, { from: unknown; to: unknown }> }> = [];
+	for (const [id, current] of currentSnapshots) {
+		// Skip newly created tasks (they'll be in newTasks)
+		if (!previousTaskSnapshots.has(id)) continue;
 
-	// Broadcast changes
+		const previous = previousTaskSnapshots.get(id)!;
+		const changes: Record<string, { from: unknown; to: unknown }> = {};
+
+		if (previous.status !== current.status) {
+			changes.status = { from: previous.status, to: current.status };
+		}
+		if (previous.assignee !== current.assignee) {
+			changes.assignee = { from: previous.assignee, to: current.assignee };
+		}
+		if (previous.priority !== current.priority) {
+			changes.priority = { from: previous.priority, to: current.priority };
+		}
+
+		if (Object.keys(changes).length > 0) {
+			updatedTasks.push({ id, changes });
+		}
+	}
+
+	previousTaskSnapshots = currentSnapshots;
+
+	// Broadcast create/delete events
 	if (newTasks.length > 0 || removedTasks.length > 0) {
 		console.log(`[WS Watcher] Task changes: +${newTasks.length} -${removedTasks.length}`);
 		broadcastTaskChange(newTasks, removedTasks);
+	}
+
+	// Broadcast field-level updates (separate from create/delete)
+	for (const { id, changes } of updatedTasks) {
+		const changedFields = Object.keys(changes).join(', ');
+		console.log(`[WS Watcher] Task updated: ${id} (${changedFields})`);
+		broadcastTaskUpdate(id, changes);
 	}
 }
 
@@ -122,9 +178,9 @@ function startTaskWatcher(): void {
 
 	console.log(`[WS Watcher] Starting task watcher: ${JAT_DIR}`);
 
-	// Initialize previous task IDs
-	previousTaskIds = getTaskIds();
-	console.log(`[WS Watcher] Initialized with ${previousTaskIds.size} existing tasks`);
+	// Initialize previous task snapshots
+	previousTaskSnapshots = getTaskSnapshots();
+	console.log(`[WS Watcher] Initialized with ${previousTaskSnapshots.size} existing tasks`);
 
 	try {
 		// Watch the .jat/ directory for last-touched changes

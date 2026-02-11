@@ -413,6 +413,7 @@ export function getQueueStats(): QueueStats {
 		tasks: 0,
 		output: 0,
 		messages: 0,
+		sessions: 0,
 		system: 0
 	};
 

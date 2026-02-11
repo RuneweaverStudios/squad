@@ -39,7 +39,7 @@ import {
 // ============================================================================
 
 /** Supported broadcast channels */
-export type Channel = 'agents' | 'tasks' | 'output' | 'messages' | 'system';
+export type Channel = 'agents' | 'tasks' | 'output' | 'messages' | 'sessions' | 'system';
 
 /** Message types for each channel */
 export interface ChannelMessages {
@@ -65,6 +65,11 @@ export interface ChannelMessages {
 		type: 'new-message' | 'message-ack';
 		agentName: string;
 		data: unknown;
+	};
+	sessions: {
+		type: 'session-state' | 'session-output';
+		sessionName: string;
+		data?: unknown;
 	};
 	system: {
 		type: 'connected' | 'heartbeat' | 'error' | 'subscribed' | 'unsubscribed';
@@ -112,7 +117,7 @@ let heartbeatInterval: NodeJS.Timeout | null = null;
 let clientIdCounter = 0;
 
 // Initialize channel subscriber sets
-const allChannels: Channel[] = ['agents', 'tasks', 'output', 'messages', 'system'];
+const allChannels: Channel[] = ['agents', 'tasks', 'output', 'messages', 'sessions', 'system'];
 allChannels.forEach(channel => {
 	channelSubscribers.set(channel, new Set());
 });
@@ -666,5 +671,45 @@ export function broadcastNewMessage(
 			data: messageData
 		},
 		{ priority: 'high' }
+	);
+}
+
+/**
+ * Broadcast session state change (high priority - state changes are important)
+ * Used by watchers.ts to push session state over WS instead of SSE
+ */
+export function broadcastSessionState(
+	sessionName: string,
+	state: string,
+	data?: unknown
+): { sent: number; queued: number } {
+	return broadcast(
+		'sessions',
+		{
+			type: 'session-state',
+			sessionName,
+			data: { state, ...((data as object) || {}) }
+		},
+		{ priority: 'high' }
+	);
+}
+
+/**
+ * Broadcast session output update (low priority, fire-and-forget)
+ * Output updates are high volume and not critical - missing one is okay
+ */
+export function broadcastSessionOutput(
+	sessionName: string,
+	delta: string,
+	lineCount: number
+): { sent: number; queued: number } {
+	return broadcast(
+		'sessions',
+		{
+			type: 'session-output',
+			sessionName,
+			data: { delta, lineCount }
+		},
+		{ priority: 'low', enableRetry: false }
 	);
 }
