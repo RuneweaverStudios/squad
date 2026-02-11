@@ -1,6 +1,6 @@
 ## Integrating with JAT Tasks (dependency-aware task planning)
 
-JAT provides a lightweight, dependency-aware task database and a CLI (`jt`) for selecting "ready work," setting priorities, and tracking status. It complements Agent Mail's messaging, audit trail, and file-reservation signals.
+JAT provides a lightweight, dependency-aware task database and a CLI (`jt`) for selecting "ready work," setting priorities, and tracking status. It works alongside the Agent Registry for identity and file reservations.
 
 ### Multi-Project Architecture
 
@@ -309,34 +309,23 @@ jat-abc           (epic)
 - Dependencies between siblings enable parallel work
 
 Recommended conventions
-- **Single source of truth**: Use **JAT Tasks** for task status/priority/dependencies; use **Agent Mail** for conversation, decisions, and attachments (audit).
-- **Shared identifiers**: Use the task id (e.g., `jat-123`) as the Mail `thread_id` and prefix message subjects with `[jat-123]`.
+- **Single source of truth**: Use **JAT Tasks** for task status/priority/dependencies.
 - **Reservations**: When starting a task, use `am-reserve` for the affected paths; include the task id in the `--reason` and release on completion with `am-release`.
+- **Memory**: Context transfers between sessions via `.jat/memory/` entries, not messaging.
 
 Typical flow (agents)
 1) **Pick ready work** (JAT Tasks)
    - `jt ready --json` → choose one item (highest priority, no blockers)
-2) **Reserve edit surface** (Agent Mail)
+2) **Reserve edit surface** (Agent Registry)
    - `am-reserve src/**/*.ts --agent AgentName --ttl 3600 --exclusive --reason "jat-123"`
-3) **Announce start** (Agent Mail)
-   - `am-send "[jat-123] Start: <short title>" "Starting work on..." --from AgentName --to Team --thread jat-123`
-4) **Work and update**
-   - Reply in-thread with progress: `am-reply message-id "Progress update..." --agent AgentName`
-5) **Complete and release**
-   - `jt close jat-123 --reason "Completed"` (JAT Tasks is status authority)
+3) **Work on task**
+   - Update task status, commit regularly
+4) **Complete and release**
+   - `jt close jat-123 --reason "Completed"`
    - `am-release src/**/*.ts --agent AgentName`
-   - Final Mail reply: `am-send "[jat-123] Completed" "Summary..." --from AgentName --to Team --thread jat-123`
+   - Memory entry written automatically by `/jat:complete`
 
 Mapping cheat-sheet
-- **Mail `thread_id`** ↔ task ID (e.g., `jat-123`)
-- **Mail subject**: `[jat-123] …`
 - **File reservation `reason`**: task ID
-- **Commit messages (optional)**: include task ID for traceability
-
-Event mirroring (optional automation)
-- On `jt update --status blocked`, send a high-importance Mail message in thread describing the blocker.
-- On Mail "ACK overdue" for a critical decision, add a label (e.g., `needs-ack`) or bump priority to surface it in `jt ready`.
-
-Pitfalls to avoid
-- Don't create or manage tasks in Mail; treat JAT Tasks as the single task queue.
-- Always include the task ID in message `thread_id` to avoid ID drift across tools.
+- **Commit messages**: include task ID for traceability
+- **Memory files**: `{date}-{taskId}-{slug}.md` in `.jat/memory/`

@@ -13,7 +13,7 @@ argument-hint: AgentName taskId
 | Step | Who Does It |
 |------|-------------|
 | Generate agent name | Spawn API |
-| Register in Agent Mail | Spawn API |
+| Register in Agent Registry | Spawn API |
 | Create tmux session `jat-{Agent}` | Spawn API |
 | Assign task | Spawn API |
 | Write `.tmux-agent-{session}` file | Spawn API |

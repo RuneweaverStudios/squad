@@ -1,6 +1,6 @@
 ---
 name: jat-complete
-description: Complete current JAT task with full verification. Checks Agent Mail, verifies work (tests/lint), commits changes, closes task, releases file reservations, announces completion, and emits final signal. Session ends after completion.
+description: Complete current JAT task with full verification. Verifies work (tests/lint), commits changes, writes memory entry, closes task, releases file reservations, and emits final signal. Session ends after completion.
 metadata:
   author: jat
   version: "1.0"
@@ -19,14 +19,12 @@ Complete current task with full verification protocol. Session ends after comple
 
 ## What This Does
 
-1. **Read & Respond to Agent Mail** (always, before completing)
-2. **Verify task** (tests, lint, security)
-3. **Commit changes** with proper message
-4. **Write memory entry** - Save context for future agents
-5. **Mark task complete** (`jt close`)
-6. **Release file reservations**
-7. **Announce completion** via Agent Mail
-8. **Emit completion signal** to IDE
+1. **Verify task** (tests, lint, security)
+2. **Commit changes** with proper message
+3. **Write memory entry** - Save context for future agents
+4. **Mark task complete** (`jt close`)
+5. **Release file reservations**
+6. **Emit completion signal** to IDE
 
 ## Prerequisites
 
@@ -91,21 +89,7 @@ jt create "INFERRED_TITLE" \
 
 If no work detected, exit the completion flow.
 
-### STEP 2: Read & Respond to Agent Mail
-
-**Mandatory. Do NOT skip.**
-
-```bash
-am-inbox "$AGENT_NAME" --unread
-```
-
-- Read each message
-- Reply if needed: `am-reply MSG_ID "response" --agent "$AGENT_NAME"`
-- Acknowledge: `am-ack MSG_ID --agent "$AGENT_NAME"`
-
-Messages might say "don't complete yet" or "requirements changed" - check before proceeding.
-
-### STEP 3: Verify Task
+### STEP 2: Verify Task
 
 Run verification checks appropriate to the project:
 
@@ -122,7 +106,7 @@ jat-step verifying --task "$TASK_ID" --title "$TASK_TITLE" --agent "$AGENT_NAME"
 
 If verification fails, stop and fix issues before continuing.
 
-### STEP 3.5: Update Documentation (If Appropriate)
+### STEP 2.5: Update Documentation (If Appropriate)
 
 Only update docs when changes affect how others use the codebase:
 - New tool/command added
@@ -132,7 +116,7 @@ Only update docs when changes affect how others use the codebase:
 
 Most tasks do NOT need doc updates.
 
-### STEP 4: Commit Changes
+### STEP 3: Commit Changes
 
 ```bash
 # Get task type for commit prefix
@@ -151,7 +135,7 @@ git commit -m "TASK_TYPE($TASK_ID): TASK_TITLE
 Co-Authored-By: Pi Agent <noreply@pi.dev>"
 ```
 
-### STEP 4.5: Write Memory Entry
+### STEP 3.5: Write Memory Entry
 
 Save context from this session for future agents. Use the Write tool to create:
 
@@ -169,7 +153,7 @@ jat-memory index --project "$(pwd)"
 
 If indexing fails, log the error but continue. Memory is non-blocking.
 
-### STEP 5: Mark Task Complete
+### STEP 4: Mark Task Complete
 
 ```bash
 jat-step closing --task "$TASK_ID" --title "$TASK_TITLE" --agent "$AGENT_NAME"
@@ -181,13 +165,13 @@ Or manually:
 jt close "$TASK_ID" --reason "Completed by $AGENT_NAME"
 ```
 
-### STEP 5.5: Auto-Close Eligible Epics
+### STEP 4.5: Auto-Close Eligible Epics
 
 ```bash
 jt epic close-eligible
 ```
 
-### STEP 6: Release File Reservations
+### STEP 5: Release File Reservations
 
 ```bash
 jat-step releasing --task "$TASK_ID" --title "$TASK_TITLE" --agent "$AGENT_NAME"
@@ -201,20 +185,7 @@ am-reservations --agent "$AGENT_NAME" --json | jq -r '.[].pattern' | while read 
 done
 ```
 
-### STEP 7: Announce Completion
-
-```bash
-jat-step announcing --task "$TASK_ID" --title "$TASK_TITLE" --agent "$AGENT_NAME" --type "$TASK_TYPE"
-```
-
-Or manually:
-
-```bash
-am-send "[$TASK_ID] Completed: $TASK_TITLE" "Task completed successfully." \
-  --from "$AGENT_NAME" --to @active --thread "$TASK_ID"
-```
-
-### STEP 8: Emit Completion Signal
+### STEP 6: Emit Completion Signal
 
 ```bash
 jat-step complete --task "$TASK_ID" --title "$TASK_TITLE" --agent "$AGENT_NAME"
@@ -267,13 +238,11 @@ Fix issues and try again.
 |------|------|------|
 | 1 | Get Task and Agent Identity | jt list, tmux |
 | 1D | Spontaneous Work Detection | git status |
-| 2 | Read & Respond to Mail | am-inbox, am-ack |
-| 3 | Verify Task | jat-step verifying |
-| 3.5 | Update Documentation | (if appropriate) |
-| 4 | Commit Changes | jat-step committing |
-| 4.5 | Write Memory Entry | Write tool + jat-memory index |
-| 5 | Mark Task Complete | jat-step closing |
-| 5.5 | Auto-Close Epics | jt epic close-eligible |
-| 6 | Release Reservations | jat-step releasing |
-| 7 | Announce Completion | jat-step announcing |
-| 8 | Emit Completion Signal | jat-step complete |
+| 2 | Verify Task | jat-step verifying |
+| 2.5 | Update Documentation | (if appropriate) |
+| 3 | Commit Changes | jat-step committing |
+| 3.5 | Write Memory Entry | Write tool + jat-memory index |
+| 4 | Mark Task Complete | jat-step closing |
+| 4.5 | Auto-Close Epics | jt epic close-eligible |
+| 5 | Release Reservations | jat-step releasing |
+| 6 | Emit Completion Signal | jat-step complete |

@@ -18,7 +18,7 @@ Session 3: StrongShore | [P0] task-xyz - Critical bug fix [🔒1]
 ### Registration
 
 When you run `/jat:start`, it automatically:
-1. Registers your agent in Agent Mail
+1. Registers your agent in the Agent Registry
 2. Writes agent name to `.claude/sessions/agent-{session_id}.txt`
 3. Statusline reads from that file and displays your identity
 

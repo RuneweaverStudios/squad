@@ -39,7 +39,7 @@ fi
 
 # The imports to add to each project's CLAUDE.md (use detected JAT_DIR)
 JAT_IMPORTS="@$JAT_DIR/shared/overview.md
-@$JAT_DIR/shared/agent-mail.md
+@$JAT_DIR/shared/agent-registry.md
 @$JAT_DIR/shared/bash-patterns.md
 @$JAT_DIR/shared/tasks.md
 @$JAT_DIR/shared/tools.md
@@ -295,7 +295,7 @@ else
     echo ""
     echo "  Each project's CLAUDE.md imports:"
     echo "    @$JAT_DIR/shared/overview.md      # System overview"
-    echo "    @$JAT_DIR/shared/agent-mail.md    # Agent Mail docs"
+    echo "    @$JAT_DIR/shared/agent-registry.md    # Agent Mail docs"
     echo "    @$JAT_DIR/shared/bash-patterns.md # Bash patterns"
     echo "    @$JAT_DIR/shared/tasks.md         # JAT task planning"
     echo "    @$JAT_DIR/shared/tools.md         # 33 bash tools"

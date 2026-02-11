@@ -122,19 +122,15 @@ The IDE writes this signal directly to the timeline file when a user sends input
 │  /jat:complete workflow                                             │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│  Step 3: Verify task (tests, lint, security)                        │
+│  Step 2: Verify task (tests, lint, security)                        │
 │       ↓                                                             │
-│  Step 4: Commit changes                                             │
+│  Step 3: Commit changes                                             │
 │       ↓                                                             │
-│  Step 5: Close task in JAT Tasks (jt close)                         │
+│  Step 4: Close task in JAT Tasks (jt close)                         │
 │       ↓                                                             │
-│  Step 6: Release file reservations                                  │
+│  Step 5: Release file reservations                                  │
 │       ↓                                                             │
-│  Step 7: Announce completion (Agent Mail)                           │
-│       ↓                                                             │
-│  Step 7.5: Determine completion mode (review rules)                 │
-│       ↓                                                             │
-│  Step 8: jat-signal complete '{"completionMode":"..."}'       100% │
+│  Step 6: jat-signal complete '{"completionMode":"..."}'       100% │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```

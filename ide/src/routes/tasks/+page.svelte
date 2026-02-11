@@ -69,6 +69,7 @@
 	let sessionsLoading = $state(true);
 	let sessionsError = $state<string | null>(null);
 	let pollInterval: ReturnType<typeof setInterval> | null = null;
+	let recoveryPollInterval: ReturnType<typeof setInterval> | null = null;
 
 	// Open tasks state
 	let openTasks = $state<Task[]>([]);
@@ -711,6 +712,7 @@
 		await Promise.all([
 			fetchCriticalData(),
 			fetchSupplementalData(),
+			fetchRecoverableSessions(),
 		]);
 	}
 
@@ -1039,7 +1041,7 @@
 			fetchSupplementalData();
 		}, 1500);
 
-		// Phase 3: Recovery data (expensive, 12+ seconds) — load once after initial render
+		// Phase 3: Recovery data — load after initial render, then poll every 30s
 		setTimeout(() => {
 			fetchRecoverableSessions();
 		}, 5000);
@@ -1060,11 +1062,21 @@
 			if (document.visibilityState === 'hidden') return;
 			fetchCriticalData();
 		}, 15000);
+
+		// Poll recovery data at a slower interval for detecting paused/orphaned sessions.
+		// Recovery detects tasks changed outside the IDE (e.g., via terminal jt commands).
+		recoveryPollInterval = setInterval(() => {
+			if (document.visibilityState === 'hidden') return;
+			fetchRecoverableSessions();
+		}, 30000);
 	});
 
 	onDestroy(() => {
 		if (pollInterval) {
 			clearInterval(pollInterval);
+		}
+		if (recoveryPollInterval) {
+			clearInterval(recoveryPollInterval);
 		}
 	});
 

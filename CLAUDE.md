@@ -3,7 +3,7 @@
 Lightweight bash tools for agent orchestration, database operations, monitoring, development, and browser automation.
 
 @~/code/jat/shared/overview.md
-@~/code/jat/shared/agent-mail.md
+@~/code/jat/shared/agent-registry.md
 @~/code/jat/shared/bash-patterns.md
 @~/code/jat/shared/tasks.md
 @~/code/jat/shared/tools.md
@@ -26,7 +26,7 @@ Lightweight bash tools for agent orchestration, database operations, monitoring,
 jat/
 ├── tools/               # All executable tools
 │   ├── core/            # Database, monitoring, task review tools
-│   ├── mail/            # Agent Mail coordination (11 tools)
+│   ├── mail/            # Agent Registry (identity, file locks, messaging)
 │   ├── browser/         # Browser automation (11 tools)
 │   ├── media/           # Image generation tools (gemini-*, avatar-*)
 │   ├── signal/          # JAT signal tools (jat-signal, jat-signal-validate)
@@ -47,7 +47,7 @@ jat/
 
 **Required** (installer will check for these):
 - `tmux` - Terminal multiplexer (sessions, IDE tracking)
-- `sqlite3` - Database for Agent Mail
+- `sqlite3` - Database for Agent Registry
 - `jq` - JSON processing
 
 **Optional but recommended:**
@@ -170,7 +170,7 @@ npm --version    # Expected: 10.x (optional but recommended)
 node --version   # Expected: v20+ (optional but recommended)
 ```
 
-### Agent Mail (14 tools)
+### Agent Registry (14 tools)
 ```bash
 # Identity and registration
 am-whoami                    # Shows: "Not registered" or agent name
@@ -220,7 +220,7 @@ browser-screenshot.js --output /tmp/test.png  # Captures screenshot
 ### Database Tools (4 tools)
 ```bash
 # Schema inspection
-db-schema                    # Shows Agent Mail database schema
+db-schema                    # Shows Agent Registry database schema
 
 # Safe query test
 db-query "SELECT COUNT(*) as agent_count FROM agents"
@@ -262,7 +262,7 @@ npm run dev                  # Expected: http://127.0.0.1:5174
 ### All Tools Summary Check
 ```bash
 # Quick verification of all symlinks
-ls ~/.local/bin/am-* | wc -l   # Expected: 13 (Agent Mail)
+ls ~/.local/bin/am-* | wc -l   # Expected: 13 (Agent Registry)
 ls ~/.local/bin/jt* | wc -l    # Expected: 5 (Task CLI + review tools)
 ls ~/.local/bin/browser-* | wc -l  # Expected: 11 (Browser tools)
 ls ~/.local/bin/db-* | wc -l   # Expected: 4 (Database tools)
@@ -835,7 +835,7 @@ jat-demo clean
 1. Check `ide/src/app.css` uses Tailwind v4 syntax
 2. See `ide/CLAUDE.md` for detailed troubleshooting
 
-### Agent Mail "not registered"
+### Agent Registry "not registered"
 ```bash
 /jat:start                # Quick fix (auto-registers)
 # Or manually:

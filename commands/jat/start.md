@@ -56,7 +56,7 @@ This automatically retries if the session file hasn't been created yet.
 
 **IDE-spawned agents are already registered.** The spawn API:
 - Generates the agent name
-- Registers it in the Agent Mail database
+- Registers it in the Agent Registry database
 - Creates the tmux session as `jat-{AgentName}`
 - Writes an identity file for the agent to read
 
@@ -189,7 +189,6 @@ jt show "$TASK_ID" --json | jq -r '.[0].dependencies[]'  # Check deps
 ```bash
 jt update "$TASK_ID" --status in_progress --assignee "$AGENT_NAME"
 am-reserve "relevant/files/**" --agent "$AGENT_NAME" --ttl 3600 --reason "$TASK_ID"
-am-send "[$TASK_ID] Starting: $TASK_TITLE" "Starting work" --from "$AGENT_NAME" --to @active --thread "$TASK_ID"
 ```
 
 ---

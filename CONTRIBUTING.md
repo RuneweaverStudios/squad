@@ -497,7 +497,7 @@ jat/
 │
 ├── shared/                    # Shared documentation
 │   ├── overview.md           # System overview
-│   ├── agent-mail.md         # Agent Mail docs
+│   ├── agent-registry.md     # Agent Registry docs (identity + file locks)
 │   └── ...                   # Other shared docs
 │
 ├── README.md                  # Main documentation

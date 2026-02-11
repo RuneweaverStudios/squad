@@ -57,8 +57,7 @@
 **What it does:**
 - ✅ Verify task (tests, lint, security, browser)
 - ✅ Commit changes
-- ✅ Acknowledge all unread Agent Mail
-- ✅ Announce completion
+- ✅ Write memory entry for future agents
 - ✅ Mark task complete in JAT Tasks
 - ✅ Release file locks
 - ✅ **Session ends** (one agent = one task)
@@ -89,8 +88,6 @@
 
 **What it does:**
 - ✅ Quick commit/stash (always fast, no verification)
-- ✅ Acknowledge all unread Agent Mail
-- ✅ Send pause notification
 - ✅ Mark task as incomplete (keeps in_progress)
 - ✅ Release file locks
 - ✅ **Show available tasks menu** (to pivot)
@@ -115,7 +112,6 @@
 **What it shows:**
 - Current task progress
 - Active file reservations
-- Unread Agent Mail messages
 - Team sync (who's working on what)
 
 ---

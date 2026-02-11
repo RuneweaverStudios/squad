@@ -22,7 +22,7 @@ You are running as part of a **multi-agent development system** called JAT (Joma
 
 1. **One agent = one session = one task** - Each session handles exactly one task
 2. **File reservations prevent conflicts** - Always reserve before editing shared files
-3. **Messages coordinate work** - Check Agent Mail before starting and completing
+3. **Memory coordinates work** - Past session context surfaces via `.jat/memory/`
 4. **JAT Tasks is the task queue** - Pick from ready work, update status, close when done
 5. **Signals track your state** - The IDE monitors agents through `jat-signal`
 
@@ -71,20 +71,15 @@ jt create "Child task" --type task --priority 2
 jt dep add epic-id child-id
 ```
 
-## Agent Mail (Coordination)
+## Agent Registry (Identity + File Locks)
 
-Async messaging between agents. All tools are in `~/.local/bin/`.
+Agent identities and file locks for multi-agent coordination. All tools are in `~/.local/bin/`.
 
 ```bash
 # Identity
 am-register --name AgentName --program pi --model sonnet
 am-whoami
-
-# Messages
-am-inbox AgentName --unread                       # Check inbox
-am-send "Subject" "Body" --from Me --to Other --thread task-id
-am-reply MSG_ID "Response" --agent AgentName
-am-ack MSG_ID --agent AgentName                   # Acknowledge
+am-agents                                         # List all agents
 
 # File Reservations (prevent conflicts)
 am-reserve "src/**/*.ts" --agent AgentName --ttl 3600 --reason "task-id"
@@ -92,7 +87,7 @@ am-release "src/**/*.ts" --agent AgentName
 am-reservations --json                            # List all locks
 ```
 
-**Broadcast recipients:** `@active` (last 60min), `@recent` (24h), `@all`
+Messaging tools (`am-send`, `am-inbox`, `am-reply`, `am-ack`, `am-search`) are available but not required in workflows.
 
 ## Signals (IDE State Tracking)
 
@@ -168,20 +163,15 @@ All tools are bash commands in `~/.local/bin/`. Every tool has `--help`.
 | `jt` | JAT Tasks CLI for task management |
 | `jt-epic-child` | Set epic-child dependency correctly |
 
-### Agent Mail
+### Agent Registry
 | Tool | Purpose |
 |------|---------|
 | `am-register` | Create agent identity |
-| `am-inbox` | Check messages |
-| `am-send` | Send message |
-| `am-reply` | Reply to message |
-| `am-ack` | Acknowledge message |
+| `am-agents` | List agents |
+| `am-whoami` | Current identity |
 | `am-reserve` | Lock files |
 | `am-release` | Unlock files |
 | `am-reservations` | List locks |
-| `am-search` | Search messages |
-| `am-agents` | List agents |
-| `am-whoami` | Current identity |
 
 ### Signals
 | Tool | Purpose |
@@ -225,9 +215,8 @@ git commit -m "feat(jat-abc): Implement new endpoint"
 
 ## Key Behaviors
 
-- **Always check Agent Mail first** - before starting or completing work
 - **Reserve files before editing** - prevents stepping on other agents
-- **Use task IDs everywhere** - thread_id, reservation reason, commits
+- **Use task IDs everywhere** - reservation reason, commits, memory entries
 - **Update task status** - `in_progress` when working, `closed` when done
 - **Emit signals in order** - starting -> working -> review -> complete
 - **Push to remote** - work is NOT complete until `git push` succeeds

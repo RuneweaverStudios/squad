@@ -1,6 +1,6 @@
 ---
 name: jat-start
-description: Begin working on a JAT task. Registers agent identity, checks Agent Mail, selects a task, detects conflicts, reserves files, emits IDE signals, and starts work. Use this at the beginning of every JAT session.
+description: Begin working on a JAT task. Registers agent identity, selects a task, searches memory, detects conflicts, reserves files, emits IDE signals, and starts work. Use this at the beginning of every JAT session.
 metadata:
   author: jat
   version: "1.0"
@@ -23,11 +23,11 @@ Add `quick` to skip conflict checks.
 
 ## What This Does
 
-1. **Establish identity** - Register or resume agent in Agent Mail
+1. **Establish identity** - Register or resume agent in Agent Registry
 2. **Select task** - From parameter or show recommendations
 3. **Search memory** - Surface context from past sessions
 4. **Review prior tasks** - Check for duplicates and related work
-5. **Start work** - Reserve files, update task status, announce
+5. **Start work** - Reserve files, update task status
 6. **Emit signals** - IDE tracks state through jat-signal
 
 ## Step-by-Step Instructions
@@ -128,10 +128,6 @@ jt update "$TASK_ID" --status in_progress --assignee "$AGENT_NAME"
 
 # Reserve files you'll edit
 am-reserve "relevant/files/**" --agent "$AGENT_NAME" --ttl 3600 --reason "$TASK_ID"
-
-# Announce to other agents
-am-send "[$TASK_ID] Starting: $TASK_TITLE" "Starting work" \
-  --from "$AGENT_NAME" --to @active --thread "$TASK_ID"
 ```
 
 ### STEP 8: Emit Signals

@@ -16,11 +16,10 @@
 **Maintenance:**
 - `jat-doctor` - Bash script to diagnose installation issues (run anytime)
 
-**CRITICAL: All commands check Agent Mail FIRST (before any work):**
-- Read messages (display to user)
-- Respond if needed (reply, adjust plan)
-- Acknowledge after reading
-- This is MANDATORY - not optional!
+**Key behaviors:**
+- All commands register your agent identity in the Agent Registry
+- File reservations prevent conflicts between agents
+- Memory system provides cross-session context
 
 **Quick Start:**
 ```bash

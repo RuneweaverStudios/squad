@@ -45,30 +45,32 @@ This layer requires the agent to understand and use JAT's coordination tools.
 
 **How it works:**
 ```
-Agent reads CLAUDE.md ──► Uses Agent Mail ──► Picks tasks from JAT
+Agent reads CLAUDE.md ──► Uses Agent Registry ──► Picks tasks from JAT
                               │                        │
                               ▼                        ▼
-                    Coordinates with          Updates task status
-                    other agents              Follows dependencies
+                    Registers identity,        Updates task status
+                    reserves files             Follows dependencies
 ```
 
 **Key characteristics:**
 - Agent knows about and uses the system
 - Requires `CLAUDE.md` to instruct behavior
-- Agent Mail for coordination between agents
+- Agent Registry for identity and file locks
 - JAT Tasks for task management and dependencies
+- Memory system for cross-session context
 
 **Examples:**
 - `/jat:start` - Register agent, pick task
-- `/jat:complete` - Close task, announce completion
+- `/jat:complete` - Close task, write memory entry
 - File reservations to prevent conflicts
-- Message threads for coordination
+- Memory entries for cross-session knowledge transfer
 
 **Implementation:**
 - `CLAUDE.md` documents the system
-- Agent Mail tools (`am-*`) for messaging
+- Agent Registry tools (`am-register`, `am-reserve`, etc.) for identity and locks
 - Task CLI (`jt`) for task management
 - Signal system for state updates
+- Memory system (`.jat/memory/`) for persistent context
 
 ### The Relationship
 
@@ -77,7 +79,7 @@ Agent reads CLAUDE.md ──► Uses Agent Mail ──► Picks tasks from JAT
 │                                                                     │
 │   LAYER 2: Agent Orchestration (JAT-specific)                      │
 │   ┌─────────────────────────────────────────────────────────────┐  │
-│   │  • Agent Mail (coordination)                                 │  │
+│   │  • Agent Registry (identity + file locks)                     │  │
 │   │  • JAT Tasks (task management)                               │  │
 │   │  • CLAUDE.md (agent instructions)                            │  │
 │   │  • Workflow commands (/jat:start, /jat:complete)            │  │
@@ -130,6 +132,6 @@ Agent reads CLAUDE.md ──► Uses Agent Mail ──► Picks tasks from JAT
 **Layer 2 (Explicit):**
 - `CLAUDE.md` - Agent instructions
 - `shared/*.md` - Agent documentation
-- `tools/mail/` - Agent Mail tools
+- `tools/mail/` - Agent Registry tools (identity, file locks, messaging)
 - `commands/jat/` - Workflow commands
 - `.jat/` - Task database

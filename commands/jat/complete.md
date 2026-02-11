@@ -13,20 +13,14 @@ Complete current task properly with full verification. Session ends after comple
 - `--kill` - IDE will auto-kill the session after completion (no review needed)
 
 **What this command does:**
-1. **Read & Respond to Agent Mail** (ALWAYS - before completing)
-2. **Full Completion Protocol**:
+1. **Full Completion Protocol**:
    - Verify task (tests, lint, security, browser checks)
    - Commit changes with proper message
-3. **Write Memory Entry** - Save context for future agents
-4. **Task Management**:
+2. **Write Memory Entry** - Save context for future agents
+3. **Task Management**:
    - Mark task as complete (`jt close`)
    - Release file reservations
-5. **Announce Completion** in Agent Mail
-6. **End Session** - Session is complete, user spawns new agent for next task
-
-**Key behaviors:**
-- **ALWAYS check Agent Mail first** - before completing work
-- Mail = read + respond + ack (not just silent batch-ack)
+4. **End Session** - Session is complete, user spawns new agent for next task
 
 **When to use:**
 - After you display "🔍 READY FOR REVIEW" and user approves
@@ -91,7 +85,6 @@ When the agent enters "ready-for-review" state (via the `review` signal), the ID
 1. Changes committed
 2. `jt close` has run successfully
 3. Reservations released
-4. Completion announced via Agent Mail
 
 **The typical flow:**
 1. You finish coding → display "🔍 READY FOR REVIEW"
@@ -312,56 +305,11 @@ Files: cli/jat
 
 ---
 
-### STEP 2: Read & Respond to Agent Mail (ALWAYS)
-
-**THIS STEP IS MANDATORY - runs before any completion work.**
-
-Do NOT silently batch-ack messages. Actually READ them and RESPOND if needed.
-
-#### 2A: Check Inbox (with registration fallback)
-
-**IMPORTANT:** If inbox fails with "Agent not found", the agent may not be registered in this session. Run `am-register` first (it's idempotent), then retry inbox.
-
-```bash
-# First attempt
-am-inbox "$agent_name" --unread
-
-# If it fails with "Agent not found":
-# 1. Run: am-register --name "$agent_name" --program claude-code --model sonnet-4.5
-# 2. Then retry: am-inbox "$agent_name" --unread
-```
-
-**Best practice:** Run these as separate Bash tool calls, not chained together.
-
-#### 2B: Display Messages to User
-Show the user what messages are in the inbox. Read each message.
-
-#### 2C: Respond If Needed
-- If a message asks a question → reply with `am-reply`
-- If a message changes requirements → adjust your plan
-- If a message says "stop" or "wait" → pause and clarify
-- If a message is informational → acknowledge it
-
-#### 2D: Acknowledge Messages
-```bash
-# Only AFTER reading and responding
-am-inbox "$agent_name" --unread --json | jq -r '.[].id' | while read msg_id; do
-  am-ack "$msg_id" --agent "$agent_name"
-done
-```
-
-**Why this matters:**
-- Messages might say "don't complete yet, found a bug"
-- Messages might say "requirements changed"
-- Messages might say "I need to review first"
-- You need context BEFORE completing work
-
----
-
-### STEP 3: Verify Task
+### STEP 2: Verify Task
 
 ```bash
 jat-step verifying --task "$task_id" --title "$task_title" --agent "$agent_name"
+
 
 # Run verification checks:
 # - Tests
@@ -375,7 +323,7 @@ jat-step verifying --task "$task_id" --title "$task_title" --agent "$agent_name"
 
 ---
 
-### STEP 3.5: Update Documentation (If Appropriate)
+### STEP 2.5: Update Documentation (If Appropriate)
 
 **Most tasks do NOT require doc updates.** Only update docs when you've made changes that affect how others use the codebase.
 
@@ -443,7 +391,7 @@ Did you add/change/remove something that affects usage?
 
 ---
 
-### STEP 3.6: Update Changelog (If Notable)
+### STEP 2.6: Update Changelog (If Notable)
 
 **Most tasks do NOT need changelog entries.** Only add entries for changes users/stakeholders would care about.
 
@@ -494,7 +442,7 @@ Is this change visible to users/stakeholders?
 
 ---
 
-### STEP 4: Commit Changes
+### STEP 3: Commit Changes
 
 ```bash
 # Get task type for commit message
@@ -506,7 +454,7 @@ jat-step committing --task "$task_id" --title "$task_title" --agent "$agent_name
 
 ---
 
-### STEP 4.5: Write Memory Entry
+### STEP 3.5: Write Memory Entry
 
 **Save context from this session for future agents.**
 
@@ -582,7 +530,7 @@ This incrementally indexes the new file. If no memory index exists yet, it creat
 
 ---
 
-### STEP 5: Mark Task Complete
+### STEP 4: Mark Task Complete
 
 ```bash
 # Emit signal + close task
@@ -591,7 +539,7 @@ jat-step closing --task "$task_id" --title "$task_title" --agent "$agent_name"
 
 ---
 
-### STEP 5.5: Auto-Close Eligible Epics
+### STEP 4.5: Auto-Close Eligible Epics
 
 **After closing a task, check if any parent epics are now fully complete.**
 
@@ -615,7 +563,7 @@ jt epic close-eligible
 
 ---
 
-### STEP 6: Release File Reservations
+### STEP 5: Release File Reservations
 
 ```bash
 # Emit signal + release all reservations for this agent
@@ -624,16 +572,7 @@ jat-step releasing --task "$task_id" --title "$task_title" --agent "$agent_name"
 
 ---
 
-### STEP 7: Announce Completion
-
-```bash
-# Emit signal + send completion announcement via Agent Mail
-jat-step announcing --task "$task_id" --title "$task_title" --agent "$agent_name" --type "$task_type"
-```
-
----
-
-### STEP 8: Generate Completion Bundle and Emit Signal
+### STEP 6: Generate Completion Bundle and Emit Signal
 
 ```bash
 # Generate completion bundle via LLM and emit the complete signal
@@ -720,10 +659,6 @@ When it receives the `complete` signal:
 
 Full verification ensures quality before task closure.
 
-**Still done (NEVER skip these):**
-- STEP 2: Read & respond to Agent Mail
-- All other steps
-
 ---
 
 ## Output Examples
@@ -731,9 +666,6 @@ Full verification ensures quality before task closure.
 The completion output is generated by `jat-complete-bundle`. A typical flow looks like:
 
 ```
-📬 Checking Agent Mail...
-  No unread messages
-
 🔍 Verifying task...
    ✅ Tests passed
    ✅ Build clean
@@ -743,9 +675,6 @@ The completion output is generated by `jat-complete-bundle`. A typical flow look
 
 ✅ Marking task complete...
    ✅ Closed jat-abc
-
-📢 Announcing completion...
-   ✅ Sent to @active
 
 ╔═══════════════════════════════════════════════════════════════╗
 ║  ✅ TASK COMPLETED: jat-abc                                   ║
@@ -763,14 +692,14 @@ The completion flow emits **progress signals** at each step, followed by a final
 
 | Tool | Signal Emitted | IDE Effect |
 |------|----------------|------------------|
-| `jat-step verifying\|committing\|closing\|releasing\|announcing` | `completing` | Shows progress bar with current step |
+| `jat-step verifying\|committing\|closing\|releasing` | `completing` | Shows progress bar with current step |
 | `jat-complete-bundle --emit` | `complete` | Full completion bundle with summary, suggested tasks |
 
 **Signals are emitted automatically by the tools.** You don't need to manually call `jat-signal`. The final **complete signal** includes:
 - `completionMode: "review_required"` → IDE shows COMPLETED state, session stays open for review
 - `completionMode: "auto_proceed"` with `nextTaskId` → IDE spawns next task (Epic Swarm)
 
-**Completion mode is determined in Step 7.5** based on:
+**Completion mode is determined automatically** based on:
 1. Per-task override in notes (`[REVIEW_OVERRIDE:...]`)
 2. Project review rules (`.jat/review-rules.json`)
 3. Safe default: review required (no auto-proceed without explicit configuration)
@@ -826,34 +755,27 @@ Or run /jat:verify to see detailed error report
 |------|------|------|
 | 1A-C | Get Task and Agent Identity | - |
 | 1D | Spontaneous Work Detection | - |
-| 2 | Read & Respond to Mail | `am-inbox`, `am-ack` |
-| 3 | Verify Task | `jat-step verifying` (0%) |
-| 3.5 | Update Documentation | *(if appropriate - most tasks skip)* |
-| 3.6 | Update Changelog | *(if notable - most tasks skip)* |
-| 4 | Commit Changes | `jat-step committing` (20%) |
-| **4.5** | **Write Memory Entry** | **Write tool + `jat-memory index`** |
-| 5 | Mark Task Complete | `jat-step closing` (40%) |
-| 5.5 | Auto-Close Eligible Epics | `jt epic close-eligible` |
-| 6 | Release Reservations | `jat-step releasing` (60%) |
-| 7 | Announce Completion | `jat-step announcing` (80%) |
-| **8** | **Generate & Emit Completion** | **`jat-step complete`** (100%) |
+| 2 | Verify Task | `jat-step verifying` (0%) |
+| 2.5 | Update Documentation | *(if appropriate - most tasks skip)* |
+| 2.6 | Update Changelog | *(if notable - most tasks skip)* |
+| 3 | Commit Changes | `jat-step committing` (25%) |
+| **3.5** | **Write Memory Entry** | **Write tool + `jat-memory index`** |
+| 4 | Mark Task Complete | `jat-step closing` (50%) |
+| 4.5 | Auto-Close Eligible Epics | `jt epic close-eligible` |
+| 5 | Release Reservations | `jat-step releasing` (75%) |
+| **6** | **Generate & Emit Completion** | **`jat-step complete`** (100%) |
 
-**Note:** `jat-step` automatically emits signals. Steps 3-7 emit `completing` signals with progress. Step 8 (`jat-step complete`) auto-detects review mode and emits the final `complete` signal.
+**Note:** `jat-step` automatically emits signals. Steps 2-5 emit `completing` signals with progress. Step 6 (`jat-step complete`) auto-detects review mode and emits the final `complete` signal.
 
 ---
 
 ## Key Design Principles
 
-1. **Always check Agent Mail first**
-   - Read messages BEFORE completing work
-   - Respond to questions, don't just ack
-   - Context matters for decision-making
-
-2. **Full verification required**
+1. **Full verification required**
    - No quick mode for this command
    - Quality over speed
 
-3. **One agent = one session = one task**
+2. **One agent = one session = one task**
    - Session ENDS after completion (do NOT show "Available Tasks")
    - User spawns new agent for next task
    - Keeps context clean and focused
