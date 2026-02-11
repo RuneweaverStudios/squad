@@ -91,10 +91,11 @@ export function connectTaskEvents() {
 
 			if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
 				reconnectAttempts++;
-				console.log(`[TaskEvents] Reconnecting (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
+				const jitter = Math.floor(Math.random() * 2000); // 0-2s jitter to avoid HMR stampede
+				console.log(`[TaskEvents] Reconnecting (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}) in ${RECONNECT_DELAY + jitter}ms...`);
 				reconnectTimer = setTimeout(() => {
 					connectTaskEvents();
-				}, RECONNECT_DELAY);
+				}, RECONNECT_DELAY + jitter);
 			} else {
 				console.error('[TaskEvents] Max reconnect attempts reached');
 			}

@@ -24,8 +24,8 @@ Add `quick` to skip conflict checks.
 ## What This Does
 
 1. **Establish identity** - Register or resume agent in Agent Mail
-2. **Check Agent Mail** - Read messages before starting
-3. **Select task** - From parameter or show recommendations
+2. **Select task** - From parameter or show recommendations
+3. **Search memory** - Surface context from past sessions
 4. **Review prior tasks** - Check for duplicates and related work
 5. **Start work** - Reserve files, update task status, announce
 6. **Emit signals** - IDE tracks state through jat-signal
@@ -74,17 +74,7 @@ mkdir -p .claude/sessions
 echo "$AGENT_NAME" > ".claude/sessions/agent-${SESSION_ID}.txt"
 ```
 
-### STEP 3: Check Agent Mail
-
-**Always check mail before selecting a task.**
-
-```bash
-am-inbox "$AGENT_NAME" --unread
-```
-
-Read each message. Reply if needed with `am-reply`. Acknowledge with `am-ack`.
-
-### STEP 4: Select Task
+### STEP 3: Select Task
 
 If a task-id was provided, use it. Otherwise, show available work:
 
@@ -93,6 +83,21 @@ jt ready --json | jq -r '.[] | "  [P\(.priority)] \(.id) - \(.title)"'
 ```
 
 If no task-id provided, display recommendations and stop here.
+
+### STEP 4: Search Memory
+
+Search project memory for relevant context from past sessions:
+
+```bash
+jat-memory search "key terms from task title" --limit 5
+```
+
+Returns JSON with matching chunks (taskId, section, snippet, score). Use results to:
+- Incorporate lessons and gotchas into your approach
+- Avoid repeating documented mistakes
+- Build on established patterns
+
+If no memory index exists, skip silently.
 
 ### STEP 5: Review Prior Tasks
 
@@ -106,9 +111,7 @@ jt search "$SEARCH_TERM" --updated-after "$DATE_7D" --limit 20 --json
 Look for:
 - **Duplicates** (closed tasks with nearly identical titles) - ask user before proceeding
 - **Related work** (same files/features) - note for context
-- **In-progress** by other agents - coordinate via Agent Mail
-
-If a potential duplicate is found, ask the user before proceeding.
+- **In-progress** by other agents - coordinate to avoid conflicts
 
 ### STEP 6: Conflict Detection
 

@@ -152,6 +152,13 @@ export const unifiedNavConfig: UnifiedNavConfig = {
 			icon: 'columns',
 			category: 'views'
 		},
+		{
+			id: 'memory',
+			label: 'Memory',
+			href: '/memory',
+			icon: 'memory',
+			category: 'views'
+		},
 		// LABS: Experimental features (not production-ready)
 		{
 			id: 'automation',

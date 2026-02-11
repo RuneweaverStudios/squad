@@ -909,12 +909,13 @@ export function connectSessionEvents(): void {
 
 			if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
 				reconnectAttempts++;
+				const jitter = Math.floor(Math.random() * 2000); // 0-2s jitter to avoid HMR stampede
 				console.log(
-					`[SessionEvents] Reconnecting (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`
+					`[SessionEvents] Reconnecting (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}) in ${RECONNECT_DELAY + jitter}ms...`
 				);
 				reconnectTimer = setTimeout(() => {
 					connectSessionEvents();
-				}, RECONNECT_DELAY);
+				}, RECONNECT_DELAY + jitter);
 			} else {
 				console.error('[SessionEvents] Max reconnect attempts reached');
 			}

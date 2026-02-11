@@ -22,10 +22,11 @@ Complete current task with full verification protocol. Session ends after comple
 1. **Read & Respond to Agent Mail** (always, before completing)
 2. **Verify task** (tests, lint, security)
 3. **Commit changes** with proper message
-4. **Mark task complete** (`jt close`)
-5. **Release file reservations**
-6. **Announce completion** via Agent Mail
-7. **Emit completion signal** to IDE
+4. **Write memory entry** - Save context for future agents
+5. **Mark task complete** (`jt close`)
+6. **Release file reservations**
+7. **Announce completion** via Agent Mail
+8. **Emit completion signal** to IDE
 
 ## Prerequisites
 
@@ -150,6 +151,24 @@ git commit -m "TASK_TYPE($TASK_ID): TASK_TITLE
 Co-Authored-By: Pi Agent <noreply@pi.dev>"
 ```
 
+### STEP 4.5: Write Memory Entry
+
+Save context from this session for future agents. Use the Write tool to create:
+
+```
+.jat/memory/{YYYY-MM-DD}-{taskId}-{slug}.md
+```
+
+Include YAML frontmatter (task, agent, project, completed, files, tags, labels, priority, type) and sections: Summary, Approach, Decisions (if notable), Key Files, Lessons (if any).
+
+Then trigger incremental index:
+
+```bash
+jat-memory index --project "$(pwd)"
+```
+
+If indexing fails, log the error but continue. Memory is non-blocking.
+
 ### STEP 5: Mark Task Complete
 
 ```bash
@@ -252,6 +271,7 @@ Fix issues and try again.
 | 3 | Verify Task | jat-step verifying |
 | 3.5 | Update Documentation | (if appropriate) |
 | 4 | Commit Changes | jat-step committing |
+| 4.5 | Write Memory Entry | Write tool + jat-memory index |
 | 5 | Mark Task Complete | jat-step closing |
 | 5.5 | Auto-Close Epics | jt epic close-eligible |
 | 6 | Release Reservations | jat-step releasing |

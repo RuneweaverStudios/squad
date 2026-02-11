@@ -67,7 +67,7 @@ export interface ChannelMessages {
 		data: unknown;
 	};
 	sessions: {
-		type: 'session-state' | 'session-output';
+		type: 'session-state' | 'session-output' | 'session-question' | 'session-signal' | 'session-complete' | 'session-created' | 'session-destroyed';
 		sessionName: string;
 		data?: unknown;
 	};
@@ -711,5 +711,95 @@ export function broadcastSessionOutput(
 			data: { delta, lineCount }
 		},
 		{ priority: 'low', enableRetry: false }
+	);
+}
+
+/**
+ * Broadcast session question detected (high priority - user needs to respond)
+ */
+export function broadcastSessionQuestion(
+	sessionName: string,
+	questionData: unknown
+): { sent: number; queued: number } {
+	return broadcast(
+		'sessions',
+		{
+			type: 'session-question',
+			sessionName,
+			data: questionData
+		},
+		{ priority: 'high' }
+	);
+}
+
+/**
+ * Broadcast session signal (high priority - contains rich payload data)
+ */
+export function broadcastSessionSignal(
+	sessionName: string,
+	signalType: string,
+	signalData?: unknown
+): { sent: number; queued: number } {
+	return broadcast(
+		'sessions',
+		{
+			type: 'session-signal',
+			sessionName,
+			data: { signalType, ...((signalData as object) || {}) }
+		},
+		{ priority: 'high' }
+	);
+}
+
+/**
+ * Broadcast session completion bundle (high priority - completion data)
+ */
+export function broadcastSessionComplete(
+	sessionName: string,
+	completionBundle: unknown
+): { sent: number; queued: number } {
+	return broadcast(
+		'sessions',
+		{
+			type: 'session-complete',
+			sessionName,
+			data: { completionBundle }
+		},
+		{ priority: 'high' }
+	);
+}
+
+/**
+ * Broadcast session created event (high priority)
+ */
+export function broadcastSessionCreated(
+	sessionName: string,
+	agentName: string,
+	task?: { id: string; title?: string; status?: string } | null
+): { sent: number; queued: number } {
+	return broadcast(
+		'sessions',
+		{
+			type: 'session-created',
+			sessionName,
+			data: { agentName, task }
+		},
+		{ priority: 'high' }
+	);
+}
+
+/**
+ * Broadcast session destroyed event (high priority)
+ */
+export function broadcastSessionDestroyed(
+	sessionName: string
+): { sent: number; queued: number } {
+	return broadcast(
+		'sessions',
+		{
+			type: 'session-destroyed',
+			sessionName
+		},
+		{ priority: 'high' }
 	);
 }

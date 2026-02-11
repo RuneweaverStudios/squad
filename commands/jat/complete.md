@@ -17,11 +17,12 @@ Complete current task properly with full verification. Session ends after comple
 2. **Full Completion Protocol**:
    - Verify task (tests, lint, security, browser checks)
    - Commit changes with proper message
-3. **Task Management**:
+3. **Write Memory Entry** - Save context for future agents
+4. **Task Management**:
    - Mark task as complete (`jt close`)
    - Release file reservations
-4. **Announce Completion** in Agent Mail
-5. **End Session** - Session is complete, user spawns new agent for next task
+5. **Announce Completion** in Agent Mail
+6. **End Session** - Session is complete, user spawns new agent for next task
 
 **Key behaviors:**
 - **ALWAYS check Agent Mail first** - before completing work
@@ -505,6 +506,82 @@ jat-step committing --task "$task_id" --title "$task_title" --agent "$agent_name
 
 ---
 
+### STEP 4.5: Write Memory Entry
+
+**Save context from this session for future agents.**
+
+Generate a memory file capturing the key learnings from this task.
+
+#### 4.5A: Generate Memory Content
+
+Synthesize a memory entry from:
+- Task description and title
+- Approach taken (from your working signal)
+- Files modified (from git diff)
+- Key decisions made during the session
+- Lessons learned and gotchas discovered
+
+#### 4.5B: Write the Memory File
+
+```bash
+# File naming: {date}-{taskId}-{slug}.md
+# Slug: lowercase task title, non-alphanumeric → hyphens, max 50 chars
+# Example: .jat/memory/2026-02-11-jat-abc-fix-oauth-timeout.md
+```
+
+Use the Write tool to create the file at `.jat/memory/{date}-{taskId}-{slug}.md` following this format:
+
+```markdown
+---
+task: {taskId}
+agent: {agentName}
+project: {projectName}
+completed: {ISO timestamp}
+files:
+  - {modified file paths from git diff}
+tags:
+  - {semantic tags derived from content}
+labels:
+  - {task labels from JAT}
+priority: {task priority}
+type: {task type}
+---
+
+## Summary
+
+- {What was accomplished, bullet points}
+
+## Approach
+
+{How the work was done, 2-3 sentences}
+
+## Decisions
+
+- {Key decisions and rationale}
+
+## Key Files
+
+- `{path}:{line}` - {what this file does}
+
+## Lessons
+
+- {Non-obvious learnings for future agents}
+```
+
+Only include sections that have meaningful content. Skip `## Decisions` or `## Lessons` if nothing notable.
+
+#### 4.5C: Update Memory Index
+
+```bash
+jat-memory index --project "$(pwd)"
+```
+
+This incrementally indexes the new file. If no memory index exists yet, it creates one.
+
+**If jat-memory index fails**, log the error but continue with completion. Memory is non-blocking.
+
+---
+
 ### STEP 5: Mark Task Complete
 
 ```bash
@@ -754,6 +831,7 @@ Or run /jat:verify to see detailed error report
 | 3.5 | Update Documentation | *(if appropriate - most tasks skip)* |
 | 3.6 | Update Changelog | *(if notable - most tasks skip)* |
 | 4 | Commit Changes | `jat-step committing` (20%) |
+| **4.5** | **Write Memory Entry** | **Write tool + `jat-memory index`** |
 | 5 | Mark Task Complete | `jat-step closing` (40%) |
 | 5.5 | Auto-Close Eligible Epics | `jt epic close-eligible` |
 | 6 | Release Reservations | `jat-step releasing` (60%) |

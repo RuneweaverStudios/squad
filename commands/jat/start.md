@@ -22,8 +22,8 @@ argument-hint: [agent-name | task-id | agent-name task-id]
 ## What This Command Does
 
 1. **Establish identity** - Use pre-registered agent (IDE-spawned) or create new (CLI)
-2. **Check Agent Mail** - Read messages before starting work
-3. **Select task** - From parameter or show recommendations
+2. **Select task** - From parameter or show recommendations
+3. **Search memory** - Surface relevant context from past sessions
 4. **Review prior tasks** - Check for duplicates and related work
 5. **Start work** - Reserve files, update task status, announce start
 6. **Plan approach** - Analyze task, emit rich working signal
@@ -97,21 +97,9 @@ mkdir -p .claude/sessions
 
 ---
 
-### STEP 3: Check Agent Mail
+### STEP 3: Select Task
 
-**ALWAYS do this before selecting a task.**
-
-```bash
-am-inbox "$AGENT_NAME" --unread
-```
-
-Read, reply if needed, then acknowledge: `am-ack {msg_id} --agent "$AGENT_NAME"`
-
----
-
-### STEP 4: Select Task
-
-**If task-id provided** → continue to Step 5
+**If task-id provided** → continue to Step 4
 
 **If no task-id** → show recommendations and EXIT:
 
@@ -121,95 +109,68 @@ jt ready --json | jq -r '.[] | "  [\(.priority)] \(.id) - \(.title)"'
 
 ---
 
+### STEP 4: Search Memory (skip with quick mode)
+
+**Search project memory for relevant context from past sessions.**
+
+This surfaces lessons, patterns, gotchas, and approaches from previous work on related areas.
+
+```bash
+# Extract key terms from task title and description
+# Search project memory for relevant entries
+jat-memory search "key terms from task title" --limit 5
+```
+
+The search returns JSON with matching memory chunks. Each result includes:
+- `path` - Memory file name
+- `taskId` - The task that created this memory
+- `section` - Which section matched (summary, approach, decisions, lessons, etc.)
+- `snippet` - The matching text
+- `score` - Relevance score
+
+**Output format** (if results found):
+```
+┌─ MEMORY: Found N relevant entries ──────────────────────────────┐
+│                                                                 │
+│  From jat-abc "Fix OAuth timeout":                              │
+│    [lessons] Always use env vars for timeout values             │
+│    [approach] Traced OAuth flow end-to-end, found upstream...   │
+│                                                                 │
+│  From jat-def "Add login page":                                 │
+│    [gotchas] Refresh endpoint returns 200 on partial failures   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**How to use memory results:**
+- Incorporate relevant lessons and gotchas into your approach
+- Avoid repeating mistakes documented in past sessions
+- Build on patterns established by previous agents
+- Reference specific files and line numbers mentioned in memories
+
+**If no memory index exists** (first run), skip silently. Memory builds up over time as tasks complete.
+
+**If no results found**, proceed to Step 5.
+
+---
+
 ### STEP 5: Review Prior Tasks (skip with quick mode)
 
 **Search for related or duplicate work before starting.**
 
-This step helps avoid duplicate effort and surfaces relevant context from recent work.
+This helps avoid duplicate effort and surfaces relevant context from recent work.
 
 ```bash
-# Extract key terms from task title (remove common words)
-TASK_TITLE="Your task title here"
-# Search for tasks updated in last 7 days with similar keywords
 DATE_7_DAYS_AGO=$(date -d '7 days ago' +%Y-%m-%d 2>/dev/null || date -v-7d +%Y-%m-%d)
 jt search "$SEARCH_TERM" --updated-after "$DATE_7_DAYS_AGO" --limit 20 --json
 ```
 
 **What to look for:**
-- **Duplicates**: Tasks with nearly identical titles or descriptions → may already be complete
-- **Related work**: Tasks touching similar files/features → useful context or dependencies
-- **Recent completions**: Recently closed tasks in same area → learn from their approach
+- **Duplicates**: Closed tasks with nearly identical titles → may already be complete
+- **Related work**: Tasks touching similar files/features → useful context
+- **In-progress**: Another agent working on similar area → coordinate
 
-**Output format** (if relevant tasks found):
-```
-┌─ RELATED TASKS (last 7 days) ───────────────────────────────────┐
-│                                                                 │
-│  Potential duplicates:                                          │
-│    [CLOSED] jat-abc: Similar feature X                          │
-│    → May already address this. Review before proceeding.        │
-│                                                                 │
-│  Related work:                                                  │
-│    [CLOSED] jat-def: Refactored auth module                     │
-│    → Touched same files. Check approach used.                   │
-│                                                                 │
-│    [IN_PROGRESS] jat-ghi: Auth improvements (by OtherAgent)     │
-│    → Currently being worked on. Coordinate to avoid conflicts.  │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-**Actions based on findings:**
-
-1. **Potential duplicate found** (closed task with very similar title/goal):
-
-   First, emit the `needs_input` signal:
-   ```bash
-   jat-signal needs_input '{
-     "taskId": "jat-xyz",
-     "question": "Found potential duplicate: jat-abc. Is this a duplicate, different scope, or incomplete?",
-     "questionType": "duplicate_check",
-     "options": ["duplicate", "different_scope", "incomplete"]
-   }'
-   ```
-
-   Then ask the user using AskUserQuestion:
-   ```
-   Found potential duplicate: jat-abc "Similar feature X" [CLOSED]
-
-   Options:
-   1. This is a duplicate - close my task and reference jat-abc
-   2. Different scope - proceed (explain how this differs)
-   3. Incomplete - jat-abc didn't fully solve it, continue work
-   ```
-
-   **Wait for user response** before proceeding. After response, emit `working` signal to resume:
-   ```bash
-   jat-signal working '{
-     "taskId": "jat-xyz",
-     "taskTitle": "Your task title",
-     "approach": "Proceeding with different scope - this task focuses on X while jat-abc did Y"
-   }'
-   ```
-
-2. **Related closed task found** (similar area, useful context):
-   - Read the task description with `jt show jat-xyz`
-   - Note the approach used and files modified
-   - Mention it in your approach: "Building on jat-xyz which did X..."
-   - **Proceed to Step 6**
-
-3. **Related in-progress task found** (another agent working on similar area):
-   ```bash
-   # Check their file reservations
-   am-reservations --json | jq '.[] | select(.agent != "YourName")'
-
-   # Send coordination message
-   am-send "[jat-abc] Coordination" "Starting jat-xyz which touches similar files. Let me know if conflicts." \
-     --from YourName --to OtherAgent --thread jat-abc
-   ```
-   - Wait for response or check reservations before proceeding
-   - May need to pick a different task if files overlap
-
-**If no relevant tasks found**, proceed to Step 6.
+**If a potential duplicate is found**, emit `needs_input` signal and ask the user before proceeding.
 
 ---
 
@@ -272,7 +233,7 @@ jat-signal starting '{
 
 #### 8B: Emit Working Signal (REQUIRED before coding)
 
-**Do NOT skip this step.** After reading the task and planning your approach, emit the working signal:
+**Do NOT skip this step.** After reading the task, reviewing memory results, and planning your approach, emit the working signal:
 
 ```bash
 jat-signal working '{
@@ -304,9 +265,11 @@ After BOTH signals are emitted, output the banner:
 ✅ Agent: {AGENT_NAME}
 📋 Task: {TASK_TITLE}
 🎯 Priority: P{X}
+🧠 Memory: {N relevant entries found | no index yet | no matches}
 
 ┌─ APPROACH ──────────────────────────────────────────────┐
 │  {YOUR_APPROACH_DESCRIPTION}                            │
+│  (incorporating lessons from past sessions if any)      │
 └─────────────────────────────────────────────────────────┘
 ```
 

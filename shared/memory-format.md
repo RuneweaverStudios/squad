@@ -252,14 +252,14 @@ The `memory/` directory is NOT gitignored - memory files are committed to the re
 
 ### Integration Points
 
-**Write (during `/jat:complete`):**
-1. Gather context: task details, git diff, completion bundle
-2. Generate memory .md file (LLM-assisted or template-based)
+**Write (during `/jat:complete` Step 4.5):**
+1. Gather context: task details, approach, git diff, key decisions
+2. Agent generates memory .md file directly (no LLM call needed)
 3. Write to `.jat/memory/{date}-{taskId}-{slug}.md`
-4. Trigger incremental index update
+4. Run `jat-memory index` to incrementally update search index
 
-**Read (during `/jat:start` Step 5):**
-1. Extract key terms from new task title + description
+**Read (during `/jat:start` Step 4):**
+1. Extract key terms from task title + description
 2. Run `jat-memory search` with those terms
 3. Display relevant snippets to the agent
 4. Agent incorporates context into approach planning

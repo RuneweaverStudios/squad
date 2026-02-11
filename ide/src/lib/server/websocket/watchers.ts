@@ -2,11 +2,19 @@
  * File Watchers for WebSocket Event Broadcasting
  *
  * Watches key files and broadcasts changes to WebSocket subscribers.
- * This replaces/complements the existing SSE implementation for tasks.
+ * This replaces/complements the existing SSE implementation.
  *
- * Watched files:
+ * Watched sources:
  * - .jat/last-touched - Task mutation sentinel (written by lib/tasks.js on every write)
  * - .claude/sessions/agent-*.txt - Agent state changes
+ * - /tmp/jat-signal-tmux-*.json - Agent state signals (working, review, complete, etc.)
+ * - /tmp/claude-question-tmux-*.json - Agent questions pending user response
+ * - tmux session list - Session create/destroy lifecycle events
+ * - tmux pane output - Terminal output streaming
+ *
+ * Architecture:
+ * - fs.watch() for instant file updates (~50ms latency): signals, questions, tasks, agent files
+ * - Polling for tmux operations (1000ms): output capture, session lifecycle
  *
  * Usage:
  *   import { startWatchers, stopWatchers } from '$lib/server/websocket/watchers';
@@ -18,12 +26,25 @@
  *   stopWatchers();
  */
 
-import { watch, type FSWatcher } from 'fs';
+import { watch, readFileSync, existsSync, statSync, readdirSync, type FSWatcher } from 'fs';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { broadcastTaskChange, broadcastTaskUpdate, broadcastAgentState, broadcastOutput, isInitialized, getChannelSubscriberCount } from './connectionPool.js';
+import {
+	broadcastTaskChange,
+	broadcastTaskUpdate,
+	broadcastAgentState,
+	broadcastOutput,
+	broadcastSessionState,
+	broadcastSessionQuestion,
+	broadcastSessionSignal,
+	broadcastSessionComplete,
+	broadcastSessionCreated,
+	broadcastSessionDestroyed,
+	isInitialized,
+	getChannelSubscriberCount
+} from './connectionPool.js';
 // NOTE: Must use relative import (not $lib alias) because this file is transitively
 // imported by vite.config.ts via vitePlugin.ts, and $lib isn't available at config time.
 import { getTasks } from '../jat-tasks.js';
@@ -42,13 +63,40 @@ const SENTINEL_FILENAME = 'last-touched';
 
 const SESSIONS_DIR = join(PROJECT_ROOT, '.claude', 'sessions');
 
+// Signal TTL configuration (mirrors SIGNAL_TTL from constants.ts)
+// Inlined here to avoid importing from $lib which isn't available at vite config time
+const SIGNAL_TTL = {
+	TRANSIENT_MS: 60 * 1000,         // 1 minute for transitional states
+	USER_WAITING_MS: 30 * 60 * 1000, // 30 minutes for states waiting on human
+	USER_WAITING_STATES: ['completed', 'review', 'needs_input', 'working', 'planning'] as const
+};
+
+// Question file max age
+const QUESTION_MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes
+
+// Signal state mapping (signal short names → SessionCard states)
+const SIGNAL_STATE_MAP: Record<string, string> = {
+	'working': 'working',
+	'review': 'ready-for-review',
+	'needs_input': 'needs-input',
+	'idle': 'idle',
+	'completed': 'completed',
+	'starting': 'starting',
+	'compacting': 'compacting',
+	'completing': 'completing',
+	'polishing': 'polishing',
+	'planning': 'planning',
+};
+
 // ============================================================================
 // State
 // ============================================================================
 
 let taskWatcher: FSWatcher | null = null;
 let sessionsWatcher: FSWatcher | null = null;
+let signalWatcher: FSWatcher | null = null;
 let outputPollingInterval: NodeJS.Timeout | null = null;
+let sessionLifecycleInterval: NodeJS.Timeout | null = null;
 let debounceTimers: Map<string, NodeJS.Timeout> = new Map();
 
 /** Task snapshot for field-level change detection */
@@ -68,8 +116,36 @@ const OUTPUT_POLL_INTERVAL = 2000; // Poll every 2 seconds (was 250ms - caused m
 const OUTPUT_LINES = 100; // Number of lines to capture per session
 const EXEC_TIMEOUT_MS = 5000; // Timeout for exec commands
 
+// Session lifecycle polling (matches SSE endpoint interval)
+const SESSION_LIFECYCLE_POLL_INTERVAL = 1000; // 1 second
+
 // Guard against overlapping polls
 let isPolling = false;
+let isLifecyclePolling = false;
+
+// Session lifecycle tracking
+let knownSessions = new Set<string>();
+
+// Signal file watcher state
+const signalFileStates = new Map<string, { state: string | null; completeHash: string | null }>();
+const signalDebounceTimers = new Map<string, NodeJS.Timeout>();
+const SIGNAL_DEBOUNCE_MS = 50;
+
+// Question file watcher state
+const questionFileStates = new Map<string, { hasQuestion: boolean; questionHash: string | null }>();
+const questionDebounceTimers = new Map<string, NodeJS.Timeout>();
+const QUESTION_DEBOUNCE_MS = 50;
+
+// Task cache for session lifecycle (avoids expensive JSONL parsing)
+interface TaskInfo {
+	id: string;
+	title?: string;
+	status?: string;
+	assignee?: string;
+}
+let cachedTasks: TaskInfo[] = [];
+let taskCacheTimestamp = 0;
+const TASK_CACHE_TTL_MS = 5000;
 
 // ============================================================================
 // Task Watcher (watches .jat/last-touched sentinel)
@@ -208,7 +284,7 @@ function startTaskWatcher(): void {
 }
 
 // ============================================================================
-// Agent Sessions Watcher
+// Agent Sessions Watcher (watches .claude/sessions/agent-*.txt)
 // ============================================================================
 
 /**
@@ -289,12 +365,12 @@ function startSessionsWatcher(): void {
 }
 
 // ============================================================================
-// Output Polling (for WebSocket streaming)
+// Signal & Question File Watcher (watches /tmp for jat-signal-* and claude-question-*)
 // ============================================================================
 
 /**
  * Simple hash function for change detection
- * We only need to detect if output changed, not cryptographic security
+ * We only need to detect if content changed, not cryptographic security
  */
 function simpleHash(str: string): string {
 	let hash = 0;
@@ -305,6 +381,337 @@ function simpleHash(str: string): string {
 	}
 	return hash.toString(36);
 }
+
+/**
+ * Read and parse a signal file, returning null if stale or invalid
+ */
+function readSignalFile(sessionName: string): { type: string; state?: string; data?: unknown; timestamp?: string } | null {
+	const signalFile = `/tmp/jat-signal-tmux-${sessionName}.json`;
+
+	try {
+		if (!existsSync(signalFile)) {
+			return null;
+		}
+
+		const content = readFileSync(signalFile, 'utf-8');
+		const signal = JSON.parse(content);
+
+		// Apply TTL based on signal type
+		const stats = statSync(signalFile);
+		const ageMs = Date.now() - stats.mtimeMs;
+		const isUserWaitingState = signal.type === 'state' && SIGNAL_TTL.USER_WAITING_STATES.includes(signal.state);
+		const ttl = signal.type === 'complete' || isUserWaitingState ? SIGNAL_TTL.USER_WAITING_MS : SIGNAL_TTL.TRANSIENT_MS;
+
+		if (ageMs > ttl) {
+			return null;
+		}
+
+		return signal;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Read completion bundle from signal file
+ * Returns full bundle data or null if not a complete signal
+ */
+function readCompletionBundle(sessionName: string): Record<string, unknown> | null {
+	const signalFile = `/tmp/jat-signal-tmux-${sessionName}.json`;
+
+	try {
+		if (!existsSync(signalFile)) {
+			return null;
+		}
+
+		const stats = statSync(signalFile);
+		const ageMs = Date.now() - stats.mtimeMs;
+		if (ageMs > SIGNAL_TTL.USER_WAITING_MS) {
+			return null;
+		}
+
+		const content = readFileSync(signalFile, 'utf-8');
+		const signal = JSON.parse(content);
+
+		if (signal.type === 'complete' && signal.data) {
+			const data = signal.data;
+			return {
+				taskId: data.taskId || '',
+				agentName: data.agentName || '',
+				summary: Array.isArray(data.summary) ? data.summary : (typeof data.summary === 'string' ? [data.summary] : []),
+				quality: data.quality || { tests: 'none', build: 'clean' },
+				humanActions: Array.isArray(data.humanActions) ? data.humanActions : undefined,
+				suggestedTasks: Array.isArray(data.suggestedTasks) ? data.suggestedTasks : undefined,
+				crossAgentIntel: data.crossAgentIntel || undefined,
+				completionMode: data.completionMode || 'review_required',
+				nextTaskId: data.nextTaskId || undefined,
+				nextTaskTitle: data.nextTaskTitle || undefined
+			};
+		}
+
+		return null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Process a signal file change and broadcast appropriate events
+ */
+function processSignalFileChange(sessionName: string): void {
+	if (!isInitialized()) return;
+
+	// Check if anyone is subscribed to sessions channel
+	const subscriberCount = getChannelSubscriberCount('sessions');
+	if (subscriberCount === 0) return;
+
+	const signal = readSignalFile(sessionName);
+	if (!signal) return;
+
+	const prevFileState = signalFileStates.get(sessionName) || { state: null, completeHash: null };
+	const currentFileState = { state: prevFileState.state, completeHash: prevFileState.completeHash };
+
+	// Handle state signals (working, review, needs_input, etc.)
+	if (signal.type === 'state' && signal.state) {
+		const mappedState = SIGNAL_STATE_MAP[signal.state] || signal.state;
+		if (mappedState !== prevFileState.state) {
+			currentFileState.state = mappedState;
+			broadcastSessionState(sessionName, mappedState, {
+				previousState: prevFileState.state,
+				signalPayload: signal.data ? { type: signal.state, ...signal.data as object } : undefined
+			});
+			console.log(`[WS Watcher] Signal state change for ${sessionName}: ${prevFileState.state} -> ${mappedState}${signal.data ? ' (with payload)' : ''}`);
+		}
+	}
+
+	// Handle IDE-initiated signals with direct type (e.g., { type: 'working', data: {...} })
+	if (signal.type && SIGNAL_STATE_MAP[signal.type] && signal.type !== 'state' && signal.type !== 'complete') {
+		const mappedState = SIGNAL_STATE_MAP[signal.type];
+		if (mappedState !== prevFileState.state) {
+			currentFileState.state = mappedState;
+			broadcastSessionState(sessionName, mappedState, {
+				previousState: prevFileState.state
+			});
+			console.log(`[WS Watcher] IDE signal state for ${sessionName}: ${prevFileState.state} -> ${mappedState}`);
+		}
+	}
+
+	// Handle complete signals (full completion bundle)
+	if (signal.type === 'complete') {
+		const bundle = readCompletionBundle(sessionName);
+		const completeHash = bundle ? simpleHash(JSON.stringify(bundle)) : null;
+		if (completeHash !== prevFileState.completeHash) {
+			currentFileState.completeHash = completeHash;
+			if (bundle) {
+				// Persist the completion bundle (lazy import to avoid $lib at config time)
+				if (bundle.taskId) {
+					try {
+						// Dynamic import since completionBundles uses $lib
+						import('../completionBundles.js').then(({ persistCompletionBundle }) => {
+							const result = persistCompletionBundle(bundle.taskId as string, bundle as Parameters<typeof persistCompletionBundle>[1], sessionName);
+							if (result.success) {
+								console.log(`[WS Watcher] Persisted completion bundle for task ${bundle.taskId}`);
+							} else {
+								console.error(`[WS Watcher] Failed to persist bundle for ${bundle.taskId}: ${result.error}`);
+							}
+						}).catch(() => {
+							// Silently fail if module not available
+						});
+					} catch {
+						// Silently fail
+					}
+				}
+
+				// Broadcast completion bundle
+				broadcastSessionComplete(sessionName, bundle);
+				console.log(`[WS Watcher] Complete bundle for ${sessionName}: ${(bundle.summary as string[])?.length || 0} summary items`);
+
+				// Also broadcast the appropriate state change
+				if ((bundle.completionMode as string) === 'auto_proceed') {
+					currentFileState.state = 'auto_proceed';
+					broadcastSessionState(sessionName, 'auto_proceed', {
+						previousState: prevFileState.state,
+						signalPayload: {
+							taskId: bundle.taskId,
+							nextTaskId: bundle.nextTaskId,
+							nextTaskTitle: bundle.nextTaskTitle
+						}
+					});
+					console.log(`[WS Watcher] Auto-proceed triggered for ${sessionName}: next task ${bundle.nextTaskId}`);
+				} else {
+					currentFileState.state = 'completed';
+					broadcastSessionState(sessionName, 'completed', {
+						previousState: prevFileState.state
+					});
+				}
+			}
+		}
+	}
+
+	signalFileStates.set(sessionName, currentFileState);
+}
+
+/**
+ * Process all existing signal files on startup
+ * Ensures clients get current state when connecting
+ */
+function processExistingSignalFiles(): void {
+	try {
+		const files = readdirSync('/tmp').filter(f =>
+			f.startsWith('jat-signal-tmux-') && f.endsWith('.json')
+		);
+
+		signalFileStates.clear();
+
+		for (const filename of files) {
+			const sessionName = filename.replace('jat-signal-tmux-', '').replace('.json', '');
+			if (sessionName) {
+				processSignalFileChange(sessionName);
+			}
+		}
+
+		console.log(`[WS Watcher] Processed ${files.length} existing signal files`);
+	} catch (err) {
+		console.error('[WS Watcher] Failed to process existing signal files:', err);
+	}
+}
+
+/**
+ * Read question data for a session from /tmp/claude-question-tmux-{sessionName}.json
+ */
+function readQuestionData(sessionName: string): { hasQuestion: boolean; questionData?: unknown } {
+	const questionFile = `/tmp/claude-question-tmux-${sessionName}.json`;
+
+	try {
+		if (!existsSync(questionFile)) {
+			return { hasQuestion: false };
+		}
+
+		const stats = statSync(questionFile);
+		const ageMs = Date.now() - stats.mtimeMs;
+
+		if (ageMs > QUESTION_MAX_AGE_MS) {
+			return { hasQuestion: false };
+		}
+
+		const content = readFileSync(questionFile, 'utf-8');
+		const questionData = JSON.parse(content);
+
+		return { hasQuestion: true, questionData };
+	} catch {
+		return { hasQuestion: false };
+	}
+}
+
+/**
+ * Process a question file change and broadcast if question appeared/changed
+ */
+function processQuestionFileChange(sessionName: string): void {
+	if (!isInitialized()) return;
+
+	const subscriberCount = getChannelSubscriberCount('sessions');
+	if (subscriberCount === 0) return;
+
+	const { hasQuestion, questionData } = readQuestionData(sessionName);
+	const questionHash = hasQuestion && questionData ? simpleHash(JSON.stringify(questionData)) : null;
+
+	const prevState = questionFileStates.get(sessionName) || { hasQuestion: false, questionHash: null };
+
+	// Only broadcast if question appeared or changed
+	if (hasQuestion && (!prevState.hasQuestion || questionHash !== prevState.questionHash)) {
+		broadcastSessionQuestion(sessionName, questionData);
+		console.log(`[WS Watcher] Question appeared/changed for ${sessionName}`);
+	}
+
+	questionFileStates.set(sessionName, { hasQuestion, questionHash });
+}
+
+/**
+ * Start watching /tmp for signal and question file changes
+ * Provides instant (~50ms) updates for state changes and questions
+ */
+function startSignalAndQuestionWatcher(): void {
+	if (signalWatcher) {
+		console.log('[WS Watcher] Signal/question watcher already running');
+		return;
+	}
+
+	console.log('[WS Watcher] Starting signal/question file watcher on /tmp');
+
+	// Process existing signal files first
+	processExistingSignalFiles();
+
+	try {
+		signalWatcher = watch('/tmp', { persistent: false }, (_eventType, filename) => {
+			if (!filename || !filename.endsWith('.json')) return;
+
+			// Handle signal files: jat-signal-tmux-{sessionName}.json
+			if (filename.startsWith('jat-signal-tmux-')) {
+				const sessionName = filename.replace('jat-signal-tmux-', '').replace('.json', '');
+				if (!sessionName) return;
+
+				const existingTimer = signalDebounceTimers.get(sessionName);
+				if (existingTimer) clearTimeout(existingTimer);
+
+				signalDebounceTimers.set(sessionName, setTimeout(() => {
+					signalDebounceTimers.delete(sessionName);
+					processSignalFileChange(sessionName);
+				}, SIGNAL_DEBOUNCE_MS));
+				return;
+			}
+
+			// Handle question files: claude-question-tmux-{sessionName}.json
+			if (filename.startsWith('claude-question-tmux-')) {
+				const sessionName = filename.replace('claude-question-tmux-', '').replace('.json', '');
+				if (!sessionName) return;
+
+				const existingTimer = questionDebounceTimers.get(sessionName);
+				if (existingTimer) clearTimeout(existingTimer);
+
+				questionDebounceTimers.set(sessionName, setTimeout(() => {
+					questionDebounceTimers.delete(sessionName);
+					processQuestionFileChange(sessionName);
+				}, QUESTION_DEBOUNCE_MS));
+			}
+		});
+
+		signalWatcher.on('error', (err) => {
+			console.error('[WS Watcher] Signal/question watcher error:', err);
+		});
+
+		console.log('[WS Watcher] Signal/question file watcher started');
+	} catch (err) {
+		console.error('[WS Watcher] Failed to start signal/question watcher:', err);
+	}
+}
+
+/**
+ * Stop the signal/question file watcher
+ */
+function stopSignalAndQuestionWatcher(): void {
+	if (!signalWatcher) return;
+
+	signalWatcher.close();
+	signalWatcher = null;
+
+	// Clear signal debounce timers
+	signalDebounceTimers.forEach(timer => clearTimeout(timer));
+	signalDebounceTimers.clear();
+
+	// Clear question debounce timers
+	questionDebounceTimers.forEach(timer => clearTimeout(timer));
+	questionDebounceTimers.clear();
+
+	// Clear tracked state
+	signalFileStates.clear();
+	questionFileStates.clear();
+
+	console.log('[WS Watcher] Signal/question watcher stopped');
+}
+
+// ============================================================================
+// Session Lifecycle Watcher (detects tmux session create/destroy)
+// ============================================================================
 
 /**
  * Get list of active jat-* tmux sessions
@@ -323,6 +730,135 @@ async function getTmuxSessions(): Promise<string[]> {
 		return [];
 	}
 }
+
+/**
+ * Get tasks with caching to avoid expensive JSONL parsing on every poll
+ */
+function getCachedTasks(): TaskInfo[] {
+	const now = Date.now();
+	if (now - taskCacheTimestamp > TASK_CACHE_TTL_MS || cachedTasks.length === 0) {
+		try {
+			cachedTasks = getTasks({});
+			taskCacheTimestamp = now;
+		} catch {
+			// Continue with stale cache on error
+		}
+	}
+	return cachedTasks;
+}
+
+/**
+ * Poll for tmux session create/destroy events
+ */
+async function pollSessionLifecycle(): Promise<void> {
+	if (isLifecyclePolling) return;
+	if (!isInitialized()) return;
+
+	// Only poll if there are subscribers to the sessions channel
+	const subscriberCount = getChannelSubscriberCount('sessions');
+	if (subscriberCount === 0) return;
+
+	isLifecyclePolling = true;
+
+	try {
+		const sessions = await getTmuxSessions();
+		const currentSessionNames = new Set(sessions);
+
+		// Get task info for agent lookup
+		const allTasks = getCachedTasks();
+		const agentTaskMap = new Map<string, TaskInfo>();
+		allTasks
+			.filter((t: TaskInfo) => t.status === 'in_progress' && t.assignee)
+			.forEach((t: TaskInfo) => {
+				agentTaskMap.set(t.assignee!, t);
+			});
+
+		// Detect new sessions
+		for (const sessionName of currentSessionNames) {
+			if (!knownSessions.has(sessionName)) {
+				const agentName = sessionName.replace(/^jat-/, '');
+				const task = agentTaskMap.get(agentName) || null;
+
+				broadcastSessionCreated(
+					sessionName,
+					agentName,
+					task ? { id: task.id, title: task.title, status: task.status } : null
+				);
+				console.log(`[WS Watcher] Session created: ${sessionName}`);
+			}
+		}
+
+		// Detect destroyed sessions
+		for (const sessionName of knownSessions) {
+			if (!currentSessionNames.has(sessionName)) {
+				broadcastSessionDestroyed(sessionName);
+				console.log(`[WS Watcher] Session destroyed: ${sessionName}`);
+
+				// Clean up tracked state for this session
+				signalFileStates.delete(sessionName);
+				questionFileStates.delete(sessionName);
+				previousOutputHashes.delete(sessionName);
+
+				// Clean up debounce timers for this session
+				const signalTimer = signalDebounceTimers.get(sessionName);
+				if (signalTimer) {
+					clearTimeout(signalTimer);
+					signalDebounceTimers.delete(sessionName);
+				}
+				const questionTimer = questionDebounceTimers.get(sessionName);
+				if (questionTimer) {
+					clearTimeout(questionTimer);
+					questionDebounceTimers.delete(sessionName);
+				}
+			}
+		}
+
+		knownSessions = currentSessionNames;
+	} finally {
+		isLifecyclePolling = false;
+	}
+}
+
+/**
+ * Start session lifecycle polling
+ */
+function startSessionLifecyclePolling(): void {
+	if (sessionLifecycleInterval) {
+		console.log('[WS Watcher] Session lifecycle polling already running');
+		return;
+	}
+
+	console.log(`[WS Watcher] Starting session lifecycle polling (${SESSION_LIFECYCLE_POLL_INTERVAL}ms interval)`);
+
+	// Initialize known sessions
+	getTmuxSessions().then(sessions => {
+		knownSessions = new Set(sessions);
+		console.log(`[WS Watcher] Initialized with ${sessions.length} known tmux sessions`);
+	});
+
+	sessionLifecycleInterval = setInterval(() => {
+		pollSessionLifecycle();
+	}, SESSION_LIFECYCLE_POLL_INTERVAL);
+
+	console.log('[WS Watcher] Session lifecycle polling started');
+}
+
+/**
+ * Stop session lifecycle polling
+ */
+function stopSessionLifecyclePolling(): void {
+	if (sessionLifecycleInterval) {
+		clearInterval(sessionLifecycleInterval);
+		sessionLifecycleInterval = null;
+		knownSessions.clear();
+		isLifecyclePolling = false;
+		console.log('[WS Watcher] Session lifecycle polling stopped');
+	}
+}
+
+// ============================================================================
+// Output Polling (for WebSocket streaming)
+// ============================================================================
 
 /**
  * Capture output from a single tmux session
@@ -448,6 +984,8 @@ export function startWatchers(): void {
 	console.log('[WS Watcher] Starting all watchers...');
 	startTaskWatcher();
 	startSessionsWatcher();
+	startSignalAndQuestionWatcher();
+	startSessionLifecyclePolling();
 	startOutputPolling();
 	isWatching = true;
 }
@@ -463,10 +1001,13 @@ export function stopWatchers(): void {
 	debounceTimers.forEach(timer => clearTimeout(timer));
 	debounceTimers.clear();
 
-	// Stop output polling
+	// Stop polling
 	stopOutputPolling();
+	stopSessionLifecyclePolling();
 
-	// Close watchers
+	// Stop file watchers
+	stopSignalAndQuestionWatcher();
+
 	if (taskWatcher) {
 		taskWatcher.close();
 		taskWatcher = null;

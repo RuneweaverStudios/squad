@@ -512,9 +512,14 @@ function processExistingSignalFiles(): void {
 
 		for (const filename of files) {
 			const sessionName = filename.replace('jat-signal-tmux-', '').replace('.json', '');
-			if (sessionName) {
-				processSignalFileChange(sessionName);
+			if (!sessionName) continue;
+
+			// Skip signal files for sessions that don't exist as tmux sessions
+			if (knownSessions.size > 0 && !knownSessions.has(sessionName)) {
+				continue;
 			}
+
+			processSignalFileChange(sessionName);
 		}
 
 		console.log(`[SSE Signal] Processed ${files.length} existing signal files`);
@@ -1114,14 +1119,15 @@ function startPolling(outputLines: number, debounceMs: number): void {
 
 	console.log(`[SSE Sessions] Starting polling (${POLL_INTERVAL_MS}ms interval, ${debounceMs}ms debounce)`);
 
-	// Initialize known sessions
+	// Initialize known sessions FIRST, then start signal watcher
+	// This ensures processExistingSignalFiles() can filter out dead sessions
 	getTmuxSessions().then(sessions => {
 		knownSessions = new Set(sessions.map(s => s.name));
 		console.log(`[SSE Sessions] Initialized with ${sessions.length} sessions`);
-	});
 
-	// Start signal file watcher for real-time signal updates
-	startSignalWatcher();
+		// NOW start signal watcher (processExistingSignalFiles will use populated knownSessions)
+		startSignalWatcher();
+	});
 
 	pollInterval = setInterval(() => {
 		pollSessions(outputLines, debounceMs).catch(err => {
