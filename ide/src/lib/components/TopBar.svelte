@@ -54,6 +54,7 @@
 	import { onMount } from "svelte";
 	import { SPAWN_STAGGER_MS } from "$lib/config/spawnConfig";
 	import { getMaxSessions } from "$lib/stores/preferences.svelte";
+	import ProjectSelector from "./ProjectSelector.svelte";
 
 	// Initialize sort stores on mount
 	onMount(() => {
@@ -320,6 +321,10 @@
 		reviewRules?: ReviewRule[];
 		/** Callback to open global file search (Ctrl+Shift+F) */
 		onGlobalSearchOpen?: () => void;
+		/** Callback when project selection changes */
+		onProjectChange?: (project: string) => void;
+		/** Task counts per project (for ProjectSelector) */
+		taskCounts?: Map<string, number> | null;
 	}
 
 	let {
@@ -339,11 +344,16 @@
 		epicsWithReady = [],
 		reviewRules = [],
 		onGlobalSearchOpen,
+		onProjectChange,
+		taskCounts = null,
 	}: Props = $props();
 
 
-	// Get actual project list (filter out "All Projects")
+	// Get actual project list (filter out "All Projects" for legacy compat)
 	const actualProjects = $derived(projects.filter((p) => p !== "All Projects"));
+
+	// Convert projectColors Record to Map for ProjectSelector
+	const projectColorsMap = $derived(new Map(Object.entries(projectColors)));
 
 
 	// Max sessions from user preferences (reactive)
@@ -527,6 +537,21 @@
 			<path d="M14 10l2 2l-2 2"></path>
 		</svg>
 	</button>
+
+	<!-- Project Selector (global, always visible) -->
+	{#if actualProjects.length > 0 && onProjectChange}
+		<div class="ml-3 flex-none" style="min-width: 100px; max-width: 180px;">
+			<ProjectSelector
+				projects={actualProjects}
+				{selectedProject}
+				onProjectChange={onProjectChange}
+				{taskCounts}
+				compact={true}
+				showColors={true}
+				projectColors={projectColorsMap}
+			/>
+		</div>
+	{/if}
 
 	<!-- Left side utilities -->
 	<div class="flex-1 flex items-center gap-3 px-4">

@@ -28,7 +28,7 @@
 	import { hoveredSessionName, triggerCompleteFlash, jumpToSession } from '$lib/stores/hoveredSession';
 	import { get } from 'svelte/store';
 	import { browser } from '$app/environment';
-	import { initPreferences, getActiveProject } from '$lib/stores/preferences.svelte';
+	import { initPreferences, getActiveProject, setActiveProject } from '$lib/stores/preferences.svelte';
 	import { isSetupSkipped } from '$lib/stores/onboardingStore.svelte';
 	import GlobalSearch from '$lib/components/files/GlobalSearch.svelte';
 	import { getSessions as getWorkSessions, startActivityPolling, stopActivityPolling, fetch as fetchWorkSessions } from '$lib/stores/workSessions.svelte';
@@ -47,8 +47,8 @@
 
 	let { children } = $props();
 
-	// Shared project state for entire app
-	let selectedProject = $state('All Projects');
+	// Shared project state for entire app (always a specific project, never "All Projects")
+	let selectedProject = $state('');
 	let allTasks = $state([]);
 	let configProjects = $state<string[]>([]); // Projects from JAT config (visible ones)
 
@@ -140,17 +140,39 @@
 	const isSetupPage = $derived($page.url.pathname === '/setup');
 
 	// Derived project data
-	// Use config projects (from JAT config) with "All Projects" prepended
-	const projects = $derived(['All Projects', ...configProjects]);
+	// Use config projects directly (no "All Projects" option)
+	const projects = $derived(configProjects);
 	// Task counts by project (used by child pages via context if needed)
 	const taskCounts = $derived(getTaskCountByProject(allTasks, 'open'));
 
 
-	// Sync selected project from URL parameter
+	// Sync selected project: URL param > localStorage > first config project
+	let projectInitialized = false;
 	$effect(() => {
-		const params = new URLSearchParams($page.url.searchParams);
-		const projectParam = params.get('project');
-		selectedProject = projectParam || 'All Projects';
+		const projectParam = $page.url.searchParams.get('project');
+		if (projectParam && configProjects.includes(projectParam)) {
+			// URL param takes priority (for deep links)
+			selectedProject = projectParam;
+			projectInitialized = true;
+		} else if (!projectInitialized && configProjects.length > 0) {
+			// First load: try localStorage, fall back to first project
+			const stored = getActiveProject();
+			if (stored && configProjects.includes(stored)) {
+				selectedProject = stored;
+			} else {
+				selectedProject = configProjects[0];
+			}
+			projectInitialized = true;
+			// Set URL param for the restored project
+			const url = new URL(window.location.href);
+			url.searchParams.set('project', selectedProject);
+			goto(url.toString(), { replaceState: true, noScroll: true, keepFocus: true });
+		} else if (projectInitialized && !projectParam && configProjects.length > 0) {
+			// URL param was removed (shouldn't happen normally) - keep current or fall back
+			if (!configProjects.includes(selectedProject)) {
+				selectedProject = configProjects[0];
+			}
+		}
 	});
 
 	// Sync available projects to drawer store (for TaskCreationDrawer)
@@ -702,14 +724,11 @@
 	// Handle project selection change
 	function handleProjectChange(project: string) {
 		selectedProject = project;
+		setActiveProject(project);
 
 		// Update URL parameter (use goto to trigger reactivity in child pages)
 		const url = new URL(window.location.href);
-		if (project === 'All Projects') {
-			url.searchParams.delete('project');
-		} else {
-			url.searchParams.set('project', project);
-		}
+		url.searchParams.set('project', project);
 		goto(url.toString(), { replaceState: true, noScroll: true, keepFocus: true });
 	}
 
@@ -1011,6 +1030,8 @@
 				{epicsWithReady}
 				{reviewRules}
 				onGlobalSearchOpen={() => { globalSearchOpen = true; }}
+				onProjectChange={handleProjectChange}
+				{taskCounts}
 			/>
 
 			<!-- Page content -->

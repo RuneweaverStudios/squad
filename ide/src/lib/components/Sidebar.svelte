@@ -23,6 +23,17 @@
 	import { unifiedNavConfig } from '$lib/config/navConfig';
 	import { isSidebarCollapsed, gitChangesCount, activeSessionsCount, runningServersCount, activeAgentSessionsCount, fileChangesCount } from '$lib/stores/drawerStore';
 
+	// Current project from URL (for preserving ?project= across navigation)
+	const currentProject = $derived($page.url.searchParams.get('project'));
+
+	// Build nav href preserving the current project param
+	function getNavHref(href: string): string {
+		if (currentProject) {
+			return `${href}?project=${encodeURIComponent(currentProject)}`;
+		}
+		return href;
+	}
+
 	// Helper to check if nav item is active
 	function isActive(href: string): boolean {
 		const currentPath = $page.url.pathname;
@@ -130,7 +141,7 @@
 			{#each mainItems as navItem, index}
 				{@const active = isActive(navItem.href)}
 				<a
-					href={navItem.href}
+					href={getNavHref(navItem.href)}
 					class="w-full flex items-center gap-3 px-3 py-2.5 rounded transition-all duration-200 group relative
 						{$isSidebarCollapsed ? 'justify-center tooltip tooltip-right fade-in-left fade-in-delay-' + index : ''}
 						{active ? '' : 'industrial-hover'}"
@@ -309,7 +320,7 @@
 			{#each viewsItems as navItem, index}
 				{@const active = isActive(navItem.href)}
 				<a
-					href={navItem.href}
+					href={getNavHref(navItem.href)}
 					class="w-full flex items-center gap-3 px-3 py-2 rounded transition-all duration-200 group relative
 						{$isSidebarCollapsed ? 'justify-center tooltip tooltip-right fade-in-left fade-in-delay-' + (mainItems.length + index) : ''}
 						{active ? '' : 'industrial-hover'}"
@@ -410,7 +421,7 @@
 			{#each labsItems as navItem, index}
 				{@const active = isActive(navItem.href)}
 				<a
-					href={navItem.href}
+					href={getNavHref(navItem.href)}
 					class="w-full flex items-center gap-3 px-3 py-2 rounded transition-all duration-200 group
 						{$isSidebarCollapsed ? 'justify-center tooltip tooltip-right fade-in-left fade-in-delay-' + (mainItems.length + viewsItems.length + index) : ''}
 						{active ? '' : 'industrial-hover'}"

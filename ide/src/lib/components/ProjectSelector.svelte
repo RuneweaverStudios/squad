@@ -109,9 +109,7 @@
 					style="--project-color: {projColor};"
 					onclick={() => handleSelect(project)}
 				>
-					{#if project !== "All Projects"}
-						<span class="item-dot"></span>
-					{/if}
+					<span class="item-dot"></span>
 					<span class="item-label">{formatProjectOption(project)}</span>
 					{#if selectedProject === project}
 						<svg class="check-icon" viewBox="0 0 16 16" fill="currentColor">
@@ -162,21 +160,7 @@
 		box-shadow: 0 0 10px color-mix(in oklch, var(--project-color) 25%, transparent);
 	}
 
-	.trigger-chip.neutral {
-		background: oklch(0.22 0.02 250);
-		border-color: oklch(0.32 0.02 250);
-		color: oklch(0.70 0.02 250);
-		box-shadow: none;
-	}
-
-	.trigger-chip.neutral:hover {
-		background: oklch(0.26 0.02 250);
-		border-color: oklch(0.38 0.02 250);
-		color: oklch(0.80 0.02 250);
-		box-shadow: none;
-	}
-
-	.chip-dot {
+.chip-dot {
 		width: 0.5rem;
 		height: 0.5rem;
 		border-radius: 50%;

@@ -192,11 +192,11 @@ export function compareTaskIds(idA: string, idB: string): number {
  * ];
  *
  * getProjectsFromTasks(tasks)
- * // ["All Projects", "chimaro", "jat", "jomarchy"]
+ * // ["chimaro", "jat", "jomarchy"]
  */
 export function getProjectsFromTasks(tasks: Task[]): string[] {
   if (!Array.isArray(tasks)) {
-    return ['All Projects'];
+    return [];
   }
 
   // Extract unique project names
@@ -218,8 +218,7 @@ export function getProjectsFromTasks(tasks: Task[]): string[] {
     a.localeCompare(b, undefined, { sensitivity: 'base' })
   );
 
-  // Always return "All Projects" as the first option
-  return ['All Projects', ...projects];
+  return projects;
 }
 
 /**
@@ -308,17 +307,16 @@ export function getProjectPath(taskId: string): string | null {
  * filterTasksByProject(tasks, "chimaro")
  * // [{ id: "chimaro-abc", title: "Task 1" }]
  *
- * filterTasksByProject(tasks, "All Projects")
- * // [{ id: "chimaro-abc", title: "Task 1" }, { id: "jat-def", title: "Task 2" }]
+ * filterTasksByProject(tasks, "")
+ * // [] (empty project name returns nothing)
  */
 export function filterTasksByProject(tasks: Task[], projectName: string): Task[] {
   if (!Array.isArray(tasks)) {
     return [];
   }
 
-  // "All Projects" returns everything
-  if (projectName === 'All Projects' || !projectName) {
-    return tasks;
+  if (!projectName) {
+    return [];
   }
 
   return tasks.filter(task => {
