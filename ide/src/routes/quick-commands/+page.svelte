@@ -85,7 +85,7 @@
 	let fileSearchQuery = $state('');
 	let fileAutocompleteIndex = $state(0);
 	let atTriggerPosition = $state(0); // cursor position of the @ that triggered autocomplete
-	let textareaRef = $state<HTMLTextAreaElement | null>(null);
+	let textareaRef = $state<HTMLDivElement | null>(null);
 	let editorTextareaRef = $state<HTMLTextAreaElement | null>(null);
 	let activeAutocompleteTarget = $state<'command' | 'editor'>('command');
 	let autocompleteRef = $state<HTMLDivElement | null>(null);
@@ -223,7 +223,6 @@
 	async function runCustomCommand() {
 		if (!commandPrompt.trim() || isExecuting) return;
 		await executeCommand(commandPrompt.trim(), selectedProject, selectedModel);
-		referencedFiles = []; // Clear chips after execution
 	}
 
 	// --- Template execution ---
@@ -412,21 +411,69 @@
 	}
 
 	function handleTextareaInput(e: Event, target: 'command' | 'editor' = 'command') {
+		activeAutocompleteTarget = target;
+
+		if (target === 'command') {
+			syncCommandPrompt();
+			// Clean up empty contenteditable (remove lingering <br>)
+			if (!commandPrompt.trim() && textareaRef) {
+				textareaRef.innerHTML = '';
+			}
+
+			const sel = window.getSelection();
+			if (!sel || sel.rangeCount === 0) {
+				showFileAutocomplete = false;
+				fileSearchResults = [];
+				return;
+			}
+
+			const range = sel.getRangeAt(0);
+
+			// Get text before cursor using Range — works whether cursor is in
+			// a text node OR an element node (common after chip insertion)
+			let beforeCursor = '';
+			try {
+				const preRange = document.createRange();
+				preRange.selectNodeContents(textareaRef!);
+				preRange.setEnd(range.startContainer, range.startOffset);
+				beforeCursor = preRange.toString();
+			} catch {
+				showFileAutocomplete = false;
+				fileSearchResults = [];
+				return;
+			}
+
+			const atMatch = beforeCursor.match(/@([\w\-\.\/]*)$/);
+
+			if (atMatch) {
+				fileSearchQuery = atMatch[1];
+				showFileAutocomplete = true;
+
+				if (fileSearchTimeout) clearTimeout(fileSearchTimeout);
+				fileSearchTimeout = setTimeout(() => {
+					searchFiles(fileSearchQuery);
+				}, 150);
+			} else {
+				showFileAutocomplete = false;
+				fileSearchResults = [];
+			}
+
+			syncReferencedFiles();
+			return;
+		}
+
+		// Editor target - standard textarea approach
 		const textarea = e.target as HTMLTextAreaElement;
 		const cursorPos = textarea.selectionStart;
 		const text = textarea.value;
-		activeAutocompleteTarget = target;
-
-		// Look backwards from cursor for @ pattern (file path after @)
 		const beforeCursor = text.slice(0, cursorPos);
 		const atMatch = beforeCursor.match(/@([\w\-\.\/]*)$/);
 
 		if (atMatch) {
 			atTriggerPosition = cursorPos - atMatch[0].length;
-			fileSearchQuery = atMatch[1]; // the part after @
+			fileSearchQuery = atMatch[1];
 			showFileAutocomplete = true;
 
-			// Debounce the search
 			if (fileSearchTimeout) clearTimeout(fileSearchTimeout);
 			fileSearchTimeout = setTimeout(() => {
 				searchFiles(fileSearchQuery);
@@ -434,11 +481,6 @@
 		} else {
 			showFileAutocomplete = false;
 			fileSearchResults = [];
-		}
-
-		// Sync file chips - remove chips for paths no longer in prompt (main command only)
-		if (target === 'command') {
-			syncReferencedFiles();
 		}
 	}
 
@@ -476,55 +518,185 @@
 	}
 
 	function selectFileFromAutocomplete(file: { path: string; name: string; folder: string }) {
-		const isEditor = activeAutocompleteTarget === 'editor';
-		const ref = isEditor ? editorTextareaRef : textareaRef;
-		if (!ref) return;
+		if (activeAutocompleteTarget === 'editor') {
+			// Editor uses standard textarea approach
+			const ref = editorTextareaRef;
+			if (!ref) return;
 
-		const fullPath = `@${file.path}`;
-		const currentValue = isEditor ? editorPrompt : commandPrompt;
-		const before = currentValue.slice(0, atTriggerPosition);
-		const after = currentValue.slice(ref.selectionStart);
-		const newValue = before + fullPath + ' ' + after;
+			const fullPath = `@${file.path}`;
+			const before = editorPrompt.slice(0, atTriggerPosition);
+			const after = editorPrompt.slice(ref.selectionStart);
+			editorPrompt = before + fullPath + ' ' + after;
 
-		if (isEditor) {
-			editorPrompt = newValue;
-		} else {
-			commandPrompt = newValue;
-			// Track referenced file (main command only)
-			if (!referencedFiles.find(f => f.path === file.path)) {
-				referencedFiles = [...referencedFiles, { path: file.path, name: file.name }];
+			showFileAutocomplete = false;
+			fileSearchResults = [];
+
+			requestAnimationFrame(() => {
+				if (ref) {
+					const newPos = before.length + fullPath.length + 1;
+					ref.focus();
+					ref.setSelectionRange(newPos, newPos);
+				}
+			});
+			return;
+		}
+
+		// Command uses contenteditable with inline chip
+		if (!textareaRef) return;
+
+		const sel = window.getSelection();
+		if (!sel || sel.rangeCount === 0) return;
+
+		const range = sel.getRangeAt(0);
+
+		// Resolve the text node at cursor — browser may place caret in element node
+		// (common after contenteditable="false" chip elements)
+		let textNode: Node = range.startContainer;
+		let cursorPos = range.startOffset;
+		if (textNode.nodeType !== Node.TEXT_NODE) {
+			const children = Array.from(textNode.childNodes);
+			const prev = children[cursorPos - 1];
+			if (prev && prev.nodeType === Node.TEXT_NODE) {
+				textNode = prev;
+				cursorPos = (prev.textContent || '').length;
+			} else if (prev) {
+				// Walk into element to find last text node
+				let last: Node | null = prev;
+				while (last && last.nodeType !== Node.TEXT_NODE) {
+					last = last.lastChild;
+				}
+				if (last) {
+					textNode = last;
+					cursorPos = (last.textContent || '').length;
+				} else {
+					return;
+				}
+			} else {
+				return;
 			}
 		}
 
+		const text = textNode.textContent || '';
+		const beforeCursor = text.slice(0, cursorPos);
+
+		// Find the @ that triggered autocomplete
+		const atMatch = beforeCursor.match(/@([\w\-\.\/]*)$/);
+		if (!atMatch) return;
+
+		const atPos = cursorPos - atMatch[0].length;
+		const beforeText = text.slice(0, atPos);
+		const afterText = text.slice(cursorPos);
+
+		const parent = textNode.parentNode!;
+
+		// Create before text node (only if non-empty)
+		if (beforeText) {
+			parent.insertBefore(document.createTextNode(beforeText), textNode);
+		}
+
+		// Create chip element
+		const chip = document.createElement('span');
+		chip.contentEditable = 'false';
+		chip.dataset.filePath = file.path;
+		chip.className = 'inline-file-chip';
+		chip.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:12px;height:12px;flex-shrink:0;"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>\u00A0${file.name}`;
+		parent.insertBefore(chip, textNode);
+
+		// Create after text node with a leading space for continued typing
+		const afterNode = document.createTextNode('\u00A0' + afterText);
+		parent.insertBefore(afterNode, textNode);
+
+		// Remove original text node
+		parent.removeChild(textNode);
+
+		// Position cursor after the space
+		const newRange = document.createRange();
+		newRange.setStart(afterNode, 1);
+		newRange.collapse(true);
+		sel.removeAllRanges();
+		sel.addRange(newRange);
+
+		// Track referenced file
+		if (!referencedFiles.find(f => f.path === file.path)) {
+			referencedFiles = [...referencedFiles, { path: file.path, name: file.name }];
+		}
+
+		syncCommandPrompt();
 		showFileAutocomplete = false;
 		fileSearchResults = [];
-
-		// Restore focus and cursor position
-		requestAnimationFrame(() => {
-			if (ref) {
-				const newPos = before.length + fullPath.length + 1;
-				ref.focus();
-				ref.setSelectionRange(newPos, newPos);
-			}
-		});
 	}
 
 	function removeFileReference(path: string) {
 		referencedFiles = referencedFiles.filter(f => f.path !== path);
-		// Also remove from the prompt text
-		commandPrompt = commandPrompt.replace(new RegExp(`@${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s?`, 'g'), '');
+		// Remove chip from contenteditable DOM
+		if (textareaRef) {
+			const chips = textareaRef.querySelectorAll(`[data-file-path="${CSS.escape(path)}"]`);
+			chips.forEach(chip => {
+				// Remove trailing space if present
+				const next = chip.nextSibling;
+				if (next && next.nodeType === Node.TEXT_NODE && next.textContent?.startsWith('\u00A0')) {
+					next.textContent = next.textContent.slice(1);
+				}
+				chip.remove();
+			});
+			syncCommandPrompt();
+		}
 	}
 
-	// Sync referencedFiles when prompt changes (detect manually typed @path references)
+	// Sync referencedFiles from DOM chips (remove tracked files whose chip was deleted)
 	function syncReferencedFiles() {
-		const pattern = /@([\w\-\.\/]+\.[\w\-\.\/]+)/g;
+		if (!textareaRef) return;
+		const chips = textareaRef.querySelectorAll('[data-file-path]');
 		const paths = new Set<string>();
-		let match;
-		while ((match = pattern.exec(commandPrompt)) !== null) {
-			paths.add(match[1]);
-		}
-		// Remove chips for files no longer in prompt
+		chips.forEach(chip => {
+			const p = (chip as HTMLElement).dataset.filePath;
+			if (p) paths.add(p);
+		});
 		referencedFiles = referencedFiles.filter(f => paths.has(f.path));
+	}
+
+	// --- Contenteditable helpers ---
+	/** Extract prompt text from contenteditable, converting chips to @path */
+	function getPromptText(el: HTMLElement): string {
+		let result = '';
+		for (const node of Array.from(el.childNodes)) {
+			if (node.nodeType === Node.TEXT_NODE) {
+				result += node.textContent || '';
+			} else if (node instanceof HTMLElement) {
+				if (node.dataset.filePath) {
+					result += `@${node.dataset.filePath}`;
+				} else if (node.tagName === 'BR') {
+					result += '\n';
+				} else if (node.tagName === 'DIV' || node.tagName === 'P') {
+					if (result.length > 0 && !result.endsWith('\n')) result += '\n';
+					result += getPromptText(node);
+				} else {
+					result += getPromptText(node);
+				}
+			}
+		}
+		return result;
+	}
+
+	function syncCommandPrompt() {
+		if (!textareaRef) return;
+		commandPrompt = getPromptText(textareaRef);
+	}
+
+	function handlePaste(e: ClipboardEvent) {
+		e.preventDefault();
+		const text = e.clipboardData?.getData('text/plain') || '';
+		const sel = window.getSelection();
+		if (!sel || sel.rangeCount === 0) return;
+		const range = sel.getRangeAt(0);
+		range.deleteContents();
+		const textNode = document.createTextNode(text);
+		range.insertNode(textNode);
+		range.setStartAfter(textNode);
+		range.collapse(true);
+		sel.removeAllRanges();
+		sel.addRange(range);
+		syncCommandPrompt();
 	}
 
 	// --- Helpers ---
@@ -547,9 +719,13 @@
 	}
 
 	function rerunFromHistory(entry: ExecutionResult) {
+		if (textareaRef) {
+			textareaRef.textContent = entry.prompt;
+		}
 		commandPrompt = entry.prompt;
 		selectedProject = entry.project;
 		selectedModel = entry.model;
+		referencedFiles = [];
 	}
 </script>
 
@@ -590,19 +766,29 @@
 					</span>
 				</div>
 
-				<!-- Textarea with @file autocomplete -->
+				<!-- Contenteditable with inline @file chips -->
 				<div class="relative">
-					<textarea
+					<div
 						bind:this={textareaRef}
-						bind:value={commandPrompt}
-						placeholder="Enter a prompt to send to Claude... Use @path/to/file to inject file contents"
-						rows="3"
-						class="w-full rounded-md px-3 py-2 text-sm resize-y"
-						style="background: oklch(0.14 0.01 250); border: 1px solid oklch(0.30 0.02 250); color: oklch(0.90 0.01 250); min-height: 72px;"
-						oninput={handleTextareaInput}
-						onkeydown={handleTextareaKeydown}
+						contenteditable="true"
+						role="textbox"
+						aria-multiline="true"
+						class="w-full rounded-md px-3 py-2 text-sm"
+						style="background: oklch(0.14 0.01 250); border: 1px solid oklch(0.30 0.02 250); color: oklch(0.90 0.01 250); min-height: 72px; max-height: 240px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; outline: none; resize: vertical; line-height: 1.6;"
+						oninput={(e) => handleTextareaInput(e, 'command')}
+						onkeydown={(e) => handleTextareaKeydown(e, 'command')}
+						onpaste={handlePaste}
 						onblur={() => { setTimeout(() => { showFileAutocomplete = false; }, 200); }}
-					></textarea>
+					></div>
+					<!-- Placeholder overlay -->
+					{#if !commandPrompt.trim()}
+						<div
+							class="absolute top-0 left-0 px-3 py-2 text-sm pointer-events-none"
+							style="color: oklch(0.40 0.01 250);"
+						>
+							Enter a prompt to send to Claude... Use @file to inject file contents
+						</div>
+					{/if}
 
 					<!-- @file autocomplete dropdown -->
 					{#if showFileAutocomplete && fileSearchResults.length > 0}
@@ -639,32 +825,6 @@
 						</div>
 					{/if}
 				</div>
-
-				<!-- Referenced file chips -->
-				{#if referencedFiles.length > 0}
-					<div class="flex flex-wrap gap-1.5 mt-2">
-						{#each referencedFiles as file (file.path)}
-							<span
-								class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition-all"
-								style="background: oklch(0.25 0.06 200 / 0.4); color: oklch(0.80 0.10 200); border: 1px solid oklch(0.35 0.08 200 / 0.4);"
-							>
-								<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3 h-3">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-								</svg>
-								{file.name}
-								<button
-									onclick={() => removeFileReference(file.path)}
-									class="ml-0.5 rounded-full p-0.5 transition-colors hover:bg-white/10"
-									title="Remove file reference"
-								>
-									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-2.5 h-2.5">
-										<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-									</svg>
-								</button>
-							</span>
-						{/each}
-					</div>
-				{/if}
 
 				<div class="flex items-center gap-3 mt-3">
 					<!-- Project selector -->
@@ -1268,3 +1428,34 @@
 		</div>
 	</div>
 {/if}
+
+<style>
+	/* :global needed because chips are created via DOM manipulation, not Svelte templates */
+	:global(.inline-file-chip) {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		padding: 1px 7px 1px 5px;
+		margin: 0 2px;
+		border-radius: 4px;
+		background: oklch(0.25 0.06 200 / 0.4);
+		border: 1px solid oklch(0.35 0.08 200 / 0.4);
+		color: oklch(0.80 0.10 200);
+		font-size: 0.75rem;
+		line-height: 1.4;
+		vertical-align: baseline;
+		user-select: none;
+		cursor: default;
+		white-space: nowrap;
+	}
+
+	:global(.inline-file-chip:hover) {
+		background: oklch(0.28 0.07 200 / 0.5);
+		border-color: oklch(0.40 0.10 200 / 0.5);
+	}
+
+	:global([contenteditable='true']:focus) {
+		border-color: oklch(0.45 0.10 200) !important;
+		box-shadow: 0 0 0 1px oklch(0.45 0.10 200 / 0.3);
+	}
+</style>
