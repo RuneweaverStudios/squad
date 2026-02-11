@@ -15,15 +15,12 @@
 
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
 	import { fade } from 'svelte/transition';
 	import GitPanel from '$lib/components/files/GitPanel.svelte';
 	import DiffViewer from '$lib/components/files/DiffViewer.svelte';
 	import SupabasePanel from '$lib/components/files/SupabasePanel.svelte';
 	import MigrationViewer from '$lib/components/files/MigrationViewer.svelte';
 	import ResizableDivider from '$lib/components/ResizableDivider.svelte';
-	import ProjectSelector from '$lib/components/ProjectSelector.svelte';
-	import { getActiveProject, setActiveProject } from '$lib/stores/preferences.svelte';
 	import { FilesSkeleton } from '$lib/components/skeleton';
 
 	// Types
@@ -58,14 +55,6 @@
 
 	// Supabase project detection
 	let hasSupabase = $state(false);
-
-	// Derived: project names for the ProjectSelector (sorted by last activity from API)
-	const projectNames = $derived(projects.map(p => p.name));
-
-	// Derived: project colors map for immediate color display
-	const projectColors = $derived(
-		new Map(projects.filter(p => p.activeColor).map(p => [p.name, p.activeColor!]))
-	);
 
 	// Layout state
 	let leftPanelWidth = $state(400);
@@ -127,20 +116,11 @@
 			const projectExists = projects.some(p => p.name === projectParam);
 			if (projectExists && selectedProject !== projectParam) {
 				selectedProject = projectParam;
+				// Clear selected file when changing projects
+				selectedFilePath = null;
 			}
 		}
 	});
-
-	// Handle project change
-	function handleProjectChange(projectName: string) {
-		selectedProject = projectName;
-		setActiveProject(projectName);
-		// Clear selected file when changing projects
-		selectedFilePath = null;
-		const url = new URL(window.location.href);
-		url.searchParams.set('project', projectName);
-		goto(url.pathname + url.search, { replaceState: true, noScroll: true });
-	}
 
 	// Fetch visible projects
 	async function fetchProjects() {
@@ -154,18 +134,6 @@
 			}
 
 			projects = data.projects || [];
-
-			// If no project selected but we have projects, choose default
-			if (projects.length > 0 && !$page.url.searchParams.get('project')) {
-				const activeProject = getActiveProject();
-				const projectExists = activeProject && projects.some(p => p.name === activeProject);
-
-				if (projectExists) {
-					handleProjectChange(activeProject);
-				} else {
-					handleProjectChange(projects[0].name);
-				}
-			}
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to load projects';
 			console.error('[Git] Failed to fetch projects:', err);
@@ -363,16 +331,7 @@
 									<path d="M13.5 3L6 14h6l-1.5 7L18 10h-6l1.5-7z"/>
 								</svg>
 							{/if}
-							<div class="project-selector-wrapper">
-								<ProjectSelector
-									projects={projectNames}
-									selectedProject={selectedProject || 'Select Project'}
-									onProjectChange={handleProjectChange}
-									showColors={true}
-									compact={false}
-									{projectColors}
-								/>
-							</div>
+							<span class="font-medium text-base-content/90">{selectedProject || 'No project selected'}</span>
 						</div>
 						{#if hasSupabase}
 							<div class="mode-toggle">
@@ -588,13 +547,7 @@
 		min-width: 0;
 	}
 
-	/* Make compact ProjectSelector fill available width */
-	.project-selector-wrapper > :global(*) {
-		display: block;
-		width: 100%;
-	}
-
-	.panel-title-icon {
+.panel-title-icon {
 		width: 1rem;
 		height: 1rem;
 		flex-shrink: 0;

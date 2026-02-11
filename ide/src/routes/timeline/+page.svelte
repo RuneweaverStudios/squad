@@ -1,12 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
 	import TimelineGantt from '$lib/components/graph/TimelineGantt.svelte';
 	import TaskDetailDrawer from '$lib/components/TaskDetailDrawer.svelte';
 	import { TimelineSkeleton } from '$lib/components/skeleton';
-	import ProjectSelector from '$lib/components/ProjectSelector.svelte';
-	import { getProjectsFromTasks, getTaskCountByProject } from '$lib/utils/projectUtils';
 
 	// Task type
 	interface Task {
@@ -33,39 +30,21 @@
 	let selectedStatus = $state('open');
 	let searchQuery = $state('');
 
-	// Read project filter from URL (managed by root layout)
-	let selectedProject = $state('All Projects');
+	// Read project filter from URL (managed by TopBar via root layout)
+	let selectedProject = $state('');
 
 	// Sync selectedProject from URL params
 	$effect(() => {
 		const projectParam = $page.url.searchParams.get('project');
-		selectedProject = projectParam || 'All Projects';
+		if (projectParam) selectedProject = projectParam;
 	});
-
-	// Derive projects list from all tasks
-	const projects = $derived(getProjectsFromTasks(allTasks));
-
-	// Derive task counts per project for display in dropdown
-	const taskCounts = $derived(getTaskCountByProject(allTasks, selectedStatus));
 
 	// Filter tasks by project
 	const filteredTasks = $derived(
-		!selectedProject || selectedProject === 'All Projects'
-			? allTasks
-			: allTasks.filter((task) => task.id.startsWith(selectedProject + '-'))
+		selectedProject
+			? allTasks.filter((task) => task.id.startsWith(selectedProject + '-'))
+			: allTasks
 	);
-
-	// Handle project selection change - update URL
-	function handleProjectChange(project: string) {
-		selectedProject = project;
-		const url = new URL(window.location.href);
-		if (project === 'All Projects') {
-			url.searchParams.delete('project');
-		} else {
-			url.searchParams.set('project', project);
-		}
-		goto(url.toString(), { replaceState: true, noScroll: true, keepFocus: true });
-	}
 
 	// Fetch tasks
 	async function fetchTasks() {
@@ -127,20 +106,6 @@
 	<!-- Filters Bar -->
 	<div class="bg-base-100 border-b border-base-300 p-4">
 		<div class="flex flex-wrap items-center gap-4">
-			<!-- Project Filter -->
-			<div class="flex flex-col">
-				<label class="industrial-label" for="project-filter">Project</label>
-				<div class="w-40" id="project-filter">
-					<ProjectSelector
-						{projects}
-						{selectedProject}
-						onProjectChange={handleProjectChange}
-						{taskCounts}
-						compact={true}
-					/>
-				</div>
-			</div>
-
 			<!-- Filters -->
 			<div class="flex flex-col">
 				<label class="industrial-label" for="priority-filter">Priority</label>

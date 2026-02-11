@@ -170,23 +170,129 @@ export function appendToTask(taskId, replies, project) {
 }
 
 /**
+ * Resume an existing agent session for a task, injecting the reply text.
+ * Returns { resumed: true, sessionName } on success, { resumed: false, reason } on failure.
+ *
+ * @param {string} taskId - Task ID to resume
+ * @param {string} replyText - Text from the user reply to inject
+ * @param {string} project - Project name
+ * @returns {Promise<{ resumed: boolean, sessionName?: string, reason?: string }>}
+ */
+export async function resumeSession(taskId, replyText, project) {
+  const cwd = getProjectPath(project);
+
+  // 1. Look up task assignee
+  let assignee;
+  try {
+    const showOutput = execFileSync('jt', ['show', taskId, '--json'], {
+      encoding: 'utf-8', timeout: 15000, cwd
+    });
+    const parsed = JSON.parse(showOutput);
+    const task = Array.isArray(parsed) ? parsed[0] : parsed;
+    assignee = task?.assignee;
+  } catch (err) {
+    return { resumed: false, reason: `jt show failed: ${err.message}` };
+  }
+
+  if (!assignee) {
+    return { resumed: false, reason: 'no-assignee' };
+  }
+
+  const sessionName = `jat-${assignee}`;
+
+  // 2. Check if tmux session still exists (agent still running)
+  try {
+    execFileSync('tmux', ['has-session', '-t', sessionName], { timeout: 5000 });
+    // Session exists — agent is still active, don't resume
+    return { resumed: false, reason: 'session-still-active' };
+  } catch {
+    // Session doesn't exist — good, we can resume
+  }
+
+  // 3. Check if session is paused (has signal file with resumable state)
+  try {
+    const res = await fetch(`${IDE_BASE_URL}/api/sessions/${encodeURIComponent(sessionName)}/pause`, {
+      signal: AbortSignal.timeout(10000)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (!data.paused) {
+        return { resumed: false, reason: 'not-paused' };
+      }
+    }
+  } catch (err) {
+    return { resumed: false, reason: `pause-check-failed: ${err.message}` };
+  }
+
+  // 4. Call resume API
+  try {
+    const res = await fetch(`${IDE_BASE_URL}/api/sessions/${encodeURIComponent(sessionName)}/resume`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project }),
+      signal: AbortSignal.timeout(30000)
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { resumed: false, reason: `resume-api-${res.status}: ${body.message || body.error || ''}` };
+    }
+  } catch (err) {
+    return { resumed: false, reason: `resume-api-failed: ${err.message}` };
+  }
+
+  // 5. Wait for session to start, then inject reply text via tmux
+  await new Promise(resolve => setTimeout(resolve, 5000));
+
+  const escapedText = replyText.replace(/'/g, "'\\''");
+  try {
+    execFileSync('tmux', ['send-keys', '-t', sessionName, `The user replied: ${escapedText}`, 'Enter'], {
+      timeout: 10000
+    });
+  } catch (err) {
+    logger.warn(`Failed to inject reply into ${sessionName}: ${err.message}`, project);
+    // Session resumed but injection failed — still counts as resumed
+  }
+
+  logger.info(`Resumed session ${sessionName} with reply for ${taskId}`, project);
+  return { resumed: true, sessionName };
+}
+
+/**
  * Check if an item is a reply to a tracked thread and append it if so.
+ * For sources with immediate automation, attempts to resume the original agent session first.
  * Returns { handled: true, taskId } if the reply was routed, { handled: false } otherwise.
  *
  * @param {Object} source - Source config
  * @param {Object} item - Ingested item (must have replyTo set)
  * @param {Array} downloaded - Downloaded attachments
- * @returns {{ handled: boolean, taskId?: string }}
+ * @returns {Promise<{ handled: boolean, taskId?: string, resumed?: boolean }>}
  */
-export function handleThreadReply(source, item, downloaded = []) {
+export async function handleThreadReply(source, item, downloaded = []) {
   if (!item.replyTo) return { handled: false };
 
   const thread = findThreadByParentItemId(source.id, item.replyTo);
   if (!thread) return { handled: false };
 
   const taskId = thread.task_id;
+  const replyText = item.description || item.title;
+
+  // If source has immediate automation, try to resume the original session
+  if (source.automation?.action === 'immediate') {
+    const result = await resumeSession(taskId, replyText, source.project);
+    if (result.resumed) {
+      updateThreadCursor(source.id, thread.parent_item_id, item.timestamp || new Date().toISOString());
+      if (taskId && downloaded.length > 0) {
+        registerTaskAttachments(taskId, downloaded, source.project);
+      }
+      logger.info(`Resumed session for reply → task ${taskId} (${result.sessionName})`, source.id);
+      return { handled: true, taskId, resumed: true };
+    }
+    logger.info(`Resume failed (${result.reason}), falling back to append for ${taskId}`, source.id);
+  }
+
+  // Fallback: append reply to task description
   const reply = {
-    text: item.description || item.title,
+    text: replyText,
     author: item.author || 'unknown',
     timestamp: item.timestamp || new Date().toISOString(),
     downloaded

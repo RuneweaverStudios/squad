@@ -261,7 +261,7 @@ export class ConnectionManager {
     }
 
     // Check if this is a reply to a tracked thread
-    const threadResult = handleThreadReply(source, item, downloaded);
+    const threadResult = await handleThreadReply(source, item, downloaded);
     if (threadResult.handled) {
       recordItem(source.id, item.id, item.hash, threadResult.taskId, item.title, item.origin);
       logger.info(`Realtime reply → task ${threadResult.taskId}: ${item.title.slice(0, 60)}`, source.id);

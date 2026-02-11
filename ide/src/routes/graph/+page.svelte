@@ -1,11 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
 	import DependencyGraph from '$lib/components/DependencyGraph.svelte';
 	import TaskDetailDrawer from '$lib/components/TaskDetailDrawer.svelte';
 	import { GraphSkeleton } from '$lib/components/skeleton';
-	import { getProjectsFromTasks, getTaskCountByProject } from '$lib/utils/projectUtils';
 
 	// Task type compatible with DependencyGraph component
 	interface Task {
@@ -41,12 +39,6 @@
 		const projectParam = $page.url.searchParams.get('project');
 		if (projectParam) selectedProject = projectParam;
 	});
-
-	// Derive projects list from all tasks
-	const projects = $derived(getProjectsFromTasks(allTasks));
-
-	// Derive task counts per project for display in dropdown
-	const taskCounts = $derived(getTaskCountByProject(allTasks, selectedStatus));
 
 	// Filter tasks by project
 	const filteredTasks = $derived(

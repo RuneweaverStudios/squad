@@ -315,6 +315,42 @@ export const AUTOMATION_PRESETS: AutomationPreset[] = [
 		}
 	},
 
+	{
+		id: 'preset-auto-pause-after-reply',
+		name: 'Auto-Pause After Reply',
+		description:
+			'Pause the agent session after it sends a reply via jat-signal, enabling conversational resume when the user responds',
+		category: 'prompt',
+		rule: {
+			name: 'Auto-Pause After Reply',
+			description:
+				'Detects when an agent emits a reply signal and pauses the session so it can be resumed when the user responds',
+			enabled: false,
+			patterns: [
+				{
+					pattern: 'jat-signal reply',
+					mode: 'contains',
+					caseSensitive: false
+				}
+			],
+			actions: [
+				{
+					type: 'notify_only',
+					payload: 'Agent sent reply, pausing for conversational resume...'
+				},
+				{
+					type: 'send_text',
+					payload: '/jat:pause',
+					delay: 3000
+				}
+			],
+			cooldownSeconds: 10,
+			maxTriggersPerSession: 50,
+			category: 'prompt',
+			priority: 45
+		}
+	},
+
 	// -------------------------------------------------------------------------
 	// Stall Detection Presets
 	// -------------------------------------------------------------------------

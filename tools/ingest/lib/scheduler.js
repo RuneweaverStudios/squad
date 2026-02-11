@@ -218,7 +218,7 @@ async function pollSource(source) {
         messageBuffer.add(key, { item, downloaded, source }, debounceMs);
       } else {
         // Check if this is a reply to a tracked thread
-        const threadResult = handleThreadReply(source, item, downloaded);
+        const threadResult = await handleThreadReply(source, item, downloaded);
         if (threadResult.handled) {
           recordItem(source.id, item.id, item.hash, threadResult.taskId, item.title, item.origin);
           continue;
@@ -470,7 +470,7 @@ function getSourceDebounceMs(source) {
  * Handle flushed buffer entries: merge items into a single task.
  * Called by MessageBuffer when debounce window expires or max count reached.
  */
-function handleBufferFlush(key, entries) {
+async function handleBufferFlush(key, entries) {
   if (entries.length === 0) return;
 
   const { source } = entries[0];
@@ -500,7 +500,7 @@ function handleBufferFlush(key, entries) {
 
   // Check if any entry is a reply to a tracked thread
   for (const entry of entries) {
-    const threadResult = handleThreadReply(source, entry.item, entry.downloaded || []);
+    const threadResult = await handleThreadReply(source, entry.item, entry.downloaded || []);
     if (threadResult.handled) {
       recordItem(source.id, entry.item.id, entry.item.hash, threadResult.taskId, entry.item.title, entry.item.origin);
       // Remove handled entries from the batch

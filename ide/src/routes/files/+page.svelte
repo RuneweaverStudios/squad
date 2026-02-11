@@ -23,10 +23,9 @@
 	import QuickFileFinder from '$lib/components/files/QuickFileFinder.svelte';
 	import GlobalSearch from '$lib/components/files/GlobalSearch.svelte';
 	import ResizableDivider from '$lib/components/ResizableDivider.svelte';
-	import { getActiveProject, setActiveProject } from '$lib/stores/preferences.svelte';
+	import { setActiveProject } from '$lib/stores/preferences.svelte';
 	import { FilesSkeleton } from '$lib/components/skeleton';
 	import { setGitChangesCount, setGitAheadCount } from '$lib/stores/drawerStore';
-	import ProjectSelector from '$lib/components/ProjectSelector.svelte';
 
 	// Types
 	interface Project {
@@ -51,19 +50,11 @@
 			: null
 	);
 
-	// Derived: project names for ProjectSelector
-	const projectNames = $derived(projects.map(p => p.name));
-
 	// Derived: selected project's root path (for file path display)
 	const selectedProjectPath = $derived(
 		selectedProject
 			? projects.find(p => p.name === selectedProject)?.path || ''
 			: ''
-	);
-
-	// Derived: project colors map for ProjectSelector
-	const projectColorsMap = $derived(
-		new Map(projects.map(p => [p.name, p.activeColor || 'oklch(0.60 0.15 145)']))
 	);
 
 	// File tree state
@@ -149,16 +140,6 @@
 		}
 	});
 
-	// Handle project change - update URL and user preferences
-	function handleProjectChange(projectName: string) {
-		selectedProject = projectName;
-		// Update user preferences so other pages (like task drawer) remember this
-		setActiveProject(projectName);
-		const url = new URL(window.location.href);
-		url.searchParams.set('project', projectName);
-		goto(url.pathname + url.search, { replaceState: true, noScroll: true });
-	}
-
 	// Fetch visible projects
 	async function fetchProjects() {
 		try {
@@ -171,21 +152,6 @@
 			}
 
 			projects = data.projects || [];
-
-			// If no project selected but we have projects, choose default
-			// Priority: 1) URL param, 2) User's active project, 3) First from sorted list
-			if (projects.length > 0 && !$page.url.searchParams.get('project')) {
-				const activeProject = getActiveProject();
-				const projectExists = activeProject && projects.some(p => p.name === activeProject);
-
-				if (projectExists) {
-					// Use the user's previously selected project
-					handleProjectChange(activeProject);
-				} else {
-					// Fall back to first project (sorted by recent agent activity)
-					handleProjectChange(projects[0].name);
-				}
-			}
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to load projects';
 			console.error('[Files] Failed to fetch projects:', err);
@@ -905,7 +871,11 @@
 	async function handleGlobalSearchResult(file: string, line: number, project: string) {
 		// Switch project if different
 		if (project !== selectedProject) {
-			handleProjectChange(project);
+			selectedProject = project;
+			setActiveProject(project);
+			const url = new URL(window.location.href);
+			url.searchParams.set('project', project);
+			goto(url.pathname + url.search, { replaceState: true, noScroll: true, keepFocus: true });
 			// Wait for project change to take effect
 			await new Promise(r => setTimeout(r, 100));
 		}
@@ -1114,18 +1084,9 @@
 					class="file-tree-panel"
 					style="{isMobileLayout ? `height: ${topPanelHeight}%` : `width: ${leftPanelWidth}px`};"
 				>
-					<!-- Project Selector in Panel Header -->
+					<!-- Panel Header -->
 					<div class="panel-header project-header">
-						<div class="flex-1">
-							<ProjectSelector
-								projects={projectNames}
-								selectedProject={selectedProject || ''}
-								onProjectChange={handleProjectChange}
-								showColors={true}
-								projectColors={projectColorsMap}
-								compact={false}
-							/>
-						</div>
+						<span class="font-medium text-base-content/90 flex-1 truncate">{selectedProject || 'No project selected'}</span>
 						<!-- Search button -->
 						<button
 							class="search-button"

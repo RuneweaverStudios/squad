@@ -13,13 +13,11 @@
 
 	import { onMount } from "svelte";
 	import { page } from "$app/stores";
-	import { goto } from "$app/navigation";
 	import StreakCalendar from "$lib/components/StreakCalendar.svelte";
 	import AnimatedDigits from "$lib/components/AnimatedDigits.svelte";
 	import TaskDetailDrawer from "$lib/components/TaskDetailDrawer.svelte";
 	import { HistorySkeleton } from "$lib/components/skeleton";
 	import { getProjectColor, initProjectColors } from "$lib/utils/projectColors";
-	import ProjectSelector from "$lib/components/ProjectSelector.svelte";
 	import AgentAvatar from "$lib/components/AgentAvatar.svelte";
 	import { getIssueTypeVisual } from "$lib/config/statusColors";
 
@@ -48,7 +46,7 @@
 
 	// Filters
 	let searchQuery = $state("");
-	let selectedProject = $state("All Projects");
+	let selectedProject = $state("");
 
 	// Task detail drawer
 	let selectedTaskId = $state<string | null>(null);
@@ -57,7 +55,7 @@
 	// Sync selectedProject from URL params
 	$effect(() => {
 		const projectParam = $page.url.searchParams.get("project");
-		selectedProject = projectParam || "All Projects";
+		if (projectParam) selectedProject = projectParam;
 	});
 
 	// Fetch data on mount
@@ -94,46 +92,11 @@
 		}
 	}
 
-	// Project names derived from actual closed tasks (only show projects with history)
-	const projectNames = $derived.by(() => {
-		const counts = new Map<string, number>();
-		for (const task of tasks) {
-			const proj = task.project || task.id.split("-")[0];
-			counts.set(proj, (counts.get(proj) || 0) + 1);
-		}
-		// Sort by task count descending
-		const sorted = Array.from(counts.entries())
-			.sort((a, b) => b[1] - a[1])
-			.map(([name]) => name);
-		return ["All Projects", ...sorted];
-	});
-
-	// Project colors map for ProjectSelector
-	const projectColorsMap = $derived(
-		new Map(projects.map(p => [p.name, p.activeColor || "oklch(0.60 0.15 145)"]))
-	);
-
-	// Handle project selection change - update URL
-	function handleProjectChange(project: string) {
-		selectedProject = project;
-		const url = new URL(window.location.href);
-		if (project === "All Projects") {
-			url.searchParams.delete("project");
-		} else {
-			url.searchParams.set("project", project);
-		}
-		goto(url.toString(), {
-			replaceState: true,
-			noScroll: true,
-			keepFocus: true,
-		});
-	}
-
 	// Filtered tasks
 	const filteredTasks = $derived.by(() => {
 		return tasks.filter((task) => {
 			// Project filter
-			if (selectedProject !== "All Projects") {
+			if (selectedProject) {
 				const taskProject = task.project || task.id.split("-")[0];
 				if (taskProject !== selectedProject) return false;
 			}
@@ -486,23 +449,12 @@
 						class="industrial-input w-48"
 						bind:value={searchQuery}
 					/>
-					<div class="w-48">
-						<ProjectSelector
-							projects={projectNames}
-							{selectedProject}
-							onProjectChange={handleProjectChange}
-							showColors={true}
-							projectColors={projectColorsMap}
-							compact={true}
-						/>
-					</div>
-					{#if searchQuery || selectedProject !== "All Projects"}
+					{#if searchQuery}
 						<button
 							type="button"
 							class="btn btn-ghost btn-xs text-base-content/60 hover:text-base-content"
 							onclick={() => {
 								searchQuery = "";
-								handleProjectChange("All Projects");
 							}}
 						>
 							Clear filters
@@ -651,7 +603,7 @@
 							</svg>
 							<p>No completed tasks found</p>
 							<p class="empty-hint">
-								{#if searchQuery || selectedProject !== "All Projects"}
+								{#if searchQuery}
 									Try adjusting your filters
 								{:else}
 									Tasks will appear here when marked complete
