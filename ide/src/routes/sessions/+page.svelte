@@ -1985,7 +1985,7 @@
 	}
 
 	/* Column widths - fixed second column, first column gets remainder */
-	.th-actions, .td-actions { width: 205px; min-width: 205px; max-width: 205px; }
+	.th-actions, .td-actions { width: 260px; min-width: 260px; max-width: 260px; }
 
 	/* Session name */
 	.td-name {

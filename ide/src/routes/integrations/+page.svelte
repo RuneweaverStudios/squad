@@ -1392,14 +1392,29 @@
 				</summary>
 				<div class="px-4 pb-4 space-y-3" style="border-top: 1px solid oklch(0.22 0.02 250);">
 					<p class="font-mono text-[10px] leading-relaxed pt-3" style="color: oklch(0.55 0.02 250);">
-						An integration is a single JavaScript file that extends <code class="px-1 py-0.5 rounded" style="background: oklch(0.20 0.02 250); color: oklch(0.65 0.06 200);">BaseAdapter</code> and exports a <code class="px-1 py-0.5 rounded" style="background: oklch(0.20 0.02 250); color: oklch(0.65 0.06 200);">metadata</code> object. Drop it in a folder and it works.
+						An integration extends <code class="px-1 py-0.5 rounded" style="background: oklch(0.20 0.02 250); color: oklch(0.65 0.06 200);">BaseAdapter</code> and exports a <code class="px-1 py-0.5 rounded" style="background: oklch(0.20 0.02 250); color: oklch(0.65 0.06 200);">metadata</code> object. Drop it in a folder and it works. TypeScript types are included for full editor support.
 					</p>
 
 					<!-- Minimal example -->
 					<div class="rounded-lg overflow-hidden" style="border: 1px solid oklch(0.22 0.02 250);">
-						<div class="px-3 py-1.5 font-mono text-[9px] font-semibold" style="background: oklch(0.14 0.02 250); color: oklch(0.45 0.02 250);">
-							my-adapter/index.js
+						<div class="flex items-center justify-between px-3 py-1.5" style="background: oklch(0.14 0.02 250);">
+							<span class="font-mono text-[9px] font-semibold" style="color: oklch(0.45 0.02 250);">
+								my-adapter/index.{exampleLang === 'ts' ? 'ts' : 'js'}
+							</span>
+							<div class="flex gap-0.5">
+								<button
+									class="px-1.5 py-0.5 rounded font-mono text-[9px] font-semibold transition-colors"
+									style="background: {exampleLang === 'js' ? 'oklch(0.25 0.04 80)' : 'transparent'}; color: {exampleLang === 'js' ? 'oklch(0.80 0.12 80)' : 'oklch(0.40 0.02 250)'};"
+									onclick={() => exampleLang = 'js'}
+								>JS</button>
+								<button
+									class="px-1.5 py-0.5 rounded font-mono text-[9px] font-semibold transition-colors"
+									style="background: {exampleLang === 'ts' ? 'oklch(0.22 0.06 240)' : 'transparent'}; color: {exampleLang === 'ts' ? 'oklch(0.75 0.12 240)' : 'oklch(0.40 0.02 250)'};"
+									onclick={() => exampleLang = 'ts'}
+								>TS</button>
+							</div>
 						</div>
+						{#if exampleLang === 'js'}
 						<pre
 							class="px-3 py-2 font-mono text-[10px] leading-relaxed overflow-x-auto"
 							style="background: oklch(0.12 0.02 250); color: oklch(0.60 0.02 250); margin: 0;"
@@ -1430,6 +1445,46 @@ export default class MyAdapter extends BaseAdapter {
     // Return { ok: true, message: 'Connected', sampleItems: [] }
   }
 }`}</pre>
+						{:else}
+						<pre
+							class="px-3 py-2 font-mono text-[10px] leading-relaxed overflow-x-auto"
+							style="background: oklch(0.12 0.02 250); color: oklch(0.60 0.02 250); margin: 0;"
+						>{`import { BaseAdapter } from '../base.js';
+import type { PluginMetadata, PollResult, TestResult } from '../base';
+
+export const metadata: PluginMetadata = {
+  type: 'my-source',
+  name: 'My Source',
+  description: 'Polls my data source for new items',
+  version: '1.0.0',
+  configFields: [
+    { key: 'apiUrl', label: 'API URL', type: 'string', required: true },
+    { key: 'token', label: 'API Token', type: 'secret' }
+  ],
+  itemFields: [
+    { key: 'category', label: 'Category', type: 'enum', values: ['news', 'update'] }
+  ]
+};
+
+export default class MyAdapter extends BaseAdapter {
+  constructor() { super(metadata.type); }
+
+  async poll(
+    source: Record<string, unknown>,
+    state: Record<string, unknown>,
+    getSecret: (name: string) => string
+  ): Promise<PollResult> {
+    // Fetch items, return { items: [...], state: {...} }
+  }
+
+  async test(
+    source: Record<string, unknown>,
+    getSecret: (name: string) => string
+  ): Promise<TestResult> {
+    // Return { ok: true, message: 'Connected', sampleItems: [] }
+  }
+}`}</pre>
+						{/if}
 					</div>
 
 					<!-- Where to put it -->
@@ -1450,6 +1505,12 @@ export default class MyAdapter extends BaseAdapter {
 							<span class="font-mono text-[10px] font-semibold shrink-0 mt-0.5" style="color: oklch(0.55 0.06 200);">Reference:</span>
 							<span class="font-mono text-[10px]" style="color: oklch(0.50 0.02 250);">
 								See the built-in adapters in <code class="px-1 py-0.5 rounded" style="background: oklch(0.20 0.02 250); color: oklch(0.65 0.04 250);">tools/ingest/adapters/</code> for working examples
+							</span>
+						</div>
+						<div class="flex items-start gap-2">
+							<span class="font-mono text-[10px] font-semibold shrink-0 mt-0.5" style="color: oklch(0.55 0.06 200);">Types:</span>
+							<span class="font-mono text-[10px]" style="color: oklch(0.50 0.02 250);">
+								TypeScript definitions in <code class="px-1 py-0.5 rounded" style="background: oklch(0.20 0.02 250); color: oklch(0.65 0.04 250);">tools/ingest/adapters/base.d.ts</code> for full editor autocompletion
 							</span>
 						</div>
 					</div>
