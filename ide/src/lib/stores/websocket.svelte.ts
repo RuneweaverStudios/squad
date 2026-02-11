@@ -31,7 +31,7 @@ import { browser } from '$app/environment';
 // ============================================================================
 
 /** Supported channels (must match server-side Channel type) */
-export type Channel = 'agents' | 'tasks' | 'output' | 'messages' | 'system';
+export type Channel = 'agents' | 'tasks' | 'output' | 'messages' | 'sessions' | 'system';
 
 /** Connection states */
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';

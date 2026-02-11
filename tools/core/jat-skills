@@ -431,7 +431,7 @@ PI_SKILLS_DIR="$HOME/.pi/agent/skills"
 # based on which skills are currently enabled in installed.json
 sync_agent_links() {
     ensure_installed
-    local installed
+    local installed skill_id
     installed=$(get_installed)
 
     # Build set of enabled skill IDs and their invocation names

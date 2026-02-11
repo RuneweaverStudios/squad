@@ -2,19 +2,21 @@
  * Session event broadcasting for real-time session updates
  *
  * Two modes of operation:
- * 1. SSE connection to /api/sessions/events for real-time server events
+ * 1. WebSocket channel subscriptions to 'sessions' and 'output' channels
  * 2. BroadcastChannel API for cross-tab communication
  *
- * Events handled from SSE:
- * - connected: Initial connection acknowledgment
+ * Events handled from WebSocket:
  * - session-output: Terminal output changed → update workSessions store
  * - session-state: Session state changed → update state in workSessions store
  * - session-question: Agent asked a question → update question data
+ * - session-signal: Rich signal payload (working, review, etc.)
+ * - session-complete: Completion bundle with summary, quality, suggestions
  * - session-created: New session appeared → add to workSessions store
  * - session-destroyed: Session ended → remove from workSessions store
+ * - output-update: Full terminal output buffer (from 'output' channel)
  *
  * Integration:
- * - Call connectSessionEvents() in +layout.svelte onMount
+ * - Call connectSessionEvents() in +layout.svelte onMount (after WS connect)
  * - Disconnect on unmount with disconnectSessionEvents()
  * - Components can subscribe to lastSessionEvent for reactive updates
  */
@@ -217,14 +219,14 @@ export const lastSessionEvent = writable<SessionEvent | null>(null);
 export const sessionEventsConnected = writable(false);
 
 // ============================================================================
-// SSE Connection
+// WebSocket Channel Subscriptions
 // ============================================================================
 
-let eventSource: EventSource | null = null;
-let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-let reconnectAttempts = 0;
-const MAX_RECONNECT_ATTEMPTS = 5;
-const RECONNECT_DELAY = 3000;
+import { onMessage, subscribe, unsubscribe, type WebSocketMessage } from '$lib/stores/websocket.svelte';
+
+// Cleanup functions for WS message handlers
+let unsubSessionsChannel: (() => void) | null = null;
+let unsubOutputChannel: (() => void) | null = null;
 
 // Cleanup function for automation trigger subscription (prevent leak on reconnect)
 let unsubAutomationCleanup: (() => void) | null = null;
@@ -804,13 +806,145 @@ async function handleAutoProceed(data: SessionEvent): Promise<void> {
 }
 
 /**
- * Connect to the session events SSE endpoint for real-time updates
- * Call this once on app mount (in +layout.svelte)
+ * Transform a WebSocket 'sessions' channel message into a SessionEvent
+ * and route it to the appropriate handler.
+ *
+ * WS messages nest data under a `data` field; existing handlers expect
+ * flat SessionEvent objects. This function bridges the format difference.
+ */
+function handleWebSocketSessionMessage(msg: WebSocketMessage): void {
+	const wsData = msg as Record<string, unknown>;
+	const data = wsData.data as Record<string, unknown> | undefined;
+	let event: SessionEvent;
+
+	switch (wsData.type) {
+		case 'session-output': {
+			// WS: { sessionName, data: { delta, lineCount } }
+			event = {
+				type: 'session-output',
+				sessionName: wsData.sessionName as string,
+				output: data?.delta as string,
+				lineCount: data?.lineCount as number,
+				isDelta: true,
+				timestamp: wsData.timestamp as number
+			};
+			break;
+		}
+		case 'session-state': {
+			// WS: { sessionName, data: { state, previousState, signalPayload } }
+			event = {
+				type: 'session-state',
+				sessionName: wsData.sessionName as string,
+				state: data?.state as string,
+				previousState: (data?.previousState as string) ?? null,
+				signalPayload: data?.signalPayload as RichSignalPayload | undefined,
+				timestamp: wsData.timestamp as number
+			};
+			break;
+		}
+		case 'session-question': {
+			// WS: { sessionName, data: questionData }
+			event = {
+				type: 'session-question',
+				sessionName: wsData.sessionName as string,
+				question: data,
+				timestamp: wsData.timestamp as number
+			};
+			break;
+		}
+		case 'session-signal': {
+			// WS: { sessionName, data: { signalType, ...signalData } }
+			event = {
+				type: 'session-signal',
+				sessionName: wsData.sessionName as string,
+				signalType: data?.signalType as string,
+				timestamp: wsData.timestamp as number
+			};
+			break;
+		}
+		case 'session-complete': {
+			// WS: { sessionName, data: { completionBundle } }
+			event = {
+				type: 'session-complete',
+				sessionName: wsData.sessionName as string,
+				completionBundle: data?.completionBundle as CompletionBundle,
+				timestamp: wsData.timestamp as number
+			};
+			break;
+		}
+		case 'session-created': {
+			// WS: { sessionName, data: { agentName, task } }
+			event = {
+				type: 'session-created',
+				sessionName: wsData.sessionName as string,
+				agentName: data?.agentName as string,
+				task: data?.task as SessionEvent['task'],
+				timestamp: wsData.timestamp as number
+			};
+			break;
+		}
+		case 'session-destroyed': {
+			// WS: { sessionName }
+			event = {
+				type: 'session-destroyed',
+				sessionName: wsData.sessionName as string,
+				timestamp: wsData.timestamp as number
+			};
+			break;
+		}
+		default:
+			return; // Unknown message type, ignore
+	}
+
+	// Route to existing handlers
+	switch (event.type) {
+		case 'session-output': handleSessionOutput(event); break;
+		case 'session-state': handleSessionState(event); break;
+		case 'session-question': handleSessionQuestion(event); break;
+		case 'session-signal': handleSessionSignal(event); break;
+		case 'session-complete': handleSessionComplete(event); break;
+		case 'session-created': handleSessionCreated(event); break;
+		case 'session-destroyed': handleSessionDestroyed(event); break;
+	}
+
+	// Broadcast event to any listening components
+	lastSessionEvent.set(event);
+}
+
+/**
+ * Transform a WebSocket 'output' channel message into a SessionEvent
+ * and route it to handleSessionOutput.
+ *
+ * The 'output' channel carries full terminal buffer updates (not deltas).
+ */
+function handleWebSocketOutputMessage(msg: WebSocketMessage): void {
+	const wsData = msg as Record<string, unknown>;
+	if (wsData.type !== 'output-update') return;
+
+	// Full buffer update: { sessionName, output, lineCount }
+	const event: SessionEvent = {
+		type: 'session-output',
+		sessionName: wsData.sessionName as string,
+		output: wsData.output as string,
+		lineCount: wsData.lineCount as number,
+		isDelta: false,
+		timestamp: wsData.timestamp as number
+	};
+
+	handleSessionOutput(event);
+	lastSessionEvent.set(event);
+}
+
+/**
+ * Subscribe to WebSocket channels for real-time session updates.
+ * Call this once on app mount (in +layout.svelte), after the WS connection
+ * is registered with connectionManager. If the WS isn't connected yet,
+ * subscriptions are queued and processed on connect.
  */
 export function connectSessionEvents(): void {
 	if (typeof window === 'undefined') return; // SSR guard
-	if (eventSource) {
-		console.log('[SessionEvents] Already connected, skipping');
+	if (unsubSessionsChannel) {
+		console.log('[SessionEvents] Already subscribed, skipping');
 		return;
 	}
 
@@ -844,100 +978,34 @@ export function connectSessionEvents(): void {
 		}
 	});
 
-	console.log('[SessionEvents] Connecting to SSE...');
+	console.log('[SessionEvents] Subscribing to WS channels: sessions, output');
 
-	try {
-		eventSource = new EventSource('/api/sessions/events');
+	// Subscribe to WS channels (queued if WS not yet connected)
+	subscribe(['sessions', 'output']);
 
-		eventSource.onopen = () => {
-			console.log('[SessionEvents] SSE connected!');
-			sessionEventsConnected.set(true);
-			reconnectAttempts = 0;
-		};
+	// Register message handlers
+	unsubSessionsChannel = onMessage('sessions', handleWebSocketSessionMessage);
+	unsubOutputChannel = onMessage('output', handleWebSocketOutputMessage);
 
-		eventSource.onmessage = (event) => {
-			try {
-				const data: SessionEvent = JSON.parse(event.data);
-				const eventType = data.type;
-
-				// Only log significant events (not frequent output/state updates)
-
-				// Handle event based on type
-				switch (eventType) {
-					case 'connected':
-						// Initial connection acknowledgment
-						break;
-					case 'session-output':
-						handleSessionOutput(data);
-						break;
-					case 'session-state':
-						handleSessionState(data);
-						break;
-					case 'session-question':
-						handleSessionQuestion(data);
-						break;
-					case 'session-signal':
-						handleSessionSignal(data);
-						break;
-					case 'session-complete':
-						handleSessionComplete(data);
-						break;
-					case 'session-created':
-						handleSessionCreated(data);
-						break;
-					case 'session-destroyed':
-						handleSessionDestroyed(data);
-						break;
-				}
-
-				// Broadcast event to any listening components
-				lastSessionEvent.set(data);
-			} catch (err) {
-				console.error('[SessionEvents] Failed to parse session event:', err);
-			}
-		};
-
-		eventSource.onerror = (err) => {
-			console.error('[SessionEvents] SSE error:', err);
-			sessionEventsConnected.set(false);
-
-			// Close and attempt reconnect
-			if (eventSource) {
-				eventSource.close();
-				eventSource = null;
-			}
-
-			if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-				reconnectAttempts++;
-				const jitter = Math.floor(Math.random() * 2000); // 0-2s jitter to avoid HMR stampede
-				console.log(
-					`[SessionEvents] Reconnecting (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}) in ${RECONNECT_DELAY + jitter}ms...`
-				);
-				reconnectTimer = setTimeout(() => {
-					connectSessionEvents();
-				}, RECONNECT_DELAY + jitter);
-			} else {
-				console.error('[SessionEvents] Max reconnect attempts reached');
-			}
-		};
-	} catch (err) {
-		console.error('[SessionEvents] Failed to connect to session events:', err);
-	}
+	sessionEventsConnected.set(true);
 }
 
 /**
- * Disconnect from session events SSE
- * Call this on app unmount
+ * Unsubscribe from session event WS channels.
+ * Call this on app unmount.
  */
 export function disconnectSessionEvents(): void {
-	if (reconnectTimer) {
-		clearTimeout(reconnectTimer);
-		reconnectTimer = null;
-	}
+	// Unsubscribe from WS channels
+	unsubscribe(['sessions', 'output']);
 
-	if (eventSource) {
-		eventSource.close();
-		eventSource = null;
+	// Remove message handlers
+	if (unsubSessionsChannel) {
+		unsubSessionsChannel();
+		unsubSessionsChannel = null;
+	}
+	if (unsubOutputChannel) {
+		unsubOutputChannel();
+		unsubOutputChannel = null;
 	}
 
 	// Clean up automation trigger subscription (prevents leak across reconnects)
@@ -961,15 +1029,14 @@ export function disconnectSessionEvents(): void {
 	initializedSessions.clear();
 
 	sessionEventsConnected.set(false);
-	reconnectAttempts = 0;
-	console.log('[SessionEvents] Disconnected');
+	console.log('[SessionEvents] Unsubscribed from WS channels');
 }
 
 /**
- * Check if SSE connection is active
+ * Check if WS session event subscriptions are active
  */
 export function isSessionEventsConnected(): boolean {
-	return eventSource !== null && eventSource.readyState === EventSource.OPEN;
+	return unsubSessionsChannel !== null;
 }
 
 /**
@@ -977,7 +1044,6 @@ export function isSessionEventsConnected(): boolean {
  */
 export function reconnectSessionEvents(): void {
 	disconnectSessionEvents();
-	reconnectAttempts = 0;
 	connectSessionEvents();
 }
 

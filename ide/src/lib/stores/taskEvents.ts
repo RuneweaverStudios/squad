@@ -4,10 +4,11 @@
  *
  * Supports two modes:
  * 1. Local broadcast (broadcastTaskEvent) - for in-browser events
- * 2. SSE connection (connectTaskEvents) - for real-time server events (e.g., CLI task creation)
+ * 2. WebSocket channel subscription to 'tasks' - for real-time server events (e.g., CLI task creation)
  */
 
 import { writable } from 'svelte/store';
+import { onMessage, subscribe, unsubscribe, type WebSocketMessage } from '$lib/stores/websocket.svelte';
 
 export type TaskEventType = 'task-created' | 'task-updated' | 'task-released' | 'task-start-requested' | 'task-change' | 'session-resumed';
 
@@ -23,101 +24,76 @@ export interface TaskEvent {
 // Store for reactive updates - components can subscribe to this
 export const lastTaskEvent = writable<TaskEvent | null>(null);
 
-// SSE connection state
+// Connection state (true when subscribed to WS 'tasks' channel)
 export const taskEventsConnected = writable(false);
 
-let eventSource: EventSource | null = null;
-let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-let reconnectAttempts = 0;
-const MAX_RECONNECT_ATTEMPTS = 5;
-const RECONNECT_DELAY = 3000;
+// Cleanup functions for WS subscriptions
+let unsubTasksChannel: (() => void) | null = null;
 
 /**
- * Connect to the task events SSE endpoint for real-time updates
- * Call this once on app mount (in +layout.svelte)
+ * Handle incoming WebSocket messages on 'tasks' channel.
+ * Transforms WS message format to TaskEvent format.
+ *
+ * WS wire format (from broadcastTaskChange):
+ *   { channel: 'tasks', type: 'task-change', newTasks, removedTasks, timestamp }
+ * WS wire format (from broadcastTaskUpdate):
+ *   { channel: 'tasks', type: 'task-updated', taskId, data, timestamp }
  */
-export function connectTaskEvents() {
-	if (typeof window === 'undefined') return; // SSR guard
-	if (eventSource) {
-		console.log('[TaskEvents] Already connected, skipping');
-		return;
-	}
+function handleWebSocketTaskMessage(msg: WebSocketMessage): void {
+	const wsData = msg as Record<string, unknown>;
 
-	console.log('[TaskEvents] Connecting to SSE...');
-
-	try {
-		eventSource = new EventSource('/api/tasks/events');
-
-		eventSource.onopen = () => {
-			console.log('[TaskEvents] SSE connected!');
-			taskEventsConnected.set(true);
-			reconnectAttempts = 0;
-		};
-
-		eventSource.onmessage = (event) => {
-			console.log('[TaskEvents] Received event:', event.data);
-			try {
-				const data = JSON.parse(event.data);
-
-				// Convert SSE event to TaskEvent format
-				if (data.type === 'task-change') {
-					console.log('[TaskEvents] Task change detected:', {
-						new: data.newTasks,
-						removed: data.removedTasks,
-						updated: data.updatedTasks
-					});
-					lastTaskEvent.set({
-						type: 'task-change',
-						newTasks: data.newTasks || [],
-						removedTasks: data.removedTasks || [],
-						updatedTasks: data.updatedTasks || [],
-						timestamp: data.timestamp || Date.now()
-					});
-				}
-			} catch (err) {
-				console.error('[TaskEvents] Failed to parse task event:', err);
-			}
-		};
-
-		eventSource.onerror = (err) => {
-			console.error('[TaskEvents] SSE error:', err);
-			taskEventsConnected.set(false);
-
-			// Close and attempt reconnect
-			if (eventSource) {
-				eventSource.close();
-				eventSource = null;
-			}
-
-			if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-				reconnectAttempts++;
-				const jitter = Math.floor(Math.random() * 2000); // 0-2s jitter to avoid HMR stampede
-				console.log(`[TaskEvents] Reconnecting (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}) in ${RECONNECT_DELAY + jitter}ms...`);
-				reconnectTimer = setTimeout(() => {
-					connectTaskEvents();
-				}, RECONNECT_DELAY + jitter);
-			} else {
-				console.error('[TaskEvents] Max reconnect attempts reached');
-			}
-		};
-	} catch (err) {
-		console.error('[TaskEvents] Failed to connect to task events:', err);
+	if (wsData.type === 'task-change') {
+		console.log('[TaskEvents] Task change detected:', {
+			new: wsData.newTasks,
+			removed: wsData.removedTasks,
+			updated: wsData.updatedTasks
+		});
+		lastTaskEvent.set({
+			type: 'task-change',
+			newTasks: (wsData.newTasks as string[]) || [],
+			removedTasks: (wsData.removedTasks as string[]) || [],
+			updatedTasks: (wsData.updatedTasks as string[]) || [],
+			timestamp: (wsData.timestamp as number) || Date.now()
+		});
+	} else if (wsData.type === 'task-updated') {
+		lastTaskEvent.set({
+			type: 'task-updated',
+			taskId: wsData.taskId as string,
+			updatedTasks: [wsData.taskId as string],
+			timestamp: (wsData.timestamp as number) || Date.now()
+		});
 	}
 }
 
 /**
- * Disconnect from task events SSE
- * Call this on app unmount
+ * Subscribe to the 'tasks' WebSocket channel for real-time updates.
+ * Call this once on app mount (in +layout.svelte).
  */
-export function disconnectTaskEvents() {
-	if (reconnectTimer) {
-		clearTimeout(reconnectTimer);
-		reconnectTimer = null;
+export function connectTaskEvents() {
+	if (typeof window === 'undefined') return; // SSR guard
+	if (unsubTasksChannel) {
+		console.log('[TaskEvents] Already subscribed, skipping');
+		return;
 	}
 
-	if (eventSource) {
-		eventSource.close();
-		eventSource = null;
+	console.log('[TaskEvents] Subscribing to WS tasks channel...');
+
+	subscribe(['tasks']);
+	unsubTasksChannel = onMessage('tasks', handleWebSocketTaskMessage);
+
+	taskEventsConnected.set(true);
+}
+
+/**
+ * Unsubscribe from task events WS channel.
+ * Call this on app unmount.
+ */
+export function disconnectTaskEvents() {
+	unsubscribe(['tasks']);
+
+	if (unsubTasksChannel) {
+		unsubTasksChannel();
+		unsubTasksChannel = null;
 	}
 
 	taskEventsConnected.set(false);

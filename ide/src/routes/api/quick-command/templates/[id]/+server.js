@@ -102,6 +102,9 @@ export async function PUT({ params, request }) {
 			...(body.prompt && { prompt: body.prompt.trim() }),
 			...(body.defaultProject !== undefined && { defaultProject: body.defaultProject || null }),
 			...(body.defaultModel && { defaultModel: body.defaultModel }),
+			...(body.outputAction !== undefined && {
+				outputAction: body.outputAction && body.outputAction !== 'display' ? body.outputAction : undefined
+			}),
 			...(body.variables && { variables: body.variables }),
 			updatedAt: new Date().toISOString()
 		};

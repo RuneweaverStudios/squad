@@ -240,7 +240,7 @@
 	// Track connection manager registrations for cleanup
 	let connectionIds: string[] = [];
 
-	// Initialize theme-change, SSE, preferences, and load all tasks
+	// Initialize theme-change, WebSocket, preferences, and load all tasks
 	onMount(async () => {
 		initPreferences(); // Initialize unified preferences store
 		syncSidebarFromPreferences(); // Restore sidebar collapsed state from localStorage
@@ -251,10 +251,10 @@
 
 		// Phase 1: Critical data for initial render (fast, no usage data)
 		// Use loadAllTasksFast instead of loadAllTasks to avoid 2-4s token aggregation
-		// IMPORTANT: Load data BEFORE registering persistent connections.
-		// Firefox limits HTTP/1.1 to 6 connections per origin. SSE (2) + WebSocket (1)
-		// consume 3 slots permanently, leaving only 3 for fetches. By loading data first
-		// we use all 6 slots for fast parallel fetches, then open persistent connections.
+		// IMPORTANT: Load data BEFORE registering the persistent WebSocket connection.
+		// Firefox limits HTTP/1.1 to 6 connections per origin. The single WebSocket
+		// consumes 1 slot permanently (session/task events are now WS channel subscriptions,
+		// not separate SSE connections). Loading data first maximizes available slots.
 		await Promise.all([
 			loadAllTasksFast(),
 			loadReadyTaskCount(),
@@ -262,13 +262,19 @@
 			loadStateCounts()
 		]);
 
-		// Phase 1.5: Register persistent connections AFTER critical data is loaded
-		// These occupy 3 of Firefox's 6 HTTP/1.1 connection slots permanently.
-		// By deferring them we ensure Phase 1 fetches complete without contention.
+		// Phase 1.5: Register persistent WebSocket connection AFTER critical data is loaded.
+		// Session events and task events now subscribe to WS channels (no separate HTTP connections),
+		// so they connect/disconnect alongside the WebSocket rather than as separate managed connections.
 		connectionIds = [
-			registerConnection('websocket', connectWebSocket, disconnectWebSocket, 5),
-			registerConnection('session-events-sse', connectSessionEvents, disconnectSessionEvents, 10),
-			registerConnection('task-events-sse', connectTaskEvents, disconnectTaskEvents, 15)
+			registerConnection('websocket', () => {
+				connectWebSocket();
+				connectSessionEvents();
+				connectTaskEvents();
+			}, () => {
+				disconnectSessionEvents();
+				disconnectTaskEvents();
+				disconnectWebSocket();
+			}, 5)
 		];
 
 		// Phase 2: Non-critical data (deferred 2s to let page render + components settle)

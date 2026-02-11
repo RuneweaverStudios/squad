@@ -70,7 +70,7 @@ export async function GET() {
 export async function POST({ request }) {
 	try {
 		const body = await request.json();
-		const { name, prompt, defaultProject, defaultModel = 'haiku', variables = [] } = body;
+		const { name, prompt, defaultProject, defaultModel = 'haiku', outputAction, variables = [] } = body;
 
 		if (!name || typeof name !== 'string' || name.trim().length === 0) {
 			return json(
@@ -102,6 +102,7 @@ export async function POST({ request }) {
 			prompt: prompt.trim(),
 			defaultProject: defaultProject || null,
 			defaultModel,
+			...(outputAction && outputAction !== 'display' && { outputAction }),
 			variables: Array.isArray(variables) ? variables : [],
 			createdAt: new Date().toISOString()
 		};

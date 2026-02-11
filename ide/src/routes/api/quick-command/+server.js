@@ -9,11 +9,28 @@
  */
 
 import { json } from '@sveltejs/kit';
-import { spawn } from 'child_process';
+import { spawn, execFile } from 'child_process';
 import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join, normalize, relative } from 'path';
 import { getProjectPath } from '$lib/server/projectPaths.js';
+
+/**
+ * Execute a shell command and return stdout.
+ * @param {string} cmd
+ * @param {string[]} args
+ * @param {string} cwd
+ * @param {number} [timeoutMs=10000]
+ * @returns {Promise<string>}
+ */
+function execCommand(cmd, args, cwd, timeoutMs = 10000) {
+	return new Promise((resolve, reject) => {
+		execFile(cmd, args, { cwd, timeout: timeoutMs, maxBuffer: 1024 * 1024 }, (err, stdout) => {
+			if (err) reject(err);
+			else resolve(stdout);
+		});
+	});
+}
 
 /**
  * Replace {varName} placeholders in prompt with variable values.
@@ -86,6 +103,173 @@ async function resolveFileReferences(prompt, projectPath) {
 	}
 
 	return { resolved, files, errors };
+}
+
+// --- Context Providers ---
+// Resolve @task:ID, @git:diff, @git:log:N, @git:branch, @mail:THREAD, @url:URL
+// Must run BEFORE resolveFileReferences to avoid pattern overlap.
+
+/** @type {Array<{pattern: RegExp, type: string, resolve: (match: RegExpMatchArray, cwd: string) => Promise<{content: string, ref: string}>}>} */
+const CONTEXT_PROVIDERS = [
+	{
+		// @task:ID - inject task details
+		pattern: /@task:([\w\-\.]+)/g,
+		type: 'task',
+		resolve: async (match, cwd) => {
+			const taskId = match[1];
+			const stdout = await execCommand('jt', ['show', taskId, '--json'], cwd);
+			const tasks = JSON.parse(stdout);
+			if (!tasks || tasks.length === 0) throw new Error(`Task '${taskId}' not found`);
+			const t = tasks[0];
+			const lines = [
+				`Title: ${t.title}`,
+				`Status: ${t.status}`,
+				`Priority: P${t.priority}`,
+				`Type: ${t.issue_type}`,
+				t.assignee ? `Assignee: ${t.assignee}` : null,
+				t.labels?.length ? `Labels: ${t.labels.join(', ')}` : null,
+				t.description ? `\nDescription:\n${t.description}` : null,
+				t.dependencies?.length ? `\nDependencies:\n${t.dependencies.map(d => `  - ${d.id}: ${d.title} [${d.status}]`).join('\n')}` : null,
+				t.dependents?.length ? `\nBlocks:\n${t.dependents.map(d => `  - ${d.id}: ${d.title} [${d.status}]`).join('\n')}` : null
+			].filter(Boolean);
+			return { content: lines.join('\n'), ref: taskId };
+		}
+	},
+	{
+		// @git:diff - inject staged + unstaged diff
+		pattern: /@git:diff/g,
+		type: 'git',
+		resolve: async (_match, cwd) => {
+			const [unstaged, staged] = await Promise.all([
+				execCommand('git', ['diff'], cwd).catch(() => ''),
+				execCommand('git', ['diff', '--cached'], cwd).catch(() => '')
+			]);
+			const parts = [];
+			if (staged.trim()) parts.push(`--- Staged changes ---\n${staged.trim()}`);
+			if (unstaged.trim()) parts.push(`--- Unstaged changes ---\n${unstaged.trim()}`);
+			if (parts.length === 0) return { content: '(no changes)', ref: 'diff' };
+			return { content: parts.join('\n\n'), ref: 'diff' };
+		}
+	},
+	{
+		// @git:log:N - inject last N commits (default 10)
+		pattern: /@git:log(?::(\d+))?/g,
+		type: 'git',
+		resolve: async (match, cwd) => {
+			const n = Math.min(parseInt(match[1] || '10', 10), 100);
+			const stdout = await execCommand('git', ['log', `--oneline`, `-${n}`], cwd);
+			return { content: stdout.trim() || '(no commits)', ref: `log:${n}` };
+		}
+	},
+	{
+		// @git:branch - inject current branch and status
+		pattern: /@git:branch/g,
+		type: 'git',
+		resolve: async (_match, cwd) => {
+			const [branch, status] = await Promise.all([
+				execCommand('git', ['branch', '--show-current'], cwd),
+				execCommand('git', ['status', '--short'], cwd).catch(() => '')
+			]);
+			const lines = [`Branch: ${branch.trim()}`];
+			if (status.trim()) {
+				lines.push(`\nStatus:\n${status.trim()}`);
+			} else {
+				lines.push('Status: clean');
+			}
+			return { content: lines.join('\n'), ref: 'branch' };
+		}
+	},
+	{
+		// @mail:THREAD - inject Agent Mail thread messages
+		pattern: /@mail:([\w\-\.]+)/g,
+		type: 'mail',
+		resolve: async (match, cwd) => {
+			const thread = match[1];
+			const stdout = await execCommand('am-inbox', ['--thread', thread, '--json', '@all'], cwd);
+			const messages = JSON.parse(stdout);
+			if (!messages || messages.length === 0) return { content: '(no messages in thread)', ref: thread };
+			const formatted = messages.map(m =>
+				`[${m.created_at || m.timestamp}] ${m.from_agent} → ${m.to_agent}: ${m.subject}\n${m.body}`
+			).join('\n---\n');
+			return { content: formatted, ref: thread };
+		}
+	},
+	{
+		// @url:URL - fetch URL content (with size limit)
+		pattern: /@url:(https?:\/\/[^\s]+)/g,
+		type: 'url',
+		resolve: async (match, _cwd) => {
+			const url = match[1];
+			// Security: basic URL validation (no file://, no localhost by default)
+			const parsed = new URL(url);
+			if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+				throw new Error('Only http/https URLs are allowed');
+			}
+			// Block internal/private IPs
+			const host = parsed.hostname;
+			if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.startsWith('192.168.') || host.startsWith('10.') || host.startsWith('172.')) {
+				throw new Error('Internal/private URLs are not allowed');
+			}
+
+			const controller = new AbortController();
+			const timer = setTimeout(() => controller.abort(), 10000);
+			try {
+				const res = await fetch(url, {
+					signal: controller.signal,
+					headers: { 'User-Agent': 'JAT-IDE/1.0' }
+				});
+				clearTimeout(timer);
+				if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+				const text = await res.text();
+				// Limit content size (100KB)
+				const maxSize = 100 * 1024;
+				const content = text.length > maxSize ? text.slice(0, maxSize) + '\n... (truncated)' : text;
+				return { content, ref: url };
+			} finally {
+				clearTimeout(timer);
+			}
+		}
+	}
+];
+
+/**
+ * Resolve context provider references in prompt.
+ * @param {string} prompt
+ * @param {string} projectPath
+ * @returns {Promise<{resolved: string, providers: Array<{type: string, ref: string, size: number}>, errors: string[]}>}
+ */
+async function resolveContextProviders(prompt, projectPath) {
+	const providers = [];
+	const errors = [];
+	let resolved = prompt;
+
+	for (const provider of CONTEXT_PROVIDERS) {
+		// Collect all matches for this provider
+		const matches = [];
+		let m;
+		// Reset regex state
+		const regex = new RegExp(provider.pattern.source, provider.pattern.flags);
+		while ((m = regex.exec(resolved)) !== null) {
+			matches.push({ full: m[0], groups: m, index: m.index });
+		}
+
+		if (matches.length === 0) continue;
+
+		// Process in reverse order to preserve indices
+		for (let i = matches.length - 1; i >= 0; i--) {
+			const match = matches[i];
+			try {
+				const result = await provider.resolve(match.groups, projectPath);
+				const replacement = `<context type="${provider.type}" ref="${result.ref}">\n${result.content}\n</context>`;
+				resolved = resolved.slice(0, match.index) + replacement + resolved.slice(match.index + match.full.length);
+				providers.push({ type: provider.type, ref: result.ref, size: result.content.length });
+			} catch (err) {
+				errors.push(`@${provider.type}:${match.groups[1] || ''}: ${err.message}`);
+			}
+		}
+	}
+
+	return { resolved, providers, errors };
 }
 
 /**
@@ -205,6 +389,22 @@ export async function POST({ request }) {
 		// Substitute variables in prompt
 		let resolvedPrompt = substituteVariables(prompt, variables);
 
+		// Resolve context providers FIRST (@task:, @git:, @mail:, @url:)
+		// Must run before file references to avoid pattern overlap
+		const providerResult = await resolveContextProviders(resolvedPrompt, projectInfo.path);
+		resolvedPrompt = providerResult.resolved;
+
+		if (providerResult.errors.length > 0) {
+			console.warn('[quick-command] Provider resolution warnings:', providerResult.errors);
+		}
+
+		if (providerResult.providers.length > 0) {
+			console.log(
+				`[quick-command] Resolved ${providerResult.providers.length} provider(s):`,
+				providerResult.providers.map((p) => `${p.type}:${p.ref}`)
+			);
+		}
+
 		// Resolve @file references (inject file contents into prompt)
 		const fileResult = await resolveFileReferences(resolvedPrompt, projectInfo.path);
 		resolvedPrompt = fileResult.resolved;
@@ -247,7 +447,9 @@ export async function POST({ request }) {
 			durationMs,
 			timestamp: new Date().toISOString(),
 			resolvedFiles: fileResult.files,
-			fileErrors: fileResult.errors
+			fileErrors: fileResult.errors,
+			resolvedProviders: providerResult.providers,
+			providerErrors: providerResult.errors
 		});
 	} catch (error) {
 		const durationMs = Date.now() - startTime;
