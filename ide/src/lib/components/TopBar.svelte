@@ -20,7 +20,6 @@
 
 	import { page } from "$app/stores";
 	import ActivityBadge from "./ActivityBadge.svelte";
-	import ActionPill from "./ActionPill.svelte";
 	import ServersBadge from "./ServersBadge.svelte";
 	import UserProfile from "./UserProfile.svelte";
 	import CommandPalette from "./CommandPalette.svelte";
@@ -127,7 +126,6 @@
 	// New Session - spawn a planning session in selected project
 	async function handleNewSession(projectName: string) {
 		newSessionLoading = true;
-		showSessionDropdown = false;
 		try {
 			const response = await fetch("/api/work/spawn", {
 				method: "POST",
@@ -538,9 +536,9 @@
 		</svg>
 	</button>
 
-	<!-- Project Selector (global, always visible) -->
+	<!-- Project Selector + Actions (global, always visible) -->
 	{#if actualProjects.length > 0 && onProjectChange}
-		<div class="ml-3 flex-none" style="min-width: 100px; max-width: 180px;">
+		<div class="ml-3 flex-none">
 			<ProjectSelector
 				projects={actualProjects}
 				{selectedProject}
@@ -549,23 +547,18 @@
 				compact={true}
 				showColors={true}
 				projectColors={projectColorsMap}
+				{readyTasks}
+				epics={epicsWithReadyChildren.map(e => ({ id: e.id, title: e.title, project: e.project, childCount: e.readyCount }))}
+				idleSlots={availableSlots}
+				onNewTask={handleNewTask}
+				onStart={handleSpawnSingle}
+				onSwarm={(count, epicId) => epicId ? handleRunEpic(epicId) : handleSwarm()}
 			/>
 		</div>
 	{/if}
 
-	<!-- Left side utilities -->
-	<div class="flex-1 flex items-center gap-3 px-4">
-		<!-- Unified Action Pill: + New | ▶ Start | ⚡ Swarm -->
-		<ActionPill
-			projects={actualProjects.map(p => ({ name: p, taskCount: tasksByProject.get(p)?.length }))}
-			{readyTasks}
-			epics={epicsWithReadyChildren.map(e => ({ id: e.id, title: e.title, project: e.project, childCount: e.readyCount }))}
-			idleSlots={availableSlots}
-			onNewTask={handleNewTask}
-			onStart={handleSpawnSingle}
-			onSwarm={(count, epicId) => epicId ? handleRunEpic(epicId) : handleSwarm()}
-		/>
-	</div>
+	<!-- Spacer -->
+	<div class="flex-1"></div>
 
 	<!-- Agent Sort Dropdown (on /agents page) -->
 	{#if isAgentsPage}
