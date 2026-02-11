@@ -270,7 +270,7 @@ export class BaseAdapter {
    * @param {SendTarget} target - Where to send the message
    * @param {OutboundMessage} message - The message to send
    * @param {(name: string) => string} getSecret - Retrieve a secret by name
-   * @returns {Promise<void>}
+   * @returns {Promise<{messageId?: string}|void>} Optional sent message ID for thread tracking
    */
   async send(_target, _message, _getSecret) {
     throw new Error(`${this.type}: send() not supported`);

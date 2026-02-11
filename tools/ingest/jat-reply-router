@@ -19,7 +19,7 @@
  *   - Secret configured for the adapter (via jat-secret)
  */
 
-import { getOriginByTaskId } from './lib/dedup.js';
+import { getOriginByTaskId, registerThread } from './lib/dedup.js';
 import { discoverPlugins } from './lib/pluginLoader.js';
 import { getSecret, getEnabledSources } from './lib/config.js';
 
@@ -98,10 +98,16 @@ async function main() {
     text: `${prefix} ${args.message}`.trim()
   };
 
-  // 5. Send
+  // 5. Send and register bot reply for thread tracking
   try {
-    await adapter.send(target, message, getSecret);
+    const result = await adapter.send(target, message, getSecret);
     console.log(`Reply sent to ${origin.adapterType} channel ${origin.channelId} (${args.type})`);
+
+    // Register the bot's sent message ID so user replies to it route back to this task
+    if (result?.messageId) {
+      registerThread(origin.sourceId, result.messageId, new Date().toISOString(), args.taskId);
+      console.log(`Registered bot reply ${result.messageId} for thread tracking`);
+    }
   } catch (err) {
     console.error(`Failed to send reply: ${err.message}`);
     process.exit(1);

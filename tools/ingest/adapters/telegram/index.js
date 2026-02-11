@@ -163,6 +163,12 @@ export default class TelegramAdapter extends BaseAdapter {
       const text = await resp.text();
       throw new Error(`telegram: send() failed ${resp.status}: ${text}`);
     }
+    const data = await resp.json();
+    if (data.ok && data.result?.message_id) {
+      return {
+        messageId: `tg-${data.result.message_id}-${target.channelId}`
+      };
+    }
   }
 
   async test(source, getSecret) {
