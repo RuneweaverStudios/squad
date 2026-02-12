@@ -102,12 +102,14 @@ export { getAgentStatusVisual, getTaskStatusVisual, getPriorityVisual };
 interface TaskWithLabels {
 	labels?: string[];
 	issue_type?: string;
+	agent_program?: string | null;
 }
 
 /**
  * Check if a task is a human-action task.
  * A task is considered "human" if:
  * - It has issue_type === 'human', OR
+ * - It has agent_program === 'human', OR
  * - It has a label 'human-action' or 'human'
  *
  * Human tasks are tasks that require human intervention (not agent work).
@@ -118,6 +120,9 @@ export function isHumanTask(task: TaskWithLabels | null | undefined): boolean {
 
 	// Check issue_type
 	if (task.issue_type === 'human') return true;
+
+	// Check agent_program
+	if (task.agent_program === 'human') return true;
 
 	// Check labels
 	const labels = task.labels || [];

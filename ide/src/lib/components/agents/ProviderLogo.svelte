@@ -69,6 +69,7 @@
 			width={size}
 			height={size}
 			style="color: {providerInfo.color};"
+			class="mt-0.5"
 			aria-label="{providerInfo.name} logo"
 		>
 			<path d={providerInfo.iconPath} />

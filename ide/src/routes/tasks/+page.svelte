@@ -45,6 +45,7 @@
 		labels?: string[];
 		created_at?: string;
 		depends_on?: Array<{ id: string; [key: string]: any }>;
+		agent_program?: string | null;
 	}
 
 	interface AgentTask {

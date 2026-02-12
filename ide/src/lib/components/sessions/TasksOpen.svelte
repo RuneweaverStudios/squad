@@ -333,16 +333,22 @@
 		}
 	}
 
-	async function handleSingleHarnessChange(taskId: string, agentId: string) {
+	async function handleSingleHarnessChange(taskId: string, selection: { agentId: string | null; model: string | null }) {
 		harnessPickerTaskId = null;
 		const task = tasks.find(t => t.id === taskId);
 		if (!task) return;
+		const agentId = selection.agentId;
+		const model = selection.model;
 		try {
-			// Update agent_program field
+			// Update agent_program and model fields together
+			const updates: Record<string, any> = {
+				agent_program: agentId || null,
+				model: model || null
+			};
 			const resp = await fetchWithTimeout(`/api/tasks/${taskId}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ agent_program: agentId === 'claude-code' ? null : agentId })
+				body: JSON.stringify(updates)
 			});
 			if (!resp.ok) {
 				console.error('Failed to update harness:', resp.status, await resp.text());
@@ -372,6 +378,14 @@
 			console.error('Failed to update harness:', err);
 		}
 		onRetry();
+	}
+
+	async function handleSingleHarnessSaveAndLaunch(taskId: string, selection: { agentId: string | null; model: string | null }) {
+		const task = tasks.find(t => t.id === taskId);
+		if (!task) return;
+		// Save first, then spawn
+		await handleSingleHarnessChange(taskId, selection);
+		onSpawnTask(task, selection);
 	}
 
 	// Close single-task harness picker on Escape key
@@ -1104,10 +1118,18 @@
 											animate={isNew}
 											{harness}
 											onHarnessClick={(e) => {
+												e.stopPropagation();
 												harnessPickerTaskId = task.id;
-												const estimatedHeight = AGENT_PRESETS.length * 30 + 8;
-												const maxY = window.innerHeight - estimatedHeight - 8;
-												harnessPickerPos = { x: e.clientX, y: Math.min(e.clientY, maxY) };
+												const rect = (e.target as HTMLElement).getBoundingClientRect();
+												const selectorWidth = 300;
+												const selectorHeight = 420;
+												// Position to the right of the avatar, clamped to viewport edges
+												const left = Math.min(rect.right + 8, window.innerWidth - selectorWidth - 16);
+												// Use top positioning: try to align with click, but clamp to stay within viewport
+												const idealTop = rect.top;
+												const maxTop = window.innerHeight - selectorHeight - 16;
+												const top = Math.max(16, Math.min(idealTop, maxTop));
+												harnessPickerPos = { x: left, y: top };
 											}}
 										/>
 										<div class="text-column">
@@ -1483,29 +1505,26 @@
 	</div>
 {/if}
 
-<!-- Single-task Harness Picker -->
+<!-- Single-task Harness + Model Picker (AgentSelector) -->
 {#if harnessPickerTaskId}
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<div class="harness-picker-backdrop" onclick={() => harnessPickerTaskId = null}></div>
-	<div class="harness-picker" style="left: {harnessPickerPos.x}px; top: {harnessPickerPos.y}px;" onclick={(e) => e.stopPropagation()}>
-		{#each AGENT_PRESETS as preset}
-			{@const pickerTask = tasks.find(t => t.id === harnessPickerTaskId)}
-			{@const currentHarness = pickerTask ? getTaskHarness(pickerTask) : 'claude-code'}
-			<button
-				class="harness-picker-item {currentHarness === preset.id ? 'active' : ''}"
-				onclick={() => handleSingleHarnessChange(harnessPickerTaskId!, preset.id)}
-			>
-				<ProviderLogo agentId={preset.id} size={16} />
-				<span>{preset.name}</span>
-				{#if currentHarness === preset.id}
-					<svg class="w-3 h-3 ml-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-						<polyline points="20 6 9 17 4 12" />
-					</svg>
-				{/if}
-			</button>
-		{/each}
-	</div>
+	{@const pickerTask = tasks.find(t => t.id === harnessPickerTaskId)}
+	{#if pickerTask}
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<div class="harness-picker-backdrop" onclick={() => harnessPickerTaskId = null}></div>
+		<div
+			class="fixed z-50"
+			style="left: {harnessPickerPos.x}px; top: {harnessPickerPos.y}px;"
+			onclick={(e) => e.stopPropagation()}
+		>
+			<AgentSelector
+				task={pickerTask}
+				onsave={(selection) => handleSingleHarnessChange(harnessPickerTaskId!, selection)}
+				onselect={(selection) => handleSingleHarnessSaveAndLaunch(harnessPickerTaskId!, selection)}
+				oncancel={() => harnessPickerTaskId = null}
+			/>
+		</div>
+	{/if}
 {/if}
 
 <style>
@@ -2289,48 +2308,10 @@
 		flex-shrink: 0;
 	}
 
-	/* === Single-task Harness Picker === */
+	/* === Single-task Harness Picker Backdrop === */
 	.harness-picker-backdrop {
 		position: fixed;
 		inset: 0;
 		z-index: 49;
-	}
-
-	.harness-picker {
-		position: fixed;
-		z-index: 50;
-		background: oklch(0.18 0.02 250);
-		border: 1px solid oklch(0.30 0.03 250);
-		border-radius: 8px;
-		padding: 4px;
-		box-shadow: 0 8px 32px oklch(0 0 0 / 0.5);
-		min-width: 180px;
-		max-height: calc(100vh - 16px);
-		overflow-y: auto;
-		animation: contextMenuIn 0.1s ease;
-	}
-
-	.harness-picker-item {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		padding: 6px 10px;
-		border-radius: 6px;
-		width: 100%;
-		color: oklch(0.80 0.02 250);
-		font-size: 0.8125rem;
-		background: transparent;
-		border: none;
-		cursor: pointer;
-		transition: background 0.1s;
-		text-align: left;
-	}
-
-	.harness-picker-item:hover {
-		background: oklch(0.25 0.03 250);
-	}
-
-	.harness-picker-item.active {
-		color: oklch(0.85 0.12 200);
 	}
 </style>

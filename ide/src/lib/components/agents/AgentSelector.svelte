@@ -22,6 +22,8 @@
 		labels?: string[];
 		priority?: number;
 		title?: string;
+		agent_program?: string | null;
+		model?: string | null;
 	}
 
 	interface RoutingResult {
@@ -35,8 +37,10 @@
 
 	interface Props {
 		task: Task;
-		/** Called when user confirms selection */
+		/** Called when user confirms selection (Launch / Save & Launch) */
 		onselect?: (selection: { agentId: string | null; model: string | null }) => void;
+		/** Called when user wants to save without launching */
+		onsave?: (selection: { agentId: string | null; model: string | null }) => void;
 		/** Called when user cancels/closes */
 		oncancel?: () => void;
 		/** Show compact inline mode vs full dropdown */
@@ -46,6 +50,7 @@
 	let {
 		task,
 		onselect = () => {},
+		onsave,
 		oncancel = () => {},
 		compact = false
 	}: Props = $props();
@@ -128,14 +133,21 @@
 				const routingData = await routingResponse.json();
 				routingResult = routingData.result;
 
-				// Initialize selection with auto-selected values
-				const result = routingResult;
-				if (result) {
-					selectedAgentId = result.agentId;
-					// Find the model shortName from the model name
-					const agent = programs.find((p) => p.id === result.agentId);
-					const model = agent?.models.find((m) => m.name === result.modelName);
-					selectedModel = model?.shortName ?? null;
+				// If task already has saved agent_program/model, use those
+				if (task.agent_program) {
+					selectedAgentId = task.agent_program;
+					selectedModel = task.model ?? programs.find(p => p.id === task.agent_program)?.defaultModel ?? null;
+					useAutoSelection = false;
+				} else {
+					// Initialize selection with auto-selected values from routing
+					const result = routingResult;
+					if (result) {
+						selectedAgentId = result.agentId;
+						// Find the model shortName from the model name
+						const agent = programs.find((p) => p.id === result.agentId);
+						const model = agent?.models.find((m) => m.name === result.modelName);
+						selectedModel = model?.shortName ?? null;
+					}
 				}
 			}
 		} catch (err) {
@@ -176,13 +188,20 @@
 		}
 	}
 
-	function handleConfirm() {
+	function getSelection(): { agentId: string | null; model: string | null } {
 		// If using auto selection, pass null to let spawn API use routing
 		if (useAutoSelection) {
-			onselect({ agentId: null, model: null });
-		} else {
-			onselect({ agentId: selectedAgentId, model: selectedModel });
+			return { agentId: null, model: null };
 		}
+		return { agentId: selectedAgentId, model: selectedModel };
+	}
+
+	function handleConfirm() {
+		onselect(getSelection());
+	}
+
+	function handleSave() {
+		onsave?.(getSelection());
 	}
 
 	function handleCancel() {
@@ -688,6 +707,14 @@
 			<!-- Actions -->
 			<div class="flex justify-end gap-2">
 				<button class="btn btn-sm btn-ghost" onclick={handleCancel}> Cancel </button>
+				{#if onsave}
+					<button class="btn btn-sm btn-outline btn-primary" onclick={handleSave}>
+						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+							<path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+						</svg>
+						Save
+					</button>
+				{/if}
 				<button class="btn btn-sm btn-primary" onclick={handleConfirm}>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -703,7 +730,7 @@
 							d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"
 						/>
 					</svg>
-					Launch
+					{onsave ? 'Save & Launch' : 'Launch'}
 				</button>
 			</div>
 		{/if}
