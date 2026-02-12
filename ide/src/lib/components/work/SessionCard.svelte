@@ -1652,9 +1652,12 @@
 	let pathAutocompleteIndex = $state(0);
 	let pathSearchTimeout: ReturnType<typeof setTimeout> | null = null;
 
+	let pathSearchGeneration = 0; // Tracks which search is current (prevents stale results)
+
 	function detectPathAutocomplete() {
 		if (!inputRef) return;
-		const text = inputText;
+		// Read directly from DOM to avoid Svelte binding lag
+		const text = inputRef.value;
 		const cursorPos = inputRef.selectionStart ?? text.length;
 		const beforeCursor = text.slice(0, cursorPos);
 		const atMatch = beforeCursor.match(/@([\w\-\.\/]*)$/);
@@ -1663,19 +1666,25 @@
 			showPathAutocomplete = true;
 			pathAutocompleteIndex = 0;
 			if (pathSearchTimeout) clearTimeout(pathSearchTimeout);
+			// Clear stale results immediately when query changes
+			pathSearchResults = [];
 			if (query.length >= 1) {
+				const generation = ++pathSearchGeneration;
 				pathSearchTimeout = setTimeout(async () => {
 					try {
 						const res = await fetch(`/api/files/search?project=${encodeURIComponent(defaultProject)}&query=${encodeURIComponent(query)}&limit=8`);
 						const data = await res.json();
-						pathSearchResults = data.files || [];
-						pathAutocompleteIndex = 0;
+						// Only apply if this is still the latest search
+						if (generation === pathSearchGeneration) {
+							pathSearchResults = data.files || [];
+							pathAutocompleteIndex = 0;
+						}
 					} catch {
-						pathSearchResults = [];
+						if (generation === pathSearchGeneration) {
+							pathSearchResults = [];
+						}
 					}
 				}, 150);
-			} else {
-				pathSearchResults = [];
 			}
 		} else {
 			showPathAutocomplete = false;
@@ -1685,7 +1694,7 @@
 
 	function selectPathResult(file: {path: string; name: string; folder: string}) {
 		if (!inputRef) return;
-		const text = inputText;
+		const text = inputRef.value;
 		const cursorPos = inputRef.selectionStart ?? text.length;
 		const beforeCursor = text.slice(0, cursorPos);
 		const afterCursor = text.slice(cursorPos);

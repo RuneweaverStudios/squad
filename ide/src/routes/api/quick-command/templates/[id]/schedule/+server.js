@@ -140,14 +140,16 @@ export async function POST({ params, request }) {
 			);
 		}
 
-		// Compute first next_run_at using cron-parser
-		// Import dynamically since this is an IDE route
+		// Compute first next_run_at using cron-parser from the scheduler
+		// Use createRequire to resolve at runtime (avoids Rollup static analysis)
 		let nextRunAt;
 		try {
-			const { nextCronRun } = await import(
-				'../../../../../../tools/scheduler/lib/cron.js'
-			);
-			nextRunAt = nextCronRun(cronExpr);
+			const { createRequire } = await import('module');
+			const { join } = await import('path');
+			const require = createRequire(join(process.cwd(), '..', 'tools', 'scheduler', 'lib', 'cron.js'));
+			const cronParser = require('cron-parser');
+			const interval = cronParser.parseExpression(cronExpr, { currentDate: new Date(), tz: 'UTC' });
+			nextRunAt = interval.next().toISOString();
 		} catch {
 			// Fallback: set to now + 1 minute if cron-parser not available
 			nextRunAt = new Date(Date.now() + 60000).toISOString();
