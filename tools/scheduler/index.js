@@ -1,19 +1,26 @@
 #!/usr/bin/env node
 /**
- * jat-scheduler - Polls task databases for scheduled tasks and spawns agents.
+ * jat-scheduler - Polls task databases and workflow files for scheduled execution.
  *
- * Scans all projects in ~/code/ that have .jat/tasks.db for tasks where:
- *   next_run_at <= now AND status = 'open'
+ * Task scheduling:
+ *   Scans all projects in ~/code/ that have .jat/tasks.db for tasks where:
+ *     next_run_at <= now AND status = 'open'
  *
- * For recurring tasks (schedule_cron set):
- *   - Creates a child instance task inheriting command/agent_program/model
- *   - For regular tasks: Spawns via /api/work/spawn
- *   - For quick commands (/quick-command:{id}): Executes via /api/quick-command
- *   - Computes next next_run_at from cron expression
+ *   For recurring tasks (schedule_cron set):
+ *     - Creates a child instance task inheriting command/agent_program/model
+ *     - For regular tasks: Spawns via /api/work/spawn
+ *     - For quick commands (/quick-command:{id}): Executes via /api/quick-command
+ *     - For workflows (/workflow:{id}): Executes via /api/workflows/{id}/run
+ *     - Computes next next_run_at from cron expression
  *
- * For one-shot tasks (no schedule_cron, but next_run_at set):
- *   - Spawns directly using task's command/agent_program/model
- *   - Clears next_run_at after spawn
+ *   For one-shot tasks (no schedule_cron, but next_run_at set):
+ *     - Spawns directly using task's command/agent_program/model
+ *     - Clears next_run_at after spawn
+ *
+ * Workflow scheduling (direct from workflow JSON files):
+ *   Reads ~/.config/jat/workflows/*.json for enabled workflows with trigger_cron nodes.
+ *   Tracks next_run_at per workflow in ~/.config/jat/workflows/.scheduler-state.json.
+ *   Executes due workflows via POST /api/workflows/{id}/run with trigger='cron'.
  *
  * Usage:
  *   node index.js [--poll-interval 30] [--port 3334] [--verbose] [--dry-run]

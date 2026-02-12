@@ -12,11 +12,53 @@
 import { json } from '@sveltejs/kit';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { readFileSync, existsSync, readdirSync } from 'fs';
+import { join } from 'path';
+import { homedir } from 'os';
 import { getScheduledTasks } from '$lib/server/jat-tasks.js';
 
 const execAsync = promisify(exec);
 
 const SCHEDULER_SESSION = 'server-scheduler';
+const WORKFLOWS_DIR = join(homedir(), '.config', 'jat', 'workflows');
+const WORKFLOW_STATE_FILE = join(WORKFLOWS_DIR, '.scheduler-state.json');
+
+/**
+ * Discover enabled workflows with trigger_cron nodes and their scheduling state.
+ * @returns {Array<{id: string, name: string, cronExpr: string, nextRunAt: string|null}>}
+ */
+function getScheduledWorkflows() {
+	if (!existsSync(WORKFLOWS_DIR)) return [];
+
+	// Read scheduler state
+	let state = {};
+	try {
+		if (existsSync(WORKFLOW_STATE_FILE)) {
+			state = JSON.parse(readFileSync(WORKFLOW_STATE_FILE, 'utf-8'));
+		}
+	} catch { /* ignore */ }
+
+	const workflows = [];
+	try {
+		const entries = readdirSync(WORKFLOWS_DIR, { withFileTypes: true });
+		for (const entry of entries) {
+			if (!entry.isFile() || !entry.name.endsWith('.json') || entry.name.startsWith('.')) continue;
+			try {
+				const data = JSON.parse(readFileSync(join(WORKFLOWS_DIR, entry.name), 'utf-8'));
+				if (!data.enabled) continue;
+				const cronNode = (data.nodes || []).find(n => n.type === 'trigger_cron');
+				if (!cronNode || !cronNode.config?.cronExpr) continue;
+				workflows.push({
+					id: data.id,
+					name: data.name || data.id,
+					cronExpr: cronNode.config.cronExpr,
+					nextRunAt: state[data.id] || null,
+				});
+			} catch { /* skip malformed */ }
+		}
+	} catch { /* skip */ }
+	return workflows;
+}
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET() {
@@ -63,12 +105,16 @@ export async function GET() {
 			};
 		}
 
+		// Get scheduled workflows (cron-triggered from workflow JSON files)
+		const scheduledWorkflows = getScheduledWorkflows();
+
 		return json({
 			running,
 			uptime,
 			sessionCreated,
 			scheduledCount,
 			nextRun,
+			scheduledWorkflows,
 			timestamp: new Date().toISOString()
 		});
 	} catch (error) {
