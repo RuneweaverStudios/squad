@@ -420,11 +420,15 @@ export async function POST({ params, request }) {
 		}
 
 		// Get claude flags from config
-		let claudeFlags = '--dangerously-skip-permissions';
+		let claudeFlags = '';
 		if (existsSync(configPath)) {
 			try {
 				const config = JSON.parse(readFileSync(configPath, 'utf-8'));
-				claudeFlags = config.defaults?.claude_flags || claudeFlags;
+				claudeFlags = config.defaults?.claude_flags || '';
+				// Inject permission flag from autonomous mode toggle only
+				if (config.defaults?.skip_permissions) {
+					claudeFlags = (claudeFlags + ' --dangerously-skip-permissions').trim();
+				}
 			} catch (e) {
 				// Use default
 			}

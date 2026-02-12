@@ -377,8 +377,13 @@
 			if (diffEditor && monaco) {
 				const model = diffEditor.getModel();
 				if (model) {
-					model.original.setValue(originalContent);
-					model.modified.setValue(modifiedContent);
+					try {
+						model.original.setValue(originalContent);
+						model.modified.setValue(modifiedContent);
+					} catch {
+						// Monaco can throw "Illegal value for lineNumber" when restoring
+						// cursor position after setValue() if new content has fewer lines
+					}
 				}
 			}
 

@@ -44,7 +44,7 @@
 	let terminal = $state('auto');
 	let editor = $state('code');
 	let toolsPath = $state('~/.local/bin');
-	let claudeFlags = $state('--dangerously-skip-permissions');
+	let claudeFlags = $state('');
 	let model = $state('opus');
 	let agentStagger = $state(15);
 	let claudeStartupTimeout = $state(20);
@@ -60,10 +60,7 @@
 	let skipPermissions = $state(false);
 	let fileWatcherIgnoredDirs = $state<string[]>([]);
 	let newIgnoredDir = $state('');
-	let launchingYolo = $state(false);
 	let savingSkipPermissions = $state(false);
-	let yoloInfoMessage = $state<string | null>(null);
-	let yoloManualCommand = $state<string | null>(null);
 
 	// Track if form has changes
 	let originalValues = $state<JatDefaults | null>(null);
@@ -181,7 +178,7 @@
 			terminal = defaults.terminal || 'auto';
 			editor = defaults.editor || 'code';
 			toolsPath = defaults.tools_path || '~/.local/bin';
-			claudeFlags = defaults.claude_flags || '--dangerously-skip-permissions';
+			claudeFlags = defaults.claude_flags || '';
 			model = defaults.model || 'opus';
 			agentStagger = defaults.agent_stagger || 15;
 			claudeStartupTimeout = defaults.claude_startup_timeout || 20;
@@ -386,58 +383,6 @@
 	}
 
 	/**
-	 * Launch a Claude session with --dangerously-skip-permissions flag
-	 * so the user can accept the YOLO warning in their terminal
-	 */
-	async function launchYoloSession() {
-		launchingYolo = true;
-		error = null;
-		yoloInfoMessage = null;
-		yoloManualCommand = null;
-
-		let response: Response;
-		try {
-			response = await fetch('/api/sessions/yolo', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' }
-			});
-		} catch {
-			error = 'Could not connect to the IDE server. Is it running?';
-			yoloManualCommand = 'claude --dangerously-skip-permissions';
-			launchingYolo = false;
-			return;
-		}
-
-		let data: Record<string, unknown>;
-		try {
-			data = await response.json();
-		} catch {
-			error = `Server error (${response.status}). The server returned an unexpected response.`;
-			yoloManualCommand = 'claude --dangerously-skip-permissions';
-			launchingYolo = false;
-			return;
-		}
-
-		if (!response.ok) {
-			error = (data.message as string) || (data.error as string) || 'Failed to launch session';
-			yoloManualCommand = (data.manualCommand as string) || 'claude --dangerously-skip-permissions';
-			launchingYolo = false;
-			return;
-		}
-
-		if (data.manualAttach) {
-			yoloInfoMessage = 'Session created, but a terminal window could not be opened automatically.';
-			yoloManualCommand = (data.manualCommand as string) || null;
-			launchingYolo = false;
-			return;
-		}
-
-		success = 'Claude session launched! Accept the permissions warning in your terminal, then enable the toggle here.';
-		setTimeout(() => { success = null; }, 8000);
-		launchingYolo = false;
-	}
-
-	/**
 	 * Add a new directory to the ignored list
 	 */
 	function addIgnoredDir() {
@@ -569,6 +514,45 @@
 				</div>
 			{/if}
 
+			<!-- Autonomous Mode Section -->
+			<div class="form-section autonomous-section">
+				<h3 class="section-title">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="section-icon">
+						<path d="M13 10V3L4 14h7v7l9-11h-7z"/>
+					</svg>
+					Autonomous Mode
+				</h3>
+
+				<div class="form-group">
+					<label class="form-label toggle-label" for="skip-permissions">
+						<span class="toggle-label-text">
+							Enable autonomous mode
+							<span class="label-hint">Pass --dangerously-skip-permissions to Claude and --full-auto to Codex</span>
+							{#if savingSkipPermissions}
+								<span class="saving-indicator">Saving...</span>
+							{/if}
+						</span>
+						<input
+							type="checkbox"
+							id="skip-permissions"
+							class="toggle toggle-warning"
+							checked={skipPermissions}
+							onchange={handleSkipPermissionsToggle}
+							disabled={savingSkipPermissions}
+						/>
+					</label>
+				</div>
+
+				{#if skipPermissions}
+					<div class="enabled-notice">
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="notice-icon">
+							<path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+						</svg>
+						<span>Autonomous mode is <strong>enabled</strong>. Agents will run without permission prompts.</span>
+					</div>
+				{/if}
+			</div>
+
 			<!-- Agent Spawning Section -->
 			<div class="form-section">
 				<h3 class="section-title">Agent Spawning</h3>
@@ -588,14 +572,14 @@
 				<div class="form-group">
 					<label class="form-label" for="claude-flags">
 						Claude Flags
-						<span class="label-hint">CLI flags passed to claude command</span>
+						<span class="label-hint">Additional CLI flags passed to claude command</span>
 					</label>
 					<input
 						type="text"
 						id="claude-flags"
 						class="form-input"
 						bind:value={claudeFlags}
-						placeholder="--dangerously-skip-permissions"
+						placeholder="e.g. --verbose"
 					/>
 				</div>
 
@@ -644,111 +628,6 @@
 						{/if}
 					</div>
 				</div>
-			</div>
-
-			<!-- Autonomous Mode Section -->
-			<div class="form-section autonomous-section">
-				<h3 class="section-title">
-					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="section-icon">
-						<path d="M13 10V3L4 14h7v7l9-11h-7z"/>
-					</svg>
-					Autonomous Mode
-				</h3>
-				<p class="section-description">
-					Enable autonomous operation by passing <code>--dangerously-skip-permissions</code> to Claude
-					and <code>--full-auto</code> to Codex. This allows agents to execute commands without confirmation prompts.
-				</p>
-
-				{#if !skipPermissions}
-					<div class="autonomous-setup-section">
-						<div class="autonomous-warning">
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="warning-icon">
-								<path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-							</svg>
-							<div class="warning-content">
-								<strong>First time setup required</strong>
-								<p>
-									Before enabling this toggle, you must accept Claude's permissions warning once in your terminal.
-									Click the button below to launch a Claude session where you can accept it.
-								</p>
-							</div>
-						</div>
-
-						<div class="autonomous-actions">
-							<button
-								type="button"
-								class="btn btn-warning"
-								onclick={launchYoloSession}
-								disabled={launchingYolo}
-							>
-								{#if launchingYolo}
-									<span class="btn-spinner"></span>
-									Launching...
-								{:else}
-									<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
-										<path d="M5 3l14 9-14 9V3z"/>
-									</svg>
-									Launch Claude to Accept Warning
-								{/if}
-							</button>
-						</div>
-
-						{#if yoloInfoMessage}
-							<div class="alert alert-info">
-								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="alert-icon">
-									<circle cx="12" cy="12" r="10"/>
-									<path d="M12 16v-4M12 8h.01"/>
-								</svg>
-								<span>{yoloInfoMessage}</span>
-							</div>
-						{/if}
-
-						{#if yoloManualCommand}
-							<div class="manual-fallback">
-								<span class="manual-fallback-label">Run this in your terminal instead:</span>
-								<!-- svelte-ignore a11y_click_events_have_key_events -->
-								<!-- svelte-ignore a11y_no_static_element_interactions -->
-								<code class="manual-fallback-cmd" onclick={(e) => {
-									const el = e.currentTarget as HTMLElement;
-									const range = document.createRange();
-									range.selectNodeContents(el);
-									const sel = window.getSelection();
-									sel?.removeAllRanges();
-									sel?.addRange(range);
-								}}>{yoloManualCommand}</code>
-							</div>
-						{/if}
-					</div>
-				{/if}
-
-				<div class="form-group" style="margin-top: 1.25rem;">
-					<label class="form-label toggle-label" for="skip-permissions">
-						<span class="toggle-label-text">
-							Enable autonomous mode
-							<span class="label-hint">Pass --dangerously-skip-permissions to Claude and --full-auto to Codex</span>
-							{#if savingSkipPermissions}
-								<span class="saving-indicator">Saving...</span>
-							{/if}
-						</span>
-						<input
-							type="checkbox"
-							id="skip-permissions"
-							class="toggle toggle-warning"
-							checked={skipPermissions}
-							onchange={handleSkipPermissionsToggle}
-							disabled={savingSkipPermissions}
-						/>
-					</label>
-				</div>
-
-				{#if skipPermissions}
-					<div class="enabled-notice">
-						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="notice-icon">
-							<path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-						</svg>
-						<span>Autonomous mode is <strong>enabled</strong>. Agents will run without permission prompts.</span>
-					</div>
-				{/if}
 			</div>
 
 			<!-- Tools Section -->
@@ -1257,40 +1136,6 @@
 		color: oklch(0.85 0.10 230);
 	}
 
-	.manual-fallback {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-		padding: 0.75rem 1rem;
-		background: oklch(0.14 0.02 250);
-		border: 1px solid oklch(0.28 0.02 250);
-		border-radius: 8px;
-	}
-
-	.manual-fallback-label {
-		font-size: 0.8rem;
-		color: oklch(0.60 0.02 250);
-	}
-
-	.manual-fallback-cmd {
-		display: block;
-		padding: 0.5rem 0.75rem;
-		background: oklch(0.10 0.02 250);
-		border: 1px solid oklch(0.25 0.02 250);
-		border-radius: 6px;
-		font-size: 0.85rem;
-		font-family: ui-monospace, monospace;
-		color: oklch(0.85 0.10 200);
-		cursor: pointer;
-		user-select: all;
-		word-break: break-all;
-	}
-
-	.manual-fallback-cmd:hover {
-		background: oklch(0.12 0.02 250);
-		border-color: oklch(0.35 0.08 200);
-	}
-
 	.alert-icon {
 		width: 18px;
 		height: 18px;
@@ -1657,83 +1502,6 @@
 		vertical-align: middle;
 		margin-right: 0.5rem;
 		color: oklch(0.70 0.15 45);
-	}
-
-	.autonomous-warning {
-		display: flex;
-		gap: 0.75rem;
-		padding: 1rem;
-		background: oklch(0.20 0.08 45 / 0.4);
-		border: 1px solid oklch(0.40 0.12 45 / 0.5);
-		border-radius: 8px;
-		margin-bottom: 1rem;
-	}
-
-	.warning-icon {
-		width: 24px;
-		height: 24px;
-		flex-shrink: 0;
-		color: oklch(0.70 0.18 45);
-	}
-
-	.warning-content {
-		font-size: 0.85rem;
-		color: oklch(0.75 0.02 250);
-		line-height: 1.5;
-	}
-
-	.warning-content strong {
-		color: oklch(0.85 0.10 45);
-		display: block;
-		margin-bottom: 0.25rem;
-	}
-
-	.warning-content p {
-		margin: 0;
-		color: oklch(0.65 0.02 250);
-	}
-
-	.autonomous-actions {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-	}
-
-	.btn-warning {
-		background: oklch(0.45 0.12 45);
-		border: 1px solid oklch(0.55 0.15 45);
-		color: oklch(0.98 0.02 45);
-	}
-
-	.btn-warning:hover:not(:disabled) {
-		background: oklch(0.50 0.15 45);
-	}
-
-	.already-enabled {
-		font-size: 0.8rem;
-		color: oklch(0.55 0.02 250);
-		font-style: italic;
-	}
-
-	.autonomous-setup-section {
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-		overflow: hidden;
-		animation: slideDown 0.3s ease-out;
-	}
-
-	@keyframes slideDown {
-		from {
-			opacity: 0;
-			max-height: 0;
-			transform: translateY(-10px);
-		}
-		to {
-			opacity: 1;
-			max-height: 300px;
-			transform: translateY(0);
-		}
 	}
 
 	.saving-indicator {

@@ -566,37 +566,34 @@ function buildAgentCommand({ agent, model, projectPath, jatDefaults, agentName, 
 			agentCmd += ` --model ${model.id}`;
 		}
 
-		let agentFlags = agent.flags ?? [];
+		// Permission-bypass flags are controlled exclusively by the skip_permissions toggle.
+		// Strip them from agent.flags so they don't get double-injected or appear
+		// when the user has disabled autonomous mode.
+		const PERMISSION_FLAGS = ['--dangerously-skip-permissions', '--full-auto', '--auto-edit'];
+		let agentFlags = (agent.flags ?? []).filter(f => !PERMISSION_FLAGS.includes(f));
 
-		// For plan mode WITHOUT autonomous mode, filter out permission-bypass flags
+		// For plan mode without autonomous, skip permission flags entirely
 		// (--permission-mode plan takes precedence for non-autonomous sessions)
-		// When autonomous mode is enabled (via agent flags or JAT config), keep the flag
-		// so plan sessions can transition to implementation without permission prompts
-		const wantsAutonomous = jatDefaults.skip_permissions ||
-			(agent.flags ?? []).includes('--dangerously-skip-permissions');
+		const wantsAutonomous = jatDefaults.skip_permissions;
 		if (mode === 'plan' && agent.command === 'claude' && !wantsAutonomous) {
-			agentFlags = agentFlags.filter(f => f !== '--dangerously-skip-permissions');
+			// plan mode already uses --permission-mode plan below
 		}
 
-		// Add configured flags
+		// Add configured flags (sans permission flags)
 		if (agentFlags.length > 0) {
 			agentCmd += ' ' + agentFlags.join(' ');
 		}
 
-		// For Claude Code specifically, handle skip_permissions from JAT config
-		if (agent.command === 'claude' && jatDefaults.skip_permissions) {
-			// Only add if not already in flags
-			if (!agentFlags.includes('--dangerously-skip-permissions')) {
+		// Inject permission flags from the autonomous mode toggle only
+		if (jatDefaults.skip_permissions) {
+			if (agent.command === 'claude') {
 				agentCmd += ' --dangerously-skip-permissions';
-			}
-		}
-
-		// For Codex, map skip_permissions to full auto mode unless user set an approval mode already
-		if (agent.command === 'codex' && jatDefaults.skip_permissions) {
-			const codexApprovalFlags = ['--full-auto', '--auto-edit', '--suggest'];
-			const hasApprovalFlag = agentFlags.some((flag) => codexApprovalFlags.includes(flag));
-			if (!hasApprovalFlag) {
-				agentCmd += ' --full-auto';
+			} else if (agent.command === 'codex') {
+				const codexApprovalFlags = ['--full-auto', '--auto-edit', '--suggest'];
+				const hasApprovalFlag = agentFlags.some((flag) => codexApprovalFlags.includes(flag));
+				if (!hasApprovalFlag) {
+					agentCmd += ' --full-auto';
+				}
 			}
 		}
 

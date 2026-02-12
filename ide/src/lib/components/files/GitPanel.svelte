@@ -12,12 +12,32 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import BranchSwitcherModal from './BranchSwitcherModal.svelte';
-	import CommitDetailModal from './CommitDetailModal.svelte';
 	import { openDiffPreviewDrawer } from '$lib/stores/drawerStore';
+
+	interface FileChange {
+		path: string;
+		type: 'A' | 'M' | 'D' | 'R' | 'C' | 'U';
+		additions: number;
+		deletions: number;
+		binary: boolean;
+	}
+
+	interface CommitDetail {
+		hash: string;
+		hashShort: string;
+		author: { name: string; email: string; date: string };
+		committer: { name: string; email: string; date: string };
+		message: string;
+		parents: string[];
+		files: FileChange[];
+		stats: { totalFiles: number; additions: number; deletions: number };
+	}
 
 	interface Props {
 		project: string;
 		onFileClick?: (path: string, isStaged: boolean) => void;
+		onCommitSelect?: (commitHash: string, files: FileChange[], project: string) => void;
+		onCommitFileClick?: (path: string) => void;
 		selectedFilePath?: string | null;
 	}
 
@@ -35,14 +55,16 @@
 		isIncoming?: boolean;
 	}
 
-	let { project, onFileClick, selectedFilePath = null }: Props = $props();
+	let { project, onFileClick, onCommitSelect, onCommitFileClick, selectedFilePath = null }: Props = $props();
 
 	// Branch switcher modal state
 	let showBranchModal = $state(false);
 
-	// Commit detail modal state
-	let showCommitModal = $state(false);
-	let selectedCommitHash = $state<string | null>(null);
+	// Inline commit expansion state
+	let expandedCommitHash = $state<string | null>(null);
+	let expandedCommitDetail = $state<CommitDetail | null>(null);
+	let isLoadingCommitDetail = $state(false);
+	let copiedHash = $state(false);
 
 	// Git status state
 	let currentBranch = $state<string | null>(null);
@@ -888,10 +910,101 @@
 		fetchTimeline();
 	}
 
-	// Handle commit click to show details modal
-	function handleCommitClick(commitHash: string) {
-		selectedCommitHash = commitHash;
-		showCommitModal = true;
+	/**
+	 * Get file type indicator for commit files
+	 */
+	function getFileTypeInfo(type: string): { label: string; color: string; bgColor: string } {
+		switch (type) {
+			case 'A':
+				return { label: 'Added', color: 'oklch(0.70 0.15 145)', bgColor: 'oklch(0.70 0.15 145 / 0.15)' };
+			case 'M':
+				return { label: 'Modified', color: 'oklch(0.70 0.15 85)', bgColor: 'oklch(0.70 0.15 85 / 0.15)' };
+			case 'D':
+				return { label: 'Deleted', color: 'oklch(0.70 0.15 25)', bgColor: 'oklch(0.70 0.15 25 / 0.15)' };
+			case 'R':
+				return { label: 'Renamed', color: 'oklch(0.70 0.15 280)', bgColor: 'oklch(0.70 0.15 280 / 0.15)' };
+			case 'C':
+				return { label: 'Copied', color: 'oklch(0.70 0.15 200)', bgColor: 'oklch(0.70 0.15 200 / 0.15)' };
+			default:
+				return { label: 'Unknown', color: 'oklch(0.60 0.02 250)', bgColor: 'oklch(0.60 0.02 250 / 0.15)' };
+		}
+	}
+
+	/**
+	 * Format a date string to a human-readable format
+	 */
+	function formatDate(dateString: string): string {
+		const date = new Date(dateString);
+		return date.toLocaleDateString('en-US', {
+			weekday: 'short',
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric',
+			hour: '2-digit',
+			minute: '2-digit'
+		});
+	}
+
+	/**
+	 * Copy hash to clipboard
+	 */
+	async function copyHash() {
+		if (!expandedCommitDetail) return;
+		try {
+			await navigator.clipboard.writeText(expandedCommitDetail.hash);
+			copiedHash = true;
+			setTimeout(() => { copiedHash = false; }, 2000);
+		} catch (err) {
+			console.error('Failed to copy hash:', err);
+		}
+	}
+
+	// Handle commit click to expand inline
+	async function handleCommitClick(commitHash: string) {
+		// Toggle: click same commit = collapse
+		if (expandedCommitHash === commitHash) {
+			expandedCommitHash = null;
+			expandedCommitDetail = null;
+			return;
+		}
+
+		expandedCommitHash = commitHash;
+		expandedCommitDetail = null;
+		isLoadingCommitDetail = true;
+
+		try {
+			const response = await fetch(
+				`/api/files/git/show?project=${encodeURIComponent(project)}&hash=${encodeURIComponent(commitHash)}`
+			);
+
+			if (!response.ok) {
+				const data = await response.json();
+				throw new Error(data.message || 'Failed to fetch commit details');
+			}
+
+			const data = await response.json();
+			expandedCommitDetail = data.commit;
+
+			// Notify parent (source page) about commit files
+			if (expandedCommitDetail && onCommitSelect) {
+				onCommitSelect(commitHash, expandedCommitDetail.files, project);
+			}
+		} catch (err) {
+			console.error('Failed to fetch commit details:', err);
+			showToast(err instanceof Error ? err.message : 'Failed to load commit', 'error');
+			expandedCommitHash = null;
+		} finally {
+			isLoadingCommitDetail = false;
+		}
+	}
+
+	/**
+	 * Handle clicking a file in the expansion to select it in right panel
+	 */
+	function handleExpansionFileClick(file: FileChange) {
+		if (onCommitFileClick) {
+			onCommitFileClick(file.path);
+		}
 	}
 
 	// Auto-refresh interval for git status (5 seconds)
@@ -959,10 +1072,10 @@
 			ahead = 0;
 			behind = 0;
 			unpushedCount = 0;
-			// Close commit modal and clear selection when project changes
+			// Close commit expansion when project changes
 			// Prevents "bad object" errors from fetching old project's commits
-			showCommitModal = false;
-			selectedCommitHash = null;
+			expandedCommitHash = null;
+			expandedCommitDetail = null;
 
 			fetchStatus();
 			fetchTimeline();
@@ -1749,6 +1862,7 @@
 									{@const firstLine = commit.message.split('\n')[0]}
 									<button
 										class="commit-item is-incoming"
+										class:is-expanded={expandedCommitHash === commit.hash}
 										title="Incoming - Remote commit not yet pulled locally"
 										onclick={() => handleCommitClick(commit.hash)}
 									>
@@ -1766,6 +1880,9 @@
 											<div class="commit-author">{commit.author_name}</div>
 										</div>
 									</button>
+									{#if expandedCommitHash === commit.hash}
+										{@render commitExpansion()}
+									{/if}
 								{/each}
 								<div class="incoming-divider">
 									<div class="incoming-divider-line"></div>
@@ -1794,6 +1911,7 @@
 									class:is-unpushed={!commit.isPushed}
 									class:is-pushed={commit.isPushed}
 									class:is-remote-head={commit.isRemoteHead}
+									class:is-expanded={expandedCommitHash === commit.hash}
 									title={commit.isHead
 										? 'HEAD - Your current commit'
 										: commit.isRemoteHead
@@ -1833,6 +1951,9 @@
 										<div class="commit-author">{commit.author_name}</div>
 									</div>
 								</button>
+								{#if expandedCommitHash === commit.hash}
+									{@render commitExpansion()}
+								{/if}
 							{/each}
 						</div>
 					{/if}
@@ -1840,6 +1961,85 @@
 			{/if}
 		</div>
 	{/if}
+
+	{#snippet commitExpansion()}
+		<div class="commit-expansion">
+			{#if isLoadingCommitDetail}
+				<div class="expansion-loading">
+					<span class="loading loading-spinner loading-xs"></span>
+					<span>Loading details...</span>
+				</div>
+			{:else if expandedCommitDetail}
+				<div class="expansion-content">
+					<!-- Hash + parent -->
+					<div class="expansion-row">
+						<span class="expansion-label">Commit</span>
+						<button class="expansion-hash" onclick={(e) => { e.stopPropagation(); copyHash(); }} title="Click to copy full hash">
+							{expandedCommitDetail.hash.slice(0, 12)}
+							{#if copiedHash}
+								<span class="copied-badge">copied</span>
+							{/if}
+						</button>
+					</div>
+					{#if expandedCommitDetail.parents.length > 0}
+						<div class="expansion-row">
+							<span class="expansion-label">Parent</span>
+							<span class="expansion-hash-dim">{expandedCommitDetail.parents[0].slice(0, 12)}</span>
+						</div>
+					{/if}
+
+					<!-- Author + date -->
+					<div class="expansion-row">
+						<span class="expansion-label">Author</span>
+						<span class="expansion-author">
+							<span class="expansion-avatar">{expandedCommitDetail.author.name.charAt(0).toUpperCase()}</span>
+							{expandedCommitDetail.author.name}
+						</span>
+					</div>
+					<div class="expansion-row">
+						<span class="expansion-label">Date</span>
+						<span class="expansion-date">{formatDate(expandedCommitDetail.author.date)}</span>
+					</div>
+
+					<!-- Full commit message -->
+					<div class="expansion-message">{expandedCommitDetail.message}</div>
+
+					<!-- Changed files -->
+					{#if expandedCommitDetail.files.length > 0}
+						<div class="expansion-files-header">
+							<span>Changed files</span>
+							<span class="expansion-stats">
+								<span class="stat-add">+{expandedCommitDetail.stats.additions}</span>
+								<span class="stat-del">-{expandedCommitDetail.stats.deletions}</span>
+							</span>
+						</div>
+						<div class="expansion-files">
+							{#each expandedCommitDetail.files as file}
+								{@const typeInfo = getFileTypeInfo(file.type)}
+								<!-- svelte-ignore a11y_no_static_element_interactions -->
+								<div
+									class="expansion-file"
+									onclick={(e) => { e.stopPropagation(); handleExpansionFileClick(file); }}
+								>
+									<span class="expansion-file-type" style="color: {typeInfo.color}; background: {typeInfo.bgColor};">{file.type}</span>
+									<span class="expansion-file-name" title={file.path}>{getFileName(file.path)}</span>
+									<span class="expansion-file-dir">{getDirectory(file.path)}</span>
+									{#if !file.binary}
+										<span class="expansion-file-stats">
+											{#if file.additions > 0}<span class="stat-add">+{file.additions}</span>{/if}
+											{#if file.deletions > 0}<span class="stat-del">-{file.deletions}</span>{/if}
+										</span>
+									{:else}
+										<span class="expansion-file-stats binary">binary</span>
+									{/if}
+								</div>
+							{/each}
+						</div>
+					{/if}
+				</div>
+			{/if}
+		</div>
+	{/snippet}
 
 	<!-- Toast -->
 	{#if toastMessage}
@@ -1868,14 +2068,6 @@
 	bind:isOpen={showBranchModal}
 	onClose={() => showBranchModal = false}
 	onBranchSwitch={handleBranchSwitch}
-/>
-
-<!-- Commit Detail Modal -->
-<CommitDetailModal
-	{project}
-	commitHash={selectedCommitHash}
-	bind:isOpen={showCommitModal}
-	onClose={() => showCommitModal = false}
 />
 
 <style>
@@ -2645,6 +2837,218 @@
 	.commit-author {
 		font-size: 0.6875rem;
 		color: oklch(0.50 0.02 250);
+	}
+
+	/* Expanded commit item highlight */
+	.commit-item.is-expanded {
+		background: oklch(0.20 0.03 200 / 0.3);
+		border-left: 2px solid oklch(0.65 0.15 200);
+		padding-left: calc(0.25rem - 2px);
+		border-radius: 0.25rem 0.25rem 0 0;
+		margin-bottom: 0;
+	}
+
+	/* Inline Commit Expansion */
+	.commit-expansion {
+		background: oklch(0.20 0.03 200 / 0.3);
+		border-left: 2px solid oklch(0.65 0.15 200);
+		padding-left: calc(0.75rem + 12px);
+		padding-right: 0.25rem;
+		margin-bottom: 0.25rem;
+		border-radius: 0 0 0.25rem 0.25rem;
+	}
+
+	.expansion-loading {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		padding: 0.5rem 0;
+		color: oklch(0.55 0.02 250);
+		font-size: 0.75rem;
+	}
+
+	.expansion-content {
+		padding: 0.375rem 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.expansion-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 0.75rem;
+	}
+
+	.expansion-label {
+		color: oklch(0.50 0.02 250);
+		font-weight: 500;
+		min-width: 48px;
+		flex-shrink: 0;
+	}
+
+	.expansion-hash {
+		font-family: ui-monospace, monospace;
+		font-size: 0.6875rem;
+		color: oklch(0.70 0.12 200);
+		background: oklch(0.70 0.12 200 / 0.1);
+		padding: 0.0625rem 0.375rem;
+		border-radius: 0.25rem;
+		border: none;
+		cursor: pointer;
+		transition: all 0.15s ease;
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+	}
+
+	.expansion-hash:hover {
+		background: oklch(0.70 0.12 200 / 0.2);
+		color: oklch(0.80 0.12 200);
+	}
+
+	.copied-badge {
+		font-size: 0.5625rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		color: oklch(0.75 0.15 145);
+	}
+
+	.expansion-hash-dim {
+		font-family: ui-monospace, monospace;
+		font-size: 0.6875rem;
+		color: oklch(0.50 0.04 250);
+	}
+
+	.expansion-author {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		color: oklch(0.80 0.02 250);
+	}
+
+	.expansion-avatar {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 18px;
+		height: 18px;
+		border-radius: 50%;
+		background: oklch(0.35 0.08 200);
+		color: oklch(0.80 0.08 200);
+		font-size: 0.625rem;
+		font-weight: 600;
+		flex-shrink: 0;
+	}
+
+	.expansion-date {
+		color: oklch(0.60 0.02 250);
+	}
+
+	.expansion-message {
+		font-size: 0.75rem;
+		color: oklch(0.80 0.02 250);
+		white-space: pre-wrap;
+		word-break: break-word;
+		padding: 0.375rem 0.5rem;
+		background: oklch(0.16 0.01 250);
+		border-radius: 0.25rem;
+		border: 1px solid oklch(0.22 0.02 250);
+		margin: 0.25rem 0;
+		max-height: 120px;
+		overflow-y: auto;
+	}
+
+	.expansion-files-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		font-size: 0.6875rem;
+		font-weight: 600;
+		color: oklch(0.55 0.02 250);
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+		padding-top: 0.25rem;
+	}
+
+	.expansion-stats {
+		display: flex;
+		gap: 0.375rem;
+		font-weight: 500;
+		text-transform: none;
+		letter-spacing: normal;
+	}
+
+	.stat-add {
+		color: oklch(0.65 0.15 145);
+	}
+
+	.stat-del {
+		color: oklch(0.65 0.15 25);
+	}
+
+	.expansion-files {
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+		margin-top: 0.25rem;
+	}
+
+	.expansion-file {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		padding: 0.25rem 0.375rem;
+		border-radius: 0.25rem;
+		cursor: pointer;
+		transition: background 0.1s ease;
+		font-size: 0.75rem;
+	}
+
+	.expansion-file:hover {
+		background: oklch(0.22 0.02 250);
+	}
+
+	.expansion-file-type {
+		font-family: ui-monospace, monospace;
+		font-size: 0.5625rem;
+		font-weight: 700;
+		padding: 0.0625rem 0.25rem;
+		border-radius: 0.1875rem;
+		flex-shrink: 0;
+	}
+
+	.expansion-file-name {
+		color: oklch(0.85 0.02 250);
+		font-weight: 500;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.expansion-file-dir {
+		color: oklch(0.45 0.02 250);
+		font-size: 0.6875rem;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		min-width: 0;
+		flex: 1;
+	}
+
+	.expansion-file-stats {
+		display: flex;
+		gap: 0.25rem;
+		font-family: ui-monospace, monospace;
+		font-size: 0.625rem;
+		margin-left: auto;
+		flex-shrink: 0;
+	}
+
+	.expansion-file-stats.binary {
+		color: oklch(0.50 0.02 250);
+		font-style: italic;
 	}
 
 	/* File Changes Sections */

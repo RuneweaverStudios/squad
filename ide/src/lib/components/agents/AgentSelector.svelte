@@ -510,7 +510,7 @@
 	</div>
 {:else}
 	<!-- Full dropdown panel mode -->
-	<div class="card bg-base-200 shadow-lg p-4 min-w-72">
+	<div class="card bg-base-200 shadow-lg p-4 min-w-72 flex flex-col overflow-y-auto" style="max-height: inherit;">
 		<h3 class="font-semibold text-sm mb-3 flex items-center gap-2">
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
@@ -642,7 +642,7 @@
 							bind:this={agentDropdownRef}
 							class="absolute z-50 mt-1 w-full rounded-lg border shadow-xl overflow-hidden animate-dropdown"
 							style="background: oklch(0.20 0.02 250); border-color: oklch(0.35 0.03 250); transform-origin: top;">
-							<div class="max-h-64 overflow-y-auto">
+							<div class="max-h-96 overflow-y-auto">
 								{#each programs as program, index}
 									{@const status = getAgentStatus(program.id)}
 									{@const isSelected = selectedAgentId === program.id}
@@ -807,7 +807,7 @@
 									{/if}
 								</div>
 							</div>
-							<div class="max-h-64 overflow-y-auto">
+							<div class="max-h-96 overflow-y-auto">
 								{#if modelsLoading}
 									<div class="p-3 text-xs" style="color: oklch(0.65 0.10 240);">Loading models...</div>
 								{:else if modelsError}

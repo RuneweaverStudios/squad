@@ -18,10 +18,12 @@
 	import { fade } from 'svelte/transition';
 	import GitPanel from '$lib/components/files/GitPanel.svelte';
 	import DiffViewer from '$lib/components/files/DiffViewer.svelte';
+	import FileTabBar from '$lib/components/files/FileTabBar.svelte';
 	import SupabasePanel from '$lib/components/files/SupabasePanel.svelte';
 	import MigrationViewer from '$lib/components/files/MigrationViewer.svelte';
 	import ResizableDivider from '$lib/components/ResizableDivider.svelte';
 	import { FilesSkeleton } from '$lib/components/skeleton';
+	import type { OpenFile } from '$lib/components/files/types';
 
 	// Types
 	interface Project {
@@ -46,6 +48,18 @@
 	// Git mode state: selected file for diff view
 	let selectedFilePath = $state<string | null>(null);
 	let selectedFileIsStaged = $state(false);
+
+	// Commit view state: files from expanded commit shown as tabs in right panel
+	interface FileChange {
+		path: string;
+		type: 'A' | 'M' | 'D' | 'R' | 'C' | 'U';
+		additions: number;
+		deletions: number;
+		binary: boolean;
+	}
+	let commitViewHash = $state<string | null>(null);
+	let commitOpenFiles = $state<OpenFile[]>([]);
+	let activeCommitFilePath = $state<string | null>(null);
 
 	// Supabase mode state: selected migration for viewing
 	let selectedMigrationContent = $state<string>('');
@@ -143,10 +157,32 @@
 		}
 	}
 
-	// Handle file click from GitPanel
+	// Handle file click from GitPanel (working tree file)
 	function handleFileClick(filePath: string, isStaged: boolean) {
 		selectedFilePath = filePath;
 		selectedFileIsStaged = isStaged;
+		// Clear commit view (mutually exclusive)
+		commitViewHash = null;
+		commitOpenFiles = [];
+		activeCommitFilePath = null;
+	}
+
+	// Handle commit selection from GitPanel (inline expansion)
+	function handleCommitSelect(commitHash: string, files: FileChange[], proj: string) {
+		commitViewHash = commitHash;
+		// Sort binary files to end so text diffs are shown first
+		const sorted = [...files].sort((a, b) => (a.binary ? 1 : 0) - (b.binary ? 1 : 0));
+		commitOpenFiles = sorted.map(f => ({
+			path: f.path,
+			content: '',
+			originalContent: '',
+			dirty: false
+		}));
+		// Select first non-binary file (or first file if all binary)
+		const firstText = sorted.find(f => !f.binary);
+		activeCommitFilePath = (firstText ?? sorted[0])?.path ?? null;
+		// Clear working tree selection (mutually exclusive)
+		selectedFilePath = null;
 	}
 
 	// Handle stage file
@@ -202,6 +238,9 @@
 	// Clear selected file
 	function handleClearSelection() {
 		selectedFilePath = null;
+		commitViewHash = null;
+		commitOpenFiles = [];
+		activeCommitFilePath = null;
 	}
 
 	// Clear Supabase migration selection
@@ -376,6 +415,8 @@
 							<GitPanel
 								project={selectedProject}
 								onFileClick={handleFileClick}
+								onCommitSelect={handleCommitSelect}
+								onCommitFileClick={(path) => { activeCommitFilePath = path; }}
 								{selectedFilePath}
 							/>
 						{:else}
@@ -418,6 +459,30 @@
 								onUnstage={handleUnstageFile}
 								onClose={handleClearSelection}
 							/>
+						{:else if selectedProject && commitViewHash && activeCommitFilePath}
+							<div class="commit-diff-container">
+								<FileTabBar
+									openFiles={commitOpenFiles}
+									activeFilePath={activeCommitFilePath}
+									onTabSelect={(path) => { activeCommitFilePath = path; }}
+									onTabClose={(path) => {
+										commitOpenFiles = commitOpenFiles.filter(f => f.path !== path);
+										if (activeCommitFilePath === path) {
+											activeCommitFilePath = commitOpenFiles[0]?.path ?? null;
+										}
+										if (commitOpenFiles.length === 0) {
+											commitViewHash = null;
+										}
+									}}
+								/>
+								{#key activeCommitFilePath}
+									<DiffViewer
+										filePath={activeCommitFilePath}
+										projectName={selectedProject}
+										commitHash={commitViewHash}
+									/>
+								{/key}
+							</div>
 						{:else}
 							<div class="diff-placeholder">
 								<div class="diff-placeholder-content">
@@ -425,10 +490,10 @@
 										<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
 									</svg>
 									<p class="diff-placeholder-text">
-										{selectedProject ? 'Select a file to view diff' : 'Select a project to start'}
+										{selectedProject ? 'Select a file or commit to view diff' : 'Select a project to start'}
 									</p>
 									<p class="diff-placeholder-hint">
-										Click on a modified file in the left panel to see changes
+										Click on a modified file or a commit in the timeline
 									</p>
 								</div>
 							</div>
@@ -707,6 +772,14 @@
 	.diff-placeholder-hint {
 		font-size: 0.8125rem;
 		color: oklch(0.40 0.02 250);
+	}
+
+	/* Commit Diff Container (FileTabBar + DiffViewer) */
+	.commit-diff-container {
+		display: flex;
+		flex-direction: column;
+		flex: 1;
+		min-height: 0;
 	}
 
 	/* Error State */

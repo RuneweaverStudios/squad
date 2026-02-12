@@ -201,8 +201,8 @@ export const JAT_DEFAULTS = {
 	editor: 'code',
 	/** Path to JAT tools directory */
 	tools_path: '~/.local/bin',
-	/** CLI flags passed to claude command */
-	claude_flags: '--dangerously-skip-permissions',
+	/** CLI flags passed to claude command (non-permission flags only; autonomous mode is controlled by skip_permissions toggle) */
+	claude_flags: '',
 	/** Default Claude model: opus, sonnet, haiku */
 	model: 'opus',
 	/** Seconds between batch agent spawns */

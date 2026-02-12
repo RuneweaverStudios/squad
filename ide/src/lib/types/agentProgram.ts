@@ -468,7 +468,7 @@ export const AGENT_PRESETS: AgentProgramPreset[] = [
 			],
 			defaultModel: 'o4-mini',
 			authType: 'subscription',  // Codex has its own auth via 'codex auth'
-			flags: ['--full-auto'],
+			flags: [],
 			taskInjection: 'argument'  // Codex takes prompt as positional argument
 		}
 	},
