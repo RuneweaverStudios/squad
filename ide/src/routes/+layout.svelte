@@ -321,11 +321,6 @@
 			checkIngestAutoStart();
 		}, 4000);
 
-		// Phase 4: Expensive usage data (heavily deferred)
-		setTimeout(() => {
-			loadAllTasks();
-		}, 30000);
-
 		// Phase 3b: Session/server counts for sidebar badges
 		setTimeout(() => {
 			fetchWorkSessions();
@@ -472,45 +467,6 @@
 			console.error('Failed to load tasks (fast):', error);
 			if (retries > 0) {
 				setTimeout(() => loadAllTasksFast(retries - 1), 1000);
-			} else {
-				allTasks = [];
-			}
-		}
-	}
-
-	// Full task loader - includes usage data, ~2-4s (for initial load + background refresh)
-	// Retries on failure since network may not be ready during page load
-	async function loadAllTasks(retries = 3) {
-		try {
-			const response = await fetch('/api/agents?full=true&usage=true');
-			const data = await response.json();
-			allTasks = data.tasks || [];
-
-			// Update agent counts
-			if (data.agent_counts) {
-				activeAgentCount = data.agent_counts.activeCount || 0;
-				totalAgentCount = data.agent_counts.totalCount || 0;
-				activeAgents = data.agent_counts.activeAgents || [];
-			}
-
-			// Calculate token usage from agents
-			const agents = data.agents || [];
-			let totalTokens = 0;
-			let totalCost = 0;
-
-			agents.forEach((agent: any) => {
-				if (agent.usage?.today) {
-					totalTokens += agent.usage.today.total_tokens || 0;
-					totalCost += agent.usage.today.cost || 0;
-				}
-			});
-
-			tokensToday = totalTokens;
-			costToday = totalCost;
-		} catch (error) {
-			console.error('Failed to load tasks:', error);
-			if (retries > 0) {
-				setTimeout(() => loadAllTasks(retries - 1), 1000);
 			} else {
 				allTasks = [];
 			}

@@ -1223,7 +1223,7 @@
 													created={session.created}
 													size="sm"
 													variant="projectPill"
-													class="min-w-[120px]"
+													class="min-w-[140px] flex-shrink-0 [&>button]:w-full"
 													onAction={async (actionId) => {
 														if (actionId === 'stop') {
 															await killSession(session.name);

@@ -183,7 +183,7 @@
 	<div class="inline-flex flex-col items-start gap-0.5 relative {className}" bind:this={dropdownRef}>
 		<button
 			class="inline-flex items-center gap-1.5 font-mono cursor-pointer uppercase
-				   hover:opacity-90 transition-all {size === 'xs' ? 'text-xs px-2 py-0.5' : size === 'sm' ? 'text-sm px-2.5 py-0.5' : 'text-base px-3 py-1'}"
+				   hover:opacity-90 transition-all {size === 'xs' ? 'text-xs pl-3 pr-2 py-0.5' : size === 'sm' ? 'text-sm pl-3.5 pr-2.5 py-0.5' : 'text-base pl-4 pr-3 py-1'}"
 			style="
 				background: color-mix(in oklch, {projectColor} 15%, transparent);
 				border: 1px solid color-mix(in oklch, {projectColor} 40%, transparent);
@@ -209,7 +209,7 @@
 			{/if}
 			<!-- Dropdown indicator -->
 			<svg
-				class="w-2.5 h-2.5 opacity-60 transition-transform"
+				class="w-2.5 h-2.5 opacity-60 transition-transform ml-auto"
 				class:rotate-180={isOpen}
 				fill="none"
 				viewBox="0 0 24 24"

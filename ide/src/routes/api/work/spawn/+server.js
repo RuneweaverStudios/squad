@@ -309,8 +309,38 @@ function selectAgentAndModel({ agentId, model, task }) {
 
 		// Get the model (explicit or default)
 		const modelShortName = model || agent.defaultModel;
+
+		// If model contains '/', treat as full provider/model ID (e.g., openrouter/kimi-k2.5)
+		// This allows using any model from OpenRouter or other providers without hardcoded list
+		if (modelShortName && modelShortName.includes('/')) {
+			return {
+				agent,
+				model: {
+					id: modelShortName,  // Full provider/model string
+					shortName: modelShortName,
+					name: modelShortName
+				},
+				matchedRule: null,
+				reason: `Explicit selection: ${agent.name} with custom model ${modelShortName}`
+			};
+		}
+
 		const selectedModel = getAgentModel(agent, modelShortName);
 		if (!selectedModel) {
+			// If explicit model provided but not found, allow custom model ID
+			if (model) {
+				return {
+					agent,
+					model: {
+						id: modelShortName,
+						shortName: modelShortName,
+						name: modelShortName
+					},
+					matchedRule: null,
+					reason: `Explicit selection: ${agent.name} with custom model ${modelShortName}`
+				};
+			}
+
 			return {
 				error: `Model '${modelShortName}' not found for agent '${agentId}'`,
 				status: 400
@@ -352,6 +382,18 @@ function selectAgentAndModel({ agentId, model, task }) {
 						reason: `${routingResult.reason} (model overridden to ${overrideModel.name})`
 					};
 				}
+
+				// Allow custom model override even if not in list
+				return {
+					agent: routingResult.agent,
+					model: {
+						id: model,
+						shortName: model,
+						name: model
+					},
+					matchedRule: routingResult.matchedRule,
+					reason: `${routingResult.reason} (model overridden to ${model})`
+				};
 			}
 
 			// Check agent is available
@@ -479,8 +521,13 @@ function buildAgentCommand({ agent, model, projectPath, jatDefaults, agentName, 
 			agentCmd += ` --model ${model.id}`;
 		} else if (agent.command === 'opencode') {
 			// OpenCode uses provider/model format (e.g., anthropic/claude-sonnet-4-20250514)
-			const provider = agent.apiKeyProvider || 'anthropic';
-			agentCmd += ` --model ${provider}/${model.id}`;
+			// If model.id already contains '/', use it directly (custom provider/model)
+			if (model.id.includes('/')) {
+				agentCmd += ` --model ${model.id}`;
+			} else {
+				const provider = agent.apiKeyProvider || 'anthropic';
+				agentCmd += ` --model ${provider}/${model.id}`;
+			}
 		} else {
 			// Generic: try --model with full ID
 			agentCmd += ` --model ${model.id}`;

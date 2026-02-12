@@ -12,7 +12,7 @@
 	 * to show the auto-selected agent/model, with override capability.
 	 */
 
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import type { AgentProgram, AgentModel, AgentStatus } from '$lib/types/agentProgram';
 	import ProviderLogo from './ProviderLogo.svelte';
 
@@ -71,6 +71,15 @@
 	let showAgentDropdown = $state(false);
 	let showModelDropdown = $state(false);
 
+	// Model search state (type-to-filter)
+	let modelSearchQuery = $state('');
+	let modelSearchInput: HTMLInputElement | undefined;
+
+	// Model loading state
+	let modelsLoading = $state(false);
+	let modelsError = $state<string | null>(null);
+	let modelsByAgentId = $state<Record<string, AgentModel[]>>({});
+
 	// Keyboard navigation state
 	let highlightedAgentIndex = $state(-1);
 	let highlightedModelIndex = $state(-1);
@@ -84,8 +93,23 @@
 		selectedAgentId ? programs.find((p) => p.id === selectedAgentId) : null
 	);
 
-	// Derived: available models for selected agent
-	const availableModels = $derived(selectedAgent?.models ?? []);
+	// Derived: available models for selected agent (dynamic fetch + fallback)
+	const availableModels = $derived.by(() => {
+		if (!selectedAgentId) return [];
+		const cached = modelsByAgentId[selectedAgentId];
+		return cached ?? selectedAgent?.models ?? [];
+	});
+
+	// Derived: filtered models based on search query
+	const filteredModels = $derived.by(() => {
+		if (!modelSearchQuery.trim()) return availableModels;
+		const q = modelSearchQuery.toLowerCase();
+		return availableModels.filter((m) =>
+			m.name?.toLowerCase().includes(q) ||
+			m.shortName?.toLowerCase().includes(q) ||
+			m.id?.toLowerCase().includes(q)
+		);
+	});
 
 	// Derived: is selection different from auto?
 	const isOverridden = $derived(
@@ -99,6 +123,30 @@
 	onMount(async () => {
 		await loadAgentsAndRouting();
 	});
+
+	async function loadModelsForAgent(agentId: string, force = false) {
+		if (!agentId) return;
+		if (!force && modelsByAgentId[agentId]) return;
+
+		modelsLoading = true;
+		modelsError = null;
+
+		try {
+			const response = await fetch(`/api/config/agents/${agentId}/models`);
+			if (!response.ok) {
+				throw new Error(`Failed to fetch models (${response.status})`);
+			}
+			const data = await response.json();
+			const models = data.models ?? [];
+			modelsByAgentId = { ...modelsByAgentId, [agentId]: models };
+		} catch (err) {
+			modelsError = err instanceof Error ? err.message : 'Failed to load models';
+			const fallbackAgent = programs.find((p) => p.id === agentId);
+			modelsByAgentId = { ...modelsByAgentId, [agentId]: fallbackAgent?.models ?? [] };
+		} finally {
+			modelsLoading = false;
+		}
+	}
 
 	async function loadAgentsAndRouting() {
 		loading = true;
@@ -149,6 +197,10 @@
 						selectedModel = model?.shortName ?? null;
 					}
 				}
+
+				if (selectedAgentId) {
+					await loadModelsForAgent(selectedAgentId);
+				}
 			}
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to load agent configuration';
@@ -165,10 +217,15 @@
 		const target = event.target as HTMLSelectElement;
 		selectedAgentId = target.value || null;
 		useAutoSelection = false;
+		modelSearchQuery = '';
 
 		// Reset model to agent's default
 		const agent = programs.find((p) => p.id === selectedAgentId);
 		selectedModel = agent?.defaultModel ?? null;
+
+		if (selectedAgentId) {
+			void loadModelsForAgent(selectedAgentId);
+		}
 	}
 
 	function handleModelChange(event: Event) {
@@ -185,6 +242,8 @@
 			const model = agent?.models.find((m) => m.name === result.modelName);
 			selectedModel = model?.shortName ?? null;
 			useAutoSelection = true;
+			modelSearchQuery = '';
+			void loadModelsForAgent(result.agentId);
 		}
 	}
 
@@ -213,13 +272,23 @@
 		return `${model.name}${model.costTier ? ` (${model.costTier})` : ''}`;
 	}
 
+	// Get model metadata line (cost tier + context)
+	function getModelMeta(model: AgentModel): string {
+		const parts: string[] = [];
+		if (model.costTier) parts.push(`Cost: ${model.costTier}`);
+		if (model.description) parts.push(model.description);
+		return parts.length > 0 ? parts.join(' • ') : 'Standard';
+	}
+
 	// Select agent from dropdown
 	function selectAgent(program: AgentProgram) {
 		selectedAgentId = program.id;
 		useAutoSelection = false;
 		selectedModel = program.defaultModel ?? null;
+		modelSearchQuery = '';
 		showAgentDropdown = false;
 		highlightedAgentIndex = -1;
+		void loadModelsForAgent(program.id);
 	}
 
 	// Select model from dropdown
@@ -227,6 +296,7 @@
 		selectedModel = model.shortName;
 		useAutoSelection = false;
 		showModelDropdown = false;
+		modelSearchQuery = '';
 		highlightedModelIndex = -1;
 	}
 
@@ -248,10 +318,12 @@
 		if (!selectedAgent) return;
 		showModelDropdown = !showModelDropdown;
 		if (showModelDropdown) {
+			modelSearchQuery = '';
 			// Reset to current selection or first available
 			const currentIndex = availableModels.findIndex((m) => m.shortName === selectedModel);
 			highlightedModelIndex = currentIndex >= 0 ? currentIndex : 0;
 			showAgentDropdown = false;
+			tick().then(() => modelSearchInput?.focus());
 		} else {
 			highlightedModelIndex = -1;
 		}
@@ -305,6 +377,13 @@
 		}
 	}
 
+	// Reset highlighted index when filtering
+	$effect(() => {
+		if (showModelDropdown && modelSearchQuery.trim()) {
+			highlightedModelIndex = filteredModels.length > 0 ? 0 : -1;
+		}
+	});
+
 	// Keyboard handler for model dropdown
 	function handleModelKeydown(event: KeyboardEvent) {
 		if (!showModelDropdown || !selectedAgent) return;
@@ -312,7 +391,7 @@
 		switch (event.key) {
 			case 'ArrowDown':
 				event.preventDefault();
-				highlightedModelIndex = Math.min(highlightedModelIndex + 1, availableModels.length - 1);
+				highlightedModelIndex = Math.min(highlightedModelIndex + 1, filteredModels.length - 1);
 				scrollHighlightedIntoView(modelDropdownRef, highlightedModelIndex);
 				break;
 			case 'ArrowUp':
@@ -322,14 +401,15 @@
 				break;
 			case 'Enter':
 				event.preventDefault();
-				if (highlightedModelIndex >= 0 && highlightedModelIndex < availableModels.length) {
-					selectModel(availableModels[highlightedModelIndex]);
+				if (highlightedModelIndex >= 0 && highlightedModelIndex < filteredModels.length) {
+					selectModel(filteredModels[highlightedModelIndex]);
 				}
 				break;
 			case 'Escape':
 				event.preventDefault();
 				showModelDropdown = false;
 				highlightedModelIndex = -1;
+				modelSearchQuery = '';
 				break;
 		}
 	}
@@ -630,7 +710,7 @@
 							<div class="flex-1 min-w-0 text-left">
 								<div class="font-medium text-sm">{currentModel?.name ?? selectedModel}</div>
 								<div class="text-xs" style="color: oklch(0.60 0.02 250);">
-									{currentModel?.costTier ? `Cost: ${currentModel.costTier}` : 'Model'}
+									{currentModel ? getModelMeta(currentModel) : 'Custom model'}
 								</div>
 							</div>
 						{:else}
@@ -647,42 +727,79 @@
 					{#if showModelDropdown && selectedAgent}
 						<!-- svelte-ignore a11y_no_static_element_interactions -->
 						<!-- svelte-ignore a11y_click_events_have_key_events -->
-						<div class="fixed inset-0 z-40" onclick={() => { showModelDropdown = false; highlightedModelIndex = -1; }}></div>
+						<div class="fixed inset-0 z-40" onclick={() => { showModelDropdown = false; highlightedModelIndex = -1; modelSearchQuery = ''; }}></div>
 						<div
 							bind:this={modelDropdownRef}
 							class="absolute z-50 mt-1 w-full rounded-lg border shadow-xl overflow-hidden animate-dropdown"
 							style="background: oklch(0.20 0.02 250); border-color: oklch(0.35 0.03 250); transform-origin: top;">
+							<!-- Search -->
+							<div class="px-2.5 py-1.5 cmd-dropdown-search-border">
+								<div class="relative flex items-center gap-1.5">
+									<svg class="w-3 h-3 flex-shrink-0" style="color: oklch(0.45 0.02 250);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+									</svg>
+									<input
+										bind:this={modelSearchInput}
+										bind:value={modelSearchQuery}
+										onkeydown={(e) => {
+											if (e.key === 'Escape') {
+												e.stopPropagation();
+												showModelDropdown = false;
+												modelSearchQuery = '';
+											}
+										}}
+										type="text"
+										placeholder="Filter models..."
+										class="w-full bg-transparent text-[10px] font-mono focus:outline-none"
+										style="color: oklch(0.75 0.02 250);"
+										autocomplete="off"
+									/>
+									{#if modelSearchQuery}
+										<button type="button" onclick={() => { modelSearchQuery = ''; modelSearchInput?.focus(); }} style="color: oklch(0.40 0.02 250);" class="hover:opacity-80 transition-opacity">
+											<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+										</button>
+									{/if}
+								</div>
+							</div>
 							<div class="max-h-64 overflow-y-auto">
-								{#each availableModels as model, index}
-									{@const isSelected = selectedModel === model.shortName}
-									{@const isHighlighted = highlightedModelIndex === index}
-									<button
-										type="button"
-										data-dropdown-item
-										class="w-full flex items-center gap-3 p-2.5 transition-colors duration-150"
-										style="background: {isHighlighted ? 'oklch(0.30 0.05 250)' : isSelected ? 'oklch(0.55 0.15 240 / 0.1)' : 'transparent'};"
-										onclick={() => selectModel(model)}
-										onmouseenter={() => { highlightedModelIndex = index; }}
-									>
-										<div class="w-8 h-8 rounded-full flex items-center justify-center" style="background: oklch(0.28 0.04 250);">
-											<span class="text-xs font-bold" style="color: oklch(0.80 0.10 250);">
-												{model.shortName?.slice(0, 2).toUpperCase()}
-											</span>
-										</div>
-										<div class="flex-1 min-w-0 text-left">
-											<div class="font-medium text-sm">{model.name}</div>
-											<div class="text-xs" style="color: oklch(0.60 0.02 250);">
-												{model.costTier ? `Cost tier: ${model.costTier}` : 'Standard'}
+								{#if modelsLoading}
+									<div class="p-3 text-xs" style="color: oklch(0.65 0.10 240);">Loading models...</div>
+								{:else if modelsError}
+									<div class="p-3 text-xs text-error">{modelsError}</div>
+								{:else if filteredModels.length === 0}
+									<div class="p-3 text-xs" style="color: oklch(0.65 0.10 240);">No models match your search.</div>
+								{:else}
+									{#each filteredModels as model, index}
+										{@const isSelected = selectedModel === model.shortName}
+										{@const isHighlighted = highlightedModelIndex === index}
+										<button
+											type="button"
+											data-dropdown-item
+											class="w-full flex items-center gap-3 p-2.5 transition-colors duration-150"
+											style="background: {isHighlighted ? 'oklch(0.30 0.05 250)' : isSelected ? 'oklch(0.55 0.15 240 / 0.1)' : 'transparent'};"
+											onclick={() => selectModel(model)}
+											onmouseenter={() => { highlightedModelIndex = index; }}
+										>
+											<div class="w-8 h-8 rounded-full flex items-center justify-center" style="background: oklch(0.28 0.04 250);">
+												<span class="text-xs font-bold" style="color: oklch(0.80 0.10 250);">
+													{model.shortName?.slice(0, 2).toUpperCase()}
+												</span>
 											</div>
-										</div>
-										{#if isSelected}
-											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
-												class="w-4 h-4" style="color: oklch(0.75 0.15 145);">
-												<path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-											</svg>
-										{/if}
-									</button>
-								{/each}
+											<div class="flex-1 min-w-0 text-left">
+												<div class="font-medium text-sm">{model.name}</div>
+												<div class="text-xs" style="color: oklch(0.60 0.02 250);">
+													{getModelMeta(model)}
+												</div>
+											</div>
+											{#if isSelected}
+												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+													class="w-4 h-4" style="color: oklch(0.75 0.15 145);">
+													<path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+												</svg>
+											{/if}
+										</button>
+									{/each}
+								{/if}
 							</div>
 						</div>
 					{/if}

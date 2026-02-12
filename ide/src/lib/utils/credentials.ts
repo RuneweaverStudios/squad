@@ -150,6 +150,15 @@ export const API_KEY_PROVIDERS: ApiKeyProvider[] = [
 		verifyUrl: 'https://api.openai.com/v1/models',
 		usedBy: ['Codex integration (future)'],
 		docsUrl: 'https://platform.openai.com/api-keys'
+	},
+	{
+		id: 'openrouter',
+		name: 'OpenRouter',
+		description: 'OpenRouter API for accessing 200+ models from various providers',
+		keyPrefix: 'sk-or-',
+		verifyUrl: 'https://openrouter.ai/api/v1/auth/key',
+		usedBy: ['Dynamic model discovery', 'Multi-provider access'],
+		docsUrl: 'https://openrouter.ai/settings/keys'
 	}
 ];
 
@@ -458,6 +467,32 @@ export async function verifyOpenAIKey(key: string): Promise<{ success: boolean; 
 }
 
 /**
+ * Verify an OpenRouter API key
+ */
+export async function verifyOpenRouterKey(key: string): Promise<{ success: boolean; error?: string }> {
+	try {
+		const response = await fetch('https://openrouter.ai/api/v1/auth/key', {
+			headers: {
+				'Authorization': `Bearer ${key}`
+			}
+		});
+
+		if (response.ok) {
+			return { success: true };
+		}
+
+		if (response.status === 401) {
+			return { success: false, error: 'Invalid API key' };
+		}
+
+		const errorText = await response.text();
+		return { success: false, error: `API error: ${response.status} - ${errorText.slice(0, 100)}` };
+	} catch (error) {
+		return { success: false, error: `Connection error: ${(error as Error).message}` };
+	}
+}
+
+/**
  * Verify an API key for any provider
  */
 export async function verifyApiKey(
@@ -471,6 +506,8 @@ export async function verifyApiKey(
 			return verifyGoogleKey(key);
 		case 'openai':
 			return verifyOpenAIKey(key);
+		case 'openrouter':
+			return verifyOpenRouterKey(key);
 		default:
 			return { success: false, error: `Unknown provider: ${provider}` };
 	}
@@ -503,6 +540,10 @@ export function validateKeyFormat(provider: string, key: string): { valid: boole
 
 	if (provider === 'openai' && !trimmedKey.startsWith('sk-')) {
 		return { valid: false, error: 'OpenAI keys should start with sk-' };
+	}
+
+	if (provider === 'openrouter' && !trimmedKey.startsWith('sk-or-')) {
+		return { valid: false, error: 'OpenRouter keys should start with sk-or-' };
 	}
 
 	// Check minimum length
