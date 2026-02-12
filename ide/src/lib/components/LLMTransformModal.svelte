@@ -16,6 +16,7 @@
 
 	import { successToast, errorToast } from '$lib/stores/toasts.svelte';
 	import FilePathPicker from '$lib/components/files/FilePathPicker.svelte';
+	import PromptInput from '$lib/components/quick-commands/PromptInput.svelte';
 
 	interface Props {
 		/** Whether the modal is open */
@@ -54,14 +55,14 @@
 	let instructions = $state('');
 	let isProcessing = $state(false);
 	let result = $state<string | null>(null);
-	let textareaRef = $state<HTMLTextAreaElement | null>(null);
+	let promptInputRef: ReturnType<typeof PromptInput> | undefined;
 	let showFilenameInput = $state(false);
 	let filename = $state('llm-result.md');
 
-	// Focus textarea when modal opens
+	// Focus input when modal opens
 	$effect(() => {
-		if (isOpen && textareaRef) {
-			setTimeout(() => textareaRef?.focus(), 100);
+		if (isOpen) {
+			setTimeout(() => promptInputRef?.focus(), 100);
 		}
 	});
 
@@ -217,15 +218,14 @@
 						<span class="label-text text-xs text-base-content/60">Instructions</span>
 						<span class="label-text-alt text-xs text-base-content/40">Ctrl+Enter to submit</span>
 					</label>
-					<textarea
-						bind:this={textareaRef}
+					<PromptInput
+						bind:this={promptInputRef}
 						bind:value={instructions}
-						placeholder="Enter instructions for the LLM..."
-						class="textarea textarea-bordered w-full font-mono text-sm"
-						rows="3"
+						project={project || ''}
+						placeholder="Enter instructions for the LLM... Use @ to attach context"
+						rows={3}
 						disabled={isProcessing || !!result}
-						style="background: oklch(0.14 0.01 250); border-color: oklch(0.25 0.02 250);"
-					></textarea>
+					/>
 				</div>
 
 				<!-- Result display (when available) -->

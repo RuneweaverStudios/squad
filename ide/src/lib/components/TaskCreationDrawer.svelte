@@ -21,6 +21,7 @@
 	import { getFileTypeInfo, formatFileSize, getAcceptAttribute, type FileCategory } from '$lib/utils/fileUtils';
 	import { getProjectColor } from '$lib/utils/projectColors';
 	import VoiceInput from './VoiceInput.svelte';
+	import PromptInput from './quick-commands/PromptInput.svelte';
 	import CreatePaste from './tasks/CreatePaste.svelte';
 	import CreateTemplate from './tasks/CreateTemplate.svelte';
 	import CreateGenerator from './tasks/CreateGenerator.svelte';
@@ -304,6 +305,7 @@
 	let submitError = $state<string | null>(null);
 	let successMessage = $state<string | null>(null);
 	let titleInput: HTMLInputElement;
+	let descriptionInputRef: ReturnType<typeof PromptInput> | undefined;
 	let projectDropdownBtn: HTMLButtonElement;
 	let drawerPanel: HTMLDivElement;
 	let projectDropdownOpen = $state(false);
@@ -425,10 +427,8 @@
 	function handleDescriptionTranscription(event: CustomEvent<string>) {
 		const text = event.detail;
 		if (text) {
-			// Append to existing description with space if needed
-			formData.description = formData.description
-				? formData.description + ' ' + text
-				: text;
+			const prefix = formData.description ? ' ' : '';
+			descriptionInputRef?.appendText(prefix + text);
 		}
 		voiceInputError = null;
 	}
@@ -1660,14 +1660,15 @@
 								/>
 							</span>
 						</label>
-						<textarea
-							id="task-description"
-							placeholder={formDisabled ? "Select a project first..." : "Enter task description or use voice input..."}
-							class="textarea w-full h-32 font-mono bg-base-200 text-base-content {isDescriptionRecording ? 'textarea-primary border-primary' : 'border-base-content/30'} {formDisabled ? 'opacity-50' : ''}"
+						<PromptInput
+							bind:this={descriptionInputRef}
 							bind:value={formData.description}
-							onblur={handleDescriptionBlur}
+							project={formData.project}
+							placeholder={formDisabled ? "Select a project first..." : "Enter task description... Use @ to attach files and context"}
+							rows={5}
 							disabled={formDisabled || isSubmitting}
-						></textarea>
+							onblur={handleDescriptionBlur}
+						/>
 						<label class="label">
 							<span class="label-text-alt text-base-content/60">
 								{#if suggestionsApplied}

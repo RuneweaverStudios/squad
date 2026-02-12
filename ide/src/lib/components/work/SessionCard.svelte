@@ -7492,6 +7492,7 @@
 							onkeydown={handleInputKeydown}
 							onpaste={handlePaste}
 							oninput={handleInputChange}
+							onblur={() => { setTimeout(() => { showPathAutocomplete = false; }, 200); }}
 							placeholder={liveStreamEnabled
 								? "Type to stream live... (Enter to submit)"
 								: "Type and press Enter..."}
@@ -7504,6 +7505,36 @@
 							disabled={sendingInput || !onSendInput}
 							data-session-input="true"
 						></textarea>
+						<!-- Path autocomplete dropdown -->
+						{#if showPathAutocomplete && pathSearchResults.length > 0}
+							<div
+								class="absolute z-50 w-full rounded-lg overflow-hidden shadow-xl"
+								style="background: oklch(0.18 0.01 250); border: 1px solid oklch(0.30 0.03 250); max-height: 200px; overflow-y: auto; bottom: 100%; margin-bottom: 4px;"
+							>
+								{#each pathSearchResults as file, i (file.path)}
+									<button
+										class="w-full text-left px-3 py-1.5 flex items-center gap-2 transition-colors text-xs"
+										style="
+											background: {i === pathAutocompleteIndex ? 'oklch(0.25 0.04 200 / 0.3)' : 'transparent'};
+											color: oklch(0.85 0.01 250);
+										"
+										onmouseenter={() => pathAutocompleteIndex = i}
+										onmousedown={(e) => { e.preventDefault(); selectPathResult(file); }}
+									>
+										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3 h-3 shrink-0" style="color: oklch(0.55 0.08 200);">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+										</svg>
+										<span class="truncate">{file.name}</span>
+										<span class="truncate ml-auto" style="color: oklch(0.45 0.01 250);">{file.folder}</span>
+									</button>
+								{/each}
+								<div class="px-3 py-1 text-xs flex items-center gap-3" style="color: oklch(0.40 0.01 250); border-top: 1px solid oklch(0.25 0.02 250);">
+									<span><kbd style="background: oklch(0.25 0.02 250); padding: 1px 4px; border-radius: 2px; font-size: 10px;">↑↓</kbd> Navigate</span>
+									<span><kbd style="background: oklch(0.25 0.02 250); padding: 1px 4px; border-radius: 2px; font-size: 10px;">Tab</kbd> Select</span>
+									<span><kbd style="background: oklch(0.25 0.02 250); padding: 1px 4px; border-radius: 2px; font-size: 10px;">Esc</kbd> Close</span>
+								</div>
+							</div>
+						{/if}
 						<!-- Text exit animation overlay -->
 						{#if exitingText}
 							<div
