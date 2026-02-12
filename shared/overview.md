@@ -31,6 +31,10 @@ You are running as part of a **multi-agent development system** that enables par
 /jat:pause          # Pause and pivot to different work
 ```
 
+> **IDE-spawned agents:** When spawned by the IDE, agents are pre-registered
+> automatically. The workflow commands above are for manual CLI usage.
+> IDE-spawned non-Claude agents should NOT run `am-register`.
+
 ### Key Behaviors
 
 - **Reserve files before editing** - prevents stepping on other agents

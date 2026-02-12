@@ -79,6 +79,7 @@
 	let dropdownOpen = $state(false);
 	let agentPickerOpen = $state(false);
 	let altKeyHeld = $state(false);
+	let humanToggling = $state(false);
 
 	// Track Alt key state for visual feedback
 	$effect(() => {
@@ -138,10 +139,12 @@
 	// Determine what action mode we're in
 	// Only show dropdown when there's an assignee (something to release)
 	// For blocked tasks without assignee, show disabled spawn button
-	type ActionMode = 'spawn' | 'dropdown' | 'disabled' | 'completed';
+	type ActionMode = 'spawn' | 'dropdown' | 'disabled' | 'completed' | 'human';
 	const actionMode: ActionMode = $derived(
 		isCompletedByActiveSession ? 'completed' :
 		task.status === 'closed' ? 'disabled' :
+		// Human tasks get their own toggle mode (both open and in_progress)
+		isHuman && (task.status === 'open' || task.status === 'in_progress') ? 'human' :
 		task.status === 'in_progress' ? 'dropdown' :
 		// Only show dropdown for blocked tasks that have an assignee (something to release)
 		(task.status === 'blocked' || hasBlockers) && task.assignee ? 'dropdown' :
@@ -240,6 +243,29 @@
 		}
 	}
 
+	async function handleHumanToggle() {
+		if (humanToggling) return;
+		humanToggling = true;
+		try {
+			// Toggle: open → in_progress → closed
+			const newStatus = task.status === 'open' ? 'in_progress' : 'closed';
+			const response = await fetch(`/api/tasks/${task.id}`, createPutRequest({
+				status: newStatus
+			}));
+			if (!response.ok) {
+				console.error('Human toggle failed:', await response.text());
+				errorToast('Update failed', 'Could not update task status');
+			} else {
+				broadcastTaskEvent(newStatus === 'closed' ? 'task-closed' : 'task-updated', task.id);
+			}
+		} catch (err) {
+			console.error('Human toggle error:', err);
+			errorToast('Update failed', 'Network error');
+		} finally {
+			humanToggling = false;
+		}
+	}
+
 	function closeDropdown() {
 		dropdownOpen = false;
 	}
@@ -257,16 +283,29 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="relative flex items-center justify-center" style="min-width: 28px; min-height: 28px;">
-	{#if actionMode === 'spawn' && isHuman}
-		<!-- Human task: show person icon (unclickable) instead of rocket -->
-		<div
-			class="w-7 h-7 flex items-center justify-center opacity-50 cursor-default"
-			title="Human task — complete manually"
+	{#if actionMode === 'human'}
+		<!-- Human task: clickable toggle (open → in_progress → closed) -->
+		<button
+			class="w-7 h-7 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer"
+			style="background: {task.status === 'in_progress' ? 'oklch(0.55 0.18 45 / 0.3)' : 'transparent'}; border: 2px solid {task.status === 'in_progress' ? 'oklch(0.70 0.18 45)' : 'oklch(0.45 0.05 250)'};"
+			title={task.status === 'in_progress' ? 'Click to mark complete' : 'Click to start working'}
+			onclick={handleHumanToggle}
+			disabled={humanToggling}
 		>
-			<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4" style="color: oklch(0.70 0.18 45);">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
-			</svg>
-		</div>
+			{#if humanToggling}
+				<span class="loading loading-spinner" style="width: 14px; height: 14px;"></span>
+			{:else if task.status === 'in_progress'}
+				<!-- Active state: filled person icon with check -->
+				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4" style="color: oklch(0.80 0.18 45);">
+					<path fill-rule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clip-rule="evenodd" />
+				</svg>
+			{:else}
+				<!-- Idle state: outline person icon -->
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4" style="color: oklch(0.60 0.10 45);">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+				</svg>
+			{/if}
+		</button>
 	{:else if actionMode === 'spawn'}
 		<!-- Agent picker dropdown (shown when Alt+click or showAgentPicker) -->
 		{#if agentPickerOpen}

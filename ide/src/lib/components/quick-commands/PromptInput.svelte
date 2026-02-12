@@ -83,6 +83,27 @@
 	let activeProvider = $state<string | null>(null);
 	let providerSearchResults = $state<ProviderResult[]>([]);
 
+	// --- Sync contenteditable when value is changed externally ---
+	// Track last value we synced TO the DOM to avoid infinite loops
+	let lastSyncedValue = '';
+
+	$effect(() => {
+		// When the value prop changes (e.g., parent resets form), sync the contenteditable div
+		if (textareaRef && value !== lastSyncedValue) {
+			const currentDomText = getPromptText(textareaRef);
+			if (value !== currentDomText) {
+				// Value was changed externally (not by user input) - update DOM
+				if (value === '') {
+					textareaRef.innerHTML = '';
+					references = [];
+				} else {
+					textareaRef.textContent = value;
+				}
+				lastSyncedValue = value;
+			}
+		}
+	});
+
 	// --- Derived ---
 	let filteredProviderCategories = $derived(getFilteredProviderCategories());
 
@@ -556,6 +577,7 @@
 	function syncCommandPrompt() {
 		if (!textareaRef) return;
 		value = getPromptText(textareaRef);
+		lastSyncedValue = value;
 		onchange?.(value);
 	}
 
@@ -590,6 +612,7 @@
 			textareaRef.innerHTML = '';
 		}
 		value = '';
+		lastSyncedValue = '';
 		references = [];
 	}
 
@@ -598,6 +621,7 @@
 			textareaRef.textContent = text;
 		}
 		value = text;
+		lastSyncedValue = text;
 		references = [];
 	}
 
@@ -606,6 +630,7 @@
 			textareaRef.textContent = (textareaRef.textContent || '') + text;
 		}
 		value = (value || '') + text;
+		lastSyncedValue = value;
 	}
 </script>
 

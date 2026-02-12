@@ -13,6 +13,9 @@ Core tools (always used)
 - `am-release` - Unlock files when done
 - `am-reservations` - List active file locks
 
+> **Note:** IDE-spawned agents are pre-registered by the spawn API.
+> Only use `am-register` when starting a session manually from the CLI.
+
 How to use effectively
 1) Register an identity:
    `am-register --name AgentName --program claude-code --model sonnet-4.5`

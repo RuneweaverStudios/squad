@@ -459,6 +459,41 @@ function selectAgentAndModel({ agentId, model, task }) {
  */
 
 /**
+ * Build a self-contained prompt for non-native agents (Codex, Gemini, OpenCode).
+ * These agents don't have /jat:start, so the prompt must include all context.
+ *
+ * @param {object} params
+ * @param {string} [params.agentName]
+ * @param {string} [params.taskId]
+ * @param {string} [params.taskTitle]
+ * @param {string} [params.taskCommand]
+ * @param {string} params.projName
+ * @returns {string[]} Array of prompt sentences to join
+ */
+function buildNonNativePrompt({ agentName, taskId, taskTitle, taskCommand, projName }) {
+	const parts = [];
+	const isChat = taskCommand === '/jat:chat';
+
+	parts.push(`You are agent ${agentName} in the ${projName} project.`);
+	parts.push('You are already registered in the agent registry. Do NOT run am-register or /jat:start.');
+
+	if (isChat) {
+		if (taskId) parts.push(`Task: ${taskId}`);
+		if (taskTitle) parts.push(`Message: ${taskTitle}`);
+		parts.push('This is a conversational task. Research and respond to the question.');
+	} else if (taskId) {
+		parts.push(`Task: ${taskId}${taskTitle ? ' - ' + taskTitle : ''}`);
+		parts.push(`Run jt show ${taskId} --json to get full task details.`);
+		parts.push("Read the project's CLAUDE.md for project context, then implement the task.");
+		parts.push(`When finished, close the task: jt close ${taskId} --reason "brief summary"`);
+	} else {
+		parts.push("Read the project's CLAUDE.md for project context.");
+	}
+
+	return parts;
+}
+
+/**
  * Build the CLI command for starting an agent session.
  *
  * @param {object} params
@@ -469,10 +504,11 @@ function selectAgentAndModel({ agentId, model, task }) {
  * @param {string} [params.agentName] - Agent name for task injection
  * @param {string} [params.taskId] - Task ID for task injection
  * @param {string} [params.taskTitle] - Task title for task injection
+ * @param {string} [params.taskCommand] - Task command (e.g. '/jat:start', '/jat:chat')
  * @param {string} [params.mode] - Spawn mode (e.g. 'planning')
  * @returns {{ command: string, env: Record<string, string>, needsJatStart: boolean }}
  */
-function buildAgentCommand({ agent, model, projectPath, jatDefaults, agentName, taskId, taskTitle, mode }) {
+function buildAgentCommand({ agent, model, projectPath, jatDefaults, agentName, taskId, taskTitle, taskCommand, mode }) {
 	// Build environment variables
 	/** @type {Record<string, string>} */
 	const env = { AGENT_MAIL_URL };
@@ -588,54 +624,28 @@ function buildAgentCommand({ agent, model, projectPath, jatDefaults, agentName, 
 			}
 		} else if (taskInjectionMode === 'argument' && (agentName || taskId)) {
 			// Agents with argument injection (like Codex) - pass task as positional argument
-			const promptParts = [];
-			promptParts.push('You are a JAT agent working on a software development task.');
-			if (taskId) {
-				promptParts.push(`Task ID: ${taskId}`);
-			}
-			if (taskTitle) {
-				promptParts.push(`Task: ${taskTitle}`);
-			}
-			if (agentName) {
-				promptParts.push(`Your agent name is: ${agentName}`);
-			}
-			promptParts.push('Read the CLAUDE.md file in the project root for JAT workflow instructions.');
-			promptParts.push('Start by understanding the task and implementing it.');
+			const projName = projectPath.split('/').filter(Boolean).pop() || 'project';
+			const promptParts = buildNonNativePrompt({
+				agentName, taskId, taskTitle, taskCommand, projName
+			});
 
-			// Inject installed skills for non-native agents
 			const skillsSummary = getEnabledSkillsSummary();
-			if (skillsSummary) {
-				promptParts.push(skillsSummary);
-			}
+			if (skillsSummary) promptParts.push(skillsSummary);
 
 			const prompt = promptParts.join(' ');
-			// Escape double quotes for shell argument
 			const escapedPrompt = prompt.replace(/"/g, '\\"');
 			agentCmd += ` "${escapedPrompt}"`;
 		} else if (taskInjectionMode === 'prompt' && (agentName || taskId)) {
 			// Agents with prompt injection (like OpenCode) - pass task via --prompt
-			const promptParts = [];
-			promptParts.push('You are a JAT agent working on a software development task.');
-			if (taskId) {
-				promptParts.push(`Task ID: ${taskId}`);
-			}
-			if (taskTitle) {
-				promptParts.push(`Task: ${taskTitle}`);
-			}
-			if (agentName) {
-				promptParts.push(`Your agent name is: ${agentName}`);
-			}
-			promptParts.push('Read the CLAUDE.md file in the project root for JAT workflow instructions.');
-			promptParts.push('Start by understanding the task and implementing it.');
+			const projName = projectPath.split('/').filter(Boolean).pop() || 'project';
+			const promptParts = buildNonNativePrompt({
+				agentName, taskId, taskTitle, taskCommand, projName
+			});
 
-			// Inject installed skills for non-native agents
 			const skillsSummary = getEnabledSkillsSummary();
-			if (skillsSummary) {
-				promptParts.push(skillsSummary);
-			}
+			if (skillsSummary) promptParts.push(skillsSummary);
 
 			const prompt = promptParts.join(' ');
-			// Escape single quotes in prompt
 			const escapedPrompt = prompt.replace(/'/g, "'\\''");
 			agentCmd += ` --prompt '${escapedPrompt}'`;
 		}
@@ -885,6 +895,7 @@ export async function POST({ request }) {
 			agentName,
 			taskId,
 			taskTitle: task?.title,
+			taskCommand: task?.command || '/jat:start',
 			mode
 		});
 

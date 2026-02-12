@@ -126,7 +126,7 @@ const PROVIDER_APIS: Record<string, {
 					};
 				});
 		}
-	}
+	},
 };
 
 /**
@@ -218,7 +218,7 @@ function inferProvider(agentId: string, command?: string): string {
 	if (id.includes('openrouter')) return 'openrouter';
 	if (id.includes('claude') || cmd === 'claude') return 'anthropic';
 	if (id.includes('aider') || cmd === 'aider') return 'anthropic';
-	if (id.includes('opencode') || cmd === 'opencode') return 'anthropic';
+	if (id.includes('opencode') || cmd === 'opencode') return 'openrouter';
 
 	return 'anthropic'; // default fallback
 }
@@ -266,7 +266,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
 			});
 		}
 
-		// Get API key for the provider
+		// Standard provider flow: requires API key
 		const apiKeyEnvVar = provider === 'openrouter' ? 'OPENROUTER_API_KEY' :
 			provider === 'google' ? 'GOOGLE_API_KEY' :
 			`${provider.toUpperCase()}_API_KEY`;

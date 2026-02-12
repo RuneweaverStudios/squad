@@ -11,7 +11,7 @@
 	 * - File attachment dropzone (supports multiple files)
 	 */
 
-	import { tick, onDestroy } from 'svelte';
+	import { tick, onDestroy, untrack } from 'svelte';
 	import { slide } from 'svelte/transition';
 	import { get } from 'svelte/store';
 	import { isTaskDrawerOpen, selectedDrawerProject, availableProjects, initialTaskText, initialIssueType, drawerCreationMode, type DrawerCreationMode } from '$lib/stores/drawerStore';
@@ -86,22 +86,29 @@
 	// Track if drawer was opened without an explicit project (requires user to select one)
 	let projectSelectionRequired = $state(false);
 
-	// Pre-fill project when drawer opens (read from store at open time)
+	// Reset form and pre-fill project when drawer opens (read from store at open time)
+	// untrack prevents circular dependency: resetForm() reassigns formData, and this
+	// effect also reads formData (via formData.project = ...), which would re-trigger it.
 	$effect(() => {
 		if (isOpen) {
-			// Priority: 1) selectedDrawerProject (explicit from caller)
-			//           2) If no explicit project, require user selection (don't auto-select)
-			const explicitProject = get(selectedDrawerProject);
-			if (explicitProject) {
-				formData.project = explicitProject;
-				projectSelectionRequired = false;
-			} else {
-				// No explicit project - require user to select one first
-				formData.project = '';
-				projectSelectionRequired = true;
-			}
-			// Load commands for the command dropdown
-			loadCommands();
+			untrack(() => {
+				// Always reset form on open to prevent stale data from previous usage
+				resetForm();
+
+				// Priority: 1) selectedDrawerProject (explicit from caller)
+				//           2) If no explicit project, require user selection (don't auto-select)
+				const explicitProject = get(selectedDrawerProject);
+				if (explicitProject) {
+					formData.project = explicitProject;
+					projectSelectionRequired = false;
+				} else {
+					// No explicit project - require user to select one first
+					formData.project = '';
+					projectSelectionRequired = true;
+				}
+				// Load commands for the command dropdown
+				loadCommands();
+			});
 		}
 	});
 

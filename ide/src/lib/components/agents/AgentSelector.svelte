@@ -88,6 +88,9 @@
 	let agentDropdownRef = $state<HTMLDivElement | null>(null);
 	let modelDropdownRef = $state<HTMLDivElement | null>(null);
 
+	// Is "human" selected?
+	const isHumanSelected = $derived(selectedAgentId === 'human');
+
 	// Derived: currently selected agent object
 	const selectedAgent = $derived(
 		selectedAgentId ? programs.find((p) => p.id === selectedAgentId) : null
@@ -256,6 +259,11 @@
 	}
 
 	function handleConfirm() {
+		if (isHumanSelected) {
+			// For human, we save agent_program='human' and don't launch
+			onsave?.({ agentId: 'human', model: null });
+			return;
+		}
 		onselect(getSelection());
 	}
 
@@ -459,6 +467,7 @@
 						{#if !status?.available}(unavailable){/if}
 					</option>
 				{/each}
+				<option value="human">Human</option>
 			</select>
 
 			<!-- Model dropdown -->
@@ -592,10 +601,20 @@
 					<button
 						type="button"
 						class="w-full flex items-center gap-3 p-2.5 rounded-lg border transition-all duration-200 hover:border-primary/50"
-						style="background: oklch(0.22 0.02 250); border-color: oklch(0.35 0.03 250);"
+						style="background: oklch(0.22 0.02 250); border-color: {isHumanSelected ? 'oklch(0.55 0.18 45 / 0.5)' : 'oklch(0.35 0.03 250)'};"
 						onclick={toggleAgentDropdown}
 					>
-						{#if selectedAgent}
+						{#if isHumanSelected}
+							<div class="w-8 h-8 rounded-full flex items-center justify-center" style="background: oklch(0.35 0.12 45 / 0.3);">
+								<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5" style="color: oklch(0.80 0.15 45);">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+								</svg>
+							</div>
+							<div class="flex-1 min-w-0 text-left">
+								<div class="font-medium text-sm">Human</div>
+								<div class="text-xs" style="color: oklch(0.70 0.15 45);">Manual task — no agent spawn</div>
+							</div>
+						{:else if selectedAgent}
 							{@const agentStatus = getAgentStatus(selectedAgent.id)}
 							<div class="w-8 h-8 rounded-full flex items-center justify-center" style="background: oklch(0.30 0.04 250);">
 								<ProviderLogo agentId={selectedAgent.id} apiKeyProvider={selectedAgent.apiKeyProvider} size={20} />
@@ -668,6 +687,33 @@
 									</button>
 								{/each}
 							</div>
+							<!-- Human option divider + entry -->
+							<div style="border-top: 1px solid oklch(0.30 0.03 250);">
+								<button
+									type="button"
+									data-dropdown-item
+									class="w-full flex items-center gap-3 p-2.5 transition-colors duration-150"
+									style="background: {isHumanSelected ? 'oklch(0.55 0.18 45 / 0.1)' : 'transparent'};"
+									onclick={() => { selectedAgentId = 'human'; selectedModel = null; useAutoSelection = false; showAgentDropdown = false; }}
+									onmouseenter={() => { highlightedAgentIndex = -1; }}
+								>
+									<div class="w-8 h-8 rounded-full flex items-center justify-center" style="background: oklch(0.35 0.12 45 / 0.3);">
+										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5" style="color: oklch(0.80 0.15 45);">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+										</svg>
+									</div>
+									<div class="flex-1 min-w-0 text-left">
+										<div class="font-medium text-sm">Human</div>
+										<div class="text-xs" style="color: oklch(0.70 0.15 45);">Manual task — no agent spawn</div>
+									</div>
+									{#if isHumanSelected}
+										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+											class="w-4 h-4" style="color: oklch(0.75 0.15 145);">
+											<path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+										</svg>
+									{/if}
+								</button>
+							</div>
 							<!-- Settings link -->
 							<a
 								href="/config?tab=agents"
@@ -685,8 +731,8 @@
 				</div>
 			</div>
 
-			<!-- Model selection - Custom dropdown -->
-			<div class="form-control mb-4">
+			<!-- Model selection - Custom dropdown (hidden for human) -->
+			<div class="form-control mb-4" class:hidden={isHumanSelected}>
 				<label class="label py-1">
 					<span class="label-text text-xs font-medium">Model</span>
 				</label>
@@ -824,31 +870,41 @@
 			<!-- Actions -->
 			<div class="flex justify-end gap-2">
 				<button class="btn btn-sm btn-ghost" onclick={handleCancel}> Cancel </button>
-				{#if onsave}
-					<button class="btn btn-sm btn-outline btn-primary" onclick={handleSave}>
+				{#if isHumanSelected}
+					<!-- Human: single "Assign to Human" button, no launch -->
+					<button class="btn btn-sm" style="background: oklch(0.45 0.12 45); color: oklch(0.95 0.02 45); border: none;" onclick={handleConfirm}>
 						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-							<path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+							<path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
 						</svg>
-						Save
+						Assign to Human
+					</button>
+				{:else}
+					{#if onsave}
+						<button class="btn btn-sm btn-outline btn-primary" onclick={handleSave}>
+							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+								<path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+							</svg>
+							Save
+						</button>
+					{/if}
+					<button class="btn btn-sm btn-primary" onclick={handleConfirm}>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke-width="1.5"
+							stroke="currentColor"
+							class="w-4 h-4"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"
+							/>
+						</svg>
+						{onsave ? 'Save & Launch' : 'Launch'}
 					</button>
 				{/if}
-				<button class="btn btn-sm btn-primary" onclick={handleConfirm}>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke-width="1.5"
-						stroke="currentColor"
-						class="w-4 h-4"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"
-						/>
-					</svg>
-					{onsave ? 'Save & Launch' : 'Launch'}
-				</button>
 			</div>
 		{/if}
 	</div>

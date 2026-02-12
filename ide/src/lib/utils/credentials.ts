@@ -359,20 +359,36 @@ export function updateKeyVerification(
 
 /**
  * Get API key with fallback chain:
- * 1. credentials.json
- * 2. Environment variable
+ * 1. credentials.json (built-in apiKeys)
+ * 2. Custom API keys (by provider name or env var match)
+ * 3. Environment variable
  *
- * @param provider - Provider ID (anthropic, google, openai)
+ * @param provider - Provider ID (anthropic, google, openai, openrouter)
  * @param envVarName - Environment variable name to check
  */
 export function getApiKeyWithFallback(provider: string, envVarName: string): string | undefined {
-	// First try credentials.json
+	// 1. Built-in apiKeys in credentials.json
 	const credKey = getApiKey(provider);
 	if (credKey) {
 		return credKey;
 	}
 
-	// Fall back to environment variable
+	// 2. Custom API keys — match by name or envVar
+	const creds = getCredentials();
+	if (creds.customApiKeys) {
+		// Direct name match (e.g., customApiKeys.openrouter)
+		if (creds.customApiKeys[provider]?.value) {
+			return creds.customApiKeys[provider].value;
+		}
+		// Search by envVar match (e.g., custom key with envVar: "OPENROUTER_API_KEY")
+		for (const entry of Object.values(creds.customApiKeys)) {
+			if (entry.envVar === envVarName && entry.value) {
+				return entry.value;
+			}
+		}
+	}
+
+	// 3. Environment variable
 	return process.env[envVarName];
 }
 
