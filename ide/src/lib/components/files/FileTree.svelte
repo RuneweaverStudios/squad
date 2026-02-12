@@ -73,6 +73,9 @@
 	// Starred section collapsed state
 	let starredCollapsed = $state(false);
 
+	// Drag-and-drop state for file move
+	let draggedPath = $state<string | null>(null);
+
 	/**
 	 * Get a user-friendly error message for file tree operations
 	 */
@@ -93,7 +96,7 @@
 			return `A file or folder named "${name}" already exists.`;
 		}
 		if (status === 500) {
-			return `Server error while ${operation === 'delete' ? 'deleting' : operation === 'rename' ? 'renaming' : 'creating'} "${name}". Please try again.`;
+			return `Server error while ${operation === 'delete' ? 'deleting' : operation === 'rename' ? 'renaming' : operation === 'move' ? 'moving' : 'creating'} "${name}". Please try again.`;
 		}
 		// Check for common filesystem errors
 		if (error.includes('ENOSPC') || error.includes('no space')) {
@@ -584,6 +587,79 @@
 		if (preloadTimer) {
 			clearTimeout(preloadTimer);
 			preloadTimer = null;
+		}
+	}
+
+	// Handle file/folder move via drag-and-drop
+	async function handleFileMove(sourcePath: string, destinationFolder: string) {
+		const fileName = sourcePath.includes('/') ? sourcePath.split('/').pop()! : sourcePath;
+
+		try {
+			const params = new URLSearchParams({
+				project,
+				path: sourcePath
+			});
+
+			const response = await fetch(`/api/files/content?${params}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ destination: destinationFolder })
+			});
+
+			if (!response.ok) {
+				const data = await response.json();
+				const errorMsg = getOperationErrorMessage(data.error || '', response.status, 'move', fileName);
+				if (onError) onError(errorMsg);
+				return;
+			}
+
+			const result = await response.json();
+
+			if (onSuccess) {
+				onSuccess(`Moved "${fileName}" to ${destinationFolder || 'root'}`);
+			}
+
+			// Refresh the source parent folder
+			const sourceParent = sourcePath.includes('/')
+				? sourcePath.substring(0, sourcePath.lastIndexOf('/'))
+				: '';
+
+			if (sourceParent) {
+				const entries = await fetchDirectory(sourceParent);
+				const newLoaded = new Map(loadedFolders);
+				newLoaded.set(sourceParent, entries);
+				loadedFolders = newLoaded;
+			} else {
+				await loadRoot();
+			}
+
+			// Refresh the destination folder
+			if (destinationFolder) {
+				const entries = await fetchDirectory(destinationFolder);
+				const newLoaded = new Map(loadedFolders);
+				newLoaded.set(destinationFolder, entries);
+				loadedFolders = newLoaded;
+
+				// Expand the destination folder if not already
+				if (!expandedFolders.has(destinationFolder)) {
+					const newExpanded = new Set(expandedFolders);
+					newExpanded.add(destinationFolder);
+					expandedFolders = newExpanded;
+				}
+			} else {
+				await loadRoot();
+			}
+
+			// Update selected path if the moved file was selected
+			if (selectedPath === sourcePath && result.newPath) {
+				onFileSelect(result.newPath);
+			}
+
+			// Refresh git status
+			await fetchGitStatus();
+		} catch (err) {
+			const errorMsg = err instanceof Error ? err.message : 'Failed to move file';
+			if (onError) onError(errorMsg);
 		}
 	}
 
@@ -1120,6 +1196,36 @@
 		};
 	});
 
+	// Root drop zone state (for dropping files to project root)
+	let isRootDragOver = $state(false);
+
+	function handleRootDragOver(e: DragEvent) {
+		if (!draggedPath) return;
+		// Only accept if the dragged item is not already at root level
+		if (!draggedPath.includes('/')) return;
+		e.preventDefault();
+		if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+		isRootDragOver = true;
+	}
+
+	function handleRootDragLeave(e: DragEvent) {
+		const relatedTarget = e.relatedTarget as HTMLElement | null;
+		const currentTarget = e.currentTarget as HTMLElement;
+		if (relatedTarget && currentTarget.contains(relatedTarget)) return;
+		isRootDragOver = false;
+	}
+
+	function handleRootDrop(e: DragEvent) {
+		e.preventDefault();
+		isRootDragOver = false;
+		if (!e.dataTransfer) return;
+		const sourcePath = e.dataTransfer.getData('application/x-filetree-path') || e.dataTransfer.getData('text/plain');
+		if (!sourcePath) return;
+		// Don't move if already at root level
+		if (!sourcePath.includes('/')) return;
+		handleFileMove(sourcePath, '');
+	}
+
 	// Reference to tree content for scrolling
 	let treeContentRef: HTMLDivElement | null = $state(null);
 
@@ -1359,7 +1465,15 @@
 	</div>
 
 	<!-- Tree Content -->
-	<div class="tree-content" bind:this={treeContentRef}>
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div
+		class="tree-content"
+		class:root-drag-over={isRootDragOver}
+		bind:this={treeContentRef}
+		ondragover={handleRootDragOver}
+		ondragleave={handleRootDragLeave}
+		ondrop={handleRootDrop}
+	>
 		{#if isLoadingRoot}
 			<div class="tree-loading">
 				<span class="loading-spinner"></span>
@@ -1398,6 +1512,10 @@
 						filterTerm={debouncedFilterTerm}
 						onFolderHover={handleFolderHover}
 						onFolderHoverEnd={handleFolderHoverEnd}
+						onFileMove={handleFileMove}
+						{draggedPath}
+						onDragStart={(path) => draggedPath = path}
+						onDragEnd={() => draggedPath = null}
 					/>
 				{/each}
 			</div>
@@ -2052,6 +2170,12 @@
 		overflow-y: auto;
 		overflow-x: hidden;
 		padding: 0.25rem;
+	}
+
+	.tree-content.root-drag-over {
+		background: oklch(0.55 0.15 220 / 0.08);
+		outline: 2px dashed oklch(0.55 0.15 220 / 0.4);
+		outline-offset: -2px;
 	}
 
 	.tree-nodes {

@@ -37,6 +37,10 @@
 		filterTerm?: string;
 		onFolderHover?: (path: string) => void;
 		onFolderHoverEnd?: () => void;
+		onFileMove?: (sourcePath: string, destinationFolder: string) => void;
+		draggedPath?: string | null;
+		onDragStart?: (path: string) => void;
+		onDragEnd?: () => void;
 	}
 
 	// Performance: Limit initial children shown for large folders
@@ -57,7 +61,11 @@
 		onContextMenu,
 		filterTerm = '',
 		onFolderHover,
-		onFolderHoverEnd
+		onFolderHoverEnd,
+		onFileMove,
+		draggedPath = null,
+		onDragStart,
+		onDragEnd
 	}: Props = $props();
 
 	// Get git status for this entry
@@ -72,6 +80,7 @@
 	const isExpanded = $derived(expandedFolders.has(entry.path));
 	const isLoading = $derived(loadingFolders.has(entry.path));
 	const isSelected = $derived(selectedPath === entry.path);
+	const isActiveFolder = $derived(isFolder && selectedPath !== null && selectedPath.startsWith(entry.path + '/') && !selectedPath.slice(entry.path.length + 1).includes('/'));
 	const children = $derived(loadedFolders.get(entry.path) || []);
 
 	// Filter children based on filter term
@@ -236,6 +245,74 @@
 			onFolderHoverEnd();
 		}
 	}
+
+	// Drag-and-drop state
+	let isDragOver = $state(false);
+
+	// Is this node the one being dragged?
+	const isBeingDragged = $derived(draggedPath === entry.path);
+
+	// Can this folder accept a drop? (is a folder, not the source or its parent)
+	function canAcceptDrop(sourcePath: string): boolean {
+		if (!isFolder) return false;
+		// Can't drop onto itself
+		if (entry.path === sourcePath) return false;
+		// Can't drop into its own parent (same location = no-op)
+		const sourceParent = sourcePath.includes('/') ? sourcePath.substring(0, sourcePath.lastIndexOf('/')) : '';
+		if (entry.path === sourceParent) return false;
+		// Can't drop a folder into itself or a subfolder of itself
+		if (entry.path.startsWith(sourcePath + '/')) return false;
+		return true;
+	}
+
+	function handleDragStart(e: DragEvent) {
+		if (!e.dataTransfer) return;
+		e.dataTransfer.effectAllowed = 'move';
+		e.dataTransfer.setData('text/plain', entry.path);
+		e.dataTransfer.setData('application/x-filetree-path', entry.path);
+		if (onDragStart) onDragStart(entry.path);
+	}
+
+	function handleDragEnd() {
+		isDragOver = false;
+		if (onDragEnd) onDragEnd();
+	}
+
+	function handleDragOver(e: DragEvent) {
+		if (!e.dataTransfer) return;
+		const sourcePath = draggedPath;
+		if (!sourcePath || !canAcceptDrop(sourcePath)) return;
+		e.preventDefault();
+		e.stopPropagation();
+		e.dataTransfer.dropEffect = 'move';
+		isDragOver = true;
+	}
+
+	function handleDragEnter(e: DragEvent) {
+		if (!e.dataTransfer) return;
+		const sourcePath = draggedPath;
+		if (!sourcePath || !canAcceptDrop(sourcePath)) return;
+		e.preventDefault();
+		isDragOver = true;
+	}
+
+	function handleDragLeave(e: DragEvent) {
+		// Only clear if leaving the node itself, not entering a child
+		const relatedTarget = e.relatedTarget as HTMLElement | null;
+		const currentTarget = e.currentTarget as HTMLElement;
+		if (relatedTarget && currentTarget.contains(relatedTarget)) return;
+		isDragOver = false;
+	}
+
+	function handleDrop(e: DragEvent) {
+		e.preventDefault();
+		e.stopPropagation();
+		isDragOver = false;
+		if (!e.dataTransfer) return;
+		const sourcePath = e.dataTransfer.getData('application/x-filetree-path') || e.dataTransfer.getData('text/plain');
+		if (!sourcePath || !canAcceptDrop(sourcePath)) return;
+		if (onFileMove) onFileMove(sourcePath, entry.path);
+	}
 </script>
 
 <div class="tree-node" style="--depth: {depth};">
@@ -246,12 +323,22 @@
 		class:file={!isFolder}
 		class:expanded={isExpanded}
 		class:selected={isSelected}
+		class:active-folder={isActiveFolder}
 		class:loading={isLoading}
+		class:drag-over={isDragOver}
+		class:being-dragged={isBeingDragged}
+		draggable="true"
 		onclick={handleClick}
 		onkeydown={handleKeyDown}
 		oncontextmenu={handleContextMenu}
 		onmouseenter={handleMouseEnter}
 		onmouseleave={handleMouseLeave}
+		ondragstart={handleDragStart}
+		ondragend={handleDragEnd}
+		ondragover={handleDragOver}
+		ondragenter={handleDragEnter}
+		ondragleave={handleDragLeave}
+		ondrop={handleDrop}
 		title={entry.path}
 		aria-expanded={isFolder ? isExpanded : undefined}
 		data-path={entry.path}
@@ -319,6 +406,10 @@
 					{filterTerm}
 					{onFolderHover}
 					{onFolderHoverEnd}
+					{onFileMove}
+					{draggedPath}
+					{onDragStart}
+					{onDragEnd}
 				/>
 			{/each}
 			{#if hasMoreChildren()}
@@ -363,6 +454,14 @@
 
 	.node-row.selected:hover {
 		background: oklch(0.65 0.12 220 / 0.25);
+	}
+
+	.node-row.active-folder {
+		background: oklch(0.55 0.06 250 / 0.15);
+	}
+
+	.node-row.active-folder:hover {
+		background: oklch(0.55 0.06 250 / 0.22);
 	}
 
 	.node-row.folder {
@@ -450,6 +549,18 @@
 
 	.node-row:hover .git-status-badge {
 		opacity: 1;
+	}
+
+	/* Drag-and-drop styles */
+	.node-row.drag-over {
+		background: oklch(0.55 0.15 220 / 0.25);
+		outline: 2px dashed oklch(0.65 0.15 220);
+		outline-offset: -2px;
+		border-radius: 0.25rem;
+	}
+
+	.node-row.being-dragged {
+		opacity: 0.4;
 	}
 
 	.children {

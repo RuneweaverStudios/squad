@@ -28,6 +28,8 @@
 	import { TaskDetailSkeleton } from '$lib/components/skeleton';
 	import SlideOpenButton from '$lib/components/SlideOpenButton.svelte';
 	import { SESSION_STATE_VISUALS } from '$lib/config/statusColors';
+	import { AGENT_PRESETS } from '$lib/types/agentProgram';
+	import ProviderLogo from '$lib/components/agents/ProviderLogo.svelte';
 	import EventStack from '$lib/components/work/EventStack.svelte';
 	import type { SuggestedTaskWithState } from '$lib/types/signals';
 	import { getProjectFromTaskId } from '$lib/utils/projectUtils';
@@ -428,9 +430,9 @@
 		return cron; // Fallback to raw expression
 	}
 
-	// Derived: Has any scheduling fields set
-	const hasSchedulingFields = $derived(
-		!!(task?.command || task?.schedule_cron || task?.next_run_at || task?.due_date || task?.agent_program || task?.model)
+	// Derived: Has any schedule-specific fields set (cron, next_run, due_date)
+	const hasScheduleFields = $derived(
+		!!(task?.schedule_cron || task?.next_run_at || task?.due_date)
 	);
 
 	// Derived: Due date info
@@ -441,53 +443,39 @@
 	let editingNextRun = $state(false);
 	let editingDueDate = $state(false);
 
-	// Agent programs data for dropdowns
-	interface AgentProgramInfo {
-		id: string;
-		name: string;
-		enabled: boolean;
-		models: Array<{ shortName: string; name: string }>;
-		defaultModel: string;
-	}
-	let agentPrograms = $state<AgentProgramInfo[]>([]);
-	let agentDropdownOpen = $state(false);
-	let agentDropdownRef: HTMLDivElement | undefined;
+	// Harness / Model dropdowns (using AGENT_PRESETS from agentProgram types)
+	let harnessDropdownOpen = $state(false);
+	let harnessDropdownRef: HTMLDivElement | undefined;
 	let modelDropdownOpen = $state(false);
 	let modelDropdownRef: HTMLDivElement | undefined;
 
-	// Models available for the currently selected agent program
+	// Models available for the currently selected harness
 	const availableModels = $derived.by(() => {
 		if (!task?.agent_program) {
-			// Show all unique models across all agents
+			// No harness selected — show all unique models across all presets
 			const seen = new Map<string, string>();
-			for (const prog of agentPrograms) {
-				for (const m of prog.models) {
+			for (const preset of AGENT_PRESETS) {
+				for (const m of preset.config.models || []) {
 					if (!seen.has(m.shortName)) seen.set(m.shortName, m.name);
 				}
 			}
 			return Array.from(seen.entries()).map(([shortName, name]) => ({ shortName, name }));
 		}
-		const prog = agentPrograms.find(p => p.id === task.agent_program);
-		return prog?.models || [];
+		const preset = AGENT_PRESETS.find(p => p.id === task.agent_program);
+		return (preset?.config.models || []).map(m => ({ shortName: m.shortName, name: m.name }));
 	});
 
-	async function fetchAgentPrograms() {
-		try {
-			const res = await fetch('/api/config/agents');
-			if (!res.ok) return;
-			const data = await res.json();
-			const programs = data.programs;
-			if (Array.isArray(programs)) {
-				agentPrograms = programs.filter((p: AgentProgramInfo) => p.enabled);
-			} else if (typeof programs === 'object') {
-				agentPrograms = Object.values(programs).filter((p: any) => p.enabled);
-			}
-		} catch { /* silent */ }
-	}
-
-	function selectAgentProgram(id: string | null) {
-		agentDropdownOpen = false;
+	function selectHarness(id: string | null) {
+		harnessDropdownOpen = false;
 		autoSave('agent_program', id);
+		// Clear model if it's not valid for the new harness
+		if (id && task?.model) {
+			const preset = AGENT_PRESETS.find(p => p.id === id);
+			const validModels = (preset?.config.models || []).map(m => m.shortName);
+			if (!validModels.includes(task.model)) {
+				autoSave('model', null);
+			}
+		}
 	}
 
 	function selectModel(shortName: string | null) {
@@ -495,9 +483,9 @@
 		autoSave('model', shortName);
 	}
 
-	function handleAgentClickOutside(e: MouseEvent) {
-		if (agentDropdownRef && !agentDropdownRef.contains(e.target as Node)) {
-			agentDropdownOpen = false;
+	function handleHarnessClickOutside(e: MouseEvent) {
+		if (harnessDropdownRef && !harnessDropdownRef.contains(e.target as Node)) {
+			harnessDropdownOpen = false;
 		}
 	}
 
@@ -508,9 +496,9 @@
 	}
 
 	$effect(() => {
-		if (agentDropdownOpen) {
-			document.addEventListener('mousedown', handleAgentClickOutside);
-			return () => document.removeEventListener('mousedown', handleAgentClickOutside);
+		if (harnessDropdownOpen) {
+			document.addEventListener('mousedown', handleHarnessClickOutside);
+			return () => document.removeEventListener('mousedown', handleHarnessClickOutside);
 		}
 	});
 
@@ -2002,7 +1990,6 @@
 			fetchProjects();
 			// Load commands and agent programs for scheduling dropdowns
 			loadCommands();
-			fetchAgentPrograms();
 		}
 	});
 
@@ -2463,13 +2450,12 @@
 							/>
 						</div>
 
-						<!-- Scheduling & Automation -->
-						{#if hasSchedulingFields}
-							<div>
-								<h4 class="text-xs font-semibold mb-2 font-mono uppercase tracking-wider text-base-content/60">Scheduling</h4>
-								<div class="flex flex-col gap-3">
+						<!-- Execution & Scheduling -->
+						<div>
+							<h4 class="text-xs font-semibold mb-2 font-mono uppercase tracking-wider text-base-content/60">Execution</h4>
+							<div class="flex flex-col gap-3">
 
-									<!-- Command (searchable dropdown) -->
+								<!-- Command (searchable dropdown) -->
 									<div class="flex items-start gap-2">
 										<span class="text-xs text-base-content/50 w-20 shrink-0 pt-0.5">Command</span>
 										<div class="flex-1 relative" bind:this={cmdDropdownRef}>
@@ -2547,58 +2533,62 @@
 										</div>
 									</div>
 
-									<!-- Agent / Model Override (dropdowns) -->
+									<!-- Harness / Model Override (dropdowns) -->
 									<div class="flex items-start gap-2">
-										<span class="text-xs text-base-content/50 w-20 shrink-0 pt-0.5">Agent</span>
+										<span class="text-xs text-base-content/50 w-20 shrink-0 pt-0.5">Harness</span>
 										<div class="flex-1 flex flex-wrap gap-1.5 items-center">
-											<!-- Agent Program dropdown -->
-											<div class="relative" bind:this={agentDropdownRef}>
+											<!-- Harness dropdown (AGENT_PRESETS + ProviderLogo) -->
+											<div class="relative" bind:this={harnessDropdownRef}>
 												<button
 													type="button"
-													class="px-2.5 py-1 rounded-lg font-mono text-sm text-left flex items-center gap-1.5 transition-colors cmd-dropdown-trigger min-h-6"
-													onclick={() => { agentDropdownOpen = !agentDropdownOpen; modelDropdownOpen = false; }}
+													class="px-2.5 py-1 rounded-lg text-sm text-left flex items-center gap-1.5 transition-colors cmd-dropdown-trigger min-h-6"
+													onclick={() => { harnessDropdownOpen = !harnessDropdownOpen; modelDropdownOpen = false; }}
 												>
-													<span class="truncate" style="color: oklch(0.85 0.02 250);">{task.agent_program || 'default'}</span>
-													<svg class="w-2.5 h-2.5 flex-shrink-0 transition-transform {agentDropdownOpen ? 'rotate-180' : ''}" style="color: oklch(0.50 0.02 250);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+													{#if task.agent_program}
+														{@const preset = AGENT_PRESETS.find(p => p.id === task.agent_program)}
+														<ProviderLogo agentId={task.agent_program} size={14} />
+														<span class="truncate" style="color: oklch(0.85 0.02 250);">{preset?.name || task.agent_program}</span>
+													{:else}
+														<span class="truncate" style="color: oklch(0.65 0.02 250); font-style: italic;">default</span>
+													{/if}
+													<svg class="w-2.5 h-2.5 flex-shrink-0 transition-transform {harnessDropdownOpen ? 'rotate-180' : ''}" style="color: oklch(0.50 0.02 250);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 														<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
 													</svg>
 												</button>
 
-												{#if agentDropdownOpen}
+												{#if harnessDropdownOpen}
 													<div
-														class="absolute z-50 mt-1 min-w-[160px] rounded-lg overflow-hidden shadow-xl"
-														style="background: oklch(0.16 0.01 250); border: 1px solid oklch(0.25 0.02 250);"
+														class="absolute z-50 mt-1 rounded-lg overflow-hidden shadow-xl"
+														style="background: oklch(0.18 0.02 250); border: 1px solid oklch(0.25 0.02 250); border-radius: 8px; min-width: 180px;"
 														transition:slide={{ duration: 120 }}
 													>
-														<ul class="py-0.5">
-															<li>
+														<div class="py-1">
+															<button
+																type="button"
+																onclick={() => selectHarness(null)}
+																class="harness-item w-full flex items-center gap-2 px-2.5 py-1.5 text-[11px] transition-colors rounded-md mx-0.5 {!task.agent_program ? 'active' : ''}"
+																style="width: calc(100% - 4px);"
+															>
+																<span style="color: oklch(0.65 0.02 250); font-style: italic;">default</span>
+																{#if !task.agent_program}
+																	<svg class="w-3 h-3 ml-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+																{/if}
+															</button>
+															{#each AGENT_PRESETS.filter(p => p.id !== 'human') as preset}
 																<button
 																	type="button"
-																	onclick={() => selectAgentProgram(null)}
-																	class="w-full px-3 py-1.5 flex items-center gap-2 text-left text-[11px] font-mono transition-colors {!task.agent_program ? 'cmd-item-selected' : 'cmd-item-default'}"
+																	onclick={() => selectHarness(preset.id)}
+																	class="harness-item w-full flex items-center gap-2 px-2.5 py-1.5 text-[11px] transition-colors rounded-md mx-0.5 {task.agent_program === preset.id ? 'active' : ''}"
+																	style="width: calc(100% - 4px);"
 																>
-																	<span style="color: oklch(0.65 0.02 250); font-style: italic;">default</span>
-																	{#if !task.agent_program}
-																		<svg class="w-3 h-3 flex-shrink-0 ml-auto" style="color: oklch(0.70 0.15 145);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+																	<ProviderLogo agentId={preset.id} size={16} />
+																	<span>{preset.name}</span>
+																	{#if task.agent_program === preset.id}
+																		<svg class="w-3 h-3 ml-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12" /></svg>
 																	{/if}
 																</button>
-															</li>
-															{#each agentPrograms as prog}
-																<li>
-																	<button
-																		type="button"
-																		onclick={() => selectAgentProgram(prog.id)}
-																		class="w-full px-3 py-1.5 flex items-center gap-2 text-left text-[11px] font-mono transition-colors {task.agent_program === prog.id ? 'cmd-item-selected' : 'cmd-item-default'}"
-																	>
-																		<span style="color: oklch(0.80 0.02 250);">{prog.id}</span>
-																		<span class="text-[9px] ml-auto" style="color: oklch(0.45 0.02 250);">{prog.name}</span>
-																		{#if task.agent_program === prog.id}
-																			<svg class="w-3 h-3 flex-shrink-0" style="color: oklch(0.70 0.15 145);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
-																		{/if}
-																	</button>
-																</li>
 															{/each}
-														</ul>
+														</div>
 													</div>
 												{/if}
 											</div>
@@ -2610,7 +2600,7 @@
 												<button
 													type="button"
 													class="px-2.5 py-1 rounded-lg font-mono text-sm text-left flex items-center gap-1.5 transition-colors cmd-dropdown-trigger min-h-6"
-													onclick={() => { modelDropdownOpen = !modelDropdownOpen; agentDropdownOpen = false; }}
+													onclick={() => { modelDropdownOpen = !modelDropdownOpen; harnessDropdownOpen = false; }}
 												>
 													<span class="truncate" style="color: oklch(0.85 0.02 250);">{task.model || 'default'}</span>
 													<svg class="w-2.5 h-2.5 flex-shrink-0 transition-transform {modelDropdownOpen ? 'rotate-180' : ''}" style="color: oklch(0.50 0.02 250);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -2658,10 +2648,27 @@
 											</div>
 										</div>
 									</div>
+								</div>
+							</div>
+
+							<!-- Schedule (Optional) — collapsed disclosure -->
+							<details class="group" open={hasScheduleFields || undefined}>
+								<summary class="cursor-pointer list-none flex items-center gap-1.5 text-xs font-semibold font-mono uppercase tracking-wider text-base-content/60 py-1">
+									<svg class="w-3 h-3 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+									</svg>
+									Schedule
+									{#if task?.schedule_cron}
+										<span class="badge badge-xs bg-primary/30 text-base-content ml-1">
+											{task.schedule_cron}
+										</span>
+									{/if}
+								</summary>
+								<div class="mt-2 flex flex-col gap-3">
 
 									<!-- Schedule (Cron) -->
 									<div class="flex items-start gap-2">
-										<span class="text-xs text-base-content/50 w-20 shrink-0 pt-0.5">Schedule</span>
+										<span class="text-xs text-base-content/50 w-20 shrink-0 pt-0.5">Cron</span>
 										{#if editingCron}
 											<input
 												type="text"
@@ -2774,8 +2781,7 @@
 										{/if}
 									</div>
 								</div>
-							</div>
-						{/if}
+							</details>
 
 						<!-- Task Summary - Industrial -->
 						{#if task.status === 'closed' || summaryData}
@@ -3952,5 +3958,11 @@
 	}
 	.cmd-item-default:hover {
 		background: oklch(0.19 0.01 250);
+	}
+	.harness-item:hover {
+		background: oklch(0.25 0.03 250);
+	}
+	.harness-item.active {
+		color: oklch(0.85 0.12 200);
 	}
 </style>

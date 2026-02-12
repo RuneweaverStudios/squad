@@ -473,8 +473,10 @@ export const DELETE: RequestHandler = async ({ url }) => {
 };
 
 /**
- * PATCH /api/files/content - Rename file or directory
- * Body: { newName: string }
+ * PATCH /api/files/content - Rename or move file/directory
+ * Body: { newName: string } for rename (same directory)
+ * Body: { destination: string } for move (different directory, keep name)
+ * Body: { newName: string, destination: string } for move + rename
  */
 export const PATCH: RequestHandler = async ({ url, request }) => {
 	try {
@@ -491,15 +493,30 @@ export const PATCH: RequestHandler = async ({ url, request }) => {
 
 		// Parse request body
 		const body = await request.json();
-		const { newName } = body;
+		const { newName, destination } = body;
 
-		if (!newName || typeof newName !== 'string') {
-			return json({ error: 'newName is required and must be a string' }, { status: 400 });
+		if (!newName && destination === undefined) {
+			return json({ error: 'newName or destination is required' }, { status: 400 });
 		}
 
-		// Validate new name (no path separators, no traversal)
-		if (newName.includes('/') || newName.includes('\\') || newName === '.' || newName === '..') {
-			return json({ error: 'Invalid file name' }, { status: 400 });
+		// Validate newName if provided
+		if (newName) {
+			if (typeof newName !== 'string') {
+				return json({ error: 'newName must be a string' }, { status: 400 });
+			}
+			if (newName.includes('/') || newName.includes('\\') || newName === '.' || newName === '..') {
+				return json({ error: 'Invalid file name' }, { status: 400 });
+			}
+		}
+
+		// Validate destination if provided
+		if (destination !== undefined) {
+			if (typeof destination !== 'string') {
+				return json({ error: 'destination must be a string' }, { status: 400 });
+			}
+			if (destination.includes('..')) {
+				return json({ error: 'Path traversal not allowed in destination' }, { status: 403 });
+			}
 		}
 
 		// Get project path
@@ -526,26 +543,62 @@ export const PATCH: RequestHandler = async ({ url, request }) => {
 			return json({ error: 'Cannot rename sensitive file' }, { status: 403 });
 		}
 
-		// Calculate new path (same directory, new name)
-		const parentDir = dirname(resolvedPath);
-		const newPath = join(parentDir, newName);
+		let newPath: string;
+		let newRelativePath: string;
+
+		if (destination !== undefined) {
+			// Move operation: move to different directory
+			const fileName = newName || basename(resolvedPath);
+
+			// Validate destination directory
+			const destValidation = validatePath(projectPath, destination || '.');
+			if (!destValidation.valid) {
+				return json({ error: 'Invalid destination path' }, { status: 403 });
+			}
+
+			const destDir = destValidation.resolved!;
+
+			// Check destination is a directory
+			if (!existsSync(destDir)) {
+				return json({ error: 'Destination folder not found' }, { status: 404 });
+			}
+
+			const destStats = await stat(destDir);
+			if (!destStats.isDirectory()) {
+				return json({ error: 'Destination is not a folder' }, { status: 400 });
+			}
+
+			// Cannot move into itself (for directories)
+			const sourceStats = await stat(resolvedPath);
+			if (sourceStats.isDirectory() && destDir.startsWith(resolvedPath + '/')) {
+				return json({ error: 'Cannot move a folder into itself' }, { status: 400 });
+			}
+
+			newPath = join(destDir, fileName);
+			newRelativePath = destination ? join(destination, fileName) : fileName;
+		} else {
+			// Rename operation: same directory, new name
+			const parentDir = dirname(resolvedPath);
+			newPath = join(parentDir, newName);
+			newRelativePath = filePath.replace(basename(filePath), newName);
+		}
 
 		// Validate new path is still within project
-		const newValidation = validatePath(projectPath, newPath.replace(projectPath + '/', ''));
+		const finalRelPath = newPath.startsWith(projectPath + '/')
+			? newPath.slice(projectPath.length + 1)
+			: newPath === projectPath ? '.' : newPath;
+		const newValidation = validatePath(projectPath, finalRelPath);
 		if (!newValidation.valid) {
 			return json({ error: 'Invalid destination path' }, { status: 403 });
 		}
 
 		// Check if destination already exists
 		if (existsSync(newPath)) {
-			return json({ error: 'A file with that name already exists' }, { status: 409 });
+			return json({ error: 'A file or folder with that name already exists at the destination' }, { status: 409 });
 		}
 
-		// Perform rename
+		// Perform rename/move
 		await rename(resolvedPath, newPath);
-
-		// Calculate new relative path
-		const newRelativePath = filePath.replace(basename(filePath), newName);
 
 		return json({
 			success: true,

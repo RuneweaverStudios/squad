@@ -1801,13 +1801,13 @@
 										{/if}
 									</div>
 									{#if !step.templateId}
-										<textarea
+										<PromptInput
 											bind:value={step.prompt}
+											project={selectedProject}
 											placeholder={i === 0 ? 'Enter prompt for this step...' : `Enter prompt... Use {input} for previous step output`}
-											rows="2"
-											class="w-full rounded px-2 py-1.5 text-xs resize-y"
-											style="background: oklch(0.12 0.01 250); border: 1px solid oklch(0.25 0.02 250); color: oklch(0.85 0.01 250);"
-										></textarea>
+											rows={2}
+											compact={true}
+										/>
 									{:else}
 										<div class="text-xs px-2 py-1 rounded truncate" style="background: oklch(0.14 0.01 250); color: oklch(0.50 0.01 250);">
 											Using template: {templates.find(t => t.id === step.templateId)?.name || step.templateId}
@@ -2464,55 +2464,5 @@
 {/if}
 
 <style>
-	/* :global needed because chips are created via DOM manipulation, not Svelte templates */
-	:global(.inline-file-chip) {
-		display: inline-flex;
-		align-items: center;
-		gap: 3px;
-		padding: 1px 7px 1px 5px;
-		margin: 0 2px;
-		border-radius: 4px;
-		background: oklch(0.25 0.06 200 / 0.4);
-		border: 1px solid oklch(0.35 0.08 200 / 0.4);
-		color: oklch(0.80 0.10 200);
-		font-size: 0.75rem;
-		line-height: 1.4;
-		vertical-align: baseline;
-		user-select: none;
-		cursor: default;
-		white-space: nowrap;
-	}
-
-	:global(.inline-file-chip:hover) {
-		background: oklch(0.28 0.07 200 / 0.5);
-		border-color: oklch(0.40 0.10 200 / 0.5);
-	}
-
-	:global(.inline-provider-chip) {
-		display: inline-flex;
-		align-items: center;
-		gap: 3px;
-		padding: 1px 7px 1px 5px;
-		margin: 0 2px;
-		border-radius: 4px;
-		background: oklch(0.25 0.06 145 / 0.4);
-		border: 1px solid oklch(0.35 0.08 145 / 0.4);
-		color: oklch(0.80 0.10 145);
-		font-size: 0.75rem;
-		line-height: 1.4;
-		vertical-align: baseline;
-		user-select: none;
-		cursor: default;
-		white-space: nowrap;
-	}
-
-	:global(.inline-provider-chip:hover) {
-		background: oklch(0.28 0.07 145 / 0.5);
-		border-color: oklch(0.40 0.10 145 / 0.5);
-	}
-
-	:global([contenteditable='true']:focus) {
-		border-color: oklch(0.45 0.10 200) !important;
-		box-shadow: 0 0 0 1px oklch(0.45 0.10 200 / 0.3);
-	}
+	/* Chip styles now live in PromptInput.svelte */
 </style>
