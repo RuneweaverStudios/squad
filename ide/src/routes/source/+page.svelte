@@ -57,9 +57,9 @@
 	let hasSupabase = $state(false);
 
 	// Layout state
-	let leftPanelWidth = $state(400);
+	let leftPanelWidth = $state(520);
 	const MIN_PANEL_WIDTH = 200;
-	const MAX_PANEL_WIDTH = 500;
+	const MAX_PANEL_WIDTH_FALLBACK = 900;
 
 	// Mobile layout state
 	let isMobileLayout = $state(false);
@@ -90,7 +90,8 @@
 		if (!isDragging) return;
 		const deltaX = e.clientX - startX;
 		let newWidth = startWidth + deltaX;
-		newWidth = Math.max(MIN_PANEL_WIDTH, Math.min(MAX_PANEL_WIDTH, newWidth));
+		const maxWidth = Math.max(MAX_PANEL_WIDTH_FALLBACK, window.innerWidth * 0.8);
+		newWidth = Math.max(MIN_PANEL_WIDTH, Math.min(maxWidth, newWidth));
 		leftPanelWidth = newWidth;
 	}
 
@@ -500,7 +501,7 @@
 		display: flex;
 		flex-direction: column;
 		min-width: 200px;
-		max-width: 500px;
+		max-width: 80vw;
 		flex-shrink: 0;
 		background: oklch(0.15 0.01 250);
 		border-right: 1px solid oklch(0.22 0.02 250);

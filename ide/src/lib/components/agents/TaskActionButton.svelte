@@ -171,6 +171,19 @@
 		await onspawn(task.id, selection);
 	}
 
+	async function handleAgentSave(selection: AgentSelection) {
+		agentPickerOpen = false;
+		try {
+			await fetch(`/api/tasks/${task.id}`, createPutRequest({
+				agent_program: selection.agentId || null,
+				model: selection.model || null
+			}));
+			broadcastTaskEvent('task-updated', task.id);
+		} catch (err) {
+			console.error('Failed to save harness:', err);
+		}
+	}
+
 	function handleAgentPickerCancel() {
 		agentPickerOpen = false;
 	}
@@ -256,7 +269,7 @@
 				console.error('Human toggle failed:', await response.text());
 				errorToast('Update failed', 'Could not update task status');
 			} else {
-				broadcastTaskEvent(newStatus === 'closed' ? 'task-closed' : 'task-updated', task.id);
+				broadcastTaskEvent('task-updated', task.id);
 			}
 		} catch (err) {
 			console.error('Human toggle error:', err);
@@ -318,6 +331,7 @@
 				<AgentSelector
 					{task}
 					onselect={handleAgentSelect}
+					onsave={handleAgentSave}
 					oncancel={handleAgentPickerCancel}
 				/>
 			</div>

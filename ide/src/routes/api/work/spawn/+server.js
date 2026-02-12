@@ -29,13 +29,10 @@ import { homedir } from 'os';
 import Database from 'better-sqlite3';
 import {
 	DEFAULT_MODEL,
-	AGENT_MAIL_URL,
-	CLAUDE_STARTUP_TIMEOUT_SECONDS
+	AGENT_MAIL_URL
 } from '$lib/config/spawnConfig.js';
 import { getTaskById } from '$lib/server/jat-tasks.js';
 import { getProjectPath, getJatDefaults } from '$lib/server/projectPaths.js';
-import { CLAUDE_READY_PATTERNS, SHELL_PROMPT_PATTERNS, isYoloWarningDialog, getReadyPatternsForAgent } from '$lib/server/shellPatterns.js';
-import { stripAnsi } from '$lib/utils/ansiToHtml.js';
 import {
 	evaluateRouting,
 	getAgentProgram,
@@ -611,16 +608,23 @@ function buildAgentCommand({ agent, model, projectPath, jatDefaults, agentName, 
 		const taskInjectionMode = agent.taskInjection || 'stdin';
 
 		if (agent.command === 'claude') {
-			// Claude Code uses JAT bootstrap + /jat:start after startup
+			// Claude Code: system prompt + initial command as positional argument
 			const projName = projectPath.split('/').filter(Boolean).pop() || 'project';
-			const jatBootstrap = mode === 'plan'
-				? `You are a planning assistant for the ${projName} project. Help the user plan features, discuss architecture, and think through requirements. When the user is ready to create tasks, they can use /jat:tasktree. Do NOT run /jat:start.`
-				: `You are a JAT agent. Run /jat:start to begin work.`;
-			agentCmd += ` --append-system-prompt '${jatBootstrap}'`;
-
-			// Start planning sessions in Claude's native plan mode
 			if (mode === 'plan') {
+				const jatBootstrap = `You are a planning assistant for the ${projName} project. Help the user plan features, discuss architecture, and think through requirements. When the user is ready to create tasks, they can use /jat:tasktree. Do NOT run /jat:start.`;
+				agentCmd += ` --append-system-prompt '${jatBootstrap}'`;
 				agentCmd += ' --permission-mode plan';
+			} else {
+				agentCmd += ` --append-system-prompt 'You are a JAT agent.'`;
+				// Pass initial command as positional argument — Claude processes it
+				// as the first user message in interactive mode. If a YOLO permissions
+				// dialog appears, the prompt queues behind it automatically.
+				const taskCmd = taskCommand || '/jat:start';
+				const initialPrompt = taskId
+					? `${taskCmd} ${agentName} ${taskId}`
+					: `/jat:start ${agentName}`;
+				const escapedPrompt = initialPrompt.replace(/'/g, "'\\''");
+				agentCmd += ` '${escapedPrompt}'`;
 			}
 		} else if (taskInjectionMode === 'argument' && (agentName || taskId)) {
 			// Agents with argument injection (like Codex) - pass task as positional argument
@@ -653,11 +657,11 @@ function buildAgentCommand({ agent, model, projectPath, jatDefaults, agentName, 
 		cmdParts.push(agentCmd);
 	}
 
-	// Determine if we need to send /jat:start after the agent starts
-	// Claude Code: yes (uses /jat:start slash command)
-	// OpenCode with prompt injection: no (task already passed via --prompt)
+	// Determine if we need to send /jat:start after the agent starts via tmux send-keys.
+	// All known agents receive their task via CLI args (positional, --prompt, or argument).
+	// Only agents with explicit 'stdin' taskInjection AND not Claude would need this.
 	const taskInjectionMode = agent.taskInjection || 'stdin';
-	const needsJatStart = mode !== 'plan' && (agent.command === 'claude' || taskInjectionMode === 'stdin');
+	const needsJatStart = mode !== 'plan' && agent.command !== 'claude' && taskInjectionMode === 'stdin';
 
 	return {
 		command: cmdParts.join(' && '),
@@ -959,202 +963,11 @@ export async function POST({ request }) {
 			console.warn('[spawn] Failed to write starting signal:', err);
 		}
 
-		// Step 4: Wait for Claude to initialize, then send the task's command
-		// Use the task's command field if set (e.g., /jat:chat for integration messages),
-		// otherwise default to /jat:start
-		// Pass the agent name explicitly so the command resumes the existing agent
-		// instead of creating a new one with a different name
-		// If taskId provided, include BOTH agent name and task ID so the agent:
-		// 1. Uses the pre-created agent name (no duplicate creation)
-		// 2. Starts working on the specific task immediately
-		const taskCommand = task?.command || '/jat:start';
-		const initialPrompt = taskId
-			? `${taskCommand} ${agentName} ${taskId}`  // Agent name + task (prevents duplicate agent)
-			: `/jat:start ${agentName}`;  // Planning mode - just register agent
-
-		// Wait for agent to initialize with verification
-		// Check that agent TUI is running (not just bash prompt)
-		const maxWaitSeconds = jatDefaults.claude_startup_timeout || 20;
-		const checkIntervalMs = 500;
-		let agentReady = false;
-		let shellPromptDetected = false;
-		for (let waited = 0; waited < maxWaitSeconds * 1000 && !agentReady; waited += checkIntervalMs) {
-			await new Promise(resolve => setTimeout(resolve, checkIntervalMs));
-
-			try {
-				const { stdout: paneOutput } = await execAsync(
-					`tmux capture-pane -t "${sessionName}" -p 2>/dev/null`
-				);
-
-				// Check for YOLO warning dialog (first-time --dangerously-skip-permissions)
-				// This dialog blocks startup and expects user to select "1" (No) or "2" (Yes)
-				// We do NOT auto-accept for liability reasons - user must read and accept themselves
-				if (isYoloWarningDialog(paneOutput)) {
-					console.log(`[spawn] YOLO permission warning detected - waiting for user to accept in terminal...`);
-					// Return error so IDE can notify user to accept manually
-					return json({
-						error: 'Permission warning requires user acceptance',
-						code: 'YOLO_WARNING_PENDING',
-						message: 'Claude Code is showing a permissions warning dialog. Please open the terminal and accept it to continue.',
-						sessionName,
-						agentName,
-						recoveryHint: `Run: tmux attach-session -t ${sessionName}`
-					}, { status: 202 }); // 202 Accepted - request received but needs user action
-				}
-
-				// Check if agent is running (has agent-specific ready patterns)
-				const readyPatterns = getReadyPatternsForAgent(selectedAgent.command);
-				const hasAgentPatterns = readyPatterns.some(p => paneOutput.includes(p));
-
-				// Check if we're at a shell prompt (agent never started or exited)
-				// Only flag as shell prompt if:
-				// 1. We see shell patterns
-				// 2. The output does NOT contain the agent command name (to avoid false positives during startup)
-				// 3. We've waited at least 3 seconds (give agent command time to start)
-				const outputLowercase = paneOutput.toLowerCase();
-				const hasShellPatterns = SHELL_PROMPT_PATTERNS.some(p => paneOutput.includes(p));
-				const mentionsAgent = outputLowercase.includes(selectedAgent.command.toLowerCase());
-				const isLikelyShellPrompt = hasShellPatterns && !mentionsAgent && waited > 3000;
-
-				if (hasAgentPatterns) {
-					agentReady = true;
-					console.log(`[spawn] ${selectedAgent.name} ready after ${waited}ms`);
-				} else if (isLikelyShellPrompt && waited > 5000) {
-					// If we see shell prompt after 5s, agent likely failed to start
-					shellPromptDetected = true;
-					console.error(`[spawn] ${selectedAgent.name} failed to start - detected shell prompt`);
-					console.error(`[spawn] Terminal output (last 300 chars): ${stripAnsi(paneOutput.slice(-300))}`);
-					break;
-				}
-			} catch {
-				// Session might not exist yet, continue waiting
-			}
-		}
-
-		// CRITICAL: Don't send /jat:start if agent isn't ready - it will go to bash!
-		if (!agentReady) {
-			if (shellPromptDetected) {
-				// Shell prompt detected - agent definitely didn't start
-				console.error(`[spawn] ABORTING: ${selectedAgent.name} did not start (shell prompt detected)`);
-				return json({
-					error: `${selectedAgent.name} failed to start`,
-					message: `${selectedAgent.name} did not start within the timeout period. The session was created but the agent is not running. Try attaching to the terminal manually.`,
-					sessionName,
-					agentName,
-					taskId,
-					recoveryHint: `Try: tmux attach-session -t ${sessionName}`
-				}, { status: 500 });
-			}
-			// No shell prompt but no agent patterns either - might still be starting
-			console.warn(`[spawn] ${selectedAgent.name} may not have started properly after ${maxWaitSeconds}s, proceeding with caution`);
-		}
-
-		// Only send /jat:start for agents that use stdin injection (like Claude Code)
-		// Agents with prompt injection (like OpenCode) already have their task via --prompt flag
-		if (needsJatStart) {
-			/**
-			 * Send the initial prompt with retry logic
-			 *
-			 * CRITICAL: Claude Code's TUI doesn't reliably process Enter when sent
-			 * in the same tmux send-keys command as the text. The fix is to:
-			 * 1. Send text first (without Enter)
-			 * 2. Brief delay for text to be fully typed
-			 * 3. Send Enter separately
-			 *
-			 * This mimics how a human would type - text first, then press Enter.
-			 */
-			const escapedPrompt = initialPrompt.replace(/"/g, '\\"').replace(/\$/g, '\\$');
-			const maxRetries = 3;
-			let commandSent = false;
-
-			for (let attempt = 1; attempt <= maxRetries && !commandSent; attempt++) {
-				try {
-					// Step 1: Send text WITHOUT Enter
-					await execAsync(`tmux send-keys -t "${sessionName}" -- "${escapedPrompt}"`);
-
-					// Step 2: Brief delay for text to be fully received by Claude's TUI
-					await new Promise(resolve => setTimeout(resolve, 100));
-
-					// Step 3: Send Enter SEPARATELY - this is the key fix!
-					await execAsync(`tmux send-keys -t "${sessionName}" Enter`);
-
-					// Wait for the command to be accepted by Claude Code
-					// We need enough time for the slash command to start executing
-					// but NOT so aggressive that we interrupt commands in progress
-					await new Promise(resolve => setTimeout(resolve, 2000));
-
-					// Check if the command was received
-					// We look for signs the command is executing OR has been received
-					// DO NOT use Ctrl-C retry - it interrupts in-flight bash commands
-					// causing "Interrupted by user" errors (jat-t45zv)
-					//
-					// Use -S -40 -E -4 to capture agent output area only, skipping:
-					// - Last 1-2 lines: statusline ("bypass permissions", JAT status)
-					// - Last 2-3 lines: input prompt area
-					const { stdout: paneOutput } = await execAsync(
-						`tmux capture-pane -t "${sessionName}" -p -S -40 -E -4 2>/dev/null`
-					);
-
-					// Signs the command is executing or was received:
-					// 1. "is running" - Claude Code shows this for slash commands
-					// 2. "STARTING" - JAT signal state
-					// 3. "Bash(" - Tool execution has started
-					// 4. "● " - Tool execution indicator
-					const commandReceived =
-						paneOutput.includes('is running') ||
-						paneOutput.includes('STARTING') ||
-						paneOutput.includes('Bash(') ||
-						paneOutput.includes('● ');
-
-					if (commandReceived) {
-						commandSent = true;
-						console.log(`[spawn] Initial prompt sent successfully on attempt ${attempt}`);
-					} else if (attempt < maxRetries) {
-						// Check if command is still sitting in input buffer (separate capture for input area)
-						// Use -S -3 -E -1 to capture just the input line area (skip only statusline)
-						const { stdout: inputArea } = await execAsync(
-							`tmux capture-pane -t "${sessionName}" -p -S -4 -E -1 2>/dev/null`
-						);
-
-						const inputStillVisible = inputArea.includes(initialPrompt) &&
-							!inputArea.includes('is running');
-
-						if (inputStillVisible) {
-							// Command is still in input buffer - try sending Enter again
-							console.log(`[spawn] Attempt ${attempt}: Command visible in input, sending Enter again...`);
-							await execAsync(`tmux send-keys -t "${sessionName}" Enter`);
-							await new Promise(resolve => setTimeout(resolve, 500));
-						} else {
-							// Command was likely received, just taking time to show "is running"
-							// DO NOT send Ctrl-C - it will interrupt in-flight bash commands
-							if (taskCommand === '/jat:start') {
-								// /jat:start is idempotent - safe to retry if needed
-								console.log(`[spawn] Attempt ${attempt}: Command likely in progress, waiting...`);
-								await new Promise(resolve => setTimeout(resolve, 2000));
-							} else {
-								// Custom commands (e.g. /jat:chat) may NOT be idempotent
-								// Re-sending would cause duplicate processing (triple replies, etc.)
-								// Treat as sent since it's no longer in the input buffer
-								commandSent = true;
-								console.log(`[spawn] Attempt ${attempt}: Custom command no longer in input buffer - treating as sent (no retry for non-idempotent commands)`);
-							}
-						}
-					}
-				} catch (err) {
-					// Non-fatal - session is created, prompt just failed
-					console.error(`[spawn] Attempt ${attempt} failed:`, err);
-					if (attempt < maxRetries) {
-						await new Promise(resolve => setTimeout(resolve, 1000));
-					}
-				}
-			}
-
-			if (!commandSent) {
-				console.warn(`[spawn] Initial prompt may not have been executed after ${maxRetries} attempts`);
-			}
-		} else {
-			console.log(`[spawn] Skipping /jat:start - agent ${selectedAgent.name} uses prompt injection`);
-		}
+		// Step 4: All agents receive their initial command via CLI args (positional
+		// argument, --prompt, or argument injection). No stdin send-keys needed.
+		// If a YOLO permissions dialog appears, the prompt queues behind it and
+		// runs automatically after the user accepts.
+		console.log(`[spawn] Agent launched with command via CLI args (no stdin injection needed)`);
 
 		// Step 4c: If imagePath provided, wait for agent to start working, then send the image
 		// This gives the agent context (e.g., bug screenshot) after it has initialized

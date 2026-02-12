@@ -32,6 +32,7 @@
 		isHead?: boolean;
 		isPushed?: boolean;
 		isRemoteHead?: boolean;
+		isIncoming?: boolean;
 	}
 
 	let { project, onFileClick, selectedFilePath = null }: Props = $props();
@@ -183,6 +184,7 @@
 
 	// Timeline state
 	let commits = $state<Commit[]>([]);
+	let incomingCommits = $state<Commit[]>([]);
 	let isTimelineExpanded = $state(true);
 	let isLoadingTimeline = $state(false);
 	let timelineError = $state<string | null>(null);
@@ -199,6 +201,8 @@
 	let isPushing = $state(false);
 	let isPulling = $state(false);
 	let isFetching = $state(false);
+	let pullStrategy = $state<'rebase' | 'merge'>('rebase');
+	let showPullDropdown = $state(false);
 
 	// Toast state
 	let toastMessage = $state<string | null>(null);
@@ -655,6 +659,7 @@
 			const data = await response.json();
 			if (project !== requestProject) return; // Project changed during parse
 			commits = data.commits || [];
+			incomingCommits = data.incomingCommits || [];
 			unpushedCount = data.unpushedCount || 0;
 			mergeBaseHash = data.mergeBaseHash || null;
 			defaultBranch = data.defaultBranch || null;
@@ -671,8 +676,9 @@
 
 	// Derived state
 	const canCommit = $derived(stagedCount > 0 && commitMessage.trim().length > 0 && !isCommitting);
-	const canPush = $derived(ahead > 0 && !isPushing);
+	const canPush = $derived(ahead > 0 && behind === 0 && !isPushing);
 	const canPull = $derived(behind > 0 && !isPulling);
+	const isDiverged = $derived(ahead > 0 && behind > 0);
 
 	async function fetchStatus() {
 		if (!project) {
@@ -801,15 +807,17 @@
 		}
 	}
 
-	async function handlePull() {
+	async function handlePull(strategy?: 'rebase' | 'merge') {
 		if (isPulling) return;
+		const useRebase = strategy ?? pullStrategy;
 
 		isPulling = true;
+		showPullDropdown = false;
 		try {
 			const response = await fetch('/api/files/git/pull', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ project })
+				body: JSON.stringify({ project, rebase: useRebase === 'rebase' })
 			});
 
 			if (!response.ok) {
@@ -818,10 +826,11 @@
 			}
 
 			const data = await response.json();
+			const label = useRebase === 'rebase' ? 'Rebased' : 'Pulled';
 			const changes = data.summary?.changes || 0;
-			showToast(changes > 0 ? `Pulled ${changes} change(s)` : 'Already up to date');
+			showToast(changes > 0 ? `${label} ${changes} change(s)` : `${label} successfully`);
 			await fetchStatus();
-			await fetchTimeline(); // Refresh commit timeline to show new commits
+			await fetchTimeline();
 		} catch (err) {
 			showToast(err instanceof Error ? err.message : 'Failed to pull', 'error');
 		} finally {
@@ -937,6 +946,7 @@
 			error = null;
 			timelineError = null;
 			commits = [];
+			incomingCommits = [];
 			stagedFiles = [];
 			modifiedFiles = [];
 			deletedFiles = [];
@@ -1592,44 +1602,107 @@
 
 		<!-- Push/Pull Actions -->
 		<div class="sync-actions">
-			<button
-				class="btn btn-sm btn-outline sync-btn"
-				onclick={handlePush}
-				disabled={!canPush && !isPushing}
-				title={ahead === 0 ? 'Nothing to push' : `Push ${ahead} commit(s) to remote`}
+			<span
+				class="sync-btn-wrap"
+				title={ahead === 0 ? 'Nothing to push' : behind > 0 ? `Pull ${behind} remote commit(s) first` : `Push ${ahead} commit(s) to remote`}
 			>
-				{#if isPushing}
-					<span class="loading loading-spinner loading-xs"></span>
-				{:else}
-					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<line x1="12" y1="19" x2="12" y2="5" />
-						<polyline points="5 12 12 5 19 12" />
-					</svg>
-				{/if}
-				Push
-				{#if ahead > 0}
-					<span class="count">{ahead}</span>
-				{/if}
-			</button>
-			<button
-				class="btn btn-sm btn-outline sync-btn"
-				onclick={handlePull}
-				disabled={!canPull && !isPulling}
-				title={behind === 0 ? 'Nothing to pull' : `Pull ${behind} commit(s) from remote`}
-			>
-				{#if isPulling}
-					<span class="loading loading-spinner loading-xs"></span>
-				{:else}
-					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<line x1="12" y1="5" x2="12" y2="19" />
-						<polyline points="19 12 12 19 5 12" />
-					</svg>
-				{/if}
-				Pull
-				{#if behind > 0}
-					<span class="count">{behind}</span>
-				{/if}
-			</button>
+				<button
+					class="btn btn-sm btn-outline sync-btn"
+					onclick={handlePush}
+					disabled={!canPush && !isPushing}
+				>
+					{#if isPushing}
+						<span class="loading loading-spinner loading-xs"></span>
+					{:else}
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<line x1="12" y1="19" x2="12" y2="5" />
+							<polyline points="5 12 12 5 19 12" />
+						</svg>
+					{/if}
+					Push
+					{#if ahead > 0}
+						<span class="count">{ahead}</span>
+					{/if}
+				</button>
+			</span>
+			{#if isDiverged}
+				<!-- Split button: main action + strategy dropdown -->
+				<div class="pull-split-btn">
+					<button
+						class="btn btn-sm btn-outline sync-btn pull-main"
+						onclick={() => handlePull()}
+						disabled={!canPull && !isPulling}
+						title={pullStrategy === 'rebase'
+							? `Rebase ${ahead} local commit(s) onto ${behind} remote commit(s)`
+							: `Merge ${behind} remote commit(s) into local branch`}
+					>
+						{#if isPulling}
+							<span class="loading loading-spinner loading-xs"></span>
+						{:else}
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<line x1="12" y1="5" x2="12" y2="19" />
+								<polyline points="19 12 12 19 5 12" />
+							</svg>
+						{/if}
+						{pullStrategy === 'rebase' ? 'Rebase' : 'Pull'}
+						{#if behind > 0}
+							<span class="count">{behind}</span>
+						{/if}
+					</button>
+					<button
+						class="btn btn-sm btn-outline pull-dropdown-toggle"
+						onclick={() => showPullDropdown = !showPullDropdown}
+						disabled={!canPull && !isPulling}
+						title="Choose pull strategy"
+					>
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px">
+							<polyline points="6 9 12 15 18 9" />
+						</svg>
+					</button>
+					{#if showPullDropdown}
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
+						<div class="pull-dropdown-overlay" onclick={() => showPullDropdown = false} onkeydown={() => {}}></div>
+						<div class="pull-dropdown-menu">
+							<button
+								class="pull-dropdown-item"
+								class:active={pullStrategy === 'rebase'}
+								onclick={() => { pullStrategy = 'rebase'; showPullDropdown = false; }}
+							>
+								<span class="pull-dropdown-label">Rebase</span>
+								<span class="pull-dropdown-desc">Replay local commits on top of remote</span>
+							</button>
+							<button
+								class="pull-dropdown-item"
+								class:active={pullStrategy === 'merge'}
+								onclick={() => { pullStrategy = 'merge'; showPullDropdown = false; }}
+							>
+								<span class="pull-dropdown-label">Merge</span>
+								<span class="pull-dropdown-desc">Create merge commit</span>
+							</button>
+						</div>
+					{/if}
+				</div>
+			{:else}
+				<button
+					class="btn btn-sm btn-outline sync-btn"
+					onclick={() => handlePull()}
+					disabled={!canPull && !isPulling}
+					title={behind === 0 ? 'Nothing to pull' : `Pull ${behind} commit(s) from remote`}
+				>
+					{#if isPulling}
+						<span class="loading loading-spinner loading-xs"></span>
+					{:else}
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<line x1="12" y1="5" x2="12" y2="19" />
+							<polyline points="19 12 12 19 5 12" />
+						</svg>
+					{/if}
+					Pull
+					{#if behind > 0}
+						<span class="count">{behind}</span>
+					{/if}
+				</button>
+			{/if}
 		</div>
 
 		<!-- Timeline Section -->
@@ -1650,8 +1723,8 @@
 					<polyline points="9 18 15 12 9 6" />
 				</svg>
 				<span class="timeline-title">TIMELINE</span>
-				{#if commits.length > 0}
-					<span class="timeline-count">{commits.length}</span>
+				{#if commits.length + incomingCommits.length > 0}
+					<span class="timeline-count">{commits.length + incomingCommits.length}</span>
 				{/if}
 			</button>
 
@@ -1667,10 +1740,44 @@
 							<span>{timelineError}</span>
 							<button class="btn btn-xs btn-ghost" onclick={fetchTimeline}>Retry</button>
 						</div>
-					{:else if commits.length === 0}
+					{:else if commits.length === 0 && incomingCommits.length === 0}
 						<div class="timeline-empty">No commits yet</div>
 					{:else}
 						<div class="commit-list">
+							{#if incomingCommits.length > 0}
+								{#each incomingCommits as commit, index}
+									{@const firstLine = commit.message.split('\n')[0]}
+									<button
+										class="commit-item is-incoming"
+										title="Incoming - Remote commit not yet pulled locally"
+										onclick={() => handleCommitClick(commit.hash)}
+									>
+										<div class="commit-marker">
+											<span class="incoming-dot" title="Incoming">▼</span>
+											<div class="commit-line incoming"></div>
+										</div>
+										<div class="commit-details">
+											<div class="commit-top">
+												<span class="commit-hash incoming">{commit.hashShort}</span>
+												<span class="incoming-badge">incoming</span>
+												<span class="commit-time">{formatTimeAgo(commit.date)}</span>
+											</div>
+											<div class="commit-message">{firstLine}</div>
+											<div class="commit-author">{commit.author_name}</div>
+										</div>
+									</button>
+								{/each}
+								<div class="incoming-divider">
+									<div class="incoming-divider-line"></div>
+									<span class="incoming-divider-label">
+										{incomingCommits.length} incoming from remote
+										{#if isDiverged}
+											· pull to reconcile
+										{/if}
+									</span>
+									<div class="incoming-divider-line"></div>
+								</div>
+							{/if}
 							{#each commits as commit, index}
 								{@const firstLine = commit.message.split('\n')[0]}
 								{@const isMergeBase = mergeBaseHash && commit.hash === mergeBaseHash && index > 0}
@@ -2024,6 +2131,15 @@
 		margin-top: auto;
 	}
 
+	.sync-btn-wrap {
+		flex: 1;
+		display: flex;
+	}
+
+	.sync-btn-wrap .sync-btn {
+		flex: 1;
+	}
+
 	.sync-btn {
 		flex: 1;
 		display: flex;
@@ -2048,6 +2164,84 @@
 		border-radius: 9px;
 		font-size: 0.6875rem;
 		font-weight: 600;
+	}
+
+	/* Pull split button (shown when diverged) */
+	.pull-split-btn {
+		flex: 1;
+		display: flex;
+		position: relative;
+	}
+
+	.pull-split-btn .pull-main {
+		flex: 1;
+		border-top-right-radius: 0;
+		border-bottom-right-radius: 0;
+		border-right: none;
+	}
+
+	.pull-dropdown-toggle {
+		border-top-left-radius: 0;
+		border-bottom-left-radius: 0;
+		padding: 0 0.375rem;
+		min-width: 0;
+	}
+
+	.pull-dropdown-overlay {
+		position: fixed;
+		inset: 0;
+		z-index: 39;
+	}
+
+	.pull-dropdown-menu {
+		position: absolute;
+		bottom: calc(100% + 4px);
+		right: 0;
+		z-index: 40;
+		background: oklch(0.18 0.02 250);
+		border: 1px solid oklch(0.30 0.02 250);
+		border-radius: 0.5rem;
+		padding: 0.25rem;
+		min-width: 200px;
+		box-shadow: 0 4px 12px oklch(0 0 0 / 0.4);
+	}
+
+	.pull-dropdown-item {
+		display: flex;
+		flex-direction: column;
+		gap: 0.125rem;
+		width: 100%;
+		padding: 0.5rem 0.625rem;
+		border: none;
+		border-radius: 0.375rem;
+		background: transparent;
+		cursor: pointer;
+		text-align: left;
+		transition: background 0.1s;
+	}
+
+	.pull-dropdown-item:hover {
+		background: oklch(0.25 0.02 250);
+	}
+
+	.pull-dropdown-item.active {
+		background: oklch(0.25 0.05 250);
+	}
+
+	.pull-dropdown-item.active .pull-dropdown-label::after {
+		content: ' ✓';
+		color: oklch(0.70 0.15 145);
+	}
+
+	.pull-dropdown-label {
+		font-size: 0.8125rem;
+		font-weight: 600;
+		color: oklch(0.85 0.02 250);
+	}
+
+	.pull-dropdown-desc {
+		font-size: 0.6875rem;
+		color: oklch(0.55 0.02 250);
 	}
 
 	/* Toast */
@@ -2377,6 +2571,61 @@
 		color: oklch(0.85 0.12 75);
 		background: oklch(0.70 0.15 75 / 0.2);
 		border: 1px solid oklch(0.70 0.15 75 / 0.35);
+	}
+
+	/* Incoming commits - blue (hue 250) */
+	.incoming-dot {
+		color: oklch(0.70 0.15 250);
+		font-size: 0.625rem;
+		line-height: 1;
+	}
+
+	.commit-line.incoming {
+		background: oklch(0.50 0.12 250);
+	}
+
+	.commit-item.is-incoming:hover {
+		background: oklch(0.20 0.03 250 / 0.4);
+	}
+
+	.commit-hash.incoming {
+		color: oklch(0.70 0.15 250);
+		background: oklch(0.70 0.15 250 / 0.15);
+	}
+
+	.incoming-badge {
+		font-size: 0.5625rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+		padding: 0.0625rem 0.25rem;
+		border-radius: 0.1875rem;
+		color: oklch(0.85 0.12 250);
+		background: oklch(0.65 0.15 250 / 0.2);
+		border: 1px solid oklch(0.65 0.15 250 / 0.35);
+	}
+
+	.incoming-divider {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.5rem 0.25rem;
+		margin: 0.25rem 0;
+	}
+
+	.incoming-divider-line {
+		flex: 1;
+		height: 1px;
+		background: oklch(0.45 0.10 250);
+	}
+
+	.incoming-divider-label {
+		font-size: 0.625rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: oklch(0.65 0.12 250);
+		white-space: nowrap;
 	}
 
 	.commit-time {

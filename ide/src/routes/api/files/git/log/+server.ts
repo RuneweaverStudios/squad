@@ -33,6 +33,16 @@ export const GET: RequestHandler = async ({ url }) => {
 		// These are commits that exist locally but not on the remote tracking branch
 		let unpushedHashes = new Set<string>();
 		let remoteHeadHash: string | null = null;
+		let incomingCommits: Array<{
+			hash: string;
+			hashShort: string;
+			date: string;
+			message: string;
+			author_name: string;
+			author_email: string;
+			refs: string;
+			isIncoming: true;
+		}> = [];
 
 		if (tracking) {
 			try {
@@ -51,6 +61,35 @@ export const GET: RequestHandler = async ({ url }) => {
 				} catch {
 					// Tracking branch ref might not exist locally
 					remoteHeadHash = null;
+				}
+
+				// Get commits on remote that are NOT in local history (need to be pulled)
+				// Must use raw() with two-dot syntax: HEAD..origin/branch
+				// simple-git's log({ from, to }) generates three-dot (symmetric diff) which
+				// includes BOTH sides of divergence — we only want the remote-only side.
+				try {
+					const incomingRaw = await git.raw([
+						'log', `HEAD..${tracking}`,
+						'--format=%H%x1f%aI%x1f%s%x1f%an%x1f%ae%x1f%D',
+						'--max-count=50'
+					]);
+					if (incomingRaw.trim()) {
+						incomingCommits = incomingRaw.trim().split('\n').map(line => {
+							const [hash, date, message, author_name, author_email, refs] = line.split('\x1f');
+							return {
+								hash,
+								hashShort: hash.substring(0, 7),
+								date,
+								message,
+								author_name,
+								author_email,
+								refs: refs || '',
+								isIncoming: true as const
+							};
+						});
+					}
+				} catch {
+					// No incoming commits or tracking branch issue
 				}
 			} catch {
 				// If tracking branch doesn't exist on remote yet, all commits are unpushed
@@ -93,6 +132,8 @@ export const GET: RequestHandler = async ({ url }) => {
 			mergeBaseHash,
 			defaultBranch,
 			unpushedCount: unpushedHashes.size,
+			behindCount: incomingCommits.length,
+			incomingCommits,
 			commits: log.all.map((commit) => ({
 				hash: commit.hash,
 				hashShort: commit.hash.substring(0, 7),

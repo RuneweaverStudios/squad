@@ -98,7 +98,7 @@
 
 	// === Single-task Harness Picker ===
 	let harnessPickerTaskId = $state<string | null>(null);
-	let harnessPickerPos = $state({ x: 0, y: 0 });
+	let harnessPickerPos = $state({ x: 0, y: 0, openUp: false, maxH: 0 });
 
 	// === Hover-to-select (spacebar) ===
 	let hoveredTaskId = $state<string | null>(null);
@@ -1122,14 +1122,15 @@
 												harnessPickerTaskId = task.id;
 												const rect = (e.target as HTMLElement).getBoundingClientRect();
 												const selectorWidth = 300;
-												const selectorHeight = 420;
 												// Position to the right of the avatar, clamped to viewport edges
 												const left = Math.min(rect.right + 8, window.innerWidth - selectorWidth - 16);
-												// Use top positioning: try to align with click, but clamp to stay within viewport
-												const idealTop = rect.top;
-												const maxTop = window.innerHeight - selectorHeight - 16;
-												const top = Math.max(16, Math.min(idealTop, maxTop));
-												harnessPickerPos = { x: left, y: top };
+												// Decide: open up or down based on available space
+												const spaceBelow = window.innerHeight - rect.top;
+												const spaceAbove = rect.bottom;
+												const openUp = spaceBelow < 480 && spaceAbove > spaceBelow;
+												const y = openUp ? (window.innerHeight - rect.bottom) : Math.max(16, rect.top);
+												const maxH = (openUp ? spaceAbove : spaceBelow) - 16;
+												harnessPickerPos = { x: left, y, openUp, maxH };
 											}}
 										/>
 										<div class="text-column">
@@ -1176,6 +1177,12 @@
 											<AgentSelector
 												task={task}
 												onselect={handleAgentSelect}
+												onsave={(selection) => {
+													if (agentPickerTask) handleSingleHarnessChange(agentPickerTask.id, selection);
+													agentPickerOpen = false;
+													agentPickerTask = null;
+													agentPickerPosition = null;
+												}}
 												oncancel={handleAgentPickerCancel}
 											/>
 										</div>
@@ -1513,8 +1520,8 @@
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<div class="harness-picker-backdrop" onclick={() => harnessPickerTaskId = null}></div>
 		<div
-			class="fixed z-50"
-			style="left: {harnessPickerPos.x}px; top: {harnessPickerPos.y}px;"
+			class="fixed z-50 overflow-y-auto rounded-lg"
+			style="left: {harnessPickerPos.x}px; {harnessPickerPos.openUp ? `bottom: ${harnessPickerPos.y}px;` : `top: ${harnessPickerPos.y}px;`} max-height: {harnessPickerPos.maxH}px;"
 			onclick={(e) => e.stopPropagation()}
 		>
 			<AgentSelector
