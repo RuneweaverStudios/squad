@@ -51,8 +51,8 @@
 		type ServerSortOption,
 	} from "$lib/stores/serverSort.svelte.js";
 	import { onMount } from "svelte";
-	import { SPAWN_STAGGER_MS } from "$lib/config/spawnConfig";
 	import { getMaxSessions } from "$lib/stores/preferences.svelte";
+	import { spawnInBatches } from "$lib/utils/spawnBatch";
 	import ProjectSelector from "./ProjectSelector.svelte";
 
 	// Initialize sort stores on mount
@@ -149,25 +149,8 @@
 	// Swarm - spawn one agent per ready task up to MAX_SESSIONS limit
 	async function handleSwarm() {
 		swarmLoading = true;
-		startBulkSpawn(); // Signal bulk spawn started for TaskTable animations
 		try {
-			// Step 1: Get current active sessions to calculate available slots
-			const workResponse = await fetch("/api/work");
-			const workData = await workResponse.json();
-			const activeSessionCount = workData.count || 0;
-			const currentMaxSessions = getMaxSessions(); // Get current preference value
-			const availableSlots = Math.max(
-				0,
-				currentMaxSessions - activeSessionCount,
-			);
-
-			if (availableSlots === 0) {
-				throw new Error(
-					`All ${currentMaxSessions} session slots are in use. Close some sessions first.`,
-				);
-			}
-
-			// Step 2: Get ready tasks
+			// Get ready tasks
 			const readyResponse = await fetch("/api/tasks/ready");
 			const readyData = await readyResponse.json();
 
@@ -175,65 +158,19 @@
 				throw new Error("No ready tasks available");
 			}
 
-			// Limit tasks to available slots
-			const tasksToSpawn = readyData.tasks.slice(0, availableSlots);
-			const skippedCount = readyData.tasks.length - tasksToSpawn.length;
-			const results = [];
-
-			// Step 3: Spawn an agent for each ready task (up to limit)
-			for (let i = 0; i < tasksToSpawn.length; i++) {
-				const task = tasksToSpawn[i];
-				startSpawning(task.id); // Signal this task is spawning for animation
-				try {
-					const response = await fetch("/api/work/spawn", {
-						method: "POST",
-						headers: { "Content-Type": "application/json" },
-						body: JSON.stringify({ taskId: task.id }),
-					});
-					const data = await response.json();
-
-					if (!response.ok) {
-						results.push({
-							taskId: task.id,
-							success: false,
-							error: data.message || "Failed to spawn",
-						});
-						stopSpawning(task.id); // Clear animation on failure
-					} else {
-						results.push({
-							taskId: task.id,
-							success: true,
-							agentName: data.session?.agentName,
-						});
-						// Keep spawning animation until TaskTable refreshes and sees the new status
-						setTimeout(() => stopSpawning(task.id), 2000);
-					}
-				} catch (err) {
-					results.push({
-						taskId: task.id,
-						success: false,
-						error: err instanceof Error ? err.message : "Unknown error",
-					});
-					stopSpawning(task.id); // Clear animation on error
-				}
-
-				// Stagger between spawns (except last one)
-				if (i < tasksToSpawn.length - 1) {
-					await new Promise((resolve) => setTimeout(resolve, SPAWN_STAGGER_MS));
-				}
-			}
+			const taskIds = readyData.tasks.map((t: { id: string }) => t.id);
+			const results = await spawnInBatches(taskIds);
 
 			const successCount = results.filter((r) => r.success).length;
 
 			if (successCount === 0) {
-				throw new Error("Failed to spawn any agents");
+				const firstError = results[0]?.error || "Failed to spawn any agents";
+				throw new Error(firstError);
 			}
-
 		} catch (error) {
 			alert(error instanceof Error ? error.message : "Failed to spawn agents");
 		} finally {
 			swarmLoading = false;
-			endBulkSpawn(); // Signal bulk spawn ended
 		}
 	}
 
@@ -377,6 +314,17 @@
 		runningEpicId = epicId;
 
 		try {
+			// Check available session slots
+			const workResponse = await fetch("/api/work");
+			const workData = await workResponse.json();
+			const activeSessionCount = workData.count || 0;
+			const currentMaxSessions = getMaxSessions();
+			const epicAvailableSlots = Math.max(0, currentMaxSessions - activeSessionCount);
+
+			if (epicAvailableSlots === 0) {
+				throw new Error(`All ${currentMaxSessions} session slots are in use. Close some sessions first.`);
+			}
+
 			// Fetch epic's children with ready status
 			const response = await fetch(`/api/epics/${epicId}/children`);
 			if (!response.ok) {
@@ -385,14 +333,17 @@
 			const data = await response.json();
 
 			// Filter to ready children only
-			const readyChildren = data.children.filter(
+			const allReadyChildren = data.children.filter(
 				(c: { isBlocked: boolean; status: string }) =>
 					!c.isBlocked && c.status !== "closed" && c.status !== "in_progress",
 			);
 
-			if (readyChildren.length === 0) {
+			if (allReadyChildren.length === 0) {
 				return;
 			}
+
+			// Cap to available session slots
+			const readyChildren = allReadyChildren.slice(0, epicAvailableSlots);
 
 			startBulkSpawn();
 

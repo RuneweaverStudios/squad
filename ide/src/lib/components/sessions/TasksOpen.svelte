@@ -16,6 +16,7 @@
 	import { addToast } from '$lib/stores/toasts.svelte';
 	import { AGENT_PRESETS } from '$lib/types/agentProgram';
 	import ProviderLogo from '$lib/components/agents/ProviderLogo.svelte';
+	import { spawnInBatches, type SpawnResult } from '$lib/utils/spawnBatch';
 
 	interface AgentSelection {
 		agentId: string | null;
@@ -90,6 +91,7 @@
 	let lastClickedTaskId = $state<string | null>(null);
 	let bulkActionLoading = $state(false);
 	let bulkActionError = $state('');
+	let spawnProgress = $state('');
 	let priorityDropdownOpen = $state(false);
 	let harnessDropdownOpen = $state(false);
 
@@ -223,16 +225,34 @@
 		if (!confirm(`Spawn ${ids.length} agent${ids.length > 1 ? 's' : ''}? One per selected task.`)) return;
 		bulkActionLoading = true;
 		bulkActionError = '';
+		spawnProgress = `Spawning 0/${ids.length}...`;
 		try {
-			for (const taskId of ids) {
-				const task = tasks.find(t => t.id === taskId);
-				if (task) onSpawnTask(task);
+			const results = await spawnInBatches(ids, {
+				onSpawn(result: SpawnResult, index: number, total: number) {
+					spawnProgress = `Spawning ${index + 1}/${total}...`;
+				},
+				onBatchComplete(batchResults: SpawnResult[], batchIndex: number, totalBatches: number) {
+					if (totalBatches > 1) {
+						spawnProgress = `Batch ${batchIndex + 1}/${totalBatches} done...`;
+					}
+				}
+			});
+			const succeeded = results.filter(r => r.success).length;
+			const failed = results.filter(r => !r.success);
+			if (failed.length === 0) {
+				addToast({ message: `Spawned ${succeeded} agent${succeeded !== 1 ? 's' : ''}`, type: 'success' });
+			} else if (succeeded > 0) {
+				addToast({ message: `Spawned ${succeeded}/${results.length} (${failed.length} failed)`, type: 'warning' });
+			} else {
+				const firstError = failed[0]?.error || 'Unknown error';
+				addToast({ message: `Spawn failed: ${firstError}`, type: 'error' });
 			}
 			clearSelection();
 		} catch (err) {
 			bulkActionError = err instanceof Error ? err.message : String(err);
 		} finally {
 			bulkActionLoading = false;
+			spawnProgress = '';
 		}
 	}
 
@@ -1208,7 +1228,7 @@
 				<path d="M12 2C12 2 8 6 8 12C8 15 9 17 10 18L10 21C10 21.5 10.5 22 11 22H13C13.5 22 14 21.5 14 21L14 18C15 17 16 15 16 12C16 6 12 2 12 2Z" />
 				<circle cx="12" cy="10" r="2" />
 			</svg>
-			Spawn
+			{spawnProgress || 'Spawn'}
 		</button>
 		<button type="button" class="floating-btn floating-btn-close" onclick={handleBulkClose} disabled={bulkActionLoading}>
 			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">

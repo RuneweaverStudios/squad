@@ -34,6 +34,8 @@ export interface SpawnBatchOptions {
 	onBatchComplete?: (batchResults: SpawnResult[], batchIndex: number, totalBatches: number) => void;
 	/** Project name to pass to spawn API (optional - inferred from task) */
 	project?: string;
+	/** Model alias to pass to spawn API (e.g. 'opus', 'sonnet', 'haiku') */
+	model?: string;
 }
 
 /**
@@ -52,10 +54,11 @@ async function getActiveSessionCount(): Promise<number> {
 /**
  * Spawn a single agent for a task via the IDE spawn API.
  */
-async function spawnOne(taskId: string, project?: string): Promise<SpawnResult> {
+async function spawnOne(taskId: string, project?: string, model?: string): Promise<SpawnResult> {
 	try {
 		const body: Record<string, string> = { taskId };
 		if (project) body.project = project;
+		if (model) body.model = model;
 
 		const response = await fetch('/api/work/spawn', {
 			method: 'POST',
@@ -107,7 +110,8 @@ export async function spawnInBatches(
 		staggerMs = 500,
 		onSpawn,
 		onBatchComplete,
-		project
+		project,
+		model
 	} = options;
 
 	if (taskIds.length === 0) return [];
@@ -150,7 +154,7 @@ export async function spawnInBatches(
 					await new Promise(resolve => setTimeout(resolve, i * staggerMs));
 				}
 
-				const result = await spawnOne(taskId, project);
+				const result = await spawnOne(taskId, project, model);
 
 				// Clear spawning animation (with delay on success for visual feedback)
 				if (result.success) {

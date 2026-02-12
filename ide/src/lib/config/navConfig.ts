@@ -169,6 +169,13 @@ export const unifiedNavConfig: UnifiedNavConfig = {
 			category: 'labs'
 		},
 		{
+			id: 'workflows',
+			label: 'Workflows',
+			href: '/workflows',
+			icon: 'workflows',
+			category: 'labs'
+		},
+		{
 			id: 'swarm',
 			label: 'Swarm',
 			href: '/swarm',

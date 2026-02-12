@@ -233,6 +233,17 @@
 		showDropdown = false;
 
 		try {
+			// Check available session slots
+			const workResponse = await fetch("/api/work");
+			const workData = await workResponse.json();
+			const activeSessionCount = workData.count || 0;
+			const currentMaxSessions = getMaxSessions();
+			const epicAvailableSlots = Math.max(0, currentMaxSessions - activeSessionCount);
+
+			if (epicAvailableSlots === 0) {
+				throw new Error(`All ${currentMaxSessions} session slots are in use. Close some sessions first.`);
+			}
+
 			// Fetch epic's children with ready status
 			const response = await fetch(`/api/epics/${epicId}/children`);
 			if (!response.ok) {
@@ -241,15 +252,18 @@
 			const data = await response.json();
 
 			// Filter to ready children only
-			const readyChildren = data.children.filter(
+			const allReadyChildren = data.children.filter(
 				(c: { isBlocked: boolean; status: string }) =>
 					!c.isBlocked && c.status !== "closed" && c.status !== "in_progress",
 			);
 
-			if (readyChildren.length === 0) {
+			if (allReadyChildren.length === 0) {
 				console.log("No ready tasks in epic", epicId);
 				return;
 			}
+
+			// Cap to available session slots
+			const readyChildren = allReadyChildren.slice(0, epicAvailableSlots);
 
 			startBulkSpawn();
 

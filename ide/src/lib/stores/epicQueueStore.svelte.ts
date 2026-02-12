@@ -24,6 +24,7 @@
 
 import type { Task } from '$lib/types/api.types';
 import { SPAWN_STAGGER_MS, DEFAULT_MODEL } from '$lib/config/spawnConfig';
+import { spawnInBatches, type SpawnResult as BatchSpawnResult } from '$lib/utils/spawnBatch';
 
 // =============================================================================
 // TYPES
@@ -67,15 +68,9 @@ export interface ExecutionSettings {
 }
 
 /**
- * Result of a spawn operation
+ * Result of a spawn operation (re-exported from spawnBatch utility)
  */
-export interface SpawnResult {
-	success: boolean;
-	sessionName?: string;
-	agentName?: string;
-	taskId?: string;
-	error?: string;
-}
+export type SpawnResult = BatchSpawnResult;
 
 /**
  * Epic queue state
@@ -373,9 +368,9 @@ export async function launchEpic(
  * Spawn initial agents for ready tasks up to maxConcurrent limit
  * Called automatically by launchEpic when autoSpawn is enabled.
  *
- * Uses PARALLEL spawning with staggered start times for fast execution.
- * Each spawn request starts after a small delay (500ms) from the previous,
- * but all requests run concurrently.
+ * Uses spawnInBatches() for batched concurrent spawning with staggered starts.
+ * Each batch spawns batchSize tasks simultaneously, then waits for the batch
+ * to complete before starting the next.
  *
  * @returns Array of spawn results
  */
@@ -386,7 +381,7 @@ export async function spawnInitialAgents(): Promise<SpawnResult[]> {
 
 	if (!state.isActive) {
 		console.log(`[epic spawn] BLOCKED: No active epic`);
-		return [{ success: false, error: 'No active epic' }];
+		return [{ success: false, taskId: '', error: 'No active epic' }];
 	}
 
 	const readyTasks = getReadyTasks();
@@ -401,75 +396,42 @@ export async function spawnInitialAgents(): Promise<SpawnResult[]> {
 
 	if (maxToSpawn === 0) {
 		console.log(`[epic spawn] BLOCKED: No ready tasks to spawn`);
-		return [{ success: false, error: 'No ready tasks to spawn' }];
+		return [{ success: false, taskId: '', error: 'No ready tasks to spawn' }];
 	}
 
 	state.isSpawning = true;
 
-	// Use PARALLEL spawning with staggered starts (like bulk spawn fix)
-	const spawnPromises = readyTasks.slice(0, maxToSpawn).map(async (task, i) => {
-		const taskStartTime = Date.now();
-
-		// Stagger spawn request starts (500ms between each)
-		if (i > 0) {
-			console.log(`[epic spawn] [${i + 1}/${maxToSpawn}] ${task.id}: Waiting ${i * 500}ms stagger...`);
-			await delay(i * 500);
-		}
-
-		console.log(`[epic spawn] [${i + 1}/${maxToSpawn}] ${task.id}: Sending spawn request...`);
-
-		try {
-			const result = await spawnAgentForTask(task.id);
-			const elapsed = Date.now() - taskStartTime;
-
-			if (result.success) {
-				console.log(`[epic spawn] [${i + 1}/${maxToSpawn}] ${task.id}: ✓ SUCCESS - Agent: ${result.agentName} (${elapsed}ms)`);
-
-				// Mark task as in_progress
-				updateTaskStatus(task.id, 'in_progress', result.agentName);
-
-				// Track the spawned session
-				if (result.sessionName) {
-					state.spawnedSessions.set(task.id, result.sessionName);
-				}
-
-				// Add to running agents
-				if (result.agentName) {
-					addRunningAgent(result.agentName);
-				}
-			} else {
-				console.error(`[epic spawn] [${i + 1}/${maxToSpawn}] ${task.id}: ✗ FAILED - ${result.error} (${elapsed}ms)`);
-			}
-
-			return result;
-		} catch (err) {
-			const elapsed = Date.now() - taskStartTime;
-			console.error(`[epic spawn] [${i + 1}/${maxToSpawn}] ${task.id}: ✗ EXCEPTION after ${elapsed}ms:`, err);
-			return {
-				success: false,
-				taskId: task.id,
-				error: err instanceof Error ? err.message : 'Spawn exception'
-			};
-		}
-	});
-
-	console.log(`[epic spawn] All ${spawnPromises.length} promises created, waiting for completion...`);
-
 	try {
-		const results = await Promise.all(spawnPromises);
-		const successCount = results.filter(r => r.success).length;
-		const failedTasks = results.filter(r => !r.success).map(r => r.taskId);
+		const taskIds = readyTasks.slice(0, maxToSpawn).map(t => t.id);
 
+		const results = await spawnInBatches(taskIds, {
+			batchSize: maxToSpawn,
+			staggerMs: 500,
+			model: DEFAULT_MODEL,
+			onSpawn: (result, index, total) => {
+				if (result.success) {
+					console.log(`[epic spawn] [${index + 1}/${total}] ${result.taskId}: ✓ SUCCESS - Agent: ${result.agentName}`);
+					updateTaskStatus(result.taskId, 'in_progress', result.agentName);
+					if (result.sessionName) {
+						state.spawnedSessions.set(result.taskId, result.sessionName);
+					}
+					if (result.agentName) {
+						addRunningAgent(result.agentName);
+					}
+				} else {
+					console.error(`[epic spawn] [${index + 1}/${total}] ${result.taskId}: ✗ FAILED - ${result.error}`);
+				}
+			}
+		});
+
+		const successCount = results.filter(r => r.success).length;
 		console.log(`[epic spawn] ========== EPIC SPAWN COMPLETE ==========`);
 		console.log(`[epic spawn] Results: ${successCount}/${maxToSpawn} succeeded in ${Date.now() - startTime}ms`);
-		if (failedTasks.length > 0) {
-			console.log(`[epic spawn] Failed tasks:`, failedTasks);
-		}
 
 		return results;
 	} catch (err) {
-		console.error('[epic spawn] ✗ Promise.all EXCEPTION:', err);
-		return [{ success: false, error: 'Epic spawn failed' }];
+		console.error('[epic spawn] ✗ spawnInBatches EXCEPTION:', err);
+		return [{ success: false, taskId: '', error: 'Epic spawn failed' }];
 	} finally {
 		state.isSpawning = false;
 		console.log(`[epic spawn] isSpawning reset to false`);
@@ -578,13 +540,6 @@ async function spawnAgentForTask(taskId: string): Promise<SpawnResult> {
 }
 
 /**
- * Helper to delay execution
- */
-function delay(ms: number): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
  * Determine initial status for a child task
  */
 function determineInitialStatus(task: Task, allChildren: Task[]): ChildStatus {
@@ -666,52 +621,39 @@ export async function completeTask(taskId: string): Promise<void> {
 			// Sort by priority (lower = higher priority)
 			newlyUnblocked.sort((a, b) => a.priority - b.priority);
 
-			// Spawn agents for ALL newly unblocked tasks (up to maxConcurrent)
-			// This fills available slots when a blocking task completes
-			for (const task of newlyUnblocked) {
-				if (!canSpawnMore()) break; // Stop if at capacity
+			// Compute how many slots are available (respect maxConcurrent)
+			const availableSlots = state.settings.mode === 'sequential'
+				? (state.runningAgents.length === 0 ? 1 : 0)
+				: Math.max(0, state.settings.maxConcurrent - state.runningAgents.length);
 
-				await spawnAgentForTaskAndTrack(task.id);
+			if (availableSlots > 0) {
+				const taskIds = newlyUnblocked.slice(0, availableSlots).map(t => t.id);
 
-				// Stagger spawns to avoid overwhelming the system
-				if (canSpawnMore() && newlyUnblocked.indexOf(task) < newlyUnblocked.length - 1) {
-					await delay(SPAWN_STAGGER_MS);
+				state.isSpawning = true;
+				try {
+					await spawnInBatches(taskIds, {
+						batchSize: availableSlots,
+						staggerMs: SPAWN_STAGGER_MS,
+						model: DEFAULT_MODEL,
+						onSpawn: (result) => {
+							if (result.success) {
+								updateTaskStatus(result.taskId, 'in_progress', result.agentName);
+								if (result.sessionName) {
+									state.spawnedSessions.set(result.taskId, result.sessionName);
+								}
+								if (result.agentName) {
+									addRunningAgent(result.agentName);
+								}
+							} else {
+								state.lastSpawnError = result.error || 'Failed to spawn agent';
+							}
+						}
+					});
+				} finally {
+					state.isSpawning = false;
 				}
 			}
 		}
-	}
-}
-
-/**
- * Spawn an agent for a task and update tracking state
- * @param taskId - The task ID to assign
- */
-async function spawnAgentForTaskAndTrack(taskId: string): Promise<SpawnResult> {
-	state.isSpawning = true;
-
-	try {
-		const result = await spawnAgentForTask(taskId);
-
-		if (result.success) {
-			// Mark task as in_progress
-			updateTaskStatus(taskId, 'in_progress', result.agentName);
-
-			// Track the spawned session
-			if (result.sessionName) {
-				state.spawnedSessions.set(taskId, result.sessionName);
-			}
-
-			// Add to running agents
-			if (result.agentName) {
-				addRunningAgent(result.agentName);
-			}
-		} else {
-			state.lastSpawnError = result.error || 'Failed to spawn agent';
-		}
-
-		return result;
-	} finally {
-		state.isSpawning = false;
 	}
 }
 

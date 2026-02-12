@@ -27,7 +27,7 @@
 	import { playNewTaskChime, playTaskExitSound, playTaskStartSound, playTaskCompleteSound, playEpicCompleteSound } from '$lib/utils/soundEffects';
 	import { spawningTaskIds, isBulkSpawning } from '$lib/stores/spawningTasks';
 	import { successToast } from '$lib/stores/toasts.svelte';
-	import { getEpicCelebration, getEpicAutoClose, getCollapsedEpics, setCollapsedEpics } from '$lib/stores/preferences.svelte';
+	import { getEpicCelebration, getEpicAutoClose, getCollapsedEpics, setCollapsedEpics, getMaxSessions } from '$lib/stores/preferences.svelte';
 	import { workSessionsState } from '$lib/stores/workSessions.svelte';
 	import { getFileTypeInfo, getFileTypeInfoFromPath, formatFileSize, type FileCategory } from '$lib/utils/fileUtils';
 	import { calculateRecommendationScore, type RecommendationScore } from '$lib/utils/recommendationUtils';
@@ -1732,7 +1732,31 @@
 		}
 
 		spawningBulk = true;
-		const taskIds = Array.from(selectedTasks);
+
+		// Check max_sessions limit before spawning
+		let allTaskIds = Array.from(selectedTasks);
+		try {
+			const workResponse = await fetch('/api/work');
+			const workData = await workResponse.json();
+			const activeSessionCount = workData.count || 0;
+			const currentMaxSessions = getMaxSessions();
+			const availableSlots = Math.max(0, currentMaxSessions - activeSessionCount);
+
+			if (availableSlots === 0) {
+				console.log(`[bulk spawn] BLOCKED: All ${currentMaxSessions} session slots are in use (${activeSessionCount} active)`);
+				spawningBulk = false;
+				return;
+			}
+
+			if (allTaskIds.length > availableSlots) {
+				console.log(`[bulk spawn] Capping from ${allTaskIds.length} to ${availableSlots} tasks (${activeSessionCount}/${currentMaxSessions} sessions active)`);
+				allTaskIds = allTaskIds.slice(0, availableSlots);
+			}
+		} catch (err) {
+			console.warn('[bulk spawn] Failed to check session count, proceeding with all tasks:', err);
+		}
+
+		const taskIds = allTaskIds;
 		console.log(`[bulk spawn] Task IDs to spawn (${taskIds.length}):`, taskIds);
 
 		// Fire off all spawn requests with small stagger (500ms between starts)
