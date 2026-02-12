@@ -25,6 +25,7 @@ import { homedir } from 'node:os';
 import { createServer } from 'node:http';
 import { discoverProjects, getDueTasks, updateNextRun, createChildTask, updateChildResult } from './lib/db.js';
 import { nextCronRun } from './lib/cron.js';
+import { getDueWorkflows, updateWorkflowNextRun, discoverCronWorkflows, getWorkflowState } from './lib/workflows.js';
 
 // --- CLI args ---
 const args = process.argv.slice(2);
@@ -287,6 +288,57 @@ async function poll() {
     }
   }
 
+  // --- Workflow scheduling (direct from workflow JSON files) ---
+  const dueWorkflows = getDueWorkflows();
+  if (dueWorkflows.length > 0) {
+    debug(`${dueWorkflows.length} due workflow(s)`);
+  }
+
+  for (const wf of dueWorkflows) {
+    const tz = wf.timezone || getTimezone();
+    log(`Executing workflow ${wf.id} (cron: ${wf.cronExpr})`);
+
+    if (DRY_RUN) {
+      log(`[DRY-RUN] Would execute workflow ${wf.id}`);
+    } else {
+      try {
+        const res = await fetch(`${IDE_URL}/api/workflows/${encodeURIComponent(wf.id)}/run`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ trigger: 'cron' }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          log(`Workflow ${wf.id} failed: ${data.message || data.error || res.statusText}`);
+        } else {
+          log(`Workflow ${wf.id} completed (status: ${data.status})`);
+        }
+
+        spawned.push({
+          taskId: `workflow:${wf.id}`,
+          project: 'workflows',
+          time: new Date().toISOString(),
+          result: res.ok ? 'ok' : 'failed',
+          type: 'workflow-cron',
+        });
+      } catch (err) {
+        log(`Workflow ${wf.id} error: ${err.message}`);
+        spawned.push({
+          taskId: `workflow:${wf.id}`,
+          project: 'workflows',
+          time: new Date().toISOString(),
+          result: 'failed',
+          type: 'workflow-cron',
+        });
+      }
+    }
+
+    // Always compute and store next run
+    const nextRun = nextCronRun(wf.cronExpr, tz);
+    updateWorkflowNextRun(wf.id, nextRun);
+    debug(`Next run for workflow ${wf.id}: ${nextRun}`);
+  }
+
   lastPoll = new Date().toISOString();
 
   // Trim spawn log to last 100 entries
@@ -299,6 +351,8 @@ function startHttpServer() {
     res.setHeader('Content-Type', 'application/json');
 
     if (req.method === 'GET' && req.url === '/status') {
+      const cronWorkflows = discoverCronWorkflows();
+      const workflowState = getWorkflowState();
       res.end(JSON.stringify({
         running,
         pollInterval: POLL_INTERVAL / 1000,
@@ -306,6 +360,13 @@ function startHttpServer() {
         lastPoll,
         recentSpawns: spawned.slice(-10),
         projectCount: discoverProjects().length,
+        workflowCount: cronWorkflows.length,
+        workflows: cronWorkflows.map(wf => ({
+          id: wf.id,
+          name: wf.name,
+          cronExpr: wf.cronExpr,
+          nextRunAt: workflowState[wf.id] || null,
+        })),
         uptime: process.uptime(),
       }));
     } else if (req.method === 'POST' && req.url === '/start') {
