@@ -585,9 +585,18 @@ export const POST: RequestHandler = async ({ url, request }) => {
 			return json({ error: 'Type must be "file" or "folder"' }, { status: 400 });
 		}
 
-		// Validate name (no path separators, no traversal)
-		if (name.includes('/') || name.includes('\\') || name === '.' || name === '..') {
-			return json({ error: 'Invalid name' }, { status: 400 });
+		// Normalize name: strip leading slashes (user may type "/docs/foo.md" meaning relative)
+		const normalizedName = name.replace(/^\/+/, '');
+		if (!normalizedName) {
+			return json({ error: 'Name is required' }, { status: 400 });
+		}
+
+		// Validate each path segment (name can contain / for nested creation like "docs/plans/file.md")
+		const segments = normalizedName.split('/').filter(Boolean);
+		for (const segment of segments) {
+			if (segment === '.' || segment === '..' || segment.includes('\\')) {
+				return json({ error: 'Invalid name' }, { status: 400 });
+			}
 		}
 
 		// Get project path
@@ -603,7 +612,7 @@ export const POST: RequestHandler = async ({ url, request }) => {
 		}
 
 		// Build full path
-		const newPath = parentPath ? join(parentPath, name) : name;
+		const newPath = parentPath ? join(parentPath, normalizedName) : normalizedName;
 		const fullPath = resolve(projectPath, newPath);
 
 		// Validate new path is still within project
