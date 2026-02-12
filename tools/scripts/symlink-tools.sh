@@ -302,6 +302,32 @@ else
 fi
 
 echo ""
+echo -e "${BLUE}Setting up jat-step...${NC}"
+echo ""
+
+# Symlink jat-step (completion step executor with signal emission)
+JAT_STEP_SOURCE="$PROJECT_ROOT/tools/scripts/jat-step"
+JAT_STEP_TARGET="$HOME/.local/bin/jat-step"
+
+if [ -f "$JAT_STEP_SOURCE" ]; then
+    if [ -L "$JAT_STEP_TARGET" ]; then
+        CURRENT_TARGET=$(readlink "$JAT_STEP_TARGET")
+        if [ "$CURRENT_TARGET" = "$JAT_STEP_SOURCE" ]; then
+            echo -e "  ${GREEN}✓${NC} jat-step (already linked)"
+        else
+            echo -e "  ${YELLOW}↻${NC} jat-step (updating link)"
+            rm "$JAT_STEP_TARGET"
+            ln -s "$JAT_STEP_SOURCE" "$JAT_STEP_TARGET"
+        fi
+    else
+        echo -e "  ${GREEN}+${NC} jat-step (linked)"
+        ln -s "$JAT_STEP_SOURCE" "$JAT_STEP_TARGET"
+    fi
+else
+    echo -e "  ${YELLOW}⚠${NC} jat-step not found at $JAT_STEP_SOURCE"
+fi
+
+echo ""
 echo -e "${BLUE}Setting up jat-uninstall...${NC}"
 echo ""
 
