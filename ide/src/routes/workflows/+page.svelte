@@ -1021,6 +1021,7 @@
 			class="rounded-xl p-5 max-w-sm w-full mx-4"
 			style="background: oklch(0.18 0.01 250); border: 1px solid oklch(0.25 0.02 250)"
 			onclick={(e) => e.stopPropagation()}
+			onkeydown={(e) => e.stopPropagation()}
 		>
 			<h3 class="text-sm font-semibold mb-2" style="color: oklch(0.85 0.02 250)">
 				Delete Workflow?

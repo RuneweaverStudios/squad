@@ -40,6 +40,7 @@
 		description?: string;
 		notes?: string;
 		labels?: string[];
+		agent_program?: string | null;
 	}
 
 	interface AgentSessionInfo {
@@ -397,9 +398,7 @@
 
 	// Helper functions
 	function getTaskHarness(task: AgentTask | null): string {
-		if (!task?.labels) return 'claude-code';
-		const harnessLabel = task.labels.find(l => l.startsWith('harness:'));
-		return harnessLabel ? harnessLabel.replace('harness:', '') : 'claude-code';
+		return task?.agent_program || 'claude-code';
 	}
 
 	function getAgentName(sessionName: string): string {

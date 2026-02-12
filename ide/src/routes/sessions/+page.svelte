@@ -800,9 +800,7 @@
 	}
 
 	function getTaskHarness(task: any): string {
-		if (!task?.labels) return 'claude-code';
-		const harnessLabel = task.labels.find((l: string) => l.startsWith('harness:'));
-		return harnessLabel ? harnessLabel.replace('harness:', '') : 'claude-code';
+		return task?.agent_program || 'claude-code';
 	}
 
 	async function sendWorkflowCommand(sessionName: string, command: string) {

@@ -820,10 +820,9 @@
 				if (selection.agentId) body.agentId = selection.agentId;
 				if (selection.model) body.model = selection.model;
 			} else {
-				// No explicit selection — use task's harness label if set
-				const harnessLabel = task.labels?.find((l: string) => l.startsWith('harness:'));
-				if (harnessLabel) {
-					body.agentId = harnessLabel.replace('harness:', '');
+				// No explicit selection — use task's agent_program if set
+				if (task.agent_program) {
+					body.agentId = task.agent_program;
 				}
 			}
 
@@ -890,10 +889,9 @@
 					autoStart: true,
 				};
 
-				// Use task's harness label if set
-				const harnessLabel = task.labels?.find((l: string) => l.startsWith('harness:'));
-				if (harnessLabel) {
-					body.agentId = harnessLabel.replace('harness:', '');
+				// Use task's agent_program if set
+				if (task.agent_program) {
+					body.agentId = task.agent_program;
 				}
 
 				try {

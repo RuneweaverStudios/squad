@@ -962,10 +962,7 @@
 				labels.push('human-action');
 			}
 
-			// Add harness label if non-default harness selected
-			if (selectedHarness && selectedHarness !== 'claude-code') {
-				labels.push(`harness:${selectedHarness}`);
-			}
+			// Note: harness is stored via agent_program field, not labels
 
 			// Get dependencies from selected list
 			const dependencies = selectedDependencies.map(d => d.id);

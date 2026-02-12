@@ -50,6 +50,7 @@
 		labels?: string[];
 		created_at?: string;
 		depends_on?: Dependency[];
+		agent_program?: string | null;
 	}
 
 	let {
@@ -269,11 +270,9 @@
 		}
 	}
 
-	/** Extract harness from task labels (e.g., 'harness:codex-cli' → 'codex-cli') */
+	/** Extract harness from task's agent_program field (falls back to 'claude-code') */
 	function getTaskHarness(task: Task): string {
-		if (!task.labels) return 'claude-code';
-		const harnessLabel = task.labels.find(l => l.startsWith('harness:'));
-		return harnessLabel ? harnessLabel.replace('harness:', '') : 'claude-code';
+		return task.agent_program || 'claude-code';
 	}
 
 	async function handleBulkPriority(priority: number) {
@@ -313,15 +312,10 @@
 		bulkActionError = '';
 		try {
 			const result = await bulkApiOperation(ids, async (taskId) => {
-				const task = tasks.find(t => t.id === taskId);
-				if (!task) return;
-				// Remove existing harness: labels, add new one (or remove if default)
-				const otherLabels = (task.labels || []).filter(l => !l.startsWith('harness:'));
-				const newLabels = agentId === 'claude-code' ? otherLabels : [...otherLabels, `harness:${agentId}`];
 				const response = await fetchWithTimeout(`/api/tasks/${taskId}`, {
-					method: 'PATCH',
+					method: 'PUT',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ labels: newLabels.join(',') })
+					body: JSON.stringify({ agent_program: agentId === 'claude-code' ? null : agentId })
 				});
 				if (!response.ok) {
 					throw new Error(await handleApiError(response, `update harness for ${taskId}`));
@@ -343,23 +337,36 @@
 		harnessPickerTaskId = null;
 		const task = tasks.find(t => t.id === taskId);
 		if (!task) return;
-		// Remove harness: labels and human-related labels (human-action, human) when switching harness
-		const otherLabels = (task.labels || []).filter(l =>
-			!l.startsWith('harness:') && l !== 'human-action' && l !== 'human'
-		);
-		const newLabels = agentId === 'claude-code'
-			? otherLabels
-			: agentId === 'human'
-				? [...otherLabels, `harness:${agentId}`, 'human-action']
-				: [...otherLabels, `harness:${agentId}`];
 		try {
+			// Update agent_program field
 			const resp = await fetchWithTimeout(`/api/tasks/${taskId}`, {
-				method: 'PATCH',
+				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ labels: newLabels.join(',') })
+				body: JSON.stringify({ agent_program: agentId === 'claude-code' ? null : agentId })
 			});
 			if (!resp.ok) {
 				console.error('Failed to update harness:', resp.status, await resp.text());
+			}
+			// Handle human-action label separately if needed
+			if (agentId === 'human') {
+				const currentLabels = (task.labels || []).filter(l => l !== 'human-action' && l !== 'human');
+				const newLabels = [...currentLabels, 'human-action'];
+				await fetchWithTimeout(`/api/tasks/${taskId}`, {
+					method: 'PATCH',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ labels: newLabels.join(',') })
+				});
+			} else {
+				// Remove human-action label if switching away from human
+				const currentLabels = task.labels || [];
+				if (currentLabels.includes('human-action') || currentLabels.includes('human')) {
+					const newLabels = currentLabels.filter(l => l !== 'human-action' && l !== 'human');
+					await fetchWithTimeout(`/api/tasks/${taskId}`, {
+						method: 'PATCH',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ labels: newLabels.join(',') })
+					});
+				}
 			}
 		} catch (err) {
 			console.error('Failed to update harness:', err);
