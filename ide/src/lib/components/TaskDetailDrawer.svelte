@@ -13,7 +13,8 @@
 	 * - Task actions: Spawn, Attach, Release, Send Message
 	 */
 
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, tick } from 'svelte';
+	import { slide } from 'svelte/transition';
 	import { browser } from '$app/environment';
 	import { formatDate, formatSavedTime, formatRelativeTimestamp } from '$lib/utils/dateFormatters';
 	import InlineEdit from '$lib/components/InlineEdit.svelte';
@@ -31,6 +32,7 @@
 	import type { SuggestedTaskWithState } from '$lib/types/signals';
 	import { getProjectFromTaskId } from '$lib/utils/projectUtils';
 	import { availableProjects as availableProjectsStore } from '$lib/stores/drawerStore';
+	import { loadCommands, getCommands } from '$lib/stores/configStore.svelte';
 
 	// Task interface for drawer (extends API Task with additional optional fields)
 	interface DrawerTask {
@@ -435,12 +437,69 @@
 	const dueDateInfo = $derived(task?.due_date ? formatDueDate(task.due_date) : null);
 
 	// Editing states for scheduling fields
-	let editingCommand = $state(false);
 	let editingCron = $state(false);
 	let editingNextRun = $state(false);
 	let editingDueDate = $state(false);
 	let editingAgentProgram = $state(false);
 	let editingModel = $state(false);
+
+	// Command dropdown state (searchable dropdown from /integrations)
+	let cmdDropdownOpen = $state(false);
+	let cmdSearchQuery = $state('');
+	let cmdSearchInput: HTMLInputElement | undefined;
+	let cmdDropdownRef: HTMLDivElement | undefined;
+
+	// Group commands by namespace for the dropdown
+	const commandsByNamespace = $derived.by(() => {
+		const cmds = getCommands();
+		const groups = new Map<string, Array<{ invocation: string; name: string }>>();
+		for (const cmd of cmds) {
+			const ns = cmd.namespace || 'local';
+			if (!groups.has(ns)) groups.set(ns, []);
+			groups.get(ns)!.push({ invocation: cmd.invocation, name: cmd.name });
+		}
+		const sorted = Array.from(groups.entries()).sort(([a], [b]) => {
+			if (a === 'jat') return -1;
+			if (b === 'jat') return 1;
+			if (a === 'local') return -1;
+			if (b === 'local') return 1;
+			return a.localeCompare(b);
+		});
+		return sorted;
+	});
+
+	// Filtered commands for search
+	const filteredCommandsByNamespace = $derived.by(() => {
+		if (!cmdSearchQuery.trim()) return commandsByNamespace;
+		const q = cmdSearchQuery.toLowerCase();
+		const result: Array<[string, Array<{ invocation: string; name: string }>]> = [];
+		for (const [ns, cmds] of commandsByNamespace) {
+			const filtered = cmds.filter(c => c.invocation.toLowerCase().includes(q) || c.name.toLowerCase().includes(q));
+			if (filtered.length > 0) result.push([ns, filtered]);
+		}
+		return result;
+	});
+
+	function selectCommandDropdown(invocation: string) {
+		cmdDropdownOpen = false;
+		cmdSearchQuery = '';
+		autoSave('command', invocation);
+	}
+
+	function handleCmdClickOutside(e: MouseEvent) {
+		if (cmdDropdownRef && !cmdDropdownRef.contains(e.target as Node)) {
+			cmdDropdownOpen = false;
+			cmdSearchQuery = '';
+		}
+	}
+
+	$effect(() => {
+		if (cmdDropdownOpen) {
+			document.addEventListener('mousedown', handleCmdClickOutside);
+			tick().then(() => cmdSearchInput?.focus());
+			return () => document.removeEventListener('mousedown', handleCmdClickOutside);
+		}
+	});
 
 	// Timeline filter state
 	let timelineFilter = $state<'all' | 'tasks' | 'messages'>('all');
@@ -1863,6 +1922,8 @@
 			}, 30000);
 			// Fetch available projects for migration dropdown
 			fetchProjects();
+			// Load commands for the command dropdown
+			loadCommands();
 		}
 	});
 

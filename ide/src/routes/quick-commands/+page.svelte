@@ -48,6 +48,36 @@
 		providerErrors?: string[];
 	}
 
+	interface PipelineStep {
+		id: string;
+		order: number;
+		templateId: string | null;
+		prompt: string | null;
+		model: string | null;
+		label: string;
+	}
+
+	interface Pipeline {
+		id: string;
+		name: string;
+		description: string;
+		steps: PipelineStep[];
+		defaultProject: string | null;
+		createdAt: string;
+		updatedAt?: string;
+	}
+
+	interface PipelineRunStep {
+		stepIndex: number;
+		label: string;
+		model: string;
+		prompt: string;
+		result?: string;
+		error?: string;
+		durationMs?: number;
+		status: 'pending' | 'running' | 'done' | 'error';
+	}
+
 	interface Project {
 		key: string;
 		name: string;
@@ -133,8 +163,40 @@
 	let pendingWriteResult = $state<ExecutionResult | null>(null);
 
 
+	// Schedule modal state
+	let showScheduleModal = $state(false);
+	let schedulingTemplate = $state<Template | null>(null);
+	let scheduleCron = $state('0 9 * * *');
+	let scheduleProject = $state('');
+	let scheduleModel = $state('haiku');
+	let scheduleVariables = $state<Record<string, string>>({});
+	let scheduleSaving = $state(false);
+	let scheduleError = $state('');
+	let templateSchedules = $state<Record<string, { taskId: string; cron: string; nextRun: string; project: string }>>({});
+
+	// Pipeline state
+	let pipelines = $state<Pipeline[]>([]);
+	let showPipelineEditor = $state(false);
+	let editingPipeline = $state<Pipeline | null>(null);
+	let pipelineEditorName = $state('');
+	let pipelineEditorDescription = $state('');
+	let pipelineEditorProject = $state('');
+	let pipelineEditorSteps = $state<Array<{ id: string; templateId: string | null; prompt: string; model: string; label: string }>>([]);
+	let pipelineEditorSaving = $state(false);
+	let pipelineEditorError = $state('');
+	let draggedStepIndex = $state<number | null>(null);
+	let dragOverStepIndex = $state<number | null>(null);
+
+	// Pipeline runner state
+	let runningPipeline = $state<Pipeline | null>(null);
+	let pipelineRunSteps = $state<PipelineRunStep[]>([]);
+	let pipelineRunning = $state(false);
+	let pipelineCurrentStep = $state(-1);
+	let pipelineRunProject = $state('jat');
+	let pipelineRunError = $state('');
+
 	// Active tab
-	let activeTab = $state<'templates' | 'history'>('templates');
+	let activeTab = $state<'templates' | 'history' | 'pipelines'>('templates');
 
 	const OUTPUT_ACTIONS: Array<{ id: OutputAction; label: string; icon: string; desc: string }> = [
 		{ id: 'display', label: 'Display', icon: 'M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z M15 12a3 3 0 11-6 0 3 3 0 016 0z', desc: 'Show result inline' },
@@ -155,8 +217,10 @@
 	// --- Lifecycle ---
 	onMount(async () => {
 		loadHistory();
-		await Promise.all([fetchTemplates(), fetchProjects()]);
+		await Promise.all([fetchTemplates(), fetchProjects(), fetchPipelines()]);
 		isLoading = false;
+		// Fetch schedules after templates are loaded
+		fetchSchedules();
 	});
 
 	// --- Data fetching ---
@@ -188,6 +252,295 @@
 		} catch (e) {
 			console.error('[quick-commands] Failed to fetch projects:', e);
 		}
+	}
+
+	// --- Pipelines ---
+	async function fetchPipelines() {
+		try {
+			const res = await fetch('/api/quick-command/pipelines');
+			const data = await res.json();
+			if (data.success) {
+				pipelines = data.pipelines || [];
+			}
+		} catch (e) {
+			console.error('[quick-commands] Failed to fetch pipelines:', e);
+		}
+	}
+
+	function openNewPipeline() {
+		editingPipeline = null;
+		pipelineEditorName = '';
+		pipelineEditorDescription = '';
+		pipelineEditorProject = '';
+		pipelineEditorSteps = [
+			{ id: crypto.randomUUID(), templateId: null, prompt: '', model: 'haiku', label: 'Step 1' },
+			{ id: crypto.randomUUID(), templateId: null, prompt: '', model: 'sonnet', label: 'Step 2' }
+		];
+		pipelineEditorError = '';
+		showPipelineEditor = true;
+	}
+
+	function openEditPipeline(pipeline: Pipeline) {
+		editingPipeline = pipeline;
+		pipelineEditorName = pipeline.name;
+		pipelineEditorDescription = pipeline.description;
+		pipelineEditorProject = pipeline.defaultProject || '';
+		pipelineEditorSteps = pipeline.steps.map((s) => ({
+			id: s.id,
+			templateId: s.templateId,
+			prompt: s.prompt || '',
+			model: s.model || 'haiku',
+			label: s.label
+		}));
+		pipelineEditorError = '';
+		showPipelineEditor = true;
+	}
+
+	function addPipelineStep() {
+		const n = pipelineEditorSteps.length + 1;
+		pipelineEditorSteps = [
+			...pipelineEditorSteps,
+			{ id: crypto.randomUUID(), templateId: null, prompt: '', model: 'haiku', label: `Step ${n}` }
+		];
+	}
+
+	function removePipelineStep(index: number) {
+		if (pipelineEditorSteps.length <= 2) return;
+		pipelineEditorSteps = pipelineEditorSteps.filter((_, i) => i !== index);
+	}
+
+	function handleStepDragStart(index: number) {
+		draggedStepIndex = index;
+	}
+
+	function handleStepDragOver(e: DragEvent, index: number) {
+		e.preventDefault();
+		dragOverStepIndex = index;
+	}
+
+	function handleStepDrop(index: number) {
+		if (draggedStepIndex === null || draggedStepIndex === index) {
+			draggedStepIndex = null;
+			dragOverStepIndex = null;
+			return;
+		}
+		const items = [...pipelineEditorSteps];
+		const [moved] = items.splice(draggedStepIndex, 1);
+		items.splice(index, 0, moved);
+		pipelineEditorSteps = items;
+		draggedStepIndex = null;
+		dragOverStepIndex = null;
+	}
+
+	function handleStepDragEnd() {
+		draggedStepIndex = null;
+		dragOverStepIndex = null;
+	}
+
+	async function savePipeline() {
+		pipelineEditorError = '';
+		if (!pipelineEditorName.trim()) {
+			pipelineEditorError = 'Pipeline name is required';
+			return;
+		}
+		// Validate steps
+		for (let i = 0; i < pipelineEditorSteps.length; i++) {
+			const step = pipelineEditorSteps[i];
+			if (!step.templateId && !step.prompt.trim()) {
+				pipelineEditorError = `Step ${i + 1} must have a template or a prompt`;
+				return;
+			}
+		}
+
+		pipelineEditorSaving = true;
+		try {
+			const url = editingPipeline
+				? `/api/quick-command/pipelines/${editingPipeline.id}`
+				: '/api/quick-command/pipelines';
+			const method = editingPipeline ? 'PUT' : 'POST';
+
+			const res = await fetch(url, {
+				method,
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					name: pipelineEditorName,
+					description: pipelineEditorDescription,
+					defaultProject: pipelineEditorProject || null,
+					steps: pipelineEditorSteps.map((s) => ({
+						id: s.id,
+						templateId: s.templateId || null,
+						prompt: s.templateId ? null : s.prompt,
+						model: s.model || null,
+						label: s.label
+					}))
+				})
+			});
+
+			const data = await res.json();
+			if (!res.ok) {
+				pipelineEditorError = data.message || 'Failed to save pipeline';
+				return;
+			}
+
+			showPipelineEditor = false;
+			await fetchPipelines();
+		} catch (e: any) {
+			pipelineEditorError = e.message || 'Network error';
+		} finally {
+			pipelineEditorSaving = false;
+		}
+	}
+
+	async function deletePipeline(pipeline: Pipeline) {
+		if (!confirm(`Delete pipeline "${pipeline.name}"?`)) return;
+		try {
+			await fetch(`/api/quick-command/pipelines/${pipeline.id}`, { method: 'DELETE' });
+			await fetchPipelines();
+		} catch (e) {
+			console.error('[quick-commands] Failed to delete pipeline:', e);
+		}
+	}
+
+	/** Resolve step prompt: if templateId, load template prompt; else use step prompt */
+	function resolveStepPrompt(step: PipelineStep): string {
+		if (step.templateId) {
+			const template = templates.find((t) => t.id === step.templateId);
+			return template?.prompt || `[Template ${step.templateId} not found]`;
+		}
+		return step.prompt || '';
+	}
+
+	function startPipelineRun(pipeline: Pipeline) {
+		runningPipeline = pipeline;
+		pipelineRunProject = pipeline.defaultProject || selectedProject;
+		pipelineRunSteps = pipeline.steps.map((s, i) => ({
+			stepIndex: i,
+			label: s.label,
+			model: s.model || 'haiku',
+			prompt: resolveStepPrompt(s),
+			status: 'pending' as const
+		}));
+		pipelineCurrentStep = -1;
+		pipelineRunning = false;
+		pipelineRunError = '';
+	}
+
+	async function executePipelineRun() {
+		if (!runningPipeline || pipelineRunning) return;
+		pipelineRunning = true;
+		pipelineRunError = '';
+
+		let previousOutput = '';
+		const startFrom = pipelineRunSteps.findIndex((s) => s.status === 'pending' || s.status === 'error');
+		if (startFrom === -1) return;
+
+		// Collect output from previously completed steps
+		for (let i = 0; i < startFrom; i++) {
+			if (pipelineRunSteps[i].status === 'done' && pipelineRunSteps[i].result) {
+				previousOutput = pipelineRunSteps[i].result!;
+			}
+		}
+
+		for (let i = startFrom; i < pipelineRunSteps.length; i++) {
+			pipelineCurrentStep = i;
+
+			// Build prompt with {input} substitution
+			let prompt = pipelineRunSteps[i].prompt;
+			if (previousOutput && prompt.includes('{input}')) {
+				prompt = prompt.replace(/\{input\}/g, previousOutput);
+			} else if (previousOutput && i > 0) {
+				// Auto-append previous output if no {input} placeholder
+				prompt = `${prompt}\n\nInput from previous step:\n${previousOutput}`;
+			}
+
+			// Update status
+			pipelineRunSteps[i] = { ...pipelineRunSteps[i], status: 'running' };
+			pipelineRunSteps = [...pipelineRunSteps];
+
+			const stepStart = Date.now();
+			try {
+				const res = await fetch('/api/quick-command', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						prompt,
+						project: pipelineRunProject,
+						model: pipelineRunSteps[i].model
+					})
+				});
+				const data = await res.json();
+
+				if (!data.success) {
+					pipelineRunSteps[i] = {
+						...pipelineRunSteps[i],
+						status: 'error',
+						error: data.message || 'Execution failed',
+						durationMs: Date.now() - stepStart
+					};
+					pipelineRunSteps = [...pipelineRunSteps];
+					pipelineRunError = `Step ${i + 1} failed: ${data.message || 'Unknown error'}`;
+					break;
+				}
+
+				previousOutput = data.result;
+				pipelineRunSteps[i] = {
+					...pipelineRunSteps[i],
+					status: 'done',
+					result: data.result,
+					durationMs: data.durationMs || (Date.now() - stepStart)
+				};
+				pipelineRunSteps = [...pipelineRunSteps];
+			} catch (e: any) {
+				pipelineRunSteps[i] = {
+					...pipelineRunSteps[i],
+					status: 'error',
+					error: e.message || 'Network error',
+					durationMs: Date.now() - stepStart
+				};
+				pipelineRunSteps = [...pipelineRunSteps];
+				pipelineRunError = `Step ${i + 1} failed: ${e.message}`;
+				break;
+			}
+		}
+
+		// If all steps completed, add final result to history
+		const allDone = pipelineRunSteps.every((s) => s.status === 'done');
+		if (allDone && runningPipeline) {
+			const totalMs = pipelineRunSteps.reduce((sum, s) => sum + (s.durationMs || 0), 0);
+			const finalResult = pipelineRunSteps[pipelineRunSteps.length - 1]?.result || '';
+			addToHistory({
+				id: crypto.randomUUID(),
+				prompt: `[Pipeline: ${runningPipeline.name}] ${pipelineRunSteps.length} steps`,
+				result: finalResult,
+				model: 'pipeline',
+				project: pipelineRunProject,
+				durationMs: totalMs,
+				timestamp: new Date().toISOString(),
+				templateName: `Pipeline: ${runningPipeline.name}`,
+				outputAction: selectedOutputAction
+			});
+
+			// Route final output
+			await routeOutput({
+				id: crypto.randomUUID(),
+				prompt: '',
+				result: finalResult,
+				model: 'pipeline',
+				project: pipelineRunProject,
+				durationMs: totalMs,
+				timestamp: new Date().toISOString()
+			}, selectedOutputAction);
+		}
+
+		pipelineRunning = false;
+		pipelineCurrentStep = -1;
+	}
+
+	function closePipelineRunner() {
+		runningPipeline = null;
+		pipelineRunSteps = [];
+		pipelineRunning = false;
+		pipelineCurrentStep = -1;
 	}
 
 	// --- History ---
@@ -460,6 +813,122 @@
 			}
 		} catch (e) {
 			console.error('[quick-commands] Failed to delete template:', e);
+		}
+	}
+
+	// --- Schedule functions ---
+	async function fetchSchedules() {
+		for (const t of templates) {
+			try {
+				const res = await fetch(`/api/quick-command/templates/${t.id}/schedule`);
+				const data = await res.json();
+				if (data.scheduled) {
+					templateSchedules[t.id] = {
+						taskId: data.task.id,
+						cron: data.task.schedule_cron,
+						nextRun: data.task.next_run_at,
+						project: data.task.project
+					};
+				} else {
+					delete templateSchedules[t.id];
+				}
+			} catch { /* ignore */ }
+		}
+		templateSchedules = { ...templateSchedules };
+	}
+
+	function openScheduleModal(template: Template) {
+		schedulingTemplate = template;
+		scheduleCron = '0 9 * * *';
+		scheduleProject = template.defaultProject || selectedProject;
+		scheduleModel = template.defaultModel || 'haiku';
+		scheduleVariables = {};
+		if (template.variables) {
+			for (const v of template.variables) {
+				scheduleVariables[v.name] = v.default || '';
+			}
+		}
+		scheduleError = '';
+		showScheduleModal = true;
+	}
+
+	async function saveSchedule() {
+		if (!schedulingTemplate || !scheduleCron.trim()) return;
+
+		scheduleSaving = true;
+		scheduleError = '';
+
+		try {
+			const res = await fetch(`/api/quick-command/templates/${schedulingTemplate.id}/schedule`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					cronExpr: scheduleCron.trim(),
+					project: scheduleProject,
+					model: scheduleModel,
+					variables: scheduleVariables
+				})
+			});
+			const data = await res.json();
+			if (!res.ok) {
+				scheduleError = data.message || data.error || 'Failed to schedule';
+				return;
+			}
+
+			showScheduleModal = false;
+			await fetchSchedules();
+		} catch (e: any) {
+			scheduleError = e.message || 'Schedule failed';
+		} finally {
+			scheduleSaving = false;
+		}
+	}
+
+	async function removeSchedule(templateId: string) {
+		try {
+			const res = await fetch(`/api/quick-command/templates/${templateId}/schedule`, {
+				method: 'DELETE'
+			});
+			if (res.ok) {
+				delete templateSchedules[templateId];
+				templateSchedules = { ...templateSchedules };
+			}
+		} catch (e) {
+			console.error('[quick-commands] Failed to remove schedule:', e);
+		}
+	}
+
+	function formatCron(cron: string): string {
+		const presets: Record<string, string> = {
+			'* * * * *': 'Every minute',
+			'*/5 * * * *': 'Every 5 min',
+			'*/15 * * * *': 'Every 15 min',
+			'*/30 * * * *': 'Every 30 min',
+			'0 * * * *': 'Hourly',
+			'0 */2 * * *': 'Every 2 hours',
+			'0 */6 * * *': 'Every 6 hours',
+			'0 9 * * *': 'Daily 9 AM',
+			'0 9 * * 1-5': 'Weekdays 9 AM',
+			'0 0 * * *': 'Daily midnight',
+			'0 9,17 * * *': '9 AM & 5 PM',
+			'0 0 * * 0': 'Weekly Sun',
+			'0 0 1 * *': 'Monthly 1st',
+		};
+		return presets[cron] || cron;
+	}
+
+	function formatNextRun(iso: string): string {
+		try {
+			const d = new Date(iso);
+			const now = new Date();
+			const diffMs = d.getTime() - now.getTime();
+			if (diffMs < 0) return 'overdue';
+			if (diffMs < 60000) return 'in <1 min';
+			if (diffMs < 3600000) return `in ${Math.round(diffMs / 60000)} min`;
+			if (diffMs < 86400000) return `in ${Math.round(diffMs / 3600000)}h`;
+			return `in ${Math.round(diffMs / 86400000)}d`;
+		} catch {
+			return '';
 		}
 	}
 
@@ -1682,7 +2151,7 @@
 				</div>
 			{/if}
 
-			<!-- Tabs: Templates / History -->
+			<!-- Tabs: Templates / Pipelines / History -->
 			<div class="flex items-center gap-1" style="border-bottom: 1px solid oklch(0.28 0.02 250);">
 				<button
 					onclick={() => activeTab = 'templates'}
@@ -1695,6 +2164,19 @@
 					{/if}
 					{#if activeTab === 'templates'}
 						<div class="absolute bottom-0 left-0 right-0 h-0.5 rounded-full" style="background: oklch(0.65 0.15 200);"></div>
+					{/if}
+				</button>
+				<button
+					onclick={() => activeTab = 'pipelines'}
+					class="px-4 py-2 text-sm font-medium transition-colors relative"
+					style="color: {activeTab === 'pipelines' ? 'oklch(0.90 0.01 250)' : 'oklch(0.55 0.01 250)'};"
+				>
+					Pipelines
+					{#if pipelines.length > 0}
+						<span class="ml-1.5 text-xs" style="color: oklch(0.50 0.01 250);">{pipelines.length}</span>
+					{/if}
+					{#if activeTab === 'pipelines'}
+						<div class="absolute bottom-0 left-0 right-0 h-0.5 rounded-full" style="background: oklch(0.65 0.12 270);"></div>
 					{/if}
 				</button>
 				<button
@@ -1761,6 +2243,19 @@
 													{template.variables.length} var{template.variables.length > 1 ? 's' : ''}
 												</span>
 											{/if}
+											{#if templateSchedules[template.id]}
+												<span
+													class="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded shrink-0 cursor-pointer"
+													style="background: oklch(0.25 0.06 85); color: oklch(0.70 0.12 85);"
+													title={`Scheduled: ${formatCron(templateSchedules[template.id].cron)} | Next: ${templateSchedules[template.id].nextRun}`}
+												>
+													<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3 h-3">
+														<path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+													</svg>
+													{formatCron(templateSchedules[template.id].cron)}
+													<span style="color: oklch(0.55 0.06 85);">({formatNextRun(templateSchedules[template.id].nextRun)})</span>
+												</span>
+											{/if}
 										</div>
 										<p class="text-xs mt-1.5 line-clamp-2" style="color: oklch(0.55 0.01 250);">
 											{truncate(template.prompt, 160)}
@@ -1775,6 +2270,30 @@
 										>
 											Run
 										</button>
+										{#if templateSchedules[template.id]}
+											<button
+												onclick={() => removeSchedule(template.id)}
+												class="p-1.5 rounded transition-colors"
+												style="color: oklch(0.70 0.12 85);"
+												title="Remove schedule"
+											>
+												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+													<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6" />
+												</svg>
+											</button>
+										{:else}
+											<button
+												onclick={() => openScheduleModal(template)}
+												class="p-1.5 rounded transition-colors"
+												style="color: oklch(0.55 0.06 85);"
+												title="Schedule template"
+											>
+												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+												</svg>
+											</button>
+										{/if}
 										<button
 											onclick={() => openEditTemplate(template)}
 											class="p-1.5 rounded transition-colors"
@@ -1885,9 +2404,457 @@
 					{/if}
 				</div>
 			{/if}
+
+			{#if activeTab === 'pipelines'}
+				<div class="flex flex-col gap-3">
+					{#if pipelines.length === 0}
+						<div class="text-center py-12">
+							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" class="w-12 h-12 mx-auto mb-3" style="color: oklch(0.35 0.01 250);">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12" />
+							</svg>
+							<p class="text-sm mb-1" style="color: oklch(0.55 0.01 250);">No pipelines yet</p>
+							<p class="text-xs mb-4" style="color: oklch(0.40 0.01 250);">
+								Chain multiple commands together with output&#x2192;input passing
+							</p>
+							<button
+								onclick={openNewPipeline}
+								class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
+								style="background: oklch(0.30 0.08 270); color: oklch(0.85 0.08 270);"
+							>
+								Create Pipeline
+							</button>
+						</div>
+					{:else}
+						{#each pipelines as pipeline (pipeline.id)}
+							<div
+								class="group rounded-lg p-3 transition-all"
+								style="background: oklch(0.20 0.01 250); border: 1px solid oklch(0.25 0.01 250);"
+							>
+								<div class="flex items-center justify-between gap-3">
+									<div class="flex-1 min-w-0">
+										<div class="flex items-center gap-2 mb-1">
+											<h3 class="text-sm font-medium truncate" style="color: oklch(0.90 0.01 250);">
+												{pipeline.name}
+											</h3>
+											<span class="text-xs px-1.5 py-0.5 rounded shrink-0" style="background: oklch(0.25 0.06 270); color: oklch(0.70 0.10 270);">
+												{pipeline.steps.length} steps
+											</span>
+										</div>
+										{#if pipeline.description}
+											<p class="text-xs truncate" style="color: oklch(0.50 0.01 250);">
+												{pipeline.description}
+											</p>
+										{/if}
+										<div class="flex items-center gap-1.5 mt-1.5">
+											{#each pipeline.steps as step, i}
+												<span class="text-xs px-1 py-0.5 rounded" style="background: oklch(0.18 0.01 250); color: oklch(0.55 0.01 250);">
+													{step.label}
+												</span>
+												{#if i < pipeline.steps.length - 1}
+													<span class="text-xs" style="color: oklch(0.35 0.01 250);">&#x2192;</span>
+												{/if}
+											{/each}
+										</div>
+									</div>
+									<div class="flex items-center gap-1.5 shrink-0">
+										<button
+											onclick={() => startPipelineRun(pipeline)}
+											class="p-1.5 rounded-md transition-colors"
+											style="color: oklch(0.60 0.12 145); background: oklch(0.60 0.12 145 / 0.1);"
+											title="Run pipeline"
+										>
+											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+											</svg>
+										</button>
+										<button
+											onclick={() => openEditPipeline(pipeline)}
+											class="p-1.5 rounded-md transition-colors"
+											style="color: oklch(0.60 0.08 200); background: oklch(0.60 0.08 200 / 0.1);"
+											title="Edit pipeline"
+										>
+											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+												<path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
+											</svg>
+										</button>
+										<button
+											onclick={() => deletePipeline(pipeline)}
+											class="p-1.5 rounded-md transition-colors"
+											style="color: oklch(0.55 0.10 30); background: oklch(0.55 0.10 30 / 0.1);"
+											title="Delete pipeline"
+										>
+											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+												<path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+											</svg>
+										</button>
+									</div>
+								</div>
+							</div>
+						{/each}
+						<button
+							onclick={openNewPipeline}
+							class="w-full py-2 text-xs font-medium rounded-md transition-colors"
+							style="background: oklch(0.18 0.01 250); border: 1px dashed oklch(0.30 0.02 250); color: oklch(0.55 0.01 250);"
+						>
+							+ New Pipeline
+						</button>
+					{/if}
+				</div>
+			{/if}
 		</div>
 	</div>
 </div>
+
+<!-- Pipeline Editor Modal -->
+{#if showPipelineEditor}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center"
+		style="background: oklch(0.10 0.01 250 / 0.7);"
+		onclick={(e) => { if (e.target === e.currentTarget) showPipelineEditor = false; }}
+	>
+		<div
+			class="rounded-xl w-full max-w-2xl max-h-[85vh] overflow-y-auto p-5 animate-scale-in"
+			style="background: oklch(0.20 0.01 250); border: 1px solid oklch(0.30 0.02 250);"
+		>
+			<h2 class="text-base font-semibold mb-4" style="color: oklch(0.90 0.01 250);">
+				{editingPipeline ? 'Edit Pipeline' : 'New Pipeline'}
+			</h2>
+
+			<div class="flex flex-col gap-3">
+				<!-- Name -->
+				<div>
+					<label class="block text-xs mb-1 font-medium" style="color: oklch(0.65 0.01 250);">Name</label>
+					<input
+						type="text"
+						bind:value={pipelineEditorName}
+						placeholder="Pipeline name"
+						class="w-full rounded-md px-3 py-2 text-sm"
+						style="background: oklch(0.14 0.01 250); border: 1px solid oklch(0.30 0.02 250); color: oklch(0.90 0.01 250);"
+					/>
+				</div>
+
+				<!-- Description -->
+				<div>
+					<label class="block text-xs mb-1 font-medium" style="color: oklch(0.65 0.01 250);">Description</label>
+					<input
+						type="text"
+						bind:value={pipelineEditorDescription}
+						placeholder="What this pipeline does"
+						class="w-full rounded-md px-3 py-2 text-sm"
+						style="background: oklch(0.14 0.01 250); border: 1px solid oklch(0.30 0.02 250); color: oklch(0.90 0.01 250);"
+					/>
+				</div>
+
+				<!-- Default Project -->
+				<div>
+					<label class="block text-xs mb-1 font-medium" style="color: oklch(0.65 0.01 250);">Default Project</label>
+					<select
+						bind:value={pipelineEditorProject}
+						class="w-full rounded-md px-2 py-2 text-sm"
+						style="background: oklch(0.14 0.01 250); border: 1px solid oklch(0.30 0.02 250); color: oklch(0.80 0.01 250);"
+					>
+						<option value="">Any project</option>
+						{#each projects as project}
+							<option value={project.key}>{project.name}</option>
+						{/each}
+					</select>
+				</div>
+
+				<!-- Steps -->
+				<div>
+					<label class="block text-xs mb-1 font-medium" style="color: oklch(0.65 0.01 250);">
+						Steps <span class="font-normal opacity-60">({pipelineEditorSteps.length} steps, drag to reorder)</span>
+					</label>
+					<div class="flex flex-col gap-2">
+						{#each pipelineEditorSteps as step, i (step.id)}
+							<div
+								class="rounded-lg p-3 relative transition-all"
+								style="background: oklch(0.16 0.01 250); border: 1px solid {dragOverStepIndex === i ? 'oklch(0.50 0.12 270)' : 'oklch(0.28 0.02 250)'};"
+								draggable="true"
+								ondragstart={() => handleStepDragStart(i)}
+								ondragover={(e) => handleStepDragOver(e, i)}
+								ondrop={() => handleStepDrop(i)}
+								ondragend={handleStepDragEnd}
+							>
+								<div class="flex items-center gap-2 mb-2">
+									<!-- Drag handle -->
+									<span class="cursor-grab text-xs opacity-40" style="color: oklch(0.55 0.01 250);" title="Drag to reorder">
+										&#x2630;
+									</span>
+									<!-- Step number -->
+									<span class="text-xs font-bold rounded px-1.5 py-0.5" style="background: oklch(0.30 0.08 270); color: oklch(0.80 0.10 270);">
+										{i + 1}
+									</span>
+									<!-- Label -->
+									<input
+										type="text"
+										bind:value={step.label}
+										placeholder="Step label"
+										class="flex-1 rounded px-2 py-1 text-xs"
+										style="background: oklch(0.12 0.01 250); border: 1px solid oklch(0.25 0.02 250); color: oklch(0.85 0.01 250);"
+									/>
+									<!-- Model selector -->
+									<select
+										bind:value={step.model}
+										class="rounded px-1.5 py-1 text-xs"
+										style="background: oklch(0.12 0.01 250); border: 1px solid oklch(0.25 0.02 250); color: oklch(0.75 0.01 250);"
+									>
+										{#each MODELS as m}
+											<option value={m.id}>{m.label}</option>
+										{/each}
+									</select>
+									<!-- Remove button -->
+									{#if pipelineEditorSteps.length > 2}
+										<button
+											onclick={() => removePipelineStep(i)}
+											class="p-1 rounded transition-colors"
+											style="color: oklch(0.50 0.10 30);"
+											title="Remove step"
+										>
+											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+											</svg>
+										</button>
+									{/if}
+								</div>
+
+								<!-- Template selector or prompt -->
+								<div class="flex flex-col gap-1.5">
+									<div class="flex items-center gap-2">
+										<select
+											value={step.templateId || ''}
+											onchange={(e) => {
+												const val = (e.target as HTMLSelectElement).value;
+												pipelineEditorSteps[i] = { ...step, templateId: val || null, prompt: val ? '' : step.prompt };
+												pipelineEditorSteps = [...pipelineEditorSteps];
+											}}
+											class="rounded px-2 py-1 text-xs"
+											style="background: oklch(0.12 0.01 250); border: 1px solid oklch(0.25 0.02 250); color: oklch(0.75 0.01 250);"
+										>
+											<option value="">Freeform prompt</option>
+											{#each templates as t}
+												<option value={t.id}>{t.name}</option>
+											{/each}
+										</select>
+										{#if i > 0}
+											<span class="text-xs opacity-40" style="color: oklch(0.55 0.08 270);">
+												{`{input}`} = output from step {i}
+											</span>
+										{/if}
+									</div>
+									{#if !step.templateId}
+										<textarea
+											bind:value={step.prompt}
+											placeholder={i === 0 ? 'Enter prompt for this step...' : `Enter prompt... Use {input} for previous step output`}
+											rows="2"
+											class="w-full rounded px-2 py-1.5 text-xs resize-y"
+											style="background: oklch(0.12 0.01 250); border: 1px solid oklch(0.25 0.02 250); color: oklch(0.85 0.01 250);"
+										></textarea>
+									{:else}
+										<div class="text-xs px-2 py-1 rounded truncate" style="background: oklch(0.14 0.01 250); color: oklch(0.50 0.01 250);">
+											Using template: {templates.find(t => t.id === step.templateId)?.name || step.templateId}
+										</div>
+									{/if}
+								</div>
+
+								<!-- Arrow between steps -->
+								{#if i < pipelineEditorSteps.length - 1}
+									<div class="flex justify-center mt-2 -mb-1" style="color: oklch(0.40 0.06 270);">
+										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 13.5L12 21m0 0l-7.5-7.5M12 21V3" />
+										</svg>
+									</div>
+								{/if}
+							</div>
+						{/each}
+
+						<!-- Add step button -->
+						<button
+							onclick={addPipelineStep}
+							class="rounded-lg p-2 text-xs transition-colors flex items-center justify-center gap-1.5"
+							style="border: 1px dashed oklch(0.30 0.02 250); color: oklch(0.55 0.01 250);"
+						>
+							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+							</svg>
+							Add Step
+						</button>
+					</div>
+				</div>
+
+				{#if pipelineEditorError}
+					<p class="text-xs" style="color: oklch(0.65 0.12 30);">{pipelineEditorError}</p>
+				{/if}
+
+				<!-- Actions -->
+				<div class="flex justify-end gap-2 mt-2">
+					<button
+						onclick={() => showPipelineEditor = false}
+						class="px-3 py-1.5 rounded text-sm transition-colors"
+						style="color: oklch(0.65 0.01 250);"
+					>
+						Cancel
+					</button>
+					<button
+						onclick={savePipeline}
+						disabled={pipelineEditorSaving}
+						class="px-4 py-1.5 rounded text-sm font-medium transition-colors"
+						style="background: oklch(0.50 0.12 270); color: oklch(0.98 0.01 270); opacity: {pipelineEditorSaving ? '0.6' : '1'};"
+					>
+						{pipelineEditorSaving ? 'Saving...' : (editingPipeline ? 'Update' : 'Create')} Pipeline
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Pipeline Runner Modal -->
+{#if runningPipeline}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center"
+		style="background: oklch(0.10 0.01 250 / 0.7);"
+		onclick={(e) => { if (e.target === e.currentTarget && !pipelineRunning) closePipelineRunner(); }}
+	>
+		<div
+			class="rounded-xl w-full max-w-2xl max-h-[85vh] overflow-y-auto p-5 animate-scale-in"
+			style="background: oklch(0.20 0.01 250); border: 1px solid oklch(0.30 0.02 250);"
+		>
+			<div class="flex items-center justify-between mb-4">
+				<div>
+					<h2 class="text-base font-semibold" style="color: oklch(0.90 0.01 250);">
+						{runningPipeline.name}
+					</h2>
+					{#if runningPipeline.description}
+						<p class="text-xs mt-0.5" style="color: oklch(0.50 0.01 250);">{runningPipeline.description}</p>
+					{/if}
+				</div>
+				<!-- Progress indicator -->
+				<span class="text-xs px-2 py-1 rounded" style="background: oklch(0.25 0.06 270); color: oklch(0.75 0.10 270);">
+					{pipelineRunSteps.filter(s => s.status === 'done').length}/{pipelineRunSteps.length} steps
+				</span>
+			</div>
+
+			<!-- Project selector -->
+			{#if !pipelineRunning && pipelineRunSteps.every(s => s.status === 'pending')}
+				<div class="mb-3">
+					<label class="block text-xs mb-1 font-medium" style="color: oklch(0.65 0.01 250);">Project</label>
+					<select
+						bind:value={pipelineRunProject}
+						class="w-full rounded-md px-2 py-2 text-sm"
+						style="background: oklch(0.14 0.01 250); border: 1px solid oklch(0.30 0.02 250); color: oklch(0.80 0.01 250);"
+					>
+						{#each projects as project}
+							<option value={project.key}>{project.name}</option>
+						{/each}
+					</select>
+				</div>
+			{/if}
+
+			<!-- Steps display -->
+			<div class="flex flex-col gap-2">
+				{#each pipelineRunSteps as step, i (i)}
+					<div
+						class="rounded-lg p-3 transition-all"
+						style="
+							background: oklch({step.status === 'running' ? '0.22' : '0.16'} 0.01 250);
+							border: 1px solid {
+								step.status === 'running' ? 'oklch(0.50 0.12 85)' :
+								step.status === 'done' ? 'oklch(0.40 0.10 145)' :
+								step.status === 'error' ? 'oklch(0.45 0.12 30)' :
+								'oklch(0.25 0.02 250)'
+							};
+						"
+					>
+						<div class="flex items-center gap-2">
+							<!-- Status icon -->
+							{#if step.status === 'running'}
+								<div class="w-4 h-4 rounded-full animate-spin-fast" style="border: 2px solid oklch(0.65 0.12 85); border-top-color: transparent;"></div>
+							{:else if step.status === 'done'}
+								<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="oklch(0.65 0.12 145)" class="w-4 h-4">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+								</svg>
+							{:else if step.status === 'error'}
+								<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="oklch(0.65 0.12 30)" class="w-4 h-4">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+								</svg>
+							{:else}
+								<div class="w-4 h-4 rounded-full" style="border: 2px solid oklch(0.30 0.02 250);"></div>
+							{/if}
+
+							<span class="text-xs font-bold rounded px-1.5 py-0.5" style="background: oklch(0.30 0.08 270); color: oklch(0.80 0.10 270);">
+								{i + 1}
+							</span>
+							<span class="text-sm flex-1" style="color: oklch(0.85 0.01 250);">{step.label}</span>
+							<span class="text-xs px-1.5 py-0.5 rounded" style="background: oklch(0.25 0.02 250); color: oklch(0.55 0.01 250);">
+								{step.model}
+							</span>
+							{#if step.durationMs}
+								<span class="text-xs" style="color: oklch(0.45 0.01 250);">{formatDuration(step.durationMs)}</span>
+							{/if}
+						</div>
+
+						<!-- Result/Error -->
+						{#if step.status === 'done' && step.result}
+							<div class="mt-2 rounded p-2 text-xs overflow-auto" style="background: oklch(0.12 0.01 250); color: oklch(0.75 0.01 250); max-height: 150px;">
+								<pre class="whitespace-pre-wrap">{step.result.length > 500 ? step.result.slice(0, 500) + '...' : step.result}</pre>
+							</div>
+						{/if}
+						{#if step.status === 'error' && step.error}
+							<div class="mt-2 rounded p-2 text-xs" style="background: oklch(0.18 0.04 30 / 0.3); color: oklch(0.70 0.12 30);">
+								{step.error}
+							</div>
+						{/if}
+					</div>
+
+					<!-- Arrow between steps -->
+					{#if i < pipelineRunSteps.length - 1}
+						<div class="flex justify-center -my-1" style="color: oklch(0.40 0.06 270);">
+							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 13.5L12 21m0 0l-7.5-7.5M12 21V3" />
+							</svg>
+						</div>
+					{/if}
+				{/each}
+			</div>
+
+			{#if pipelineRunError}
+				<div class="mt-3 rounded p-2 text-xs" style="background: oklch(0.18 0.04 30 / 0.3); color: oklch(0.70 0.12 30);">
+					{pipelineRunError}
+				</div>
+			{/if}
+
+			<!-- Actions -->
+			<div class="flex justify-end gap-2 mt-4">
+				<button
+					onclick={closePipelineRunner}
+					disabled={pipelineRunning}
+					class="px-3 py-1.5 rounded text-sm transition-colors"
+					style="color: oklch(0.65 0.01 250); opacity: {pipelineRunning ? '0.5' : '1'};"
+				>
+					{pipelineRunSteps.every(s => s.status === 'done') ? 'Done' : 'Cancel'}
+				</button>
+				{#if !pipelineRunSteps.every(s => s.status === 'done')}
+					<button
+						onclick={executePipelineRun}
+						disabled={pipelineRunning}
+						class="px-4 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-2"
+						style="background: oklch(0.45 0.12 145); color: oklch(0.98 0.01 145); opacity: {pipelineRunning ? '0.6' : '1'};"
+					>
+						{#if pipelineRunning}
+							<div class="w-3 h-3 rounded-full animate-spin-fast" style="border: 2px solid oklch(0.98 0.01 145); border-top-color: transparent;"></div>
+							Running...
+						{:else if pipelineRunSteps.some(s => s.status === 'error')}
+							Resume
+						{:else}
+							Run Pipeline
+						{/if}
+					</button>
+				{/if}
+			</div>
+		</div>
+	</div>
+{/if}
 
 <!-- Template Editor Modal -->
 {#if showTemplateEditor}
@@ -2209,6 +3176,153 @@
 	</div>
 {/if}
 
+<!-- Schedule Modal -->
+{#if showScheduleModal && schedulingTemplate}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center"
+		style="background: oklch(0.10 0.01 250 / 0.7);"
+		onclick={(e) => { if (e.target === e.currentTarget) showScheduleModal = false; }}
+	>
+		<div
+			class="rounded-xl w-full max-w-md max-h-[85vh] overflow-y-auto p-5 animate-scale-in"
+			style="background: oklch(0.20 0.01 250); border: 1px solid oklch(0.30 0.02 250);"
+		>
+			<h2 class="text-base font-semibold mb-1" style="color: oklch(0.90 0.01 250);">
+				Schedule: {schedulingTemplate.name}
+			</h2>
+			<p class="text-xs mb-4" style="color: oklch(0.50 0.01 250);">
+				Run this template on a recurring schedule via the scheduler daemon.
+			</p>
+
+			<div class="flex flex-col gap-3">
+				<!-- Cron Expression -->
+				<div>
+					<label class="block text-xs mb-1 font-medium" style="color: oklch(0.65 0.01 250);">Cron Expression</label>
+					<input
+						type="text"
+						bind:value={scheduleCron}
+						placeholder="0 9 * * *"
+						class="w-full rounded-md px-3 py-2 text-sm font-mono"
+						style="background: oklch(0.14 0.01 250); border: 1px solid oklch(0.30 0.02 250); color: oklch(0.90 0.01 250);"
+					/>
+					<div class="flex flex-wrap gap-1 mt-1.5">
+						{#each [
+							{ label: 'Hourly', cron: '0 * * * *' },
+							{ label: 'Daily 9 AM', cron: '0 9 * * *' },
+							{ label: 'Weekdays 9 AM', cron: '0 9 * * 1-5' },
+							{ label: 'Every 6h', cron: '0 */6 * * *' },
+							{ label: 'Every 30m', cron: '*/30 * * * *' },
+							{ label: 'Weekly Sun', cron: '0 0 * * 0' },
+						] as preset}
+							<button
+								onclick={() => scheduleCron = preset.cron}
+								class="px-2 py-0.5 rounded text-xs transition-colors"
+								style="
+									background: {scheduleCron === preset.cron ? 'oklch(0.40 0.10 85)' : 'oklch(0.18 0.01 250)'};
+									color: {scheduleCron === preset.cron ? 'oklch(0.95 0.01 85)' : 'oklch(0.55 0.01 250)'};
+									border: 1px solid {scheduleCron === preset.cron ? 'oklch(0.50 0.12 85)' : 'oklch(0.28 0.02 250)'};
+								"
+							>
+								{preset.label}
+							</button>
+						{/each}
+					</div>
+					<p class="text-xs mt-1 font-mono" style="color: oklch(0.50 0.06 85);">
+						{formatCron(scheduleCron)}
+					</p>
+				</div>
+
+				<!-- Project -->
+				<div>
+					<label class="block text-xs mb-1 font-medium" style="color: oklch(0.65 0.01 250);">Project</label>
+					<select
+						bind:value={scheduleProject}
+						class="w-full rounded-md px-3 py-2 text-sm"
+						style="background: oklch(0.14 0.01 250); border: 1px solid oklch(0.30 0.02 250); color: oklch(0.90 0.01 250);"
+					>
+						{#each projects as project}
+							<option value={project.key}>{project.name}</option>
+						{/each}
+					</select>
+				</div>
+
+				<!-- Model -->
+				<div>
+					<label class="block text-xs mb-1 font-medium" style="color: oklch(0.65 0.01 250);">Model</label>
+					<div class="flex gap-1.5">
+						{#each MODELS as model}
+							<button
+								onclick={() => scheduleModel = model.id}
+								class="flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors text-center"
+								style="
+									background: {scheduleModel === model.id ? 'oklch(0.40 0.10 200)' : 'oklch(0.18 0.01 250)'};
+									color: {scheduleModel === model.id ? 'oklch(0.95 0.01 200)' : 'oklch(0.55 0.01 250)'};
+									border: 1px solid {scheduleModel === model.id ? 'oklch(0.50 0.12 200)' : 'oklch(0.28 0.02 250)'};
+								"
+							>
+								{model.label}
+							</button>
+						{/each}
+					</div>
+				</div>
+
+				<!-- Variable Defaults (if template has variables) -->
+				{#if schedulingTemplate.variables && schedulingTemplate.variables.length > 0}
+					<div>
+						<label class="block text-xs mb-1 font-medium" style="color: oklch(0.65 0.01 250);">
+							Variable Defaults
+							<span class="font-normal opacity-60 ml-1">Used for each scheduled run</span>
+						</label>
+						<div class="flex flex-col gap-2">
+							{#each schedulingTemplate.variables as variable}
+								<div>
+									<label class="block text-xs mb-0.5" style="color: oklch(0.55 0.01 250);">{variable.label || variable.name}</label>
+									<input
+										type="text"
+										bind:value={scheduleVariables[variable.name]}
+										placeholder={variable.placeholder || variable.default || ''}
+										class="w-full rounded-md px-3 py-1.5 text-sm"
+										style="background: oklch(0.14 0.01 250); border: 1px solid oklch(0.30 0.02 250); color: oklch(0.90 0.01 250);"
+									/>
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				<!-- Error -->
+				{#if scheduleError}
+					<div class="text-xs p-2 rounded" style="background: oklch(0.25 0.05 30); color: oklch(0.75 0.15 30);">
+						{scheduleError}
+					</div>
+				{/if}
+			</div>
+
+			<!-- Footer -->
+			<div class="flex items-center justify-end gap-2 mt-4">
+				<button
+					onclick={() => showScheduleModal = false}
+					class="px-3 py-1.5 rounded-md text-sm"
+					style="color: oklch(0.60 0.01 250);"
+				>
+					Cancel
+				</button>
+				<button
+					onclick={saveSchedule}
+					disabled={!scheduleCron.trim() || scheduleSaving}
+					class="px-4 py-1.5 rounded-md text-sm font-medium"
+					style="
+						background: {!scheduleCron.trim() || scheduleSaving ? 'oklch(0.25 0.02 250)' : 'oklch(0.50 0.12 85)'};
+						color: {!scheduleCron.trim() || scheduleSaving ? 'oklch(0.50 0.01 250)' : 'oklch(0.98 0.01 85)'};
+					"
+				>
+					{scheduleSaving ? 'Scheduling...' : 'Save Schedule'}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
 
 <style>
 	/* :global needed because chips are created via DOM manipulation, not Svelte templates */

@@ -100,6 +100,31 @@ export function updateNextRun(dbPath, taskId, nextRunAt) {
 }
 
 /**
+ * Update a child task with quick command result.
+ * Stores the result in the notes field and closes the task.
+ * @param {string} dbPath
+ * @param {string} childId
+ * @param {string} result - The quick command output
+ * @param {number} [durationMs] - Execution time in ms
+ */
+export function updateChildResult(dbPath, childId, result, durationMs) {
+  let db;
+  try {
+    db = new Database(dbPath);
+    const now = new Date().toISOString();
+    const notes = durationMs
+      ? `Quick command result (${durationMs}ms):\n\n${result}`
+      : `Quick command result:\n\n${result}`;
+
+    db.prepare(`
+      UPDATE tasks SET notes = ?, status = 'closed', close_reason = 'Quick command completed', closed_at = ?, updated_at = ? WHERE id = ?
+    `).run(notes, now, now, childId);
+  } finally {
+    if (db) db.close();
+  }
+}
+
+/**
  * Generate a short random ID for child tasks.
  * @returns {string} 5-character alphanumeric ID
  */

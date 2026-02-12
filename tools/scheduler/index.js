@@ -7,7 +7,8 @@
  *
  * For recurring tasks (schedule_cron set):
  *   - Creates a child instance task inheriting command/agent_program/model
- *   - Spawns it via /api/work/spawn
+ *   - For regular tasks: Spawns via /api/work/spawn
+ *   - For quick commands (/quick-command:{id}): Executes via /api/quick-command
  *   - Computes next next_run_at from cron expression
  *
  * For one-shot tasks (no schedule_cron, but next_run_at set):
@@ -22,7 +23,7 @@ import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { homedir } from 'node:os';
 import { createServer } from 'node:http';
-import { discoverProjects, getDueTasks, updateNextRun, createChildTask } from './lib/db.js';
+import { discoverProjects, getDueTasks, updateNextRun, createChildTask, updateChildResult } from './lib/db.js';
 import { nextCronRun } from './lib/cron.js';
 
 // --- CLI args ---
@@ -92,6 +93,79 @@ async function spawnTask(taskId, project, model, agentProgram) {
   }
 }
 
+// --- Quick command template loading ---
+function readTemplates() {
+  try {
+    const templatesFile = join(homedir(), '.config/jat/quick-commands.json');
+    if (!existsSync(templatesFile)) return [];
+    const content = readFileSync(templatesFile, 'utf-8');
+    const data = JSON.parse(content);
+    return Array.isArray(data) ? data : [];
+  } catch { return []; }
+}
+
+// --- Execute quick command via IDE API ---
+async function executeQuickCommand(task, project) {
+  // Extract template ID from command: /quick-command:{templateId}
+  const templateId = task.command.replace('/quick-command:', '');
+  const templates = readTemplates();
+  const template = templates.find(t => t.id === templateId);
+
+  if (!template) {
+    log(`Quick command template ${templateId} not found for task ${task.id}`);
+    return { success: false, error: `Template ${templateId} not found` };
+  }
+
+  // Parse variable defaults from task description (stored as JSON block)
+  let variables = {};
+  try {
+    const jsonMatch = task.description?.match(/```json\n([\s\S]*?)\n```/);
+    if (jsonMatch) variables = JSON.parse(jsonMatch[1]);
+  } catch { /* ignore parse errors */ }
+
+  const body = {
+    prompt: template.prompt,
+    project,
+    model: task.model || template.defaultModel || 'haiku',
+    variables,
+    timeout: 120000,
+  };
+
+  debug(`Executing quick command: template=${template.name}, project=${project}, model=${body.model}`);
+
+  if (DRY_RUN) {
+    log(`[DRY-RUN] Would execute quick command: ${template.name} in ${project}`);
+    return { success: true, dryRun: true };
+  }
+
+  try {
+    const res = await fetch(`${IDE_URL}/api/quick-command`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      log(`Quick command failed for ${task.id}: ${data.message || res.statusText}`);
+      return { success: false, error: data.message || res.statusText };
+    }
+    log(`Quick command completed: ${template.name} (${data.durationMs}ms)`);
+    return { success: true, result: data.result, durationMs: data.durationMs };
+  } catch (err) {
+    log(`Quick command error for ${task.id}: ${err.message}`);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Check if a task command is a quick command.
+ * @param {string} command
+ * @returns {boolean}
+ */
+function isQuickCommand(command) {
+  return command && command.startsWith('/quick-command:');
+}
+
 // --- Main poll loop ---
 async function poll() {
   pollCount++;
@@ -108,14 +182,26 @@ async function poll() {
     debug(`${proj.name}: ${dueTasks.length} due task(s)`);
 
     for (const task of dueTasks) {
+      const quickCmd = isQuickCommand(task.command);
+
       if (task.schedule_cron) {
-        // Recurring: create child instance task, spawn child, update next_run_at
+        // Recurring: create child instance task, execute, update next_run_at
         const childId = createChildTask(proj.dbPath, task);
-        log(`Created child ${childId} from recurring ${task.id} (cron: ${task.schedule_cron})`);
+        log(`Created child ${childId} from recurring ${task.id} (cron: ${task.schedule_cron})${quickCmd ? ' [quick-command]' : ''}`);
 
-        const result = await spawnTask(childId, proj.name, task.model, task.agent_program);
+        let result;
+        if (quickCmd) {
+          // Quick command: execute via /api/quick-command, store result in child
+          result = await executeQuickCommand(task, proj.name);
+          if (result.success && result.result) {
+            updateChildResult(proj.dbPath, childId, result.result, result.durationMs);
+          }
+        } else {
+          // Regular task: spawn agent session
+          result = await spawnTask(childId, proj.name, task.model, task.agent_program);
+        }
 
-        // Compute next run regardless of spawn result
+        // Compute next run regardless of result
         const nextRun = nextCronRun(task.schedule_cron, tz);
         updateNextRun(proj.dbPath, task.id, nextRun);
         debug(`Next run for ${task.id}: ${nextRun}`);
@@ -126,10 +212,16 @@ async function poll() {
           project: proj.name,
           time: new Date().toISOString(),
           result: result.success ? 'ok' : 'failed',
+          type: quickCmd ? 'quick-command' : 'spawn',
         });
       } else {
-        // One-shot: spawn directly, clear next_run_at
-        const result = await spawnTask(task.id, proj.name, task.model, task.agent_program);
+        // One-shot: execute directly, clear next_run_at
+        let result;
+        if (quickCmd) {
+          result = await executeQuickCommand(task, proj.name);
+        } else {
+          result = await spawnTask(task.id, proj.name, task.model, task.agent_program);
+        }
 
         // Clear next_run_at so it won't fire again
         updateNextRun(proj.dbPath, task.id, null);
@@ -139,6 +231,7 @@ async function poll() {
           project: proj.name,
           time: new Date().toISOString(),
           result: result.success ? 'ok' : 'failed',
+          type: quickCmd ? 'quick-command' : 'spawn',
         });
       }
     }

@@ -1066,8 +1066,7 @@
 									style="pointer-events: none;"
 								/>
 							</td>
-							<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-							<td class="td-task" style={isExiting ? 'background: transparent;' : ''} onclick={(e) => e.stopPropagation()}>
+							<td class="td-task" style={isExiting ? 'background: transparent;' : ''}>
 								<div class="task-cell-content">
 									<div class="badge-and-text">
 										<TaskIdBadge
