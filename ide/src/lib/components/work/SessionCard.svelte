@@ -1646,6 +1646,63 @@
 	// even if lastStreamedText gets cleared by submission detection
 	let maxStreamedLength = $state(0);
 
+	// Path autocomplete state (triggered by @ in input)
+	let showPathAutocomplete = $state(false);
+	let pathSearchResults = $state<Array<{path: string; name: string; folder: string}>>([]);
+	let pathAutocompleteIndex = $state(0);
+	let pathSearchTimeout: ReturnType<typeof setTimeout> | null = null;
+
+	function detectPathAutocomplete() {
+		if (!inputRef) return;
+		const text = inputText;
+		const cursorPos = inputRef.selectionStart ?? text.length;
+		const beforeCursor = text.slice(0, cursorPos);
+		const atMatch = beforeCursor.match(/@([\w\-\.\/]*)$/);
+		if (atMatch && defaultProject) {
+			const query = atMatch[1];
+			showPathAutocomplete = true;
+			pathAutocompleteIndex = 0;
+			if (pathSearchTimeout) clearTimeout(pathSearchTimeout);
+			if (query.length >= 1) {
+				pathSearchTimeout = setTimeout(async () => {
+					try {
+						const res = await fetch(`/api/files/search?project=${encodeURIComponent(defaultProject)}&query=${encodeURIComponent(query)}&limit=8`);
+						const data = await res.json();
+						pathSearchResults = data.files || [];
+						pathAutocompleteIndex = 0;
+					} catch {
+						pathSearchResults = [];
+					}
+				}, 150);
+			} else {
+				pathSearchResults = [];
+			}
+		} else {
+			showPathAutocomplete = false;
+			pathSearchResults = [];
+		}
+	}
+
+	function selectPathResult(file: {path: string; name: string; folder: string}) {
+		if (!inputRef) return;
+		const text = inputText;
+		const cursorPos = inputRef.selectionStart ?? text.length;
+		const beforeCursor = text.slice(0, cursorPos);
+		const afterCursor = text.slice(cursorPos);
+		const atMatch = beforeCursor.match(/@([\w\-\.\/]*)$/);
+		if (!atMatch) return;
+		const atPos = cursorPos - atMatch[0].length;
+		inputText = beforeCursor.slice(0, atPos) + file.path + afterCursor;
+		showPathAutocomplete = false;
+		pathSearchResults = [];
+		// Place cursor after inserted path
+		const newCursorPos = atPos + file.path.length;
+		requestAnimationFrame(() => {
+			inputRef?.setSelectionRange(newCursorPos, newCursorPos);
+			inputRef?.focus({ preventScroll: true });
+		});
+	}
+
 	// Ctrl+C behavior toggle (reactive from preferences store)
 	// When true, Ctrl+C sends interrupt to tmux; when false, Ctrl+C copies as usual
 	const ctrlCInterceptEnabled = $derived(getCtrlCIntercept());
@@ -1806,6 +1863,7 @@
 	// Debounced input handler for live streaming
 	function handleInputChange() {
 		autoResizeTextarea();
+		detectPathAutocomplete();
 
 		if (!liveStreamEnabled) return;
 
@@ -4247,6 +4305,31 @@
 
 	// Handle keyboard shortcuts in input
 	function handleInputKeydown(e: KeyboardEvent) {
+		// Path autocomplete intercepts (when dropdown is visible)
+		if (showPathAutocomplete && pathSearchResults.length > 0) {
+			if (e.key === 'ArrowDown') {
+				e.preventDefault();
+				pathAutocompleteIndex = (pathAutocompleteIndex + 1) % pathSearchResults.length;
+				return;
+			}
+			if (e.key === 'ArrowUp') {
+				e.preventDefault();
+				pathAutocompleteIndex = (pathAutocompleteIndex - 1 + pathSearchResults.length) % pathSearchResults.length;
+				return;
+			}
+			if (e.key === 'Tab' || (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.shiftKey)) {
+				e.preventDefault();
+				selectPathResult(pathSearchResults[pathAutocompleteIndex]);
+				return;
+			}
+			if (e.key === 'Escape') {
+				e.preventDefault();
+				showPathAutocomplete = false;
+				pathSearchResults = [];
+				return;
+			}
+		}
+
 		if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && e.shiftKey) {
 			// Ctrl+Shift+Enter: submit AND go to PREVIOUS session
 			e.preventDefault();

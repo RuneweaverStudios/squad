@@ -600,6 +600,13 @@
 		value = text;
 		references = [];
 	}
+
+	export function appendText(text: string) {
+		if (textareaRef) {
+			textareaRef.textContent = (textareaRef.textContent || '') + text;
+		}
+		value = (value || '') + text;
+	}
 </script>
 
 <div class="prompt-input-wrapper relative">
