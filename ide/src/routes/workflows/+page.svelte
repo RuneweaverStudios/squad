@@ -12,6 +12,8 @@
 	import { getDefaultPorts } from '$lib/types/workflow';
 	import WorkflowCanvas from '$lib/components/workflows/WorkflowCanvas.svelte';
 	import NodeConfigPanel from '$lib/components/workflows/NodeConfigPanel.svelte';
+	import RunHistory from '$lib/components/workflows/RunHistory.svelte';
+	import RunDetail from '$lib/components/workflows/RunDetail.svelte';
 	import { getCategorizedNodes, getNodeMeta, type NodeTypeMeta } from '$lib/config/workflowNodes';
 
 	// =========================================================================
@@ -43,6 +45,13 @@
 	// Execution log
 	let lastRun = $state<WorkflowRun | null>(null);
 	let logExpanded = $state(false);
+
+	// Run history
+	let bottomTab = $state<'log' | 'history'>('log');
+	let selectedRun = $state<WorkflowRun | null>(null);
+	let selectedRunId = $state<string | null>(null);
+	let runHistoryRef: { refresh: () => Promise<void> } | undefined = $state();
+	let nodeStatusOverlay = $state<Record<string, string> | null>(null);
 
 	// Palette
 	let paletteCollapsed = $state(false);
@@ -171,6 +180,8 @@
 			dirty = false;
 			undoStack = [];
 			redoStack = [];
+			clearRunSelection();
+			bottomTab = 'log';
 
 			// Load last run
 			await loadLastRun(id);
@@ -287,6 +298,8 @@
 			showToast('Execution failed', 'error');
 		} finally {
 			running = false;
+			// Refresh run history if open
+			runHistoryRef?.refresh();
 		}
 	}
 
@@ -480,6 +493,30 @@
 		const hrs = Math.floor(mins / 60);
 		if (hrs < 24) return `${hrs}h ago`;
 		return `${Math.floor(hrs / 24)}d ago`;
+	}
+
+	// =========================================================================
+	// RUN HISTORY
+	// =========================================================================
+
+	function handleRunSelect(run: WorkflowRun | null) {
+		selectedRun = run;
+		if (run) {
+			// Build node status overlay map
+			const overlay: Record<string, string> = {};
+			for (const [nodeId, result] of Object.entries(run.nodeResults)) {
+				overlay[nodeId] = (result as NodeExecutionResult).status;
+			}
+			nodeStatusOverlay = overlay;
+		} else {
+			nodeStatusOverlay = null;
+		}
+	}
+
+	function clearRunSelection() {
+		selectedRun = null;
+		selectedRunId = null;
+		nodeStatusOverlay = null;
 	}
 
 	// =========================================================================
@@ -834,6 +871,7 @@
 						bind:edges
 						bind:selectedNodeIds
 						bind:selectedEdgeIds
+						{nodeStatusOverlay}
 						onNodesChange={handleNodesChange}
 						onEdgesChange={handleEdgesChange}
 						onNodeDoubleClick={handleNodeDoubleClick}
@@ -896,110 +934,125 @@
 		</div>
 	</div>
 
-	<!-- ===== EXECUTION LOG (bottom panel) ===== -->
+	<!-- ===== BOTTOM PANEL (execution log + run history) ===== -->
 	{#if currentId}
 		<div
-			class="shrink-0"
-			style="background: oklch(0.14 0.01 250); border-top: 1px solid oklch(0.22 0.02 250)"
+			class="shrink-0 flex flex-col"
+			style="background: oklch(0.14 0.01 250); border-top: 1px solid oklch(0.22 0.02 250); max-height: {logExpanded ? '320px' : 'auto'}"
 		>
-			<!-- Log header (always visible) -->
-			<button
-				class="w-full flex items-center gap-2 px-3 py-1.5 text-left"
-				onclick={() => (logExpanded = !logExpanded)}
-			>
-				<svg
-					class="w-3.5 h-3.5 transition-transform"
-					style="color: oklch(0.50 0.02 250); transform: rotate({logExpanded ? '90deg' : '0deg'})"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
+			<!-- Panel header with tabs -->
+			<div class="flex items-center shrink-0">
+				<!-- Expand/collapse + tabs -->
+				<button
+					class="flex items-center gap-2 px-3 py-1.5"
+					onclick={() => (logExpanded = !logExpanded)}
 				>
-					<path d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-				</svg>
-				<span class="text-xs font-medium" style="color: oklch(0.60 0.02 250)">Execution Log</span
-				>
-
-				{#if lastRun}
-					<span
-						class="text-[10px] px-1.5 py-0.5 rounded"
-						style="background: {getStatusColor(lastRun.status)}20; color: {getStatusColor(
-							lastRun.status
-						)}"
+					<svg
+						class="w-3.5 h-3.5 transition-transform"
+						style="color: oklch(0.50 0.02 250); transform: rotate({logExpanded ? '90deg' : '0deg'})"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
 					>
-						{lastRun.status}
-					</span>
-					{#if lastRun.durationMs}
-						<span class="text-[10px]" style="color: oklch(0.45 0.02 250)">
-							{formatDuration(lastRun.durationMs)}
-						</span>
-					{/if}
-					<span class="text-[10px]" style="color: oklch(0.40 0.02 250)">
-						{formatTimeAgo(lastRun.startedAt)}
-					</span>
-				{:else if !running}
-					<span class="text-[10px]" style="color: oklch(0.40 0.02 250)">No runs yet</span>
-				{/if}
+						<path d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+					</svg>
+				</button>
 
-				{#if running}
-					<span class="loading loading-spinner loading-xs" style="color: oklch(0.75 0.15 85)"
-					></span>
-					<span class="text-[10px]" style="color: oklch(0.75 0.15 85)">Running...</span>
-				{/if}
-			</button>
-
-			<!-- Log details (expanded) -->
-			{#if logExpanded && lastRun}
-				<div
-					class="overflow-y-auto px-3 pb-2"
-					style="max-height: 200px; border-top: 1px solid oklch(0.20 0.02 250)"
+				<!-- Tab buttons -->
+				<button
+					class="px-2 py-1.5 text-xs font-medium transition-colors"
+					style="color: {bottomTab === 'log' ? 'oklch(0.80 0.02 250)' : 'oklch(0.50 0.02 250)'}; border-bottom: 2px solid {bottomTab === 'log' ? 'oklch(0.60 0.15 200)' : 'transparent'}"
+					onclick={() => { bottomTab = 'log'; logExpanded = true; }}
 				>
-					{#if lastRun.error}
-						<div
-							class="mt-2 p-2 rounded text-xs"
-							style="background: oklch(0.25 0.05 20); color: oklch(0.75 0.15 20)"
+					Last Run
+				</button>
+				<button
+					class="px-2 py-1.5 text-xs font-medium transition-colors"
+					style="color: {bottomTab === 'history' ? 'oklch(0.80 0.02 250)' : 'oklch(0.50 0.02 250)'}; border-bottom: 2px solid {bottomTab === 'history' ? 'oklch(0.60 0.15 200)' : 'transparent'}"
+					onclick={() => { bottomTab = 'history'; logExpanded = true; }}
+				>
+					History
+				</button>
+
+				<!-- Status summary on header -->
+				<div class="flex items-center gap-2 ml-2">
+					{#if lastRun && bottomTab === 'log'}
+						<span
+							class="text-[10px] px-1.5 py-0.5 rounded"
+							style="background: {getStatusColor(lastRun.status)}20; color: {getStatusColor(lastRun.status)}"
 						>
-							{lastRun.error}
-						</div>
+							{lastRun.status}
+						</span>
+						{#if lastRun.durationMs}
+							<span class="text-[10px]" style="color: oklch(0.45 0.02 250)">
+								{formatDuration(lastRun.durationMs)}
+							</span>
+						{/if}
+						<span class="text-[10px]" style="color: oklch(0.40 0.02 250)">
+							{formatTimeAgo(lastRun.startedAt)}
+						</span>
+					{:else if bottomTab === 'history' && selectedRun}
+						<span
+							class="text-[10px] px-1.5 py-0.5 rounded"
+							style="background: {getStatusColor(selectedRun.status)}20; color: {getStatusColor(selectedRun.status)}"
+						>
+							viewing: {selectedRun.status}
+						</span>
+						<button
+							class="text-[10px] underline"
+							style="color: oklch(0.50 0.02 250)"
+							onclick={clearRunSelection}
+						>
+							clear
+						</button>
+					{:else if !running && bottomTab === 'log'}
+						<span class="text-[10px]" style="color: oklch(0.40 0.02 250)">No runs yet</span>
 					{/if}
 
-					<!-- Per-node results -->
-					{#each Object.entries(lastRun.nodeResults) as [nodeId, result]}
-						{@const nodeLabel =
-							nodes.find((n) => n.id === nodeId)?.label || (result as NodeExecutionResult).nodeId}
-						{@const r = result as NodeExecutionResult}
-						<div
-							class="flex items-center gap-2 py-1.5"
-							style="border-bottom: 1px solid oklch(0.18 0.01 250)"
-						>
-							<svg
-								class="w-3.5 h-3.5 shrink-0"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke={getStatusColor(r.status)}
-								stroke-width="2"
-							>
-								<path d={getStatusIcon(r.status)} />
-							</svg>
-							<span class="text-xs font-medium flex-1 truncate" style="color: oklch(0.75 0.02 250)"
-								>{nodeLabel}</span
-							>
-							<span
-								class="text-[10px] px-1.5 py-0.5 rounded"
-								style="background: {getStatusColor(r.status)}15; color: {getStatusColor(
-									r.status
-								)}"
-							>
-								{r.status}
-							</span>
-							<span class="text-[10px] tabular-nums" style="color: oklch(0.45 0.02 250)">
-								{formatDuration(r.durationMs)}
-							</span>
-						</div>
-					{/each}
+					{#if running}
+						<span class="loading loading-spinner loading-xs" style="color: oklch(0.75 0.15 85)"></span>
+						<span class="text-[10px]" style="color: oklch(0.75 0.15 85)">Running...</span>
+					{/if}
+				</div>
+			</div>
 
-					{#if Object.keys(lastRun.nodeResults).length === 0}
-						<div class="text-xs py-2" style="color: oklch(0.40 0.02 250)">No node results</div>
+			<!-- Panel content (expanded) -->
+			{#if logExpanded}
+				<div style="border-top: 1px solid oklch(0.20 0.02 250); height: 280px; overflow: hidden">
+					{#if bottomTab === 'log'}
+						<!-- LAST RUN TAB -->
+						{#if lastRun}
+							<RunDetail run={lastRun} {nodes} />
+						{:else}
+							<div class="flex items-center justify-center h-full">
+								<p class="text-xs" style="color: oklch(0.40 0.02 250)">No runs yet. Click Run to execute the workflow.</p>
+							</div>
+						{/if}
+					{:else}
+						<!-- HISTORY TAB -->
+						<div class="flex h-full">
+							<!-- Run list (left) -->
+							<div class="shrink-0 overflow-hidden" style="width: 260px; border-right: 1px solid oklch(0.20 0.02 250)">
+								<RunHistory
+									bind:this={runHistoryRef}
+									workflowId={currentId}
+									bind:selectedRunId
+									onRunSelect={handleRunSelect}
+								/>
+							</div>
+
+							<!-- Run detail (right) -->
+							<div class="flex-1 overflow-hidden">
+								{#if selectedRun}
+									<RunDetail run={selectedRun} {nodes} />
+								{:else}
+									<div class="flex items-center justify-center h-full">
+										<p class="text-xs" style="color: oklch(0.40 0.02 250)">Select a run to view details</p>
+									</div>
+								{/if}
+							</div>
+						</div>
 					{/if}
 				</div>
 			{/if}

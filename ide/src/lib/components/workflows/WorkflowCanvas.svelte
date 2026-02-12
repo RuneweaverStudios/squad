@@ -14,6 +14,7 @@
 		gridSnap = $bindable(false),
 		gridSize = 20,
 		readonly = false,
+		nodeStatusOverlay = null,
 		onNodesChange,
 		onEdgesChange,
 		onNodeDoubleClick
@@ -25,6 +26,7 @@
 		gridSnap?: boolean;
 		gridSize?: number;
 		readonly?: boolean;
+		nodeStatusOverlay?: Record<string, string> | null;
 		onNodesChange?: (nodes: WorkflowNode[]) => void;
 		onEdgesChange?: (edges: WorkflowEdge[]) => void;
 		onNodeDoubleClick?: (nodeId: string) => void;
@@ -58,6 +60,14 @@
 		llm: { bg: 'oklch(0.20 0.04 280)', accent: 'oklch(0.60 0.15 280)', icon: 'oklch(0.75 0.18 280)' },
 		action: { bg: 'oklch(0.20 0.04 230)', accent: 'oklch(0.60 0.15 230)', icon: 'oklch(0.75 0.18 230)' },
 		logic: { bg: 'oklch(0.20 0.04 50)', accent: 'oklch(0.60 0.15 50)', icon: 'oklch(0.75 0.18 50)' }
+	};
+
+	const STATUS_OVERLAY_COLORS: Record<string, { border: string; glow: string; bg: string }> = {
+		success: { border: 'oklch(0.65 0.18 145)', glow: 'oklch(0.65 0.18 145 / 0.4)', bg: 'oklch(0.65 0.18 145 / 0.08)' },
+		error: { border: 'oklch(0.60 0.20 25)', glow: 'oklch(0.60 0.20 25 / 0.4)', bg: 'oklch(0.60 0.20 25 / 0.08)' },
+		running: { border: 'oklch(0.70 0.15 200)', glow: 'oklch(0.70 0.15 200 / 0.4)', bg: 'oklch(0.70 0.15 200 / 0.08)' },
+		skipped: { border: 'oklch(0.40 0.02 250)', glow: 'oklch(0.40 0.02 250 / 0.2)', bg: 'oklch(0.40 0.02 250 / 0.05)' },
+		pending: { border: 'oklch(0.35 0.02 250)', glow: 'oklch(0.35 0.02 250 / 0.15)', bg: 'transparent' }
 	};
 
 	const NODE_ICONS: Record<NodeType, string> = {
@@ -768,6 +778,8 @@
 			{@const catColors = CATEGORY_COLORS[category]}
 			{@const nodeHeight = getNodeHeight(node)}
 			{@const isSelected = selectedNodeIds.has(node.id)}
+			{@const overlayStatus = nodeStatusOverlay?.[node.id]}
+			{@const overlayColors = overlayStatus ? STATUS_OVERLAY_COLORS[overlayStatus] : null}
 
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
@@ -781,6 +793,7 @@
 					--node-bg: {catColors.bg};
 					--node-accent: {catColors.accent};
 					--node-icon: {catColors.icon};
+					{overlayColors ? `border-color: ${overlayColors.border}; box-shadow: 0 0 12px ${overlayColors.glow}; background: ${overlayColors.bg};` : ''}
 				"
 				onmousedown={(e) => handleNodeMouseDown(e, node.id)}
 				ondblclick={(e) => handleNodeDoubleClick(e, node.id)}
