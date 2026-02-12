@@ -18,10 +18,8 @@ import type {
 	WorkflowEdge,
 	WorkflowRun,
 	NodeExecutionResult,
-	NodeExecutionStatus,
 	RunStatus,
 	NodeType,
-	NodeConfig,
 	LlmPromptConfig,
 	ActionCreateTaskConfig,
 	ActionSendMessageConfig,
@@ -199,11 +197,16 @@ function resolveNodeInput(
 		return { input: undefined, shouldSkip: false };
 	}
 
-	// Check if ALL incoming edges come from skipped nodes
-	const activeEdges = incomingEdges.filter((e) => !skippedNodes.has(e.sourceNodeId));
+	// Check if ALL incoming edges come from skipped or errored nodes
+	const activeEdges = incomingEdges.filter((e) => {
+		if (skippedNodes.has(e.sourceNodeId)) return false;
+		const result = ctx.nodeResults.get(e.sourceNodeId);
+		if (result && result.status === 'error') return false;
+		return true;
+	});
 
 	if (activeEdges.length === 0) {
-		// All sources are skipped - skip this node too
+		// All sources are skipped or errored - skip this node too
 		return { input: undefined, shouldSkip: true };
 	}
 
@@ -506,8 +509,9 @@ async function executeCondition(
 	}
 
 	// Evaluate the expression in a sandboxed function
-	const fn = new Function('input', `return Boolean(${config.expression})`);
-	const result = fn(input);
+	// Wrap in try-catch to handle undefined/null input gracefully
+	const fn = new Function('input', `try { return Boolean(${config.expression}); } catch(e) { return false; }`);
+	const result = fn(input ?? '');
 
 	ctx.log(node.id, `Condition result: ${result} → branch: ${result ? 'true' : 'false'}`);
 

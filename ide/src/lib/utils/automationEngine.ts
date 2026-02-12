@@ -349,6 +349,10 @@ async function executeAction(
 				await runSlashCommand(sessionName, processedPayload, ruleName);
 				break;
 
+			case 'execute_workflow':
+				await executeWorkflowAction(processedPayload, templateContext, ruleName);
+				break;
+
 			default:
 				return {
 					action,
@@ -613,6 +617,50 @@ async function runSlashCommand(
 	infoToast(
 		`Running command: ${normalizedCommand}`,
 		`Rule: ${ruleName} • Session: ${sessionName}`
+	);
+}
+
+/**
+ * Execute a workflow by ID via the IDE API
+ */
+async function executeWorkflowAction(
+	workflowId: string,
+	context: TemplateContext,
+	ruleName: string
+): Promise<void> {
+	const config = getConfig();
+
+	if (config.debugLogging) {
+		console.log(`[automationEngine] Executing workflow "${workflowId}" (rule: ${ruleName})`);
+	}
+
+	const response = await fetch(`http://127.0.0.1:3333/api/workflows/${encodeURIComponent(workflowId)}/run`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({
+			trigger: 'event',
+			eventData: {
+				automationRule: ruleName,
+				session: context.session,
+				agent: context.agent,
+				match: context.match,
+				timestamp: context.timestamp
+			}
+		})
+	});
+
+	if (!response.ok) {
+		const data = await response.json().catch(() => ({}));
+		throw new Error(
+			(data as { message?: string }).message ||
+			(data as { error?: string }).error ||
+			`Workflow execution failed (${response.status})`
+		);
+	}
+
+	infoToast(
+		`Workflow executed: ${workflowId}`,
+		`Rule: ${ruleName}`
 	);
 }
 

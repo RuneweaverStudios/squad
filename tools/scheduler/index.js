@@ -166,6 +166,49 @@ function isQuickCommand(command) {
   return command && command.startsWith('/quick-command:');
 }
 
+/**
+ * Check if a task command is a workflow execution.
+ * @param {string} command
+ * @returns {boolean}
+ */
+function isWorkflow(command) {
+  return command && command.startsWith('/workflow:');
+}
+
+/**
+ * Execute a workflow via the IDE API.
+ * @param {object} task
+ * @param {string} project
+ */
+async function executeWorkflow(task, project) {
+  const workflowId = task.command.replace('/workflow:', '');
+
+  debug(`Executing workflow ${workflowId} for project ${project}`);
+
+  if (DRY_RUN) {
+    log(`[DRY-RUN] Would execute workflow ${workflowId} in ${project}`);
+    return { success: true, dryRun: true };
+  }
+
+  try {
+    const res = await fetch(`${IDE_URL}/api/workflows/${encodeURIComponent(workflowId)}/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trigger: 'cron', project }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      log(`Workflow execution failed for ${task.id}: ${data.message || data.error || res.statusText}`);
+      return { success: false, error: data.message || data.error || res.statusText };
+    }
+    log(`Workflow ${workflowId} completed (status: ${data.status})`);
+    return { success: true, ...data };
+  } catch (err) {
+    log(`Workflow execution error for ${task.id}: ${err.message}`);
+    return { success: false, error: err.message };
+  }
+}
+
 // --- Main poll loop ---
 async function poll() {
   pollCount++;
@@ -183,11 +226,13 @@ async function poll() {
 
     for (const task of dueTasks) {
       const quickCmd = isQuickCommand(task.command);
+      const workflowCmd = isWorkflow(task.command);
 
       if (task.schedule_cron) {
         // Recurring: create child instance task, execute, update next_run_at
         const childId = createChildTask(proj.dbPath, task);
-        log(`Created child ${childId} from recurring ${task.id} (cron: ${task.schedule_cron})${quickCmd ? ' [quick-command]' : ''}`);
+        const cmdLabel = quickCmd ? ' [quick-command]' : workflowCmd ? ' [workflow]' : '';
+        log(`Created child ${childId} from recurring ${task.id} (cron: ${task.schedule_cron})${cmdLabel}`);
 
         let result;
         if (quickCmd) {
@@ -196,6 +241,9 @@ async function poll() {
           if (result.success && result.result) {
             updateChildResult(proj.dbPath, childId, result.result, result.durationMs);
           }
+        } else if (workflowCmd) {
+          // Workflow: execute via /api/workflows/{id}/run
+          result = await executeWorkflow(task, proj.name);
         } else {
           // Regular task: spawn agent session
           result = await spawnTask(childId, proj.name, task.model, task.agent_program);
@@ -212,13 +260,15 @@ async function poll() {
           project: proj.name,
           time: new Date().toISOString(),
           result: result.success ? 'ok' : 'failed',
-          type: quickCmd ? 'quick-command' : 'spawn',
+          type: quickCmd ? 'quick-command' : workflowCmd ? 'workflow' : 'spawn',
         });
       } else {
         // One-shot: execute directly, clear next_run_at
         let result;
         if (quickCmd) {
           result = await executeQuickCommand(task, proj.name);
+        } else if (workflowCmd) {
+          result = await executeWorkflow(task, proj.name);
         } else {
           result = await spawnTask(task.id, proj.name, task.model, task.agent_program);
         }
@@ -231,7 +281,7 @@ async function poll() {
           project: proj.name,
           time: new Date().toISOString(),
           result: result.success ? 'ok' : 'failed',
-          type: quickCmd ? 'quick-command' : 'spawn',
+          type: quickCmd ? 'quick-command' : workflowCmd ? 'workflow' : 'spawn',
         });
       }
     }

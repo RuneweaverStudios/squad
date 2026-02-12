@@ -7,6 +7,7 @@ import { json } from '@sveltejs/kit';
 import { getTaskById, closeTask } from '$lib/server/jat-tasks.js';
 import { invalidateCache } from '$lib/server/cache.js';
 import { _resetTaskCache } from '../../../../api/agents/+server.js';
+import { emitEvent } from '$lib/utils/eventBus.server.js';
 
 /**
  * Close a task
@@ -54,6 +55,24 @@ export async function POST({ params, request }) {
 		invalidateCache.tasks();
 		invalidateCache.agents();
 		_resetTaskCache();
+
+		// Emit task_closed event for workflow triggers
+		try {
+			emitEvent({
+				type: 'task_closed',
+				source: 'task_api',
+				data: {
+					taskId,
+					title: existingTask.title,
+					reason,
+					project: existingTask.project_name || undefined,
+					assignee: existingTask.assignee || undefined
+				},
+				project: existingTask.project_name || undefined
+			});
+		} catch (e) {
+			console.error('[tasks/close] Failed to emit task_closed event:', e);
+		}
 
 		return json({
 			success: true,

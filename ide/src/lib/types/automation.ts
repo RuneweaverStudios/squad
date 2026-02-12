@@ -38,13 +38,14 @@ export interface AutomationPattern {
  * Action types available for automation rules
  */
 export type ActionType =
-	| 'send_text'        // Send text to session (like typing)
-	| 'send_keys'        // Send special keys (Enter, Escape, Tab)
-	| 'tmux_command'     // Run arbitrary tmux command
-	| 'signal'           // Emit jat-signal
-	| 'notify_only'      // Show toast notification only
-	| 'show_question_ui' // Show custom question UI with options defined in the rule
-	| 'run_command';     // Run a Claude agent slash command
+	| 'send_text'          // Send text to session (like typing)
+	| 'send_keys'          // Send special keys (Enter, Escape, Tab)
+	| 'tmux_command'       // Run arbitrary tmux command
+	| 'signal'             // Emit jat-signal
+	| 'notify_only'        // Show toast notification only
+	| 'show_question_ui'   // Show custom question UI with options defined in the rule
+	| 'run_command'        // Run a Claude agent slash command
+	| 'execute_workflow';  // Execute a workflow by ID
 
 /**
  * Special keys that can be sent via send_keys action
@@ -103,6 +104,7 @@ export interface AutomationAction {
 	 * - notify_only: The notification message
 	 * - show_question_ui: JSON string of QuestionUIConfig (parsed at runtime)
 	 * - run_command: The slash command to run (e.g., "/jat:complete" or "jat:start")
+	 * - execute_workflow: The workflow ID to execute
 	 */
 	payload: string;
 

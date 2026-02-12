@@ -9,6 +9,7 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { invalidateCache } from '$lib/server/cache.js';
 import { _resetTaskCache } from '../../../api/agents/+server.js';
+import { emitEvent } from '$lib/utils/eventBus.server.js';
 
 // Path to task images store
 const getImageStorePath = () => {
@@ -147,6 +148,26 @@ export async function PUT({ params, request }) {
 
 		if (!updatedTask) {
 			return json({ error: 'Task not found after update' }, { status: 404 });
+		}
+
+		// Emit task_status_changed event if status changed
+		if (updates.status && updates.status !== existingTask.status) {
+			try {
+				emitEvent({
+					type: 'task_status_changed',
+					source: 'task_api',
+					data: {
+						taskId,
+						oldStatus: existingTask.status,
+						newStatus: updates.status,
+						title: updatedTask.title,
+						project: updatedTask.project_name || undefined
+					},
+					project: updatedTask.project_name || undefined
+				});
+			} catch (e) {
+				console.error('[tasks] Failed to emit task_status_changed event:', e);
+			}
 		}
 
 		return json({ task: updatedTask });

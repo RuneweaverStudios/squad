@@ -7,6 +7,7 @@ import { getTasks, getProjects, getTaskById, createTask, updateTask, getSchedule
 import { invalidateCache } from '$lib/server/cache.js';
 import { _resetTaskCache } from '../../api/agents/+server.js';
 import { getProjectPath } from '$lib/server/projectPaths.js';
+import { emitEvent } from '$lib/utils/eventBus.server.js';
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ url }) {
@@ -263,6 +264,25 @@ export async function POST({ request }) {
 		invalidateCache.tasks();
 		invalidateCache.agents();
 		_resetTaskCache();
+
+		// Emit task_created event for workflow triggers
+		try {
+			emitEvent({
+				type: 'task_created',
+				source: 'task_api',
+				data: {
+					taskId: createdTask.id,
+					title,
+					type,
+					priority,
+					labels,
+					project: project || undefined
+				},
+				project: project || undefined
+			});
+		} catch (e) {
+			console.error('[tasks] Failed to emit task_created event:', e);
+		}
 
 		return json({
 			success: true,
