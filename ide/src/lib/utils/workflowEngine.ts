@@ -49,6 +49,8 @@ export interface RunOptions {
 	project?: string;
 	/** Abort signal for cancellation */
 	signal?: AbortSignal;
+	/** Data from the triggering event (passed as trigger node output) */
+	eventData?: Record<string, unknown>;
 }
 
 /** Execution context passed to node executors */
@@ -65,6 +67,8 @@ export interface ExecutionContext {
 	log: (nodeId: string, message: string) => void;
 	/** Abort signal */
 	signal?: AbortSignal;
+	/** Event data from the triggering event (for event-triggered runs) */
+	eventData?: Record<string, unknown>;
 }
 
 /** A node executor function */
@@ -188,6 +192,10 @@ function resolveNodeInput(
 
 	if (incomingEdges.length === 0) {
 		// Trigger nodes or nodes with no inputs
+		// For trigger nodes, inject eventData from context if available
+		if (ctx.eventData && node.type.startsWith('trigger_')) {
+			return { input: ctx.eventData, shouldSkip: false };
+		}
 		return { input: undefined, shouldSkip: false };
 	}
 
@@ -264,13 +272,17 @@ function execCommand(cmd: string, args: string[], cwd: string, timeoutMs = 30000
 	});
 }
 
-/** Trigger nodes are no-ops at execution time */
+/** Trigger nodes pass through event data (if provided) or emit a basic trigger signal */
 async function executeTrigger(
 	_node: WorkflowNode,
-	_input: unknown,
+	input: unknown,
 	ctx: ExecutionContext
 ): Promise<unknown> {
 	ctx.log(_node.id, `Trigger ${_node.type} fired`);
+	// If input contains event data (from event-triggered run), pass it through
+	if (input && typeof input === 'object' && Object.keys(input as object).length > 0) {
+		return input;
+	}
 	return { triggered: true, timestamp: new Date().toISOString() };
 }
 
@@ -562,7 +574,8 @@ export async function executeWorkflow(
 		dryRun = false,
 		ideBaseUrl = 'http://127.0.0.1:3333',
 		project,
-		signal
+		signal,
+		eventData
 	} = options;
 
 	const runId = generateRunId();
@@ -582,6 +595,7 @@ export async function executeWorkflow(
 			logs.push(`[${nodeId}] ${message}`);
 		},
 		signal,
+		eventData,
 		_nodes: workflow.nodes
 	};
 

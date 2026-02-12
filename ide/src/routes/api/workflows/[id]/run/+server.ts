@@ -42,7 +42,7 @@ export const POST: RequestHandler = async ({ params, request, url }) => {
 	}
 
 	// Parse request body
-	let body: { dryRun?: boolean; project?: string; trigger?: string } = {};
+	let body: { dryRun?: boolean; project?: string; trigger?: string; eventData?: Record<string, unknown> } = {};
 	try {
 		const text = await request.text();
 		if (text) {
@@ -55,6 +55,7 @@ export const POST: RequestHandler = async ({ params, request, url }) => {
 	const dryRun = body.dryRun === true;
 	const trigger = (body.trigger as 'manual' | 'cron' | 'event') || 'manual';
 	const project = body.project;
+	const eventData = body.eventData;
 
 	// Determine IDE base URL from the request
 	const ideBaseUrl = `${url.protocol}//${url.host}`;
@@ -64,7 +65,8 @@ export const POST: RequestHandler = async ({ params, request, url }) => {
 			trigger,
 			dryRun,
 			ideBaseUrl,
-			project
+			project,
+			eventData
 		});
 
 		return json(run);

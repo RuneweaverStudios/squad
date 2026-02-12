@@ -70,8 +70,14 @@ export interface TriggerCronConfig {
 /** Event trigger: fires on a JAT event */
 export interface TriggerEventConfig {
 	/** Event type to listen for */
-	eventType: 'task_completed' | 'task_created' | 'agent_idle' | 'signal_received';
-	/** Optional filter expression (e.g., task label or project) */
+	eventType:
+		| 'task_created'
+		| 'task_closed'
+		| 'task_status_changed'
+		| 'signal_received'
+		| 'file_changed'
+		| 'ingest_item';
+	/** Optional JS filter expression evaluated against event.data (e.g., "data.priority <= 1") */
 	filter?: string;
 }
 
