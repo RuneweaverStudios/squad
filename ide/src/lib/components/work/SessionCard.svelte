@@ -2302,9 +2302,13 @@
 		];
 
 		if (sseState && validStates.includes(sseState as SessionState)) {
-			// "completed", "auto-proceeding", and "planning" states should persist - they indicate
-			// terminal/long-lived states that don't change via output parsing
-			if (sseState === "completed" || sseState === "auto-proceeding" || sseState === "planning") {
+			// Persistent states don't use TTL - they persist until a new signal changes them.
+			// These are either terminal states or user-waiting states where the agent is blocked:
+			// - "completed", "auto-proceeding", "planning" - terminal/long-lived states
+			// - "needs-input" - agent waiting for user to answer a question
+			// - "ready-for-review" - agent waiting for user to review and /jat:complete
+			if (sseState === "completed" || sseState === "auto-proceeding" || sseState === "planning" ||
+				sseState === "needs-input" || sseState === "ready-for-review") {
 				return sseState as SessionState;
 			}
 			// Other states use TTL for freshness

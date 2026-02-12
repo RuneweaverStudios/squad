@@ -33,13 +33,32 @@ async function readTemplates() {
 
 /**
  * Find the scheduled task for a template.
+ * Matches both quick-command and spawn-agent modes.
  * @param {string} templateId
  * @returns {object|null}
  */
 function findScheduledTask(templateId) {
-	const command = `/quick-command:${templateId}`;
+	const quickCommand = `/quick-command:${templateId}`;
 	const scheduled = getScheduledTasks();
-	return scheduled.find((t) => t.command === command && t.status !== 'closed') || null;
+	// Match by quick-command prefix OR by title pattern for spawn-agent mode
+	return scheduled.find((t) => {
+		if (t.status === 'closed') return false;
+		if (t.command === quickCommand) return true;
+		// spawn-agent tasks use /jat:start but have a template-id marker in description
+		if (t.description?.includes(`template-id:${templateId}`)) return true;
+		return false;
+	}) || null;
+}
+
+/**
+ * Determine run mode from a scheduled task.
+ * @param {object} task
+ * @param {string} templateId
+ * @returns {'quick-command' | 'spawn-agent'}
+ */
+function getRunMode(task, templateId) {
+	if (task.command === `/quick-command:${templateId}`) return 'quick-command';
+	return 'spawn-agent';
 }
 
 /** @type {import('./$types').RequestHandler} */
@@ -59,7 +78,8 @@ export async function GET({ params }) {
 				next_run_at: task.next_run_at,
 				model: task.model,
 				status: task.status,
-				project: task.project
+				project: task.project,
+				runMode: getRunMode(task, params.id)
 			}
 		});
 	} catch (error) {
@@ -72,7 +92,7 @@ export async function GET({ params }) {
 export async function POST({ params, request }) {
 	try {
 		const body = await request.json();
-		const { cronExpr, project, model = 'haiku', variables = {} } = body;
+		const { cronExpr, project, model = 'haiku', runMode = 'quick-command', variables = {} } = body;
 
 		// Validate required fields
 		if (!cronExpr || typeof cronExpr !== 'string') {
@@ -133,8 +153,9 @@ export async function POST({ params, request }) {
 			nextRunAt = new Date(Date.now() + 60000).toISOString();
 		}
 
-		// Build the command string with template ID
-		const command = `/quick-command:${params.id}`;
+		// Build the command string based on run mode
+		const isSpawnAgent = runMode === 'spawn-agent';
+		const command = isSpawnAgent ? '/jat:start' : `/quick-command:${params.id}`;
 
 		// Store variable defaults in the description as JSON block
 		const variableBlock =
@@ -142,7 +163,12 @@ export async function POST({ params, request }) {
 				? `\n\n---\nScheduled variables:\n\`\`\`json\n${JSON.stringify(variables, null, 2)}\n\`\`\``
 				: '';
 
-		const description = `Scheduled quick command: ${template.name}\nTemplate: ${template.prompt.substring(0, 200)}${template.prompt.length > 200 ? '...' : ''}${variableBlock}`;
+		// For spawn-agent mode, include full prompt so the agent has context
+		const promptSection = isSpawnAgent
+			? `\n\nPrompt:\n${template.prompt}`
+			: `\nTemplate: ${template.prompt.substring(0, 200)}${template.prompt.length > 200 ? '...' : ''}`;
+
+		const description = `Scheduled ${isSpawnAgent ? 'agent task' : 'quick command'}: ${template.name}${promptSection}\ntemplate-id:${params.id}${variableBlock}`;
 
 		// Create the task
 		const task = createTask({
@@ -151,9 +177,9 @@ export async function POST({ params, request }) {
 			description,
 			type: 'chore',
 			priority: 3,
-			labels: ['quick-command', 'scheduled'],
+			labels: isSpawnAgent ? ['scheduled', 'agent'] : ['quick-command', 'scheduled'],
 			command,
-			model: model || template.defaultModel || 'haiku',
+			model: model || (isSpawnAgent ? 'sonnet' : template.defaultModel || 'haiku'),
 			schedule_cron: cronExpr,
 			next_run_at: nextRunAt
 		});
