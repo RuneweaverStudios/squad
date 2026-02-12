@@ -12,7 +12,24 @@
 	import { onMount } from 'svelte';
 	import { JAT_DEFAULTS } from '$lib/config/constants';
 	import { successToast, errorToast } from '$lib/stores/toasts.svelte';
+	import { setMaxSessions, type MaxSessions } from '$lib/stores/preferences.svelte';
 	import ReviewRulesEditor from '$lib/components/ReviewRulesEditor.svelte';
+
+	/** Coerce a number to the nearest valid MaxSessions value */
+	function toMaxSessions(n: number): MaxSessions {
+		const valid: MaxSessions[] = [4, 6, 8, 10, 12, 16, 20];
+		// Find closest valid value
+		let best: MaxSessions = 12;
+		let bestDiff = Infinity;
+		for (const v of valid) {
+			const diff = Math.abs(n - v);
+			if (diff < bestDiff) {
+				bestDiff = diff;
+				best = v;
+			}
+		}
+		return best;
+	}
 
 	// State
 	let loading = $state(true);
@@ -77,6 +94,10 @@
 				agent_stagger: agentStagger,
 				claude_startup_timeout: claudeStartupTimeout
 			};
+
+			// Sync max_sessions to client-side preferences store (localStorage)
+			// so all spawn paths use the same limit
+			setMaxSessions(toMaxSessions(maxSessions));
 		} catch (error) {
 			console.error('[SwarmSettings] Load error:', error);
 			errorToast('Failed to load settings', error instanceof Error ? error.message : 'Unknown error');
@@ -116,6 +137,9 @@
 				agent_stagger: agentStagger,
 				claude_startup_timeout: claudeStartupTimeout
 			};
+
+			// Sync max_sessions to client-side preferences store (localStorage)
+			setMaxSessions(toMaxSessions(maxSessions));
 
 			successToast('Swarm settings saved', 'Configuration updated');
 		} catch (error) {

@@ -29,7 +29,7 @@
 	import { hoveredSessionName, triggerCompleteFlash, jumpToSession } from '$lib/stores/hoveredSession';
 	import { get } from 'svelte/store';
 	import { browser } from '$app/environment';
-	import { initPreferences, getActiveProject, setActiveProject } from '$lib/stores/preferences.svelte';
+	import { initPreferences, getActiveProject, setActiveProject, setMaxSessions, type MaxSessions } from '$lib/stores/preferences.svelte';
 	import { isSetupSkipped } from '$lib/stores/onboardingStore.svelte';
 	import GlobalSearch from '$lib/components/files/GlobalSearch.svelte';
 	import { getSessions as getWorkSessions, startActivityPolling, stopActivityPolling, fetch as fetchWorkSessions } from '$lib/stores/workSessions.svelte';
@@ -705,10 +705,26 @@
 	}
 
 	// Check ingest_autostart setting and start daemon if enabled and not already running
+	// Also syncs max_sessions from server config to client-side preferences store
 	async function checkIngestAutoStart() {
 		try {
 			const resp = await fetch('/api/config/defaults');
 			const data = await resp.json();
+
+			// Sync max_sessions from server config to localStorage preferences
+			if (data.success && data.defaults?.max_sessions != null) {
+				const valid: MaxSessions[] = [4, 6, 8, 10, 12, 16, 20];
+				const serverVal = Number(data.defaults.max_sessions);
+				// Find closest valid MaxSessions value
+				let best: MaxSessions = 12;
+				let bestDiff = Infinity;
+				for (const v of valid) {
+					const diff = Math.abs(serverVal - v);
+					if (diff < bestDiff) { bestDiff = diff; best = v; }
+				}
+				setMaxSessions(best);
+			}
+
 			if (data.success && data.defaults?.ingest_autostart === true) {
 				// Start the ingest service - /api/servers/start returns 409 if already running
 				await fetch('/api/servers/start', {

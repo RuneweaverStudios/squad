@@ -41,7 +41,7 @@ export interface SpawnBatchOptions {
 /**
  * Get the number of currently active sessions by querying the work API.
  */
-async function getActiveSessionCount(): Promise<number> {
+export async function getActiveSessionCount(): Promise<number> {
 	try {
 		const response = await fetch('/api/work');
 		const data = await response.json();

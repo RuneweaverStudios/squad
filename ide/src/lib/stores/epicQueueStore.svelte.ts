@@ -24,7 +24,8 @@
 
 import type { Task } from '$lib/types/api.types';
 import { SPAWN_STAGGER_MS, DEFAULT_MODEL } from '$lib/config/spawnConfig';
-import { spawnInBatches, type SpawnResult as BatchSpawnResult } from '$lib/utils/spawnBatch';
+import { spawnInBatches, type SpawnResult as BatchSpawnResult, getActiveSessionCount } from '$lib/utils/spawnBatch';
+import { getMaxSessions } from '$lib/stores/preferences.svelte';
 
 // =============================================================================
 // TYPES
@@ -450,9 +451,21 @@ export async function spawnNextAgent(): Promise<SpawnResult | null> {
 		return null;
 	}
 
-	// Check if we're at capacity
+	// Check if we're at per-epic capacity
 	if (!canSpawnMore()) {
 		return null;
+	}
+
+	// Check global max_sessions limit
+	try {
+		const activeCount = await getActiveSessionCount();
+		const maxSessions = getMaxSessions();
+		if (activeCount >= maxSessions) {
+			console.log(`[epic spawn] spawnNextAgent blocked: ${activeCount}/${maxSessions} global sessions active`);
+			return null;
+		}
+	} catch {
+		// Non-blocking: continue if check fails
 	}
 
 	// Get next ready task
