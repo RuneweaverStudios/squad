@@ -3,7 +3,7 @@
 	import { CRON_PRESETS } from '$lib/config/workflowNodes';
 
 	let {
-		config = $bindable({ cronExpr: '0 9 * * *' }),
+		config = { cronExpr: '0 9 * * *' },
 		onUpdate = () => {}
 	}: {
 		config: TriggerCronConfig;

@@ -30,6 +30,7 @@
 	} = $props();
 
 	let meta = $derived(node ? getNodeMeta(node.type) : null);
+	let cfg: any = $derived(node?.config);
 	let editLabel = $state('');
 	let isEditingLabel = $state(false);
 	let testResult = $state<{ output?: string; error?: string; loading: boolean }>({ loading: false });
@@ -156,7 +157,6 @@
 				</div>
 
 				<!-- Node-type-specific config -->
-				{@const cfg = node.config}
 				{#if node.type === 'trigger_cron'}
 					<CronTriggerConfig config={cfg} onUpdate={handleConfigUpdate} />
 				{:else if node.type === 'trigger_event'}

@@ -2,7 +2,7 @@
 	import type { ActionSendMessageConfig } from '$lib/types/workflow';
 
 	let {
-		config = $bindable({ recipient: '', message: '' }),
+		config = { recipient: '', message: '' },
 		onUpdate = () => {}
 	}: {
 		config: ActionSendMessageConfig;

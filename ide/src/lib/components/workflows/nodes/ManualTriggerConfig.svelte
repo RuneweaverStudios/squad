@@ -2,7 +2,7 @@
 	import type { TriggerManualConfig } from '$lib/types/workflow';
 
 	let {
-		config = $bindable({}),
+		config = {},
 		onUpdate = () => {}
 	}: {
 		config: TriggerManualConfig;

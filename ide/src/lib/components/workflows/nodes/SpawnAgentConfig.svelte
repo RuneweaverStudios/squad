@@ -3,7 +3,7 @@
 	import { MODEL_OPTIONS } from '$lib/config/workflowNodes';
 
 	let {
-		config = $bindable({ taskTitle: '', model: 'sonnet' as const }),
+		config = { taskTitle: '', model: 'sonnet' as const },
 		onUpdate = () => {}
 	}: {
 		config: ActionSpawnAgentConfig;

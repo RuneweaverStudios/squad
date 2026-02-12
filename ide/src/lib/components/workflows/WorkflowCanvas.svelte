@@ -90,6 +90,7 @@
 
 	// Panning
 	let isPanning = $state(false);
+	let spaceHeld = $state(false);
 	let panStartMouseX = 0;
 	let panStartMouseY = 0;
 	let panStartPanX = 0;
@@ -240,8 +241,8 @@
 		updateContainerRect();
 		contextMenu = null;
 
-		// Middle mouse button or Space key held = pan
-		if (e.button === 1 || (e.button === 0 && e.altKey)) {
+		// Middle mouse button, Alt+click, or Space+click = pan
+		if (e.button === 1 || (e.button === 0 && (e.altKey || spaceHeld))) {
 			e.preventDefault();
 			isPanning = true;
 			panStartMouseX = e.clientX;
@@ -456,10 +457,17 @@
 	// =========================================================================
 
 	function handleKeyDown(e: KeyboardEvent) {
+		if (e.key === ' ' && !spaceHeld) {
+			const tag = (e.target as HTMLElement).tagName;
+			if (tag !== 'INPUT' && tag !== 'TEXTAREA') {
+				e.preventDefault();
+				spaceHeld = true;
+			}
+		}
 		if (readonly) return;
 		if (e.key === 'Delete' || e.key === 'Backspace') {
-			// Don't delete if user is typing in an input
-			if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') return;
+			const tag = (e.target as HTMLElement).tagName;
+			if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
 			if (selectedNodeIds.size > 0 || selectedEdgeIds.size > 0) {
 				e.preventDefault();
@@ -472,11 +480,17 @@
 			contextMenu = null;
 			isDrawingEdge = false;
 		}
-		// Toggle grid snap
 		if (e.key === 'g' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-			if ((e.target as HTMLElement).tagName !== 'INPUT' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
+			const tag = (e.target as HTMLElement).tagName;
+			if (tag !== 'INPUT' && tag !== 'TEXTAREA') {
 				gridSnap = !gridSnap;
 			}
+		}
+	}
+
+	function handleKeyUp(e: KeyboardEvent) {
+		if (e.key === ' ') {
+			spaceHeld = false;
 		}
 	}
 
@@ -631,11 +645,24 @@
 		}
 	});
 
+	// Window-level mouse events so dragging works when cursor leaves the canvas
+	$effect(() => {
+		if (isPanning || isDragging || isDrawingEdge) {
+			const onMove = (e: MouseEvent) => handleCanvasMouseMove(e);
+			const onUp = (e: MouseEvent) => handleCanvasMouseUp(e);
+			window.addEventListener('mousemove', onMove);
+			window.addEventListener('mouseup', onUp);
+			return () => {
+				window.removeEventListener('mousemove', onMove);
+				window.removeEventListener('mouseup', onUp);
+			};
+		}
+	});
+
 	// Close context menu on click outside
 	$effect(() => {
 		if (contextMenu) {
 			const handler = () => { contextMenu = null; };
-			// Use setTimeout to avoid immediately closing
 			const id = setTimeout(() => window.addEventListener('click', handler, { once: true }), 0);
 			return () => { clearTimeout(id); window.removeEventListener('click', handler); };
 		}
@@ -651,6 +678,7 @@
 	onmouseup={handleCanvasMouseUp}
 	onwheel={handleWheel}
 	onkeydown={handleKeyDown}
+	onkeyup={handleKeyUp}
 	oncontextmenu={(e) => { if (e.target === e.currentTarget) e.preventDefault(); }}
 	tabindex="0"
 	role="application"
@@ -661,6 +689,7 @@
 		--grid-offset-y: {panY}px;
 	"
 	class:panning={isPanning}
+	class:space-held={spaceHeld}
 	class:drawing-edge={isDrawingEdge}
 >
 	<!-- Grid background -->
@@ -937,6 +966,10 @@
 		cursor: grabbing;
 	}
 
+	.wf-canvas.space-held {
+		cursor: grab;
+	}
+
 	.wf-canvas.drawing-edge {
 		cursor: crosshair;
 	}
@@ -997,6 +1030,7 @@
 	}
 
 	.wf-node.selected {
+		background: oklch(0.22 0.06 200);
 		border-color: oklch(0.60 0.15 230);
 		box-shadow:
 			0 0 0 2px oklch(0.60 0.15 230 / 0.3),

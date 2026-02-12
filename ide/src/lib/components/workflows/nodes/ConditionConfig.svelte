@@ -2,7 +2,7 @@
 	import type { ConditionConfig } from '$lib/types/workflow';
 
 	let {
-		config = $bindable({ expression: '' }),
+		config = { expression: '' },
 		onUpdate = () => {}
 	}: {
 		config: ConditionConfig;

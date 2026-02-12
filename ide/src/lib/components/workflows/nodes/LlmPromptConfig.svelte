@@ -3,7 +3,7 @@
 	import { MODEL_OPTIONS } from '$lib/config/workflowNodes';
 
 	let {
-		config = $bindable({ prompt: '', model: 'sonnet' as const }),
+		config = { prompt: '', model: 'sonnet' as const },
 		onUpdate = () => {}
 	}: {
 		config: LlmPromptConfig;

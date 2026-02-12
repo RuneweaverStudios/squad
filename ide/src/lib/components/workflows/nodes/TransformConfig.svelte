@@ -2,7 +2,7 @@
 	import type { TransformConfig } from '$lib/types/workflow';
 
 	let {
-		config = $bindable({ functionBody: 'return input' }),
+		config = { functionBody: 'return input' },
 		onUpdate = () => {}
 	}: {
 		config: TransformConfig;

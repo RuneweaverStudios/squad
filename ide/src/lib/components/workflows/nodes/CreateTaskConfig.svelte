@@ -3,7 +3,7 @@
 	import { TASK_TYPES, PRIORITY_OPTIONS } from '$lib/config/workflowNodes';
 
 	let {
-		config = $bindable({ title: '' }),
+		config = { title: '' },
 		onUpdate = () => {}
 	}: {
 		config: ActionCreateTaskConfig;

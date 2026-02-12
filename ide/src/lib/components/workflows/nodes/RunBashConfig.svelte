@@ -2,7 +2,7 @@
 	import type { ActionRunBashConfig } from '$lib/types/workflow';
 
 	let {
-		config = $bindable({ command: '', timeout: 60 }),
+		config = { command: '', timeout: 60 },
 		onUpdate = () => {}
 	}: {
 		config: ActionRunBashConfig;

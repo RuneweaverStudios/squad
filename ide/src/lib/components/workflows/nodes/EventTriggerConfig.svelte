@@ -3,7 +3,7 @@
 	import { EVENT_TYPES } from '$lib/config/workflowNodes';
 
 	let {
-		config = $bindable({ eventType: 'task_completed' as const }),
+		config = { eventType: 'task_completed' as const },
 		onUpdate = () => {}
 	}: {
 		config: TriggerEventConfig;

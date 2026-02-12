@@ -3,7 +3,7 @@
 	import { BROWSER_ACTIONS } from '$lib/config/workflowNodes';
 
 	let {
-		config = $bindable({ action: 'navigate' as const, url: '' }),
+		config = { action: 'navigate' as const, url: '' },
 		onUpdate = () => {}
 	}: {
 		config: ActionBrowserConfig;
