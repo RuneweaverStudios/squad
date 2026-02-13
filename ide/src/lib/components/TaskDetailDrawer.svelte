@@ -2085,19 +2085,28 @@
 								{/if}
 							</button>
 
-							<!-- Status (editable) -->
-							<InlineSelect
-								value={task.status || 'open'}
-								options={statusOptions}
-								onSave={async (newValue) => {
-									await autoSave('status', newValue);
-								}}
-								disabled={isSaving}
-							>
-								<div class="badge badge-sm {statusColors[task.status] || 'badge-ghost'}">
-									{task.status || 'unknown'}
+							<!-- Status (editable for non-closed; distinct static badge for closed) -->
+							{#if task.status === 'closed'}
+								<div class="badge badge-sm badge-success gap-1" style="border: 1.5px solid oklch(0.65 0.18 145 / 0.6);">
+									<svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+									</svg>
+									closed
 								</div>
-							</InlineSelect>
+							{:else}
+								<InlineSelect
+									value={task.status || 'open'}
+									options={statusOptions}
+									onSave={async (newValue) => {
+										await autoSave('status', newValue);
+									}}
+									disabled={isSaving}
+								>
+									<div class="badge badge-sm {statusColors[task.status] || 'badge-ghost'}">
+										{task.status || 'unknown'}
+									</div>
+								</InlineSelect>
+							{/if}
 
 							<!-- Priority (editable) -->
 							<InlineSelect
@@ -2315,7 +2324,7 @@
 										{/if}
 										<!-- Reopen: Change task status back to open -->
 										<button
-											class="btn btn-xs btn-ghost gap-1"
+											class="btn btn-xs btn-outline gap-1"
 											onclick={handleReopen}
 											disabled={isSaving}
 											title="Change task status from closed to open (doesn't restore conversation)"

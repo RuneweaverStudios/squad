@@ -7,7 +7,7 @@
 	 *
 	 * Features:
 	 * - Auto-saves on change and closes
-	 * - Closes on blur without save if no change
+	 * - Click-outside to close (no onblur - avoids native select popup issues)
 	 * - Auto-focus when editing starts
 	 * - Disabled state during saves
 	 */
@@ -47,13 +47,34 @@
 	let isEditing = $state(false);
 	let editValue = $state(value);
 	let isSaving = $state(false);
-	let selectElement = $state<HTMLSelectElement | null>(null);
+	let containerElement = $state<HTMLDivElement | null>(null);
 
 	// Sync editValue when value prop changes (only when not editing)
 	$effect(() => {
 		if (!isEditing) {
 			editValue = value;
 		}
+	});
+
+	// Click-outside listener: close select when clicking outside container
+	$effect(() => {
+		if (!isEditing) return;
+
+		function handlePointerDown(event: PointerEvent) {
+			if (containerElement && !containerElement.contains(event.target as Node)) {
+				cancelEditing();
+			}
+		}
+
+		// Use setTimeout so the click that opened editing doesn't immediately close it
+		const timer = setTimeout(() => {
+			document.addEventListener('pointerdown', handlePointerDown, true);
+		}, 0);
+
+		return () => {
+			clearTimeout(timer);
+			document.removeEventListener('pointerdown', handlePointerDown, true);
+		};
 	});
 
 	// Start editing
@@ -94,16 +115,6 @@
 		saveValue();
 	}
 
-	// Handle blur - close without saving if unchanged
-	function handleBlur() {
-		// Small delay to allow change event to fire first
-		setTimeout(() => {
-			if (isEditing && !isSaving) {
-				cancelEditing();
-			}
-		}, 100);
-	}
-
 	// Handle keydown
 	function handleKeyDown(event: KeyboardEvent) {
 		if (event.key === 'Escape') {
@@ -128,14 +139,12 @@
 
 {#if isEditing}
 	<!-- Edit mode -->
-	<div class="inline-select-container inline-flex items-center {className}">
+	<div bind:this={containerElement} class="inline-select-container inline-flex items-center {className}">
 		<select
-			bind:this={selectElement}
 			bind:value={editValue}
 			class="select select-bordered select-sm"
 			disabled={isSaving}
 			onchange={handleChange}
-			onblur={handleBlur}
 			onkeydown={handleKeyDown}
 			use:autofocus
 		>
