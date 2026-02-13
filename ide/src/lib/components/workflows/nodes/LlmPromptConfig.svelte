@@ -15,9 +15,19 @@
 		onUpdate(config);
 	}
 
+	let showHelp = $state(false);
+
 	let variableEntries = $derived(
 		config.variables ? Object.entries(config.variables) : []
 	);
+
+	const PROMPT_TEMPLATES: { label: string; prompt: string }[] = [
+		{ label: 'Summarize', prompt: 'Summarize the following in 2-3 bullet points:\n\n{{input}}' },
+		{ label: 'Categorize', prompt: 'Categorize this into one of: bug, feature, chore, improvement.\nRespond with just the category.\n\n{{input}}' },
+		{ label: 'Extract action items', prompt: 'Extract all action items from the following text. Return as a numbered list:\n\n{{input}}' },
+		{ label: 'Code review', prompt: 'Review this code change and list any issues, suggestions, or potential bugs:\n\n{{input}}' },
+		{ label: 'Generate description', prompt: 'Write a clear, concise task description for:\n\nTitle: {{input}}\n\nInclude acceptance criteria.' }
+	];
 
 	function addVariable() {
 		const vars = { ...(config.variables || {}), '': '' };
@@ -56,11 +66,52 @@
 			oninput={(e) => update({ prompt: e.currentTarget.value })}
 			placeholder={`Enter your prompt here...\n\nUse {{input}} to reference data from the previous node.`}
 		></textarea>
-		<label class="label w-full pt-1">
-			<span class="label-text-alt" style="color: oklch(0.55 0.02 250)">
-				Use <code class="px-1 py-0.5 rounded text-xs" style="background: oklch(0.20 0.02 250); color: oklch(0.72 0.15 280)">{`{{input}}`}</code> for previous node output
-			</span>
-		</label>
+		<div class="mt-1.5 flex items-center gap-1">
+			<button
+				type="button"
+				class="text-xs px-0 bg-transparent border-none cursor-pointer flex items-center gap-1"
+				style="color: oklch(0.60 0.10 280)"
+				onclick={() => showHelp = !showHelp}
+			>
+				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3 h-3">
+					<path fill-rule="evenodd" d="M15 8A7 7 0 1 1 1 8a7 7 0 0 1 14 0ZM9 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM6.75 8a.75.75 0 0 0 0 1.5h.75v1.75a.75.75 0 0 0 1.5 0v-2.5A.75.75 0 0 0 8.25 8h-1.5Z" clip-rule="evenodd" />
+				</svg>
+				{showHelp ? 'Hide' : 'Template variables & examples'}
+			</button>
+		</div>
+
+		{#if showHelp}
+			<div class="mt-1.5 rounded-lg p-2.5 text-xs" style="background: oklch(0.14 0.01 250); border: 1px solid oklch(0.22 0.02 250)">
+				<div class="mb-1.5" style="color: oklch(0.55 0.02 250)">Available template variables:</div>
+				<div class="flex flex-col gap-1">
+					<div class="flex items-baseline gap-2">
+						<code class="font-mono px-1 rounded" style="background: oklch(0.18 0.02 250); color: oklch(0.80 0.12 280); font-size: 0.6875rem">{`{{input}}`}</code>
+						<span style="color: oklch(0.50 0.02 250)">Output from the previous node</span>
+					</div>
+					<div class="flex items-baseline gap-2">
+						<code class="font-mono px-1 rounded" style="background: oklch(0.18 0.02 250); color: oklch(0.80 0.12 280); font-size: 0.6875rem">{`{{result}}`}</code>
+						<span style="color: oklch(0.50 0.02 250)">Alias for input (same value)</span>
+					</div>
+					<div class="flex items-baseline gap-2">
+						<code class="font-mono px-1 rounded" style="background: oklch(0.18 0.02 250); color: oklch(0.80 0.12 280); font-size: 0.6875rem">{`{{varName}}`}</code>
+						<span style="color: oklch(0.50 0.02 250)">Custom variables (define below)</span>
+					</div>
+				</div>
+				<div class="mt-2 pt-1.5 flex flex-col gap-1" style="border-top: 1px solid oklch(0.22 0.02 250)">
+					<div style="color: oklch(0.55 0.02 250)">Prompt templates (click to use):</div>
+					{#each PROMPT_TEMPLATES as tpl}
+						<button
+							class="flex items-baseline gap-2 text-left bg-transparent border-none cursor-pointer px-0"
+							onclick={() => update({ prompt: tpl.prompt })}
+							title="Click to use this template"
+						>
+							<span class="shrink-0 w-[110px] text-right" style="color: oklch(0.50 0.02 250)">{tpl.label}</span>
+							<code class="font-mono px-1 rounded truncate" style="background: oklch(0.18 0.02 250); color: oklch(0.75 0.15 280); font-size: 0.6875rem">{tpl.prompt.split('\n')[0]}</code>
+						</button>
+					{/each}
+				</div>
+			</div>
+		{/if}
 	</div>
 
 	<div class="form-control">

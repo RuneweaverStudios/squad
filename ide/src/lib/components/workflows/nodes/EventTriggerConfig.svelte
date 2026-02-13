@@ -62,11 +62,15 @@
 				{ name: 'data.type', type: 'string', desc: 'Signal type: starting, working, needs_input, review, complete' },
 				{ name: 'data.taskId', type: 'string', desc: 'Task ID' },
 				{ name: 'data.taskTitle', type: 'string', desc: 'Task title' },
+				{ name: 'data.taskType', type: 'string', desc: 'bug, feature, task, chore, epic' },
+				{ name: 'data.priority', type: 'number', desc: 'Priority (0-4)' },
+				{ name: 'data.labels', type: 'string', desc: 'Comma-separated labels' },
 				{ name: 'data.agentName', type: 'string', desc: 'Agent name' },
 				{ name: 'data.project', type: 'string', desc: 'Project name' }
 			],
 			examples: [
 				{ label: 'On complete', expr: 'data.type === "complete"' },
+				{ label: 'Bugs only', expr: 'data.type === "complete" && data.taskType === "bug"' },
 				{ label: 'Multiple signals', expr: 'data.type === "review" || data.type === "complete"' }
 			]
 		}

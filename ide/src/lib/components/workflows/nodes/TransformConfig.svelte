@@ -18,9 +18,13 @@
 		{ label: 'Pass through', body: 'return input' },
 		{ label: 'Filter lines', body: "return input.split('\\n').filter(l => l.includes('error')).join('\\n')" },
 		{ label: 'Extract JSON', body: 'return JSON.parse(input)' },
+		{ label: 'JSON → text', body: 'const d = JSON.parse(input); return `${d.title} (${d.type} P${d.priority})`' },
 		{ label: 'Count lines', body: "return input.split('\\n').length.toString()" },
 		{ label: 'Uppercase', body: 'return input.toUpperCase()' },
-		{ label: 'First N chars', body: 'return input.slice(0, 200)' }
+		{ label: 'First N chars', body: 'return input.slice(0, 200)' },
+		{ label: 'Summarize list', body: "const items = JSON.parse(input); return items.map(i => `- ${i.title}`).join('\\n')" },
+		{ label: 'Extract field', body: "return JSON.parse(input).taskId" },
+		{ label: 'Template string', body: 'const d = JSON.parse(input); return `Task ${d.taskId} completed by ${d.assignee}`' }
 	];
 </script>
 

@@ -493,15 +493,29 @@ function processSignalFileChange(sessionName: string): void {
 		}
 	}
 
-	// Handle IDE-initiated signals with direct type (e.g., { type: 'working', data: {...} })
+	// Handle IDE-initiated signals with direct type (e.g., { type: 'completing', currentStep: 'verifying', ... })
+	// These are flat-format signals written by the IDE signal API, not nested {type: 'state', state: ..., data: ...}
 	if (signal.type && SIGNAL_STATE_MAP[signal.type] && signal.type !== 'state' && signal.type !== 'complete') {
 		const mappedState = SIGNAL_STATE_MAP[signal.type];
-		if (mappedState !== prevFileState.state) {
+		// Extract payload from flat IDE signal (everything except type and timestamp)
+		const { type: _type, timestamp: _ts, ...idePayloadData } = signal as Record<string, unknown>;
+		const hasPayload = Object.keys(idePayloadData).length > 0;
+		const newPayloadHash = hasPayload ? simpleHash(JSON.stringify(idePayloadData)) : null;
+		const stateChanged = mappedState !== prevFileState.state;
+		const payloadChanged = newPayloadHash !== prevFileState.payloadHash;
+
+		if (stateChanged || payloadChanged) {
 			currentFileState.state = mappedState;
+			currentFileState.payloadHash = newPayloadHash;
 			broadcastSessionState(sessionName, mappedState, {
-				previousState: prevFileState.state
+				previousState: prevFileState.state,
+				signalPayload: hasPayload ? { type: signal.type as string, ...idePayloadData } : undefined
 			});
-			console.log(`[WS Watcher] IDE signal state for ${sessionName}: ${prevFileState.state} -> ${mappedState}`);
+			if (stateChanged) {
+				console.log(`[WS Watcher] IDE signal state for ${sessionName}: ${prevFileState.state} -> ${mappedState}${hasPayload ? ' (with payload)' : ''}`);
+			} else {
+				console.log(`[WS Watcher] IDE signal payload update for ${sessionName}: ${mappedState} (data changed)`);
+			}
 		}
 	}
 

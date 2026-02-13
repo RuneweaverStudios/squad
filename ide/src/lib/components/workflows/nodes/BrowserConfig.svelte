@@ -10,6 +10,8 @@
 		onUpdate?: (config: ActionBrowserConfig) => void;
 	} = $props();
 
+	let showHelp = $state(false);
+
 	function update(patch: Partial<ActionBrowserConfig>) {
 		config = { ...config, ...patch };
 		onUpdate(config);
@@ -19,6 +21,24 @@
 	let showSelector = $derived(['click', 'wait'].includes(config.action));
 	let showJsCode = $derived(config.action === 'eval');
 	let showTimeout = $derived(config.action === 'wait');
+
+	const SELECTOR_EXAMPLES: { label: string; sel: string }[] = [
+		{ label: 'Button by text', sel: 'button:has-text("Submit")' },
+		{ label: 'Input by name', sel: 'input[name="email"]' },
+		{ label: 'Link by href', sel: 'a[href="/dashboard"]' },
+		{ label: 'Class selector', sel: '.btn-primary' },
+		{ label: 'ID selector', sel: '#login-form' },
+		{ label: 'Data attribute', sel: '[data-testid="submit-btn"]' }
+	];
+
+	const JS_EXAMPLES: { label: string; code: string }[] = [
+		{ label: 'Page title', code: 'document.title' },
+		{ label: 'Text content', code: 'document.querySelector("h1").textContent' },
+		{ label: 'Form value', code: 'document.querySelector("#search").value' },
+		{ label: 'Element count', code: 'document.querySelectorAll(".item").length.toString()' },
+		{ label: 'JSON from page', code: 'JSON.stringify(Array.from(document.querySelectorAll("tr")).map(r => r.textContent))' },
+		{ label: 'Check visible', code: 'document.querySelector(".modal")?.offsetParent !== null ? "visible" : "hidden"' }
+	];
 </script>
 
 <div class="flex flex-col gap-4">
@@ -94,6 +114,68 @@
 				placeholder="document.title"
 			></textarea>
 		</div>
+	{/if}
+
+	{#if showSelector || showJsCode}
+		<div class="mt-1.5 flex items-center gap-1">
+			<button
+				type="button"
+				class="text-xs px-0 bg-transparent border-none cursor-pointer flex items-center gap-1"
+				style="color: oklch(0.60 0.10 220)"
+				onclick={() => showHelp = !showHelp}
+			>
+				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3 h-3">
+					<path fill-rule="evenodd" d="M15 8A7 7 0 1 1 1 8a7 7 0 0 1 14 0ZM9 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM6.75 8a.75.75 0 0 0 0 1.5h.75v1.75a.75.75 0 0 0 1.5 0v-2.5A.75.75 0 0 0 8.25 8h-1.5Z" clip-rule="evenodd" />
+				</svg>
+				{showHelp ? 'Hide' : 'Examples & variables'}
+			</button>
+		</div>
+
+		{#if showHelp}
+			<div class="mt-1.5 rounded-lg p-2.5 text-xs" style="background: oklch(0.14 0.01 250); border: 1px solid oklch(0.22 0.02 250)">
+				<div class="mb-1.5" style="color: oklch(0.55 0.02 250)">Template variables:</div>
+				<div class="flex flex-col gap-1">
+					<div class="flex items-baseline gap-2">
+						<code class="font-mono px-1 rounded" style="background: oklch(0.18 0.02 250); color: oklch(0.80 0.12 220); font-size: 0.6875rem">{`{{input}}`}</code>
+						<span style="color: oklch(0.50 0.02 250)">Output from the previous node (in URL, selector, or JS)</span>
+					</div>
+				</div>
+
+				{#if showSelector}
+					<div class="mt-2 pt-1.5 flex flex-col gap-1" style="border-top: 1px solid oklch(0.22 0.02 250)">
+						<div style="color: oklch(0.55 0.02 250)">Selector examples (click to use):</div>
+						{#each SELECTOR_EXAMPLES as ex}
+							<div class="flex items-baseline gap-2">
+								<span class="shrink-0 w-[100px] text-right" style="color: oklch(0.50 0.02 250)">{ex.label}</span>
+								<button
+									class="font-mono px-1 rounded text-left bg-transparent border-none cursor-pointer"
+									style="background: oklch(0.18 0.02 250); color: oklch(0.75 0.15 220); font-size: 0.6875rem"
+									onclick={() => update({ selector: ex.sel })}
+									title="Click to use"
+								>{ex.sel}</button>
+							</div>
+						{/each}
+					</div>
+				{/if}
+
+				{#if showJsCode}
+					<div class="mt-2 pt-1.5 flex flex-col gap-1" style="border-top: 1px solid oklch(0.22 0.02 250)">
+						<div style="color: oklch(0.55 0.02 250)">JS examples (click to use):</div>
+						{#each JS_EXAMPLES as ex}
+							<div class="flex items-baseline gap-2">
+								<span class="shrink-0 w-[100px] text-right" style="color: oklch(0.50 0.02 250)">{ex.label}</span>
+								<button
+									class="font-mono px-1 rounded text-left bg-transparent border-none cursor-pointer truncate max-w-[200px]"
+									style="background: oklch(0.18 0.02 250); color: oklch(0.75 0.15 145); font-size: 0.6875rem"
+									onclick={() => update({ jsCode: ex.code })}
+									title="Click to use"
+								>{ex.code}</button>
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</div>
+		{/if}
 	{/if}
 
 	{#if showTimeout}
