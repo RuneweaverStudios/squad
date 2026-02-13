@@ -56,6 +56,11 @@
 	let modeChange = $state<{ oldMode: string; newMode: string } | null>(null);
 	let isBinaryFile = $state(false);
 
+	// Raw diff text (fallback when Monaco can't render)
+	let rawDiff = $state('');
+	// Monaco init error
+	let monacoInitError = $state<string | null>(null);
+
 	// Monaco state
 	let containerRef: HTMLDivElement | null = $state(null);
 	let diffEditor: Monaco.editor.IStandaloneDiffEditor | null = $state(null);
@@ -352,6 +357,7 @@
 
 			originalContent = data.original ?? '';
 			modifiedContent = data.modified ?? '';
+			rawDiff = data.raw ?? '';
 
 			// Mark content as loaded (triggers first-time Monaco initialization)
 			if (!contentLoaded) {
@@ -391,6 +397,7 @@
 			error = e instanceof Error ? e.message : 'Failed to load diff';
 			originalContent = '';
 			modifiedContent = '';
+			rawDiff = '';
 		} finally {
 			loading = false;
 		}

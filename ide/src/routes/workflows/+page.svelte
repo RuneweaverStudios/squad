@@ -119,8 +119,12 @@
 	// UNDO / REDO
 	// =========================================================================
 
+	function deepCopy<T>(value: T): T {
+		return JSON.parse(JSON.stringify(value));
+	}
+
 	function pushUndoState() {
-		undoStack = [...undoStack, { nodes: structuredClone(nodes), edges: structuredClone(edges) }];
+		undoStack = [...undoStack, { nodes: deepCopy(nodes), edges: deepCopy(edges) }];
 		if (undoStack.length > 50) undoStack = undoStack.slice(-50);
 		redoStack = [];
 	}
@@ -129,7 +133,7 @@
 		if (undoStack.length === 0) return;
 		const state = undoStack[undoStack.length - 1];
 		undoStack = undoStack.slice(0, -1);
-		redoStack = [...redoStack, { nodes: structuredClone(nodes), edges: structuredClone(edges) }];
+		redoStack = [...redoStack, { nodes: deepCopy(nodes), edges: deepCopy(edges) }];
 		nodes = state.nodes;
 		edges = state.edges;
 		dirty = true;
@@ -139,7 +143,7 @@
 		if (redoStack.length === 0) return;
 		const state = redoStack[redoStack.length - 1];
 		redoStack = redoStack.slice(0, -1);
-		undoStack = [...undoStack, { nodes: structuredClone(nodes), edges: structuredClone(edges) }];
+		undoStack = [...undoStack, { nodes: deepCopy(nodes), edges: deepCopy(edges) }];
 		nodes = state.nodes;
 		edges = state.edges;
 		dirty = true;

@@ -39,6 +39,7 @@
 		onCommitSelect?: (commitHash: string, files: FileChange[], project: string) => void;
 		onCommitFileClick?: (path: string) => void;
 		selectedFilePath?: string | null;
+		onRebaseComplete?: () => void;
 	}
 
 	interface Commit {
@@ -55,7 +56,7 @@
 		isIncoming?: boolean;
 	}
 
-	let { project, onFileClick, onCommitSelect, onCommitFileClick, selectedFilePath = null }: Props = $props();
+	let { project, onFileClick, onCommitSelect, onCommitFileClick, selectedFilePath = null, onRebaseComplete }: Props = $props();
 
 	// Branch switcher modal state
 	let showBranchModal = $state(false);
@@ -213,6 +214,14 @@
 	let unpushedCount = $state(0);
 	let mergeBaseHash = $state<string | null>(null);
 	let defaultBranch = $state<string | null>(null);
+
+	// Select mode state (for multi-select drop/rebase)
+	let selectMode = $state(false);
+	let selectedCommits = $state<Set<string>>(new Set());
+	let lastClickedCommitHash = $state<string | null>(null);
+	let isRebasing = $state(false);
+	let rebaseError = $state<string | null>(null);
+	let showDropConfirm = $state(false);
 
 	// UI state
 	let isLoading = $state(true);
@@ -860,11 +869,123 @@
 		}
 	}
 
+	// ── Select mode functions (multi-select drop/rebase) ──
+
+	function enterSelectMode() {
+		selectMode = true;
+		selectedCommits = new Set();
+		lastClickedCommitHash = null;
+		rebaseError = null;
+		showDropConfirm = false;
+	}
+
+	function exitSelectMode() {
+		selectMode = false;
+		selectedCommits = new Set();
+		lastClickedCommitHash = null;
+		rebaseError = null;
+		showDropConfirm = false;
+	}
+
+	function toggleCommitSelection(hash: string, event?: MouseEvent) {
+		// Shift+click for range selection
+		if (event?.shiftKey && lastClickedCommitHash) {
+			const selectableCommits = commits.filter(c => !c.isIncoming);
+			const hashes = selectableCommits.map(c => c.hash);
+			const a = hashes.indexOf(lastClickedCommitHash);
+			const b = hashes.indexOf(hash);
+			if (a !== -1 && b !== -1) {
+				const [start, end] = a < b ? [a, b] : [b, a];
+				const next = new Set(selectedCommits);
+				for (let i = start; i <= end; i++) {
+					// Don't select HEAD commit
+					if (!selectableCommits[i].isHead) {
+						next.add(hashes[i]);
+					}
+				}
+				selectedCommits = next;
+				lastClickedCommitHash = hash;
+				return;
+			}
+		}
+
+		const next = new Set(selectedCommits);
+		if (next.has(hash)) {
+			next.delete(hash);
+		} else {
+			next.add(hash);
+		}
+		selectedCommits = next;
+		lastClickedCommitHash = hash;
+	}
+
+	function getSelectedCommitDetails(): { hash: string; hashShort: string; message: string; isPushed: boolean }[] {
+		return commits
+			.filter(c => selectedCommits.has(c.hash))
+			.map(c => ({
+				hash: c.hash,
+				hashShort: c.hashShort,
+				message: c.message.split('\n')[0],
+				isPushed: !!c.isPushed
+			}));
+	}
+
+	const selectedHasPushed = $derived(
+		commits.some(c => selectedCommits.has(c.hash) && c.isPushed)
+	);
+
+	async function handleDropCommits(force: boolean = false) {
+		if (isRebasing || selectedCommits.size === 0) return;
+
+		isRebasing = true;
+		rebaseError = null;
+
+		try {
+			const response = await fetch('/api/files/git/rebase', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					project,
+					dropCommits: [...selectedCommits],
+					force
+				})
+			});
+
+			const data = await response.json();
+
+			if (!data.success) {
+				if (data.requiresForce && !force) {
+					// Show force-push warning - user needs to confirm again
+					rebaseError = data.error;
+					return;
+				}
+				rebaseError = data.error;
+				return;
+			}
+
+			showToast(`Dropped ${data.droppedCount} commit(s)`);
+			exitSelectMode();
+			await fetchStatus();
+			await fetchTimeline();
+			onRebaseComplete?.();
+		} catch (err) {
+			rebaseError = err instanceof Error ? err.message : 'Rebase failed';
+		} finally {
+			isRebasing = false;
+		}
+	}
+
+
 	// Handle Ctrl+Enter to commit
 	function handleKeyDown(e: KeyboardEvent) {
 		if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && canCommit) {
 			e.preventDefault();
 			handleCommit();
+		}
+		// Escape exits select mode
+		if (e.key === 'Escape' && selectMode) {
+			e.preventDefault();
+			exitSelectMode();
 		}
 	}
 
@@ -1820,28 +1941,114 @@
 
 		<!-- Timeline Section -->
 		<div class="timeline-section">
-			<button
-				class="timeline-header"
-				onclick={() => isTimelineExpanded = !isTimelineExpanded}
-				aria-expanded={isTimelineExpanded}
-			>
-				<svg
-					class="chevron"
-					class:expanded={isTimelineExpanded}
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
+			<div class="timeline-header-row">
+				<button
+					class="timeline-header"
+					onclick={() => isTimelineExpanded = !isTimelineExpanded}
+					aria-expanded={isTimelineExpanded}
 				>
-					<polyline points="9 18 15 12 9 6" />
-				</svg>
-				<span class="timeline-title">TIMELINE</span>
-				{#if commits.length + incomingCommits.length > 0}
-					<span class="timeline-count">{commits.length + incomingCommits.length}</span>
+					<svg
+						class="chevron"
+						class:expanded={isTimelineExpanded}
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<polyline points="9 18 15 12 9 6" />
+					</svg>
+					<span class="timeline-title">TIMELINE</span>
+					{#if commits.length + incomingCommits.length > 0}
+						<span class="timeline-count">{commits.length + incomingCommits.length}</span>
+					{/if}
+				</button>
+				{#if isTimelineExpanded && commits.length > 1}
+					{#if selectMode}
+						<!-- svelte-ignore a11y_click_events_have_key_events -->
+						<button class="select-mode-btn cancel" onclick={(e) => { e.stopPropagation(); exitSelectMode(); }} title="Cancel selection">
+							Cancel
+						</button>
+					{:else}
+						<!-- svelte-ignore a11y_click_events_have_key_events -->
+						<button class="select-mode-btn" onclick={(e) => { e.stopPropagation(); enterSelectMode(); }} title="Select commits to drop">
+							Select
+						</button>
+					{/if}
 				{/if}
-			</button>
+			</div>
 
 			{#if isTimelineExpanded}
+				<!-- Select mode toolbar -->
+				{#if selectMode}
+					<div class="select-mode-toolbar">
+						{#if selectedCommits.size > 0}
+							<span class="select-count">{selectedCommits.size} selected</span>
+							<button
+								class="drop-btn"
+								disabled={isRebasing}
+								onclick={() => { showDropConfirm = true; rebaseError = null; }}
+							>
+								{#if isRebasing}
+									<span class="loading loading-spinner loading-xs"></span>
+								{/if}
+								Drop {selectedCommits.size} commit{selectedCommits.size > 1 ? 's' : ''}
+							</button>
+						{:else}
+							<span class="select-hint">Click commits to select (Shift+click for range)</span>
+						{/if}
+					</div>
+				{/if}
+
+				<!-- Drop confirmation panel -->
+				{#if showDropConfirm}
+					<div class="drop-confirm">
+						<div class="drop-confirm-header">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="drop-confirm-icon">
+								<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+								<line x1="12" y1="9" x2="12" y2="13" />
+								<line x1="12" y1="17" x2="12.01" y2="17" />
+							</svg>
+							<span>Drop {selectedCommits.size} commit{selectedCommits.size > 1 ? 's' : ''}?</span>
+						</div>
+						<div class="drop-confirm-list">
+							{#each getSelectedCommitDetails() as detail}
+								<div class="drop-confirm-commit">
+									<span class="drop-confirm-hash">{detail.hashShort}</span>
+									<span class="drop-confirm-msg">{detail.message}</span>
+									{#if detail.isPushed}
+										<span class="drop-confirm-pushed">pushed</span>
+									{/if}
+								</div>
+							{/each}
+						</div>
+						{#if selectedHasPushed}
+							<div class="drop-warning">
+								These commits exist on remote. Dropping them will require a force-push.
+							</div>
+						{/if}
+						{#if rebaseError}
+							<div class="drop-error">{rebaseError}</div>
+						{/if}
+						<div class="drop-confirm-actions">
+							<button class="drop-cancel-btn" disabled={isRebasing} onclick={() => { showDropConfirm = false; rebaseError = null; }}>
+								Cancel
+							</button>
+							<button
+								class="drop-confirm-btn"
+								disabled={isRebasing}
+								onclick={() => handleDropCommits(selectedHasPushed)}
+							>
+								{#if isRebasing}
+									<span class="loading loading-spinner loading-xs"></span>
+									Dropping...
+								{:else}
+									Confirm Drop
+								{/if}
+							</button>
+						</div>
+					</div>
+				{/if}
+
 				<div class="timeline-content">
 					{#if isLoadingTimeline}
 						<div class="timeline-loading">
@@ -1898,6 +2105,8 @@
 							{#each commits as commit, index}
 								{@const firstLine = commit.message.split('\n')[0]}
 								{@const isMergeBase = mergeBaseHash && commit.hash === mergeBaseHash && index > 0}
+								{@const isSelected = selectedCommits.has(commit.hash)}
+								{@const isSelectable = selectMode && !commit.isHead}
 								{#if isMergeBase}
 									<div class="branch-divider">
 										<div class="branch-divider-line"></div>
@@ -1912,15 +2121,41 @@
 									class:is-pushed={commit.isPushed}
 									class:is-remote-head={commit.isRemoteHead}
 									class:is-expanded={expandedCommitHash === commit.hash}
-									title={commit.isHead
-										? 'HEAD - Your current commit'
-										: commit.isRemoteHead
-											? 'Remote HEAD - Last pushed commit on remote'
-											: !commit.isPushed
-												? 'Unpushed - Local commit not yet on remote'
-												: 'Pushed - Commit exists on remote'}
-									onclick={() => handleCommitClick(commit.hash)}
+									class:is-selected={isSelected}
+									title={selectMode
+										? (commit.isHead ? 'HEAD commit cannot be dropped' : 'Click to select/deselect')
+										: commit.isHead
+											? 'HEAD - Your current commit'
+											: commit.isRemoteHead
+												? 'Remote HEAD - Last pushed commit on remote'
+												: !commit.isPushed
+													? 'Unpushed - Local commit not yet on remote'
+													: 'Pushed - Commit exists on remote'}
+									onclick={(e) => {
+										if (selectMode) {
+											if (!commit.isHead) {
+												toggleCommitSelection(commit.hash, e);
+											}
+										} else {
+											handleCommitClick(commit.hash);
+										}
+									}}
 								>
+									{#if selectMode}
+										<div class="commit-checkbox" class:disabled={commit.isHead}>
+											<input
+												type="checkbox"
+												checked={isSelected}
+												disabled={commit.isHead}
+												onclick={(e) => e.stopPropagation()}
+												onchange={(e) => {
+												e.stopPropagation();
+												if (!commit.isHead) toggleCommitSelection(commit.hash);
+												}}
+												class="checkbox checkbox-xs"
+											/>
+										</div>
+									{/if}
 									<div class="commit-marker">
 										{#if commit.isHead}
 											<span class="head-marker" title="HEAD">●</span>
@@ -1951,7 +2186,7 @@
 										<div class="commit-author">{commit.author_name}</div>
 									</div>
 								</button>
-								{#if expandedCommitHash === commit.hash}
+								{#if expandedCommitHash === commit.hash && !selectMode}
 									{@render commitExpansion()}
 								{/if}
 							{/each}
@@ -2529,6 +2764,274 @@
 		background: oklch(0.22 0.02 250);
 		border-radius: 9999px;
 		color: oklch(0.65 0.02 250);
+	}
+
+	/* Timeline header row - wraps header button + select toggle */
+	.timeline-header-row {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+	}
+
+	.timeline-header-row .timeline-header {
+		flex: 1;
+	}
+
+	/* Select mode toggle button */
+	.select-mode-btn {
+		font-size: 0.625rem;
+		font-weight: 600;
+		padding: 0.125rem 0.5rem;
+		border-radius: 0.25rem;
+		border: 1px solid oklch(0.35 0.02 250);
+		background: oklch(0.20 0.02 250);
+		color: oklch(0.65 0.02 250);
+		cursor: pointer;
+		transition: all 0.15s ease;
+		white-space: nowrap;
+	}
+
+	.select-mode-btn:hover {
+		background: oklch(0.25 0.02 250);
+		color: oklch(0.80 0.02 250);
+		border-color: oklch(0.45 0.02 250);
+	}
+
+	.select-mode-btn.cancel {
+		color: oklch(0.70 0.15 25);
+		border-color: oklch(0.50 0.12 25 / 0.4);
+	}
+
+	.select-mode-btn.cancel:hover {
+		background: oklch(0.25 0.04 25);
+		color: oklch(0.80 0.15 25);
+	}
+
+	/* Select mode toolbar */
+	.select-mode-toolbar {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.375rem 0.5rem;
+		background: oklch(0.17 0.02 240);
+		border: 1px solid oklch(0.28 0.04 240);
+		border-radius: 0.375rem;
+		margin-top: 0.375rem;
+	}
+
+	.select-count {
+		font-size: 0.6875rem;
+		font-weight: 600;
+		color: oklch(0.75 0.12 240);
+	}
+
+	.select-hint {
+		font-size: 0.6875rem;
+		color: oklch(0.55 0.02 250);
+		font-style: italic;
+	}
+
+	.drop-btn {
+		margin-left: auto;
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		font-size: 0.6875rem;
+		font-weight: 600;
+		padding: 0.25rem 0.625rem;
+		border-radius: 0.25rem;
+		border: 1px solid oklch(0.55 0.15 25 / 0.5);
+		background: oklch(0.30 0.08 25);
+		color: oklch(0.85 0.12 25);
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.drop-btn:hover:not(:disabled) {
+		background: oklch(0.35 0.12 25);
+		border-color: oklch(0.60 0.15 25 / 0.7);
+	}
+
+	.drop-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	/* Commit checkbox */
+	.commit-checkbox {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 16px;
+		flex-shrink: 0;
+		padding-top: 2px;
+	}
+
+	.commit-checkbox .checkbox {
+		width: 13px;
+		height: 13px;
+		border-radius: 2px;
+		border-color: oklch(0.45 0.02 250);
+		cursor: pointer;
+	}
+
+	.commit-checkbox.disabled .checkbox {
+		opacity: 0.3;
+		cursor: not-allowed;
+	}
+
+	/* Selected commit highlight */
+	.commit-item.is-selected {
+		background: oklch(0.70 0.18 240 / 0.1);
+		border-left: 2px solid oklch(0.65 0.15 240);
+		padding-left: calc(0.25rem - 2px);
+	}
+
+	.commit-item.is-selected:hover {
+		background: oklch(0.70 0.18 240 / 0.15);
+	}
+
+	/* Drop confirmation panel */
+	.drop-confirm {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		padding: 0.625rem;
+		background: oklch(0.15 0.02 25);
+		border: 1px solid oklch(0.35 0.08 25 / 0.5);
+		border-radius: 0.375rem;
+		margin-top: 0.375rem;
+	}
+
+	.drop-confirm-header {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: oklch(0.80 0.12 25);
+	}
+
+	.drop-confirm-icon {
+		width: 14px;
+		height: 14px;
+		color: oklch(0.75 0.15 60);
+		flex-shrink: 0;
+	}
+
+	.drop-confirm-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.1875rem;
+		max-height: 140px;
+		overflow-y: auto;
+	}
+
+	.drop-confirm-commit {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		padding: 0.25rem 0.375rem;
+		background: oklch(0.18 0.02 250);
+		border-radius: 0.25rem;
+		font-size: 0.6875rem;
+	}
+
+	.drop-confirm-hash {
+		font-family: ui-monospace, monospace;
+		font-size: 0.625rem;
+		color: oklch(0.65 0.08 25);
+		background: oklch(0.65 0.08 25 / 0.12);
+		padding: 0.0625rem 0.25rem;
+		border-radius: 0.1875rem;
+		flex-shrink: 0;
+	}
+
+	.drop-confirm-msg {
+		color: oklch(0.70 0.02 250);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		flex: 1;
+		min-width: 0;
+	}
+
+	.drop-confirm-pushed {
+		font-size: 0.5625rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		padding: 0.0625rem 0.25rem;
+		border-radius: 0.1875rem;
+		color: oklch(0.80 0.15 60);
+		background: oklch(0.70 0.15 60 / 0.2);
+		border: 1px solid oklch(0.70 0.15 60 / 0.3);
+		flex-shrink: 0;
+	}
+
+	.drop-warning {
+		font-size: 0.6875rem;
+		color: oklch(0.75 0.15 60);
+		padding: 0.375rem 0.5rem;
+		background: oklch(0.25 0.06 60 / 0.3);
+		border: 1px solid oklch(0.50 0.12 60 / 0.3);
+		border-radius: 0.25rem;
+	}
+
+	.drop-error {
+		font-size: 0.6875rem;
+		color: oklch(0.75 0.15 25);
+		padding: 0.375rem 0.5rem;
+		background: oklch(0.25 0.06 25 / 0.3);
+		border: 1px solid oklch(0.50 0.12 25 / 0.3);
+		border-radius: 0.25rem;
+	}
+
+	.drop-confirm-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.375rem;
+		padding-top: 0.25rem;
+	}
+
+	.drop-cancel-btn {
+		font-size: 0.6875rem;
+		padding: 0.25rem 0.625rem;
+		border-radius: 0.25rem;
+		border: 1px solid oklch(0.35 0.02 250);
+		background: oklch(0.20 0.02 250);
+		color: oklch(0.70 0.02 250);
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.drop-cancel-btn:hover:not(:disabled) {
+		background: oklch(0.25 0.02 250);
+	}
+
+	.drop-confirm-btn {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		font-size: 0.6875rem;
+		font-weight: 600;
+		padding: 0.25rem 0.625rem;
+		border-radius: 0.25rem;
+		border: 1px solid oklch(0.55 0.15 25 / 0.6);
+		background: oklch(0.35 0.12 25);
+		color: oklch(0.90 0.12 25);
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.drop-confirm-btn:hover:not(:disabled) {
+		background: oklch(0.40 0.15 25);
+		border-color: oklch(0.60 0.15 25 / 0.8);
+	}
+
+	.drop-confirm-btn:disabled,
+	.drop-cancel-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 
 	.timeline-content {

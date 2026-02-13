@@ -32,6 +32,7 @@
 	let editor: Monaco.editor.IStandaloneCodeEditor | null = $state(null);
 	let monaco: typeof Monaco | null = $state(null);
 	let isReady = $state(false);
+	let initError = $state<string | null>(null);
 	let resizeObserver: ResizeObserver | null = null;
 	let themeObserver: MutationObserver | null = null;
 	let isEditorFocused = $state(false);
@@ -282,8 +283,9 @@
 			resizeObserver.observe(containerRef);
 
 			isReady = true;
-		} catch (error) {
-			console.error('Failed to initialize Monaco Editor:', error);
+		} catch (err) {
+			console.error('Failed to initialize Monaco Editor:', err);
+			initError = err instanceof Error ? err.message : 'Failed to load editor';
 		}
 	});
 
@@ -475,7 +477,14 @@
 </script>
 
 <div class="monaco-wrapper" bind:this={containerRef}>
-	{#if !isReady}
+	{#if initError}
+		<div class="loading-placeholder error-placeholder">
+			<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:1.5rem;height:1.5rem;color:oklch(0.65 0.15 25);">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+			</svg>
+			<span class="ml-2" style="color:oklch(0.65 0.15 25);">Editor failed to load</span>
+		</div>
+	{:else if !isReady}
 		<div class="loading-placeholder">
 			<span class="loading loading-spinner loading-md"></span>
 			<span class="ml-2 text-base-content/60">Loading editor...</span>

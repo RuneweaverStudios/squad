@@ -37,10 +37,11 @@
 	// =========================================================================
 
 	const NODE_WIDTH = 220;
-	const HEADER_HEIGHT = 40;
-	const PORT_SPACING = 28;
+	const HEADER_HEIGHT = 40; // Visual header: 3px accent + 37px content
+	const SIMPLE_NODE_HEIGHT = 44; // Compact node with small bottom pad
+	const PORT_SPACING = 24;
 	const PORT_RADIUS = 6;
-	const BOTTOM_PADDING = 8;
+	const BOTTOM_PADDING = 10;
 	const MIN_ZOOM = 0.15;
 	const MAX_ZOOM = 3;
 	const EDGE_HIT_WIDTH = 14;
@@ -126,6 +127,72 @@
 	let contextMenu = $state<{ x: number; y: number; nodeId: string } | null>(null);
 
 	// =========================================================================
+	// EDGE SPRING PHYSICS
+	// =========================================================================
+
+	const SPRING_K = 0.06;
+	const SPRING_DAMP = 0.82;
+	const VEL_SCALE = 0.35;
+	const SETTLE_THRESHOLD = 0.08;
+
+	let edgeSagOffsets = $state<Record<string, number>>({});
+	const edgeSpringState = new Map<string, { vel: number; prevSrcY: number; prevTgtY: number }>();
+	let springFrameId: number | null = null;
+
+	function kickEdgeSprings() {
+		if (springFrameId) return;
+		springFrameId = requestAnimationFrame(tickEdgeSprings);
+	}
+
+	function tickEdgeSprings() {
+		let anyActive = false;
+		const newOffsets: Record<string, number> = {};
+
+		for (const edge of edges) {
+			const src = getPortAbsolutePosition(edge.sourceNodeId, edge.sourcePort);
+			const tgt = getPortAbsolutePosition(edge.targetNodeId, edge.targetPort);
+			if (!src || !tgt) continue;
+
+			let s = edgeSpringState.get(edge.id);
+			if (!s) {
+				s = { vel: 0, prevSrcY: src.y, prevTgtY: tgt.y };
+				edgeSpringState.set(edge.id, s);
+			}
+
+			// Impulse from endpoint movement
+			const srcDelta = src.y - s.prevSrcY;
+			const tgtDelta = tgt.y - s.prevTgtY;
+			s.vel += ((srcDelta + tgtDelta) / 2) * VEL_SCALE;
+
+			// Spring force back toward rest (0)
+			const currentSag = edgeSagOffsets[edge.id] || 0;
+			s.vel += (-currentSag) * SPRING_K;
+			s.vel *= SPRING_DAMP;
+
+			const newSag = currentSag + s.vel;
+
+			s.prevSrcY = src.y;
+			s.prevTgtY = tgt.y;
+
+			if (Math.abs(s.vel) > 0.05 || Math.abs(newSag) > SETTLE_THRESHOLD) {
+				newOffsets[edge.id] = newSag;
+				anyActive = true;
+			} else {
+				newOffsets[edge.id] = 0;
+				s.vel = 0;
+			}
+		}
+
+		edgeSagOffsets = newOffsets;
+
+		if (anyActive) {
+			springFrameId = requestAnimationFrame(tickEdgeSprings);
+		} else {
+			springFrameId = null;
+		}
+	}
+
+	// =========================================================================
 	// HELPER FUNCTIONS
 	// =========================================================================
 
@@ -136,9 +203,25 @@
 		};
 	}
 
+	/** Simple node = max 1 port per side. Ports sit on the header edge. */
+	function isSimpleNode(node: WorkflowNode): boolean {
+		return node.inputs.length <= 1 && node.outputs.length <= 1;
+	}
+
 	function getNodeHeight(node: WorkflowNode): number {
-		const portCount = Math.max(node.inputs.length, node.outputs.length, 1);
+		if (isSimpleNode(node)) {
+			return SIMPLE_NODE_HEIGHT;
+		}
+		const portCount = Math.max(node.inputs.length, node.outputs.length);
 		return HEADER_HEIGHT + portCount * PORT_SPACING + BOTTOM_PADDING;
+	}
+
+	/** Get the Y position for a port. Simple nodes center ports on the header. */
+	function getPortY(node: WorkflowNode, index: number): number {
+		if (isSimpleNode(node)) {
+			return node.position.y + SIMPLE_NODE_HEIGHT / 2;
+		}
+		return node.position.y + HEADER_HEIGHT + index * PORT_SPACING + PORT_SPACING / 2;
 	}
 
 	function getPortPosition(
@@ -150,7 +233,7 @@
 		const index = ports.findIndex((p) => p.id === port.id);
 		return {
 			x: node.position.x + (side === 'input' ? 0 : NODE_WIDTH),
-			y: node.position.y + HEADER_HEIGHT + index * PORT_SPACING + PORT_SPACING / 2
+			y: getPortY(node, index)
 		};
 	}
 
@@ -166,7 +249,7 @@
 		if (inputIdx >= 0) {
 			return {
 				x: node.position.x,
-				y: node.position.y + HEADER_HEIGHT + inputIdx * PORT_SPACING + PORT_SPACING / 2
+				y: getPortY(node, inputIdx)
 			};
 		}
 
@@ -175,7 +258,7 @@
 		if (outputIdx >= 0) {
 			return {
 				x: node.position.x + NODE_WIDTH,
-				y: node.position.y + HEADER_HEIGHT + outputIdx * PORT_SPACING + PORT_SPACING / 2
+				y: getPortY(node, outputIdx)
 			};
 		}
 
@@ -186,17 +269,18 @@
 		sx: number,
 		sy: number,
 		tx: number,
-		ty: number
+		ty: number,
+		sag = 0
 	): string {
 		const dx = Math.max(Math.abs(tx - sx) * 0.5, 80);
-		return `M ${sx},${sy} C ${sx + dx},${sy} ${tx - dx},${ty} ${tx},${ty}`;
+		return `M ${sx},${sy} C ${sx + dx},${sy + sag} ${tx - dx},${ty + sag} ${tx},${ty}`;
 	}
 
-	function getEdgePath(edge: WorkflowEdge): string | null {
+	function getEdgePath(edge: WorkflowEdge, sag = 0): string | null {
 		const source = getPortAbsolutePosition(edge.sourceNodeId, edge.sourcePort);
 		const target = getPortAbsolutePosition(edge.targetNodeId, edge.targetPort);
 		if (!source || !target) return null;
-		return computeEdgePath(source.x, source.y, target.x, target.y);
+		return computeEdgePath(source.x, source.y, target.x, target.y, sag);
 	}
 
 	function getEdgeColor(edge: WorkflowEdge): string {
@@ -291,6 +375,7 @@
 					}
 				};
 			});
+			kickEdgeSprings();
 			return;
 		}
 
@@ -677,6 +762,13 @@
 			return () => { clearTimeout(id); window.removeEventListener('click', handler); };
 		}
 	});
+
+	// Cleanup spring animation on destroy
+	$effect(() => {
+		return () => {
+			if (springFrameId) cancelAnimationFrame(springFrameId);
+		};
+	});
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -716,7 +808,8 @@
 		<svg class="wf-edges-svg" fill="none">
 			<!-- Existing edges -->
 			{#each edges as edge (edge.id)}
-				{@const path = getEdgePath(edge)}
+				{@const sag = edgeSagOffsets[edge.id] || 0}
+				{@const path = getEdgePath(edge, sag)}
 				{@const color = getEdgeColor(edge)}
 				{@const isSelected = selectedEdgeIds.has(edge.id)}
 				{#if path}
@@ -799,8 +892,10 @@
 				ondblclick={(e) => handleNodeDoubleClick(e, node.id)}
 				oncontextmenu={(e) => handleNodeContextMenu(e, node.id)}
 			>
+				<!-- Accent top bar -->
+				<div class="wf-node-accent" style="background: {catColors.accent};"></div>
 				<!-- Header -->
-				<div class="wf-node-header" style="border-bottom-color: {catColors.accent};">
+				<div class="wf-node-header">
 					<span class="wf-node-icon" style="color: {catColors.icon};">
 						{NODE_ICONS[node.type]}
 					</span>
@@ -810,10 +905,11 @@
 				<!-- Input Ports -->
 				{#each node.inputs as port, i (port.id)}
 					{@const portColor = PORT_COLORS[port.type]}
+					{@const portTop = isSimpleNode(node) ? SIMPLE_NODE_HEIGHT / 2 : HEADER_HEIGHT + i * PORT_SPACING + PORT_SPACING / 2}
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<div
 						class="wf-port wf-port-input"
-						style="top: {HEADER_HEIGHT + i * PORT_SPACING + PORT_SPACING / 2}px;"
+						style="top: {portTop}px;"
 						data-port-id={port.id}
 						data-node-id={node.id}
 						data-port-side="input"
@@ -823,7 +919,7 @@
 							class="wf-port-circle"
 							style="background: {portColor}; box-shadow: 0 0 6px {portColor};"
 						></div>
-						{#if port.label}
+						{#if port.label && !isSimpleNode(node)}
 							<span class="wf-port-label wf-port-label-input">{port.label}</span>
 						{/if}
 					</div>
@@ -832,17 +928,18 @@
 				<!-- Output Ports -->
 				{#each node.outputs as port, i (port.id)}
 					{@const portColor = PORT_COLORS[port.type]}
+					{@const portTop = isSimpleNode(node) ? SIMPLE_NODE_HEIGHT / 2 : HEADER_HEIGHT + i * PORT_SPACING + PORT_SPACING / 2}
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<div
 						class="wf-port wf-port-output"
-						style="top: {HEADER_HEIGHT + i * PORT_SPACING + PORT_SPACING / 2}px;"
+						style="top: {portTop}px;"
 						data-port-id={port.id}
 						data-node-id={node.id}
 						data-port-side="output"
 						data-port-type={port.type}
 						onmousedown={(e) => handlePortMouseDown(e, node.id, port, 'output')}
 					>
-						{#if port.label}
+						{#if port.label && !isSimpleNode(node)}
 							<span class="wf-port-label wf-port-label-output">{port.label}</span>
 						{/if}
 						<div
@@ -1057,14 +1154,17 @@
 	/* ===================================================================
 	   NODE HEADER
 	   =================================================================== */
+	.wf-node-accent {
+		height: 3px;
+		border-radius: 10px 10px 0 0;
+	}
+
 	.wf-node-header {
 		display: flex;
 		align-items: center;
 		gap: 8px;
 		padding: 0 14px;
-		height: 40px;
-		border-bottom: 1px solid oklch(0.25 0.02 250);
-		border-radius: 10px 10px 0 0;
+		height: 37px;
 		overflow: hidden;
 	}
 

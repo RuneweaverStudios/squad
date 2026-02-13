@@ -422,7 +422,7 @@ export function getWorkflowIds(): string[] {
 	try {
 		const entries = readdirSync(WORKFLOWS_DIR, { withFileTypes: true });
 		return entries
-			.filter((entry) => entry.isFile() && entry.name.endsWith(WORKFLOW_EXTENSION))
+			.filter((entry) => entry.isFile() && entry.name.endsWith(WORKFLOW_EXTENSION) && !entry.name.startsWith('.'))
 			.map((entry) => basename(entry.name, WORKFLOW_EXTENSION));
 	} catch {
 		return [];

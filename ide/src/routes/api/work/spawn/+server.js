@@ -557,9 +557,13 @@ function buildAgentCommand({ agent, model, projectPath, jatDefaults, agentName, 
 			// If model.id already contains '/', use it directly (custom provider/model)
 			if (model.id.includes('/')) {
 				agentCmd += ` --model ${model.id}`;
+			} else if (agent.apiKeyProvider) {
+				// Use the agent's configured API key provider as prefix
+				agentCmd += ` --model ${agent.apiKeyProvider}/${model.id}`;
 			} else {
-				const provider = agent.apiKeyProvider || 'anthropic';
-				agentCmd += ` --model ${provider}/${model.id}`;
+				// No provider info available — pass bare model ID and let opencode resolve it.
+				// Don't blindly prepend 'anthropic' for non-Anthropic models like kimi-k2.5.
+				agentCmd += ` --model ${model.id}`;
 			}
 		} else {
 			// Generic: try --model with full ID
@@ -834,7 +838,7 @@ export async function POST({ request }) {
 		// Step 2: Assign task to new agent in JAT (if taskId provided)
 		if (taskId) {
 			try {
-				await execAsync(`jt update "${taskId}" --status in_progress --assignee "${agentName}"`, {
+				await execAsync(`jt update "${taskId}" --status in_progress --assignee "${agentName}" --agent-program "${selectedAgent.id}" --model "${selectedModel.shortName}"`, {
 					cwd: projectPath,
 					timeout: 10000
 				});

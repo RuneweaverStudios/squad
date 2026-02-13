@@ -314,17 +314,6 @@
 		runningEpicId = epicId;
 
 		try {
-			// Check available session slots
-			const workResponse = await fetch("/api/work");
-			const workData = await workResponse.json();
-			const activeSessionCount = workData.count || 0;
-			const currentMaxSessions = getMaxSessions();
-			const epicAvailableSlots = Math.max(0, currentMaxSessions - activeSessionCount);
-
-			if (epicAvailableSlots === 0) {
-				throw new Error(`All ${currentMaxSessions} session slots are in use. Close some sessions first.`);
-			}
-
 			// Fetch epic's children with ready status
 			const response = await fetch(`/api/epics/${epicId}/children`);
 			if (!response.ok) {
@@ -342,43 +331,26 @@
 				return;
 			}
 
-			// Cap to available session slots
-			const readyChildren = allReadyChildren.slice(0, epicAvailableSlots);
+			const taskIds = allReadyChildren.map((t: { id: string }) => t.id);
+			const results = await spawnInBatches(taskIds);
 
-			startBulkSpawn();
+			const successCount = results.filter((r) => r.success).length;
 
-			// Spawn agents for each ready child
-			const staggerMs = 6000;
-			for (let i = 0; i < readyChildren.length; i++) {
-				const task = readyChildren[i];
-				startSpawning(task.id);
-
-				try {
-					const spawnResponse = await fetch("/api/work/spawn", {
-						method: "POST",
-						headers: { "Content-Type": "application/json" },
-						body: JSON.stringify({ taskId: task.id }),
-					});
-
-					if (!spawnResponse.ok) {
-						stopSpawning(task.id);
-					} else {
-						setTimeout(() => stopSpawning(task.id), 2000);
-					}
-				} catch (err) {
-					stopSpawning(task.id);
-				}
-
-				// Stagger between spawns
-				if (i < readyChildren.length - 1) {
-					await new Promise((resolve) => setTimeout(resolve, staggerMs));
+			if (successCount === 0 && results.length > 0) {
+				// If we had tasks but 0 success, likely all were skipped due to limits
+				// or all failed. spawnInBatches returns "Skipped" errors if full.
+				const firstError = results[0]?.error || "Failed to spawn agents";
+				if (firstError.includes("session slots are in use")) {
+					alert(firstError);
+				} else {
+					throw new Error(firstError);
 				}
 			}
 
 		} catch (err) {
+			alert(err instanceof Error ? err.message : "Failed to run epic");
 		} finally {
 			runningEpicId = null;
-			endBulkSpawn();
 		}
 	}
 
@@ -737,179 +709,5 @@
 </nav>
 
 <style>
-	/* Swarm Dropdown Panel */
-	.swarm-dropdown-panel {
-		position: absolute;
-		top: 100%;
-		left: 0;
-		margin-top: 0.25rem;
-		z-index: 50;
-		min-width: 320px;
-		max-width: 400px;
-		border-radius: 0.5rem;
-		box-shadow: 0 10px 40px oklch(0 0 0 / 0.4);
-		overflow: hidden;
-		background: var(--color-base-200);
-		border: 1px solid var(--color-base-content);
-		border-opacity: 0.2;
-		animation: swarm-dropdown-slide 0.2s ease-out;
-		transform-origin: top left;
-	}
-
-	@keyframes swarm-dropdown-slide {
-		from {
-			opacity: 0;
-			transform: translateY(-8px) scale(0.96);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0) scale(1);
-		}
-	}
-
-	/* Project header in dropdown */
-	.swarm-project-header {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.375rem 0.75rem;
-		background: var(--color-base-300);
-		border-bottom: 1px solid color-mix(in oklch, var(--color-base-content) 25%, transparent);
-		position: sticky;
-		top: 0;
-		z-index: 1;
-	}
-
-	.swarm-project-label {
-		font-size: 0.65rem;
-		font-weight: 600;
-		color: var(--color-warning);
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		font-family: ui-monospace, monospace;
-		flex: 1;
-	}
-
-	.swarm-project-count {
-		font-size: 0.6rem;
-		color: var(--color-base-content);
-		opacity: 0.5;
-		padding: 0.125rem 0.375rem;
-		background: var(--color-base-200);
-		border-radius: 8px;
-	}
-
-	/* Project tab selector */
-	.project-tab {
-		display: flex;
-		align-items: center;
-		gap: 0.25rem;
-		padding: 0.25rem 0.5rem;
-		background: var(--color-base-200);
-		border: 1px solid color-mix(in oklch, var(--color-base-content) 28%, transparent);
-		border-radius: 0.25rem;
-		color: var(--color-base-content);
-		opacity: 0.6;
-		cursor: pointer;
-		transition: all 0.15s ease;
-		white-space: nowrap;
-		flex-shrink: 0;
-	}
-
-	.project-tab:hover {
-		background: var(--color-base-300);
-		border-color: color-mix(in oklch, var(--color-base-content) 35%, transparent);
-		opacity: 0.75;
-	}
-
-	.project-tab-active {
-		background: var(--color-success);
-		border-color: var(--color-success);
-		color: var(--color-success-content);
-		opacity: 1;
-	}
-
-	.project-tab-active:hover {
-		background: color-mix(in oklch, var(--color-success) 85%, var(--color-base-100));
-		border-color: var(--color-success);
-	}
-
-	.project-tab-count {
-		font-size: 0.55rem;
-		padding: 0 0.25rem;
-		background: var(--color-base-100);
-		border-radius: 4px;
-		color: var(--color-base-content);
-		opacity: 0.55;
-	}
-
-	.project-tab-active .project-tab-count {
-		background: color-mix(in oklch, var(--color-success-content) 20%, transparent);
-		color: var(--color-success-content);
-		opacity: 0.85;
-	}
-
-	/* Task row in dropdown */
-	.swarm-task-row {
-		display: block;
-		width: 100%;
-		padding: 0.5rem 0.75rem;
-		background: transparent;
-		border: none;
-		border-bottom: 1px solid color-mix(in oklch, var(--color-base-content) 10%, transparent);
-		cursor: pointer;
-		transition: background 0.15s ease;
-	}
-
-	.swarm-task-row:last-of-type {
-		border-bottom: none;
-	}
-
-	.swarm-task-row:hover:not(:disabled) {
-		background: var(--color-base-300);
-	}
-
-	.swarm-task-row:disabled {
-		opacity: 0.6;
-		cursor: not-allowed;
-	}
-
-	/* Menu item in dropdown (Quick Actions) */
-	.swarm-menu-item {
-		display: flex;
-		align-items: center;
-		gap: 0.625rem;
-		width: 100%;
-		padding: 0.625rem 0.75rem;
-		background: transparent;
-		border: none;
-		border-radius: 0.375rem;
-		color: var(--color-base-content);
-		opacity: 0.8;
-		font-size: 0.75rem;
-		font-family: ui-monospace, monospace;
-		cursor: pointer;
-		transition: all 0.15s ease;
-		text-align: left;
-	}
-
-	.swarm-menu-item:hover:not(:disabled) {
-		background: var(--color-base-300);
-		opacity: 0.9;
-	}
-
-	.swarm-menu-item:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-	}
-
-	.swarm-menu-item svg {
-		color: var(--color-success);
-		flex-shrink: 0;
-	}
-
-	.swarm-menu-item:hover:not(:disabled) svg {
-		color: var(--color-success);
-		opacity: 1;
-	}
+	/* Swarm Dropdown Panel styles removed (moved to ProjectSelector) */
 </style>

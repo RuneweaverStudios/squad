@@ -185,6 +185,13 @@
 		selectedFilePath = null;
 	}
 
+	// Handle rebase completion from GitPanel (clear commit expansion state)
+	function handleRebaseComplete() {
+		commitViewHash = null;
+		commitOpenFiles = [];
+		activeCommitFilePath = null;
+	}
+
 	// Handle stage file
 	async function handleStageFile(path: string) {
 		if (!selectedProject) return;
@@ -417,6 +424,7 @@
 								onFileClick={handleFileClick}
 								onCommitSelect={handleCommitSelect}
 								onCommitFileClick={(path) => { activeCommitFilePath = path; }}
+								onRebaseComplete={handleRebaseComplete}
 								{selectedFilePath}
 							/>
 						{:else}
