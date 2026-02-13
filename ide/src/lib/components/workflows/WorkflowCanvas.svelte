@@ -216,10 +216,11 @@
 		return HEADER_HEIGHT + portCount * PORT_SPACING + BOTTOM_PADDING;
 	}
 
-	/** Get the Y position for a port. Simple nodes center ports on the header. */
-	function getPortY(node: WorkflowNode, index: number): number {
-		if (isSimpleNode(node)) {
-			return node.position.y + SIMPLE_NODE_HEIGHT / 2;
+	/** Get the Y position for a port. Single-port sides center on the node. */
+	function getPortY(node: WorkflowNode, index: number, portCount: number): number {
+		if (portCount <= 1) {
+			// Single port on this side: center vertically on the full node
+			return node.position.y + getNodeHeight(node) / 2;
 		}
 		return node.position.y + HEADER_HEIGHT + index * PORT_SPACING + PORT_SPACING / 2;
 	}
@@ -233,7 +234,7 @@
 		const index = ports.findIndex((p) => p.id === port.id);
 		return {
 			x: node.position.x + (side === 'input' ? 0 : NODE_WIDTH),
-			y: getPortY(node, index)
+			y: getPortY(node, index, ports.length)
 		};
 	}
 
@@ -249,7 +250,7 @@
 		if (inputIdx >= 0) {
 			return {
 				x: node.position.x,
-				y: getPortY(node, inputIdx)
+				y: getPortY(node, inputIdx, node.inputs.length)
 			};
 		}
 
@@ -258,7 +259,7 @@
 		if (outputIdx >= 0) {
 			return {
 				x: node.position.x + NODE_WIDTH,
-				y: getPortY(node, outputIdx)
+				y: getPortY(node, outputIdx, node.outputs.length)
 			};
 		}
 
@@ -905,7 +906,7 @@
 				<!-- Input Ports -->
 				{#each node.inputs as port, i (port.id)}
 					{@const portColor = PORT_COLORS[port.type]}
-					{@const portTop = isSimpleNode(node) ? SIMPLE_NODE_HEIGHT / 2 : HEADER_HEIGHT + i * PORT_SPACING + PORT_SPACING / 2}
+					{@const portTop = node.inputs.length <= 1 ? getNodeHeight(node) / 2 : HEADER_HEIGHT + i * PORT_SPACING + PORT_SPACING / 2}
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<div
 						class="wf-port wf-port-input"
@@ -928,7 +929,7 @@
 				<!-- Output Ports -->
 				{#each node.outputs as port, i (port.id)}
 					{@const portColor = PORT_COLORS[port.type]}
-					{@const portTop = isSimpleNode(node) ? SIMPLE_NODE_HEIGHT / 2 : HEADER_HEIGHT + i * PORT_SPACING + PORT_SPACING / 2}
+					{@const portTop = node.outputs.length <= 1 ? getNodeHeight(node) / 2 : HEADER_HEIGHT + i * PORT_SPACING + PORT_SPACING / 2}
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<div
 						class="wf-port wf-port-output"
@@ -1203,7 +1204,6 @@
 
 	.wf-port-output {
 		right: -7px;
-		flex-direction: row-reverse;
 	}
 
 	.wf-port-circle {

@@ -145,6 +145,24 @@
 		return 'No content changes to display';
 	});
 
+	// Derived: Split raw diff into typed lines for fallback display
+	const rawDiffLines = $derived(
+		rawDiff
+			? rawDiff.split('\n').map((line) => ({
+					text: line,
+					type: line.startsWith('+++') || line.startsWith('---')
+						? ('file' as const)
+						: line.startsWith('+')
+							? ('add' as const)
+							: line.startsWith('-')
+								? ('del' as const)
+								: line.startsWith('@@')
+									? ('hunk' as const)
+									: ('context' as const)
+				}))
+			: []
+	);
+
 	// Fetch diff content when path changes
 	$effect(() => {
 		if (filePath && projectName) {
@@ -321,7 +339,7 @@
 
 		} catch (err) {
 			console.error('Failed to initialize Monaco Diff Editor:', err);
-			error = 'Failed to load diff editor';
+			monacoInitError = err instanceof Error ? err.message : 'Failed to load diff editor';
 			// Reset flag so retry is possible
 			editorInitialized = false;
 		}
@@ -337,6 +355,7 @@
 	async function fetchDiffContent() {
 		loading = true;
 		error = null;
+		monacoInitError = null;
 
 		try {
 			const params = new URLSearchParams({
@@ -532,7 +551,7 @@
 		<div
 			class="monaco-diff-wrapper"
 			bind:this={containerRef}
-			style:display={!filePath || error || hasMetadataOnlyChange || (originalContent === '' && modifiedContent === '' && !loading) ? 'none' : 'block'}
+			style:display={!filePath || error || monacoInitError || hasMetadataOnlyChange || (originalContent === '' && modifiedContent === '' && !loading) ? 'none' : 'block'}
 		></div>
 
 		<!-- Overlay states on top of Monaco container -->
@@ -554,12 +573,46 @@
 					<button onclick={fetchDiffContent} class="btn btn-sm">Retry</button>
 				</div>
 			</div>
+		{:else if monacoInitError && rawDiff}
+			<div class="diff-overlay diff-raw-fallback">
+				<div class="raw-diff-container">
+					<div class="raw-diff-header">
+						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:1rem;height:1rem;color:oklch(0.65 0.15 45);">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+						</svg>
+						<span>Diff editor unavailable — showing raw diff</span>
+					</div>
+					<pre class="raw-diff-content">{#each rawDiffLines as line}<span class="raw-diff-line raw-diff-{line.type}">{line.text}
+</span>{/each}</pre>
+				</div>
+			</div>
+		{:else if monacoInitError}
+			<div class="diff-overlay diff-error">
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:3rem;height:3rem;color:oklch(0.65 0.15 25);">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+				</svg>
+				<p class="diff-empty-text" style="margin-top:0.75rem;">Failed to load diff editor</p>
+				<p style="font-size:0.75rem;color:oklch(0.45 0.02 250);margin-top:0.25rem;">{monacoInitError}</p>
+			</div>
 		{:else if !filePath}
 			<div class="diff-overlay diff-empty">
 				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="diff-empty-icon">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
 				</svg>
 				<p class="diff-empty-text">Select a file to view diff</p>
+			</div>
+		{:else if originalContent === '' && modifiedContent === '' && rawDiff}
+			<div class="diff-overlay diff-raw-fallback">
+				<div class="raw-diff-container">
+					<div class="raw-diff-header">
+						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:1rem;height:1rem;color:oklch(0.55 0.10 200);">
+							<path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+						</svg>
+						<span>Raw diff</span>
+					</div>
+					<pre class="raw-diff-content">{#each rawDiffLines as line}<span class="raw-diff-line raw-diff-{line.type}">{line.text}
+</span>{/each}</pre>
+				</div>
 			</div>
 		{:else if originalContent === '' && modifiedContent === ''}
 			<div class="diff-overlay diff-empty">
@@ -813,5 +866,74 @@
 	.monaco-diff-wrapper :global(.monaco-diff-editor) {
 		position: absolute !important;
 		inset: 0;
+	}
+
+	/* Raw diff fallback display */
+	.diff-raw-fallback {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		overflow: hidden;
+	}
+
+	.raw-diff-container {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		overflow: hidden;
+	}
+
+	.raw-diff-header {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		padding: 0.375rem 0.75rem;
+		font-size: 0.75rem;
+		color: oklch(0.55 0.02 250);
+		background: oklch(0.16 0.01 250);
+		border-bottom: 1px solid oklch(0.22 0.02 250);
+		flex-shrink: 0;
+	}
+
+	.raw-diff-content {
+		flex: 1;
+		overflow: auto;
+		margin: 0;
+		padding: 0.5rem 0;
+		font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+		font-size: 0.8125rem;
+		line-height: 1.5;
+		background: oklch(0.14 0.01 250);
+		white-space: pre;
+		tab-size: 4;
+	}
+
+	.raw-diff-line {
+		display: block;
+		padding: 0 0.75rem;
+	}
+
+	.raw-diff-add {
+		color: oklch(0.75 0.15 145);
+		background: oklch(0.45 0.12 145 / 0.12);
+	}
+
+	.raw-diff-del {
+		color: oklch(0.75 0.15 25);
+		background: oklch(0.45 0.12 25 / 0.12);
+	}
+
+	.raw-diff-hunk {
+		color: oklch(0.65 0.15 260);
+		background: oklch(0.45 0.10 260 / 0.08);
+	}
+
+	.raw-diff-file {
+		color: oklch(0.70 0.10 200);
+		font-weight: 600;
+	}
+
+	.raw-diff-context {
+		color: oklch(0.55 0.02 250);
 	}
 </style>
