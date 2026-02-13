@@ -1373,11 +1373,11 @@
 
 	// Handle keyboard shortcuts
 	function handleKeydown(event: KeyboardEvent) {
-		// Arrow keys navigate tabs when no text input is active, or focused input is empty
+		// Arrow keys navigate tabs only when NOT in any editable element
 		if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-			const el = document.activeElement as HTMLInputElement | HTMLTextAreaElement | null;
-			const isTextInput = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA');
-			if (!isTextInput || !el.value) {
+			const el = document.activeElement as HTMLElement | null;
+			const isTextInput = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+			if (!isTextInput) {
 				event.preventDefault();
 				navigateTab(event.key === 'ArrowLeft' ? -1 : 1);
 				return;

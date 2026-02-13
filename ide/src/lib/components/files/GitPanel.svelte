@@ -72,6 +72,7 @@
 	let tracking = $state<string | null>(null);
 	let ahead = $state(0);
 	let behind = $state(0);
+	let stashCount = $state(0);
 	let isClean = $state(true);
 
 	// File lists from git status
@@ -231,9 +232,14 @@
 	let isGeneratingMessage = $state(false);
 	let isPushing = $state(false);
 	let isPulling = $state(false);
+	let showPushDropdown = $state(false);
+	let showForcePushConfirm = $state(false);
 	let isFetching = $state(false);
 	let pullStrategy = $state<'rebase' | 'merge'>('rebase');
 	let showPullDropdown = $state(false);
+	let isStashing = $state(false);
+	let showStashDropdown = $state(false);
+	let stashEntries = $state<Array<{ index: number; hash: string; message: string; date: string }>>([]);
 
 	// Toast state
 	let toastMessage = $state<string | null>(null);
@@ -733,6 +739,7 @@
 			tracking = data.tracking;
 			ahead = data.ahead || 0;
 			behind = data.behind || 0;
+			stashCount = data.stashCount || 0;
 
 			// Populate file arrays from API response
 			stagedFiles = data.staged || [];
@@ -784,6 +791,56 @@
 		}
 	}
 
+	async function handleStash(action: 'push' | 'pop' | 'apply' | 'drop', index = 0) {
+		if (isStashing) return;
+
+		isStashing = true;
+		showStashDropdown = false;
+		try {
+			const response = await fetch('/api/files/git/stash', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ project, action, index })
+			});
+
+			if (!response.ok) {
+				const data = await response.json();
+				throw new Error(data.message || `Failed to ${action} stash`);
+			}
+
+			const data = await response.json();
+			stashCount = data.count || 0;
+			stashEntries = data.entries || [];
+
+			const labels: Record<string, string> = {
+				push: 'Changes stashed',
+				pop: 'Stash popped',
+				apply: 'Stash applied',
+				drop: 'Stash dropped'
+			};
+			showToast(labels[action]);
+			await fetchStatus();
+		} catch (err) {
+			showToast(err instanceof Error ? err.message : `Failed to ${action} stash`, 'error');
+		} finally {
+			isStashing = false;
+		}
+	}
+
+	async function fetchStashList() {
+		if (!project) return;
+		try {
+			const response = await fetch(`/api/files/git/stash?project=${encodeURIComponent(project)}`);
+			if (response.ok) {
+				const data = await response.json();
+				stashEntries = data.entries || [];
+				stashCount = data.count || 0;
+			}
+		} catch {
+			// Silent fail — stash list is supplementary
+		}
+	}
+
 	async function handleCommit() {
 		if (!canCommit) return;
 
@@ -812,15 +869,17 @@
 		}
 	}
 
-	async function handlePush() {
+	async function handlePush(force = false) {
 		if (isPushing) return;
 
 		isPushing = true;
+		showPushDropdown = false;
+		showForcePushConfirm = false;
 		try {
 			const response = await fetch('/api/files/git/push', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ project })
+				body: JSON.stringify({ project, force })
 			});
 
 			if (!response.ok) {
@@ -828,9 +887,9 @@
 				throw new Error(data.message || 'Failed to push');
 			}
 
-			showToast('Pushed to remote');
+			showToast(force ? 'Force pushed to remote' : 'Pushed to remote');
 			await fetchStatus();
-			await fetchTimeline(); // Refresh commit timeline to show pushed status
+			await fetchTimeline();
 		} catch (err) {
 			showToast(err instanceof Error ? err.message : 'Failed to push', 'error');
 		} finally {
@@ -838,7 +897,7 @@
 		}
 	}
 
-	async function handlePull(strategy?: 'rebase' | 'merge') {
+	async function handlePull(strategy?: 'rebase' | 'merge', autostash = false) {
 		if (isPulling) return;
 		const useRebase = strategy ?? pullStrategy;
 
@@ -848,7 +907,7 @@
 			const response = await fetch('/api/files/git/pull', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ project, rebase: useRebase === 'rebase' })
+				body: JSON.stringify({ project, rebase: useRebase === 'rebase', autostash })
 			});
 
 			if (!response.ok) {
@@ -858,8 +917,9 @@
 
 			const data = await response.json();
 			const label = useRebase === 'rebase' ? 'Rebased' : 'Pulled';
+			const stashLabel = autostash ? ' (autostashed)' : '';
 			const changes = data.summary?.changes || 0;
-			showToast(changes > 0 ? `${label} ${changes} change(s)` : `${label} successfully`);
+			showToast(changes > 0 ? `${label} ${changes} change(s)${stashLabel}` : `${label} successfully${stashLabel}`);
 			await fetchStatus();
 			await fetchTimeline();
 		} catch (err) {
@@ -1272,6 +1332,60 @@
 					</svg>
 				{/if}
 			</button>
+			{#if stashCount > 0}
+				<div class="stash-badge-wrap">
+					<button
+						class="stash-badge"
+						onclick={() => { if (!showStashDropdown) fetchStashList(); showStashDropdown = !showStashDropdown; }}
+						title="{stashCount} stashed change(s) — click to manage"
+					>
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px">
+							<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+						</svg>
+						{stashCount}
+					</button>
+					{#if showStashDropdown}
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
+						<div class="stash-dropdown-overlay" onclick={() => showStashDropdown = false} onkeydown={() => {}}></div>
+						<div class="stash-dropdown">
+							<div class="stash-dropdown-header">
+								<span class="stash-dropdown-title">Stash ({stashCount})</span>
+							</div>
+							{#if stashEntries.length === 0}
+								<div class="stash-dropdown-empty">Loading...</div>
+							{:else}
+								{#each stashEntries as entry}
+									<div class="stash-entry">
+										<div class="stash-entry-msg" title={entry.message}>
+											{entry.message.replace(/^WIP on .+?: /, '').replace(/^On .+?: /, '')}
+										</div>
+										<div class="stash-entry-actions">
+											<button
+												class="stash-action-btn pop"
+												onclick={() => handleStash('pop', entry.index)}
+												disabled={isStashing}
+												title="Pop (apply + remove)"
+											>Pop</button>
+											<button
+												class="stash-action-btn apply"
+												onclick={() => handleStash('apply', entry.index)}
+												disabled={isStashing}
+												title="Apply (keep in stash)"
+											>Apply</button>
+											<button
+												class="stash-action-btn drop"
+												onclick={() => handleStash('drop', entry.index)}
+												disabled={isStashing}
+												title="Drop (discard)"
+											>Drop</button>
+										</div>
+									</div>
+								{/each}
+							{/if}
+						</div>
+					{/if}
+				</div>
+			{/if}
 		</div>
 
 		<!-- File Changes Sections -->
@@ -1464,6 +1578,20 @@
 								{/if}
 							</button>
 						{/if}
+						<button
+							class="stash-btn"
+							onclick={(e) => { e.stopPropagation(); handleStash('push'); }}
+							disabled={isStashing}
+							title="Stash all changes (including untracked)"
+						>
+							{#if isStashing}
+								<span class="loading loading-spinner loading-xs"></span>
+							{:else}
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+								</svg>
+							{/if}
+						</button>
 					{/if}
 				</button>
 
@@ -1836,14 +1964,12 @@
 
 		<!-- Push/Pull Actions -->
 		<div class="sync-actions">
-			<span
-				class="sync-btn-wrap"
-				title={ahead === 0 ? 'Nothing to push' : behind > 0 ? `Pull ${behind} remote commit(s) first` : `Push ${ahead} commit(s) to remote`}
-			>
+			<div class="push-split-btn">
 				<button
-					class="btn btn-sm btn-outline sync-btn"
-					onclick={handlePush}
+					class="btn btn-sm btn-outline sync-btn push-main"
+					onclick={() => handlePush()}
 					disabled={!canPush && !isPushing}
+					title={ahead === 0 ? 'Nothing to push' : behind > 0 ? `Pull ${behind} remote commit(s) first` : `Push ${ahead} commit(s) to remote`}
 				>
 					{#if isPushing}
 						<span class="loading loading-spinner loading-xs"></span>
@@ -1858,70 +1984,73 @@
 						<span class="count">{ahead}</span>
 					{/if}
 				</button>
-			</span>
-			{#if isDiverged}
-				<!-- Split button: main action + strategy dropdown -->
-				<div class="pull-split-btn">
-					<button
-						class="btn btn-sm btn-outline sync-btn pull-main"
-						onclick={() => handlePull()}
-						disabled={!canPull && !isPulling}
-						title={pullStrategy === 'rebase'
-							? `Rebase ${ahead} local commit(s) onto ${behind} remote commit(s)`
-							: `Merge ${behind} remote commit(s) into local branch`}
-					>
-						{#if isPulling}
-							<span class="loading loading-spinner loading-xs"></span>
-						{:else}
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-								<line x1="12" y1="5" x2="12" y2="19" />
-								<polyline points="19 12 12 19 5 12" />
-							</svg>
-						{/if}
-						{pullStrategy === 'rebase' ? 'Rebase' : 'Pull'}
-						{#if behind > 0}
-							<span class="count">{behind}</span>
-						{/if}
-					</button>
-					<button
-						class="btn btn-sm btn-outline pull-dropdown-toggle"
-						onclick={() => showPullDropdown = !showPullDropdown}
-						disabled={!canPull && !isPulling}
-						title="Choose pull strategy"
-					>
-						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px">
-							<polyline points="6 9 12 15 18 9" />
-						</svg>
-					</button>
-					{#if showPullDropdown}
-						<!-- svelte-ignore a11y_no_static_element_interactions -->
-						<div class="pull-dropdown-overlay" onclick={() => showPullDropdown = false} onkeydown={() => {}}></div>
-						<div class="pull-dropdown-menu">
-							<button
-								class="pull-dropdown-item"
-								class:active={pullStrategy === 'rebase'}
-								onclick={() => { pullStrategy = 'rebase'; showPullDropdown = false; }}
-							>
-								<span class="pull-dropdown-label">Rebase</span>
-								<span class="pull-dropdown-desc">Replay local commits on top of remote</span>
-							</button>
-							<button
-								class="pull-dropdown-item"
-								class:active={pullStrategy === 'merge'}
-								onclick={() => { pullStrategy = 'merge'; showPullDropdown = false; }}
-							>
-								<span class="pull-dropdown-label">Merge</span>
-								<span class="pull-dropdown-desc">Create merge commit</span>
-							</button>
-						</div>
-					{/if}
-				</div>
-			{:else}
 				<button
-					class="btn btn-sm btn-outline sync-btn"
+					class="btn btn-sm btn-outline push-dropdown-toggle"
+					onclick={() => showPushDropdown = !showPushDropdown}
+					disabled={!canPush && !isPushing}
+					title="Push options"
+				>
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px">
+						<polyline points="6 9 12 15 18 9" />
+					</svg>
+				</button>
+				{#if showPushDropdown}
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="push-dropdown-overlay" onclick={() => { showPushDropdown = false; showForcePushConfirm = false; }} onkeydown={() => {}}></div>
+					<div class="push-dropdown-menu">
+						{#if showForcePushConfirm}
+							<div class="force-push-confirm">
+								<div class="force-push-warn">
+									<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px">
+										<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+										<line x1="12" y1="9" x2="12" y2="13" />
+										<line x1="12" y1="17" x2="12.01" y2="17" />
+									</svg>
+									<span>Overwrites remote history using --force-with-lease</span>
+								</div>
+								<div class="force-push-actions">
+									<button
+										class="btn btn-xs"
+										onclick={() => showForcePushConfirm = false}
+									>Cancel</button>
+									<button
+										class="btn btn-xs btn-error"
+										onclick={() => handlePush(true)}
+									>Force Push</button>
+								</div>
+							</div>
+						{:else}
+							<button
+								class="push-dropdown-item"
+								onclick={() => handlePush()}
+								disabled={!canPush}
+							>
+								<span class="push-dropdown-label">Push</span>
+								<span class="push-dropdown-desc">Push commits to remote</span>
+							</button>
+							<button
+								class="push-dropdown-item push-dropdown-danger"
+								onclick={() => showForcePushConfirm = true}
+							>
+								<span class="push-dropdown-label">Force Push</span>
+								<span class="push-dropdown-desc">Overwrite remote (--force-with-lease)</span>
+							</button>
+						{/if}
+					</div>
+				{/if}
+			</div>
+			<div class="pull-split-btn">
+				<button
+					class="btn btn-sm btn-outline sync-btn pull-main"
 					onclick={() => handlePull()}
 					disabled={!canPull && !isPulling}
-					title={behind === 0 ? 'Nothing to pull' : `Pull ${behind} commit(s) from remote`}
+					title={behind === 0
+						? 'Nothing to pull'
+						: isDiverged
+							? (pullStrategy === 'rebase'
+								? `Rebase ${ahead} local commit(s) onto ${behind} remote commit(s)`
+								: `Merge ${behind} remote commit(s) into local branch`)
+							: `Pull ${behind} commit(s) from remote`}
 				>
 					{#if isPulling}
 						<span class="loading loading-spinner loading-xs"></span>
@@ -1931,12 +2060,53 @@
 							<polyline points="19 12 12 19 5 12" />
 						</svg>
 					{/if}
-					Pull
+					{isDiverged && pullStrategy === 'rebase' ? 'Rebase' : 'Pull'}
 					{#if behind > 0}
 						<span class="count">{behind}</span>
 					{/if}
 				</button>
-			{/if}
+				<button
+					class="btn btn-sm btn-outline pull-dropdown-toggle"
+					onclick={() => showPullDropdown = !showPullDropdown}
+					disabled={!canPull && !isPulling}
+					title="Pull options"
+				>
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px">
+						<polyline points="6 9 12 15 18 9" />
+					</svg>
+				</button>
+				{#if showPullDropdown}
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="pull-dropdown-overlay" onclick={() => showPullDropdown = false} onkeydown={() => {}}></div>
+					<div class="pull-dropdown-menu">
+						<button
+							class="pull-dropdown-item"
+							class:active={pullStrategy === 'rebase'}
+							onclick={() => { pullStrategy = 'rebase'; showPullDropdown = false; }}
+						>
+							<span class="pull-dropdown-label">Rebase</span>
+							<span class="pull-dropdown-desc">Replay local commits on top of remote</span>
+						</button>
+						<button
+							class="pull-dropdown-item"
+							class:active={pullStrategy === 'merge'}
+							onclick={() => { pullStrategy = 'merge'; showPullDropdown = false; }}
+						>
+							<span class="pull-dropdown-label">Merge</span>
+							<span class="pull-dropdown-desc">Create merge commit</span>
+						</button>
+						<div class="pull-dropdown-divider"></div>
+						<button
+							class="pull-dropdown-item"
+							onclick={() => handlePull(undefined, true)}
+							disabled={!canPull}
+						>
+							<span class="pull-dropdown-label">Pull with Autostash</span>
+							<span class="pull-dropdown-desc">Stash changes, pull, then restore</span>
+						</button>
+					</div>
+				{/if}
+			</div>
 		</div>
 
 		<!-- Timeline Section -->
@@ -2459,6 +2629,177 @@
 		height: 14px;
 	}
 
+	/* Stash Badge + Dropdown */
+	.stash-badge-wrap {
+		position: relative;
+	}
+
+	.stash-badge {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		padding: 0.125rem 0.375rem;
+		background: oklch(0.65 0.15 60 / 0.15);
+		border: 1px solid oklch(0.65 0.15 60 / 0.3);
+		border-radius: 0.375rem;
+		color: oklch(0.75 0.15 60);
+		font-size: 0.6875rem;
+		font-weight: 600;
+		white-space: nowrap;
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.stash-badge:hover {
+		background: oklch(0.65 0.15 60 / 0.25);
+		border-color: oklch(0.65 0.15 60 / 0.5);
+	}
+
+	.stash-dropdown-overlay {
+		position: fixed;
+		inset: 0;
+		z-index: 39;
+	}
+
+	.stash-dropdown {
+		position: absolute;
+		top: calc(100% + 4px);
+		right: 0;
+		z-index: 40;
+		background: oklch(0.18 0.02 250);
+		border: 1px solid oklch(0.30 0.02 250);
+		border-radius: 0.5rem;
+		padding: 0.25rem;
+		min-width: 260px;
+		max-width: 320px;
+		box-shadow: 0 4px 12px oklch(0 0 0 / 0.4);
+	}
+
+	.stash-dropdown-header {
+		display: flex;
+		align-items: center;
+		padding: 0.375rem 0.5rem 0.25rem;
+	}
+
+	.stash-dropdown-title {
+		font-size: 0.6875rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: oklch(0.55 0.02 250);
+	}
+
+	.stash-dropdown-empty {
+		padding: 0.75rem 0.5rem;
+		font-size: 0.75rem;
+		color: oklch(0.50 0.02 250);
+		text-align: center;
+	}
+
+	.stash-entry {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		padding: 0.375rem 0.5rem;
+		border-radius: 0.375rem;
+		transition: background 0.1s;
+	}
+
+	.stash-entry:hover {
+		background: oklch(0.22 0.02 250);
+	}
+
+	.stash-entry-msg {
+		flex: 1;
+		min-width: 0;
+		font-size: 0.75rem;
+		color: oklch(0.80 0.02 250);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.stash-entry-actions {
+		display: flex;
+		gap: 0.25rem;
+		flex-shrink: 0;
+	}
+
+	.stash-action-btn {
+		padding: 0.125rem 0.375rem;
+		border: 1px solid oklch(0.30 0.02 250);
+		border-radius: 0.25rem;
+		background: transparent;
+		font-size: 0.625rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition: all 0.1s;
+	}
+
+	.stash-action-btn:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
+
+	.stash-action-btn.pop {
+		color: oklch(0.70 0.15 145);
+		border-color: oklch(0.40 0.10 145);
+	}
+
+	.stash-action-btn.pop:hover:not(:disabled) {
+		background: oklch(0.65 0.15 145 / 0.15);
+	}
+
+	.stash-action-btn.apply {
+		color: oklch(0.70 0.15 200);
+		border-color: oklch(0.40 0.10 200);
+	}
+
+	.stash-action-btn.apply:hover:not(:disabled) {
+		background: oklch(0.65 0.15 200 / 0.15);
+	}
+
+	.stash-action-btn.drop {
+		color: oklch(0.70 0.12 25);
+		border-color: oklch(0.40 0.10 25);
+	}
+
+	.stash-action-btn.drop:hover:not(:disabled) {
+		background: oklch(0.65 0.12 25 / 0.15);
+	}
+
+	/* Stash Button (Changes header) */
+	.stash-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 24px;
+		height: 24px;
+		padding: 0;
+		background: transparent;
+		border: 1px solid oklch(0.30 0.02 250);
+		border-radius: 0.25rem;
+		color: oklch(0.60 0.02 250);
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.stash-btn:hover:not(:disabled) {
+		background: oklch(0.65 0.15 60 / 0.15);
+		color: oklch(0.75 0.15 60);
+		border-color: oklch(0.65 0.15 60 / 0.4);
+	}
+
+	.stash-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.stash-btn svg {
+		width: 13px;
+		height: 13px;
+	}
+
 	/* Status Badges */
 	.status-badges {
 		display: flex;
@@ -2669,6 +3010,131 @@
 	.pull-dropdown-desc {
 		font-size: 0.6875rem;
 		color: oklch(0.55 0.02 250);
+	}
+
+	.pull-dropdown-section-label {
+		font-size: 0.625rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: oklch(0.45 0.02 250);
+		padding: 0.375rem 0.625rem 0.125rem;
+	}
+
+	.pull-dropdown-divider {
+		height: 1px;
+		background: oklch(0.28 0.02 250);
+		margin: 0.25rem 0;
+	}
+
+	/* Push split button */
+	.push-split-btn {
+		flex: 1;
+		display: flex;
+		position: relative;
+	}
+
+	.push-split-btn .push-main {
+		flex: 1;
+		border-top-right-radius: 0;
+		border-bottom-right-radius: 0;
+		border-right: none;
+	}
+
+	.push-dropdown-toggle {
+		border-top-left-radius: 0;
+		border-bottom-left-radius: 0;
+		padding: 0 0.375rem;
+		min-width: 0;
+	}
+
+	.push-dropdown-overlay {
+		position: fixed;
+		inset: 0;
+		z-index: 39;
+	}
+
+	.push-dropdown-menu {
+		position: absolute;
+		bottom: calc(100% + 4px);
+		right: 0;
+		z-index: 40;
+		background: oklch(0.18 0.02 250);
+		border: 1px solid oklch(0.30 0.02 250);
+		border-radius: 0.5rem;
+		padding: 0.25rem;
+		min-width: 220px;
+		box-shadow: 0 4px 12px oklch(0 0 0 / 0.4);
+	}
+
+	.push-dropdown-item {
+		display: flex;
+		flex-direction: column;
+		gap: 0.125rem;
+		width: 100%;
+		padding: 0.5rem 0.625rem;
+		border: none;
+		border-radius: 0.375rem;
+		background: transparent;
+		cursor: pointer;
+		text-align: left;
+		transition: background 0.1s;
+	}
+
+	.push-dropdown-item:hover {
+		background: oklch(0.25 0.02 250);
+	}
+
+	.push-dropdown-item:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
+
+	.push-dropdown-item.push-dropdown-danger:hover {
+		background: oklch(0.25 0.08 25);
+	}
+
+	.push-dropdown-label {
+		font-size: 0.8125rem;
+		font-weight: 600;
+		color: oklch(0.85 0.02 250);
+	}
+
+	.push-dropdown-danger .push-dropdown-label {
+		color: oklch(0.75 0.15 25);
+	}
+
+	.push-dropdown-desc {
+		font-size: 0.6875rem;
+		color: oklch(0.55 0.02 250);
+	}
+
+	.force-push-confirm {
+		padding: 0.5rem 0.625rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.force-push-warn {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.375rem;
+		font-size: 0.75rem;
+		color: oklch(0.75 0.15 60);
+		line-height: 1.3;
+	}
+
+	.force-push-warn svg {
+		flex-shrink: 0;
+		color: oklch(0.75 0.15 60);
+		margin-top: 1px;
+	}
+
+	.force-push-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.375rem;
 	}
 
 	/* Toast */

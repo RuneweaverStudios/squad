@@ -20,7 +20,7 @@
 
 <div class="flex flex-col gap-4">
 	<div class="form-control">
-		<label class="label pb-1">
+		<label class="label w-full pb-1">
 			<span class="label-text font-semibold text-sm" style="color: oklch(0.85 0.02 250)">Task Source</span>
 		</label>
 		<div class="flex gap-2">
@@ -47,12 +47,12 @@
 
 	{#if mode === 'new'}
 		<div class="form-control">
-			<label class="label pb-1">
+			<label class="label w-full pb-1">
 				<span class="label-text font-semibold text-sm" style="color: oklch(0.85 0.02 250)">Task Title</span>
 			</label>
 			<input
 				type="text"
-				class="input input-sm input-bordered"
+				class="input input-sm input-bordered w-full"
 				style="background: oklch(0.16 0.01 250); border-color: oklch(0.25 0.02 250); color: oklch(0.90 0.02 250)"
 				value={config.taskTitle || ''}
 				oninput={(e) => update({ taskTitle: e.currentTarget.value })}
@@ -61,12 +61,12 @@
 		</div>
 
 		<div class="form-control">
-			<label class="label pb-1">
+			<label class="label w-full pb-1">
 				<span class="label-text font-semibold text-sm" style="color: oklch(0.85 0.02 250)">Task Description</span>
 				<span class="label-text-alt" style="color: oklch(0.55 0.02 250)">Optional</span>
 			</label>
 			<textarea
-				class="textarea textarea-bordered text-sm"
+				class="textarea textarea-bordered text-sm w-full"
 				style="background: oklch(0.16 0.01 250); border-color: oklch(0.25 0.02 250); color: oklch(0.90 0.02 250); min-height: 80px"
 				value={config.taskDescription || ''}
 				oninput={(e) => update({ taskDescription: e.currentTarget.value || undefined })}
@@ -75,12 +75,12 @@
 		</div>
 	{:else}
 		<div class="form-control">
-			<label class="label pb-1">
+			<label class="label w-full pb-1">
 				<span class="label-text font-semibold text-sm" style="color: oklch(0.85 0.02 250)">Task ID</span>
 			</label>
 			<input
 				type="text"
-				class="input input-sm input-bordered font-mono"
+				class="input input-sm input-bordered font-mono w-full"
 				style="background: oklch(0.16 0.01 250); border-color: oklch(0.25 0.02 250); color: oklch(0.90 0.02 250)"
 				value={config.taskId || ''}
 				oninput={(e) => update({ taskId: e.currentTarget.value })}
@@ -90,7 +90,7 @@
 	{/if}
 
 	<div class="form-control">
-		<label class="label pb-1">
+		<label class="label w-full pb-1">
 			<span class="label-text font-semibold text-sm" style="color: oklch(0.85 0.02 250)">Model</span>
 		</label>
 		<div class="flex gap-2">
@@ -109,13 +109,13 @@
 	</div>
 
 	<div class="form-control">
-		<label class="label pb-1">
+		<label class="label w-full pb-1">
 			<span class="label-text font-semibold text-sm" style="color: oklch(0.85 0.02 250)">Project</span>
 			<span class="label-text-alt" style="color: oklch(0.55 0.02 250)">Optional</span>
 		</label>
 		<input
 			type="text"
-			class="input input-sm input-bordered"
+			class="input input-sm input-bordered w-full"
 			style="background: oklch(0.16 0.01 250); border-color: oklch(0.25 0.02 250); color: oklch(0.90 0.02 250)"
 			value={config.project || ''}
 			oninput={(e) => update({ project: e.currentTarget.value || undefined })}

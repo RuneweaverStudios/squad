@@ -46,17 +46,17 @@
 
 <div class="flex flex-col gap-4">
 	<div class="form-control">
-		<label class="label pb-1">
+		<label class="label w-full pb-1">
 			<span class="label-text font-semibold text-sm" style="color: oklch(0.85 0.02 250)">Prompt</span>
 		</label>
 		<textarea
-			class="textarea textarea-bordered text-sm font-mono leading-relaxed"
+			class="textarea textarea-bordered text-sm font-mono leading-relaxed w-full"
 			style="background: oklch(0.16 0.01 250); border-color: oklch(0.25 0.02 250); color: oklch(0.90 0.02 250); min-height: 120px"
 			value={config.prompt}
 			oninput={(e) => update({ prompt: e.currentTarget.value })}
 			placeholder={`Enter your prompt here...\n\nUse {{input}} to reference data from the previous node.`}
 		></textarea>
-		<label class="label pt-1">
+		<label class="label w-full pt-1">
 			<span class="label-text-alt" style="color: oklch(0.55 0.02 250)">
 				Use <code class="px-1 py-0.5 rounded text-xs" style="background: oklch(0.20 0.02 250); color: oklch(0.72 0.15 280)">{`{{input}}`}</code> for previous node output
 			</span>
@@ -64,7 +64,7 @@
 	</div>
 
 	<div class="form-control">
-		<label class="label pb-1">
+		<label class="label w-full pb-1">
 			<span class="label-text font-semibold text-sm" style="color: oklch(0.85 0.02 250)">Model</span>
 		</label>
 		<div class="flex gap-2">
@@ -86,13 +86,13 @@
 	</div>
 
 	<div class="form-control">
-		<label class="label pb-1">
+		<label class="label w-full pb-1">
 			<span class="label-text font-semibold text-sm" style="color: oklch(0.85 0.02 250)">Project</span>
 			<span class="label-text-alt" style="color: oklch(0.55 0.02 250)">Optional</span>
 		</label>
 		<input
 			type="text"
-			class="input input-sm input-bordered"
+			class="input input-sm input-bordered w-full"
 			style="background: oklch(0.16 0.01 250); border-color: oklch(0.25 0.02 250); color: oklch(0.90 0.02 250)"
 			value={config.project || ''}
 			oninput={(e) => update({ project: e.currentTarget.value || undefined })}
@@ -101,13 +101,13 @@
 	</div>
 
 	<div class="form-control">
-		<label class="label pb-1">
+		<label class="label w-full pb-1">
 			<span class="label-text font-semibold text-sm" style="color: oklch(0.85 0.02 250)">Max Tokens</span>
 			<span class="label-text-alt" style="color: oklch(0.55 0.02 250)">Optional</span>
 		</label>
 		<input
 			type="number"
-			class="input input-sm input-bordered"
+			class="input input-sm input-bordered w-full"
 			style="background: oklch(0.16 0.01 250); border-color: oklch(0.25 0.02 250); color: oklch(0.90 0.02 250)"
 			value={config.maxTokens || ''}
 			oninput={(e) => update({ maxTokens: e.currentTarget.value ? parseInt(e.currentTarget.value) : undefined })}
@@ -118,7 +118,7 @@
 	</div>
 
 	<div class="form-control">
-		<label class="label pb-1">
+		<label class="label w-full pb-1">
 			<span class="label-text font-semibold text-sm" style="color: oklch(0.85 0.02 250)">Variables</span>
 			<span class="label-text-alt" style="color: oklch(0.55 0.02 250)">Optional</span>
 		</label>

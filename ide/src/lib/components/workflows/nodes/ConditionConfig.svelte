@@ -39,11 +39,11 @@
 	</div>
 
 	<div class="form-control">
-		<label class="label pb-1">
+		<label class="label w-full pb-1">
 			<span class="label-text font-semibold text-sm" style="color: oklch(0.85 0.02 250)">Expression</span>
 		</label>
 		<textarea
-			class="textarea textarea-bordered text-sm font-mono leading-relaxed"
+			class="textarea textarea-bordered text-sm font-mono leading-relaxed w-full"
 			style="background: oklch(0.14 0.01 250); border-color: oklch(0.25 0.02 250); color: oklch(0.85 0.10 55); min-height: 80px"
 			value={config.expression}
 			oninput={(e) => update(e.currentTarget.value)}
@@ -52,7 +52,7 @@
 	</div>
 
 	<div class="form-control">
-		<label class="label pb-1">
+		<label class="label w-full pb-1">
 			<span class="label-text font-semibold text-sm" style="color: oklch(0.85 0.02 250)">Examples</span>
 		</label>
 		<div class="flex flex-wrap gap-1.5">

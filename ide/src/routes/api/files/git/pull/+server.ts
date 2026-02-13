@@ -2,15 +2,15 @@
  * Git Pull API Endpoint
  *
  * POST /api/files/git/pull
- * Body: { project: string, remote?: string, branch?: string, rebase?: boolean }
- * Pull from remote, optionally with --rebase.
+ * Body: { project: string, remote?: string, branch?: string, rebase?: boolean, autostash?: boolean }
+ * Pull from remote, optionally with --rebase and/or --autostash.
  */
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getGitForProject, formatGitError } from '$lib/server/git.js';
 
 export const POST: RequestHandler = async ({ request }) => {
-	let body: { project?: string; remote?: string; branch?: string; rebase?: boolean };
+	let body: { project?: string; remote?: string; branch?: string; rebase?: boolean; autostash?: boolean };
 
 	try {
 		body = await request.json();
@@ -18,7 +18,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		throw error(400, 'Invalid JSON body');
 	}
 
-	const { project: projectName, remote = 'origin', branch, rebase = false } = body;
+	const { project: projectName, remote = 'origin', branch, rebase = false, autostash = false } = body;
 
 	if (!projectName) {
 		throw error(400, 'Missing required parameter: project');
@@ -35,8 +35,9 @@ export const POST: RequestHandler = async ({ request }) => {
 		let pullResult;
 
 		if (rebase) {
-			// git pull --rebase [remote] [branch]
+			// git pull --rebase [--autostash] [remote] [branch]
 			const args = ['pull', '--rebase'];
+			if (autostash) args.push('--autostash');
 			if (remote) args.push(remote);
 			if (branch) args.push(branch);
 			await git.raw(args);
@@ -52,6 +53,19 @@ export const POST: RequestHandler = async ({ request }) => {
 					insertions: 0,
 					deletions: 0
 				}
+			};
+		} else if (autostash) {
+			// Merge pull with --autostash
+			const args = ['pull', '--autostash'];
+			if (remote) args.push(remote);
+			if (branch) args.push(branch);
+			await git.raw(args);
+
+			pullResult = {
+				files: [],
+				insertions: {},
+				deletions: {},
+				summary: { changes: 0, insertions: 0, deletions: 0 }
 			};
 		} else {
 			// Standard merge pull

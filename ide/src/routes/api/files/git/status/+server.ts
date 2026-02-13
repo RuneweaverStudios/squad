@@ -57,6 +57,15 @@ export const GET: RequestHandler = async ({ url }) => {
 			return !stagedRenameSet.has(key);
 		});
 
+		// Get stash count
+		let stashCount = 0;
+		try {
+			const stashList = await git.stashList();
+			stashCount = stashList.total;
+		} catch {
+			// Stash list may fail on fresh repos with no stash
+		}
+
 		return json({
 			project: projectName,
 			projectPath,
@@ -71,7 +80,8 @@ export const GET: RequestHandler = async ({ url }) => {
 			created: status.created,
 			not_added: status.not_added,
 			conflicted: status.conflicted,
-			isClean: status.isClean()
+			isClean: status.isClean(),
+			stashCount
 		});
 	} catch (err) {
 		const gitError = formatGitError(err as Error);

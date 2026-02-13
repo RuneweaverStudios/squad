@@ -23,7 +23,7 @@
 
 <div class="flex flex-col gap-4">
 	<div class="form-control">
-		<label class="label pb-1">
+		<label class="label w-full pb-1">
 			<span class="label-text font-semibold text-sm" style="color: oklch(0.85 0.02 250)">Action</span>
 		</label>
 		<div class="flex flex-col gap-1.5">
@@ -51,12 +51,12 @@
 
 	{#if showUrl}
 		<div class="form-control">
-			<label class="label pb-1">
+			<label class="label w-full pb-1">
 				<span class="label-text font-semibold text-sm" style="color: oklch(0.85 0.02 250)">URL</span>
 			</label>
 			<input
 				type="text"
-				class="input input-sm input-bordered"
+				class="input input-sm input-bordered w-full"
 				style="background: oklch(0.16 0.01 250); border-color: oklch(0.25 0.02 250); color: oklch(0.90 0.02 250)"
 				value={config.url || ''}
 				oninput={(e) => update({ url: e.currentTarget.value || undefined })}
@@ -67,12 +67,12 @@
 
 	{#if showSelector}
 		<div class="form-control">
-			<label class="label pb-1">
+			<label class="label w-full pb-1">
 				<span class="label-text font-semibold text-sm" style="color: oklch(0.85 0.02 250)">CSS Selector</span>
 			</label>
 			<input
 				type="text"
-				class="input input-sm input-bordered font-mono"
+				class="input input-sm input-bordered font-mono w-full"
 				style="background: oklch(0.16 0.01 250); border-color: oklch(0.25 0.02 250); color: oklch(0.90 0.02 250)"
 				value={config.selector || ''}
 				oninput={(e) => update({ selector: e.currentTarget.value || undefined })}
@@ -83,11 +83,11 @@
 
 	{#if showJsCode}
 		<div class="form-control">
-			<label class="label pb-1">
+			<label class="label w-full pb-1">
 				<span class="label-text font-semibold text-sm" style="color: oklch(0.85 0.02 250)">JavaScript Code</span>
 			</label>
 			<textarea
-				class="textarea textarea-bordered text-sm font-mono leading-relaxed"
+				class="textarea textarea-bordered text-sm font-mono leading-relaxed w-full"
 				style="background: oklch(0.14 0.01 250); border-color: oklch(0.25 0.02 250); color: oklch(0.85 0.10 145); min-height: 80px"
 				value={config.jsCode || ''}
 				oninput={(e) => update({ jsCode: e.currentTarget.value || undefined })}
@@ -98,12 +98,12 @@
 
 	{#if showTimeout}
 		<div class="form-control">
-			<label class="label pb-1">
+			<label class="label w-full pb-1">
 				<span class="label-text font-semibold text-sm" style="color: oklch(0.85 0.02 250)">Timeout (ms)</span>
 			</label>
 			<input
 				type="number"
-				class="input input-sm input-bordered"
+				class="input input-sm input-bordered w-full"
 				style="background: oklch(0.16 0.01 250); border-color: oklch(0.25 0.02 250); color: oklch(0.90 0.02 250)"
 				value={config.timeout || 5000}
 				oninput={(e) => update({ timeout: parseInt(e.currentTarget.value) || 5000 })}

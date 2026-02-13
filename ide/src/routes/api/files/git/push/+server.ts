@@ -2,15 +2,15 @@
  * Git Push API Endpoint
  *
  * POST /api/files/git/push
- * Body: { project: string, remote?: string, branch?: string }
- * Push to remote.
+ * Body: { project: string, remote?: string, branch?: string, force?: boolean }
+ * Push to remote. force uses --force-with-lease for safety.
  */
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getGitForProject, formatGitError } from '$lib/server/git.js';
 
 export const POST: RequestHandler = async ({ request }) => {
-	let body: { project?: string; remote?: string; branch?: string };
+	let body: { project?: string; remote?: string; branch?: string; force?: boolean };
 
 	try {
 		body = await request.json();
@@ -18,7 +18,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		throw error(400, 'Invalid JSON body');
 	}
 
-	const { project: projectName, remote = 'origin', branch } = body;
+	const { project: projectName, remote = 'origin', branch, force = false } = body;
 
 	if (!projectName) {
 		throw error(400, 'Missing required parameter: project');
@@ -40,8 +40,9 @@ export const POST: RequestHandler = async ({ request }) => {
 			throw error(400, 'No branch specified and not on any branch');
 		}
 
-		// Push
-		const pushResult = await git.push(remote, pushBranch);
+		// Push (force uses --force-with-lease for safety)
+		const pushArgs = force ? ['--force-with-lease'] : [];
+		const pushResult = await git.push(remote, pushBranch, pushArgs);
 
 		return json({
 			success: true,
@@ -49,6 +50,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			projectPath,
 			remote,
 			branch: pushBranch,
+			forced: force,
 			pushed: pushResult.pushed,
 			update: pushResult.update
 		});
