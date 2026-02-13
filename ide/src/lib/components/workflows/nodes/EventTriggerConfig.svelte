@@ -12,16 +12,24 @@
 
 	let showHelp = $state(false);
 
-	const EVENT_DATA_FIELDS: Record<string, { fields: { name: string; type: string; desc: string }[]; example: string }> = {
+	const EVENT_DATA_FIELDS: Record<string, { fields: { name: string; type: string; desc: string }[]; examples: { label: string; expr: string }[] }> = {
 		task_completed: {
 			fields: [
 				{ name: 'data.taskId', type: 'string', desc: 'Task ID' },
 				{ name: 'data.title', type: 'string', desc: 'Task title' },
+				{ name: 'data.type', type: 'string', desc: 'bug, feature, task, chore, epic' },
+				{ name: 'data.priority', type: 'number', desc: 'Priority (0-4)' },
 				{ name: 'data.reason', type: 'string', desc: 'Close reason' },
 				{ name: 'data.project', type: 'string', desc: 'Project name' },
-				{ name: 'data.assignee', type: 'string', desc: 'Agent name' }
+				{ name: 'data.assignee', type: 'string', desc: 'Agent name' },
+				{ name: 'data.labels', type: 'string', desc: 'Comma-separated labels' }
 			],
-			example: 'data.project === "jat"'
+			examples: [
+				{ label: 'Only bugs', expr: 'data.type === "bug"' },
+				{ label: 'AND', expr: 'data.type === "bug" && data.priority <= 1' },
+				{ label: 'OR', expr: 'data.type === "bug" || data.type === "chore"' },
+				{ label: 'NOT', expr: 'data.type !== "epic" && data.project !== "demo"' }
+			]
 		},
 		task_created: {
 			fields: [
@@ -32,14 +40,22 @@
 				{ name: 'data.labels', type: 'string', desc: 'Comma-separated labels' },
 				{ name: 'data.project', type: 'string', desc: 'Project name' }
 			],
-			example: 'data.priority <= 1'
+			examples: [
+				{ label: 'High-priority bugs', expr: 'data.type === "bug" && data.priority <= 1' },
+				{ label: 'OR', expr: 'data.type === "bug" || data.type === "feature"' },
+				{ label: 'NOT', expr: 'data.type !== "chore"' },
+				{ label: 'By label', expr: 'data.labels.includes("urgent")' }
+			]
 		},
 		agent_idle: {
 			fields: [
 				{ name: 'data.agentName', type: 'string', desc: 'Agent name' },
 				{ name: 'data.project', type: 'string', desc: 'Project name' }
 			],
-			example: 'data.agentName === "SwiftCanyon"'
+			examples: [
+				{ label: 'Specific agent', expr: 'data.agentName === "SwiftCanyon"' },
+				{ label: 'By project', expr: 'data.project === "jat"' }
+			]
 		},
 		signal_received: {
 			fields: [
@@ -49,12 +65,15 @@
 				{ name: 'data.agentName', type: 'string', desc: 'Agent name' },
 				{ name: 'data.project', type: 'string', desc: 'Project name' }
 			],
-			example: 'data.type === "complete"'
+			examples: [
+				{ label: 'On complete', expr: 'data.type === "complete"' },
+				{ label: 'Multiple signals', expr: 'data.type === "review" || data.type === "complete"' }
+			]
 		}
 	};
 
 	const currentFields = $derived(EVENT_DATA_FIELDS[config.eventType]);
-	const currentPlaceholder = $derived(currentFields ? `e.g., ${currentFields.example}` : '');
+	const currentPlaceholder = $derived(currentFields?.examples?.[0] ? `e.g., ${currentFields.examples[0].expr}` : '');
 
 	function handleEventTypeChange(value: string) {
 		config = { ...config, eventType: value as TriggerEventConfig['eventType'] };
@@ -133,9 +152,14 @@
 						</div>
 					{/each}
 				</div>
-				<div class="mt-2 pt-1.5" style="border-top: 1px solid oklch(0.22 0.02 250)">
-					<span style="color: oklch(0.50 0.02 250)">Example: </span>
-					<code class="font-mono px-1 rounded" style="background: oklch(0.18 0.02 250); color: oklch(0.75 0.15 145); font-size: 0.6875rem">{currentFields.example}</code>
+				<div class="mt-2 pt-1.5 flex flex-col gap-1" style="border-top: 1px solid oklch(0.22 0.02 250)">
+					<div style="color: oklch(0.55 0.02 250)">Examples:</div>
+					{#each currentFields.examples as ex}
+						<div class="flex items-baseline gap-2">
+							<span class="shrink-0 w-[70px] text-right" style="color: oklch(0.50 0.02 250)">{ex.label}</span>
+							<code class="font-mono px-1 rounded" style="background: oklch(0.18 0.02 250); color: oklch(0.75 0.15 145); font-size: 0.6875rem">{ex.expr}</code>
+						</div>
+					{/each}
 				</div>
 			</div>
 		{/if}

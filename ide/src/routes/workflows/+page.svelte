@@ -212,6 +212,8 @@
 		}
 	}
 
+	let nameInputRef: HTMLInputElement | null = null;
+
 	async function createWorkflow() {
 		try {
 			const res = await fetch('/api/workflows', {
@@ -224,6 +226,11 @@
 			await loadWorkflows();
 			await loadWorkflow(data.workflow.id);
 			showToast('Workflow created');
+			// Focus and select the name so user can rename immediately
+			requestAnimationFrame(() => {
+				nameInputRef?.focus();
+				nameInputRef?.select();
+			});
 		} catch (err) {
 			showToast('Failed to create workflow', 'error');
 		}
@@ -543,7 +550,7 @@
 		<!-- Workflow selector -->
 		<div class="relative">
 			<select
-				class="select select-sm select-bordered min-w-[180px]"
+				class="select select-sm select-bordered w-[160px]"
 				style="background: oklch(0.18 0.01 250); color: oklch(0.85 0.02 250); border-color: oklch(0.25 0.02 250); font-size: 0.8125rem"
 				value={currentId || ''}
 				onchange={(e) => {
@@ -576,12 +583,15 @@
 		<!-- Separator -->
 		<div class="w-px h-6 mx-1" style="background: oklch(0.25 0.02 250)"></div>
 
-		<!-- Workflow name (editable) -->
+		<!-- Workflow name (editable heading) -->
 		{#if currentId}
 			<input
+				bind:this={nameInputRef}
 				type="text"
-				class="input input-sm input-ghost flex-1 min-w-[120px] max-w-[280px] px-2"
-				style="background: oklch(0.18 0.01 250); color: oklch(0.90 0.02 250); border-color: transparent; font-weight: 600"
+				class="flex-1 min-w-[120px] px-1 text-base font-semibold tracking-tight truncate outline-none"
+				style="background: transparent; color: oklch(0.95 0.02 250); border: none; border-bottom: 1.5px solid transparent; transition: border-color 0.15s"
+				onfocus={(e) => e.currentTarget.style.borderBottomColor = 'oklch(0.50 0.15 250 / 0.5)'}
+				onblur={(e) => e.currentTarget.style.borderBottomColor = 'transparent'}
 				bind:value={workflowName}
 				oninput={() => (dirty = true)}
 				placeholder="Workflow name"
@@ -650,8 +660,6 @@
 					</svg>
 				</button>
 			</div>
-
-			<div class="flex-1"></div>
 
 			<!-- Delete button -->
 			<button
