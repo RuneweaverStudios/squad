@@ -145,26 +145,60 @@ export function topologicalSort(nodes: WorkflowNode[], edges: WorkflowEdge[]): W
 // =============================================================================
 
 /**
- * Replace {{input}} and {{result}} placeholders in a string.
- * Also replaces {{nodeId.output}} for referencing specific node outputs.
+ * Resolve a dot-separated path against an object.
+ * e.g. resolvePath({ a: { b: "c" } }, "a.b") → "c"
+ * Returns undefined if any segment is missing.
+ */
+function resolvePath(obj: unknown, path: string): unknown {
+	let current: unknown = obj;
+	for (const key of path.split('.')) {
+		if (current == null || typeof current !== 'object') return undefined;
+		current = (current as Record<string, unknown>)[key];
+	}
+	return current;
+}
+
+/** Stringify a value for template substitution */
+function toSubstitutionString(value: unknown): string {
+	if (value === undefined || value === null) return '';
+	if (typeof value === 'string') return value;
+	return JSON.stringify(value);
+}
+
+/**
+ * Replace template placeholders in a string:
+ *   {{input}}          – full input value
+ *   {{input.field}}    – dot-path into input (if input is object/JSON)
+ *   {{result}}         – alias for {{input}}
+ *   {{result.field}}   – alias for {{input.field}}
+ *   {{nodeId.output}}  – specific node's output by ID
  */
 function substituteVariables(template: string, input: unknown, ctx: ExecutionContext): string {
 	let result = template;
 
-	// Replace {{input}} with the input data
-	const inputStr = typeof input === 'string' ? input : JSON.stringify(input ?? '');
-	result = result.replace(/\{\{input\}\}/g, inputStr);
+	// Parse input into an object if it's a JSON string (for dot-path access)
+	let inputObj: unknown = input;
+	if (typeof input === 'string') {
+		try { inputObj = JSON.parse(input); } catch { /* keep as string */ }
+	}
 
-	// Replace {{result}} (alias for input in most contexts)
+	const inputStr = toSubstitutionString(input);
+
+	// Replace {{input.path}} and {{result.path}} with dot-path resolution (before bare {{input}})
+	result = result.replace(/\{\{(input|result)\.([a-zA-Z_][\w.]*)\}\}/g, (_match, _prefix, path) => {
+		const value = resolvePath(inputObj, path);
+		return toSubstitutionString(value);
+	});
+
+	// Replace bare {{input}} and {{result}} with the full input
+	result = result.replace(/\{\{input\}\}/g, inputStr);
 	result = result.replace(/\{\{result\}\}/g, inputStr);
 
 	// Replace {{nodeId.output}} with specific node outputs
 	result = result.replace(/\{\{(\w[\w-]*?)\.output\}\}/g, (_match, nodeId) => {
 		const nodeResult = ctx.nodeResults.get(nodeId);
 		if (nodeResult?.output !== undefined) {
-			return typeof nodeResult.output === 'string'
-				? nodeResult.output
-				: JSON.stringify(nodeResult.output);
+			return toSubstitutionString(nodeResult.output);
 		}
 		return '';
 	});

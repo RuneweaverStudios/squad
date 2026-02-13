@@ -65,7 +65,11 @@
 				<div class="flex flex-col gap-1">
 					<div class="flex items-baseline gap-2">
 						<code class="font-mono px-1 rounded" style="background: oklch(0.18 0.02 250); color: oklch(0.80 0.12 220); font-size: 0.6875rem">{`{{input}}`}</code>
-						<span style="color: oklch(0.50 0.02 250)">Output from the previous node</span>
+						<span style="color: oklch(0.50 0.02 250)">Full output from the previous node</span>
+					</div>
+					<div class="flex items-baseline gap-2">
+						<code class="font-mono px-1 rounded" style="background: oklch(0.18 0.02 250); color: oklch(0.80 0.12 220); font-size: 0.6875rem">{`{{input.field}}`}</code>
+						<span style="color: oklch(0.50 0.02 250)">Access a field when input is JSON</span>
 					</div>
 					<div class="flex items-baseline gap-2">
 						<code class="font-mono px-1 rounded" style="background: oklch(0.18 0.02 250); color: oklch(0.80 0.12 220); font-size: 0.6875rem">{`{{result}}`}</code>
@@ -73,7 +77,7 @@
 					</div>
 				</div>
 				<div class="mt-2 pt-1.5" style="border-top: 1px solid oklch(0.22 0.02 250)">
-					<div style="color: oklch(0.55 0.02 250)">Example: Use an LLM node before this to generate a title and description from event data, then pass it through with <code style="color: oklch(0.80 0.12 220)">{`{{input}}`}</code>.</div>
+					<div style="color: oklch(0.55 0.02 250)">Dot paths work on JSON objects: <code style="color: oklch(0.80 0.12 220)">{`{{input.title}}`}</code>, <code style="color: oklch(0.80 0.12 220)">{`{{input.taskType}}`}</code>, <code style="color: oklch(0.80 0.12 220)">{`{{input.data.name}}`}</code></div>
 				</div>
 			</div>
 		{/if}

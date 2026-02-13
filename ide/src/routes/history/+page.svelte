@@ -17,21 +17,14 @@
 	import AnimatedDigits from "$lib/components/AnimatedDigits.svelte";
 	import TaskDetailDrawer from "$lib/components/TaskDetailDrawer.svelte";
 	import { HistorySkeleton } from "$lib/components/skeleton";
-	import { getProjectColor, initProjectColors } from "$lib/utils/projectColors";
-	import AgentAvatar from "$lib/components/AgentAvatar.svelte";
-	import { getIssueTypeVisual } from "$lib/config/statusColors";
-
-	interface CompletedTask {
-		id: string;
-		title: string;
-		assignee?: string;
-		created_at: string;
-		updated_at: string;
-		closed_at?: string;
-		priority?: number;
-		issue_type?: string;
-		project?: string;
-	}
+	import { initProjectColors } from "$lib/utils/projectColors";
+	import CompletedDayGroup from "$lib/components/history/CompletedDayGroup.svelte";
+	import {
+		type CompletedTask,
+		toLocalDateStr,
+		parseLocalDate,
+		groupTasksByDay,
+	} from "$lib/utils/completedTaskHelpers";
 
 	interface Project {
 		name: string;
@@ -131,9 +124,7 @@
 		const tasksByDate = new Map<string, CompletedTask[]>();
 
 		for (const task of filteredTasks) {
-			const dateStr = task.closed_at
-				? new Date(task.closed_at).toISOString().split("T")[0]
-				: new Date(task.updated_at).toISOString().split("T")[0];
+			const dateStr = toLocalDateStr(task.closed_at || task.updated_at);
 
 			if (!tasksByDate.has(dateStr)) {
 				tasksByDate.set(dateStr, []);
@@ -142,7 +133,7 @@
 		}
 
 		// Today's count
-		const todayStr = today.toISOString().split("T")[0];
+		const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 		const todayCount = tasksByDate.get(todayStr)?.length || 0;
 
 		// Calculate current streak
@@ -150,7 +141,7 @@
 		const checkDate = new Date(today);
 
 		for (let i = 0; i < 365; i++) {
-			const dateStr = checkDate.toISOString().split("T")[0];
+			const dateStr = `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, "0")}-${String(checkDate.getDate()).padStart(2, "0")}`;
 			if (tasksByDate.has(dateStr)) {
 				streak++;
 			} else if (i > 0) {
@@ -166,7 +157,7 @@
 		let prevDate: Date | null = null;
 
 		for (const dateStr of sortedDates) {
-			const date = new Date(dateStr);
+			const date = parseLocalDate(dateStr);
 			if (prevDate) {
 				const diff =
 					(date.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24);
@@ -187,7 +178,7 @@
 		thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 		let last30Count = 0;
 		for (const [dateStr, dateTasks] of tasksByDate) {
-			if (new Date(dateStr) >= thirtyDaysAgo) {
+			if (parseLocalDate(dateStr) >= thirtyDaysAgo) {
 				last30Count += dateTasks.length;
 			}
 		}
@@ -251,15 +242,12 @@
 		const groups = new Map<string, DayGroup>();
 
 		for (const task of filteredTasks) {
-			const dateStr = task.closed_at
-				? new Date(task.closed_at).toISOString().split("T")[0]
-				: new Date(task.updated_at).toISOString().split("T")[0];
+			const dateStr = toLocalDateStr(task.closed_at || task.updated_at);
 
 			if (!groups.has(dateStr)) {
-				const date = new Date(dateStr);
 				groups.set(dateStr, {
 					date: dateStr,
-					displayDate: formatDisplayDate(date),
+					displayDate: formatDisplayDate(parseLocalDate(dateStr)),
 					tasks: [],
 					agents: new Map(),
 				});
@@ -485,6 +473,25 @@
 										class="task-item group"
 										onclick={() => handleTaskClick(task.id)}
 									>
+										<div class="task-time-col" title="Duration: {formatDuration(duration)}\nCreated: {new Date(task.created_at).toLocaleString()}{task.closed_at ? '\nCompleted: ' + new Date(task.closed_at).toLocaleString() : ''}">
+											<span class="task-time">
+												<span class="task-time-start">{formatTime(task.created_at)}</span>
+												<span class="task-time-sep">-</span>
+												<span class="task-time-end">{formatTime(task.closed_at || task.updated_at)}</span>
+												<span class="task-time-duration">{formatDuration(duration)}</span>
+											</span>
+											<div class="task-duration-track">
+												<div class="task-duration-noon"></div>
+												{#if pos.crossDay}
+													<div class="task-duration-overflow-cap"></div>
+												{/if}
+												<div
+													class="task-duration-fill"
+													class:task-duration-overflow={pos.crossDay}
+													style="left: {pos.left}%; width: {pos.width}%"
+												></div>
+											</div>
+										</div>
 										<div class="task-badge" style="--pc: {color}">
 											<span class="task-badge-avatar" title={task.assignee || 'Unassigned'}>
 												{#if task.assignee}
@@ -513,7 +520,7 @@
 												</span>
 											{/if}
 										</div>
-										<!-- Right side: resume button + time + arrow -->
+										<!-- Right side: resume button + arrow -->
 										<div class="task-actions">
 											<!-- Resume button - shows on hover when task has assignee -->
 											{#if task.assignee}
@@ -545,25 +552,6 @@
 													{/if}
 												</button>
 											{/if}
-										<div class="task-time-col" title="Duration: {formatDuration(duration)}\nCreated: {new Date(task.created_at).toLocaleString()}{task.closed_at ? '\nCompleted: ' + new Date(task.closed_at).toLocaleString() : ''}">
-											<span class="task-time">
-												<span class="task-time-start">{formatTime(task.created_at)}</span>
-												<span class="task-time-sep">-</span>
-												<span class="task-time-end">{formatTime(task.closed_at || task.updated_at)}</span>
-												<span class="task-time-duration">{formatDuration(duration)}</span>
-											</span>
-											<div class="task-duration-track">
-												<div class="task-duration-noon"></div>
-												{#if pos.crossDay}
-													<div class="task-duration-overflow-cap"></div>
-												{/if}
-												<div
-													class="task-duration-fill"
-													class:task-duration-overflow={pos.crossDay}
-													style="left: {pos.left}%; width: {pos.width}%"
-												></div>
-											</div>
-										</div>
 											<svg
 												xmlns="http://www.w3.org/2000/svg"
 												fill="none"
@@ -782,7 +770,9 @@
 		display: flex;
 		align-items: center;
 		gap: 6px;
+		width: 170px;
 		flex-shrink: 0;
+		overflow: hidden;
 	}
 
 	.task-badge-avatar {
@@ -818,6 +808,10 @@
 		font-weight: 600;
 		line-height: 1;
 		color: var(--pc);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 100%;
 	}
 
 	.task-badge-tags {
@@ -878,9 +872,10 @@
 	.task-time-col {
 		display: flex;
 		flex-direction: column;
-		align-items: flex-end;
+		align-items: flex-start;
 		gap: 3px;
-		min-width: 130px;
+		width: 150px;
+		flex-shrink: 0;
 	}
 
 	.task-time {
