@@ -6,12 +6,16 @@
 		day,
 		onTaskClick,
 		onResumeSession,
+		onMemoryClick,
 		resumingTasks,
+		memoryMap,
 	}: {
 		day: DayGroup;
 		onTaskClick: (id: string) => void;
 		onResumeSession?: (event: MouseEvent, task: CompletedTask) => void;
+		onMemoryClick?: (event: MouseEvent, filename: string, task: CompletedTask) => void;
 		resumingTasks?: Set<string>;
+		memoryMap?: Map<string, string>;
 	} = $props();
 </script>
 
@@ -28,7 +32,9 @@
 				{task}
 				{onTaskClick}
 				{onResumeSession}
+				{onMemoryClick}
 				resuming={resumingTasks?.has(task.id) ?? false}
+				memoryFilename={memoryMap?.get(task.id)}
 			/>
 		{/each}
 	</div>

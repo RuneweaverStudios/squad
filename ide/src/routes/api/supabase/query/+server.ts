@@ -75,7 +75,12 @@ function getProjectPath(projectName: string): string | null {
 
 		// Also check server_path for monorepos
 		if (projectConfig?.server_path) {
-			const resolvedPath = projectConfig.server_path.replace(/^~/, process.env.HOME || '');
+			let resolvedPath = projectConfig.server_path.replace(/^~/, process.env.HOME || '');
+			// Resolve relative server_path against project path
+			if (!resolvedPath.startsWith('/') && projectConfig.path) {
+				const basePath = projectConfig.path.replace(/^~/, process.env.HOME || '');
+				resolvedPath = join(basePath, resolvedPath);
+			}
 			if (existsSync(resolvedPath)) {
 				return resolvedPath;
 			}

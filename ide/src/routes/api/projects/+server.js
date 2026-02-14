@@ -448,7 +448,11 @@ export async function GET({ url }) {
 				const projectPath = config.path?.replace(/^~/, homedir()) || join(homedir(), 'code', key);
 
 				// serverPath is where 'npm run dev' should be executed (optional, defaults to path)
-				const serverPath = config.server_path?.replace(/^~/, homedir()) || null;
+				let serverPath = config.server_path?.replace(/^~/, homedir()) || null;
+				// Resolve relative server_path against project path
+				if (serverPath && !serverPath.startsWith('/')) {
+					serverPath = join(projectPath, serverPath);
+				}
 
 				projects.push({
 					name: key,

@@ -596,14 +596,12 @@
 						id="project-server-path"
 						type="text"
 						class="input input-bordered w-full font-mono text-sm"
-						placeholder="site (relative to project path)"
+						placeholder="e.g. dashboard"
 						bind:value={serverPath}
 					/>
 					<label class="label">
 						<span class="label-text-alt text-base-content/50">
-							Subdirectory where <code class="px-1 py-0.5 bg-base-300 rounded text-xs">npm run dev</code> runs.
-							Use relative path without leading slash (e.g., <code class="px-1 py-0.5 bg-base-300 rounded text-xs">site</code> not <code class="px-1 py-0.5 bg-base-300 rounded text-xs">/site</code>).
-							Leave empty if same as project path.
+							Subdirectory for dev server, e.g. <code class="px-1 py-0.5 bg-base-300 rounded text-xs">dashboard</code>
 						</span>
 					</label>
 				</div>

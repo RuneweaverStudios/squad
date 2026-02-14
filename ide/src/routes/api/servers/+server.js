@@ -339,7 +339,13 @@ export async function GET({ url }) {
 					);
 					const [pathPart, serverPathPart, portPart] = configOutput.trim().split('|');
 					// Use server_path if available, otherwise use path
-					const effectivePath = serverPathPart || pathPart;
+					let effectiveServerPath = serverPathPart;
+					// Resolve relative server_path against project path
+					if (effectiveServerPath && !effectiveServerPath.startsWith('/') && !effectiveServerPath.startsWith('~') && pathPart) {
+						const resolvedBase = pathPart.replace(/^~/, process.env.HOME || '');
+						effectiveServerPath = `${resolvedBase}/${effectiveServerPath}`;
+					}
+					const effectivePath = effectiveServerPath || pathPart;
 					projectPath = effectivePath ? effectivePath.replace(/^~/, process.env.HOME || '') : null;
 					configPort = portPart ? parseInt(portPart, 10) : null;
 				} catch {

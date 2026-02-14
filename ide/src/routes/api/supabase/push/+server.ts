@@ -54,7 +54,10 @@ function getProjectPaths(projectName: string): ProjectPaths {
 		}
 
 		if (projectConfig?.server_path) {
-			const resolvedServerPath = projectConfig.server_path.replace(/^~/, process.env.HOME || '');
+			let resolvedServerPath = projectConfig.server_path.replace(/^~/, process.env.HOME || '');
+			if (!resolvedServerPath.startsWith('/') && projectPath) {
+				resolvedServerPath = join(projectPath, resolvedServerPath);
+			}
 			serverPath = existsSync(resolvedServerPath) ? resolvedServerPath : null;
 		}
 

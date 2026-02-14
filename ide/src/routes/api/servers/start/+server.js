@@ -130,6 +130,10 @@ export async function POST({ request }) {
 				}
 				if (srvPath) {
 					serverPath = srvPath.replace(/^~/, process.env.HOME || '');
+					// Resolve relative server_path against project path
+					if (serverPath && !serverPath.startsWith('/') && projectPath) {
+						serverPath = `${projectPath}/${serverPath}`;
+					}
 				}
 				if (portStr && portStr !== 'null') {
 					configPort = parseInt(portStr, 10);

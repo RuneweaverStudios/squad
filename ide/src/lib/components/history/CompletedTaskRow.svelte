@@ -15,12 +15,16 @@
 		task,
 		onTaskClick,
 		onResumeSession,
+		onMemoryClick,
 		resuming = false,
+		memoryFilename,
 	}: {
 		task: CompletedTask;
 		onTaskClick: (id: string) => void;
 		onResumeSession?: (event: MouseEvent, task: CompletedTask) => void;
+		onMemoryClick?: (event: MouseEvent, filename: string, task: CompletedTask) => void;
 		resuming?: boolean;
+		memoryFilename?: string;
 	} = $props();
 
 	const duration = $derived(getTaskDuration(task));
@@ -82,6 +86,29 @@
 		{/if}
 	</div>
 	<div class="task-actions">
+		{#if memoryFilename && onMemoryClick}
+			<button
+				type="button"
+				class="memory-btn"
+				onclick={(e) => onMemoryClick!(e, memoryFilename!, task)}
+				title="View session memory"
+			>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					fill="none"
+					viewBox="0 0 24 24"
+					stroke-width="1.5"
+					stroke="currentColor"
+					class="w-3.5 h-3.5"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"
+					/>
+				</svg>
+			</button>
+		{/if}
 		{#if task.assignee && onResumeSession}
 			<button
 				type="button"
@@ -386,5 +413,35 @@
 
 	.task-item:hover .resume-btn:disabled {
 		opacity: 0.6;
+	}
+
+	.memory-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 28px;
+		height: 28px;
+		border-radius: 6px;
+		background: oklch(from var(--color-info) l c h / 12%);
+		border: 1px solid oklch(from var(--color-info) l c h / 25%);
+		color: oklch(from var(--color-info) l c h / 70%);
+		cursor: pointer;
+		opacity: 0;
+		transition:
+			opacity 0.15s ease,
+			background 0.15s ease,
+			transform 0.15s ease;
+		flex-shrink: 0;
+	}
+
+	.task-item:hover .memory-btn {
+		opacity: 1;
+	}
+
+	.memory-btn:hover {
+		background: oklch(from var(--color-info) l c h / 22%);
+		border-color: oklch(from var(--color-info) l c h / 45%);
+		color: oklch(from var(--color-info) l c h / 90%);
+		transform: scale(1.05);
 	}
 </style>

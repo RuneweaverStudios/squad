@@ -25,6 +25,11 @@
 		getParentEpicId,
 	} from "$lib/utils/projectUtils";
 	import { cleanupCollapsedEpics } from "$lib/stores/preferences.svelte";
+	import CompletedDayGroup from "$lib/components/history/CompletedDayGroup.svelte";
+	import {
+		type CompletedTask,
+		groupTasksByDay,
+	} from "$lib/utils/completedTaskHelpers";
 
 	interface TmuxSession {
 		name: string;
@@ -115,11 +120,20 @@
 	let swarmHoveredEpicId = $state<string | null>(null);
 	let swarmSpawningEpicId = $state<string | null>(null);
 
+	// Completed tasks state
+	let completedTasks = $state<CompletedTask[]>([]);
+	let completedLoading = $state(false);
+	let completedDaysLoaded = $state(1);
+	let completedMemoryMap = $state<Map<string, string>>(new Map());
+	let memoryViewerOpen = $state(false);
+	let memoryContent = $state("");
+	let memoryTitle = $state("");
+
 	// Selected project (synced from URL ?project= param, managed by TopBar)
 	let selectedProject = $state<string | null>(null);
 
 	// Subsection collapse state per project (sessions/paused/conversations/tasks)
-	type SubsectionType = "sessions" | "paused" | "conversations" | "tasks";
+	type SubsectionType = "sessions" | "paused" | "conversations" | "tasks" | "completed";
 	let collapsedSubsections = $state<Map<string, Set<SubsectionType>>>(
 		new Map(),
 	);
@@ -683,6 +697,75 @@
 		}
 	}
 
+	async function fetchCompletedTasks() {
+		completedLoading = true;
+		try {
+			const response = await fetch("/api/tasks?status=closed");
+			if (!response.ok) return;
+			const data = await response.json();
+			completedTasks = data.tasks || [];
+		} catch {
+			// Silent fail
+		} finally {
+			completedLoading = false;
+		}
+	}
+
+	// Completed tasks filtered by project and grouped by day
+	const projectCompletedTasks = $derived.by(() => {
+		const project = selectedProject;
+		if (!project) return [];
+		return completedTasks.filter((task) => {
+			const taskProject = task.project || task.id.split("-")[0];
+			return taskProject.toLowerCase() === project.toLowerCase();
+		});
+	});
+
+	const allCompletedDayGroups = $derived(groupTasksByDay(projectCompletedTasks));
+
+	const completedDayGroups = $derived(
+		allCompletedDayGroups.slice(0, completedDaysLoaded),
+	);
+
+	const hasMoreCompletedDays = $derived(
+		allCompletedDayGroups.length > completedDaysLoaded,
+	);
+
+	const completedCount = $derived(projectCompletedTasks.length);
+
+	async function fetchCompletedMemory() {
+		if (!selectedProject) return;
+		try {
+			const res = await fetch(`/api/memory?action=browse&project=${encodeURIComponent(selectedProject)}`);
+			if (!res.ok) return;
+			const data = await res.json();
+			const map = new Map<string, string>();
+			for (const file of data.files || []) {
+				if (file.task) {
+					map.set(file.task, file.filename);
+				}
+			}
+			completedMemoryMap = map;
+		} catch {
+			// Silent fail
+		}
+	}
+
+	async function handleMemoryClick(event: MouseEvent, filename: string, task: CompletedTask) {
+		event.stopPropagation();
+		const project = task.project || task.id.split("-")[0];
+		try {
+			const res = await fetch(`/api/memory?action=file&project=${encodeURIComponent(project)}&filename=${encodeURIComponent(filename)}`);
+			if (!res.ok) return;
+			const data = await res.json();
+			memoryTitle = filename.replace(/\.md$/, "").replace(/^\d{4}-\d{2}-\d{2}-/, "");
+			memoryContent = data.content || "";
+			memoryViewerOpen = true;
+		} catch (e) {
+			console.error("Failed to fetch memory file:", e);
+		}
+	}
+
 	// Get paused sessions for a project
 	function getProjectPausedSessions(project: string): RecoverableSession[] {
 		return recoverableSessions.filter(
@@ -699,12 +782,14 @@
 		]);
 	}
 
-	// Non-critical data (colors, notes, project order, recovery)
+	// Non-critical data (colors, notes, project order, recovery, completed tasks)
 	async function fetchSupplementalData() {
 		await Promise.all([
 			fetchProjectOrder(),
 			fetchProjectColors(),
 			fetchProjectNotes(),
+			fetchCompletedTasks(),
+			fetchCompletedMemory(),
 		]);
 	}
 
@@ -955,6 +1040,7 @@
 	// Handle tab selection
 	function selectProject(project: string) {
 		selectedProject = project;
+		completedDaysLoaded = 1; // Reset to today only
 
 		const projectSessions = sessionsByProject.get(project) || [];
 		const projectTasks = tasksByProject.get(project) || [];
@@ -976,6 +1062,8 @@
 			if (!hasChatSessions) {
 				projectSubsections.add("conversations");
 			}
+			// Completed Tasks starts collapsed (supplementary info)
+			projectSubsections.add("completed");
 			// Active Tasks and Open Tasks are always visible by default
 			// so users can see both in-progress work and available tasks/epics
 
@@ -990,6 +1078,7 @@
 		// creating an empty Set that overrides the defaults.
 
 		saveCollapseState();
+		fetchCompletedMemory();
 	}
 
 	// Reactively auto-expand paused/conversations subsections when data arrives.
@@ -1809,8 +1898,82 @@
 					</div>
 				{/if}
 
+				<!-- Completed Tasks Section -->
+				{#if completedCount > 0 || completedLoading}
+					<div class="subsection">
+						<button
+							class="subsection-header"
+							onclick={() =>
+								toggleSubsectionCollapse(
+									selectedProject!,
+									"completed",
+								)}
+							aria-expanded={!isSubsectionCollapsed(
+								selectedProject!,
+								"completed",
+							)}
+						>
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke-width="2"
+								stroke="currentColor"
+								class="subsection-collapse-icon"
+								class:collapsed={isSubsectionCollapsed(
+									selectedProject!,
+									"completed",
+								)}
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									d="M19 9l-7 7-7-7"
+								/>
+							</svg>
+							<span>Completed Tasks</span>
+							<span class="subsection-count">{completedCount}</span>
+						</button>
+
+						{#if !isSubsectionCollapsed(selectedProject!, "completed")}
+							<div class="completed-tasks-content">
+								{#if completedLoading}
+									<div class="completed-loading">
+										<span class="loading loading-spinner loading-sm"></span>
+										<span>Loading completed tasks...</span>
+									</div>
+								{:else}
+									{#each completedDayGroups as day (day.date)}
+										<CompletedDayGroup
+											{day}
+											onTaskClick={(taskId) => openTaskDetailDrawer(taskId)}
+											onMemoryClick={handleMemoryClick}
+											memoryMap={completedMemoryMap}
+										/>
+									{/each}
+
+									{#if hasMoreCompletedDays}
+										<button
+											class="load-more-btn"
+											onclick={() => completedDaysLoaded++}
+										>
+											Load previous day
+										</button>
+									{/if}
+
+									{#if completedDayGroups.length === 0}
+										<div class="completed-empty">
+											No completed tasks yet
+										</div>
+									{/if}
+								{/if}
+							</div>
+						{/if}
+					</div>
+				{/if}
+
 				<!-- Empty state for selected project -->
-				{#if projectSessions.length === 0 && tasksByEpic.size === 0 && projectPausedSessions.length === 0 && projectChatSessions.length === 0}
+				{#if projectSessions.length === 0 && tasksByEpic.size === 0 && projectPausedSessions.length === 0 && projectChatSessions.length === 0 && completedCount === 0}
 					<div class="project-empty-state">
 						<span
 							>No active sessions or open tasks for {selectedProject}</span
@@ -1842,6 +2005,24 @@
 		{/if}
 	{/if}
 </div>
+
+{#if memoryViewerOpen}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="memory-overlay" onclick={() => (memoryViewerOpen = false)} onkeydown={(e) => e.key === "Escape" && (memoryViewerOpen = false)}>
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="memory-panel" onclick={(e) => e.stopPropagation()}>
+			<div class="memory-header">
+				<h3 class="memory-header-title">{memoryTitle}</h3>
+				<button type="button" class="memory-close" onclick={() => (memoryViewerOpen = false)}>
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+					</svg>
+				</button>
+			</div>
+			<pre class="memory-body">{memoryContent}</pre>
+		</div>
+	</div>
+{/if}
 
 <style>
 	.tasks-page {
@@ -2395,6 +2576,123 @@
 
 	.error-state button:hover {
 		background: oklch(0.3 0.02 250);
+	}
+
+	/* Completed Tasks Section */
+	.completed-tasks-content {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		padding: 0.5rem 0.75rem;
+	}
+
+	.completed-loading {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 1rem;
+		color: oklch(0.6 0.02 250);
+		font-size: 0.8125rem;
+	}
+
+	.completed-empty {
+		padding: 1.5rem;
+		text-align: center;
+		color: oklch(0.5 0.02 250);
+		font-size: 0.8125rem;
+	}
+
+	.load-more-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		padding: 0.5rem;
+		background: transparent;
+		border: 1px dashed oklch(0.3 0.02 250);
+		border-radius: 0.5rem;
+		color: oklch(0.55 0.02 250);
+		font-size: 0.8rem;
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.load-more-btn:hover {
+		background: oklch(0.18 0.01 250);
+		border-color: oklch(0.4 0.02 250);
+		color: oklch(0.7 0.02 250);
+	}
+
+	.memory-overlay {
+		position: fixed;
+		inset: 0;
+		background: oklch(0 0 0 / 50%);
+		z-index: 50;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 2rem;
+	}
+
+	.memory-panel {
+		background: var(--color-base-100);
+		border: 1px solid var(--color-base-300);
+		border-radius: 12px;
+		max-width: 700px;
+		width: 100%;
+		max-height: 80vh;
+		display: flex;
+		flex-direction: column;
+		box-shadow: 0 25px 50px oklch(0 0 0 / 25%);
+	}
+
+	.memory-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0.75rem 1rem;
+		border-bottom: 1px solid var(--color-base-300);
+	}
+
+	.memory-header-title {
+		font-size: 0.85rem;
+		font-weight: 600;
+		font-family: ui-monospace, monospace;
+		color: var(--color-base-content);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.memory-close {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 28px;
+		height: 28px;
+		border-radius: 6px;
+		border: none;
+		background: transparent;
+		color: oklch(from var(--color-base-content) l c h / 50%);
+		cursor: pointer;
+		flex-shrink: 0;
+	}
+
+	.memory-close:hover {
+		background: var(--color-base-200);
+		color: var(--color-base-content);
+	}
+
+	.memory-body {
+		padding: 1rem;
+		overflow-y: auto;
+		font-size: 0.8rem;
+		line-height: 1.6;
+		color: oklch(from var(--color-base-content) l c h / 80%);
+		font-family: ui-monospace, monospace;
+		white-space: pre-wrap;
+		word-break: break-word;
+		margin: 0;
 	}
 
 </style>

@@ -45,6 +45,12 @@
 	let selectedTaskId = $state<string | null>(null);
 	let drawerOpen = $state(false);
 
+	// Memory
+	let memoryMap = $state<Map<string, string>>(new Map());
+	let memoryViewerOpen = $state(false);
+	let memoryContent = $state("");
+	let memoryTitle = $state("");
+
 	// Sync selectedProject from URL params
 	$effect(() => {
 		const projectParam = $page.url.searchParams.get("project");
@@ -56,6 +62,7 @@
 		initProjectColors();
 		fetchProjects();
 		fetchTasks();
+		fetchMemory();
 	});
 
 	async function fetchProjects() {
@@ -82,6 +89,49 @@
 			error = e instanceof Error ? e.message : "Unknown error";
 		} finally {
 			loading = false;
+		}
+	}
+
+	async function fetchMemory() {
+		try {
+			const response = await fetch("/api/projects?visible=true");
+			if (!response.ok) return;
+			const data = await response.json();
+			const projectNames: string[] = (data.projects || []).map((p: Project) => p.name);
+
+			const map = new Map<string, string>();
+			await Promise.all(
+				projectNames.map(async (name) => {
+					try {
+						const res = await fetch(`/api/memory?action=browse&project=${encodeURIComponent(name)}`);
+						if (!res.ok) return;
+						const memData = await res.json();
+						for (const file of memData.files || []) {
+							if (file.task) {
+								map.set(file.task, file.filename);
+							}
+						}
+					} catch {}
+				})
+			);
+			memoryMap = map;
+		} catch (e) {
+			console.error("Failed to fetch memory:", e);
+		}
+	}
+
+	async function handleMemoryClick(event: MouseEvent, filename: string, task: CompletedTask) {
+		event.stopPropagation();
+		const project = task.project || task.id.split("-")[0];
+		try {
+			const res = await fetch(`/api/memory?action=file&project=${encodeURIComponent(project)}&filename=${encodeURIComponent(filename)}`);
+			if (!res.ok) return;
+			const data = await res.json();
+			memoryTitle = filename.replace(/\.md$/, "").replace(/^\d{4}-\d{2}-\d{2}-/, "");
+			memoryContent = data.content || "";
+			memoryViewerOpen = true;
+		} catch (e) {
+			console.error("Failed to fetch memory file:", e);
 		}
 	}
 
@@ -194,116 +244,7 @@
 	});
 
 	// Group tasks by day for the list view
-	interface DayGroup {
-		date: string;
-		displayDate: string;
-		tasks: CompletedTask[];
-		agents: Map<string, number>;
-	}
-
-	function getTaskDuration(task: CompletedTask): number {
-		const end = new Date(task.closed_at || task.updated_at).getTime();
-		const start = new Date(task.created_at).getTime();
-		return Math.max(0, end - start);
-	}
-
-	function formatDuration(ms: number): string {
-		const mins = Math.round(ms / 60000);
-		if (mins < 1) return "<1m";
-		if (mins < 60) return `${mins}m`;
-		const h = Math.floor(mins / 60);
-		const m = mins % 60;
-		return m > 0 ? `${h}h ${m}m` : `${h}h`;
-	}
-
-	/** Position a task on a 24h midnight-to-midnight timeline */
-	function getTimelinePos(task: CompletedTask): { left: number; width: number; crossDay: boolean } {
-		const startDate = new Date(task.created_at);
-		const endDate = new Date(task.closed_at || task.updated_at);
-
-		const endMins = endDate.getHours() * 60 + endDate.getMinutes();
-
-		// If task spans multiple days, clamp start to midnight of completion day
-		const sameDay =
-			startDate.getFullYear() === endDate.getFullYear() &&
-			startDate.getMonth() === endDate.getMonth() &&
-			startDate.getDate() === endDate.getDate();
-		const startMins = sameDay
-			? startDate.getHours() * 60 + startDate.getMinutes()
-			: 0;
-
-		const left = (startMins / 1440) * 100;
-		const width = Math.max(1.2, ((endMins - startMins) / 1440) * 100);
-
-		return { left, width, crossDay: !sameDay };
-	}
-
-	const tasksByDay = $derived.by(() => {
-		const groups = new Map<string, DayGroup>();
-
-		for (const task of filteredTasks) {
-			const dateStr = toLocalDateStr(task.closed_at || task.updated_at);
-
-			if (!groups.has(dateStr)) {
-				groups.set(dateStr, {
-					date: dateStr,
-					displayDate: formatDisplayDate(parseLocalDate(dateStr)),
-					tasks: [],
-					agents: new Map(),
-				});
-			}
-
-			const group = groups.get(dateStr)!;
-			group.tasks.push(task);
-			if (task.assignee) {
-				group.agents.set(
-					task.assignee,
-					(group.agents.get(task.assignee) || 0) + 1,
-				);
-			}
-		}
-
-		// Sort tasks within each day by completion time descending (most recent first)
-		for (const group of groups.values()) {
-			group.tasks.sort((a, b) => {
-				const aTime = new Date(a.closed_at || a.updated_at).getTime();
-				const bTime = new Date(b.closed_at || b.updated_at).getTime();
-				return bTime - aTime;
-			});
-		}
-
-		// Sort by date descending and return all days (not limited to 30)
-		return Array.from(groups.values()).sort((a, b) =>
-			b.date.localeCompare(a.date),
-		);
-	});
-
-	function formatDisplayDate(date: Date): string {
-		const today = new Date();
-		today.setHours(0, 0, 0, 0);
-		const yesterday = new Date(today);
-		yesterday.setDate(yesterday.getDate() - 1);
-
-		const dateOnly = new Date(date);
-		dateOnly.setHours(0, 0, 0, 0);
-
-		if (dateOnly.getTime() === today.getTime()) return "Today";
-		if (dateOnly.getTime() === yesterday.getTime()) return "Yesterday";
-
-		return date.toLocaleDateString("en-US", {
-			weekday: "short",
-			month: "short",
-			day: "numeric",
-			year: date.getFullYear() !== today.getFullYear() ? "numeric" : undefined,
-		});
-	}
-
-	function formatTime(dateStr: string): string {
-		return new Date(dateStr).toLocaleTimeString("en-US", {
-			hour: "numeric",
-			minute: "2-digit",
-		});
-	}
+	const tasksByDay = $derived(groupTasksByDay(filteredTasks));
 
 	function handleTaskClick(taskId: string) {
 		selectedTaskId = taskId;
@@ -451,126 +392,15 @@
 				</div>
 
 				<div class="day-list">
-					{#each tasksByDay as day}
-						<div class="day-group">
-							<div class="day-header">
-								<span class="day-date">{day.displayDate}</span>
-								<span class="day-count"
-									>{day.tasks.length} task{day.tasks.length !== 1
-										? "s"
-										: ""}</span
-								>
-							</div>
-							<div class="day-tasks">
-								{#each day.tasks as task}
-									{@const duration = getTaskDuration(task)}
-									{@const pos = getTimelinePos(task)}
-									{@const color = getProjectColor(task.project || task.id.split('-')[0])}
-									{@const typeVis = getIssueTypeVisual(task.issue_type)}
-									{@const pColors = { 0: { bg: 'oklch(0.55 0.20 25 / 0.25)', text: 'oklch(0.75 0.18 25)', border: 'oklch(0.55 0.20 25 / 0.5)' }, 1: { bg: 'oklch(0.55 0.18 85 / 0.25)', text: 'oklch(0.80 0.15 85)', border: 'oklch(0.55 0.18 85 / 0.5)' }, 2: { bg: 'oklch(0.55 0.15 200 / 0.20)', text: 'oklch(0.75 0.12 200)', border: 'oklch(0.55 0.15 200 / 0.4)' }, 3: { bg: 'oklch(0.35 0.02 250 / 0.30)', text: 'oklch(0.65 0.02 250)', border: 'oklch(0.35 0.02 250 / 0.5)' } }}
-									{@const pc = pColors[task.priority as keyof typeof pColors] || pColors[3]}
-									<button
-										class="task-item group"
-										onclick={() => handleTaskClick(task.id)}
-									>
-										<div class="task-time-col" title="Duration: {formatDuration(duration)}\nCreated: {new Date(task.created_at).toLocaleString()}{task.closed_at ? '\nCompleted: ' + new Date(task.closed_at).toLocaleString() : ''}">
-											<span class="task-time">
-												<span class="task-time-start">{formatTime(task.created_at)}</span>
-												<span class="task-time-sep">-</span>
-												<span class="task-time-end">{formatTime(task.closed_at || task.updated_at)}</span>
-												<span class="task-time-duration">{formatDuration(duration)}</span>
-											</span>
-											<div class="task-duration-track">
-												<div class="task-duration-noon"></div>
-												{#if pos.crossDay}
-													<div class="task-duration-overflow-cap"></div>
-												{/if}
-												<div
-													class="task-duration-fill"
-													class:task-duration-overflow={pos.crossDay}
-													style="left: {pos.left}%; width: {pos.width}%"
-												></div>
-											</div>
-										</div>
-										<div class="task-badge" style="--pc: {color}">
-											<span class="task-badge-avatar" title={task.assignee || 'Unassigned'}>
-												{#if task.assignee}
-													<AgentAvatar name={task.assignee} size={28} />
-												{:else}
-													<span class="task-badge-initials">??</span>
-												{/if}
-											</span>
-											<div class="task-badge-info">
-												<span class="task-badge-id">{task.id}</span>
-												<span class="task-badge-tags mt-0.5">
-													{#if task.issue_type}
-														<span class="task-badge-type">{typeVis.icon}</span>
-													{/if}
-													{#if task.priority != null}
-														<span class="task-badge-priority ml-0.5" style="background: {pc.bg}; color: {pc.text}; border: 1px solid {pc.border};">P{task.priority}</span>
-													{/if}
-												</span>
-											</div>
-										</div>
-										<div class="task-info">
-											<span class="task-title">{task.title}</span>
-											{#if task.assignee}
-												<span class="task-meta">
-													<span class="task-agent">by {task.assignee}</span>
-												</span>
-											{/if}
-										</div>
-										<!-- Right side: resume button + arrow -->
-										<div class="task-actions">
-											<!-- Resume button - shows on hover when task has assignee -->
-											{#if task.assignee}
-												<button
-													type="button"
-													class="resume-btn"
-													onclick={(e) => handleResumeSession(e, task)}
-													title="Resume session with {task.assignee}"
-													disabled={resumingTasks.has(task.id)}
-												>
-													{#if resumingTasks.has(task.id)}
-														<span class="loading loading-spinner loading-xs"
-														></span>
-													{:else}
-														<svg
-															xmlns="http://www.w3.org/2000/svg"
-															fill="none"
-															viewBox="0 0 24 24"
-															stroke-width="1.5"
-															stroke="currentColor"
-															class="w-4 h-4"
-														>
-															<path
-																stroke-linecap="round"
-																stroke-linejoin="round"
-																d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
-															/>
-														</svg>
-													{/if}
-												</button>
-											{/if}
-											<svg
-												xmlns="http://www.w3.org/2000/svg"
-												fill="none"
-												viewBox="0 0 24 24"
-												stroke-width="1.5"
-												stroke="currentColor"
-												class="task-arrow"
-											>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													d="M8.25 4.5l7.5 7.5-7.5 7.5"
-												/>
-											</svg>
-										</div>
-									</button>
-								{/each}
-							</div>
-						</div>
+					{#each tasksByDay as day (day.date)}
+						<CompletedDayGroup
+							{day}
+							onTaskClick={handleTaskClick}
+							onResumeSession={handleResumeSession}
+							onMemoryClick={handleMemoryClick}
+							{resumingTasks}
+							{memoryMap}
+						/>
 					{/each}
 
 					{#if tasksByDay.length === 0}
@@ -607,6 +437,25 @@
 
 <!-- Task Detail Drawer -->
 <TaskDetailDrawer bind:taskId={selectedTaskId} bind:isOpen={drawerOpen} />
+
+<!-- Memory Viewer Modal -->
+{#if memoryViewerOpen}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="memory-overlay" onclick={() => (memoryViewerOpen = false)} onkeydown={(e) => e.key === "Escape" && (memoryViewerOpen = false)}>
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="memory-panel" onclick={(e) => e.stopPropagation()}>
+			<div class="memory-header">
+				<h3 class="memory-header-title">{memoryTitle}</h3>
+				<button type="button" class="memory-close" onclick={() => (memoryViewerOpen = false)}>
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+					</svg>
+				</button>
+			</div>
+			<pre class="memory-body">{memoryContent}</pre>
+		</div>
+	</div>
+{/if}
 
 <style>
 	/* Stats cluster - 2x2 grid of stat cards */
@@ -707,305 +556,6 @@
 		gap: 1rem;
 	}
 
-	.day-group {
-		background: var(--color-base-100);
-		border: 1px solid var(--color-base-300);
-		border-radius: 10px;
-		overflow: hidden;
-	}
-
-	.day-header {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		padding: 0.75rem 1rem;
-		background: var(--color-base-200);
-		border-bottom: 1px solid var(--color-base-300);
-	}
-
-	.day-date {
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: var(--color-base-content);
-		font-family: ui-monospace, monospace;
-	}
-
-	.day-count {
-		font-size: 0.75rem;
-		color: oklch(from var(--color-base-content) l c h / 60%);
-		padding: 0.125rem 0.5rem;
-		background: var(--color-base-300);
-		border-radius: 10px;
-	}
-
-	.day-tasks {
-		display: flex;
-		flex-direction: column;
-	}
-
-	.task-item {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		padding: 0.625rem 1rem;
-		background: transparent;
-		border: none;
-		cursor: pointer;
-		width: 100%;
-		text-align: left;
-		transition: background 0.15s ease;
-		border-bottom: 1px solid oklch(from var(--color-base-300) l c h / 60%);
-	}
-
-	.task-item:last-child {
-		border-bottom: none;
-	}
-
-	.task-item:hover {
-		background: var(--color-base-200);
-	}
-
-	/* Task badge - matches /tasks TaskIdBadge layout */
-	.task-badge {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		width: 170px;
-		flex-shrink: 0;
-		overflow: hidden;
-	}
-
-	.task-badge-avatar {
-		width: 32px;
-		height: 32px;
-		border-radius: 50%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		overflow: hidden;
-		background: color-mix(in oklch, var(--pc) 15%, var(--color-base-200));
-		border: 1.5px solid color-mix(in oklch, var(--pc) 35%, transparent);
-		flex-shrink: 0;
-	}
-
-	.task-badge-initials {
-		font-size: 0.55rem;
-		font-weight: 700;
-		font-family: ui-monospace, monospace;
-		text-transform: uppercase;
-		color: var(--pc);
-	}
-
-	.task-badge-info {
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-	}
-
-	.task-badge-id {
-		font-size: 0.75rem;
-		font-family: ui-monospace, monospace;
-		font-weight: 600;
-		line-height: 1;
-		color: var(--pc);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		max-width: 100%;
-	}
-
-	.task-badge-tags {
-		display: flex;
-		align-items: center;
-		gap: 3px;
-	}
-
-	.task-badge-type {
-		font-size: 0.75rem;
-		line-height: 1;
-	}
-
-	.task-badge-priority {
-		font-size: 0.6rem;
-		font-weight: 600;
-		padding: 0 4px;
-		border-radius: 3px;
-		line-height: 1.5;
-	}
-
-	.task-info {
-		flex: 1;
-		min-width: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 0.2rem;
-	}
-
-	.task-title {
-		font-size: 0.85rem;
-		color: var(--color-base-content);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	.task-meta {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		font-size: 0.7rem;
-		color: oklch(from var(--color-base-content) l c h / 55%);
-	}
-
-	.task-agent {
-		color: var(--color-success);
-	}
-
-	/* Task actions container - groups time, resume button, and arrow */
-	.task-actions {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		flex-shrink: 0;
-	}
-
-	.task-time-col {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-		gap: 3px;
-		width: 150px;
-		flex-shrink: 0;
-	}
-
-	.task-time {
-		font-size: 0.7rem;
-		color: oklch(from var(--color-base-content) l c h / 55%);
-		display: flex;
-		align-items: center;
-		gap: 0.25rem;
-		white-space: nowrap;
-	}
-
-	.task-time-start {
-		color: oklch(from var(--color-base-content) l c h / 40%);
-	}
-
-	.task-time-sep {
-		color: oklch(from var(--color-base-content) l c h / 30%);
-	}
-
-	.task-time-end {
-		color: oklch(from var(--color-base-content) l c h / 60%);
-	}
-
-	.task-time-duration {
-		color: oklch(from var(--color-base-content) l c h / 40%);
-		font-family: ui-monospace, monospace;
-		font-size: 0.6rem;
-	}
-
-	.task-duration-track {
-		position: relative;
-		width: 100%;
-		height: 3px;
-		background: oklch(from var(--color-base-content) l c h / 6%);
-		border-radius: 1.5px;
-	}
-
-	.task-duration-noon {
-		position: absolute;
-		left: 50%;
-		top: 0;
-		width: 1px;
-		height: 100%;
-		background: oklch(from var(--color-base-content) l c h / 10%);
-	}
-
-	.task-duration-fill {
-		position: absolute;
-		top: 0;
-		height: 100%;
-		border-radius: 1.5px;
-		background: linear-gradient(
-			90deg,
-			oklch(from var(--color-info) l c h / 50%),
-			oklch(from var(--color-info) l c h / 75%)
-		);
-	}
-
-	.task-duration-fill.task-duration-overflow {
-		background: linear-gradient(
-			90deg,
-			oklch(from var(--color-warning) l c h / 70%),
-			oklch(from var(--color-info) l c h / 55%)
-		);
-	}
-
-	.task-duration-overflow-cap {
-		position: absolute;
-		left: 0;
-		top: -1px;
-		width: 2px;
-		height: calc(100% + 2px);
-		background: oklch(from var(--color-warning) l c h / 85%);
-		border-radius: 1px;
-	}
-
-	.task-arrow {
-		width: 16px;
-		height: 16px;
-		color: oklch(from var(--color-base-content) l c h / 45%);
-		flex-shrink: 0;
-		transition:
-			color 0.15s ease,
-			transform 0.15s ease;
-	}
-
-	.task-item:hover .task-arrow {
-		color: oklch(from var(--color-base-content) l c h / 65%);
-		transform: translateX(2px);
-	}
-
-	/* Resume button - hidden by default, shows on hover */
-	.resume-btn {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 28px;
-		height: 28px;
-		border-radius: 6px;
-		background: oklch(from var(--color-success) l c h / 15%);
-		border: 1px solid oklch(from var(--color-success) l c h / 30%);
-		color: var(--color-success);
-		cursor: pointer;
-		opacity: 0;
-		transition:
-			opacity 0.15s ease,
-			background 0.15s ease,
-			transform 0.15s ease;
-		flex-shrink: 0;
-	}
-
-	.task-item:hover .resume-btn {
-		opacity: 1;
-	}
-
-	.resume-btn:hover:not(:disabled) {
-		background: oklch(from var(--color-success) l c h / 25%);
-		border-color: oklch(from var(--color-success) l c h / 50%);
-		transform: scale(1.05);
-	}
-
-	.resume-btn:disabled {
-		cursor: not-allowed;
-		opacity: 0.6;
-	}
-
-	.task-item:hover .resume-btn:disabled {
-		opacity: 0.6;
-	}
-
 	/* Error & Empty States */
 	.error-state,
 	.empty-state {
@@ -1028,5 +578,78 @@
 	.empty-hint {
 		font-size: 0.8rem;
 		color: oklch(from var(--color-base-content) l c h / 50%);
+	}
+
+	/* Memory Viewer Modal */
+	.memory-overlay {
+		position: fixed;
+		inset: 0;
+		background: oklch(0 0 0 / 50%);
+		z-index: 50;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 2rem;
+	}
+
+	.memory-panel {
+		background: var(--color-base-100);
+		border: 1px solid var(--color-base-300);
+		border-radius: 12px;
+		max-width: 700px;
+		width: 100%;
+		max-height: 80vh;
+		display: flex;
+		flex-direction: column;
+		box-shadow: 0 25px 50px oklch(0 0 0 / 25%);
+	}
+
+	.memory-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0.75rem 1rem;
+		border-bottom: 1px solid var(--color-base-300);
+	}
+
+	.memory-header-title {
+		font-size: 0.85rem;
+		font-weight: 600;
+		font-family: ui-monospace, monospace;
+		color: var(--color-base-content);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.memory-close {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 28px;
+		height: 28px;
+		border-radius: 6px;
+		border: none;
+		background: transparent;
+		color: oklch(from var(--color-base-content) l c h / 50%);
+		cursor: pointer;
+		flex-shrink: 0;
+	}
+
+	.memory-close:hover {
+		background: var(--color-base-200);
+		color: var(--color-base-content);
+	}
+
+	.memory-body {
+		padding: 1rem;
+		overflow-y: auto;
+		font-size: 0.8rem;
+		line-height: 1.6;
+		color: oklch(from var(--color-base-content) l c h / 80%);
+		font-family: ui-monospace, monospace;
+		white-space: pre-wrap;
+		word-break: break-word;
+		margin: 0;
 	}
 </style>
