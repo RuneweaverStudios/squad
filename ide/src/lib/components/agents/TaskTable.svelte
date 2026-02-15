@@ -3312,7 +3312,7 @@
 													<!-- Run Epic button -->
 													{#if !isEpicFullyComplete}
 														<button
-															class="btn btn-xs btn-ghost gap-1 ml-2 {canRunEpic ? 'hover:btn-primary' : 'opacity-40 cursor-not-allowed'}"
+															class="btn btn-xs btn-ghost gap-1 ml-2 hover:bg-primary/20 hover:text-primary {canRunEpic ? '' : 'opacity-40 cursor-not-allowed'}"
 															onclick={(e) => {
 																e.stopPropagation();
 																if (canRunEpic) {
@@ -3767,7 +3767,7 @@
 										<!-- Run Epic button (only in parent mode) -->
 										{#if groupingMode === 'parent' && !parentIsFullyComplete}
 											<button
-												class="btn btn-xs btn-ghost gap-1 ml-2 {canRunParentEpic ? 'hover:btn-primary' : 'opacity-40 cursor-not-allowed'}"
+												class="btn btn-xs btn-ghost gap-1 ml-2 hover:bg-primary/20 hover:text-primary {canRunParentEpic ? '' : 'opacity-40 cursor-not-allowed'}"
 												onclick={(e) => {
 													e.stopPropagation();
 													if (canRunParentEpic && groupKey) {
