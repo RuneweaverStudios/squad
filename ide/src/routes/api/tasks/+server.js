@@ -16,6 +16,8 @@ export async function GET({ url }) {
 	const priority = url.searchParams.get('priority');
 	const search = url.searchParams.get('search');
 	const scheduled = url.searchParams.get('scheduled');
+	const closedAfter = url.searchParams.get('closedAfter');
+	const closedBefore = url.searchParams.get('closedBefore');
 
 	// Pagination parameters
 	const limit = url.searchParams.get('limit');
@@ -28,9 +30,11 @@ export async function GET({ url }) {
 		tasks = getScheduledTasks({ projectName: project || undefined });
 	} else {
 		const filters = {};
-		if (project) filters.project = project;
+		if (project) filters.projectName = project;
 		if (status) filters.status = status;
 		if (priority !== null) filters.priority = parseInt(priority);
+		if (closedAfter) filters.closedAfter = closedAfter;
+		if (closedBefore) filters.closedBefore = closedBefore;
 
 		tasks = getTasks(filters);
 	}

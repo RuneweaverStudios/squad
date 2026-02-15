@@ -28,6 +28,7 @@
 	import CompletedDayGroup from "$lib/components/history/CompletedDayGroup.svelte";
 	import {
 		type CompletedTask,
+		type DayGroup,
 		groupTasksByDay,
 	} from "$lib/utils/completedTaskHelpers";
 
@@ -120,10 +121,12 @@
 	let swarmHoveredEpicId = $state<string | null>(null);
 	let swarmSpawningEpicId = $state<string | null>(null);
 
-	// Completed tasks state
-	let completedTasks = $state<CompletedTask[]>([]);
+	// Completed tasks state (loaded day-by-day from API)
+	let completedDayGroups = $state<DayGroup[]>([]);
 	let completedLoading = $state(false);
-	let completedDaysLoaded = $state(1);
+	let completedLoadingMore = $state(false);
+	let completedDaysSearched = $state(0); // how many days back we've searched
+	let completedNoMoreDays = $state(false); // true when we've exhausted lookback
 	let completedMemoryMap = $state<Map<string, string>>(new Map());
 	let memoryViewerOpen = $state(false);
 	let memoryContent = $state("");
@@ -697,13 +700,44 @@
 		}
 	}
 
+	/** Compute start/end ISO strings for a local date N days ago */
+	function getDayRange(daysAgo: number): { start: string; end: string } {
+		const d = new Date();
+		d.setHours(0, 0, 0, 0);
+		d.setDate(d.getDate() - daysAgo);
+		const start = d.toISOString();
+		const next = new Date(d);
+		next.setDate(next.getDate() + 1);
+		const end = next.toISOString();
+		return { start, end };
+	}
+
+	/** Fetch closed tasks for a single day (daysAgo=0 is today) for the selected project */
+	async function fetchCompletedDay(daysAgo: number): Promise<DayGroup[]> {
+		if (!selectedProject) return [];
+		const { start, end } = getDayRange(daysAgo);
+		const params = new URLSearchParams({
+			status: "closed",
+			project: selectedProject,
+			closedAfter: start,
+			closedBefore: end,
+		});
+		const response = await fetch(`/api/tasks?${params}`);
+		if (!response.ok) return [];
+		const data = await response.json();
+		const tasks: CompletedTask[] = data.tasks || [];
+		if (tasks.length === 0) return [];
+		return groupTasksByDay(tasks);
+	}
+
+	/** Initial fetch: load today's completed tasks */
 	async function fetchCompletedTasks() {
 		completedLoading = true;
+		completedNoMoreDays = false;
+		completedDaysSearched = 0;
 		try {
-			const response = await fetch("/api/tasks?status=closed");
-			if (!response.ok) return;
-			const data = await response.json();
-			completedTasks = data.tasks || [];
+			completedDayGroups = await fetchCompletedDay(0);
+			completedDaysSearched = 1;
 		} catch {
 			// Silent fail
 		} finally {
@@ -711,27 +745,36 @@
 		}
 	}
 
-	// Completed tasks filtered by project and grouped by day
-	const projectCompletedTasks = $derived.by(() => {
-		const project = selectedProject;
-		if (!project) return [];
-		return completedTasks.filter((task) => {
-			const taskProject = task.project || task.id.split("-")[0];
-			return taskProject.toLowerCase() === project.toLowerCase();
-		});
-	});
+	/** Load the next day of history (skips empty days, gives up after 14 consecutive misses) */
+	async function loadMoreCompletedDays() {
+		if (completedLoadingMore || completedNoMoreDays) return;
+		completedLoadingMore = true;
+		try {
+			let found = false;
+			for (let attempt = 0; attempt < 14; attempt++) {
+				const daysAgo = completedDaysSearched + attempt;
+				const dayGroups = await fetchCompletedDay(daysAgo);
+				if (dayGroups.length > 0) {
+					completedDayGroups = [...completedDayGroups, ...dayGroups];
+					completedDaysSearched = daysAgo + 1;
+					found = true;
+					break;
+				}
+			}
+			if (!found) {
+				completedDaysSearched += 14;
+				completedNoMoreDays = true;
+			}
+		} catch {
+			// Silent fail
+		} finally {
+			completedLoadingMore = false;
+		}
+	}
 
-	const allCompletedDayGroups = $derived(groupTasksByDay(projectCompletedTasks));
-
-	const completedDayGroups = $derived(
-		allCompletedDayGroups.slice(0, completedDaysLoaded),
+	const completedCount = $derived(
+		completedDayGroups.reduce((sum, g) => sum + g.tasks.length, 0),
 	);
-
-	const hasMoreCompletedDays = $derived(
-		allCompletedDayGroups.length > completedDaysLoaded,
-	);
-
-	const completedCount = $derived(projectCompletedTasks.length);
 
 	async function fetchCompletedMemory() {
 		if (!selectedProject) return;
@@ -1040,7 +1083,7 @@
 	// Handle tab selection
 	function selectProject(project: string) {
 		selectedProject = project;
-		completedDaysLoaded = 1; // Reset to today only
+		completedDayGroups = []; // Reset completed tasks for new project
 
 		const projectSessions = sessionsByProject.get(project) || [];
 		const projectTasks = tasksByProject.get(project) || [];
@@ -1952,12 +1995,18 @@
 										/>
 									{/each}
 
-									{#if hasMoreCompletedDays}
+									{#if !completedNoMoreDays}
 										<button
 											class="load-more-btn"
-											onclick={() => completedDaysLoaded++}
+											onclick={loadMoreCompletedDays}
+											disabled={completedLoadingMore}
 										>
-											Load previous day
+											{#if completedLoadingMore}
+												<span class="loading loading-spinner loading-xs"></span>
+												Loading...
+											{:else}
+												Load previous day
+											{/if}
 										</button>
 									{/if}
 

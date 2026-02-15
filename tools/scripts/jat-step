@@ -234,6 +234,16 @@ EOF
     releasing)
         emit_completing_signal "$STEP" "$TASK_ID" "$TASK_TITLE"
 
+        # Capture session log while tmux session is still alive
+        # This is the reliable capture point — SessionCard detection is racy
+        TMUX_SESSION=$(tmux display-message -p '#S' 2>/dev/null || true)
+        if [[ -n "$TMUX_SESSION" ]]; then
+            log_dim "Capturing session log..."
+            capture-session-log.sh "$TMUX_SESSION" "completed" 2>/dev/null && \
+                log_success "Session log captured" || \
+                log_dim "Session log capture skipped"
+        fi
+
         log_dim "Releasing file reservations..."
         # Get all reservations for this agent and release them
         reservations=$(am-reservations --agent "$AGENT_NAME" --json 2>/dev/null || echo "[]")
