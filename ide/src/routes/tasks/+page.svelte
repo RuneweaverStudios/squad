@@ -1152,9 +1152,18 @@
 			changed = true;
 		}
 
+		// Auto-expand completed section when tasks arrive (only if user hasn't manually toggled)
+		const completedKey = `${selectedProject}:completed`;
+		const hasCompleted = completedDayGroups.length > 0;
+		if (hasCompleted && projectCollapsed.has("completed") && !userToggledSubsections.has(completedKey)) {
+			projectCollapsed.delete("completed");
+			changed = true;
+		}
+
 		// Reset user-touched flag when section empties (so it auto-expands if it reappears)
 		if (!hasChat) userToggledSubsections.delete(chatKey);
 		if (!hasWork) userToggledSubsections.delete(pausedKey);
+		if (!hasCompleted) userToggledSubsections.delete(completedKey);
 
 		if (changed) {
 			collapsedSubsections = new Map(collapsedSubsections);
