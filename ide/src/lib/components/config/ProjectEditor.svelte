@@ -596,12 +596,12 @@
 						id="project-server-path"
 						type="text"
 						class="input input-bordered w-full font-mono text-sm"
-						placeholder="e.g. dashboard"
+						placeholder="server"
 						bind:value={serverPath}
 					/>
 					<label class="label">
 						<span class="label-text-alt text-base-content/50">
-							Subdirectory for dev server, e.g. <code class="px-1 py-0.5 bg-base-300 rounded text-xs">dashboard</code>
+							Folder name where <code class="px-1 py-0.5 bg-base-300 rounded text-xs">npm run dev</code> runs. Just the name, e.g. <code class="px-1 py-0.5 bg-base-300 rounded text-xs">server</code> not <code class="px-1 py-0.5 bg-base-300 rounded text-xs">/server</code> or <code class="px-1 py-0.5 bg-base-300 rounded text-xs">./server</code>
 						</span>
 					</label>
 				</div>
