@@ -600,9 +600,7 @@
 						bind:value={serverPath}
 					/>
 					<label class="label">
-						<span class="label-text-alt text-base-content/50">
-							Folder name where <code class="px-1 py-0.5 bg-base-300 rounded text-xs">npm run dev</code> runs. Just the name, e.g. <code class="px-1 py-0.5 bg-base-300 rounded text-xs">server</code> not <code class="px-1 py-0.5 bg-base-300 rounded text-xs">/server</code> or <code class="px-1 py-0.5 bg-base-300 rounded text-xs">./server</code>
-						</span>
+						<span class="label-text-alt text-base-content/50">Just the folder name, e.g. server</span>
 					</label>
 				</div>
 
