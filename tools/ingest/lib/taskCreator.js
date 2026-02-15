@@ -201,14 +201,43 @@ export async function resumeSession(taskId, replyText, project) {
   }
 
   const sessionName = `jat-${assignee}`;
+  const injectionText = `The user replied on the originating channel (e.g. Telegram). You MUST send your response back using jat-signal reply (not just text output). Their message: ${replyText}`;
 
   // 2. Check if tmux session still exists (agent still running)
+  let sessionActive = false;
   try {
     execFileSync('tmux', ['has-session', '-t', sessionName], { timeout: 5000 });
-    // Session exists — agent is still active, don't resume
-    return { resumed: false, reason: 'session-still-active' };
+    sessionActive = true;
   } catch {
-    // Session doesn't exist — good, we can resume
+    // Session doesn't exist — will need to resume
+  }
+
+  // 2a. If session is active, inject text directly via IDE input API
+  if (sessionActive) {
+    try {
+      const res = await fetch(`${IDE_BASE_URL}/api/sessions/${encodeURIComponent(sessionName)}/input`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'text', input: injectionText }),
+        signal: AbortSignal.timeout(10000)
+      });
+      if (res.ok) {
+        logger.info(`Injected reply into active session ${sessionName} for ${taskId}`, project);
+        return { resumed: true, sessionName };
+      }
+      logger.warn(`Input API returned ${res.status} for ${sessionName}`, project);
+    } catch (err) {
+      logger.warn(`Failed to inject reply into active session ${sessionName}: ${err.message}`, project);
+    }
+    // If input API fails, fall through to try tmux directly
+    try {
+      injectTextViaTmux(sessionName, injectionText);
+      logger.info(`Injected reply via tmux into active session ${sessionName} for ${taskId}`, project);
+      return { resumed: true, sessionName };
+    } catch (err) {
+      logger.warn(`Failed to inject reply via tmux into ${sessionName}: ${err.message}`, project);
+      return { resumed: false, reason: 'session-active-injection-failed' };
+    }
   }
 
   // 3. Check if session is paused (has signal file with resumable state)
@@ -242,14 +271,32 @@ export async function resumeSession(taskId, replyText, project) {
     return { resumed: false, reason: `resume-api-failed: ${err.message}` };
   }
 
-  // 5. Wait for session to start, then inject reply text via tmux
-  await new Promise(resolve => setTimeout(resolve, 5000));
+  // 5. Poll for session readiness, then inject reply text
+  // Claude Code with -r can take 10-20s to start; poll every 2s for up to 30s
+  const maxWait = 30000;
+  const pollInterval = 2000;
+  let ready = false;
+  for (let elapsed = 0; elapsed < maxWait; elapsed += pollInterval) {
+    await new Promise(resolve => setTimeout(resolve, pollInterval));
+    try {
+      execFileSync('tmux', ['has-session', '-t', sessionName], { timeout: 5000 });
+      ready = true;
+      break;
+    } catch {
+      // Session not ready yet, keep polling
+    }
+  }
 
-  const escapedText = replyText.replace(/'/g, "'\\''");
+  if (!ready) {
+    logger.warn(`Session ${sessionName} not ready after ${maxWait / 1000}s`, project);
+    return { resumed: true, sessionName }; // Still counts as resumed, text just wasn't injected
+  }
+
+  // Wait a bit more for Claude to finish initializing within the tmux session
+  await new Promise(resolve => setTimeout(resolve, 3000));
+
   try {
-    execFileSync('tmux', ['send-keys', '-t', sessionName, `The user replied on the originating channel (e.g. Telegram). You MUST send your response back using jat-signal reply (not just text output). Their message: ${escapedText}`, 'Enter'], {
-      timeout: 10000
-    });
+    injectTextViaTmux(sessionName, injectionText);
   } catch (err) {
     logger.warn(`Failed to inject reply into ${sessionName}: ${err.message}`, project);
     // Session resumed but injection failed — still counts as resumed
@@ -257,6 +304,26 @@ export async function resumeSession(taskId, replyText, project) {
 
   logger.info(`Resumed session ${sessionName} with reply for ${taskId}`, project);
   return { resumed: true, sessionName };
+}
+
+/**
+ * Inject text into a tmux session using literal mode.
+ * Uses -l flag for literal key interpretation and sends Enter separately.
+ * This matches the IDE input API behavior (ide/src/routes/api/sessions/[name]/input/+server.js).
+ *
+ * @param {string} sessionName - tmux session name (e.g., 'jat-AgentName')
+ * @param {string} text - Text to inject
+ */
+function injectTextViaTmux(sessionName, text) {
+  // Send text with -l (literal mode) and -- (stop option parsing)
+  // This prevents tmux from interpreting special characters as key names
+  execFileSync('tmux', ['send-keys', '-t', sessionName, '-l', '--', text], {
+    timeout: 10000
+  });
+  // Send Enter separately to submit the text
+  execFileSync('tmux', ['send-keys', '-t', sessionName, 'Enter'], {
+    timeout: 5000
+  });
 }
 
 /**
@@ -278,21 +345,7 @@ export async function handleThreadReply(source, item, downloaded = []) {
   const taskId = thread.task_id;
   const replyText = item.description || item.title;
 
-  // If source has immediate automation, try to resume the original session
-  if (source.automation?.action === 'immediate') {
-    const result = await resumeSession(taskId, replyText, source.project);
-    if (result.resumed) {
-      updateThreadCursor(source.id, thread.parent_item_id, item.timestamp || new Date().toISOString());
-      if (taskId && downloaded.length > 0) {
-        registerTaskAttachments(taskId, downloaded, source.project);
-      }
-      logger.info(`Resumed session for reply → task ${taskId} (${result.sessionName})`, source.id);
-      return { handled: true, taskId, resumed: true };
-    }
-    logger.info(`Resume failed (${result.reason}), falling back to append for ${taskId}`, source.id);
-  }
-
-  // Fallback: append reply to task description
+  // Always append reply to task description for history/audit trail
   const reply = {
     text: replyText,
     author: item.author || 'unknown',
@@ -300,13 +353,23 @@ export async function handleThreadReply(source, item, downloaded = []) {
     downloaded
   };
 
-  const ok = appendToTask(taskId, [reply], source.project);
-  if (ok) {
+  const appendOk = appendToTask(taskId, [reply], source.project);
+  if (appendOk) {
     updateThreadCursor(source.id, thread.parent_item_id, item.timestamp || new Date().toISOString());
   }
 
   if (taskId && downloaded.length > 0) {
     registerTaskAttachments(taskId, downloaded, source.project);
+  }
+
+  // If source has immediate automation, try to resume/inject into the session
+  if (source.automation?.action === 'immediate') {
+    const result = await resumeSession(taskId, replyText, source.project);
+    if (result.resumed) {
+      logger.info(`Resumed session for reply → task ${taskId} (${result.sessionName})`, source.id);
+      return { handled: true, taskId, resumed: true };
+    }
+    logger.info(`Resume/inject failed (${result.reason}), reply appended to ${taskId}`, source.id);
   }
 
   logger.info(`Routed reply to thread → task ${taskId}`, source.id);
