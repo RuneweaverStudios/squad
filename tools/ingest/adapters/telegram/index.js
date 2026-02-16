@@ -62,9 +62,9 @@ export default class TelegramAdapter extends BaseAdapter {
       timeout: '0'
     });
 
-    // Filter to specific chat if configured
+    // Subscribe to messages and reactions (reactions used to close chat tasks)
     if (source.chatId) {
-      params.set('allowed_updates', JSON.stringify(['message']));
+      params.set('allowed_updates', JSON.stringify(['message', 'message_reaction']));
     }
 
     const resp = await fetch(`${API_BASE}${token}/getUpdates?${params}`, {
@@ -90,6 +90,40 @@ export default class TelegramAdapter extends BaseAdapter {
 
     for (const update of updates) {
       newOffset = Math.max(newOffset, update.update_id + 1);
+
+      // Handle emoji reactions (e.g. thumbs-up to close a chat task)
+      if (update.message_reaction) {
+        const reaction = update.message_reaction;
+        if (source.chatId && String(reaction.chat.id) !== String(source.chatId)) continue;
+
+        // Check for positive reactions (thumbs-up, etc.)
+        const closeEmojis = ['👍', '✅', '👌', '🙏'];
+        const newEmojis = (reaction.new_reaction || [])
+          .filter(r => r.type === 'emoji')
+          .map(r => r.emoji);
+        const isCloseReaction = newEmojis.some(e => closeEmojis.includes(e));
+
+        if (isCloseReaction) {
+          items.push({
+            id: `tg-reaction-${reaction.message_id}-${reaction.chat.id}-${reaction.date}`,
+            title: '',
+            description: '',
+            hash: null,
+            author: formatAuthor(reaction.user),
+            timestamp: new Date(reaction.date * 1000).toISOString(),
+            replyTo: `tg-${reaction.message_id}-${reaction.chat.id}`,
+            reaction: newEmojis.find(e => closeEmojis.includes(e)),
+            origin: {
+              adapterType: 'telegram',
+              channelId: String(reaction.chat.id),
+              senderId: reaction.user?.id ? String(reaction.user.id) : null,
+              threadId: String(reaction.message_id),
+              metadata: { chatType: reaction.chat.type || 'private' }
+            }
+          });
+        }
+        continue;
+      }
 
       const msg = update.message;
       if (!msg) continue;

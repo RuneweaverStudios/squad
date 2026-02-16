@@ -809,6 +809,59 @@
 		}
 	}
 
+	// Completed task actions
+	let completedResumingTasks = $state<Set<string>>(new Set());
+
+	async function handleCompletedResumeSession(event: MouseEvent, task: CompletedTask) {
+		event.stopPropagation();
+		if (!task.assignee) return;
+
+		completedResumingTasks.add(task.id);
+		completedResumingTasks = new Set(completedResumingTasks);
+
+		try {
+			const response = await fetch(`/api/sessions/${task.assignee}/resume`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+			});
+			if (!response.ok) {
+				const data = await response.json();
+				console.error("Failed to resume session:", data.message);
+			}
+		} catch (error) {
+			console.error("Error resuming session:", error);
+		} finally {
+			completedResumingTasks.delete(task.id);
+			completedResumingTasks = new Set(completedResumingTasks);
+		}
+	}
+
+	async function handleReopenTask(event: MouseEvent, task: CompletedTask) {
+		event.stopPropagation();
+		try {
+			const response = await fetch(`/api/tasks/${task.id}`, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ status: "open" }),
+			});
+			if (response.ok) {
+				// Remove from completed groups and refresh open tasks
+				completedDayGroups = completedDayGroups
+					.map((g) => ({ ...g, tasks: g.tasks.filter((t) => t.id !== task.id) }))
+					.filter((g) => g.tasks.length > 0);
+				await fetchTasks();
+			}
+		} catch (error) {
+			console.error("Error reopening task:", error);
+		}
+	}
+
+	function handleDuplicateTask(event: MouseEvent, task: CompletedTask) {
+		event.stopPropagation();
+		const project = task.project || task.id.split("-")[0];
+		openTaskDrawer(project, task.title, "task", task.issue_type);
+	}
+
 	// Get paused sessions for a project
 	function getProjectPausedSessions(project: string): RecoverableSession[] {
 		return recoverableSessions.filter(
@@ -1999,7 +2052,11 @@
 										<CompletedDayGroup
 											{day}
 											onTaskClick={(taskId) => openTaskDetailDrawer(taskId)}
+											onResumeSession={handleCompletedResumeSession}
 											onMemoryClick={handleMemoryClick}
+											onReopenTask={handleReopenTask}
+											onDuplicateTask={handleDuplicateTask}
+											resumingTasks={completedResumingTasks}
 											memoryMap={completedMemoryMap}
 										/>
 									{/each}

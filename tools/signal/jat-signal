@@ -388,8 +388,13 @@ case "$SIGNAL_TYPE" in
         SCRIPT_DIR_ABS="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")")" && pwd)"
         ROUTER="$(dirname "$SCRIPT_DIR_ABS")/ingest/jat-reply-router"
         if [[ -x "$ROUTER" ]]; then
-            "$ROUTER" --task-id "$TASK_ID" --message "$MESSAGE" --type "$REPLY_TYPE" &
+            # Run synchronously — the 2-3s latency is acceptable since the agent
+            # will pause after this anyway. Background (&) is unreliable because
+            # Claude Code's Bash tool may kill the process group on exit.
+            "$ROUTER" --task-id "$TASK_ID" --message "$MESSAGE" --type "$REPLY_TYPE" 2>/dev/null || true
         fi
+        # Note: Chat tasks stay open/paused regardless of replyType.
+        # Users close tasks via emoji reaction (e.g. thumbs-up) in the channel.
         ;;
 
     complete)

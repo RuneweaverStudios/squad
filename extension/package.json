@@ -31,7 +31,5 @@
   ],
   "author": "JAT Team",
   "license": "MIT",
-  "dependencies": {
-    "@supabase/supabase-js": "^2.93.3"
-  }
+  "dependencies": {}
 }

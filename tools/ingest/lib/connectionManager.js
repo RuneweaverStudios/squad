@@ -1,6 +1,6 @@
 import { isDuplicate, recordItem, getAdapterState, setAdapterState, registerThread } from './dedup.js';
 import { downloadAttachments } from './downloader.js';
-import { createTask, appendToTask, registerTaskAttachments, applyAutomation, handleThreadReply } from './taskCreator.js';
+import { createTask, appendToTask, registerTaskAttachments, applyAutomation, handleThreadReply, handleReaction } from './taskCreator.js';
 import { applyFilter, resolveFilter } from './filterEngine.js';
 import * as logger from './logger.js';
 
@@ -231,6 +231,15 @@ export class ConnectionManager {
 
     // Apply filter
     if (!applyFilter(item, filter)) return;
+
+    // Handle emoji reactions (e.g. thumbs-up to close a chat task)
+    if (item.reaction) {
+      const reactionResult = await handleReaction(source, item);
+      if (reactionResult.handled) {
+        recordItem(source.id, item.id, item.hash, reactionResult.taskId, `reaction:${item.reaction}`, item.origin);
+      }
+      return;
+    }
 
     // Dedup
     if (isDuplicate(source.id, item.id)) return;

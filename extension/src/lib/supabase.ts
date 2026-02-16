@@ -1,12 +1,11 @@
-// Supabase client for JAT Browser Extension
-// Lazily initialized from settings stored in chrome.storage.local
+// JAT API client for JAT Browser Extension
+// Submits bug reports directly to the JAT IDE API instead of Supabase.
+// Settings stored in chrome.storage.local.
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { storage } from './browser-compat'
 
-export interface SupabaseSettings {
-  supabaseUrl: string
-  supabaseAnonKey: string
+export interface JatSettings {
+  jatUrl: string
 }
 
 export interface FeedbackReport {
@@ -22,22 +21,24 @@ export interface FeedbackReport {
   metadata: Record<string, unknown> | null
 }
 
-let client: SupabaseClient | null = null
-let currentUrl: string | null = null
-let currentKey: string | null = null
+// Legacy interface kept for backward compatibility during migration
+export interface SupabaseSettings {
+  supabaseUrl: string
+  supabaseAnonKey: string
+}
+
+const DEFAULT_JAT_URL = 'http://localhost:3333'
 
 /**
- * Load Supabase settings from chrome.storage.local
+ * Load JAT settings from chrome.storage.local
  */
-export async function getSettings(): Promise<SupabaseSettings | null> {
+export async function getSettings(): Promise<JatSettings | null> {
   try {
-    const result = await storage.local.get(['supabaseUrl', 'supabaseAnonKey'])
-    if (result.supabaseUrl && result.supabaseAnonKey) {
-      return {
-        supabaseUrl: result.supabaseUrl as string,
-        supabaseAnonKey: result.supabaseAnonKey as string,
-      }
+    const result = await storage.local.get(['jatUrl'])
+    if (result.jatUrl) {
+      return { jatUrl: result.jatUrl as string }
     }
+    // Check for legacy Supabase settings - treat as not configured for JAT
     return null
   } catch {
     return null
@@ -45,31 +46,27 @@ export async function getSettings(): Promise<SupabaseSettings | null> {
 }
 
 /**
- * Save Supabase settings to chrome.storage.local
+ * Save JAT settings to chrome.storage.local
  */
-export async function saveSettings(settings: SupabaseSettings): Promise<void> {
-  await storage.local.set({
-    supabaseUrl: settings.supabaseUrl,
-    supabaseAnonKey: settings.supabaseAnonKey,
-  })
-  // Reset client so it reinitializes with new settings
-  client = null
-  currentUrl = null
-  currentKey = null
+export async function saveSettings(settings: JatSettings): Promise<void> {
+  // Clear old Supabase settings if they exist
+  try {
+    await storage.local.remove(['supabaseUrl', 'supabaseAnonKey'])
+  } catch {
+    // ignore
+  }
+  await storage.local.set({ jatUrl: settings.jatUrl })
 }
 
 /**
- * Clear stored Supabase settings
+ * Clear stored settings
  */
 export async function clearSettings(): Promise<void> {
-  await storage.local.remove(['supabaseUrl', 'supabaseAnonKey'])
-  client = null
-  currentUrl = null
-  currentKey = null
+  await storage.local.remove(['jatUrl', 'supabaseUrl', 'supabaseAnonKey'])
 }
 
 /**
- * Check if Supabase is configured
+ * Check if JAT is configured
  */
 export async function isConfigured(): Promise<boolean> {
   const settings = await getSettings()
@@ -77,179 +74,94 @@ export async function isConfigured(): Promise<boolean> {
 }
 
 /**
- * Get or create Supabase client. Returns null if not configured.
- */
-export async function getClient(): Promise<SupabaseClient | null> {
-  const settings = await getSettings()
-  if (!settings) return null
-
-  // Reuse existing client if settings haven't changed
-  if (client && currentUrl === settings.supabaseUrl && currentKey === settings.supabaseAnonKey) {
-    return client
-  }
-
-  client = createClient(settings.supabaseUrl, settings.supabaseAnonKey)
-  currentUrl = settings.supabaseUrl
-  currentKey = settings.supabaseAnonKey
-  return client
-}
-
-/**
- * Test connection to Supabase by querying the feedback table.
+ * Test connection to JAT IDE by hitting the health check endpoint.
  * Returns { ok: true } or { ok: false, error: string }
  */
 export async function testConnection(): Promise<{ ok: boolean; error?: string }> {
   try {
-    const supabase = await getClient()
-    if (!supabase) {
-      return { ok: false, error: 'Supabase not configured' }
+    const settings = await getSettings()
+    if (!settings) {
+      return { ok: false, error: 'JAT IDE URL not configured' }
     }
 
-    // Try a lightweight query to verify connectivity and table access
-    const { error } = await supabase.from('feedback').select('id').limit(1)
-    if (error) {
-      // Provide user-friendly error messages
-      if (error.message.includes('relation') && error.message.includes('does not exist')) {
-        return { ok: false, error: 'Table "feedback" not found. Please create it in your Supabase project.' }
-      }
-      if (error.code === 'PGRST301' || error.message.includes('JWT')) {
-        return { ok: false, error: 'Invalid API key. Check your anon key.' }
-      }
-      return { ok: false, error: error.message }
+    const url = settings.jatUrl.replace(/\/+$/, '')
+    const response = await fetch(`${url}/api/extension/report`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+    })
+
+    if (!response.ok) {
+      return { ok: false, error: `JAT IDE returned status ${response.status}` }
     }
 
-    return { ok: true }
+    const data = await response.json()
+    if (data.status === 'ok') {
+      return { ok: true }
+    }
+
+    return { ok: false, error: 'Unexpected response from JAT IDE' }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Connection failed'
     if (message.includes('Failed to fetch') || message.includes('NetworkError')) {
-      return { ok: false, error: 'Cannot reach Supabase. Check your project URL.' }
+      return { ok: false, error: 'Cannot reach JAT IDE. Is it running? Check the URL.' }
     }
     return { ok: false, error: message }
   }
 }
 
 /**
- * Submit a feedback report to Supabase.
- * Handles screenshot uploads to Storage and inserts the feedback row.
+ * Submit a feedback report to JAT IDE.
+ * Sends screenshots as base64 data URLs - the IDE saves them to disk.
  */
 export async function submitFeedback(
   report: FeedbackReport,
   screenshots: string[],
 ): Promise<{ ok: boolean; id?: string; error?: string }> {
   try {
-    const supabase = await getClient()
-    if (!supabase) {
-      return { ok: false, error: 'Supabase not configured. Open Settings to add your project URL and API key.' }
+    const settings = await getSettings()
+    if (!settings) {
+      return { ok: false, error: 'JAT IDE URL not configured. Open Settings to set it up.' }
     }
 
-    // Upload screenshots to Storage if any
-    let screenshotUrls: string[] | null = null
-    if (screenshots.length > 0) {
-      screenshotUrls = await uploadScreenshots(supabase, screenshots)
+    const url = settings.jatUrl.replace(/\/+$/, '')
+    const response = await fetch(`${url}/api/extension/report`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        title: report.title,
+        description: report.description,
+        type: report.type,
+        priority: report.priority,
+        page_url: report.page_url,
+        user_agent: report.user_agent,
+        console_logs: report.console_logs,
+        selected_elements: report.selected_elements,
+        screenshots: screenshots, // base64 data URLs
+        metadata: report.metadata,
+      }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok || !data.ok) {
+      return { ok: false, error: data.error || `Server returned ${response.status}` }
     }
 
-    // Insert feedback row
-    const { data, error } = await supabase
-      .from('feedback')
-      .insert({
-        ...report,
-        screenshot_urls: screenshotUrls,
-      })
-      .select('id')
-      .single()
-
-    if (error) {
-      return { ok: false, error: friendlyError(error.message, error.code) }
-    }
-
-    return { ok: true, id: data?.id }
+    return { ok: true, id: data.id }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Submission failed'
-    return { ok: false, error: friendlyError(message) }
-  }
-}
-
-/**
- * Upload screenshot data URLs to Supabase Storage.
- * Returns an array of public URLs. Fails silently per-screenshot.
- */
-async function uploadScreenshots(
-  supabase: SupabaseClient,
-  screenshots: string[],
-): Promise<string[]> {
-  const urls: string[] = []
-  const timestamp = Date.now()
-
-  for (let i = 0; i < screenshots.length; i++) {
-    try {
-      const dataUrl = screenshots[i]
-      const blob = dataUrlToBlob(dataUrl)
-      const ext = blob.type === 'image/png' ? 'png' : 'jpg'
-      const path = `feedback/${timestamp}-${i}.${ext}`
-
-      const { error } = await supabase.storage
-        .from('screenshots')
-        .upload(path, blob, {
-          contentType: blob.type,
-          upsert: false,
-        })
-
-      if (error) {
-        console.warn(`Screenshot upload failed (${i}):`, error.message)
-        continue
-      }
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('screenshots')
-        .getPublicUrl(path)
-
-      if (urlData?.publicUrl) {
-        urls.push(urlData.publicUrl)
-      }
-    } catch (err) {
-      console.warn(`Screenshot upload error (${i}):`, err)
+    if (message.includes('Failed to fetch') || message.includes('NetworkError')) {
+      return { ok: false, error: 'Cannot reach JAT IDE. Is it running? Check the URL in Settings.' }
     }
+    return { ok: false, error: message }
   }
-
-  return urls.length > 0 ? urls : null as unknown as string[]
 }
 
 /**
- * Convert a data URL to a Blob for upload
+ * Get the default JAT URL
  */
-function dataUrlToBlob(dataUrl: string): Blob {
-  const [header, base64] = dataUrl.split(',')
-  const mime = header.match(/:(.*?);/)?.[1] || 'image/png'
-  const binary = atob(base64)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i)
-  }
-  return new Blob([bytes], { type: mime })
-}
-
-/**
- * Convert error messages to user-friendly text
- */
-function friendlyError(message: string, code?: string): string {
-  if (message.includes('Failed to fetch') || message.includes('NetworkError')) {
-    return 'Cannot reach Supabase. Check your internet connection and project URL.'
-  }
-  if (code === 'PGRST301' || message.includes('JWT')) {
-    return 'Authentication failed. Check your API key in Settings.'
-  }
-  if (message.includes('relation') && message.includes('does not exist')) {
-    return 'The "feedback" table does not exist. Please create it in your Supabase project.'
-  }
-  if (message.includes('violates row-level security')) {
-    return 'Permission denied. Check your Supabase RLS policies allow inserts.'
-  }
-  if (message.includes('new row violates') || message.includes('not-null')) {
-    return 'Missing required fields. Please fill in all required fields.'
-  }
-  if (message.includes('storage') && message.includes('not found')) {
-    return 'Screenshot storage bucket not found. Create a "screenshots" bucket in Supabase Storage.'
-  }
-  return message
+export function getDefaultUrl(): string {
+  return DEFAULT_JAT_URL
 }

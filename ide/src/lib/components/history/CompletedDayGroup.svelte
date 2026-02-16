@@ -7,6 +7,8 @@
 		onTaskClick,
 		onResumeSession,
 		onMemoryClick,
+		onReopenTask,
+		onDuplicateTask,
 		resumingTasks,
 		memoryMap,
 	}: {
@@ -14,6 +16,8 @@
 		onTaskClick: (id: string) => void;
 		onResumeSession?: (event: MouseEvent, task: CompletedTask) => void;
 		onMemoryClick?: (event: MouseEvent, filename: string, task: CompletedTask) => void;
+		onReopenTask?: (event: MouseEvent, task: CompletedTask) => void;
+		onDuplicateTask?: (event: MouseEvent, task: CompletedTask) => void;
 		resumingTasks?: Set<string>;
 		memoryMap?: Map<string, string>;
 	} = $props();
@@ -33,6 +37,8 @@
 				{onTaskClick}
 				{onResumeSession}
 				{onMemoryClick}
+				{onReopenTask}
+				{onDuplicateTask}
 				resuming={resumingTasks?.has(task.id) ?? false}
 				memoryFilename={memoryMap?.get(task.id)}
 			/>

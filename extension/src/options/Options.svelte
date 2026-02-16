@@ -1,8 +1,7 @@
 <script lang="ts">
-  import { getSettings, saveSettings, clearSettings, testConnection, type SupabaseSettings } from '../lib/supabase'
+  import { getSettings, saveSettings, clearSettings, testConnection, getDefaultUrl, type JatSettings } from '../lib/supabase'
 
-  let url = $state('')
-  let anonKey = $state('')
+  let jatUrl = $state('')
   let saving = $state(false)
   let testing = $state(false)
   let message = $state<{ type: 'success' | 'error' | 'info'; text: string } | null>(null)
@@ -16,21 +15,22 @@
   async function loadSettings() {
     const settings = await getSettings()
     if (settings) {
-      url = settings.supabaseUrl
-      anonKey = settings.supabaseAnonKey
+      jatUrl = settings.jatUrl
+    } else {
+      jatUrl = getDefaultUrl()
     }
     loaded = true
   }
 
   async function handleSave() {
-    if (!url.trim() || !anonKey.trim()) {
-      message = { type: 'error', text: 'Both fields are required.' }
+    if (!jatUrl.trim()) {
+      message = { type: 'error', text: 'JAT IDE URL is required.' }
       return
     }
 
     // Basic URL validation
-    if (!url.startsWith('https://') || !url.includes('.supabase.co')) {
-      message = { type: 'error', text: 'URL should be like https://your-project.supabase.co' }
+    if (!jatUrl.startsWith('http://') && !jatUrl.startsWith('https://')) {
+      message = { type: 'error', text: 'URL should start with http:// or https://' }
       return
     }
 
@@ -38,10 +38,7 @@
     message = null
 
     try {
-      await saveSettings({
-        supabaseUrl: url.trim(),
-        supabaseAnonKey: anonKey.trim(),
-      })
+      await saveSettings({ jatUrl: jatUrl.trim() })
       message = { type: 'success', text: 'Settings saved.' }
     } catch (err) {
       message = { type: 'error', text: err instanceof Error ? err.message : 'Failed to save.' }
@@ -51,8 +48,8 @@
   }
 
   async function handleTest() {
-    if (!url.trim() || !anonKey.trim()) {
-      message = { type: 'error', text: 'Save settings first.' }
+    if (!jatUrl.trim()) {
+      message = { type: 'error', text: 'Enter a URL first.' }
       return
     }
 
@@ -60,15 +57,12 @@
     message = { type: 'info', text: 'Testing connection...' }
 
     try {
-      // Save first so testConnection uses current values
-      await saveSettings({
-        supabaseUrl: url.trim(),
-        supabaseAnonKey: anonKey.trim(),
-      })
+      // Save first so testConnection uses current value
+      await saveSettings({ jatUrl: jatUrl.trim() })
 
       const result = await testConnection()
       if (result.ok) {
-        message = { type: 'success', text: 'Connected successfully! Feedback table found.' }
+        message = { type: 'success', text: 'Connected to JAT IDE successfully!' }
       } else {
         message = { type: 'error', text: result.error || 'Connection failed.' }
       }
@@ -81,12 +75,11 @@
 
   async function handleClear() {
     await clearSettings()
-    url = ''
-    anonKey = ''
-    message = { type: 'info', text: 'Settings cleared.' }
+    jatUrl = getDefaultUrl()
+    message = { type: 'info', text: 'Settings reset to default.' }
   }
 
-  const hasValues = $derived(url.trim().length > 0 && anonKey.trim().length > 0)
+  const hasValue = $derived(jatUrl.trim().length > 0)
 </script>
 
 {#if !loaded}
@@ -101,33 +94,22 @@
     </header>
 
     <section class="section">
-      <h2>Supabase Connection</h2>
+      <h2>JAT IDE Connection</h2>
       <p class="hint">
-        Connect to your Supabase project to submit bug reports. You need a project with
-        a <code>feedback</code> table and a <code>screenshots</code> storage bucket.
+        Connect to your JAT IDE to submit bug reports directly as tasks.
+        The IDE must be running for reports to be submitted.
       </p>
 
       <div class="field">
-        <label for="url">Project URL</label>
+        <label for="url">JAT IDE URL</label>
         <input
           id="url"
           type="url"
-          bind:value={url}
-          placeholder="https://your-project.supabase.co"
+          bind:value={jatUrl}
+          placeholder="http://localhost:3333"
           disabled={saving || testing}
         />
-      </div>
-
-      <div class="field">
-        <label for="key">Anon Key</label>
-        <input
-          id="key"
-          type="password"
-          bind:value={anonKey}
-          placeholder="eyJhbGciOiJIUzI1NiIs..."
-          disabled={saving || testing}
-        />
-        <span class="field-hint">Found in Supabase Dashboard &gt; Settings &gt; API</span>
+        <span class="field-hint">Default: http://localhost:3333 (JAT IDE dev server)</span>
       </div>
 
       {#if message}
@@ -137,54 +119,34 @@
       {/if}
 
       <div class="actions">
-        <button class="btn primary" onclick={handleSave} disabled={saving || testing || !hasValues}>
+        <button class="btn primary" onclick={handleSave} disabled={saving || testing || !hasValue}>
           {saving ? 'Saving...' : 'Save'}
         </button>
-        <button class="btn secondary" onclick={handleTest} disabled={saving || testing || !hasValues}>
+        <button class="btn secondary" onclick={handleTest} disabled={saving || testing || !hasValue}>
           {testing ? 'Testing...' : 'Test Connection'}
         </button>
-        {#if hasValues}
-          <button class="btn danger" onclick={handleClear} disabled={saving || testing}>
-            Clear
-          </button>
-        {/if}
+        <button class="btn danger" onclick={handleClear} disabled={saving || testing}>
+          Reset
+        </button>
       </div>
     </section>
 
     <section class="section">
-      <h2>Required Supabase Setup</h2>
-      <p class="hint">Run this SQL in your Supabase SQL Editor to create the feedback table:</p>
-      <pre class="code-block">{`create table feedback (
-  id uuid default gen_random_uuid() primary key,
-  created_at timestamptz default now(),
-  title text not null,
-  description text,
-  type text not null default 'bug',
-  priority text not null default 'medium',
-  page_url text,
-  user_agent text,
-  console_logs jsonb,
-  selected_elements jsonb,
-  screenshot_urls text[],
-  metadata jsonb
-);
-
--- Allow anonymous inserts (adjust RLS as needed)
-alter table feedback enable row level security;
-create policy "Allow anonymous inserts"
-  on feedback for insert
-  with check (true);
-create policy "Allow anonymous reads"
-  on feedback for select
-  using (true);`}</pre>
-
-      <p class="hint" style="margin-top: 12px;">Create a storage bucket for screenshots:</p>
-      <pre class="code-block">{`-- In Supabase Dashboard > Storage:
--- 1. Create bucket named "screenshots"
--- 2. Set it to Public
--- Or via SQL:
-insert into storage.buckets (id, name, public)
-values ('screenshots', 'screenshots', true);`}</pre>
+      <h2>How It Works</h2>
+      <div class="how-it-works">
+        <div class="step">
+          <span class="step-num">1</span>
+          <span class="step-text">Capture screenshots, console logs, or select elements on any page</span>
+        </div>
+        <div class="step">
+          <span class="step-num">2</span>
+          <span class="step-text">Fill out the bug report form in the extension popup</span>
+        </div>
+        <div class="step">
+          <span class="step-num">3</span>
+          <span class="step-text">Report is sent to JAT IDE and created as a task automatically</span>
+        </div>
+      </div>
     </section>
   </div>
 {/if}
@@ -304,13 +266,6 @@ values ('screenshots', 'screenshots', true);`}</pre>
     margin-top: 4px;
   }
 
-  code {
-    background: #f3f4f6;
-    padding: 1px 4px;
-    border-radius: 3px;
-    font-size: 12px;
-  }
-
   .message {
     padding: 8px 12px;
     border-radius: 6px;
@@ -385,16 +340,35 @@ values ('screenshots', 'screenshots', true);`}</pre>
     background: #fef2f2;
   }
 
-  .code-block {
-    background: #1f2937;
-    color: #e5e7eb;
-    padding: 14px;
-    border-radius: 6px;
+  .how-it-works {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .step {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .step-num {
+    width: 24px;
+    height: 24px;
+    background: #eef2ff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4f46e5;
+    font-weight: 700;
     font-size: 12px;
-    font-family: 'SF Mono', Monaco, 'Cascadia Code', Consolas, monospace;
-    overflow-x: auto;
-    line-height: 1.5;
-    white-space: pre;
-    margin: 0;
+    flex-shrink: 0;
+  }
+
+  .step-text {
+    font-size: 13px;
+    color: #374151;
+    line-height: 1.4;
   }
 </style>

@@ -33,7 +33,7 @@
     { value: 'critical', label: 'Critical', desc: 'Blocking' },
   ] as const
 
-  // Check if Supabase is configured on mount
+  // Check if JAT IDE is configured on mount
   $effect(() => {
     isConfigured().then(v => { configured = v })
   })
@@ -50,7 +50,7 @@
       const pageUrl = (await chrome.tabs.query({ active: true, currentWindow: true }))[0]?.url || ''
 
       if (configured) {
-        // Submit to Supabase
+        // Submit to JAT IDE
         const result = await submitFeedback(
           {
             title: title.trim(),
@@ -61,7 +61,7 @@
             user_agent: navigator.userAgent,
             console_logs: consoleLogs.length > 0 ? consoleLogs : null,
             selected_elements: selectedElements.length > 0 ? selectedElements : null,
-            screenshot_urls: null, // Filled by submitFeedback after upload
+            screenshot_urls: null,
             metadata: null,
           },
           screenshots,
@@ -72,7 +72,7 @@
           return
         }
       } else {
-        // Fallback: store locally when Supabase is not configured
+        // Fallback: store locally when JAT IDE is not configured
         const report = {
           title: title.trim(),
           description: description.trim(),
@@ -123,8 +123,8 @@
 <form class="form" onsubmit={handleSubmit}>
   {#if configured === false}
     <div class="config-notice">
-      <span>Supabase not configured. Reports will be saved locally.</span>
-      <button type="button" class="config-link" onclick={openSettings}>Set up Supabase</button>
+      <span>JAT IDE not configured. Reports will be saved locally.</span>
+      <button type="button" class="config-link" onclick={openSettings}>Set up connection</button>
     </div>
   {/if}
 

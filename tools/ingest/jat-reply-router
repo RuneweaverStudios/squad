@@ -19,16 +19,43 @@
  *   - Secret configured for the adapter (via jat-secret)
  */
 
+import { readFileSync, writeFileSync } from 'node:fs';
 import { getOriginByTaskId, registerThread } from './lib/dedup.js';
 import { discoverPlugins } from './lib/pluginLoader.js';
 import { getSecret, getEnabledSources } from './lib/config.js';
 
 const REPLY_TYPE_PREFIXES = {
   ack: '[ACK]',
+  answer: '',
   progress: '[PROGRESS]',
   question: '[QUESTION]',
   completion: '[DONE]'
 };
+
+// Simple dedup: track recent sends to prevent double-replies within a short window.
+// Prevents agents from accidentally sending the same message twice (e.g. sending
+// both an "answer" and "question" reply with identical content).
+const DEDUP_FILE = '/tmp/jat-reply-router-dedup.json';
+const DEDUP_WINDOW_MS = 10000; // 10 seconds
+
+function isDuplicateReply(taskId, message) {
+  try {
+    let recent = {};
+    try { recent = JSON.parse(readFileSync(DEDUP_FILE, 'utf-8')); } catch { /* fresh */ }
+    const now = Date.now();
+    // Clean old entries
+    for (const key of Object.keys(recent)) {
+      if (now - recent[key] > DEDUP_WINDOW_MS) delete recent[key];
+    }
+    const key = `${taskId}:${message.slice(0, 200)}`;
+    if (recent[key]) {
+      return true;
+    }
+    recent[key] = now;
+    writeFileSync(DEDUP_FILE, JSON.stringify(recent), 'utf-8');
+    return false;
+  } catch { return false; }
+}
 
 function parseArgs(argv) {
   const args = { taskId: null, message: null, type: 'progress' };
@@ -86,8 +113,14 @@ async function main() {
     process.exit(1);
   }
 
-  // 4. Build target and message
-  const prefix = REPLY_TYPE_PREFIXES[args.type] || '';
+  // 4. Dedup check — prevent same message sent twice in quick succession
+  if (isDuplicateReply(args.taskId, args.message)) {
+    console.log(`Duplicate reply suppressed for ${args.taskId} (same message within ${DEDUP_WINDOW_MS / 1000}s)`);
+    process.exit(0);
+  }
+
+  // 5. Build target and message
+  const prefix = REPLY_TYPE_PREFIXES[args.type] ?? '';
   const target = {
     channelId: origin.channelId,
     threadId: origin.threadId,
@@ -98,7 +131,7 @@ async function main() {
     text: `${prefix} ${args.message}`.trim()
   };
 
-  // 5. Send and register bot reply for thread tracking
+  // 6. Send and register bot reply for thread tracking
   try {
     const result = await adapter.send(target, message, getSecret);
     console.log(`Reply sent to ${origin.adapterType} channel ${origin.channelId} (${args.type})`);

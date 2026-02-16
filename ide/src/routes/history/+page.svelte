@@ -18,6 +18,7 @@
 	import TaskDetailDrawer from "$lib/components/TaskDetailDrawer.svelte";
 	import { HistorySkeleton } from "$lib/components/skeleton";
 	import { initProjectColors } from "$lib/utils/projectColors";
+	import { openTaskDrawer } from "$lib/stores/drawerStore";
 	import CompletedDayGroup from "$lib/components/history/CompletedDayGroup.svelte";
 	import {
 		type CompletedTask,
@@ -280,6 +281,29 @@
 			resumingTasks = new Set(resumingTasks);
 		}
 	}
+
+	async function handleReopenTask(event: MouseEvent, task: CompletedTask) {
+		event.stopPropagation();
+		try {
+			const response = await fetch(`/api/tasks/${task.id}`, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ status: "open" }),
+			});
+			if (response.ok) {
+				// Remove from local tasks list and re-derive
+				tasks = tasks.filter((t) => t.id !== task.id);
+			}
+		} catch (error) {
+			console.error("Error reopening task:", error);
+		}
+	}
+
+	function handleDuplicateTask(event: MouseEvent, task: CompletedTask) {
+		event.stopPropagation();
+		const project = task.project || task.id.split("-")[0];
+		openTaskDrawer(project, task.title, "task", task.issue_type);
+	}
 </script>
 
 <svelte:head>
@@ -398,6 +422,8 @@
 							onTaskClick={handleTaskClick}
 							onResumeSession={handleResumeSession}
 							onMemoryClick={handleMemoryClick}
+							onReopenTask={handleReopenTask}
+							onDuplicateTask={handleDuplicateTask}
 							{resumingTasks}
 							{memoryMap}
 						/>

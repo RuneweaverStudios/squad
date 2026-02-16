@@ -1,7 +1,7 @@
 import { getEnabledSources, getConfig, getSecret } from './config.js';
 import { isDuplicate, recordItem, getAdapterState, setAdapterState, logPoll, registerThread, getActiveThreads, updateThreadCursor } from './dedup.js';
 import { downloadAttachments } from './downloader.js';
-import { createTask, appendToTask, registerTaskAttachments, applyAutomation, handleThreadReply } from './taskCreator.js';
+import { createTask, appendToTask, registerTaskAttachments, applyAutomation, handleThreadReply, handleReaction } from './taskCreator.js';
 import { discoverPlugins } from './pluginLoader.js';
 import { applyFilter, resolveFilter } from './filterEngine.js';
 import { ConnectionManager } from './connectionManager.js';
@@ -186,6 +186,15 @@ async function pollSource(source) {
       // Apply filter before dedup check
       if (!applyFilter(item, filter)) {
         itemsFiltered++;
+        continue;
+      }
+
+      // Handle emoji reactions (e.g. thumbs-up to close a chat task)
+      if (item.reaction) {
+        const reactionResult = await handleReaction(source, item);
+        if (reactionResult.handled) {
+          recordItem(source.id, item.id, item.hash, reactionResult.taskId, `reaction:${item.reaction}`, item.origin);
+        }
         continue;
       }
 

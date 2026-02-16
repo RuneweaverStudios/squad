@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { findThreadByParentItemId, updateThreadCursor } from './dedup.js';
+import { findThreadByParentItemId, updateThreadCursor, deactivateThread } from './dedup.js';
 import * as logger from './logger.js';
 
 // Resolve jat root from this file's location (tools/ingest/lib/ → jat/)
@@ -344,6 +344,26 @@ export async function handleThreadReply(source, item, downloaded = []) {
 
   const taskId = thread.task_id;
   const replyText = item.description || item.title;
+  const cwd = getProjectPath(source.project);
+
+  // Check if the task is closed — if so, reopen it before proceeding
+  let taskClosed = false;
+  try {
+    const showOutput = execFileSync('jt', ['show', taskId, '--json'], {
+      encoding: 'utf-8', timeout: 15000, cwd
+    });
+    const parsed = JSON.parse(showOutput);
+    const task = Array.isArray(parsed) ? parsed[0] : parsed;
+    if (task?.status === 'closed') {
+      taskClosed = true;
+      execFileSync('jt', ['update', taskId, '--status', 'open'], {
+        encoding: 'utf-8', timeout: 15000, cwd
+      });
+      logger.info(`Reopened closed task ${taskId} for follow-up reply`, source.id);
+    }
+  } catch (err) {
+    logger.warn(`Failed to check/reopen task ${taskId}: ${err.message}`, source.id);
+  }
 
   // Always append reply to task description for history/audit trail
   const reply = {
@@ -364,6 +384,13 @@ export async function handleThreadReply(source, item, downloaded = []) {
 
   // If source has immediate automation, try to resume/inject into the session
   if (source.automation?.action === 'immediate') {
+    // If task was closed (no session to resume), spawn a fresh agent
+    if (taskClosed) {
+      logger.info(`Task ${taskId} was closed, spawning new agent for follow-up reply`, source.id);
+      spawnAgent(taskId, source.project, source.id);
+      return { handled: true, taskId, resumed: true };
+    }
+
     const result = await resumeSession(taskId, replyText, source.project);
     if (result.resumed) {
       logger.info(`Resumed session for reply → task ${taskId} (${result.sessionName})`, source.id);
@@ -373,6 +400,71 @@ export async function handleThreadReply(source, item, downloaded = []) {
   }
 
   logger.info(`Routed reply to thread → task ${taskId}`, source.id);
+  return { handled: true, taskId };
+}
+
+/**
+ * Handle an emoji reaction on a tracked message (e.g. thumbs-up to close a chat task).
+ * Looks up the reacted message → task mapping, closes the task, and deactivates the thread.
+ *
+ * @param {Object} source - Source config
+ * @param {Object} item - Reaction item (has item.reaction and item.replyTo)
+ * @returns {Promise<{ handled: boolean, taskId?: string }>}
+ */
+export async function handleReaction(source, item) {
+  if (!item.replyTo || !item.reaction) return { handled: false };
+
+  const thread = findThreadByParentItemId(source.id, item.replyTo);
+  if (!thread) return { handled: false };
+
+  const taskId = thread.task_id;
+  const cwd = getProjectPath(source.project);
+
+  // Close the task
+  try {
+    execFileSync('jt', ['close', taskId, '--reason', `Closed via ${item.reaction} reaction by ${item.author || 'user'}`], {
+      encoding: 'utf-8', timeout: 15000, cwd
+    });
+    logger.info(`Closed task ${taskId} via ${item.reaction} reaction`, source.id);
+  } catch (err) {
+    // Task may already be closed
+    logger.warn(`Failed to close task ${taskId} via reaction: ${err.message}`, source.id);
+  }
+
+  // Kill the agent session if it's still running (paused sessions have a tmux session)
+  let assignee;
+  try {
+    const showOutput = execFileSync('jt', ['show', taskId, '--json'], {
+      encoding: 'utf-8', timeout: 15000, cwd
+    });
+    const parsed = JSON.parse(showOutput);
+    const task = Array.isArray(parsed) ? parsed[0] : parsed;
+    assignee = task?.assignee;
+  } catch { /* ignore */ }
+
+  if (assignee) {
+    const sessionName = `jat-${assignee}`;
+    try {
+      execFileSync('tmux', ['kill-session', '-t', sessionName], { timeout: 5000 });
+      logger.info(`Killed session ${sessionName} after reaction close`, source.id);
+    } catch {
+      // Session may not exist (already paused/killed)
+    }
+  }
+
+  // Deactivate thread so future replies don't route to this closed task
+  deactivateThread(source.id, thread.parent_item_id);
+
+  // Send confirmation back to the channel
+  try {
+    const router = join(dirname(fileURLToPath(import.meta.url)), '..', 'jat-reply-router');
+    execFileSync(router, ['--task-id', taskId, '--message', `Task closed. ${item.reaction}`, '--type', 'completion'], {
+      encoding: 'utf-8', timeout: 15000
+    });
+  } catch {
+    // Confirmation is best-effort
+  }
+
   return { handled: true, taskId };
 }
 
