@@ -37,6 +37,17 @@
 	const BUILTIN_TYPES = ['rss', 'slack', 'telegram', 'gmail', 'custom'];
 	const isPluginType = $derived(sourceType != null && !BUILTIN_TYPES.includes(sourceType));
 
+	// Chat/messaging source types default to /jat:chat instead of /jat:start
+	const CHAT_SOURCE_TYPES = new Set([
+		'telegram', 'slack', 'discord', 'matrix', 'mattermost',
+		'line', 'signal', 'whatsapp', 'bluebubbles', 'googlechat'
+	]);
+	function getDefaultCommand(): string {
+		if (sourceType && CHAT_SOURCE_TYPES.has(sourceType)) return '/jat:chat';
+		if (pluginMetadata?.capabilities?.send) return '/jat:chat';
+		return '/jat:start';
+	}
+
 	// Wizard state
 	let step = $state(0);
 	let saving = $state(false);
@@ -378,7 +389,7 @@
 		customCommand = '';
 		connectionMode = 'polling';
 		autoAction = 'none';
-		autoCommand = '/jat:start';
+		autoCommand = getDefaultCommand();
 		autoSchedule = '08:00';
 		autoDelay = 0;
 		autoDelayUnit = 'minutes';
@@ -410,7 +421,7 @@
 		// Populate automation fields from edit source
 		if (src.automation) {
 			autoAction = src.automation.action || 'none';
-			autoCommand = src.automation.command || '/jat:start';
+			autoCommand = src.automation.command || getDefaultCommand();
 			autoSchedule = src.automation.schedule || '08:00';
 			autoDelay = src.automation.delay || 0;
 			autoDelayUnit = src.automation.delayUnit || 'minutes';

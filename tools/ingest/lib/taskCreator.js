@@ -12,14 +12,24 @@ const TASK_IMAGES_PATH = join(JAT_ROOT, '.jat', 'task-images.json');
 
 const IDE_BASE_URL = process.env.JAT_IDE_URL || 'http://127.0.0.1:3333';
 
+// Messaging/chat source types where /jat:chat is the appropriate default command
+const CHAT_SOURCE_TYPES = new Set([
+  'telegram', 'slack', 'discord', 'matrix', 'mattermost',
+  'line', 'signal', 'whatsapp', 'bluebubbles', 'googlechat'
+]);
+
+function isChatSource(source) {
+  return CHAT_SOURCE_TYPES.has(source.type) || source.trackReplies === true;
+}
+
 /**
  * Create a task via jt create CLI.
  * Returns the created task ID or null on failure.
  */
 export function createTask(source, item, downloadedAttachments = []) {
   const defaults = source.taskDefaults || {};
-  // Auto-set type to 'chat' for conversational integrations (/jat:chat automation)
-  const isChat = source.automation?.command === '/jat:chat';
+  // Auto-set type to 'chat' for conversational integrations
+  const isChat = source.automation?.command === '/jat:chat' || isChatSource(source);
   const type = isChat ? 'chat' : (defaults.type || 'task');
   const priority = String(defaults.priority ?? 2);
   const labels = defaults.labels || [];
@@ -536,7 +546,7 @@ export function applyAutomation(taskId, source) {
   if (!auto || auto.action === 'none') return;
 
   const cwd = getProjectPath(source.project);
-  const command = auto.command || '/jat:start';
+  const command = auto.command || (isChatSource(source) ? '/jat:chat' : '/jat:start');
 
   if (auto.action === 'immediate') {
     // Set command on task, then fire-and-forget spawn API call

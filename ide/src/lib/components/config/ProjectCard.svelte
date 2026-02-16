@@ -205,17 +205,15 @@
 			</span>
 		{/if}
 
-		{#if project.colors?.active}
-			<span class="badge color-badge">
-				<span class="color-swatch" style="background: {project.colors.active}"></span>
-				Active
-			</span>
-		{/if}
-
-		{#if project.colors?.inactive}
-			<span class="badge color-badge inactive">
-				<span class="color-swatch" style="background: {project.colors.inactive}"></span>
-				Inactive
+		{#if project.colors?.active || project.colors?.inactive}
+			<span class="badge color-badge" title="Active: {project.colors?.active || 'none'} / Inactive: {project.colors?.inactive || 'none'}">
+				{#if project.colors?.active}
+					<span class="color-swatch" style="background: {project.colors.active}"></span>
+				{/if}
+				{#if project.colors?.inactive}
+					<span class="color-swatch" style="background: {project.colors.inactive}"></span>
+				{/if}
+				Colors
 			</span>
 		{/if}
 
@@ -390,9 +388,8 @@
 		background: oklch(0.25 0.06 145);
 	}
 
-	.color-badge.inactive {
-		color: oklch(0.70 0.06 250);
-		background: oklch(0.22 0.02 250);
+	.color-badge .color-swatch + .color-swatch {
+		margin-left: -2px;
 	}
 
 	.color-swatch {
