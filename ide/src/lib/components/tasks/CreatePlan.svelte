@@ -23,6 +23,8 @@
 	import AgentAvatar from '$lib/components/AgentAvatar.svelte';
 	import ProjectSelector from './ProjectSelector.svelte';
 	import AttachmentZone from './AttachmentZone.svelte';
+	import { AGENT_PRESETS } from '$lib/types/agentProgram';
+	import ProviderLogo from '$lib/components/agents/ProviderLogo.svelte';
 
 	interface Props {
 		projects: string[];
@@ -42,8 +44,28 @@
 
 	// State
 	let selectedProject = $state(initialProject || projects[0] || '');
-	let selectedModel = $state('sonnet');
+	let selectedHarness = $state<string>('claude-code');
+	let selectedModel = $state<string>('opus');
+	let harnessDropdownOpen = $state(false);
 	let description = $state('');
+
+	// Derive available models from selected harness
+	const availableModels = $derived(() => {
+		const preset = AGENT_PRESETS.find(p => p.id === selectedHarness);
+		return preset?.config.models || [];
+	});
+
+	// Update selected model when harness changes — pick the highest-cost-tier model (most powerful)
+	$effect(() => {
+		const preset = AGENT_PRESETS.find(p => p.id === selectedHarness);
+		if (preset) {
+			// For planning, default to the most powerful (highest cost tier) model
+			const highModel = preset.config.models?.find(m => m.costTier === 'high');
+			selectedModel = highModel?.shortName || preset.config.defaultModel || '';
+		} else {
+			selectedModel = '';
+		}
+	});
 	let isSpawning = $state(false);
 	let activeSessionName = $state<string | null>(null);
 	let activeAgentName = $state<string | null>(null);
@@ -114,6 +136,7 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					project: selectedProject,
+					agentId: selectedHarness !== 'claude-code' ? selectedHarness : undefined,
 					model: selectedModel,
 					mode: 'plan',
 				}),
@@ -224,6 +247,7 @@
 					<span class="text-xs font-mono opacity-60 truncate">{activeAgentName}</span>
 				{/if}
 				<span class="text-xs opacity-40">|</span>
+				<ProviderLogo agentId={selectedHarness} size={14} />
 				<span class="text-xs opacity-50 capitalize">{selectedModel}</span>
 			</div>
 
@@ -296,16 +320,71 @@
 			</div>
 			{/if}
 
-			<!-- Model -->
+			<!-- Agent / Model -->
 			<div class="form-control mb-3">
 				<label class="label py-1">
-					<span class="label-text text-sm font-medium">Model</span>
+					<span class="label-text text-sm font-medium">Agent / Model</span>
 				</label>
-				<select class="select select-sm select-bordered" bind:value={selectedModel} disabled={!!activeSessionName}>
-					<option value="opus">Opus</option>
-					<option value="sonnet">Sonnet</option>
-					<option value="haiku">Haiku</option>
-				</select>
+				<div class="dropdown dropdown-end w-full" class:dropdown-open={harnessDropdownOpen}>
+					<button type="button"
+						class="btn btn-sm w-full justify-between gap-2 font-mono text-xs"
+						style="background: oklch(0.22 0.02 250); border-color: oklch(0.35 0.03 250); color: oklch(0.75 0.02 250);"
+						disabled={!!activeSessionName}
+						onclick={() => harnessDropdownOpen = !harnessDropdownOpen}
+					>
+						<span class="flex items-center gap-2">
+							<ProviderLogo agentId={selectedHarness} size={16} />
+							<span>{AGENT_PRESETS.find(p => p.id === selectedHarness)?.config.name || selectedHarness}{#if selectedModel && selectedHarness !== 'human'}<span class="opacity-50">/{selectedModel}</span>{/if}</span>
+						</span>
+						<svg class="w-3 h-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+						</svg>
+					</button>
+					{#if harnessDropdownOpen}
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
+						<div class="dropdown-content bg-base-200 rounded-box z-50 w-full p-2 shadow-lg border border-base-content/10 mt-1" onclick={(e) => e.stopPropagation()}>
+							<!-- Agent programs -->
+							<ul class="menu p-0">
+								{#each AGENT_PRESETS.filter(p => p.id !== 'human') as preset}
+									<li>
+										<button class="flex items-center gap-2 {selectedHarness === preset.id ? 'active' : ''}"
+											onclick={() => { selectedHarness = preset.id; }}
+										>
+											<ProviderLogo agentId={preset.id} size={16} />
+											<span>{preset.config.name}</span>
+											{#if selectedHarness === preset.id}
+												<svg class="w-4 h-4 ml-auto text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+												</svg>
+											{/if}
+										</button>
+									</li>
+								{/each}
+							</ul>
+							<!-- Model selector -->
+							{#if availableModels().length > 0}
+								<div class="divider my-1 text-xs text-base-content/40">MODEL</div>
+								<ul class="menu p-0">
+									{#each availableModels() as model}
+										<li>
+											<button class="flex items-center gap-2 text-xs {selectedModel === model.shortName ? 'active' : ''}"
+												onclick={() => { selectedModel = model.shortName; harnessDropdownOpen = false; }}
+											>
+												<span class="badge badge-xs {model.costTier === 'high' ? 'badge-warning' : model.costTier === 'medium' ? 'badge-info' : 'badge-ghost'}">{model.costTier?.[0]?.toUpperCase() || '?'}</span>
+												<span>{model.name}</span>
+												{#if selectedModel === model.shortName}
+													<svg class="w-3.5 h-3.5 ml-auto text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+														<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+													</svg>
+												{/if}
+											</button>
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</div>
+					{/if}
+				</div>
 			</div>
 
 			<!-- Planning description -->

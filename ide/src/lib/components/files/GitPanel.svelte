@@ -461,6 +461,10 @@
 
 			await fetchStatus();
 			showToast(`Staged ${allChanges.length} file(s)`);
+			// Auto-generate commit message when staging all files (if no message yet)
+			if (!commitMessage.trim()) {
+				handleGenerateMessage();
+			}
 		} catch (err) {
 			showToast(err instanceof Error ? err.message : 'Failed to stage files', 'error');
 		} finally {
@@ -1484,7 +1488,7 @@
 			<div class="commit-section">
 				<textarea
 					class="commit-input"
-					placeholder="Commit message..."
+					placeholder={isGeneratingMessage ? 'Generating commit message...' : 'Commit message...'}
 					bind:value={commitMessage}
 					onkeydown={handleKeyDown}
 					rows="2"
@@ -1540,25 +1544,24 @@
 					>
 						<polyline points="9 18 15 12 9 6" />
 					</svg>
-					<span class="changes-title">CHANGES</span>
-					{#if changesCount > 0}
-						<span class="changes-count changes">{changesCount}</span>
+					{#if isStagingAll}
+						<span class="changes-title staging-label"><span class="loading loading-spinner" style="width: 10px; height: 10px;"></span> Staging...</span>
+					{:else}
+						<span class="changes-title">CHANGES</span>
+						{#if changesCount > 0}
+							<span class="changes-count changes">{changesCount}</span>
+						{/if}
 					{/if}
-					{#if changesCount > 0}
+					{#if changesCount > 0 && !isStagingAll}
 						<button
 							class="stage-all-btn"
 							onclick={(e) => { e.stopPropagation(); stageAll(); }}
-							disabled={isStagingAll}
 							title="Stage all files"
 						>
-							{#if isStagingAll}
-								<span class="loading loading-spinner loading-xs"></span>
-							{:else}
-								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-									<line x1="12" y1="5" x2="12" y2="19" />
-									<line x1="5" y1="12" x2="19" y2="12" />
-								</svg>
-							{/if}
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<line x1="12" y1="5" x2="12" y2="19" />
+								<line x1="5" y1="12" x2="19" y2="12" />
+							</svg>
 						</button>
 						{@const discardableCount = modifiedFiles.filter(f => !stagedFiles.includes(f)).length + deletedFiles.filter(f => !stagedFiles.includes(f)).length}
 						{#if discardableCount > 0 && !pendingDiscardAll}
@@ -4065,6 +4068,13 @@
 	.changes-title {
 		flex: 1;
 		text-align: left;
+	}
+
+	.staging-label {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		color: oklch(0.70 0.15 85);
 	}
 
 	.changes-count {

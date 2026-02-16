@@ -357,18 +357,18 @@ export const AUTOMATION_PRESETS: AutomationPreset[] = [
 	{
 		id: 'preset-waiting-input',
 		name: 'Waiting for Input Detection',
-		description: 'Notify when session appears to be waiting for user input',
+		description: 'Notify when session appears to be waiting for user input (matches common question phrases)',
 		category: 'stall',
 		rule: {
 			name: 'Waiting for Input Detection',
-			description: 'Detect when Claude Code is waiting for input',
+			description: 'Detect when Claude Code is asking the user a question or waiting for confirmation',
 			enabled: true,
 			patterns: [
 				{
-					// The ⎿ character is the Claude Code input prompt indicator
-					pattern: '⎿',
-					mode: 'string',
-					caseSensitive: true
+					// Match common question/confirmation phrases agents use when waiting for user input
+					pattern: 'Do you want to proceed|Would you like to|Do you wish to|Should I|shall I|Please confirm|please choose|Which option|Enter to select|Type your choice|yes.*no.*\\?|\\[y\\/n\\]|\\[Y\\/N\\]|Proceed\\?|Continue\\?|approve|waiting for.*input',
+					mode: 'regex',
+					caseSensitive: false
 				}
 			],
 			actions: [
@@ -377,8 +377,8 @@ export const AUTOMATION_PRESETS: AutomationPreset[] = [
 					payload: 'Session is waiting for user input'
 				}
 			],
-			cooldownSeconds: 60,
-			maxTriggersPerSession: 100,
+			cooldownSeconds: 120,
+			maxTriggersPerSession: 50,
 			category: 'stall',
 			priority: 30
 		}

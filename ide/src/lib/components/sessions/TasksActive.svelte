@@ -41,6 +41,7 @@
 		notes?: string;
 		labels?: string[];
 		agent_program?: string | null;
+		created_at?: string;
 	}
 
 	interface AgentSessionInfo {

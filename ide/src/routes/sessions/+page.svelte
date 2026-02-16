@@ -53,6 +53,21 @@
 	// Tab filter state - synced with URL
 	let activeTab = $state('agents');
 
+	// Recently closed sessions state
+	interface RecentSession {
+		sessionName: string;
+		agentName: string;
+		taskId: string | null;
+		taskTitle: string | null;
+		project: string | null;
+		sessionId: string | null;
+		lastState: string;
+		timestamp: string;
+	}
+	let recentSessions = $state<RecentSession[]>([]);
+	let recentCollapsed = $state(false);
+	let resumingSession = $state<string | null>(null);
+
 	// Expanded session state (inline SessionCard)
 	let expandedSession = $state<string | null>(null);
 	let collapsingSession = $state<string | null>(null); // For slide-up animation
@@ -346,6 +361,69 @@
 	async function fetchAllData() {
 		await Promise.all([fetchProjectOrder(), fetchAgentProjects(), fetchProjectColors()]);
 		await fetchSessions();
+		// Lazy fetch recently closed sessions (non-blocking)
+		fetchRecentSessions();
+	}
+
+	// Fetch recently closed sessions from signal files
+	async function fetchRecentSessions() {
+		try {
+			const response = await fetch('/api/sessions/recent');
+			if (!response.ok) return;
+			const data = await response.json();
+			recentSessions = data.sessions || [];
+		} catch {
+			// Silent fail - recent sessions are optional
+		}
+	}
+
+	// Resume a closed session
+	async function resumeSession(recent: RecentSession) {
+		resumingSession = recent.sessionName;
+		attachMessage = null;
+		try {
+			const body: Record<string, string> = {};
+			if (recent.sessionId) {
+				body.session_id = recent.sessionId;
+			}
+			if (recent.project) {
+				body.project = recent.project;
+			}
+
+			const response = await fetch(`/api/sessions/${encodeURIComponent(recent.sessionName)}/resume`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(body)
+			});
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.message || data.error || 'Failed to resume session');
+			}
+
+			attachMessage = {
+				session: recent.agentName,
+				message: `Resumed in ${data.terminal || 'terminal'}`,
+				method: 'terminal'
+			};
+			setTimeout(() => {
+				if (attachMessage?.session === recent.agentName) {
+					attachMessage = null;
+				}
+			}, 4000);
+
+			// Refresh both lists - session should move from recent to active
+			await fetchSessions();
+			await fetchRecentSessions();
+		} catch (err) {
+			attachMessage = {
+				session: recent.agentName,
+				message: err instanceof Error ? err.message : 'Failed to resume',
+				method: 'error'
+			};
+		} finally {
+			resumingSession = null;
+		}
 	}
 
 	// Kill a session
@@ -1790,6 +1868,86 @@
 				</table>
 			</div>
 
+			<!-- Recently Closed Sessions (agents tab only) -->
+			{#if activeTab === 'agents' && recentSessions.length > 0}
+				<div class="recent-section">
+					<button
+						class="recent-header"
+						onclick={() => recentCollapsed = !recentCollapsed}
+					>
+						<div class="recent-header-left">
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke-width="1.5"
+								stroke="currentColor"
+								class="recent-chevron"
+								class:collapsed={recentCollapsed}
+							>
+								<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+							</svg>
+							<span class="recent-title">Recently Closed</span>
+							<span class="recent-count">{recentSessions.length}</span>
+						</div>
+					</button>
+
+					{#if !recentCollapsed}
+						<div class="recent-list">
+							{#each recentSessions as recent (recent.sessionName)}
+								{@const projectColor = recent.project ? getProjectColorReactive(recent.taskId || recent.project) : null}
+								{@const stateVisual = getSessionStateVisual(recent.lastState as SessionState)}
+								<div
+									class="recent-row"
+									style="border-left: 3px solid {projectColor || 'oklch(0.30 0.02 250)'};"
+								>
+									<div class="recent-row-left">
+										<AgentAvatar agentName={recent.agentName} size={24} />
+										<div class="recent-info">
+											<div class="recent-agent-line">
+												<span class="recent-agent-name">{recent.agentName}</span>
+												{#if recent.taskId && recent.taskId !== 'unknown'}
+													<span class="recent-task-id">{recent.taskId}</span>
+												{/if}
+											</div>
+											{#if recent.taskTitle}
+												<div class="recent-task-title">{recent.taskTitle}</div>
+											{/if}
+										</div>
+									</div>
+									<div class="recent-row-right">
+										<span
+											class="recent-state-badge"
+											style="background: {stateVisual.bgColor}; color: {stateVisual.textColor}; border: 1px solid {stateVisual.borderColor};"
+										>
+											{stateVisual.shortLabel}
+										</span>
+										<span class="recent-time">{formatElapsed(recent.timestamp)}</span>
+										<button
+											class="recent-resume-btn"
+											onclick={() => resumeSession(recent)}
+											disabled={resumingSession === recent.sessionName}
+											title="Resume this session"
+										>
+											{#if resumingSession === recent.sessionName}
+												<svg class="recent-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+													<circle cx="12" cy="12" r="10" stroke-dasharray="31.42" stroke-dashoffset="10" />
+												</svg>
+											{:else}
+												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+												</svg>
+											{/if}
+											<span>Resume</span>
+										</button>
+									</div>
+								</div>
+							{/each}
+						</div>
+					{/if}
+				</div>
+			{/if}
+
 			<!-- Command hint -->
 			<div class="command-hint">
 				<span class="hint-label">Tip:</span>
@@ -2471,6 +2629,196 @@
 		white-space: nowrap;
 		width: 100%;
 		max-width: 100%;
+	}
+
+	/* Recently Closed Sessions */
+	.recent-section {
+		margin-top: 1.5rem;
+	}
+
+	.recent-header {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.5rem 0.75rem;
+		background: oklch(0.16 0.01 250);
+		border: 1px solid oklch(0.22 0.02 250);
+		border-radius: 6px 6px 0 0;
+		cursor: pointer;
+		width: 100%;
+		text-align: left;
+		transition: background 0.15s;
+	}
+
+	.recent-header:hover {
+		background: oklch(0.18 0.01 250);
+	}
+
+	.recent-header-left {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.recent-chevron {
+		width: 14px;
+		height: 14px;
+		color: oklch(0.55 0.02 250);
+		transition: transform 0.2s;
+	}
+
+	.recent-chevron.collapsed {
+		transform: rotate(-90deg);
+	}
+
+	.recent-title {
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: oklch(0.65 0.02 250);
+	}
+
+	.recent-count {
+		font-size: 0.7rem;
+		font-weight: 600;
+		color: oklch(0.55 0.02 250);
+		background: oklch(0.22 0.02 250);
+		padding: 0.05rem 0.4rem;
+		border-radius: 9999px;
+		font-family: ui-monospace, monospace;
+	}
+
+	.recent-list {
+		border: 1px solid oklch(0.22 0.02 250);
+		border-top: none;
+		border-radius: 0 0 6px 6px;
+		overflow: hidden;
+	}
+
+	.recent-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0.5rem 0.75rem;
+		gap: 0.75rem;
+		background: oklch(0.14 0.01 250);
+		transition: background 0.15s;
+	}
+
+	.recent-row:not(:last-child) {
+		border-bottom: 1px solid oklch(0.20 0.01 250);
+	}
+
+	.recent-row:hover {
+		background: oklch(0.17 0.01 250);
+	}
+
+	.recent-row-left {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		min-width: 0;
+		flex: 1;
+	}
+
+	.recent-info {
+		display: flex;
+		flex-direction: column;
+		gap: 0.125rem;
+		min-width: 0;
+	}
+
+	.recent-agent-line {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.recent-agent-name {
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: oklch(0.75 0.02 250);
+	}
+
+	.recent-task-id {
+		font-size: 0.7rem;
+		font-weight: 500;
+		color: oklch(0.55 0.02 250);
+		font-family: ui-monospace, monospace;
+	}
+
+	.recent-task-title {
+		font-size: 0.725rem;
+		color: oklch(0.55 0.02 250);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		max-width: 400px;
+	}
+
+	.recent-row-right {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		flex-shrink: 0;
+	}
+
+	.recent-state-badge {
+		font-size: 0.65rem;
+		font-weight: 600;
+		padding: 0.1rem 0.4rem;
+		border-radius: 4px;
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+		white-space: nowrap;
+	}
+
+	.recent-time {
+		font-size: 0.7rem;
+		color: oklch(0.50 0.02 250);
+		font-family: ui-monospace, monospace;
+		white-space: nowrap;
+		min-width: 3.5rem;
+		text-align: right;
+	}
+
+	.recent-resume-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		padding: 0.25rem 0.6rem;
+		font-size: 0.7rem;
+		font-weight: 600;
+		color: oklch(0.80 0.15 145);
+		background: oklch(0.55 0.15 145 / 0.15);
+		border: 1px solid oklch(0.55 0.15 145 / 0.3);
+		border-radius: 4px;
+		cursor: pointer;
+		transition: all 0.15s;
+		white-space: nowrap;
+	}
+
+	.recent-resume-btn:hover:not(:disabled) {
+		background: oklch(0.55 0.15 145 / 0.25);
+		border-color: oklch(0.55 0.15 145 / 0.5);
+	}
+
+	.recent-resume-btn:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	.recent-resume-btn svg {
+		width: 12px;
+		height: 12px;
+	}
+
+	.recent-spinner {
+		animation: spin 1s linear infinite;
+	}
+
+	@keyframes spin {
+		from { transform: rotate(0deg); }
+		to { transform: rotate(360deg); }
 	}
 
 	/* Command hint */

@@ -492,7 +492,8 @@ async function computeWorkData(lines, includeUsage) {
 						priority: t.priority,
 						issue_type: t.issue_type,
 						depends_on: t.depends_on || [],
-						labels: t.labels || []
+						labels: t.labels || [],
+						created_at: t.created_at
 					});
 				}
 			});
@@ -519,7 +520,8 @@ async function computeWorkData(lines, includeUsage) {
 						status: t.status,
 						priority: t.priority,
 						issue_type: t.issue_type,
-						closedAt: t.updated_at
+						closedAt: t.updated_at,
+						created_at: t.created_at
 					});
 				}
 			});

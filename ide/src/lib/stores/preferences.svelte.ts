@@ -28,7 +28,10 @@ const STORAGE_KEYS = {
 	notificationsEnabled: 'push-notifications-enabled', // Browser push notifications
 	faviconBadgeEnabled: 'favicon-badge-enabled', // Favicon badge with count
 	titleBadgeEnabled: 'title-badge-enabled', // Title prefix with count
-	sidebarCollapsed: 'sidebar-collapsed' // Sidebar narrow/icon-only mode
+	sidebarCollapsed: 'sidebar-collapsed', // Sidebar narrow/icon-only mode
+	toastNeedsInput: 'toast-needs-input', // Toast when agent needs input
+	toastReview: 'toast-review', // Toast when agent ready for review
+	toastComplete: 'toast-complete' // Toast when agent completes task
 } as const;
 
 // Terminal font family options
@@ -99,7 +102,10 @@ const DEFAULTS = {
 	notificationsEnabled: true, // Browser push notifications (requires permission)
 	faviconBadgeEnabled: true, // Show count on favicon when agents need attention
 	titleBadgeEnabled: true, // Show count in document title when agents need attention
-	sidebarCollapsed: false // Sidebar narrow/icon-only mode
+	sidebarCollapsed: false, // Sidebar narrow/icon-only mode
+	toastNeedsInput: true, // Toast when agent needs input
+	toastReview: true, // Toast when agent ready for review
+	toastComplete: true // Toast when agent completes task
 };
 
 // Types
@@ -132,6 +138,9 @@ let notificationsEnabled = $state(DEFAULTS.notificationsEnabled);
 let faviconBadgeEnabled = $state(DEFAULTS.faviconBadgeEnabled);
 let titleBadgeEnabled = $state(DEFAULTS.titleBadgeEnabled);
 let sidebarCollapsed = $state(DEFAULTS.sidebarCollapsed);
+let toastNeedsInput = $state(DEFAULTS.toastNeedsInput);
+let toastReview = $state(DEFAULTS.toastReview);
+let toastComplete = $state(DEFAULTS.toastComplete);
 let initialized = $state(false);
 
 /**
@@ -226,6 +235,16 @@ export function initPreferences(): void {
 
 	const storedSidebarCollapsed = localStorage.getItem(STORAGE_KEYS.sidebarCollapsed);
 	sidebarCollapsed = storedSidebarCollapsed === null ? DEFAULTS.sidebarCollapsed : storedSidebarCollapsed === 'true';
+
+	// Load signal toast notification preferences
+	const storedToastNeedsInput = localStorage.getItem(STORAGE_KEYS.toastNeedsInput);
+	toastNeedsInput = storedToastNeedsInput === null ? DEFAULTS.toastNeedsInput : storedToastNeedsInput === 'true';
+
+	const storedToastReview = localStorage.getItem(STORAGE_KEYS.toastReview);
+	toastReview = storedToastReview === null ? DEFAULTS.toastReview : storedToastReview === 'true';
+
+	const storedToastComplete = localStorage.getItem(STORAGE_KEYS.toastComplete);
+	toastComplete = storedToastComplete === null ? DEFAULTS.toastComplete : storedToastComplete === 'true';
 
 	// Apply terminal font CSS variables to document
 	updateTerminalFontCSSVars();
@@ -641,6 +660,66 @@ export function setSidebarCollapsed(value: boolean): void {
 export function toggleSidebarCollapsed(): boolean {
 	setSidebarCollapsed(!sidebarCollapsed);
 	return sidebarCollapsed;
+}
+
+// ============================================================================
+// Toast: Needs Input (signal-based notification)
+// ============================================================================
+
+export function getToastNeedsInput(): boolean {
+	return toastNeedsInput;
+}
+
+export function setToastNeedsInput(value: boolean): void {
+	toastNeedsInput = value;
+	if (browser) {
+		localStorage.setItem(STORAGE_KEYS.toastNeedsInput, String(value));
+	}
+}
+
+export function toggleToastNeedsInput(): boolean {
+	setToastNeedsInput(!toastNeedsInput);
+	return toastNeedsInput;
+}
+
+// ============================================================================
+// Toast: Review (signal-based notification)
+// ============================================================================
+
+export function getToastReview(): boolean {
+	return toastReview;
+}
+
+export function setToastReview(value: boolean): void {
+	toastReview = value;
+	if (browser) {
+		localStorage.setItem(STORAGE_KEYS.toastReview, String(value));
+	}
+}
+
+export function toggleToastReview(): boolean {
+	setToastReview(!toastReview);
+	return toastReview;
+}
+
+// ============================================================================
+// Toast: Complete (signal-based notification)
+// ============================================================================
+
+export function getToastComplete(): boolean {
+	return toastComplete;
+}
+
+export function setToastComplete(value: boolean): void {
+	toastComplete = value;
+	if (browser) {
+		localStorage.setItem(STORAGE_KEYS.toastComplete, String(value));
+	}
+}
+
+export function toggleToastComplete(): boolean {
+	setToastComplete(!toastComplete);
+	return toastComplete;
 }
 
 // ============================================================================

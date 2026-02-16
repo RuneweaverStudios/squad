@@ -49,6 +49,12 @@
 		setEpicAutoClose,
 		getMaxSessions,
 		setMaxSessions,
+		getToastNeedsInput,
+		setToastNeedsInput,
+		getToastReview,
+		setToastReview,
+		getToastComplete,
+		setToastComplete,
 		TERMINAL_FONT_OPTIONS,
 		TERMINAL_FONT_SIZE_OPTIONS,
 		TERMINAL_SCROLLBACK_OPTIONS,
@@ -113,6 +119,17 @@
 	let isBrowserNotificationsAnimating = $state(false);
 	let isFaviconBadgeAnimating = $state(false);
 	let isTitleBadgeAnimating = $state(false);
+
+	// Signal toast notification settings (reactive from preferences store)
+	const toastNeedsInput = $derived(getToastNeedsInput());
+	const toastReview = $derived(getToastReview());
+	const toastComplete = $derived(getToastComplete());
+	let isToastNeedsInputAnimating = $state(false);
+	let isToastReviewAnimating = $state(false);
+	let isToastCompleteAnimating = $state(false);
+
+	// Collapsible section state
+	let expandedSections = $state<Set<string>>(new Set(['notifications', 'terminal', 'agents']));
 
 	// Help modal
 	let showHelpModal = $state(false);
@@ -283,6 +300,33 @@
 		}, 400);
 	}
 
+	function toggleSection(section: string) {
+		if (expandedSections.has(section)) {
+			expandedSections.delete(section);
+		} else {
+			expandedSections.add(section);
+		}
+		expandedSections = new Set(expandedSections);
+	}
+
+	function handleToastNeedsInputToggle() {
+		isToastNeedsInputAnimating = true;
+		setTimeout(() => { setToastNeedsInput(!toastNeedsInput); }, 100);
+		setTimeout(() => { isToastNeedsInputAnimating = false; }, 400);
+	}
+
+	function handleToastReviewToggle() {
+		isToastReviewAnimating = true;
+		setTimeout(() => { setToastReview(!toastReview); }, 100);
+		setTimeout(() => { isToastReviewAnimating = false; }, 400);
+	}
+
+	function handleToastCompleteToggle() {
+		isToastCompleteAnimating = true;
+		setTimeout(() => { setToastComplete(!toastComplete); }, 100);
+		setTimeout(() => { isToastCompleteAnimating = false; }, 400);
+	}
+
 	function handleHeightChange(newHeight: number) {
 		// Store handles persistence and reactivity automatically
 		setTerminalHeight(newHeight);
@@ -389,19 +433,15 @@
 
 		<div class="divider my-1 h-px bg-base-content/20"></div>
 
-		<!-- Theme Selector -->
-
+		<!-- ═══════════════════════════════════════════ -->
+		<!-- APPEARANCE -->
+		<!-- ═══════════════════════════════════════════ -->
 		<li class="menu-title mt-2">
-			<span class="text-xs text-base-content/50">Theme</span>
+			<span class="text-xs text-base-content/50 uppercase tracking-wider">Appearance</span>
 		</li>
 
 		<li>
 			<ThemeSelector inline={true} />
-		</li>
-
-		<!-- Sound Settings -->
-		<li class="menu-title mt-2">
-			<span class="text-xs text-base-content/50">Sound</span>
 		</li>
 
 		<li>
@@ -432,109 +472,6 @@
 			</button>
 		</li>
 
-		<!-- Notification Settings -->
-		<li class="menu-title mt-2">
-			<span class="text-xs text-base-content/50">Notifications</span>
-		</li>
-
-		{#if browserNotificationsSupported}
-			<li>
-				<button
-					onclick={handleBrowserNotificationsToggle}
-					class="flex items-center gap-2 w-full px-2 py-1.5 rounded transition-colors {browserNotificationsEnabled && browserNotificationPermission === 'granted' ? 'bg-info/20' : ''}"
-					title={browserNotificationPermission === 'denied'
-						? 'Browser notifications blocked - check browser settings'
-						: browserNotificationsEnabled
-							? 'Show browser notifications when agents need attention'
-							: 'Enable browser notifications'}
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke-width="1.5"
-						stroke="currentColor"
-						class="w-4 h-4 transition-transform duration-300 {browserNotificationsEnabled && browserNotificationPermission === 'granted' ? 'text-info' : 'text-base-content/50'}"
-						class:toggle-icon-pulse={isBrowserNotificationsAnimating}
-					>
-						<path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
-					</svg>
-					<span class="text-xs flex-1 text-left text-base-content/70">
-						Browser Alerts
-					</span>
-					{#if browserNotificationPermission === 'denied'}
-						<span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-error/30 text-error">
-							BLOCKED
-						</span>
-					{:else}
-						<span
-							class="text-[10px] font-mono px-1.5 py-0.5 rounded transition-transform duration-300 {browserNotificationsEnabled && browserNotificationPermission === 'granted' ? 'bg-info/40 text-info' : 'bg-base-200 text-base-content/50'}"
-							class:toggle-badge-bounce={isBrowserNotificationsAnimating}
-						>
-							{browserNotificationsEnabled && browserNotificationPermission === 'granted' ? 'ON' : 'OFF'}
-						</span>
-					{/if}
-				</button>
-			</li>
-		{/if}
-
-		<li>
-			<button
-				onclick={handleFaviconBadgeToggle}
-				class="flex items-center gap-2 w-full px-2 py-1.5 rounded transition-colors {faviconBadgeEnabled ? 'bg-warning/20' : ''}"
-				title={faviconBadgeEnabled
-					? 'Show count badge on favicon when agents need attention'
-					: 'Favicon badge disabled'}
-			>
-				<span
-					class="w-4 h-4 flex items-center justify-center text-sm transition-transform duration-300"
-					class:toggle-icon-pulse={isFaviconBadgeAnimating}
-				>
-					{faviconBadgeEnabled ? '🔴' : '⚪'}
-				</span>
-				<span class="text-xs flex-1 text-left text-base-content/70">
-					Favicon Badge
-				</span>
-				<span
-					class="text-[10px] font-mono px-1.5 py-0.5 rounded transition-transform duration-300 {faviconBadgeEnabled ? 'bg-warning/40 text-warning-content' : 'bg-base-200 text-base-content/50'}"
-					class:toggle-badge-bounce={isFaviconBadgeAnimating}
-				>
-					{faviconBadgeEnabled ? 'ON' : 'OFF'}
-				</span>
-			</button>
-		</li>
-
-		<li>
-			<button
-				onclick={handleTitleBadgeToggle}
-				class="flex items-center gap-2 w-full px-2 py-1.5 rounded transition-colors {titleBadgeEnabled ? 'bg-primary/20' : ''}"
-				title={titleBadgeEnabled
-					? 'Show count in page title when agents need attention'
-					: 'Title badge disabled'}
-			>
-				<span
-					class="w-4 h-4 flex items-center justify-center font-mono text-[9px] font-bold transition-transform duration-300 {titleBadgeEnabled ? 'text-primary' : 'text-base-content/50'}"
-					class:toggle-icon-pulse={isTitleBadgeAnimating}
-				>
-					(3)
-				</span>
-				<span class="text-xs flex-1 text-left text-base-content/70">
-					Title Badge
-				</span>
-				<span
-					class="text-[10px] font-mono px-1.5 py-0.5 rounded transition-transform duration-300 {titleBadgeEnabled ? 'bg-primary/40 text-primary' : 'bg-base-200 text-base-content/50'}"
-					class:toggle-badge-bounce={isTitleBadgeAnimating}
-				>
-					{titleBadgeEnabled ? 'ON' : 'OFF'}
-				</span>
-			</button>
-		</li>
-
-		<!-- Display Settings -->
-		<li class="menu-title mt-2">
-			<span class="text-xs text-base-content/50">Display</span>
-		</li>
-
 		<li>
 			<button
 				onclick={handleSparklineToggle}
@@ -563,202 +500,427 @@
 			</button>
 		</li>
 
-		<!-- Ctrl+C Behavior -->
-		<li>
-			<button
-				onclick={handleCtrlCToggle}
-				class="flex items-center gap-2 w-full px-2 py-1.5 rounded transition-colors {ctrlCIntercept ? 'bg-error/20' : ''}"
-				title={ctrlCIntercept
-					? 'Ctrl+C sends interrupt to tmux'
-					: 'Ctrl+C copies text (browser default)'}
-			>
-				<span
-					class="w-4 h-4 flex items-center justify-center font-mono text-[9px] font-bold transition-transform duration-300 {!ctrlCIntercept ? 'line-through opacity-50' : ''} {ctrlCIntercept ? 'text-error' : 'text-base-content/50'}"
-					class:toggle-icon-pulse={isCtrlCAnimating}
-				>
-					^C
-				</span>
-				<span class="text-xs flex-1 text-left text-base-content/70">
-					Ctrl+C Interrupt
-				</span>
-				<span
-					class="text-[10px] font-mono px-1.5 py-0.5 rounded transition-transform duration-300 {ctrlCIntercept ? 'bg-error/40 text-error' : 'bg-base-200 text-base-content/50'}"
-					class:toggle-badge-bounce={isCtrlCAnimating}
-				>
-					{ctrlCIntercept ? 'ON' : 'OFF'}
-				</span>
-			</button>
+		<!-- ═══════════════════════════════════════════ -->
+		<!-- NOTIFICATIONS (collapsible) -->
+		<!-- ═══════════════════════════════════════════ -->
+		<div class="divider my-1 h-px bg-base-content/20"></div>
+		<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+		<li class="menu-title mt-1 cursor-pointer select-none" onclick={() => toggleSection('notifications')}>
+			<span class="text-xs text-base-content/50 uppercase tracking-wider flex items-center gap-1">
+				<svg class="w-3 h-3 transition-transform duration-200 {expandedSections.has('notifications') ? 'rotate-90' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+				</svg>
+				Notifications
+			</span>
 		</li>
 
-		<!-- Epic Settings -->
-		<li class="menu-title mt-2">
-			<span class="text-xs text-base-content/50">Epic Completion</span>
-		</li>
-
-		<li>
-			<button
-				onclick={handleEpicCelebrationToggle}
-				class="flex items-center gap-2 w-full px-2 py-1.5 rounded transition-colors {epicCelebration ? 'bg-warning/20' : ''}"
-				title={epicCelebration
-					? 'Celebrate when all children of an epic complete'
-					: 'No celebration for epic completion'}
-			>
-				<span
-					class="w-4 h-4 flex items-center justify-center text-sm transition-transform duration-300"
-					class:toggle-icon-pulse={isEpicCelebrationAnimating}
-				>
-					{epicCelebration ? '🎉' : '🔕'}
-				</span>
-				<span class="text-xs flex-1 text-left text-base-content/70">
-					Celebration
-				</span>
-				<span
-					class="text-[10px] font-mono px-1.5 py-0.5 rounded transition-transform duration-300 {epicCelebration ? 'bg-warning/40 text-warning-content' : 'bg-base-200 text-base-content/50'}"
-					class:toggle-badge-bounce={isEpicCelebrationAnimating}
-				>
-					{epicCelebration ? 'ON' : 'OFF'}
-				</span>
-			</button>
-		</li>
-
-		<li>
-			<button
-				onclick={handleEpicAutoCloseToggle}
-				class="flex items-center gap-2 w-full px-2 py-1.5 rounded transition-colors {epicAutoClose ? 'bg-success/20' : ''}"
-				title={epicAutoClose
-					? 'Automatically close the epic in JAT when all children complete'
-					: 'Keep epic open even when all children complete'}
-			>
-				<span
-					class="w-4 h-4 flex items-center justify-center text-sm transition-transform duration-300"
-					class:toggle-icon-pulse={isEpicAutoCloseAnimating}
-				>
-					{epicAutoClose ? '✅' : '⏸️'}
-				</span>
-				<span class="text-xs flex-1 text-left text-base-content/70">
-					Auto-Close
-				</span>
-				<span
-					class="text-[10px] font-mono px-1.5 py-0.5 rounded transition-transform duration-300 {epicAutoClose ? 'bg-success/40 text-success' : 'bg-base-200 text-base-content/50'}"
-					class:toggle-badge-bounce={isEpicAutoCloseAnimating}
-				>
-					{epicAutoClose ? 'ON' : 'OFF'}
-				</span>
-			</button>
-		</li>
-
-		<li class="menu-title mt-2">
-			<span class="text-xs text-base-content/50">Terminal Settings</span>
-		</li>
-
-		<!-- Terminal Height Slider -->
-		<li>
-			<div class="flex flex-col gap-1 px-2 py-1">
-				<div class="flex items-center justify-between">
-					<span class="text-xs text-base-content/70">Height (rows)</span>
-					<span class="text-xs font-mono text-base-content/80">{terminalHeight}</span>
-				</div>
-				<input
-					type="range"
-					min={MIN_TERMINAL_HEIGHT}
-					max={MAX_TERMINAL_HEIGHT}
-					value={terminalHeight}
-					oninput={(e) => handleHeightChange(parseInt(e.currentTarget.value, 10))}
-					class="range range-xs range-info w-full"
-				/>
-				<div class="flex justify-between text-[9px] text-base-content/50">
-					<span>{MIN_TERMINAL_HEIGHT}</span>
-					<span>{MAX_TERMINAL_HEIGHT}</span>
-				</div>
-			</div>
-		</li>
-
-		<!-- Session Maximize Height -->
-		<li>
-			<div class="flex flex-col gap-1 px-2 py-1">
-				<span class="text-xs text-base-content/70">Click-to-Expand Height</span>
-				<div class="flex gap-1">
-					{#each SESSION_MAXIMIZE_HEIGHT_OPTIONS as option}
-						<button
-							onclick={() => handleSessionMaxHeightChange(option.value)}
-							class="px-2 py-0.5 text-[10px] font-mono rounded transition-colors border {sessionMaximizeHeight === option.value ? 'bg-info/40 text-info border-info/50' : 'bg-base-200 text-base-content/60 border-base-content/20'}"
+		{#if expandedSections.has('notifications')}
+			<!-- Browser Alerts -->
+			{#if browserNotificationsSupported}
+				<li>
+					<button
+						onclick={handleBrowserNotificationsToggle}
+						class="flex items-center gap-2 w-full px-2 py-1.5 rounded transition-colors {browserNotificationsEnabled && browserNotificationPermission === 'granted' ? 'bg-info/20' : ''}"
+						title={browserNotificationPermission === 'denied'
+							? 'Browser notifications blocked - check browser settings'
+							: browserNotificationsEnabled
+								? 'Show browser notifications when agents need attention'
+								: 'Enable browser notifications'}
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke-width="1.5"
+							stroke="currentColor"
+							class="w-4 h-4 transition-transform duration-300 {browserNotificationsEnabled && browserNotificationPermission === 'granted' ? 'text-info' : 'text-base-content/50'}"
+							class:toggle-icon-pulse={isBrowserNotificationsAnimating}
 						>
-							{option.label}
-						</button>
-					{/each}
-				</div>
-			</div>
+							<path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+						</svg>
+						<span class="text-xs flex-1 text-left text-base-content/70">
+							Browser Alerts
+						</span>
+						{#if browserNotificationPermission === 'denied'}
+							<span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-error/30 text-error">
+								BLOCKED
+							</span>
+						{:else}
+							<span
+								class="text-[10px] font-mono px-1.5 py-0.5 rounded transition-transform duration-300 {browserNotificationsEnabled && browserNotificationPermission === 'granted' ? 'bg-info/40 text-info' : 'bg-base-200 text-base-content/50'}"
+								class:toggle-badge-bounce={isBrowserNotificationsAnimating}
+							>
+								{browserNotificationsEnabled && browserNotificationPermission === 'granted' ? 'ON' : 'OFF'}
+							</span>
+						{/if}
+					</button>
+				</li>
+			{/if}
+
+			<!-- Favicon Badge -->
+			<li>
+				<button
+					onclick={handleFaviconBadgeToggle}
+					class="flex items-center gap-2 w-full px-2 py-1.5 rounded transition-colors {faviconBadgeEnabled ? 'bg-warning/20' : ''}"
+					title={faviconBadgeEnabled
+						? 'Show count badge on favicon when agents need attention'
+						: 'Favicon badge disabled'}
+				>
+					<span
+						class="w-4 h-4 flex items-center justify-center text-sm transition-transform duration-300"
+						class:toggle-icon-pulse={isFaviconBadgeAnimating}
+					>
+						{faviconBadgeEnabled ? '🔴' : '⚪'}
+					</span>
+					<span class="text-xs flex-1 text-left text-base-content/70">
+						Favicon Badge
+					</span>
+					<span
+						class="text-[10px] font-mono px-1.5 py-0.5 rounded transition-transform duration-300 {faviconBadgeEnabled ? 'bg-warning/40 text-warning-content' : 'bg-base-200 text-base-content/50'}"
+						class:toggle-badge-bounce={isFaviconBadgeAnimating}
+					>
+						{faviconBadgeEnabled ? 'ON' : 'OFF'}
+					</span>
+				</button>
+			</li>
+
+			<!-- Title Badge -->
+			<li>
+				<button
+					onclick={handleTitleBadgeToggle}
+					class="flex items-center gap-2 w-full px-2 py-1.5 rounded transition-colors {titleBadgeEnabled ? 'bg-primary/20' : ''}"
+					title={titleBadgeEnabled
+						? 'Show count in page title when agents need attention'
+						: 'Title badge disabled'}
+				>
+					<span
+						class="w-4 h-4 flex items-center justify-center font-mono text-[9px] font-bold transition-transform duration-300 {titleBadgeEnabled ? 'text-primary' : 'text-base-content/50'}"
+						class:toggle-icon-pulse={isTitleBadgeAnimating}
+					>
+						(3)
+					</span>
+					<span class="text-xs flex-1 text-left text-base-content/70">
+						Title Badge
+					</span>
+					<span
+						class="text-[10px] font-mono px-1.5 py-0.5 rounded transition-transform duration-300 {titleBadgeEnabled ? 'bg-primary/40 text-primary' : 'bg-base-200 text-base-content/50'}"
+						class:toggle-badge-bounce={isTitleBadgeAnimating}
+					>
+						{titleBadgeEnabled ? 'ON' : 'OFF'}
+					</span>
+				</button>
+			</li>
+
+			<!-- Subheader: Agent Signal Toasts -->
+			<li class="px-2 pt-2 pb-0.5">
+				<span class="text-[10px] text-base-content/40 uppercase tracking-wider">Agent Toasts</span>
+			</li>
+
+			<!-- Needs Input Toast -->
+			<li>
+				<button
+					onclick={handleToastNeedsInputToggle}
+					class="flex items-center gap-2 w-full px-2 py-1.5 rounded transition-colors {toastNeedsInput ? 'bg-warning/15' : ''}"
+					title={toastNeedsInput
+						? 'Show toast when agent needs your input'
+						: 'No toast for needs-input signals'}
+				>
+					<span
+						class="w-4 h-4 flex items-center justify-center text-sm transition-transform duration-300 {toastNeedsInput ? '' : 'opacity-40'}"
+						class:toggle-icon-pulse={isToastNeedsInputAnimating}
+					>
+						❓
+					</span>
+					<span class="text-xs flex-1 text-left text-base-content/70">
+						Needs Input
+					</span>
+					<span
+						class="text-[10px] font-mono px-1.5 py-0.5 rounded transition-transform duration-300 {toastNeedsInput ? 'bg-warning/40 text-warning-content' : 'bg-base-200 text-base-content/50'}"
+						class:toggle-badge-bounce={isToastNeedsInputAnimating}
+					>
+						{toastNeedsInput ? 'ON' : 'OFF'}
+					</span>
+				</button>
+			</li>
+
+			<!-- Ready for Review Toast -->
+			<li>
+				<button
+					onclick={handleToastReviewToggle}
+					class="flex items-center gap-2 w-full px-2 py-1.5 rounded transition-colors {toastReview ? 'bg-info/15' : ''}"
+					title={toastReview
+						? 'Show toast when agent is ready for review'
+						: 'No toast for review signals'}
+				>
+					<span
+						class="w-4 h-4 flex items-center justify-center text-sm transition-transform duration-300 {toastReview ? '' : 'opacity-40'}"
+						class:toggle-icon-pulse={isToastReviewAnimating}
+					>
+						👁
+					</span>
+					<span class="text-xs flex-1 text-left text-base-content/70">
+						Ready for Review
+					</span>
+					<span
+						class="text-[10px] font-mono px-1.5 py-0.5 rounded transition-transform duration-300 {toastReview ? 'bg-info/40 text-info' : 'bg-base-200 text-base-content/50'}"
+						class:toggle-badge-bounce={isToastReviewAnimating}
+					>
+						{toastReview ? 'ON' : 'OFF'}
+					</span>
+				</button>
+			</li>
+
+			<!-- Task Complete Toast -->
+			<li>
+				<button
+					onclick={handleToastCompleteToggle}
+					class="flex items-center gap-2 w-full px-2 py-1.5 rounded transition-colors {toastComplete ? 'bg-success/15' : ''}"
+					title={toastComplete
+						? 'Show toast when agent completes a task'
+						: 'No toast for task completion'}
+				>
+					<span
+						class="w-4 h-4 flex items-center justify-center text-sm transition-transform duration-300 {toastComplete ? '' : 'opacity-40'}"
+						class:toggle-icon-pulse={isToastCompleteAnimating}
+					>
+						✅
+					</span>
+					<span class="text-xs flex-1 text-left text-base-content/70">
+						Task Complete
+					</span>
+					<span
+						class="text-[10px] font-mono px-1.5 py-0.5 rounded transition-transform duration-300 {toastComplete ? 'bg-success/40 text-success' : 'bg-base-200 text-base-content/50'}"
+						class:toggle-badge-bounce={isToastCompleteAnimating}
+					>
+						{toastComplete ? 'ON' : 'OFF'}
+					</span>
+				</button>
+			</li>
+		{/if}
+
+		<!-- ═══════════════════════════════════════════ -->
+		<!-- TERMINAL (collapsible) -->
+		<!-- ═══════════════════════════════════════════ -->
+		<div class="divider my-1 h-px bg-base-content/20"></div>
+		<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+		<li class="menu-title mt-1 cursor-pointer select-none" onclick={() => toggleSection('terminal')}>
+			<span class="text-xs text-base-content/50 uppercase tracking-wider flex items-center gap-1">
+				<svg class="w-3 h-3 transition-transform duration-200 {expandedSections.has('terminal') ? 'rotate-90' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+				</svg>
+				Terminal
+			</span>
 		</li>
 
-		<!-- Terminal Font Family -->
-		<li>
-			<div class="flex flex-col gap-1 px-2 py-1">
-				<span class="text-xs text-base-content/70">Font Family</span>
-				<div class="flex flex-wrap gap-1">
-					{#each TERMINAL_FONT_OPTIONS as option}
-						<button
-							onclick={() => handleFontFamilyChange(option.value)}
-							class="px-2 py-0.5 text-[10px] rounded transition-colors border {terminalFontFamily === option.value ? 'bg-info/40 text-info border-info/50' : 'bg-base-200 text-base-content/60 border-base-content/20'}"
-						>
-							{option.label}
-						</button>
-					{/each}
+		{#if expandedSections.has('terminal')}
+			<!-- Terminal Height Slider -->
+			<li>
+				<div class="flex flex-col gap-1 px-2 py-1">
+					<div class="flex items-center justify-between">
+						<span class="text-xs text-base-content/70">Height (rows)</span>
+						<span class="text-xs font-mono text-base-content/80">{terminalHeight}</span>
+					</div>
+					<input
+						type="range"
+						min={MIN_TERMINAL_HEIGHT}
+						max={MAX_TERMINAL_HEIGHT}
+						value={terminalHeight}
+						oninput={(e) => handleHeightChange(parseInt(e.currentTarget.value, 10))}
+						class="range range-xs range-info w-full"
+					/>
+					<div class="flex justify-between text-[9px] text-base-content/50">
+						<span>{MIN_TERMINAL_HEIGHT}</span>
+						<span>{MAX_TERMINAL_HEIGHT}</span>
+					</div>
 				</div>
-			</div>
+			</li>
+
+			<!-- Session Maximize Height -->
+			<li>
+				<div class="flex flex-col gap-1 px-2 py-1">
+					<span class="text-xs text-base-content/70">Click-to-Expand Height</span>
+					<div class="flex gap-1">
+						{#each SESSION_MAXIMIZE_HEIGHT_OPTIONS as option}
+							<button
+								onclick={() => handleSessionMaxHeightChange(option.value)}
+								class="px-2 py-0.5 text-[10px] font-mono rounded transition-colors border {sessionMaximizeHeight === option.value ? 'bg-info/40 text-info border-info/50' : 'bg-base-200 text-base-content/60 border-base-content/20'}"
+							>
+								{option.label}
+							</button>
+						{/each}
+					</div>
+				</div>
+			</li>
+
+			<!-- Terminal Font Family -->
+			<li>
+				<div class="flex flex-col gap-1 px-2 py-1">
+					<span class="text-xs text-base-content/70">Font Family</span>
+					<div class="flex flex-wrap gap-1">
+						{#each TERMINAL_FONT_OPTIONS as option}
+							<button
+								onclick={() => handleFontFamilyChange(option.value)}
+								class="px-2 py-0.5 text-[10px] rounded transition-colors border {terminalFontFamily === option.value ? 'bg-info/40 text-info border-info/50' : 'bg-base-200 text-base-content/60 border-base-content/20'}"
+							>
+								{option.label}
+							</button>
+						{/each}
+					</div>
+				</div>
+			</li>
+
+			<!-- Terminal Font Size -->
+			<li>
+				<div class="flex flex-col gap-1 px-2 py-1">
+					<span class="text-xs text-base-content/70">Font Size</span>
+					<div class="flex gap-1">
+						{#each TERMINAL_FONT_SIZE_OPTIONS as option}
+							<button
+								onclick={() => handleFontSizeChange(option.value)}
+								class="px-2.5 py-0.5 text-[10px] font-mono rounded transition-colors border {terminalFontSize === option.value ? 'bg-info/40 text-info border-info/50' : 'bg-base-200 text-base-content/60 border-base-content/20'}"
+							>
+								{option.label}
+							</button>
+						{/each}
+					</div>
+				</div>
+			</li>
+
+			<!-- Terminal Scrollback Limit -->
+			<li>
+				<div class="flex flex-col gap-1 px-2 py-1">
+					<span class="text-xs text-base-content/70">Scrollback Lines</span>
+					<div class="flex gap-1">
+						{#each TERMINAL_SCROLLBACK_OPTIONS as option}
+							<button
+								onclick={() => handleScrollbackChange(option.value)}
+								class="px-2 py-0.5 text-[10px] font-mono rounded transition-colors border {terminalScrollback === option.value ? 'bg-info/40 text-info border-info/50' : 'bg-base-200 text-base-content/60 border-base-content/20'}"
+							>
+								{option.label}
+							</button>
+						{/each}
+					</div>
+				</div>
+			</li>
+
+			<!-- Ctrl+C Behavior -->
+			<li>
+				<button
+					onclick={handleCtrlCToggle}
+					class="flex items-center gap-2 w-full px-2 py-1.5 rounded transition-colors {ctrlCIntercept ? 'bg-error/20' : ''}"
+					title={ctrlCIntercept
+						? 'Ctrl+C sends interrupt to tmux'
+						: 'Ctrl+C copies text (browser default)'}
+				>
+					<span
+						class="w-4 h-4 flex items-center justify-center font-mono text-[9px] font-bold transition-transform duration-300 {!ctrlCIntercept ? 'line-through opacity-50' : ''} {ctrlCIntercept ? 'text-error' : 'text-base-content/50'}"
+						class:toggle-icon-pulse={isCtrlCAnimating}
+					>
+						^C
+					</span>
+					<span class="text-xs flex-1 text-left text-base-content/70">
+						Ctrl+C Interrupt
+					</span>
+					<span
+						class="text-[10px] font-mono px-1.5 py-0.5 rounded transition-transform duration-300 {ctrlCIntercept ? 'bg-error/40 text-error' : 'bg-base-200 text-base-content/50'}"
+						class:toggle-badge-bounce={isCtrlCAnimating}
+					>
+						{ctrlCIntercept ? 'ON' : 'OFF'}
+					</span>
+				</button>
+			</li>
+		{/if}
+
+		<!-- ═══════════════════════════════════════════ -->
+		<!-- AGENTS (collapsible) -->
+		<!-- ═══════════════════════════════════════════ -->
+		<div class="divider my-1 h-px bg-base-content/20"></div>
+		<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+		<li class="menu-title mt-1 cursor-pointer select-none" onclick={() => toggleSection('agents')}>
+			<span class="text-xs text-base-content/50 uppercase tracking-wider flex items-center gap-1">
+				<svg class="w-3 h-3 transition-transform duration-200 {expandedSections.has('agents') ? 'rotate-90' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+				</svg>
+				Agents
+			</span>
 		</li>
 
-		<!-- Terminal Font Size -->
-		<li>
-			<div class="flex flex-col gap-1 px-2 py-1">
-				<span class="text-xs text-base-content/70">Font Size</span>
-				<div class="flex gap-1">
-					{#each TERMINAL_FONT_SIZE_OPTIONS as option}
-						<button
-							onclick={() => handleFontSizeChange(option.value)}
-							class="px-2.5 py-0.5 text-[10px] font-mono rounded transition-colors border {terminalFontSize === option.value ? 'bg-info/40 text-info border-info/50' : 'bg-base-200 text-base-content/60 border-base-content/20'}"
-						>
-							{option.label}
-						</button>
-					{/each}
+		{#if expandedSections.has('agents')}
+			<!-- Max Concurrent Sessions -->
+			<li>
+				<div class="flex flex-col gap-1 px-2 py-1">
+					<span class="text-xs text-base-content/70">Max Sessions</span>
+					<div class="flex gap-1">
+						{#each MAX_SESSIONS_OPTIONS as option}
+							<button
+								onclick={() => handleMaxSessionsChange(option.value)}
+								class="px-2 py-0.5 text-[10px] font-mono rounded transition-colors border {maxSessions === option.value ? 'bg-success/40 text-success border-success/50' : 'bg-base-200 text-base-content/60 border-base-content/20'}"
+							>
+								{option.label}
+							</button>
+						{/each}
+					</div>
 				</div>
-			</div>
-		</li>
+			</li>
 
-		<!-- Terminal Scrollback Limit -->
-		<li>
-			<div class="flex flex-col gap-1 px-2 py-1">
-				<span class="text-xs text-base-content/70">Scrollback Lines</span>
-				<div class="flex gap-1">
-					{#each TERMINAL_SCROLLBACK_OPTIONS as option}
-						<button
-							onclick={() => handleScrollbackChange(option.value)}
-							class="px-2 py-0.5 text-[10px] font-mono rounded transition-colors border {terminalScrollback === option.value ? 'bg-info/40 text-info border-info/50' : 'bg-base-200 text-base-content/60 border-base-content/20'}"
-						>
-							{option.label}
-						</button>
-					{/each}
-				</div>
-			</div>
-		</li>
+			<!-- Epic Celebration -->
+			<li>
+				<button
+					onclick={handleEpicCelebrationToggle}
+					class="flex items-center gap-2 w-full px-2 py-1.5 rounded transition-colors {epicCelebration ? 'bg-warning/20' : ''}"
+					title={epicCelebration
+						? 'Celebrate when all children of an epic complete'
+						: 'No celebration for epic completion'}
+				>
+					<span
+						class="w-4 h-4 flex items-center justify-center text-sm transition-transform duration-300"
+						class:toggle-icon-pulse={isEpicCelebrationAnimating}
+					>
+						{epicCelebration ? '🎉' : '🔕'}
+					</span>
+					<span class="text-xs flex-1 text-left text-base-content/70">
+						Epic Celebration
+					</span>
+					<span
+						class="text-[10px] font-mono px-1.5 py-0.5 rounded transition-transform duration-300 {epicCelebration ? 'bg-warning/40 text-warning-content' : 'bg-base-200 text-base-content/50'}"
+						class:toggle-badge-bounce={isEpicCelebrationAnimating}
+					>
+						{epicCelebration ? 'ON' : 'OFF'}
+					</span>
+				</button>
+			</li>
 
-		<!-- Max Concurrent Sessions -->
-		<li>
-			<div class="flex flex-col gap-1 px-2 py-1">
-				<span class="text-xs text-base-content/70">Max Sessions</span>
-				<div class="flex gap-1">
-					{#each MAX_SESSIONS_OPTIONS as option}
-						<button
-							onclick={() => handleMaxSessionsChange(option.value)}
-							class="px-2 py-0.5 text-[10px] font-mono rounded transition-colors border {maxSessions === option.value ? 'bg-success/40 text-success border-success/50' : 'bg-base-200 text-base-content/60 border-base-content/20'}"
-						>
-							{option.label}
-						</button>
-					{/each}
-				</div>
-			</div>
-		</li>
+			<!-- Epic Auto-Close -->
+			<li>
+				<button
+					onclick={handleEpicAutoCloseToggle}
+					class="flex items-center gap-2 w-full px-2 py-1.5 rounded transition-colors {epicAutoClose ? 'bg-success/20' : ''}"
+					title={epicAutoClose
+						? 'Automatically close the epic in JAT when all children complete'
+						: 'Keep epic open even when all children complete'}
+				>
+					<span
+						class="w-4 h-4 flex items-center justify-center text-sm transition-transform duration-300"
+						class:toggle-icon-pulse={isEpicAutoCloseAnimating}
+					>
+						{epicAutoClose ? '✅' : '⏸️'}
+					</span>
+					<span class="text-xs flex-1 text-left text-base-content/70">
+						Epic Auto-Close
+					</span>
+					<span
+						class="text-[10px] font-mono px-1.5 py-0.5 rounded transition-transform duration-300 {epicAutoClose ? 'bg-success/40 text-success' : 'bg-base-200 text-base-content/50'}"
+						class:toggle-badge-bounce={isEpicAutoCloseAnimating}
+					>
+						{epicAutoClose ? 'ON' : 'OFF'}
+					</span>
+				</button>
+			</li>
+		{/if}
 
-		<!-- Version & Update -->
+		<!-- ═══════════════════════════════════════════ -->
+		<!-- VERSION & UPDATE (always visible) -->
+		<!-- ═══════════════════════════════════════════ -->
 		<div class="divider my-1 h-px bg-base-content/20"></div>
 		<li>
 			<div class="flex items-center justify-between px-2 py-1">

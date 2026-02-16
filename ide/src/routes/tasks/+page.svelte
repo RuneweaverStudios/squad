@@ -62,6 +62,7 @@
 		priority?: number;
 		description?: string;
 		labels?: string[];
+		created_at?: string;
 	}
 
 	interface AgentSessionInfo {
@@ -574,6 +575,7 @@
 						priority: taskSource.priority,
 						description: taskSource.description,
 						labels: taskSource.labels,
+						created_at: taskSource.created_at,
 					});
 				} else {
 					// No task — override idle state to 'planning'

@@ -28,6 +28,7 @@ import { initializeStore as initAutomationStore, clearSessionTriggers, getRuleBy
 import { getIsActive as isEpicSwarmActive, getChildren as getEpicChildren, getNextReadyTask as getNextEpicTask } from './epicQueueStore.svelte';
 import { getAutoKillDelayForPriority, isAutoKillEnabled, hasPendingAutoKill, clearPendingAutoKill } from './autoKillConfig';
 import { addToast } from './toasts.svelte';
+import { getToastNeedsInput, getToastReview, getToastComplete } from './preferences.svelte';
 import { AUTO_PAUSE_IDLE } from '$lib/config/constants';
 
 // Maximum accumulated output per session (characters). Prevents unbounded memory
@@ -616,6 +617,7 @@ function handleSessionState(data: SessionEvent): void {
 	}
 
 	// PERFORMANCE: Mutate in-place for fine-grained reactivity (Svelte 5 $state)
+	const previousState = currentSession._sseState;
 	workSessionsState.sessions[sessionIndex]._sseState = state;
 	workSessionsState.sessions[sessionIndex]._sseStateTimestamp = data.timestamp;
 
@@ -623,6 +625,36 @@ function handleSessionState(data: SessionEvent): void {
 	if (signalPayload) {
 		workSessionsState.sessions[sessionIndex]._richSignalPayload = signalPayload;
 		workSessionsState.sessions[sessionIndex]._richSignalPayloadTimestamp = data.timestamp;
+	}
+
+	// Toast notifications for key state transitions (only when state actually changed)
+	if (previousState !== state) {
+		const agentName = sessionName.startsWith('jat-') ? sessionName.slice(4) : sessionName;
+		const taskId = currentSession.task?.id;
+		const projectId = taskId ? taskId.split('-').slice(0, -1).join('-') || undefined : undefined;
+		const taskTitle = currentSession.task?.title;
+
+		if (state === 'needs_input' && getToastNeedsInput()) {
+			const question = signalPayload?.question || 'Waiting for your response';
+			addToast({
+				message: `${agentName} needs input`,
+				type: 'warning',
+				details: typeof question === 'string' ? question : undefined,
+				projectId,
+				taskId: taskId || undefined,
+				taskTitle: taskTitle || undefined,
+				route: '/work',
+			});
+		} else if (state === 'review' && getToastReview()) {
+			addToast({
+				message: `${agentName} is ready for review`,
+				type: 'info',
+				projectId,
+				taskId: taskId || undefined,
+				taskTitle: taskTitle || undefined,
+				route: taskId ? `/tasks?taskDetailDrawer=${taskId}` : '/work',
+			});
+		}
 	}
 }
 
@@ -716,6 +748,26 @@ function handleSessionComplete(data: SessionEvent): void {
 	if (workSessionsState.sessions[sessionIndex]._sseState !== 'completed') {
 		workSessionsState.sessions[sessionIndex]._sseState = 'completed';
 		workSessionsState.sessions[sessionIndex]._sseStateTimestamp = data.timestamp;
+	}
+
+	// Toast notification for task completion (if enabled)
+	if (getToastComplete()) {
+		const completedSession = workSessionsState.sessions[sessionIndex];
+		const completedAgentName = sessionName.startsWith('jat-') ? sessionName.slice(4) : sessionName;
+		const completedTaskId = completedSession.task?.id;
+		const completedProjectId = completedTaskId ? completedTaskId.split('-').slice(0, -1).join('-') || undefined : undefined;
+		const summaryText = completionBundle.summary?.length
+			? completionBundle.summary.slice(0, 2).join(', ')
+			: undefined;
+		addToast({
+			message: `${completedAgentName} completed task`,
+			type: 'success',
+			details: summaryText,
+			projectId: completedProjectId,
+			taskId: completedTaskId || undefined,
+			taskTitle: completedSession.task?.title || undefined,
+			route: completedTaskId ? `/tasks?taskDetailDrawer=${completedTaskId}` : '/work',
+		});
 	}
 
 	// Extract suggested tasks to the signal tasks field for consistency

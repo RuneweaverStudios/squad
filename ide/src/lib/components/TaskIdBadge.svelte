@@ -32,7 +32,7 @@
 	}
 
 	interface Props {
-		task: { id: string; status: string; issue_type?: string; assignee?: string; title?: string; updated_at?: string; labels?: string[]; priority?: number };
+		task: { id: string; status: string; issue_type?: string; assignee?: string; title?: string; updated_at?: string; created_at?: string; labels?: string[]; priority?: number };
 		size?: 'xs' | 'sm' | 'md';
 		showStatus?: boolean;
 		showType?: boolean;
@@ -282,6 +282,36 @@
 
 	// Closed/completed task indicator
 	const isClosed = $derived(task.status === 'closed');
+
+	// Task age - human-readable time since creation
+	function getAge(dateStr: string | undefined): { label: string; color: string } {
+		if (!dateStr) return { label: '', color: '' };
+		const ms = Date.now() - new Date(dateStr).getTime();
+		if (ms < 0) return { label: '', color: '' };
+		const mins = Math.floor(ms / 60000);
+		const hours = Math.floor(mins / 60);
+		const days = Math.floor(hours / 24);
+		const weeks = Math.floor(days / 7);
+		const months = Math.floor(days / 30);
+
+		// Label
+		const label = mins < 1 ? '<1m' : mins < 60 ? `${mins}m` : hours < 24 ? `${hours}h` : days < 7 ? `${days}d` : weeks < 5 ? `${weeks}w` : `${months}mo`;
+
+		// Color: bright green → faded gray over time
+		// <1h: vivid green, 1-6h: green fading, 6-24h: muted, 1-3d: dim, 3d+: gray
+		const color = hours < 1
+			? 'oklch(0.80 0.20 145)'        // bright green
+			: hours < 6
+			? 'oklch(0.72 0.15 145)'        // green, slightly faded
+			: hours < 24
+			? 'oklch(0.62 0.08 160)'        // muted green-teal
+			: days < 3
+			? 'oklch(0.55 0.03 200)'        // dim blue-gray
+			: 'oklch(0.45 0.01 250)';       // gray
+
+		return { label, color };
+	}
+	const taskAgeInfo = $derived(getAge(task.created_at));
 </script>
 
 {#if minimal}
@@ -451,6 +481,13 @@
 					<ProviderLogo agentId={harness} size={12} />
 				</span>
 			{/if}
+			{#if taskAgeInfo.label}
+				<span
+					class="text-[10px] font-mono font-semibold"
+					style="color: {taskAgeInfo.color};"
+					title="Task age: created {task.created_at}"
+				>{taskAgeInfo.label}</span>
+			{/if}
 			{#if resumed}
 				<span class="resumed-badge" title="Resumed from previous session">
 					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3" style="color: oklch(0.70 0.15 200); filter: drop-shadow(0 0 3px oklch(0.65 0.15 200 / 0.6));">
@@ -529,6 +566,13 @@
 				<span class="inline-flex scale-70 mt-0.25" title={harness}>
 					<ProviderLogo agentId={harness} size={12} />
 				</span>
+			{/if}
+			{#if taskAgeInfo.label}
+				<span
+					class="text-[10px] font-mono font-semibold"
+					style="color: {taskAgeInfo.color};"
+					title="Task age: created {task.created_at}"
+				>{taskAgeInfo.label}</span>
 			{/if}
 
 			{#if isClosed}
@@ -677,6 +721,13 @@
 					<span class="inline-flex scale-70 ml-1" title={harness}>
 						<ProviderLogo agentId={harness} size={12} />
 					</span>
+				{/if}
+				{#if taskAgeInfo.label}
+					<span
+						class="text-[10px] font-mono font-semibold"
+						style="color: {taskAgeInfo.color};"
+						title="Task age: created {task.created_at}"
+					>{taskAgeInfo.label}</span>
 				{/if}
 
 				{#if isClosed}
