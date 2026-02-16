@@ -330,6 +330,33 @@ export const AUTO_KILL = {
 } as const;
 
 // =============================================================================
+// AUTO-PAUSE IDLE SESSIONS
+// =============================================================================
+
+export const AUTO_PAUSE_IDLE = {
+	/**
+	 * Enable auto-pause for idle sessions.
+	 * When true, sessions in 'idle' or 'completed' state for longer than
+	 * IDLE_TIMEOUT_SECONDS will be paused (tmux session killed).
+	 * This reclaims tmux sessions that would otherwise be captured on every
+	 * /api/work poll, reducing cold-compute time proportionally.
+	 */
+	ENABLED: true,
+
+	/**
+	 * Seconds a session must remain idle/completed before auto-pause triggers.
+	 * Only applies to sessions that are NOT in 'working' or 'needs-input' state.
+	 */
+	IDLE_TIMEOUT_SECONDS: 300, // 5 minutes
+
+	/**
+	 * How often (in ms) to scan for stale idle sessions.
+	 * This runs as a setInterval in the sessionEvents store.
+	 */
+	SCAN_INTERVAL_MS: 60_000 // Every 60 seconds
+} as const;
+
+// =============================================================================
 // TASK FIELD LIMITS
 // =============================================================================
 

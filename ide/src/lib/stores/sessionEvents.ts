@@ -28,6 +28,7 @@ import { initializeStore as initAutomationStore, clearSessionTriggers, getRuleBy
 import { getIsActive as isEpicSwarmActive, getChildren as getEpicChildren, getNextReadyTask as getNextEpicTask } from './epicQueueStore.svelte';
 import { getAutoKillDelayForPriority, isAutoKillEnabled, hasPendingAutoKill, clearPendingAutoKill } from './autoKillConfig';
 import { addToast } from './toasts.svelte';
+import { AUTO_PAUSE_IDLE } from '$lib/config/constants';
 
 // Maximum accumulated output per session (characters). Prevents unbounded memory
 // growth from delta appending — without this, output strings grow continuously
@@ -338,6 +339,112 @@ export function cancelAutoKill(sessionName: string): void {
  */
 export function hasScheduledAutoKill(sessionName: string): boolean {
 	return scheduledAutoKills.has(sessionName);
+}
+
+// ============================================================================
+// Auto-Pause Idle Sessions
+// ============================================================================
+// Scans work sessions periodically. Sessions in 'idle' or 'completed' state
+// for longer than AUTO_PAUSE_IDLE.IDLE_TIMEOUT_SECONDS are paused via the
+// pause API (which kills the tmux session). This reclaims tmux sessions so
+// /api/work doesn't need to capture their output on every poll.
+
+let idlePauseScanInterval: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Scan sessions and pause any that have been idle/completed past the timeout.
+ */
+async function scanAndPauseIdleSessions(): Promise<void> {
+	if (!AUTO_PAUSE_IDLE.ENABLED) return;
+
+	const now = Date.now();
+	const timeoutMs = AUTO_PAUSE_IDLE.IDLE_TIMEOUT_SECONDS * 1000;
+	const sessions = workSessionsState.sessions;
+
+	for (const session of sessions) {
+		const state = session._sseState;
+		// Only target idle or completed sessions (not working, needs_input, review, etc.)
+		if (state !== 'idle' && state !== 'completed') continue;
+
+		// Don't pause sessions that already have an auto-kill pending
+		if (session.sessionName && hasScheduledAutoKill(session.sessionName)) continue;
+
+		// Check how long it's been in this state
+		const stateTimestamp = session._sseStateTimestamp;
+		if (!stateTimestamp) continue;
+
+		// _sseStateTimestamp may be epoch ms (number) or ISO string — handle both
+		const stateMs = typeof stateTimestamp === 'number' && stateTimestamp > 1e12
+			? stateTimestamp
+			: new Date(stateTimestamp).getTime();
+		const stateAge = now - stateMs;
+		if (stateAge < timeoutMs) continue;
+
+		// Session has been idle/completed for too long — pause it
+		const sessionName = session.sessionName;
+		if (!sessionName) continue;
+
+		const agentName = sessionName.startsWith('jat-') ? sessionName.slice(4) : sessionName;
+		const taskId = session.task?.id || 'unknown';
+		const taskTitle = session.task?.title || '';
+
+		console.log(`[AutoPauseIdle] Pausing ${sessionName} (state: ${state}, idle for ${Math.round(stateAge / 1000)}s)`);
+
+		try {
+			const response = await fetch(`/api/sessions/${encodeURIComponent(agentName)}/pause`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					taskId,
+					taskTitle,
+					reason: `Auto-paused after ${Math.round(stateAge / 1000)}s idle`,
+					killSession: true,
+					agentName
+				})
+			});
+
+			if (response.ok) {
+				console.log(`[AutoPauseIdle] Successfully paused ${sessionName}`);
+				addToast({
+					message: `Auto-paused idle session ${agentName}`,
+					type: 'info',
+					duration: 3000
+				});
+			} else {
+				console.warn(`[AutoPauseIdle] Failed to pause ${sessionName}: ${response.status}`);
+			}
+		} catch (error) {
+			console.error(`[AutoPauseIdle] Error pausing ${sessionName}:`, error);
+		}
+	}
+}
+
+/**
+ * Start the idle-session scanner.
+ * Called from connectSessionEvents().
+ */
+function startIdlePauseScanner(): void {
+	stopIdlePauseScanner();
+	if (!AUTO_PAUSE_IDLE.ENABLED) return;
+
+	// Initial scan after a delay (let sessions load first)
+	setTimeout(() => scanAndPauseIdleSessions(), 30_000);
+
+	idlePauseScanInterval = setInterval(
+		() => scanAndPauseIdleSessions(),
+		AUTO_PAUSE_IDLE.SCAN_INTERVAL_MS
+	);
+}
+
+/**
+ * Stop the idle-session scanner.
+ * Called from disconnectSessionEvents().
+ */
+function stopIdlePauseScanner(): void {
+	if (idlePauseScanInterval) {
+		clearInterval(idlePauseScanInterval);
+		idlePauseScanInterval = null;
+	}
 }
 
 /**
@@ -990,6 +1097,9 @@ export function connectSessionEvents(): void {
 	unsubSessionsChannel = onMessage('sessions', handleWebSocketSessionMessage);
 	unsubOutputChannel = onMessage('output', handleWebSocketOutputMessage);
 
+	// Start idle-session scanner (pauses sessions idle > AUTO_PAUSE_IDLE timeout)
+	startIdlePauseScanner();
+
 	sessionEventsConnected.set(true);
 }
 
@@ -1027,6 +1137,9 @@ export function disconnectSessionEvents(): void {
 		map.clear();
 		return map;
 	});
+
+	// Stop idle-session scanner
+	stopIdlePauseScanner();
 
 	// Clear initialized sessions so a fresh connection acts like a new page load
 	initializedSessions.clear();
