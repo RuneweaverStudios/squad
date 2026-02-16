@@ -264,7 +264,7 @@
 							<ul class="list-disc list-inside space-y-1 ml-2">
 								<li>Drag tasks from the task queue to agent cards to assign</li>
 								<li>Dependency validation prevents assigning blocked tasks</li>
-								<li>File conflict detection warns of reservation conflicts</li>
+								<li>File conflict detection warns of edit conflicts</li>
 								<li>Visual feedback shows assignment status (success/error)</li>
 							</ul>
 						</div>

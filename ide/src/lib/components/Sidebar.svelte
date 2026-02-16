@@ -651,7 +651,7 @@
 									<pre><code>/jat:status                   # Shows current task, locks, messages</code></pre>
 								</div>
 								<p class="text-sm text-base-content/70">
-									Shows current task progress, active file reservations, unread Agent Mail messages,
+									Shows current task progress, unread Agent Mail messages,
 									and team sync.
 								</p>
 							</div>

@@ -36,12 +36,6 @@
 		task?: string | null;
 	}
 
-	interface Reservation {
-		agent_name: string;
-		path_pattern: string;
-		expires_ts: string;
-	}
-
 	/** Agent session info for status ring colors (keyed by agent name) */
 	interface AgentSessionInfo {
 		activityState?: string;
@@ -53,7 +47,6 @@
 		tasks?: Task[];
 		allTasks?: Task[];
 		agents?: Agent[];
-		reservations?: Reservation[];
 		completedTasksFromActiveSessions?: Set<string>;
 		ontaskclick?: (taskId: string) => void;
 		onagentclick?: (agentName: string) => void;
@@ -67,7 +60,6 @@
 		tasks = [],
 		allTasks = [],
 		agents = [],
-		reservations = [],
 		completedTasksFromActiveSessions = new Set<string>(),
 		ontaskclick = () => {},
 		onagentclick,
@@ -160,7 +152,6 @@
 		tasks={displayedTasks}
 		{allTasks}
 		{agents}
-		{reservations}
 		{completedTasksFromActiveSessions}
 		{agentSessionInfo}
 		{ontaskclick}

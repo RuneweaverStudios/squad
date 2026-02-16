@@ -59,8 +59,8 @@ jt ready
 # Register with Agent Mail
 am-register --program claude-code --model sonnet-4.5
 
-# Reserve files before editing
-am-reserve "src/**" --agent AgentName --ttl 3600 --reason "jat-123"
+# Declare files when starting a task
+jt update jat-123 --status in_progress --assignee AgentName --files "src/**"
 ```
 
 ## Troubleshooting

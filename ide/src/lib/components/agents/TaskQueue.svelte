@@ -10,7 +10,7 @@
 	import { toggleSetItem } from '$lib/utils/filterHelpers';
 	import AnimatedDigits from '$lib/components/AnimatedDigits.svelte';
 	import TaskIdBadge from '$lib/components/TaskIdBadge.svelte';
-	import type { Task, Agent, Reservation } from '$lib/stores/agents.svelte';
+	import type { Task, Agent } from '$lib/stores/agents.svelte';
 
 	// Types
 	interface FilterOption {
@@ -22,13 +22,12 @@
 	interface Props {
 		tasks?: Task[];
 		agents?: Agent[];
-		reservations?: Reservation[];
 		selectedProject?: string;
 		ontaskclick?: (taskId: string) => void;
 		onspawnfortask?: (taskId: string) => Promise<void>;
 	}
 
-	let { tasks = [], agents = [], reservations = [], selectedProject = 'All Projects', ontaskclick, onspawnfortask }: Props = $props();
+	let { tasks = [], agents = [], selectedProject = 'All Projects', ontaskclick, onspawnfortask }: Props = $props();
 
 	// Initialize filters from URL params (default to open tasks)
 	let searchQuery = $state<string>('');

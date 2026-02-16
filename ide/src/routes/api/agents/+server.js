@@ -2,7 +2,7 @@
  * Unified Agents API Endpoint
  *
  * GET /api/agents              → Simple agent list (lightweight, for dropdowns/lists)
- * GET /api/agents?full=true    → Full orchestration data (agents + tasks + reservations + stats + activities)
+ * GET /api/agents?full=true    → Full orchestration data (agents + tasks + stats + activities)
  * GET /api/agents?orchestration=true → Alias for full orchestration data
  * GET /api/agents?usage=true   → Include token usage data for each agent
  * POST /api/agents             → Assign task to agent (body: { taskId, agentName })
@@ -14,7 +14,7 @@
  *
  * When date range is provided:
  * - Agents are filtered by activity within date range
- * - Activity includes: task updates, messages, reservations
+ * - Activity includes: task updates, messages
  * - Response includes: meta.dateRange with parsed from/to dates
  * - Each agent includes: activityInRange (count), lastActiveInRange (timestamp)
  *

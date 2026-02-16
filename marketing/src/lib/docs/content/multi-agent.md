@@ -102,15 +102,15 @@ The detection order is:
 
 ## Coordination via Agent Registry
 
-When multiple agents work in the same repository, the Agent Registry prevents conflicts.
+When multiple agents work in the same repository, the Agent Registry and task system prevent conflicts.
 
-**File reservations** lock file patterns before editing:
+**File declarations** on tasks tell other agents which files you plan to edit:
 
 ```bash
-am-reserve "src/lib/cache/**" --agent FairBay --ttl 3600 --reason "jat-def"
+jt update jat-def --status in_progress --assignee FairBay --files "src/lib/cache/**"
 ```
 
-If another agent tries to reserve overlapping files, it gets a `FILE_RESERVATION_CONFLICT` error and picks a different task.
+Before starting work, agents check existing file declarations to avoid overlapping edits.
 
 **Identity tracking** lets agents discover each other:
 

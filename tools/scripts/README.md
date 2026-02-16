@@ -6,24 +6,18 @@ Helper scripts for agent orchestration workflows.
 
 **Purpose:** Get current task ID for an agent by checking both JAT Tasks and Agent Mail.
 
-**Problem Solved:** Provides consistent agent status calculation between statusline and IDE. Previously, the statusline only checked file reservations while the IDE checked both JAT tasks and reservations, causing inconsistent status display.
+**Problem Solved:** Provides consistent agent status calculation between statusline and IDE.
 
 ### Algorithm
 
-The script checks TWO sources (matching IDE logic):
-
-1. **JAT Tasks Database** - Check for `in_progress` tasks assigned to agent
-2. **Agent Mail** - Check for active file reservations by agent
-
-Returns task_id if found from **EITHER** source.
+The script checks the JAT Tasks database for `in_progress` tasks assigned to the agent.
 
 This matches the IDE logic in `ide/src/lib/stores/agents.svelte.ts`:
 
 ```typescript
 const hasInProgressTask = agent.in_progress_tasks > 0;
-const hasActiveLocks = agent.reservation_count > 0;
 
-if (hasInProgressTask || hasActiveLocks) {
+if (hasInProgressTask) {
     return 'working';
 }
 ```
@@ -61,10 +55,6 @@ fi
 $ ./scripts/get-agent-task.sh GreatLake
 jat-a1z
 
-# Agent with file reservation but no task
-$ ./scripts/get-agent-task.sh FreeMarsh
-jat-xyz
-
 # Agent with no work
 $ ./scripts/get-agent-task.sh PaleStar
 $ echo $?
@@ -75,28 +65,15 @@ $ echo $?
 
 **Statusline** (`.claude/statusline.sh`):
 ```bash
-# Old approach (only checks reservations):
-task_id=$(am-reservations --agent "$agent_name" | grep "^Reason:" | ...)
-
-# New approach (checks both JAT Tasks and reservations):
 task_id=$(./scripts/get-agent-task.sh "$agent_name")
 ```
 
 **IDE** (`ide/src/lib/stores/agents.svelte.ts`):
 Already implements this logic correctly (serves as reference implementation).
 
-### Task ID Patterns
-
-The script recognizes these task ID patterns from reservation reasons:
-- `jat-abc` (Jomarchy Agent Tools)
-- `task-xyz` (Generic tasks)
-
-Pattern: `(jat|task)-[a-z0-9]{3}\b`
-
 ### Dependencies
 
 - `jt` command (JAT Tasks CLI)
-- `am-reservations` command (Agent Mail)
 - `jq` (for JSON parsing)
 
 All dependencies are optional - script gracefully handles missing commands.
@@ -116,32 +93,20 @@ All dependencies are optional - script gracefully handles missing commands.
 
 ### Test Coverage
 
-1. ✅ Agent with in_progress task (no file reservations)
+1. ✅ Agent with in_progress task
    - Verifies JAT Tasks in_progress tasks appear in statusline
    - Checks task ID and title display
 
-2. ✅ Agent with file reservations (no in_progress task)
-   - Verifies reservation task IDs are extracted and looked up
-   - Tests fallback to reservation-based task lookup
-
-3. ✅ Agent with BOTH in_progress task AND reservations
-   - **Critical:** Tests priority - in_progress task must take precedence
-   - Ensures reservation tasks don't override active work
-
-4. ✅ Agent with neither task nor reservations (idle state)
+2. ✅ Agent with no task (idle state)
    - Confirms "idle" status appears
    - Verifies no task ID is shown
 
-5. ✅ Edge case: Closed tasks should not appear
+3. ✅ Edge case: Closed tasks should not appear
    - Tests that only open/in_progress tasks are shown
    - Confirms closed tasks don't leak into statusline
 
-6. ✅ Priority badge display (P0/P1/P2)
+4. ✅ Priority badge display (P0/P1/P2)
    - Validates priority badge colors and formatting
-
-7. ✅ File lock count indicators
-   - Tests lock count display (🔒N format)
-   - Validates multiple reservations are counted correctly
 
 ### Exit Codes
 
@@ -166,7 +131,6 @@ Exits with proper status codes for automated testing.
 
 **Test Environment:**
 - Creates isolated temporary databases for Agent Mail and JAT Tasks
-- Mocks complete Agent Mail schema (projects, agents, file_reservations)
 - Initializes real JAT Tasks database with `jt init`
 - Injects test data via direct SQLite inserts
 
@@ -184,8 +148,6 @@ Exits with proper status codes for automated testing.
 - `sqlite3` - Database operations
 - `jq` - JSON processing
 - `jt` - JAT Tasks CLI (must be installed)
-- `am-reservations` - Agent Mail file reservations command
-- `am-inbox` - Agent Mail inbox command
 
 ### Database Schema
 
@@ -207,27 +169,12 @@ CREATE TABLE agents (
     name TEXT NOT NULL,
     FOREIGN KEY (project_id) REFERENCES projects(id)
 );
-
--- File reservations with agent/project foreign keys
-CREATE TABLE file_reservations (
-    id INTEGER PRIMARY KEY,
-    project_id INTEGER NOT NULL,
-    agent_id INTEGER NOT NULL,
-    path_pattern TEXT NOT NULL,
-    exclusive INTEGER DEFAULT 1,
-    reason TEXT DEFAULT '',
-    expires_ts TEXT NOT NULL,
-    released_ts TEXT,
-    FOREIGN KEY (project_id) REFERENCES projects(id),
-    FOREIGN KEY (agent_id) REFERENCES agents(id)
-);
 ```
 
 ### Known Limitations
 
 - Tests only status calculation logic (not full statusline features)
-- Mock data doesn't include all Agent Mail features (e.g., message threading, unread counts)
-- Requires actual `jt` and `am-*` commands to be installed
+- Requires actual `jt` command to be installed
 - Date handling assumes GNU date (may need adjustment for macOS)
 
 ### Troubleshooting
@@ -240,6 +187,3 @@ CREATE TABLE file_reservations (
 - Schema mismatch - update test database creation
 - Compare with actual Agent Mail schema: `sqlite3 ~/.agent-mail.db ".schema"`
 
-**am-reservations returns empty results**
-- Check project path matches database `human_key`
-- Verify wrapper scripts pass `--project` flag correctly

@@ -45,13 +45,11 @@ am-register --name AgentName --program claude-code --model sonnet-4.5
 am-whoami
 am-agents
 
-# File reservations
-am-reserve "src/**/*.ts" --agent AgentName --ttl 3600 --exclusive --reason "jat-abc"
-am-release "src/**/*.ts" --agent AgentName
-am-reservations --agent AgentName
+# File declarations (via task system)
+jt update jat-abc --status in_progress --assignee AgentName --files "src/**/*.ts"
 ```
 
-Messaging tools (`am-send`, `am-inbox`, `am-reply`, `am-ack`, `am-search`) are available but not used in standard workflows. Agent memory (`.jat/memory/`) handles cross-session context instead.
+Cross-session context is handled by agent memory (`.jat/memory/`), not messaging.
 
 ## jat-signal (state tracking)
 
@@ -112,7 +110,7 @@ jt-epic-child jat-abc jat-def              # Set epic->child dependency
 
 | Category | Tool Count | Prefix |
 |----------|-----------|--------|
-| Agent Registry | 14 | `am-*` |
+| Agent Registry | 4 | `am-*` |
 | Task CLI | 5 | `jt*` |
 | Browser | 12 | `browser-*` |
 | Database | 4 | `db-*` |
@@ -125,4 +123,4 @@ jt-epic-child jat-abc jat-def              # Set epic->child dependency
 - [Browser Automation](/docs/browser-automation/) - Detailed browser tool guide
 - [Database Tools](/docs/database-tools/) - Query and schema tools
 - [Media Tools](/docs/media-tools/) - Image generation
-- [Agent Registry](/docs/agent-registry/) - Identity and file locks
+- [Agent Registry](/docs/agent-registry/) - Agent identity management

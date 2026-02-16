@@ -19,19 +19,16 @@
 import type {
 	Agent,
 	AgentActivity,
-	Reservation,
 	Task,
 	TaskStats,
 	ApiMeta
 } from '$lib/types/api.types';
 
 // Re-export types for backward compatibility
-export type { Agent, AgentActivity, Reservation, Task };
+export type { Agent, AgentActivity, Task };
 
 export interface AgentsData {
 	agents: Agent[];
-	reservations: Reservation[];
-	reservations_by_agent: Record<string, Reservation[]>;
 	tasks: Task[];
 	unassigned_tasks: Task[];
 	task_stats: TaskStats;
@@ -44,8 +41,6 @@ export interface AgentsData {
 class AgentsStore {
 	data = $state<AgentsData>({
 		agents: [],
-		reservations: [],
-		reservations_by_agent: {},
 		tasks: [],
 		unassigned_tasks: [],
 		task_stats: {
@@ -75,10 +70,6 @@ class AgentsStore {
 		return this.data.agents;
 	}
 
-	get reservations() {
-		return this.data.reservations;
-	}
-
 	get tasks() {
 		return this.data.tasks;
 	}
@@ -93,7 +84,6 @@ class AgentsStore {
 
 	// Helper to compute agent status (matches AgentCard.svelte logic)
 	private getAgentStatus(agent: Agent): 'live' | 'working' | 'active' | 'idle' | 'offline' {
-		const hasActiveLocks = agent.reservation_count > 0;
 		const hasInProgressTask = agent.in_progress_tasks > 0;
 
 		let timeSinceActive = Infinity;
@@ -105,9 +95,9 @@ class AgentsStore {
 			timeSinceActive = Date.now() - lastActivity.getTime();
 		}
 
-		// Priority 1: WORKING - Has active task or file locks
+		// Priority 1: WORKING - Has active task
 		// Agent has work in progress (takes priority over recency)
-		if (hasInProgressTask || hasActiveLocks) {
+		if (hasInProgressTask) {
 			return 'working';
 		}
 

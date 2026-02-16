@@ -73,14 +73,7 @@
 		// Fields needed for agent status computation (from agentStatusUtils)
 		hasSession?: boolean;
 		in_progress_tasks?: number;
-		reservation_count?: number;
 		session_created_ts?: number | null;
-	}
-
-	interface Reservation {
-		agent_name: string;
-		path_pattern: string;
-		expires_ts: string;
 	}
 
 	// Section state type
@@ -110,7 +103,6 @@
 	let tasks = $state<Task[]>([]);
 	let allTasks = $state<Task[]>([]);
 	let agents = $state<Agent[]>([]);
-	let reservations = $state<Reservation[]>([]);
 	let isInitialLoad = $state(true);
 	let configProjects = $state<string[]>([]); // Projects from JAT config
 	let projectColorsMap = $state<Record<string, string>>({});
@@ -1020,7 +1012,6 @@
 			}
 
 			agents = data.agents || [];
-			reservations = data.reservations || [];
 			tasks = data.tasks || [];
 			allTasks = data.tasks || [];
 		} catch (error) {
@@ -1940,7 +1931,6 @@
 												tasks={filteredTasks}
 												allTasks={allTasks}
 												{agents}
-												{reservations}
 												{agentSessionInfo}
 												completedTasksFromActiveSessions={getCompletedTasksForProject(project)}
 												ontaskclick={handleTaskClick}

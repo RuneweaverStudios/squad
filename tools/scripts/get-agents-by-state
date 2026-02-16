@@ -58,14 +58,6 @@ else
     AGENTS_JSON=$(am-agents --project "$PROJECT_PATH" --json 2>/dev/null || echo "[]")
 fi
 
-# Get reservations to check for active locks (ensure valid JSON)
-RESERVATIONS_RAW=$(am-reservations --json 2>/dev/null || echo "")
-if [[ -z "$RESERVATIONS_RAW" ]] || ! echo "$RESERVATIONS_RAW" | jq empty 2>/dev/null; then
-    RESERVATIONS_JSON="[]"
-else
-    RESERVATIONS_JSON="$RESERVATIONS_RAW"
-fi
-
 # Get tasks to check in-progress status (ensure valid JSON)
 TASKS_RAW=$(jt list --json 2>/dev/null || echo "")
 if [[ -z "$TASKS_RAW" ]] || ! echo "$TASKS_RAW" | jq empty 2>/dev/null; then
@@ -80,13 +72,11 @@ TEMP_DIR=$(mktemp -d)
 trap "rm -rf '$TEMP_DIR'" EXIT
 
 echo "$AGENTS_JSON" > "$TEMP_DIR/agents.json"
-echo "$RESERVATIONS_JSON" > "$TEMP_DIR/reservations.json"
 echo "$TASKS_JSON" > "$TEMP_DIR/tasks.json"
 
 jq -r \
-    --slurpfile reservations "$TEMP_DIR/reservations.json" \
     --slurpfile tasks "$TEMP_DIR/tasks.json" \
-    '$reservations[0] as $reservations | $tasks[0] as $tasks |
+    '$tasks[0] as $tasks |
     # Helper function to format time ago
     def format_time_ago(timestamp):
         if timestamp == null or timestamp == "" then "Never"
@@ -114,9 +104,6 @@ jq -r \
         # Count in-progress tasks for this agent
         ($tasks | map(select(.assignee == $agent_name and .status == "in_progress")) | length) as $in_progress_tasks |
 
-        # Count active reservations for this agent
-        ($reservations | map(select(.agent_name == $agent_name and (.released_ts == null or .released_ts == "") and (.expires_ts > (now | todate)))) | length) as $active_locks |
-
         # Calculate time since active
         (if $last_active then
             ($last_active | sub(" "; "T") + "Z" | fromdateiso8601) as $ts |
@@ -129,8 +116,6 @@ jq -r \
         if $in_progress_tasks > 0 then
             "working"
         elif $time_since_active < 300 then
-            "active"
-        elif $active_locks > 0 and $time_since_active < 3600 then
             "active"
         elif $time_since_active < 3600 then
             "idle"
@@ -157,7 +142,6 @@ jq -r \
             {
                 name: $agent.name,
                 last_active: format_time_ago($agent.last_active_ts),
-                locks: ($reservations | map(select(.agent_name == $agent.name and (.released_ts == null or .released_ts == "") and (.expires_ts > (now | todate)))) | length),
                 program: $agent.program,
                 model: $agent.model
             }

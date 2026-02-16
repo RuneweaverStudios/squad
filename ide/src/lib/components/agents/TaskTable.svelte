@@ -89,7 +89,6 @@
 		tasks?: Task[];
 		allTasks?: Task[];
 		agents?: Agent[];
-		reservations?: Reservation[];
 		/** Task IDs that were completed by agents with active sessions - should remain visible */
 		completedTasksFromActiveSessions?: Set<string>;
 		ontaskclick?: (taskId: string) => void;
@@ -105,7 +104,7 @@
 		agentSessionInfo?: Map<string, AgentSessionInfo>;
 	}
 
-	let { tasks = [], allTasks = [], agents = [], reservations = [], completedTasksFromActiveSessions = new Set(), ontaskclick = () => {}, onagentclick, hideProjectFilter = false, hideSearch = false, onTasksChanged, agentSessionInfo }: Props = $props();
+	let { tasks = [], allTasks = [], agents = [], completedTasksFromActiveSessions = new Set(), ontaskclick = () => {}, onagentclick, hideProjectFilter = false, hideSearch = false, onTasksChanged, agentSessionInfo }: Props = $props();
 
 	// Build epic->child mapping for dependency-based grouping
 	// This allows tasks linked to epics via depends_on to be grouped under the epic

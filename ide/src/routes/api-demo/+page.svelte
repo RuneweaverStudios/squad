@@ -4,7 +4,6 @@
 
 	// Reactive state derived from agents store
 	const agents = $derived(agentsStore.agents);
-	const reservations = $derived(agentsStore.reservations);
 	const tasks = $derived(agentsStore.tasks);
 	const taskStats = $derived(agentsStore.taskStats);
 	const activeAgents = $derived(agentsStore.activeAgents);
@@ -40,7 +39,6 @@
 	const endpoints = [
 		'/api/agents?full=true',
 		'/api/agents',
-		'/api/reservations',
 		'/api/tasks',
 		'/api/tasks?status=open',
 		'/api/tasks?priority=0'
@@ -49,9 +47,9 @@
 
 <svelte:head>
 	<title>API Demo | JAT IDE</title>
-	<meta name="description" content="API demonstration page for testing JAT IDE endpoints. View agent data, reservations, and task statistics." />
+	<meta name="description" content="API demonstration page for testing JAT IDE endpoints. View agent data and task statistics." />
 	<meta property="og:title" content="API Demo | JAT IDE" />
-	<meta property="og:description" content="API demonstration page for testing JAT IDE endpoints. View agent data, reservations, and task statistics." />
+	<meta property="og:description" content="API demonstration page for testing JAT IDE endpoints. View agent data and task statistics." />
 	<meta property="og:image" content="/favicons/config.svg" />
 	<link rel="icon" href="/favicons/config.svg" />
 </svelte:head>
@@ -146,12 +144,6 @@ $effect(() => {
 							</div>
 
 							<div class="stat">
-								<div class="stat-title">Active Reservations</div>
-								<div class="stat-value text-secondary">{reservations.length}</div>
-								<div class="stat-desc">File locks preventing conflicts</div>
-							</div>
-
-							<div class="stat">
 								<div class="stat-title">Total Tasks</div>
 								<div class="stat-value">{taskStats.total}</div>
 								<div class="stat-desc">
@@ -216,7 +208,6 @@ $effect(() => {
 									<th>Name</th>
 									<th>Program</th>
 									<th>Model</th>
-									<th>Reservations</th>
 									<th>Tasks</th>
 									<th>Status</th>
 								</tr>
@@ -228,9 +219,6 @@ $effect(() => {
 										<td>{agent.program}</td>
 										<td>{agent.model}</td>
 										<td>
-											<span class="badge badge-secondary">{agent.reservation_count}</span>
-										</td>
-										<td>
 											<span class="badge badge-primary">{agent.task_count}</span>
 											<span class="text-xs text-base-content/70">
 												({agent.open_tasks} open, {agent.in_progress_tasks} in progress)
@@ -238,53 +226,6 @@ $effect(() => {
 										</td>
 										<td>
 											<span class="badge badge-success">Active</span>
-										</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
-					</div>
-				{/if}
-			</div>
-		</div>
-
-		<!-- File Reservations -->
-		<div class="card bg-base-100 shadow-xl">
-			<div class="card-body">
-				<h2 class="card-title">🔒 Active File Reservations ({reservations.length})</h2>
-				{#if reservations.length === 0}
-					<p class="text-base-content/70">No active reservations</p>
-				{:else}
-					<div class="overflow-x-auto">
-						<table class="table table-zebra">
-							<thead>
-								<tr>
-									<th>Agent</th>
-									<th>Pattern</th>
-									<th>Type</th>
-									<th>Reason</th>
-									<th>Expires</th>
-								</tr>
-							</thead>
-							<tbody>
-								{#each reservations as reservation}
-									<tr>
-										<td class="font-bold">{reservation.agent_name}</td>
-										<td>
-											<code class="text-xs bg-base-200 px-2 py-1 rounded">
-												{reservation.path_pattern}
-											</code>
-										</td>
-										<td>
-											{#if reservation.exclusive}
-												<span class="badge badge-error">Exclusive</span>
-											{:else}
-												<span class="badge badge-info">Shared</span>
-											{/if}
-										</td>
-										<td class="text-sm">{reservation.reason}</td>
-										<td class="text-sm text-base-content/70">
-											{new Date(reservation.expires_ts).toLocaleString()}
 										</td>
 									</tr>
 								{/each}
@@ -419,7 +360,6 @@ $effect(() => {
 					<h3>Available Data</h3>
 					<ul>
 						<li><code>agents.agents</code> - All registered agents with stats</li>
-						<li><code>agents.reservations</code> - Active file locks</li>
 						<li><code>agents.tasks</code> - Tasks from all projects</li>
 						<li><code>agents.taskStats</code> - Aggregated statistics</li>
 						<li><code>agents.activeAgents</code> - Filtered active agents</li>
@@ -432,7 +372,6 @@ $effect(() => {
 					<ul>
 						<li><code>/api/agents?full=true</code> - Unified endpoint (recommended)</li>
 						<li><code>/api/agents</code> - Agent data only</li>
-						<li><code>/api/reservations</code> - File reservations only</li>
 						<li><code>/api/tasks</code> - Tasks only</li>
 						<li><code>/api/tasks/[id]</code> - Single task details</li>
 					</ul>

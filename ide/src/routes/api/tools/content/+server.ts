@@ -1,10 +1,10 @@
 /**
  * Tools Content API - Read and write tool file contents
  *
- * GET /api/tools/content?path=mail/am-send
+ * GET /api/tools/content?path=mail/am-register
  * Returns file content for the specified tool path.
  *
- * PUT /api/tools/content?path=mail/am-send
+ * PUT /api/tools/content?path=mail/am-register
  * Body: { content: string }
  * Saves content to the tool file.
  *

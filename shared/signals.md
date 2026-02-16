@@ -669,7 +669,7 @@ jat-step closing --task jat-abc --title "Add auth flow" --agent FairBay
 # → emits completing (40%) + jt close
 
 jat-step releasing --task jat-abc --title "Add auth flow" --agent FairBay
-# → emits completing (75%) + am-release all
+# → emits completing (75%) + captures session log
 
 # Final completion bundle (100%) - generates + emits in one call
 jat-complete-bundle --task jat-abc --agent FairBay --emit

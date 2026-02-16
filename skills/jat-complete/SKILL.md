@@ -1,6 +1,6 @@
 ---
 name: jat-complete
-description: Complete current JAT task with full verification. Verifies work (tests/lint), commits changes, writes memory entry, closes task, releases file reservations, and emits final signal. Session ends after completion.
+description: Complete current JAT task with full verification. Verifies work (tests/lint), commits changes, writes memory entry, closes task, and emits final signal. Session ends after completion.
 metadata:
   author: jat
   version: "1.0"
@@ -23,8 +23,7 @@ Complete current task with full verification protocol. Session ends after comple
 2. **Commit changes** with proper message
 3. **Write memory entry** - Save context for future agents
 4. **Mark task complete** (`jt close`)
-5. **Release file reservations**
-6. **Emit completion signal** to IDE
+5. **Emit completion signal** to IDE
 
 ## Prerequisites
 
@@ -171,21 +170,7 @@ jt close "$TASK_ID" --reason "Completed by $AGENT_NAME"
 jt epic close-eligible
 ```
 
-### STEP 5: Release File Reservations
-
-```bash
-jat-step releasing --task "$TASK_ID" --title "$TASK_TITLE" --agent "$AGENT_NAME"
-```
-
-Or manually:
-
-```bash
-am-reservations --agent "$AGENT_NAME" --json | jq -r '.[].pattern' | while read pattern; do
-  am-release "$pattern" --agent "$AGENT_NAME"
-done
-```
-
-### STEP 6: Emit Completion Signal
+### STEP 5: Emit Completion Signal
 
 ```bash
 jat-step complete --task "$TASK_ID" --title "$TASK_TITLE" --agent "$AGENT_NAME"
@@ -244,5 +229,4 @@ Fix issues and try again.
 | 3.5 | Write Memory Entry | Write tool + jat-memory index |
 | 4 | Mark Task Complete | jat-step closing |
 | 4.5 | Auto-Close Epics | jt epic close-eligible |
-| 5 | Release Reservations | jat-step releasing |
-| 6 | Emit Completion Signal | jat-step complete |
+| 5 | Emit Completion Signal | jat-step complete |

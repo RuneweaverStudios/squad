@@ -7,7 +7,6 @@
 #   --force: Skip confirmation prompt
 #
 # Safety:
-# - Checks for active reservations (warns if found)
 # - Checks for messages (warns if found)
 # - Requires confirmation unless --force
 #
@@ -32,7 +31,6 @@ Arguments:
   --force           Skip confirmation prompt
 
 Safety checks:
-  - Warns if agent has active reservations
   - Warns if agent has sent messages
   - Requires confirmation (unless --force)
 
@@ -48,7 +46,6 @@ Exit codes:
 Note: Deleting an agent does NOT delete:
   - Messages sent by the agent (preserved for audit trail)
   - Task assignments in JAT Tasks (preserved)
-  - Reservations are released automatically
 
 Note: Agents are globally unique across all projects.
   No project specification needed.
@@ -105,18 +102,6 @@ PROJECT_PATH=$(sqlite3 "$DB_PATH" \
 # Safety checks
 echo "Checking agent dependencies..." >&2
 
-# Check for active reservations
-ACTIVE_RESERVATIONS=$(sqlite3 "$DB_PATH" \
-    "SELECT COUNT(*) FROM file_reservations
-     WHERE agent_id = $AGENT_ID
-     AND released_ts IS NULL
-     AND datetime(expires_ts) > datetime('now');" || echo "0")
-
-if [[ "$ACTIVE_RESERVATIONS" -gt 0 ]]; then
-    echo "⚠️  Warning: Agent has $ACTIVE_RESERVATIONS active reservation(s)" >&2
-    echo "   These will be released on deletion" >&2
-fi
-
 # Check for messages
 MESSAGE_COUNT=$(sqlite3 "$DB_PATH" \
     "SELECT COUNT(*) FROM messages WHERE sender_id = $AGENT_ID;" || echo "0")
@@ -131,7 +116,6 @@ if [[ "$FORCE" != true ]]; then
     echo ""
     echo "Delete agent '$AGENT_NAME'?"
     echo "  Project: $PROJECT_PATH"
-    echo "  Reservations: $ACTIVE_RESERVATIONS active"
     echo "  Messages: $MESSAGE_COUNT sent"
     echo ""
     read -p "Confirm deletion? (y/N): " -n 1 -r
@@ -142,15 +126,9 @@ if [[ "$FORCE" != true ]]; then
     fi
 fi
 
-# Delete agent (messages are preserved, reservations are released)
+# Delete agent (messages are preserved)
 sqlite3 "$DB_PATH" <<SQL
 BEGIN TRANSACTION;
-
--- Release all active reservations for this agent
-UPDATE file_reservations
-SET released_ts = datetime('now')
-WHERE agent_id = $AGENT_ID
-AND released_ts IS NULL;
 
 -- Delete agent record
 -- Note: messages are preserved (sender_id becomes orphaned but queryable)
@@ -161,7 +139,6 @@ SQL
 
 if [[ $? -eq 0 ]]; then
     echo "✓ Agent '$AGENT_NAME' deleted successfully"
-    [[ "$ACTIVE_RESERVATIONS" -gt 0 ]] && echo "  Released $ACTIVE_RESERVATIONS reservation(s)"
     [[ "$MESSAGE_COUNT" -gt 0 ]] && echo "  Preserved $MESSAGE_COUNT message(s)"
     exit 0
 else

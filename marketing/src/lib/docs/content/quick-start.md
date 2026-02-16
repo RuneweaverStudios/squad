@@ -55,7 +55,7 @@ The `/jat:start` command does several things in sequence:
 1. Registers the agent with a generated name (like "CalmMeadow")
 2. Searches memory for relevant context from past sessions
 3. Claims the task by setting status to `in_progress`
-4. Reserves files to prevent conflicts with other agents
+4. Declares files to prevent conflicts with other agents
 5. Emits signals so the IDE can track progress
 
 ## Work on the task
@@ -94,7 +94,7 @@ This triggers the completion protocol:
 1. Runs verification (tests, lint, type checking)
 2. Commits changes with a task-ID-prefixed message
 3. Closes the task (`jt close`)
-4. Releases all file reservations
+4. Clears file declarations
 5. Generates a structured completion bundle with suggested follow-up tasks
 
 The session ends after completion. To work on the next task, spawn a new agent.
@@ -136,7 +136,7 @@ JAT really shines when you run several agents in parallel:
 jat myproject 4 --auto
 ```
 
-This launches four agents with a 15-second stagger between each. Every agent picks the next highest-priority ready task automatically. File reservations prevent conflicts, and the IDE shows all sessions in a unified dashboard.
+This launches four agents with a 15-second stagger between each. Every agent picks the next highest-priority ready task automatically. File declarations prevent conflicts, and the IDE shows all sessions in a unified dashboard.
 
 ## Common commands
 
@@ -150,7 +150,7 @@ This launches four agents with a 15-second stagger between each. Every agent pic
 | `/jat:pause` | Pause current work and pivot |
 | `jt ready --json` | List tasks ready to start |
 | `jt list --status open` | List all open tasks |
-| `am-reservations --agent AgentName` | Check agent's file locks |
+| `jt show task-id --json` | Check task details and file declarations |
 
 ## Next steps
 

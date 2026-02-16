@@ -39,22 +39,22 @@
 			number: 'II',
 			glyph: '⏣',
 			title: 'Agent Coordination',
-			subtitle: 'Agent Mail: Async Communication',
-			description: 'Agents coordinate via message threads and file reservations. No conflicts. No overwrites. Just smooth parallel execution.',
+			subtitle: 'Identity & File Declarations',
+			description: 'Agents register identities and declare files on tasks. No conflicts. No overwrites. Just smooth parallel execution.',
 			features: [
-				'File reservation locks',
-				'Threaded messaging',
-				'Broadcast channels',
+				'File declarations on tasks',
+				'Agent identity registry',
+				'Cross-session memory',
 				'Conflict prevention'
 			],
-			code: `$ am-reserve "src/**/*.ts" \\
-  --agent BluePeak \\
-  --ttl 3600 \\
-  --reason "jat-7kx2m"
+			code: `$ jt update jat-7kx2m \\
+  --status in_progress \\
+  --assignee BluePeak \\
+  --files "src/**/*.ts"
 
-Reserved: src/**/*.ts
-Agent: BluePeak
-Expires: 1h`,
+Updated: jat-7kx2m
+Status: in_progress
+Files: src/**/*.ts`,
 			color: 'oklch(65% 0.20 180)'
 		},
 		{

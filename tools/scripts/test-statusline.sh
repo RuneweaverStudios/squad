@@ -74,32 +74,6 @@ CREATE TABLE IF NOT EXISTS agents (
     UNIQUE (project_id, name)
 );
 
-CREATE TABLE IF NOT EXISTS file_reservations (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    project_id INTEGER NOT NULL,
-    agent_id INTEGER NOT NULL,
-    path_pattern TEXT NOT NULL,
-    exclusive INTEGER DEFAULT 1,
-    reason TEXT DEFAULT '',
-    created_ts TEXT NOT NULL DEFAULT (datetime('now')),
-    expires_ts TEXT NOT NULL,
-    released_ts TEXT,
-    FOREIGN KEY (project_id) REFERENCES projects(id),
-    FOREIGN KEY (agent_id) REFERENCES agents(id)
-);
-
-CREATE TABLE IF NOT EXISTS messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    from_agent TEXT NOT NULL,
-    to_agent TEXT NOT NULL,
-    subject TEXT NOT NULL,
-    body TEXT,
-    thread_id TEXT,
-    created_ts TEXT DEFAULT (datetime('now')),
-    acknowledged INTEGER DEFAULT 0,
-    ack_ts TEXT
-);
-
 -- Insert test project
 INSERT INTO projects (slug, human_key) VALUES ('test-project', '$TEST_PROJECT_DIR');
 EOF
@@ -120,26 +94,6 @@ register_test_agent() {
     sqlite3 "$TEST_DB" <<EOF
 INSERT INTO agents (project_id, name, program, model, task_description, last_active_ts)
 VALUES (1, '$agent_name', 'claude-code', 'sonnet-4.5', 'Test agent', datetime('now'));
-EOF
-}
-
-# Helper: Create file reservation
-create_reservation() {
-    local agent_name="$1"
-    local pattern="$2"
-    local reason="$3"
-    local expires_offset="${4:-3600}" # seconds from now
-
-    local expires_ts
-    expires_ts=$(date -u -d "+${expires_offset} seconds" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date -u -v "+${expires_offset}S" '+%Y-%m-%d %H:%M:%S')
-
-    # Get agent_id
-    local agent_id
-    agent_id=$(sqlite3 "$TEST_DB" "SELECT id FROM agents WHERE name='$agent_name'" | head -1)
-
-    sqlite3 "$TEST_DB" <<EOF
-INSERT INTO file_reservations (project_id, agent_id, path_pattern, exclusive, reason, expires_ts)
-VALUES (1, $agent_id, '$pattern', 1, '$reason', '$expires_ts');
 EOF
 }
 
@@ -209,19 +163,12 @@ $(which jt) "\$@"
 JTEOF
         chmod +x /tmp/test-bin/jt
 
-        # am-reservations wrapper
-        cat > /tmp/test-bin/am-reservations <<AMEOF
+        # am-agents wrapper
+        cat > /tmp/test-bin/am-agents <<AMEOF
 #!/bin/bash
-AGENT_MAIL_DB="$TEST_DB" $(which am-reservations) --project "$TEST_PROJECT_DIR" "\$@"
+AGENT_MAIL_DB="$TEST_DB" $(which am-agents) "\$@"
 AMEOF
-        chmod +x /tmp/test-bin/am-reservations
-
-        # am-inbox wrapper
-        cat > /tmp/test-bin/am-inbox <<INEOF
-#!/bin/bash
-AGENT_MAIL_DB="$TEST_DB" $(which am-inbox) "\$@"
-INEOF
-        chmod +x /tmp/test-bin/am-inbox
+        chmod +x /tmp/test-bin/am-agents
 
         # Create agent session file
         mkdir -p "$TEST_PROJECT_DIR/.claude"
@@ -311,63 +258,14 @@ assert_contains "$output" "Test Task 1" "Shows task title from JAT"
 echo ""
 
 # ----------------------------------------------------------------------------
-# TEST 2: Agent with reservations, no in_progress task
+# TEST 2: Agent with no task (idle)
 # ----------------------------------------------------------------------------
-echo "Test 2: Agent with reservations (no in_progress task)"
+echo "Test 2: Agent with no task (idle)"
 echo "------------------------------------------------------"
 
 register_test_agent "TestAgent2"
-create_task "jat-xyz" "Test Task 2" "open" "" 1
-create_reservation "TestAgent2" "src/**/*.ts" "jat-xyz" 3600
-
-# Debug: Check what am-reservations returns
-if [[ "$VERBOSE" == "true" ]]; then
-    echo "  Debug: TEST_PROJECT_DIR=$TEST_PROJECT_DIR"
-    echo "  Debug: Checking projects table"
-    sqlite3 "$TEST_DB" "SELECT * FROM projects;"
-    echo "  Debug: Checking am-reservations output"
-    AGENT_MAIL_DB="$TEST_DB" am-reservations --project "$TEST_PROJECT_DIR" --agent "TestAgent2" 2>&1
-    echo "  Debug: Checking database contents"
-    sqlite3 "$TEST_DB" "SELECT * FROM file_reservations;"
-    sqlite3 "$TEST_DB" "SELECT * FROM agents;"
-fi
 
 output=$(run_statusline_test "TestAgent2")
-
-assert_contains "$output" "jat-xyz" "Shows task ID from reservation"
-assert_contains "$output" "Test Task 2" "Shows task title from JAT lookup"
-
-echo ""
-
-# ----------------------------------------------------------------------------
-# TEST 3: Agent with BOTH in_progress task AND reservations
-# ----------------------------------------------------------------------------
-echo "Test 3: Agent with in_progress task AND reservations"
-echo "------------------------------------------------------"
-
-register_test_agent "TestAgent3"
-create_task "jat-pqr" "Test Task 3 Priority" "in_progress" "TestAgent3" 0
-create_task "jat-stu" "Test Task 3 Reserve" "open" "" 1
-create_reservation "TestAgent3" "src/**/*.ts" "jat-stu" 3600
-
-output=$(run_statusline_test "TestAgent3")
-
-# Should show in_progress task (jat-pqr), NOT reservation task (jat-stu)
-assert_contains "$output" "jat-pqr" "Shows in_progress task (not reservation task)"
-assert_contains "$output" "Test Task 3 Priority" "Shows in_progress task title"
-assert_not_contains "$output" "jat-stu" "Does NOT show reservation task when in_progress exists"
-
-echo ""
-
-# ----------------------------------------------------------------------------
-# TEST 4: Agent with neither (idle)
-# ----------------------------------------------------------------------------
-echo "Test 4: Agent with no task and no reservations (idle)"
-echo "------------------------------------------------------"
-
-register_test_agent "TestAgent4"
-
-output=$(run_statusline_test "TestAgent4")
 
 assert_contains "$output" "idle" "Shows idle status when no work"
 assert_not_contains "$output" "jat-" "Does not show any task ID"
@@ -375,15 +273,15 @@ assert_not_contains "$output" "jat-" "Does not show any task ID"
 echo ""
 
 # ----------------------------------------------------------------------------
-# TEST 5: Edge case - Closed task in JAT
+# TEST 3: Edge case - Closed task in JAT
 # ----------------------------------------------------------------------------
-echo "Test 5: Edge case - Closed task should not appear"
+echo "Test 3: Edge case - Closed task should not appear"
 echo "------------------------------------------------------"
 
-register_test_agent "TestAgent5"
-create_task "jat-cls" "Closed Task" "closed" "TestAgent5" 1
+register_test_agent "TestAgent3"
+create_task "jat-cls" "Closed Task" "closed" "TestAgent3" 1
 
-output=$(run_statusline_test "TestAgent5")
+output=$(run_statusline_test "TestAgent3")
 
 assert_not_contains "$output" "jat-cls" "Does not show closed tasks"
 assert_contains "$output" "idle" "Shows idle when only closed tasks exist"
@@ -391,35 +289,18 @@ assert_contains "$output" "idle" "Shows idle when only closed tasks exist"
 echo ""
 
 # ----------------------------------------------------------------------------
-# TEST 6: Priority badge display
+# TEST 4: Priority badge display
 # ----------------------------------------------------------------------------
-echo "Test 6: Priority badge display"
+echo "Test 4: Priority badge display"
 echo "------------------------------------------------------"
 
-register_test_agent "TestAgent6"
-create_task "jat-p0t" "P0 Task" "in_progress" "TestAgent6" 0
+register_test_agent "TestAgent4"
+create_task "jat-p0t" "P0 Task" "in_progress" "TestAgent4" 0
 
-output=$(run_statusline_test "TestAgent6")
+output=$(run_statusline_test "TestAgent4")
 
 assert_contains "$output" "P0" "Shows P0 priority badge"
 assert_contains "$output" "jat-p0t" "Shows task ID"
-
-echo ""
-
-# ----------------------------------------------------------------------------
-# TEST 7: File lock count indicator
-# ----------------------------------------------------------------------------
-echo "Test 7: File lock count indicator"
-echo "------------------------------------------------------"
-
-register_test_agent "TestAgent7"
-create_task "jat-lck" "Lock Task" "in_progress" "TestAgent7" 1
-create_reservation "TestAgent7" "src/**/*.ts" "jat-lck" 3600
-create_reservation "TestAgent7" "test/**/*.ts" "jat-lck" 3600
-
-output=$(run_statusline_test "TestAgent7")
-
-assert_contains "$output" "🔒 2" "Shows lock count indicator (2 locks)"
 
 echo ""
 

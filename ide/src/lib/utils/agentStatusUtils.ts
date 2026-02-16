@@ -26,7 +26,6 @@ export type AgentStatus = 'live' | 'working' | 'active' | 'idle' | 'connecting' 
  */
 export interface AgentStatusInput {
 	last_active_ts?: string | null;
-	reservation_count?: number;
 	in_progress_tasks?: number;
 	hasSession?: boolean;
 	/** Session creation timestamp (ms since epoch) for "connecting" state detection */
@@ -39,10 +38,10 @@ export interface AgentStatusInput {
  * Priority order:
  * 0a. DISCONNECTED - No session but recent activity <15min (unexpected termination)
  * 0b. OFFLINE - No session and no recent activity (expected state)
- * 1. WORKING - Has active task or file locks (takes priority - agent is engaged)
+ * 1. WORKING - Has active task (takes priority - agent is engaged)
  * 1.5 CONNECTING - Session exists but very new (<10min) with no activity yet
  * 2. LIVE - Very recent activity (< 1 minute) without active work
- * 3. ACTIVE - Recent activity (< 10 minutes) or has locks within 1 hour
+ * 3. ACTIVE - Recent activity (< 10 minutes)
  * 4. IDLE - Within 1 hour but no activity indicators
  * 5. OFFLINE - Over 1 hour or never active
  *
@@ -52,7 +51,6 @@ export interface AgentStatusInput {
  * @example
  * const status = computeAgentStatus({
  *   last_active_ts: new Date().toISOString(),
- *   reservation_count: 2,
  *   in_progress_tasks: 1
  * });
  * // → 'working' (has in-progress task)
@@ -74,13 +72,12 @@ export function computeAgentStatus(agent: AgentStatusInput): AgentStatus {
 		return 'offline';
 	}
 
-	const hasActiveLocks = (agent.reservation_count || 0) > 0;
 	const hasInProgressTask = (agent.in_progress_tasks || 0) > 0;
 
-	// Priority 1: WORKING - Has active task or file locks
+	// Priority 1: WORKING - Has active task
 	// Agent has work in progress (takes priority over recency)
 	// Note: We only reach here if hasSession !== false, so session exists
-	if (hasInProgressTask || hasActiveLocks) {
+	if (hasInProgressTask) {
 		return 'working';
 	}
 
@@ -103,11 +100,7 @@ export function computeAgentStatus(agent: AgentStatusInput): AgentStatus {
 	}
 
 	// Priority 3: ACTIVE - Recent activity (< 10 minutes) but no current work
-	// OR has locks but not super recent
 	if (timeSinceActive < AGENT_STATUS_THRESHOLDS.WORKING_MS) {
-		return 'active';
-	}
-	if (hasActiveLocks && timeSinceActive < AGENT_STATUS_THRESHOLDS.IDLE_MS) {
 		return 'active';
 	}
 
@@ -161,7 +154,7 @@ export function getAgentStatusDescription(status: AgentStatus): string {
 		case 'live':
 			return 'Agent is responsive and ready (active within 1 minute)';
 		case 'working':
-			return 'Agent is actively working on tasks or holding file locks';
+			return 'Agent is actively working on tasks';
 		case 'active':
 			return 'Agent was recently active (within 10 minutes)';
 		case 'idle':

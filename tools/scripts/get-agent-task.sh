@@ -2,12 +2,7 @@
 #
 # Get current task ID for an agent
 #
-# Checks BOTH tasks DB (for in_progress tasks) AND Agent Mail (for file reservations)
-# to determine if an agent is actively working on a task.
-#
-# This provides consistent status calculation between:
-#   - Statusline (.claude/statusline.sh)
-#   - IDE (ide/src/lib/stores/agents.svelte.ts)
+# Checks tasks DB for in_progress tasks assigned to an agent.
 #
 # Usage:
 #   get-agent-task.sh AGENT_NAME
@@ -17,11 +12,6 @@
 #   - Empty string if agent is not working
 #   - Exit code 0: Task found
 #   - Exit code 1: No task found
-#
-# Algorithm (matches IDE logic):
-#   1. Check JAT Tasks for in_progress tasks assigned to agent
-#   2. Check Agent Mail for active file reservations by agent
-#   3. Return task_id if found from EITHER source
 #
 # Examples:
 #   # Get task ID for agent
@@ -54,28 +44,6 @@ if command -v jt &>/dev/null; then
     if [[ -n "$in_progress_task" ]]; then
         echo "$in_progress_task"
         exit 0
-    fi
-fi
-
-# STEP 2: Check Agent Mail for active file reservations by this agent
-# This matches IDE logic: agent.reservation_count > 0
-# Extract task ID from reservation reason field (e.g., "jat-abc")
-if command -v am-reservations &>/dev/null; then
-    reservation_info=$(am-reservations --agent "$AGENT_NAME" 2>/dev/null || true)
-
-    if [[ -n "$reservation_info" ]]; then
-        # Extract task ID from "Reason:" field
-        # Common patterns: "jat-abc", "task-xyz"
-        task_id=$(echo "$reservation_info" | \
-            grep "^Reason:" | \
-            sed 's/^Reason: //' | \
-            grep -oE '(jat|task)-[a-z0-9]{3}\b' | \
-            head -1)
-
-        if [[ -n "$task_id" ]]; then
-            echo "$task_id"
-            exit 0
-        fi
     fi
 fi
 

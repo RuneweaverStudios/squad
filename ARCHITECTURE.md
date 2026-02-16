@@ -89,7 +89,7 @@ Tool response:                  200 tokens
 Total per operation:         32,700 tokens
 ```
 
-**Bash Tool (am-inbox example):**
+**Bash Tool (jt example):**
 
 ```
 Tool name + description:        100 tokens
@@ -143,10 +143,10 @@ Bash tools are better when:
 ┌──────────────┐   ┌──────────────────────────┐
 │ Bash Tools   │   │  State Management        │
 │ (28+ tools)  │   │                          │
-│              │   │  • Agent Mail (SQLite)   │
+│              │   │  • Agent Registry (SQLite)│
 │ am-*         │◄──┤  • JAT Tasks (per-project)│
-│ browser-*    │   │  • File Reservations     │
-│ db-*         │   │  • Message Threads       │
+│ browser-*    │   │  • File Declarations     │
+│ db-*         │   │                          │
 └──────────────┘   └──────────────────────────┘
 ```
 
@@ -160,19 +160,17 @@ Bash tools are better when:
    - Parse parameters and mode (quick/normal)
    - Detect task type (bulk vs normal)
    - Contextualize from conversation OR auto-select
-   - Check conflicts (file locks, git, inbox)
-   - Reserve files via `am-reserve`
-   - Announce via `am-send`
+   - Check conflicts (git status, dependencies)
+   - Declare files via `jt update --files`
    - Query dependencies via `jt show`
    - BEGIN WORK
 4. **Bash tools execute:**
-   - `am-reserve "src/**"` → SQLite INSERT
-   - `am-send "[jat-123] Starting..."` → SQLite INSERT + notification
+   - `jt update jat-123 --files "src/**"` → SQLite UPDATE
    - `jt show jat-123 --json` → Reads .jat/tasks.db
 5. **State persists:**
-   - Agent Mail: `~/.agent-mail.db`
+   - Agent Registry: `~/.agent-mail.db`
    - JAT Tasks: `.jat/tasks.db` (SQLite, per-project)
-   - File locks: SQLite with TTL expiry
+   - File declarations: stored on the task record
 
 **Zero HTTP calls. Zero servers. Pure bash + SQLite.**
 
@@ -265,48 +263,16 @@ CREATE TABLE message_recipients (
 
 **Why separate table?** One message can have multiple recipients.
 
-#### File Reservations Table
-
-```sql
-CREATE TABLE file_reservations (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    agent_id INTEGER NOT NULL,
-    project_id INTEGER NOT NULL,
-    pattern TEXT NOT NULL,               -- Glob pattern (e.g., "src/**/*.ts")
-    lock_type TEXT NOT NULL DEFAULT 'exclusive', -- exclusive | shared
-    reason TEXT,                         -- Why reserved (e.g., "jat-123: Auth work")
-    created_ts TEXT NOT NULL DEFAULT (datetime('now')),
-    expires_ts TEXT NOT NULL,            -- TTL-based expiry
-    FOREIGN KEY (agent_id) REFERENCES agents(id),
-    FOREIGN KEY (project_id) REFERENCES projects(id)
-);
-```
-
-**Purpose:** Advisory file locks to prevent agent conflicts.
-
-**Why glob patterns?** More flexible than exact paths.
-
-**Why TTL expiry?** Auto-release if agent crashes/forgets to release.
-
-**Advisory (not enforced):** Agents check locks voluntarily (via `am-reserve`).
-
 #### Indexes for Performance
 
 ```sql
 CREATE INDEX idx_messages_thread ON messages(thread_id);
 CREATE INDEX idx_messages_project ON messages(project_id);
 CREATE INDEX idx_messages_created ON messages(created_ts);
-CREATE INDEX idx_reservations_project ON file_reservations(project_id);
-CREATE INDEX idx_reservations_agent ON file_reservations(agent_id);
-CREATE INDEX idx_reservations_expires ON file_reservations(expires_ts);
 ```
 
-**Why these indexes?**
-
-- Thread queries: `am-search --thread jat-123`
-- Project queries: `am-inbox AgentName` (filtered by project)
-- Expiry cleanup: Periodic TTL cleanup scans
-- Conflict checks: `am-reserve` checks existing locks
+> **Note:** File declarations are stored on the task record itself (via `jt update --files`),
+> not in a separate table. They are automatically cleared when the task is closed.
 
 ### JAT Tasks Schema (`.jat/tasks.db`)
 
@@ -349,40 +315,41 @@ CREATE INDEX idx_reservations_expires ON file_reservations(expires_ts);
 ### Pattern 1: Pipes (Data Transformation)
 
 ```bash
-# Get urgent messages as JSON, filter, extract IDs
-am-inbox AgentName --unread --json | \
-  jq '.[] | select(.importance=="urgent")' | \
+# Get ready tasks as JSON, filter by priority, extract IDs
+jt ready --json | \
+  jq '.[] | select(.priority <= 1)' | \
   jq -r '.id'
 ```
 
-**Tools used:** `am-inbox` → `jq`
+**Tools used:** `jt` → `jq`
 
 **Pattern:** Transform → Filter → Extract
 
 ### Pattern 2: Bulk Operations (xargs)
 
 ```bash
-# Acknowledge all unread messages
-am-inbox AgentName --unread --json | jq -r '.[].id' | \
-  xargs -I {} am-ack {} --agent AgentName
+# Close all tasks matching a label
+jt list --json | jq -r '.[] | select(.labels | contains(["cleanup"])) | .id' | \
+  xargs -I {} jt close {} --reason "Batch cleanup"
 ```
 
-**Tools used:** `am-inbox` → `jq` → `xargs` → `am-ack`
+**Tools used:** `jt` → `jq` → `xargs` → `jt`
 
 **Pattern:** Query → Extract → Iterate
 
 ### Pattern 3: Conditional Logic (if/else)
 
 ```bash
-# Check reservation before starting work
-if am-reservations --agent AgentName | grep -q "src/auth"; then
-  echo "Already working on auth"
+# Check if task has file declarations before starting
+task_files=$(jt show jat-abc --json | jq -r '.[0].reserved_files // ""')
+if [[ -n "$task_files" ]]; then
+  echo "Task already has file declarations: $task_files"
 else
-  am-reserve "src/auth/**" --agent AgentName --ttl 3600
+  jt update jat-abc --files "src/auth/**"
 fi
 ```
 
-**Tools used:** `am-reservations` → `grep` (condition)
+**Tools used:** `jt` → `jq` → conditional
 
 **Pattern:** Query → Check → Act
 
@@ -391,14 +358,13 @@ fi
 ```bash
 # Gather metrics in parallel
 {
-  am-inbox AgentName --unread --json > /tmp/inbox.json &
-  am-reservations --agent AgentName > /tmp/reservations.txt &
+  am-agents --json > /tmp/agents.json &
   jt ready --json > /tmp/tasks.json &
   wait
 }
 
 # Process results
-jq '.[] | .subject' /tmp/inbox.json
+jq '.[] | .name' /tmp/agents.json
 ```
 
 **Tools used:** Multiple tools in parallel via `&` and `wait`
@@ -427,11 +393,10 @@ done
 set -euo pipefail
 
 # Safely chain tools (fails if any step fails)
-am-inbox AgentName --unread --json | \
-  jq '.[] | select(.importance=="urgent")' | \
+jt ready --json | \
+  jq '.[] | select(.priority <= 1)' | \
   tee /tmp/urgent.json | \
-  jq -r '.id' | \
-  xargs -I {} am-ack {} --agent AgentName
+  jq -r '.id'
 ```
 
 **Pattern:** Safe chaining with `set -euo pipefail`
@@ -474,24 +439,16 @@ Total:                                36,500 tokens
 #### Bash Approach (JAT)
 
 ```
-1. Get inbox (am-inbox AgentName --json):
-   - Tool name:                          20 tokens
-   - Response JSON:                     800 tokens
-
-2. Get tasks (jt ready --json):
+1. Get tasks (jt ready --json):
    - Tool name:                          20 tokens
    - Response JSON:                   1,200 tokens
 
-3. Reserve files (am-reserve "src/**" ...):
+2. Start task (jt update --status in_progress --files "src/**"):
    - Tool name + args:                   50 tokens
    - Response text:                     100 tokens
 
-4. Send announcement (am-send ...):
-   - Tool name + args:                  100 tokens
-   - Response text:                     100 tokens
-
 ──────────────────────────────────────────────────
-Total:                                 2,390 tokens
+Total:                                 1,370 tokens
 ```
 
 **Savings:** 34,110 tokens (93% reduction!)
@@ -597,15 +554,15 @@ Total per invocation:    2,080-5,180ms
 
 ### Security Measures
 
-#### 1. File Reservations (Advisory Locks)
+#### 1. File Declarations (Advisory)
 
-**Not cryptographically enforced.** Agents voluntarily check locks.
+**Not enforced.** Agents declare which files they plan to edit via `jt update --files`. Other agents check these declarations voluntarily.
 
-**Attack:** Malicious agent ignores locks → writes anyway
+**Attack:** Malicious agent ignores declarations → writes anyway
 
 **Mitigation:** Git conflict resolution (manual merge required)
 
-**Design choice:** Advisory locks = simpler, sufficient for cooperative agents.
+**Design choice:** Advisory declarations = simpler, sufficient for cooperative agents.
 
 #### 2. SQLite Injection Prevention
 
@@ -625,16 +582,12 @@ sqlite3 ~/.agent-mail.db \
 
 #### 3. Path Validation
 
-**File reservation patterns validated:**
+**File declaration patterns are relative to project root:**
 
 ```bash
 # Valid patterns
-am-reserve "src/**/*.ts"          # Glob pattern
-am-reserve "src/auth/"            # Directory
-
-# Invalid patterns (rejected)
-am-reserve "/etc/passwd"          # Absolute path outside project
-am-reserve "../../../etc/passwd"  # Directory traversal
+jt update task-id --files "src/**/*.ts"   # Glob pattern
+jt update task-id --files "src/auth/"     # Directory
 ```
 
 **Validation logic:** Patterns must be relative to project root.
@@ -662,7 +615,7 @@ am-reserve "../../../etc/passwd"  # Directory traversal
 1. **Run on trusted machines** (your laptop, your servers)
 2. **Don't expose SQLite database** over network
 3. **Audit agent behavior** (check git history for rogue commits)
-4. **Use file reservations** (prevent accidental conflicts, not attacks)
+4. **Use file declarations** (prevent accidental conflicts, not attacks)
 5. **Review JAT tasks** (verify task descriptions before accepting)
 
 **JAT prioritizes simplicity over paranoia.** Designed for cooperative agents on trusted machines.

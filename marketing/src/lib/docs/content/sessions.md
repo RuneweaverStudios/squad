@@ -17,7 +17,7 @@ This feels different from how most people use AI coding assistants. Normally you
 - No context pollution between tasks
 - Clear git history (one commit = one task)
 - Other agents know exactly what each session is doing
-- File reservations have well-defined lifetimes
+- File declarations have well-defined lifetimes
 
 ## Agent registration
 
@@ -152,5 +152,5 @@ The IDE provides two ways to interact with sessions from the UI:
 ## Next steps
 
 - [Task Management](/docs/task-management/) - How JAT Tasks tracks work
-- [Agent Registry](/docs/agent-registry/) - Identity and file locks
+- [Agent Registry](/docs/agent-registry/) - Agent identity management
 - [Workflow Commands](/docs/workflow-commands/) - /jat:start, /jat:complete in detail

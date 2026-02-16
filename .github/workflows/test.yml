@@ -99,10 +99,10 @@ jobs:
     - name: Verify tool scripts
       run: |
         echo "Verifying am-* tools exist..."
-        for tool in am-register am-send am-inbox am-reserve am-release am-ack am-reply am-search am-agents am-reservations am-whoami; do
+        for tool in am-register am-agents am-whoami am-delete-agent; do
           test -f "tools/mail/$tool" || (echo "Missing mail/$tool" && exit 1)
         done
-        echo "✓ All Agent Mail tools present"
+        echo "✓ All Agent Registry tools present"
 
     - name: Verify lib exports
       run: |

@@ -374,13 +374,13 @@ if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
 fi
 
 echo "  Test tools:"
-echo "    am-inbox --help"
+echo "    am-register --help"
 echo "    browser-eval.js --help"
 echo "    jat --help"
 echo ""
 
 echo "  Tool categories:"
-echo "    • Agent Mail (9): am-register, am-inbox, am-send, am-reply, am-ack, ..."
+echo "    • Agent Registry (4): am-register, am-agents, am-whoami, am-delete-agent"
 echo "    • Browser (11): browser-start.js, browser-nav.js, browser-eval.js, ..."
 echo "    • Signal (2): jat-signal, jat-signal-validate"
 echo "    • Media (4+): gemini-image, gemini-edit, gemini-compose, avatar-generate"

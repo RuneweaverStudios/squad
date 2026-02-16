@@ -9,7 +9,7 @@
 #   verifying   - Emit signal only (agent does verification)
 #   committing  - Emit signal + git add/commit
 #   closing     - Emit signal + jt close
-#   releasing   - Emit signal + release all reservations
+#   releasing   - Emit signal + capture session log
 #
 # Options:
 #   --task <id>       Task ID (required)
@@ -47,7 +47,7 @@ Steps:
   verifying   - Emit signal only (agent does verification)
   committing  - Emit signal + git add/commit
   closing     - Emit signal + jt close
-  releasing   - Emit signal + release all reservations
+  releasing   - Emit signal + capture session log
   complete    - Generate completion bundle via LLM and emit complete signal
 
 Options:
@@ -79,7 +79,7 @@ get_step_config() {
             echo '50|["verifying","committing"]|["closing","releasing"]|Closing task in JAT'
             ;;
         releasing)
-            echo '75|["verifying","committing","closing"]|["releasing"]|Releasing file reservations'
+            echo '75|["verifying","committing","closing"]|["releasing"]|Capturing session log'
             ;;
         complete)
             # complete step doesn't emit completing signal - it emits the complete signal
@@ -87,7 +87,7 @@ get_step_config() {
             ;;
         *)
             log_error "Unknown step: $step"
-            log "Valid steps: verifying, committing, closing, releasing, complete"
+            log "Valid steps: verifying, committing, closing, releasing (session log), complete"
             exit 1
             ;;
     esac
@@ -244,21 +244,7 @@ EOF
                 log_dim "Session log capture skipped"
         fi
 
-        log_dim "Releasing file reservations..."
-        # Get all reservations for this agent and release them
-        reservations=$(am-reservations --agent "$AGENT_NAME" --json 2>/dev/null || echo "[]")
-
-        if [[ "$reservations" != "[]" && -n "$reservations" ]]; then
-            echo "$reservations" | jq -r '.[].path_pattern' | while read -r pattern; do
-                if [[ -n "$pattern" ]]; then
-                    am-release "$pattern" --agent "$AGENT_NAME" 2>/dev/null || true
-                    log_dim "  Released: $pattern"
-                fi
-            done
-            log_success "Reservations released"
-        else
-            log_dim "No reservations to release"
-        fi
+        log_dim "File declarations cleared by task close"
         ;;
 
     complete)

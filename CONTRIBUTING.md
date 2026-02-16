@@ -159,9 +159,9 @@ main "$@"
 
 Same template as generic tools, but include stack-specific dependencies and assumptions in the help text.
 
-### Agent Mail Tools
+### Agent Registry Tools
 
-Agent Mail tools (`mail/am-*`) follow a specific pattern:
+Agent Registry tools (`mail/am-*`) follow a specific pattern:
 
 ```bash
 #!/bin/bash
@@ -177,7 +177,6 @@ source "$(dirname "$0")/am-lib.sh"
 - `require_agent_name` - Validate agent registration
 - `query_db` - Execute SQLite queries safely
 - `log_info`, `log_error` - Consistent logging
-- `validate_pattern` - Check file glob patterns
 
 See `mail/am-lib.sh` for full API.
 
@@ -333,14 +332,13 @@ display_width("╔════════════════════�
 
 ### Integration Testing
 
-**For Agent Mail tools:**
+**For Agent Registry tools:**
 
 ```bash
 # Test workflow
 am-register --program test --model test-model
-am-reserve "test/**" --agent TestAgent --ttl 3600 --reason "testing"
-am-reservations --agent TestAgent
-am-release "test/**" --agent TestAgent
+am-whoami --agent TestAgent
+am-agents
 ```
 
 **For Browser tools:**
@@ -475,7 +473,7 @@ jat/
 ├── tools/                     # All executable tools
 │   ├── browser/              # Browser automation (browser-*.js)
 │   ├── core/                 # Core utilities (db-*, jt-*, etc.)
-│   ├── mail/                 # Agent Mail (am-*)
+│   ├── mail/                 # Agent Registry (am-*)
 │   ├── media/                # Image generation (gemini-*, avatar-*)
 │   ├── signal/               # JAT signal tools
 │   └── scripts/              # Installation & utilities
@@ -497,7 +495,7 @@ jat/
 │
 ├── shared/                    # Shared documentation
 │   ├── overview.md           # System overview
-│   ├── agent-registry.md     # Agent Registry docs (identity + file locks)
+│   ├── agent-registry.md     # Agent Registry docs (identity)
 │   └── ...                   # Other shared docs
 │
 ├── README.md                  # Main documentation
@@ -523,8 +521,8 @@ jt create "Add new tool: db-backup" \
   --priority 1 \
   --description "Create PostgreSQL backup tool with compression and rotation"
 
-# 3. Reserve files
-am-reserve "tools/db-backup" --agent DevAgent --ttl 3600 --reason "jat-123"
+# 3. Declare files on task
+jt update jat-123 --files "tools/db-backup"
 
 # 4. Develop tool
 vim tools/db-backup
@@ -541,8 +539,7 @@ vim README.md
 git add tools/db-backup README.md
 git commit -m "feat: add db-backup tool for PostgreSQL dumps"
 
-# 8. Release and complete
-am-release "tools/db-backup" --agent DevAgent
+# 8. Complete
 jt close jat-123 --reason "Completed: db-backup tool implemented"
 
 # 9. Push and create PR
@@ -568,22 +565,20 @@ npm install
 vim ARCH_LINUX_TEST_RESULTS.md
 ```
 
-### Testing Agent Mail Integration
+### Testing Agent Registry Integration
 
 ```bash
 # Register test agents
 am-register --program test1 --model dev
 am-register --program test2 --model dev
 
-# Test messaging
-am-send "Test" "Hello from test1" --from test1 --to test2
-am-inbox test2 --unread
+# Verify
+am-agents
+am-whoami --agent test1
 
-# Test file reservations
-am-reserve "src/**" --agent test1 --ttl 600 --exclusive --reason "testing"
-am-reserve "src/**" --agent test2 --ttl 600 --exclusive --reason "testing"  # Should fail
-am-reservations
-am-release "src/**" --agent test1
+# Clean up
+am-delete-agent test1 --force
+am-delete-agent test2 --force
 ```
 
 ---

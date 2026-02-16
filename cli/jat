@@ -1782,16 +1782,6 @@ cleanup_agents() {
                 fi
             fi
 
-            # Check 4: Does the agent have file reservations?
-            if [[ "$keep" == "false" ]] && command -v am-reservations &>/dev/null; then
-                local reservation_count
-                reservation_count=$(am-reservations --agent "$agent_name" --json 2>/dev/null | jq 'length' 2>/dev/null || echo "0")
-                if [[ "$reservation_count" -gt 0 ]]; then
-                    keep=true
-                    keep_reason="has $reservation_count file reservation(s)"
-                fi
-            fi
-
             if [[ "$keep" == "true" ]]; then
                 project_kept=$((project_kept + 1))
                 total_session_kept=$((total_session_kept + 1))
@@ -1907,16 +1897,6 @@ cleanup_agents() {
                     fi
                 fi
 
-                # Check 4: Does the agent have active file reservations?
-                if [[ "$keep" == "false" ]]; then
-                    local active_reservations
-                    active_reservations=$(sqlite3 "$db_path" "SELECT COUNT(*) FROM file_reservations WHERE agent_id = $agent_id AND released_ts IS NULL AND expires_ts > datetime('now')" 2>/dev/null || echo "0")
-                    if [[ "$active_reservations" -gt 0 ]]; then
-                        keep=true
-                        keep_reason="has $active_reservations active reservation(s)"
-                    fi
-                fi
-
                 if [[ "$keep" == "true" ]]; then
                     total_db_kept=$((total_db_kept + 1))
                     if $dry_run; then
@@ -1929,7 +1909,6 @@ cleanup_agents() {
                     else
                         # Delete agent and related records from Agent Mail database
                         sqlite3 "$db_path" "DELETE FROM message_recipients WHERE agent_id = $agent_id" 2>/dev/null
-                        sqlite3 "$db_path" "DELETE FROM file_reservations WHERE agent_id = $agent_id" 2>/dev/null
                         sqlite3 "$db_path" "DELETE FROM agents WHERE id = $agent_id" 2>/dev/null
                         echo -e "  ${RED}deleted${NC} $agent_name"
                     fi

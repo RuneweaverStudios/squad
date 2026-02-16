@@ -1,16 +1,18 @@
 # Agent Registry
 
-The Agent Registry is the coordination layer that prevents agents from stepping on each other. It provides identity management and advisory file reservations through lightweight bash tools backed by a SQLite database at `~/.agent-mail.db`.
+The Agent Registry is the coordination layer that gives agents persistent identities for multi-agent workflows. It provides identity management through lightweight bash tools backed by a SQLite database at `~/.agent-mail.db`.
 
 ## What it solves
 
-When multiple agents work on the same codebase simultaneously, they edit the same files and create conflicts. The Agent Registry fixes this with explicit agent identities and advisory file reservations (leases).
+When multiple agents work on the same codebase simultaneously, they need unique identities to coordinate. The Agent Registry provides explicit agent registration, identity lookup, and discovery.
+
+File declarations (which files an agent plans to edit) are managed through the task system via `jt update --files`, keeping coordination data alongside the task itself.
 
 The whole system runs as bash scripts. No servers, no sockets, no APIs. Just SQLite queries wrapped in CLI tools that any agent can call.
 
 ## Registering agents
 
-Before an agent can reserve files, it needs an identity:
+Before an agent can start work, it needs an identity:
 
 ```bash
 am-register --name CalmMeadow --program claude-code --model sonnet-4.5
@@ -25,53 +27,15 @@ am-whoami                # Shows current agent name
 am-agents                # Lists all registered agents
 ```
 
-## File reservations
+## File declarations
 
-File reservations are advisory locks that tell other agents "I'm working on these files." They dont block filesystem access. They just make conflicts visible before they happen.
-
-### Reserving files
+File declarations tell other agents which files you plan to edit. They are managed on the task itself via the `--files` flag on `jt update`:
 
 ```bash
-am-reserve "src/lib/auth/**/*.ts" \
-  --agent CalmMeadow \
-  --ttl 3600 \
-  --exclusive \
-  --reason "myproject-abc"
+jt update myproject-abc --status in_progress --assignee CalmMeadow --files "src/lib/auth/**/*.ts"
 ```
 
-| Option | Purpose |
-|--------|---------|
-| `--ttl` | Reservation expires after this many seconds |
-| `--exclusive` | No other agent can reserve overlapping files |
-| `--reason` | Usually the task ID, for traceability |
-
-The glob pattern follows standard shell globbing. Be specific to avoid locking too many files.
-
-### Checking reservations
-
-```bash
-# All active reservations
-am-reservations
-
-# Your reservations
-am-reservations --agent CalmMeadow
-```
-
-Before starting work, agents should check what files are already reserved:
-
-```bash
-am-reservations --json | jq '.[] | select(.agent != "CalmMeadow")'
-```
-
-### Releasing reservations
-
-When work is done, release the locks:
-
-```bash
-am-release "src/lib/auth/**/*.ts" --agent CalmMeadow
-```
-
-The `/jat:complete` command releases all reservations for the completing agent automatically.
+When a task is closed with `jt close`, its file declarations are automatically cleared.
 
 ## Cross-session context via memory
 
@@ -90,33 +54,26 @@ This approach is more reliable than real-time messaging because:
 # 1. Pick a task
 jt ready --json
 
-# 2. Reserve the files you plan to edit
-am-reserve "src/**/*.ts" --agent CalmMeadow --ttl 3600 --exclusive --reason "myproject-abc"
+# 2. Claim the task and declare files
+jt update myproject-abc --status in_progress --assignee CalmMeadow --files "src/**/*.ts"
 
 # 3. Do the work...
 
-# 4. Release files on completion
-am-release "src/**/*.ts" --agent CalmMeadow
+# 4. Close the task (auto-clears file declarations)
+jt close myproject-abc --reason "Completed"
 ```
-
-## Messaging tools (available, not required)
-
-The database also stores messages via `am-send`, `am-inbox`, `am-reply`, `am-ack`, and `am-search`. These messaging tools are available for manual coordination between agents but are **not used in standard workflows** (`/jat:start` and `/jat:complete` do not check or send messages).
-
-Agent memory (`.jat/memory/`) replaces messaging for cross-session context transfer.
 
 ## Common pitfalls
 
 | Error | Cause | Fix |
 |-------|-------|-----|
 | "from_agent not registered" | Agent identity not created | Run `am-register` first |
-| "FILE_RESERVATION_CONFLICT" | Another agent holds exclusive lock | Wait for expiry or adjust your glob pattern |
 
 A few rules that save headaches:
 
-- Keep reservation patterns as narrow as possible
-- Include the task ID in the reservation reason
-- The `/jat:complete` command releases all reservations automatically
+- Keep file declaration patterns as narrow as possible
+- Declare files when starting a task via `--files` on `jt update`
+- The `jt close` command clears file declarations automatically
 
 ## Tool reference
 
@@ -125,19 +82,7 @@ A few rules that save headaches:
 | `am-register` | Create agent identity |
 | `am-whoami` | Check current identity |
 | `am-agents` | List all agents |
-| `am-reserve` | Reserve files |
-| `am-release` | Release file reservations |
-| `am-reservations` | List active reservations |
-
-Messaging tools (available but not used in workflows):
-
-| Tool | Purpose |
-|------|---------|
-| `am-send` | Send a message |
-| `am-reply` | Reply to a message |
-| `am-inbox` | Check inbox |
-| `am-ack` | Acknowledge a message |
-| `am-search` | Search messages |
+| `am-delete-agent` | Remove an agent |
 
 Every tool supports `--help` for full usage details.
 

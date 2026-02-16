@@ -1,6 +1,6 @@
 ---
 name: jat-start
-description: Begin working on a JAT task. Registers agent identity, selects a task, searches memory, detects conflicts, reserves files, emits IDE signals, and starts work. Use this at the beginning of every JAT session.
+description: Begin working on a JAT task. Registers agent identity, selects a task, searches memory, detects conflicts, declares files, emits IDE signals, and starts work. Use this at the beginning of every JAT session.
 metadata:
   author: jat
   version: "1.0"
@@ -27,7 +27,7 @@ Add `quick` to skip conflict checks.
 2. **Select task** - From parameter or show recommendations
 3. **Search memory** - Surface context from past sessions
 4. **Review prior tasks** - Check for duplicates and related work
-5. **Start work** - Reserve files, update task status
+5. **Start work** - Declare files, update task status
 6. **Emit signals** - IDE tracks state through jat-signal
 
 ## Step-by-Step Instructions
@@ -116,18 +116,14 @@ Look for:
 ### STEP 6: Conflict Detection
 
 ```bash
-am-reservations --json          # Check file locks
 git diff-index --quiet HEAD --  # Check uncommitted changes
 ```
 
 ### STEP 7: Start the Task
 
 ```bash
-# Update task status
-jt update "$TASK_ID" --status in_progress --assignee "$AGENT_NAME"
-
-# Reserve files you'll edit
-am-reserve "relevant/files/**" --agent "$AGENT_NAME" --ttl 3600 --reason "$TASK_ID"
+# Update task status and declare files you'll edit
+jt update "$TASK_ID" --status in_progress --assignee "$AGENT_NAME" --files "relevant/files/**"
 ```
 
 ### STEP 8: Emit Signals

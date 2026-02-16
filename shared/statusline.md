@@ -100,8 +100,7 @@ All three sessions work independently with their own agent identities.
 **Priority Order:**
 1. **Agent Registration** - `.claude/sessions/agent-{session_id}.txt` exists?
 2. **Task in_progress** - `jt list --json | filter(assignee == agent && status == "in_progress")`
-3. **File Reservations** - `am-reservations --agent X | extract task ID from reason`
-4. **Idle State** - Agent registered but no work
+3. **Idle State** - Agent registered but no work
 
 **Git Display Colors:**
 
@@ -128,7 +127,6 @@ Example: `jat@master*` → blue `jat`, dim `@`, green `master`, red `*`
 | Issue | Cause | Fix |
 |-------|-------|-----|
 | Shows "idle" but I'm working | Task not marked `in_progress` | Run `jt update task-id --status in_progress` |
-| Shows wrong task | Old reservation from previous task | Release stale reservation with `am-release` |
 | Shows "no agent registered" | Session file missing | Run `/jat:start` to register |
 
 ### Why PPID-Based Session Tracking?

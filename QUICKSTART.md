@@ -38,7 +38,7 @@ curl -fsSL https://raw.githubusercontent.com/joewinke/jat/master/install.sh | ba
 
 **This symlinks all tools to `~/.local/bin/`:**
 - `jt-*` - JAT Tasks CLI
-- `am-*` - Agent Registry (13 commands)
+- `am-*` - Agent Registry (4 commands)
 - `browser-*` - Browser automation (11 commands)
 - `db-*` - Database tools (4 commands)
 - `jat-*` - JAT signals and launchers
@@ -351,8 +351,6 @@ jt dep add <task> <blocker>     # Add dependency
 ```bash
 am-whoami                       # Check your agent identity
 am-agents                       # List all registered agents
-am-inbox <agent> --unread       # Check messages
-am-send "Message" --to <agent>  # Send message
 ```
 
 ### Slash Commands (in Claude sessions)

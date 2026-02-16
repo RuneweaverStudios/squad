@@ -189,6 +189,6 @@ Do not add `.jat/` to your root `.gitignore`. The `.jat/.gitignore` file handles
 
 ## Next steps
 
-- [Agent Registry](/docs/agent-registry/) - Identity and file locks for multi-agent coordination
+- [Agent Registry](/docs/agent-registry/) - Agent identity for multi-agent coordination
 - [Workflow Commands](/docs/workflow-commands/) - How /jat:start and /jat:complete use JAT Tasks
 - [Sessions & Agents](/docs/sessions/) - The one-agent-one-task model

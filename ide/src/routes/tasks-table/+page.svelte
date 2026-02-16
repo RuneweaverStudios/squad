@@ -92,18 +92,11 @@
 		task?: string | null;
 		hasSession?: boolean;
 		in_progress_tasks?: number;
-		reservation_count?: number;
 		session_created_ts?: number | null;
-	}
-	interface TaskTableReservation {
-		agent_name: string;
-		path_pattern: string;
-		expires_ts: string;
 	}
 	let taskTableTasks = $state<TaskTableTask[]>([]);
 	let taskTableAllTasks = $state<TaskTableTask[]>([]);
 	let taskTableAgents = $state<TaskTableAgent[]>([]);
-	let taskTableReservations = $state<TaskTableReservation[]>([]);
 	let taskTableLoading = $state(true);
 	let taskTableError = $state<string | null>(null);
 	let taskTableDrawerOpen = $state(false);
@@ -402,27 +395,20 @@
 		}
 	}
 
-	async function fetchTaskTableAgentsAndReservations() {
+	async function fetchTaskTableAgents() {
 		try {
-			const [agentsRes, reservationsRes] = await Promise.all([
-				fetch('/api/agents'),
-				fetch('/api/reservations')
-			]);
+			const agentsRes = await fetch('/api/agents');
 			if (agentsRes.ok) {
 				const data = await agentsRes.json();
 				taskTableAgents = data.agents || [];
 			}
-			if (reservationsRes.ok) {
-				const data = await reservationsRes.json();
-				taskTableReservations = data.reservations || [];
-			}
 		} catch (err) {
-			console.error('Failed to fetch agents/reservations for TaskTable:', err);
+			console.error('Failed to fetch agents for TaskTable:', err);
 		}
 	}
 
 	async function fetchAllTaskTableData() {
-		await Promise.all([fetchTaskTableData(), fetchTaskTableAgentsAndReservations()]);
+		await Promise.all([fetchTaskTableData(), fetchTaskTableAgents()]);
 	}
 
 	function handleTaskTableTaskClick(taskId: string) {
@@ -1847,7 +1833,6 @@
 					tasks={taskTableTasks}
 					allTasks={taskTableAllTasks}
 					agents={taskTableAgents}
-					reservations={taskTableReservations}
 					{completedTasksFromActiveSessions}
 					{agentSessionInfo}
 					ontaskclick={handleTaskTableTaskClick}

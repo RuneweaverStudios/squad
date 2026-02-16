@@ -177,7 +177,6 @@ jt search "$SEARCH_TERM" --updated-after "$DATE_7_DAYS_AGO" --limit 20 --json
 ### STEP 6: Conflict Detection (skip with quick mode)
 
 ```bash
-am-reservations --json          # Check file locks
 git diff-index --quiet HEAD --  # Check uncommitted changes
 jt show "$TASK_ID" --json | jq -r '.[0].dependencies[]'  # Check deps
 ```
@@ -187,8 +186,7 @@ jt show "$TASK_ID" --json | jq -r '.[0].dependencies[]'  # Check deps
 ### STEP 7: Start Task
 
 ```bash
-jt update "$TASK_ID" --status in_progress --assignee "$AGENT_NAME"
-am-reserve "relevant/files/**" --agent "$AGENT_NAME" --ttl 3600 --reason "$TASK_ID"
+jt update "$TASK_ID" --status in_progress --assignee "$AGENT_NAME" --files "relevant/files/**"
 ```
 
 ---
@@ -467,8 +465,8 @@ Error: Task 'invalid-id' not found
 Use 'jt list' to see available tasks
 ```
 
-**Reservation conflict:**
+**File conflict:**
 ```
-⚠️ File conflict: src/**/*.ts reserved by OtherAgent (expires in 30 min)
-Options: Wait, contact OtherAgent, or choose different task
+⚠️ Files already claimed by another task: src/**/*.ts (task jat-xyz)
+Options: Choose different files, or pick a different task
 ```

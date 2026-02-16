@@ -80,7 +80,7 @@ fi
 echo ""
 echo "Tools:"
 TOOLS_OK=true
-for tool in am-register am-inbox am-send jt jat-signal; do
+for tool in am-register am-agents am-whoami jt jat-signal; do
     if command -v $tool &>/dev/null; then
         pass "$tool"
     else

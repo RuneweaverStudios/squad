@@ -7,10 +7,10 @@
  * @see docs/unified-agent-card-refactor-plan.md
  */
 
-import type { Agent, Task, Reservation, TokenUsage, AgentUsage, SparklinePoint } from './api.types';
+import type { Agent, Task, TokenUsage, AgentUsage, SparklinePoint } from './api.types';
 
 // Re-export core types for convenience
-export type { Agent, Task, Reservation, TokenUsage, AgentUsage, SparklinePoint };
+export type { Agent, Task, TokenUsage, AgentUsage, SparklinePoint };
 
 // =============================================================================
 // DISPLAY MODE TYPES
@@ -127,7 +127,6 @@ export interface UnifiedAgentCardProps {
 	// Optional data (mode determines what's used)
 	tasks?: Task[]; // For queue display
 	allTasks?: Task[]; // For conflict detection
-	reservations?: Reservation[]; // Agent's file reservations
 	output?: string; // Terminal output
 	lastCompletedTask?: Task; // For completion state
 	sparklineData?: SparklinePoint[];

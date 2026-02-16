@@ -6,7 +6,7 @@
 # Multi-line status display for agent orchestration workflows
 #
 # Line 1: Agent Name · [Priority] TaskIcon TaskID ⏲ ActiveTime  (NO WRAPPING)
-# Line 2: ▪▪▪▪▪▪▫▫▫▫ · ⎇ folder@branch · 🔒 N  📬 N  ⏱ Xm       (NO WRAPPING)
+# Line 2: ▪▪▪▪▪▪▫▫▫▫ · ⎇ folder@branch · 25%  ⛔ 3             (NO WRAPPING)
 # Line 3: 💬 Xm Last user prompt...                              (can wrap)
 #
 # Features:
@@ -20,11 +20,8 @@
 #   Context & Git (Line 2):
 #     5. Context remaining as battery bar (color-coded: >50% green, >25% yellow, <25% red)
 #     6. Git branch display: folder@branch (folder=blue, @=dim, branch=green, *=red)
-#     7. File lock count indicator (🔒N)
-#     8. Unread messages count (📬N)
-#     9. Time remaining on shortest lock (⏱Xm or Xh)
-#    10. Task progress percentage if available (N%)
-#    11. Blocked-by count (⛔N) - tasks waiting on current task
+#     7. Task progress percentage if available (N%)
+#     8. Blocked-by count (⛔N) - tasks waiting on current task
 #
 #   Last Prompt (Line 3):
 #    12. Last user prompt from transcript (truncated to 200 chars)
@@ -44,7 +41,7 @@
 #
 # Example output:
 #   GreatWind · [P1] 🔧 jat-4p0 ⏲ 1h23m
-#   ▪▪▪▪▪▪▫▫▫▫ · ⎇ jat@master* · 🔒 2  📬 1  ⏱ 45m
+#   ▪▪▪▪▪▪▫▫▫▫ · ⎇ jat@master*
 #   💬 12m yes implement top 3
 #
 #   chimaro · no agent registered (new session, run /jat:start)
@@ -157,7 +154,7 @@ regex_match() {
 # ============================================================================
 # CACHING LAYER
 # ============================================================================
-# Cache expensive queries (jt list, am-reservations, am-inbox) to reduce
+# Cache expensive queries (jt list) to reduce
 # statusline render latency from ~300ms to ~5ms for cached hits.
 #
 # Cache files stored in /tmp with TTL-based invalidation.
@@ -415,18 +412,12 @@ fi
 # ============================================================================
 # STATUS CALCULATION ALGORITHM
 # ============================================================================
-# Determines what task/status to display based on priority-based decision tree:
+# Determines what task/status to display:
 #
-# 1. Check JAT Tasks for in_progress tasks assigned to this agent (PRIORITY 1)
+# 1. Check JAT Tasks for in_progress tasks assigned to this agent
 #    - Source of truth for current work
-#    - Most accurate representation of agent state
 #
-# 2. Fall back to file reservations if no in_progress task found (PRIORITY 2)
-#    - Extract task ID from reservation reason field
-#    - Lookup task details in JAT Tasks
-#    - Handles case where agent has locks but forgot to update JAT Tasks
-#
-# 3. If neither found, show "idle" state
+# 2. If no in_progress task found, show "idle" state
 #
 # See CLAUDE.md "Status Calculation Algorithm" section for full decision tree
 # ============================================================================
@@ -459,74 +450,10 @@ if command -v jt &>/dev/null; then
     fi
 fi
 
-# Priority 2: Fall back to file reservations if no in_progress task found
-if [[ -z "$task_id" ]] && command -v am-reservations &>/dev/null; then
-    # Get the most recent reservation for this agent and extract task ID from reason (cached)
-    reservations_cache_key="${agent_name}-reservations"
-    reservation_info=$(cache_get_or_run "$reservations_cache_key" "am-reservations --agent '$agent_name'")
-
-    if [[ -n "$reservation_info" ]]; then
-        # Extract task ID from reason field (format: "task-id: description" or just "task-id")
-        # Dynamic project prefix: extract from cwd (e.g., /home/jw/code/chimaro -> chimaro-xxx)
-        project_prefix=$(basename "$cwd")
-        task_id=$(echo "$reservation_info" | grep "^Reason:" | sed 's/^Reason: //' | grep -oE "${project_prefix}-[a-z0-9]{3}\b" | head -1)
-
-        # If we found a task ID from reservation, get its details from JAT Tasks
-        if [[ -n "$task_id" ]] && command -v jt &>/dev/null; then
-            task_json=$(jt show "$task_id" --json 2>/dev/null)
-            task_priority=$(echo "$task_json" | jq -r '.[0].priority // empty')
-            task_progress=$(echo "$task_json" | jq -r '.[0].progress // empty')
-            task_type=$(echo "$task_json" | jq -r '.[0].issue_type // empty')
-            task_updated_at=$(echo "$task_json" | jq -r '.[0].updated_at // empty')
-        fi
-    fi
-fi
-
 # Get additional status indicators
 lock_count=0
 unread_count=0
 time_remaining=""
-
-if [[ -n "$agent_name" ]]; then
-    # Count file locks (reuse cached reservation_info if available, otherwise cache it)
-    if command -v am-reservations &>/dev/null; then
-        # Reuse cached reservations from earlier, or fetch if not set
-        if [[ -z "$reservation_info" ]]; then
-            reservations_cache_key="${agent_name}-reservations"
-            reservation_info=$(cache_get_or_run "$reservations_cache_key" "am-reservations --agent '$agent_name'")
-        fi
-
-        lock_count=$(echo "$reservation_info" | grep -c "^ID:" 2>/dev/null || echo "0")
-        lock_count=$(echo "$lock_count" | tr -d '\n' | tr -d ' ')  # Clean up output
-
-        # Calculate time remaining on shortest lock
-        if [[ "$lock_count" != "0" ]] && [[ $lock_count -gt 0 ]]; then
-            expires=$(echo "$reservation_info" | grep "^Expires:" | head -1 | sed 's/^Expires: //')
-            if [[ -n "$expires" ]]; then
-                expires_epoch=$(parse_date_to_epoch "$expires")
-                now_epoch=$(date +%s)
-                seconds_remaining=$((expires_epoch - now_epoch))
-
-                if [[ $seconds_remaining -gt 0 ]]; then
-                    minutes_remaining=$((seconds_remaining / 60))
-                    if [[ $minutes_remaining -lt 60 ]]; then
-                        time_remaining="${minutes_remaining}m"
-                    else
-                        hours_remaining=$((minutes_remaining / 60))
-                        time_remaining="${hours_remaining}h"
-                    fi
-                fi
-            fi
-        fi
-    fi
-
-    # Count unread messages (using --count for efficiency, cached)
-    if command -v am-inbox &>/dev/null; then
-        inbox_cache_key="${agent_name}-inbox-count"
-        unread_count=$(cache_get_or_run "$inbox_cache_key" "am-inbox '$agent_name' --unread --count")
-        unread_count=$(echo "$unread_count" | tr -d '\n' | tr -d ' ')  # Clean up output
-    fi
-fi
 
 # Count tasks blocked by current task (shows impact/leverage of current work)
 blocked_count=0
@@ -605,9 +532,9 @@ esac
 # Thresholds from: ide/src/lib/config/constants.ts → AGENT_STATUS_THRESHOLDS
 #
 # Status priority order:
-#   1. working - Has active task OR file locks (agent is engaged)
+#   1. working - Has active task (agent is engaged)
 #   2. live    - Very recent activity (< 1 minute) without active work
-#   3. active  - Recent activity (< 10 minutes) or has locks within 1 hour
+#   3. active  - Recent activity (< 10 minutes)
 #   4. idle    - Within 1 hour but not active
 #   5. offline - Over 1 hour or never active
 # ============================================================================
@@ -625,13 +552,11 @@ agent_status_icon="⏻"
 agent_status_color="${DIM}"
 
 has_in_progress_task=false
-has_active_locks=false
 
 [[ -n "$task_id" ]] && has_in_progress_task=true
-[[ $lock_count -gt 0 ]] && has_active_locks=true
 
-# Priority 1: WORKING - Has active task or file locks
-if [[ "$has_in_progress_task" == "true" ]] || [[ "$has_active_locks" == "true" ]]; then
+# Priority 1: WORKING - Has active task
+if [[ "$has_in_progress_task" == "true" ]]; then
     agent_status="WORKING"
     agent_status_icon="⚙"
     agent_status_color="${YELLOW}"
@@ -739,9 +664,6 @@ fi
 # ============================================================================
 # Dynamic color coding based on severity/urgency:
 #
-# 🔒 File Locks: Cyan (1-2) → Yellow (3-5) → Red (>5)
-# 📬 Messages:   Cyan (1-5) → Yellow (6-15) → Red (>15)
-# ⏱ Time Left:  Green (>30min) → Yellow (10-30min) → Red (<10min)
 # 📊 Progress:   Red (<25%) → Yellow (25-75%) → Green (>75%)
 # ⛔ Blocked:    Cyan (1-2) → Yellow (3-5) → Red (>5) - tasks waiting on this
 # 🕐 Activity:   Green (<15m) → Yellow (15-60m) → Red (>60m stale)
@@ -751,53 +673,6 @@ fi
 
 # Build indicators section (for line 2)
 indicators=""
-
-# Add lock count (dynamic: cyan=1-2, yellow=3-5, red=>5)
-if [[ $lock_count -gt 0 ]]; then
-    if [[ $lock_count -gt 5 ]]; then
-        lock_color="${RED}"
-    elif [[ $lock_count -gt 2 ]]; then
-        lock_color="${YELLOW}"
-    else
-        lock_color="${CYAN}"
-    fi
-    indicators="${indicators}${lock_color}🔒 ${lock_count}${RESET}"
-fi
-
-# Add unread messages (dynamic: cyan=1-5, yellow=6-15, red=>15)
-if [[ $unread_count -gt 0 ]]; then
-    [[ -n "$indicators" ]] && indicators="${indicators}  "
-    if [[ $unread_count -gt 15 ]]; then
-        msg_color="${RED}"
-    elif [[ $unread_count -gt 5 ]]; then
-        msg_color="${YELLOW}"
-    else
-        msg_color="${CYAN}"
-    fi
-    indicators="${indicators}${msg_color}📬 ${unread_count}${RESET}"
-fi
-
-# Add time remaining (dynamic: green=>30m, yellow=10-30m, red=<10m)
-if [[ -n "$time_remaining" ]]; then
-    [[ -n "$indicators" ]] && indicators="${indicators}  "
-
-    # Extract minutes from time_remaining (format: "45m" or "2h")
-    time_minutes=0
-    if regex_match "$time_remaining" "([0-9]+)h"; then
-        time_minutes=$((REGEX_MATCH * 60))
-    elif regex_match "$time_remaining" "([0-9]+)m"; then
-        time_minutes=$REGEX_MATCH
-    fi
-
-    if [[ $time_minutes -gt 30 ]]; then
-        time_color="${GREEN}"
-    elif [[ $time_minutes -gt 10 ]]; then
-        time_color="${YELLOW}"
-    else
-        time_color="${RED}"
-    fi
-    indicators="${indicators}${time_color}⏱ ${time_remaining}${RESET}"
-fi
 
 # Add progress if available (dynamic: red=<25%, yellow=25-75%, green=>75%)
 if [[ -n "$task_progress" ]] && [[ "$task_progress" != "null" ]]; then

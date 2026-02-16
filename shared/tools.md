@@ -7,7 +7,7 @@
 ```
 tools/
 ├── core/         # Database, monitoring, credentials, task review, skills (18 tools)
-├── mail/         # Agent Registry (identity, file locks, messaging)
+├── mail/         # Agent Registry (identity)
 ├── browser/      # Browser automation via CDP (12 tools)
 ├── media/        # Image generation with Gemini (7 tools)
 ├── scheduler/    # Task scheduling daemon (cron + one-shot spawning)
@@ -17,28 +17,17 @@ tools/
 
 ---
 
-### Agent Registry (14 tools)
-
-**Core tools (used in workflows):**
+### Agent Registry (4 tools)
 
 | Tool | Purpose | Key Options |
 |------|---------|-------------|
 | `am-register` | Create agent identity | `--name X --program claude-code` |
 | `am-agents` | List agents | (no args) |
 | `am-whoami` | Current identity | `--agent X` |
-| `am-reserve` | Lock files | `"glob/**" --agent X --ttl 3600 --reason "task-id"` |
-| `am-release` | Unlock files | `"glob/**" --agent X` |
-| `am-reservations` | List locks | `--agent X` |
+| `am-delete-agent` | Remove agent | `AGENT_NAME [--force]` |
 
-**Messaging tools (available, not required in workflows):**
-
-| Tool | Purpose | Key Options |
-|------|---------|-------------|
-| `am-inbox` | Check messages | `--unread`, `--hide-acked`, `--thread X` |
-| `am-send` | Send message | `--from X --to Y --thread Z` |
-| `am-reply` | Reply to message | `am-reply MSG_ID "text" --agent X` |
-| `am-ack` | Acknowledge message | `am-ack MSG_ID --agent X` |
-| `am-search` | Search messages | `"query" --thread X` |
+> **Note:** File declarations are managed via `jt update --files "glob/**"` on the task itself.
+> Files are auto-cleared when the task is closed.
 
 ---
 
@@ -231,7 +220,7 @@ jat-step <step> --task <id> --title <title> --agent <name> [--type <type>]
 | `verifying` | Emit only (agent does verification) | completing (0%) |
 | `committing` | git add + commit | completing (25%) |
 | `closing` | jt close | completing (50%) |
-| `releasing` | am-release all | completing (75%) |
+| `releasing` | Capture session log | completing (75%) |
 | `complete` | Generate bundle + emit complete signal | complete (100%) |
 
 **Requires:** `ANTHROPIC_API_KEY` environment variable (for `complete` step)
@@ -240,11 +229,11 @@ jat-step <step> --task <id> --title <title> --agent <name> [--type <type>]
 
 ### Quick Patterns
 
-**Reserve → Work → Release:**
+**Declare files → Work → Close (auto-clears):**
 ```bash
-am-reserve "src/**/*.ts" --agent $AGENT_NAME --ttl 3600 --reason "task-123"
+jt update task-123 --status in_progress --assignee $AGENT_NAME --files "src/**/*.ts"
 # ... work ...
-am-release "src/**/*.ts" --agent $AGENT_NAME
+jt close task-123 --reason "Completed"  # files auto-cleared
 ```
 
 ### More Info

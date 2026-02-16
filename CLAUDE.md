@@ -2,7 +2,7 @@
 
 Lightweight bash tools for agent orchestration, database operations, monitoring, development, and browser automation.
 
-@~/code/jat/shared/overview.md
+@~/code/jat/AGENTS.md
 @~/code/jat/shared/agent-registry.md
 @~/code/jat/shared/bash-patterns.md
 @~/code/jat/shared/tasks.md
@@ -13,11 +13,11 @@ Lightweight bash tools for agent orchestration, database operations, monitoring,
 @~/code/jat/shared/agent-programs.md
 @~/code/jat/shared/scheduler.md
 
-<!-- NOTE: Agent-execution docs (signals.md, workflow-commands.md, statusline.md,
-     suggested-tasks.md) are NOT imported here. They're embedded in the command
-     files (/jat:start.md, /jat:complete.md) which load on-demand when agents
-     invoke those commands. This CLAUDE.md is for developers working on jat
-     source code, not for agents executing workflows. -->
+<!-- NOTE: AGENTS.md is the canonical agent workflow instructions (replaces
+     shared/overview.md for this repo). Other projects still import
+     shared/overview.md via their own CLAUDE.md.
+     Detailed workflow steps are in command files (/jat:start.md,
+     /jat:complete.md) which load on-demand when agents invoke those commands. -->
 
 
 ## Project Structure

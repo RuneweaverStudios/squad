@@ -392,7 +392,7 @@ async function executeCreateTask(
 	return result;
 }
 
-/** Send Message: run am-send */
+/** Send Message: deprecated (am-send was removed) */
 async function executeSendMessage(
 	node: WorkflowNode,
 	input: unknown,
@@ -401,24 +401,8 @@ async function executeSendMessage(
 	const config = node.config as ActionSendMessageConfig;
 	const message = substituteVariables(config.message, input, ctx);
 
-	ctx.log(node.id, `Send message to ${config.recipient}: "${message.slice(0, 80)}..."`);
-
-	if (ctx.dryRun) {
-		return { dryRun: true, recipient: config.recipient, message };
-	}
-
-	const args = [
-		'--from',
-		'workflow',
-		'--to',
-		config.recipient,
-		'--thread',
-		`workflow-${ctx.workflowId}`,
-		message
-	];
-
-	const result = await execCommand('am-send', args, process.cwd());
-	return result;
+	ctx.log(node.id, `[DEPRECATED] Send message action skipped - am-send was removed. Recipient: ${config.recipient}`);
+	return { skipped: true, reason: 'am-send removed', recipient: config.recipient, message };
 }
 
 /** Run Bash: execute a shell command */

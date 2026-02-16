@@ -282,7 +282,7 @@ fi
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}Step 1/9: Installing Agent Mail (bash + SQLite)${NC}"
+echo -e "${BOLD}Step 1/9: Installing Agent Registry (bash + SQLite)${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
@@ -494,7 +494,7 @@ echo -e "${GREEN}╚────────────────────
 echo ""
 echo "What was installed:"
 echo ""
-echo "  ✓ Agent Mail (14 bash/SQLite tools: am-register, am-send, am-inbox, etc.)"
+echo "  ✓ Agent Registry (4 bash/SQLite tools: am-register, am-agents, am-whoami, am-delete-agent)"
 echo "  ✓ JAT Task CLI (jt command + 4 review tools)"
 echo "  ✓ Browser Tools (12 CDP automation tools: browser-*.js)"
 echo "  ✓ Database Tools (4 tools: db-query, db-schema, etc.)"
@@ -509,7 +509,7 @@ if [ "$INSTALL_PI_SKILLS" = "yes" ]; then
     echo "  ✓ Pi Skills (jat-start, jat-complete, jat-verify + AGENTS.md)"
 fi
 echo "  ✓ Multi-line statusline (agent, task, git, context)"
-echo "  ✓ Real-time hooks (auto-refresh on am-*/jt commands)"
+echo "  ✓ Real-time hooks (auto-refresh on jt/am-* commands)"
 echo "  ✓ Git pre-commit hook (agent registration check)"
 echo "  ✓ Global ~/.claude/CLAUDE.md (multi-project instructions)"
 echo "  ✓ Per-repo setup (jt init, CLAUDE.md templates)"

@@ -527,27 +527,13 @@ argument-hint: [task-id]
 2. **Validate State** - Ensure preconditions are met
 3. **Perform Action** - Main operation
 4. **Emit Signal** - Update IDE state
-5. **Coordinate** - Update JAT Tasks, reservations, send messages
+5. **Coordinate** - Update JAT Tasks, send messages
 
 ---
 
 ## Implementation Steps
 
-### STEP 1: Check Agent Mail
-
-**ALWAYS check mail before starting any coordination action.**
-
-\`\`\`bash
-am-inbox "$AGENT_NAME" --unread
-\`\`\`
-
-- Read each message
-- Reply if needed (\`am-reply\`)
-- Acknowledge after reading: \`am-ack {msg_id} --agent "$AGENT_NAME"\`
-
----
-
-### STEP 2: Validate Preconditions
+### STEP 1: Validate Preconditions
 
 \`\`\`bash
 # Check if we have an active agent
@@ -592,16 +578,8 @@ Available signals:
 ### STEP 5: Coordinate
 
 \`\`\`bash
-# Update task
-jt update task-id --status in_progress --assignee "$AGENT_NAME"
-
-# Reserve files
-am-reserve "src/**/*.ts" --agent "$AGENT_NAME" --ttl 3600 --reason "task-id"
-
-# Announce
-am-send "[task-id] Starting: Task Title" \\
-  "Brief message" \\
-  --from "$AGENT_NAME" --to @active --thread "task-id"
+# Update task, declare files, and assign
+jt update task-id --status in_progress --assignee "$AGENT_NAME" --files "src/**/*.ts"
 \`\`\`
 
 ---

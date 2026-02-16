@@ -977,22 +977,10 @@ test('extracts project from task ID', () => {
 **Rationale:**
 - Agents are globally unique (one agent name across all projects)
 - Cross-project coordination is common (deployments, infrastructure, team broadcasts)
-- Splitting inbox by project would make agents miss important messages
-- Thread filtering (--thread) provides sufficient focus when needed
+**Note:** Agent messaging (am-send, am-inbox) was removed in the reservation-to-jt migration.
+The inbox API endpoint has been deleted. Agent coordination now happens via task assignments and memory.
 
-**Implementation:**
-```javascript
-// API: ide/src/routes/api/agents/[name]/inbox/+server.js
-const command = `am-inbox "${agentName}" --json`;  // No --project flag
-```
-
-**For developers:**
-- Do NOT add project filtering to agent inbox API
-- Agents see ALL messages regardless of project context
-- Use thread filtering (`--thread task-id`) for focused message view
-- See `ide/docs/inbox-filtering-decision.md` for full analysis
-
-**Task:** jat-xkr - Resolved 2025-11-21 by SharpIsle
+**Task:** jat-xkr - Resolved 2025-11-21 by SharpIsle (messaging later removed in jat-8vpc9)
 
 ## Claude API Usage Metrics
 

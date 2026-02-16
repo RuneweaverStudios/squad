@@ -23,8 +23,8 @@ db-query "SELECT COUNT(*) as agent_count FROM agents"
 # List recent messages
 db-query "SELECT id, subject, from_agent, created_at FROM messages ORDER BY created_at DESC LIMIT 5"
 
-# Find file reservations
-db-query "SELECT pattern, agent_name, expires_at FROM file_reservations WHERE released_at IS NULL"
+# Find active agents
+db-query "SELECT name, program, model FROM agents ORDER BY created_at DESC LIMIT 5"
 ```
 
 The output is always a JSON array, even for single-row results. This makes it easy to pipe into `jq` for further processing:
@@ -41,7 +41,7 @@ Shows the structure of all tables in the database. Useful when you need to under
 db-schema
 ```
 
-This outputs CREATE TABLE statements for every table in the Agent Registry database, including `agents`, `messages`, `projects`, `file_reservations` and others.
+This outputs CREATE TABLE statements for every table in the Agent Registry database, including `agents`, `messages`, `projects`, and others.
 
 ## db-sessions
 
@@ -68,7 +68,6 @@ The primary database is `~/.agent-mail.db`, a SQLite file created during install
 - **agents** - Registered agent identities (name, program, model)
 - **messages** - All agent-to-agent communication
 - **projects** - Project registry
-- **file_reservations** - Advisory file locks with TTL
 - **acknowledgments** - Message read receipts
 
 You can query it directly with standard `sqlite3` if you prefer:

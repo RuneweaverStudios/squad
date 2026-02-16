@@ -120,16 +120,6 @@ WHERE mr.agent_id = (SELECT id FROM agents WHERE project_id = $PROJECT_ID AND na
 SQL
 )
 
-# Count active reservations
-RESERVATION_COUNT=$(sqlite3 "$AGENT_MAIL_DB" <<SQL
-SELECT COUNT(*)
-FROM file_reservations fr
-WHERE fr.agent_id = (SELECT id FROM agents WHERE project_id = $PROJECT_ID AND name = '$AGENT_NAME')
-  AND fr.released_ts IS NULL
-  AND datetime(fr.expires_ts) > datetime('now');
-SQL
-)
-
 if [[ "$JSON_OUTPUT" == "true" ]]; then
     AGENT_ID=$(echo "$AGENT_INFO" | jq -r '.[0].id')
     AGENT_PROGRAM=$(echo "$AGENT_INFO" | jq -r '.[0].program')
@@ -155,8 +145,7 @@ if [[ "$JSON_OUTPUT" == "true" ]]; then
     "path": "$PROJECT_PATH"
   },
   "stats": {
-    "unread_messages": $UNREAD_COUNT,
-    "active_reservations": $RESERVATION_COUNT
+    "unread_messages": $UNREAD_COUNT
   },
   "database": "$AGENT_MAIL_DB"
 }
@@ -178,7 +167,6 @@ else
     echo ""
     echo "Status:"
     echo "  Unread messages: $UNREAD_COUNT"
-    echo "  Active reservations: $RESERVATION_COUNT"
     echo ""
     echo "Database: $AGENT_MAIL_DB"
 fi

@@ -1,27 +1,28 @@
 # JAT Agent Instructions
 
+<!-- This is the canonical source for agent workflow instructions.
+     It is imported by CLAUDE.md (for Claude Code agents) and read directly
+     by other agent programs (Pi, Codex, Gemini, OpenCode, Aider).
+     Keep this file self-contained - no @import syntax. -->
+
 You are running as part of a **multi-agent development system** called JAT (Jomarchy Agent Tools). This system enables parallel, coordinated work across codebases using multiple AI coding agents.
 
 ## Quick Start
 
 ```bash
-# Start a session (pick a task)
-/skill:jat-start
-
-# Start a specific task
-/skill:jat-start jat-abc123
-
-# Complete your task
-/skill:jat-complete
-
-# Verify in browser
-/skill:jat-verify
+/jat:start                 # Start a session (pick a task)
+/jat:start jat-abc123      # Start a specific task
+/jat:complete              # Complete your task
+/jat:verify                # Verify in browser
 ```
+
+> **Command prefix:** Claude Code uses `/jat:` commands. Other agents (Pi, Codex, Gemini, etc.)
+> use `/skill:jat-` skills. The behavior is identical.
 
 ## Core Principles
 
 1. **One agent = one session = one task** - Each session handles exactly one task
-2. **File reservations prevent conflicts** - Always reserve before editing shared files
+2. **File declarations prevent conflicts** - Declare files when starting a task via `--files`
 3. **Memory coordinates work** - Past session context surfaces via `.jat/memory/`
 4. **JAT Tasks is the task queue** - Pick from ready work, update status, close when done
 5. **Signals track your state** - The IDE monitors agents through `jat-signal`
@@ -71,9 +72,9 @@ jt create "Child task" --type task --priority 2
 jt dep add epic-id child-id
 ```
 
-## Agent Registry (Identity + File Locks)
+## Agent Registry (Identity)
 
-Agent identities and file locks for multi-agent coordination. All tools are in `~/.local/bin/`.
+Agent identities for multi-agent coordination. All tools are in `~/.local/bin/`.
 
 ```bash
 # Identity
@@ -81,13 +82,11 @@ am-register --name AgentName --program pi --model sonnet
 am-whoami
 am-agents                                         # List all agents
 
-# File Reservations (prevent conflicts)
-am-reserve "src/**/*.ts" --agent AgentName --ttl 3600 --reason "task-id"
-am-release "src/**/*.ts" --agent AgentName
-am-reservations --json                            # List all locks
+# File Declarations (prevent conflicts) - via jt on the task itself
+jt update task-id --status in_progress --assignee AgentName --files "src/**/*.ts"
 ```
 
-Messaging tools (`am-send`, `am-inbox`, `am-reply`, `am-ack`, `am-search`) are available but not required in workflows.
+Cross-session context is handled by agent memory (`.jat/memory/`).
 
 ## Signals (IDE State Tracking)
 
@@ -115,14 +114,14 @@ jat-signal review '{"taskId":"ID","taskTitle":"TITLE","summary":["ITEM1","ITEM2"
 Spawn agent
     |
     v
- STARTING   /skill:jat-start
+ STARTING   /jat:start
     | jat-signal working
     v
  WORKING  <--> NEEDS INPUT
     | jat-signal review
     v
  REVIEW     Work done, awaiting user
-    | /skill:jat-complete
+    | /jat:complete
     v
  COMPLETE   Task closed, session ends
 ```
@@ -135,7 +134,7 @@ When finishing work:
 
 1. Emit `review` signal
 2. Show "READY FOR REVIEW" with summary
-3. Wait for user to run `/skill:jat-complete`
+3. Wait for user to run `/jat:complete`
 4. Complete handles: mail check, verify, commit, close, release, announce
 
 **Never say "Task Complete" until `jt close` has run.**
@@ -168,9 +167,6 @@ All tools are bash commands in `~/.local/bin/`. Every tool has `--help`.
 | `am-register` | Create agent identity |
 | `am-agents` | List agents |
 | `am-whoami` | Current identity |
-| `am-reserve` | Lock files |
-| `am-release` | Unlock files |
-| `am-reservations` | List locks |
 
 ### Signals
 | Tool | Purpose |
@@ -214,8 +210,8 @@ git commit -m "feat(jat-abc): Implement new endpoint"
 
 ## Key Behaviors
 
-- **Reserve files before editing** - prevents stepping on other agents
-- **Use task IDs everywhere** - reservation reason, commits, memory entries
+- **Declare files when starting task** - use `--files` on `jt update` to prevent conflicts
+- **Use task IDs everywhere** - commits, memory entries
 - **Update task status** - `in_progress` when working, `closed` when done
 - **Emit signals in order** - starting -> working -> review -> complete
 - **Push to remote** - work is NOT complete until `git push` succeeds

@@ -310,22 +310,20 @@ jat-abc           (epic)
 
 Recommended conventions
 - **Single source of truth**: Use **JAT Tasks** for task status/priority/dependencies.
-- **Reservations**: When starting a task, use `am-reserve` for the affected paths; include the task id in the `--reason` and release on completion with `am-release`.
+- **File declarations**: When starting a task, declare files via `--files` on `jt update`. Files are auto-cleared on `jt close`.
 - **Memory**: Context transfers between sessions via `.jat/memory/` entries, not messaging.
 
 Typical flow (agents)
 1) **Pick ready work** (JAT Tasks)
    - `jt ready --json` → choose one item (highest priority, no blockers)
-2) **Reserve edit surface** (Agent Registry)
-   - `am-reserve src/**/*.ts --agent AgentName --ttl 3600 --exclusive --reason "jat-123"`
+2) **Start task and declare files**
+   - `jt update jat-123 --status in_progress --assignee AgentName --files "src/**/*.ts"`
 3) **Work on task**
-   - Update task status, commit regularly
-4) **Complete and release**
-   - `jt close jat-123 --reason "Completed"`
-   - `am-release src/**/*.ts --agent AgentName`
+   - Commit regularly
+4) **Complete**
+   - `jt close jat-123 --reason "Completed"` (files auto-cleared)
    - Memory entry written automatically by `/jat:complete`
 
 Mapping cheat-sheet
-- **File reservation `reason`**: task ID
 - **Commit messages**: include task ID for traceability
 - **Memory files**: `{date}-{taskId}-{slug}.md` in `.jat/memory/`

@@ -151,7 +151,7 @@ curl http://localhost:3333/api/transcribe
 | `am-whoami` fails | Database not initialized | Run `bash ~/code/jat/tools/scripts/install-agent-mail.sh` |
 | `jt: command not found` | Task CLI not installed | Run `./install.sh` to create symlinks |
 | `NOT IN TMUX SESSION` | Claude started outside tmux | Exit and restart with launcher function |
-| `FILE_RESERVATION_CONFLICT` | Another agent holds the lock | Wait for TTL expiry or use non-exclusive |
+| File conflict | Another agent declared the same files | Check `jt show` for file declarations, coordinate |
 | `from_agent not registered` | Agent didnt run am-register | Run `/jat:start` to auto-register |
 | IDE shows blank page | Dependencies missing | Run `cd ~/code/jat/ide && npm install` |
 | Broken symlinks | Stale installation | Run `./install.sh` to refresh |
