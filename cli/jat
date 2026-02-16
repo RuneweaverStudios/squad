@@ -1627,11 +1627,27 @@ ensure_project_dbs() {
         done
     fi
 
+    # Pass 3: Schema migrations on all existing databases
+    local schema_migrated=0
+    for db in "$HOME"/code/*/.jat/tasks.db; do
+        [[ -f "$db" ]] || continue
+        # v2: add reserved_files column (jat-8vpc9)
+        local has_rf
+        has_rf="$(sqlite3 "$db" "PRAGMA table_info(tasks);" | grep -c 'reserved_files' || true)"
+        if [[ "$has_rf" == "0" ]]; then
+            sqlite3 "$db" "ALTER TABLE tasks ADD COLUMN reserved_files TEXT;"
+            schema_migrated=$((schema_migrated + 1))
+        fi
+    done
+
     if [[ $initialized -gt 0 ]]; then
         echo -e "  ${DIM}Initialized $initialized project database(s)${NC}"
     fi
     if [[ $migrated -gt 0 ]]; then
         echo -e "  ${DIM}Migrated $migrated project(s) from legacy format${NC}"
+    fi
+    if [[ $schema_migrated -gt 0 ]]; then
+        echo -e "  ${DIM}Updated $schema_migrated database schema(s)${NC}"
     fi
 }
 

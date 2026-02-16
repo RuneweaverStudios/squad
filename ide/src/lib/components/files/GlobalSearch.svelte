@@ -1,9 +1,10 @@
 <script lang="ts">
 	/**
-	 * GlobalSearch - Content search modal (Ctrl+Shift+F)
+	 * GlobalSearch - Content + filename search modal (Ctrl+Shift+F)
 	 *
 	 * Features:
 	 * - Search file CONTENTS across project (grep-style)
+	 * - Also searches FILENAMES and shows matching files at the top
 	 * - Regex toggle for pattern matching
 	 * - File type filter (glob patterns)
 	 * - Results show file, line number, content with context

@@ -74,10 +74,12 @@ export async function handleApiError(response: Response, context: string): Promi
 
 	try {
 		const data = await response.json();
-		if (data.error) {
-			errorMessage = data.error;
-		} else if (data.message) {
+		// Prefer data.message (the human-readable string) over data.error
+		// which is often just boolean `true` in our API responses
+		if (data.message && typeof data.message === 'string') {
 			errorMessage = data.message;
+		} else if (data.error && typeof data.error === 'string') {
+			errorMessage = data.error;
 		}
 	} catch {
 		// Response wasn't JSON, use status text
@@ -202,7 +204,9 @@ export function formatBulkResultMessage(result: BulkOperationResult, itemName: s
 		return `Failed to process any ${itemName}s: ${result.errors[0] || 'Unknown error'}`;
 	}
 
-	return `Processed ${result.successCount} ${itemName}${plural}, ${result.failCount} failed`;
+	// Include first error detail so users know WHY it failed
+	const errorDetail = result.errors[0] ? `: ${result.errors[0]}` : '';
+	return `Processed ${result.successCount} ${itemName}${plural}, ${result.failCount} failed${errorDetail}`;
 }
 
 /**
