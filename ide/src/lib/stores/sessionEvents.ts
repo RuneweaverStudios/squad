@@ -324,12 +324,18 @@ export function cancelAutoKill(sessionName: string): void {
 		});
 		console.log(`[AutoKill] Cancelled scheduled kill for ${sessionName}`);
 
-		// Extract agent name from session name (e.g., "jat-AgentName" -> "AgentName")
+		// Extract agent name and task context from session
 		const agentName = sessionName.startsWith('jat-') ? sessionName.slice(4) : sessionName;
+		const session = workSessionsState.sessions.find(s => s.sessionName === sessionName);
+		const taskId = session?.task?.id;
+		const projectId = taskId ? taskId.split('-')[0] : undefined;
 		addToast({
 			message: `Auto-kill cancelled for ${agentName}`,
 			type: 'info',
-			duration: 2000 // Brief feedback - 2 seconds
+			duration: 2000, // Brief feedback - 2 seconds
+			projectId,
+			taskId: taskId || undefined,
+			route: taskId ? `/tasks?taskDetailDrawer=${taskId}` : '/work',
 		});
 	}
 }
@@ -405,10 +411,15 @@ async function scanAndPauseIdleSessions(): Promise<void> {
 
 			if (response.ok) {
 				console.log(`[AutoPauseIdle] Successfully paused ${sessionName}`);
+				const projectId = taskId !== 'unknown' ? taskId.split('-')[0] : undefined;
 				addToast({
 					message: `Auto-paused idle session ${agentName}`,
 					type: 'info',
-					duration: 3000
+					duration: 3000,
+					projectId,
+					taskId: taskId !== 'unknown' ? taskId : undefined,
+					taskTitle: taskTitle || undefined,
+					route: taskId !== 'unknown' ? `/tasks?taskDetailDrawer=${taskId}` : '/work',
 				});
 			} else {
 				console.warn(`[AutoPauseIdle] Failed to pause ${sessionName}: ${response.status}`);

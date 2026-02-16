@@ -569,12 +569,9 @@
 			return;
 		}
 		if (type === 'key') {
-			const specialKeys = ['ctrl-c', 'ctrl-d'];
-			if (specialKeys.includes(input)) {
-				await sendServerInput(sessionName, '', input as 'ctrl-c' | 'ctrl-d');
-				return;
-			}
-			await sendServerInput(sessionName, input, 'raw');
+			// Pass key name directly as the type - the API handles 'up', 'down',
+			// 'left', 'right', 'ctrl-c', 'ctrl-d', 'tab', 'escape', etc.
+			await sendServerInput(sessionName, '', input as Parameters<typeof sendServerInput>[2]);
 			return;
 		}
 		await sendServerInput(sessionName, input, 'text');

@@ -5,12 +5,19 @@
 	 * Displays toast notifications in a fixed position (bottom-right).
 	 * Include this component once in your root layout.
 	 *
+	 * Features:
+	 * - Project color pill when projectId is provided
+	 * - Task ID badge when taskId is provided
+	 * - Click-to-navigate when route is provided
+	 *
 	 * Usage in +layout.svelte:
 	 *   <ToastContainer />
 	 */
 
 	import { fly, fade } from 'svelte/transition';
 	import { toasts, removeToast, type Toast, type ToastType } from '$lib/stores/toasts.svelte';
+	import { getProjectColor } from '$lib/utils/projectColors';
+	import { goto } from '$app/navigation';
 
 	// Visual config for each toast type
 	const typeConfig: Record<
@@ -43,62 +50,126 @@
 		},
 	};
 
-	function handleDismiss(id: string) {
+	function handleDismiss(e: MouseEvent, id: string) {
+		e.stopPropagation();
 		removeToast(id);
+	}
+
+	function handleToastClick(toast: Toast) {
+		if (toast.route) {
+			removeToast(toast.id);
+			goto(toast.route);
+		}
+	}
+
+	function handleActionClick(e: MouseEvent, action: NonNullable<Toast['action']>) {
+		e.stopPropagation();
+		action.onClick();
 	}
 </script>
 
 <!-- Toast Container - Fixed bottom-right -->
 <div class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none max-w-sm">
 	{#each toasts.value as toast (toast.id)}
+		{@const config = typeConfig[toast.type]}
+		{@const isClickable = !!toast.route}
+		{@const projectColor = toast.projectId ? getProjectColor(toast.projectId) : null}
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<div
 			class="pointer-events-auto rounded-lg shadow-lg px-4 py-3 flex items-start gap-3 min-w-[280px]"
+			class:cursor-pointer={isClickable}
+			class:toast-clickable={isClickable}
 			style="
-				background: {typeConfig[toast.type].bg};
-				border: 1px solid {typeConfig[toast.type].border};
+				background: {config.bg};
+				border: 1px solid {config.border};
 			"
 			in:fly={{ x: 100, duration: 200 }}
 			out:fade={{ duration: 150 }}
-			role="alert"
+			role={isClickable ? 'button' : 'alert'}
+			tabindex={isClickable ? 0 : undefined}
+			onclick={() => handleToastClick(toast)}
 		>
 			<!-- Icon -->
 			<svg
 				class="w-5 h-5 flex-shrink-0 mt-0.5"
-				style="color: {typeConfig[toast.type].text};"
+				style="color: {config.text};"
 				fill="none"
 				viewBox="0 0 24 24"
 				stroke="currentColor"
 				stroke-width="2"
 			>
-				<path stroke-linecap="round" stroke-linejoin="round" d={typeConfig[toast.type].icon} />
+				<path stroke-linecap="round" stroke-linejoin="round" d={config.icon} />
 			</svg>
 
 			<!-- Content -->
 			<div class="flex-1 min-w-0">
-				<p class="text-sm font-medium" style="color: {typeConfig[toast.type].text};">
+				<!-- Context badges row: project pill + task ID -->
+				{#if toast.projectId || toast.taskId}
+					<div class="flex items-center gap-1.5 mb-1.5 flex-wrap">
+						{#if toast.projectId && projectColor}
+							<span
+								class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
+								style="
+									background: {projectColor}22;
+									border: 1.5px solid {projectColor}88;
+									color: {projectColor};
+								"
+							>
+								<span
+									class="w-1.5 h-1.5 rounded-full flex-shrink-0"
+									style="background: {projectColor};"
+								></span>
+								{toast.projectId}
+							</span>
+						{/if}
+						{#if toast.taskId}
+							<span
+								class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-medium"
+								style="
+									background: oklch(0.90 0.02 250 / 0.12);
+									color: {projectColor || config.text};
+								"
+								title={toast.taskTitle || toast.taskId}
+							>
+								{toast.taskId}
+							</span>
+						{/if}
+					</div>
+				{/if}
+
+				<p class="text-sm font-medium" style="color: {config.text};">
 					{toast.message}
 				</p>
 				{#if toast.details}
-					<p class="text-xs mt-1 opacity-70" style="color: {typeConfig[toast.type].text};">
+					<p class="text-xs mt-1 opacity-70" style="color: {config.text};">
 						{toast.details}
 					</p>
 				{/if}
 				{#if toast.action}
 					<button
-						onclick={toast.action.onClick}
+						onclick={(e) => handleActionClick(e, toast.action!)}
 						class="text-xs mt-2 underline hover:no-underline"
-						style="color: {typeConfig[toast.type].text};"
+						style="color: {config.text};"
 					>
 						{toast.action.label}
 					</button>
+				{/if}
+				<!-- Click hint for routable toasts -->
+				{#if isClickable}
+					<p class="text-[10px] mt-1.5 opacity-50 flex items-center gap-1" style="color: {config.text};">
+						<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+						</svg>
+						Click to open
+					</p>
 				{/if}
 			</div>
 
 			<!-- Dismiss button -->
 			<button
-				onclick={() => handleDismiss(toast.id)}
+				onclick={(e) => handleDismiss(e, toast.id)}
 				class="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity"
-				style="color: {typeConfig[toast.type].text};"
+				style="color: {config.text};"
 				title="Dismiss"
 			>
 				<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -108,3 +179,11 @@
 		</div>
 	{/each}
 </div>
+
+<style>
+	.toast-clickable:hover {
+		filter: brightness(1.1);
+		transform: translateX(-2px);
+		transition: filter 0.15s, transform 0.15s;
+	}
+</style>

@@ -30,7 +30,8 @@
 		playTaskStartSound,
 	} from "$lib/utils/soundEffects";
 	import { slide } from "svelte/transition";
-	import { successToast, infoToast } from "$lib/stores/toasts.svelte";
+	import { addToast } from "$lib/stores/toasts.svelte";
+	import { getProjectFromTaskId } from "$lib/utils/projectUtils";
 	import AnimatedDigits from "$lib/components/AnimatedDigits.svelte";
 
 	interface SlashCommand {
@@ -533,18 +534,15 @@
 			const data = await response.json();
 
 			// Show toast notification based on result
+			const ctx = task ? { projectId: getProjectFromTaskId(task.id) || undefined, taskId: task.id, route: `/tasks?taskDetailDrawer=${task.id}` } : {};
 			if (data.alreadyLinked) {
-				infoToast(`Task already linked to epic`);
+				addToast({ message: `Task already linked to epic`, type: 'info', ...ctx });
 			} else if (data.movedFrom) {
-				successToast(
-					`Task ${task.id} moved from ${data.movedFrom} to ${epicId}`,
-				);
+				addToast({ message: `Task ${task.id} moved from ${data.movedFrom} to ${epicId}`, type: 'success', ...ctx });
 			} else if (data.epicReopened) {
-				successToast(
-					`Task ${task.id} linked to epic ${epicId} (epic reopened)`,
-				);
+				addToast({ message: `Task ${task.id} linked to epic ${epicId} (epic reopened)`, type: 'success', ...ctx });
 			} else {
-				successToast(`Task ${task.id} linked to epic ${epicId}`);
+				addToast({ message: `Task ${task.id} linked to epic ${epicId}`, type: 'success', ...ctx });
 			}
 
 			// Call the callback if provided (refreshes task and session data)

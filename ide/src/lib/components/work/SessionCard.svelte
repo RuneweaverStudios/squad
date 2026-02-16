@@ -90,7 +90,7 @@
 		getCtrlCIntercept,
 		setCtrlCIntercept,
 	} from "$lib/stores/preferences.svelte";
-	import { successToast } from "$lib/stores/toasts.svelte";
+	import { addToast } from "$lib/stores/toasts.svelte";
 	import { getReviewRules } from "$lib/stores/reviewRules.svelte";
 	import { computeReviewStatus } from "$lib/utils/reviewStatusUtils";
 	import { availableProjects as availableProjectsStore } from "$lib/stores/drawerStore";
@@ -2976,13 +2976,16 @@
 			// Play success sound and show toast if any tasks were created
 			if (createResults.success.length > 0) {
 				playNewTaskChime();
-				successToast(
-					`Created ${createResults.success.length} task${createResults.success.length > 1 ? "s" : ""}`,
-					createResults.success
+				addToast({
+					message: `Created ${createResults.success.length} task${createResults.success.length > 1 ? "s" : ""}`,
+					type: 'success',
+					details: createResults.success
 						.map((r) => r.taskId)
 						.filter(Boolean)
 						.join(", "),
-				);
+					projectId: task?.id ? getProjectFromTaskId(task.id) || undefined : undefined,
+					route: '/tasks',
+				});
 				// Refresh existing task titles so newly created tasks show as "Created"
 				await fetchExistingTaskTitles();
 			}
@@ -3404,11 +3407,12 @@
 			await navigator.clipboard.writeText(text);
 			sessionCopied = true;
 			playCopySound();
-			successToast(
-				isServerMode
+			addToast({
+				message: isServerMode
 					? "Server output copied to clipboard"
 					: "Session contents copied to clipboard",
-			);
+				type: 'success',
+			});
 
 			// Clear timeout if exists
 			if (sessionCopyTimeout) {
@@ -7808,7 +7812,7 @@
 		rollbackEvent = null;
 	}}
 	onConfirm={() => {
-		successToast(`Rolled back to ${rollbackEvent?.git_sha?.slice(0, 7)}`);
+		addToast({ message: `Rolled back to ${rollbackEvent?.git_sha?.slice(0, 7)}`, type: 'success', projectId: task?.id ? getProjectFromTaskId(task.id) || undefined : undefined, taskId: task?.id || undefined });
 	}}
 />
 

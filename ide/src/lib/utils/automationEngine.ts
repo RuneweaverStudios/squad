@@ -25,7 +25,16 @@ import {
 	isAutomationEnabled,
 	getConfig
 } from '$lib/stores/automationRules.svelte';
-import { infoToast } from '$lib/stores/toasts.svelte';
+import { addToast } from '$lib/stores/toasts.svelte';
+import { workSessionsState } from '$lib/stores/workSessions.svelte';
+
+/** Extract project/task context from a session name for toast enrichment */
+function getSessionToastContext(sessionName: string): { projectId?: string; taskId?: string; taskTitle?: string } {
+	const session = workSessionsState.sessions.find(s => s.sessionName === sessionName);
+	if (!session?.task?.id) return {};
+	const projectId = session.task.id.split('-').slice(0, -1).join('-') || undefined;
+	return { projectId, taskId: session.task.id, taskTitle: session.task.title || undefined };
+}
 
 // =============================================================================
 // TYPES
@@ -332,10 +341,13 @@ async function executeAction(
 
 			case 'notify_only':
 				// Show toast notification to user with rule name
-				infoToast(
-					processedPayload || `Automation triggered on ${sessionName}`,
-					`Rule: ${ruleName}`
-				);
+				addToast({
+					message: processedPayload || `Automation triggered on ${sessionName}`,
+					type: 'info',
+					details: `Rule: ${ruleName}`,
+					route: '/automation',
+					...getSessionToastContext(sessionName)
+				});
 				if (config.debugLogging) {
 					console.log(`[automationEngine] Notification for ${sessionName}: ${processedPayload}`);
 				}
@@ -582,10 +594,13 @@ async function showQuestionUI(
 	}
 
 	// Show notification that question UI is being displayed
-	infoToast(
-		`Question triggered: ${questionConfig.question.substring(0, 50)}${questionConfig.question.length > 50 ? '...' : ''}`,
-		`Rule: ${ruleName}`
-	);
+	addToast({
+		message: `Question triggered: ${questionConfig.question.substring(0, 50)}${questionConfig.question.length > 50 ? '...' : ''}`,
+		type: 'info',
+		details: `Rule: ${ruleName}`,
+		route: '/automation',
+		...getSessionToastContext(sessionName)
+	});
 }
 
 /**
@@ -614,10 +629,13 @@ async function runSlashCommand(
 	await sendTextToSession(sessionName, normalizedCommand);
 
 	// Show notification
-	infoToast(
-		`Running command: ${normalizedCommand}`,
-		`Rule: ${ruleName} • Session: ${sessionName}`
-	);
+	addToast({
+		message: `Running command: ${normalizedCommand}`,
+		type: 'info',
+		details: `Rule: ${ruleName} • Session: ${sessionName}`,
+		route: '/automation',
+		...getSessionToastContext(sessionName)
+	});
 }
 
 /**
@@ -658,10 +676,13 @@ async function executeWorkflowAction(
 		);
 	}
 
-	infoToast(
-		`Workflow executed: ${workflowId}`,
-		`Rule: ${ruleName}`
-	);
+	addToast({
+		message: `Workflow executed: ${workflowId}`,
+		type: 'info',
+		details: `Rule: ${ruleName}`,
+		route: '/automation',
+		...getSessionToastContext(context.session)
+	});
 }
 
 // =============================================================================
@@ -750,10 +771,13 @@ export async function processSessionOutput(
 		if (!hasNotifyAction) {
 			const allSucceeded = results.every(r => r.success);
 			if (allSucceeded) {
-				infoToast(
-					`Automation executed on ${sessionName}`,
-					`Rule: ${match.rule.name}`
-				);
+				addToast({
+					message: `Automation executed on ${sessionName}`,
+					type: 'info',
+					details: `Rule: ${match.rule.name}`,
+					route: '/automation',
+					...getSessionToastContext(sessionName)
+				});
 			}
 		}
 	}

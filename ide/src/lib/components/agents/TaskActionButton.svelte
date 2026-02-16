@@ -2,7 +2,8 @@
 	import { computeAgentStatus, type AgentStatusInput, type AgentStatus } from '$lib/utils/agentStatusUtils';
 	import { createPutRequest } from '$lib/utils/bulkApiHelpers';
 	import { broadcastTaskEvent } from '$lib/stores/taskEvents';
-	import { successToast, errorToast } from '$lib/stores/toasts.svelte';
+	import { addToast } from '$lib/stores/toasts.svelte';
+	import { getProjectFromTaskId } from '$lib/utils/projectUtils';
 	import AgentAvatar from '$lib/components/AgentAvatar.svelte';
 	import AgentSelector from '$lib/components/agents/AgentSelector.svelte';
 	import { isHumanTask } from '$lib/utils/badgeHelpers';
@@ -234,22 +235,22 @@
 				// Show user-friendly error - session files cleaned up is common after restart
 				if (response.status === 404) {
 					resumeError = 'Session expired - release task and restart';
-					errorToast('Resume failed', 'Session expired - release task and restart');
+					addToast({ message: 'Resume failed', type: 'error', details: 'Session expired - release task and restart', projectId: getProjectFromTaskId(task.id) || undefined, taskId: task.id, route: `/tasks?taskDetailDrawer=${task.id}` });
 				} else {
 					resumeError = data.message || data.error || 'Resume failed';
-					errorToast('Resume failed', data.message || data.error || 'Could not resume session');
+					addToast({ message: 'Resume failed', type: 'error', details: data.message || data.error || 'Could not resume session', projectId: getProjectFromTaskId(task.id) || undefined, taskId: task.id, route: `/tasks?taskDetailDrawer=${task.id}` });
 				}
 				console.error('Resume failed:', data.message || data.error);
 			} else {
 				// Show success toast
-				successToast('Session resumed', `Resuming ${task.assignee}'s session`);
+				addToast({ message: 'Session resumed', type: 'success', details: `Resuming ${task.assignee}'s session`, projectId: getProjectFromTaskId(task.id) || undefined, taskId: task.id, route: '/work' });
 				// Broadcast event so pages refresh immediately
 				broadcastTaskEvent('session-resumed', task.id);
 				dropdownOpen = false;
 			}
 		} catch (err) {
 			resumeError = 'Network error';
-			errorToast('Resume failed', 'Network error - check your connection');
+			addToast({ message: 'Resume failed', type: 'error', details: 'Network error - check your connection', projectId: getProjectFromTaskId(task.id) || undefined, taskId: task.id });
 			console.error('Resume error:', err);
 		} finally {
 			resuming = false;
@@ -267,13 +268,13 @@
 			}));
 			if (!response.ok) {
 				console.error('Human toggle failed:', await response.text());
-				errorToast('Update failed', 'Could not update task status');
+				addToast({ message: 'Update failed', type: 'error', details: 'Could not update task status', projectId: getProjectFromTaskId(task.id) || undefined, taskId: task.id });
 			} else {
 				broadcastTaskEvent('task-updated', task.id);
 			}
 		} catch (err) {
 			console.error('Human toggle error:', err);
-			errorToast('Update failed', 'Network error');
+			addToast({ message: 'Update failed', type: 'error', details: 'Network error', projectId: getProjectFromTaskId(task.id) || undefined, taskId: task.id });
 		} finally {
 			humanToggling = false;
 		}

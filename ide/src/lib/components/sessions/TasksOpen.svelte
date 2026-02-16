@@ -908,9 +908,9 @@
 			if (response.ok) {
 				const data = await response.json();
 				if (data.epicReopened) {
-					addToast({ message: `Task linked to epic (epic was reopened)`, type: 'success' });
+					addToast({ message: `Task linked to epic (epic was reopened)`, type: 'success', projectId: getProjectFromTaskId(taskId) || undefined, taskId, route: `/tasks?taskDetailDrawer=${taskId}` });
 				} else {
-					addToast({ message: `Task linked to epic`, type: 'success' });
+					addToast({ message: `Task linked to epic`, type: 'success', projectId: getProjectFromTaskId(taskId) || undefined, taskId, route: `/tasks?taskDetailDrawer=${taskId}` });
 				}
 				onRetry(); // Refresh task list
 			} else {
@@ -941,7 +941,7 @@
 				newEpicTitle = '';
 				showCreateEpic = false;
 				closeContextMenu();
-				addToast({ message: 'Epic created and task linked', type: 'success' });
+				addToast({ message: 'Epic created and task linked', type: 'success', projectId: getProjectFromTaskId(ctxTask.id) || undefined, taskId: ctxTask.id, route: `/tasks?taskDetailDrawer=${ctxTask.id}` });
 				onRetry();
 			} else {
 				const data = await response.json().catch(() => ({ error: 'Unknown error' }));

@@ -351,12 +351,12 @@ export async function restart(sessionName: string): Promise<boolean> {
  * Send input to a server session
  * @param sessionName - Name of the tmux session
  * @param input - Input text to send
- * @param type - Input type: 'text' (default), 'enter', 'ctrl-c', 'ctrl-d', 'raw'
+ * @param type - Input type: 'text' (default), or any key name the API supports
  */
 export async function sendInput(
 	sessionName: string,
 	input: string,
-	type: 'text' | 'enter' | 'ctrl-c' | 'ctrl-d' | 'raw' = 'text'
+	type: 'text' | 'enter' | 'up' | 'down' | 'left' | 'right' | 'ctrl-c' | 'ctrl-d' | 'ctrl-u' | 'tab' | 'escape' | 'delete' | 'backspace' | 'space' | 'raw' = 'text'
 ): Promise<boolean> {
 	try {
 		const response = await globalThis.fetch(`/api/sessions/${sessionName}/input`, {

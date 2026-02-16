@@ -26,7 +26,7 @@
 	} from '$lib/utils/bulkApiHelpers';
 	import { playNewTaskChime, playTaskExitSound, playTaskStartSound, playTaskCompleteSound, playEpicCompleteSound } from '$lib/utils/soundEffects';
 	import { spawningTaskIds, isBulkSpawning } from '$lib/stores/spawningTasks';
-	import { successToast } from '$lib/stores/toasts.svelte';
+	import { addToast } from '$lib/stores/toasts.svelte';
 	import { getEpicCelebration, getEpicAutoClose, getCollapsedEpics, setCollapsedEpics, getMaxSessions } from '$lib/stores/preferences.svelte';
 	import { workSessionsState } from '$lib/stores/workSessions.svelte';
 	import { getFileTypeInfo, getFileTypeInfoFromPath, formatFileSize, type FileCategory } from '$lib/utils/fileUtils';
@@ -666,7 +666,7 @@
 			// Find the epic in allTasks to get its title
 			const epic = allTasks.find(t => t.id === epicId);
 			const title = epic?.title || epicId;
-			successToast(`Epic Complete: ${title}`, `All children of ${epicId} are now closed`);
+			addToast({ message: `Epic Complete: ${title}`, type: 'success', details: `All children of ${epicId} are now closed`, projectId: getProjectFromTaskId(epicId) || undefined, taskId: epicId, route: `/tasks?taskDetailDrawer=${epicId}` });
 		}
 
 		// If auto-close is enabled, close the epics in JAT
@@ -2019,7 +2019,7 @@
 		bulkActionLoading = false;
 
 		if (successCount > 0) {
-			successToast(`Linked ${successCount} task(s) to epic ${epicId}`);
+			addToast({ message: `Linked ${successCount} task(s) to epic ${epicId}`, type: 'success', projectId: getProjectFromTaskId(epicId) || undefined, taskId: epicId, route: `/tasks?taskDetailDrawer=${epicId}` });
 			clearSelection();
 			// Trigger parent refresh
 			if (onTasksChanged) onTasksChanged();

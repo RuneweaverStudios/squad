@@ -28,6 +28,14 @@ export interface Toast {
 		label: string;
 		onClick: () => void;
 	};
+	/** Project name for color pill display (e.g., "jat", "chimaro") */
+	projectId?: string;
+	/** Task ID for badge display (e.g., "jat-abc") */
+	taskId?: string;
+	/** Task title for tooltip/context */
+	taskTitle?: string;
+	/** URL to navigate to when the toast is clicked */
+	route?: string;
 }
 
 // Toast state
@@ -54,6 +62,10 @@ export function addToast(options: {
 	duration?: number;
 	details?: string;
 	action?: Toast['action'];
+	projectId?: string;
+	taskId?: string;
+	taskTitle?: string;
+	route?: string;
 }): string {
 	const id = generateId();
 	const toast: Toast = {
@@ -63,6 +75,10 @@ export function addToast(options: {
 		duration: options.duration ?? 4000,
 		details: options.details,
 		action: options.action,
+		projectId: options.projectId,
+		taskId: options.taskId,
+		taskTitle: options.taskTitle,
+		route: options.route,
 	};
 
 	toastList = [...toastList, toast];
