@@ -38,7 +38,6 @@ export interface Agent {
 	model: string;
 	task_description: string;
 	last_active_ts: string;
-	reservation_count: number;
 	task_count: number;
 	open_tasks: number;
 	in_progress_tasks: number;
@@ -46,22 +45,6 @@ export interface Agent {
 	hasSession?: boolean;  // True if agent has an active tmux session (jat-{name})
 	activities?: AgentActivity[];
 	current_activity?: AgentActivity | null;
-}
-
-/**
- * File reservation (lock)
- */
-export interface Reservation {
-	id: number;
-	path_pattern: string;
-	exclusive: number | boolean;
-	reason: string;
-	created_ts: string;
-	expires_ts: string;
-	released_ts: string | null;
-	agent_name?: string;
-	agent?: string;
-	project_path?: string;
 }
 
 /**
@@ -184,8 +167,6 @@ export interface ApiMeta {
  */
 export interface AgentsApiResponse {
 	agents: Agent[];
-	reservations: Reservation[];
-	reservations_by_agent: Record<string, Reservation[]>;
 	tasks: Task[];
 	unassigned_tasks: Task[];
 	task_stats: TaskStats;
@@ -213,14 +194,6 @@ export interface InboxApiResponse {
 	agent: string;
 	messages: InboxMessage[];
 	unread_count: number;
-}
-
-/**
- * GET /api/agents/[name]/reservations response
- */
-export interface ReservationsApiResponse {
-	agent: string;
-	reservations: Reservation[];
 }
 
 /**

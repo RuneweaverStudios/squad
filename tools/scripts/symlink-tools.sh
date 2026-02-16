@@ -380,7 +380,7 @@ echo "    jat --help"
 echo ""
 
 echo "  Tool categories:"
-echo "    • Agent Mail (12): am-register, am-inbox, am-send, am-reply, am-ack, ..."
+echo "    • Agent Mail (9): am-register, am-inbox, am-send, am-reply, am-ack, ..."
 echo "    • Browser (11): browser-start.js, browser-nav.js, browser-eval.js, ..."
 echo "    • Signal (2): jat-signal, jat-signal-validate"
 echo "    • Media (4+): gemini-image, gemini-edit, gemini-compose, avatar-generate"

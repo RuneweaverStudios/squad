@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     priority INTEGER NOT NULL DEFAULT 2,
     issue_type TEXT NOT NULL DEFAULT 'task',
     assignee TEXT,
+    reserved_files TEXT,
     parent_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,
     command TEXT DEFAULT '/jat:start',
     agent_program TEXT,

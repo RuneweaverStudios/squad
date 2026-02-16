@@ -26,7 +26,7 @@
  */
 
 import { json } from '@sveltejs/kit';
-import { getAgents, getReservations, getTaskActivities, getAgentCounts } from '$lib/server/agent-mail.js';
+import { getAgents, getTaskActivities, getAgentCounts } from '$lib/server/agent-mail.js';
 import { getTasks } from '$lib/server/jat-tasks.js';
 import { getAllAgentUsageAsync, getHourlyUsageAsync, getAgentHourlyUsageAsync, getAgentContextPercent } from '$lib/utils/tokenUsage.js';
 import { apiCache, cacheKey, CACHE_TTL, invalidateCache, singleFlight } from '$lib/server/cache.js';
@@ -161,7 +161,6 @@ function isInDateRange(timestamp, from, to) {
 /**
  * @typedef {{ ts: string, preview: string, content: string, type: string, status?: string }} Activity
  * @typedef {{ id: number, name: string, program: string, model: string, task_description: string, inception_ts: string, last_active_ts: string, project_path: string }} Agent
- * @typedef {{ id: number, path_pattern: string, exclusive: boolean, reason: string, created_ts: string, expires_ts: string, released_ts: string, agent_name: string, project_path: string }} Reservation
  * @typedef {{ id: string, title: string, description: string, status: string, priority: number, issue_type: string, assignee: string, created_at: string, updated_at: string, project: string, project_path: string, labels: string[], depends_on: any[], blocked_by: any[], comments?: any[] }} Task
  */
 
@@ -275,8 +274,6 @@ export async function GET({ url, locals }) {
 			message: errorMsg,
 			stack: errorStack,
 			agents: [],
-			reservations: [],
-			reservations_by_agent: {},
 			tasks: [],
 			unassigned_tasks: [],
 			task_stats: {
@@ -305,11 +302,9 @@ async function computeAgentsData({ projectFilter, agentFilter, includeUsage, inc
 
 	const projectPath = process.cwd().replace('/ide', '');
 
-	// Fetch core data (agents, reservations, tasks) - always needed
+	// Fetch core data (agents, tasks) - always needed
 	/** @type {Agent[]} */
 	const agents = getAgents(undefined);  // Show all agents (don't filter by project)
-	/** @type {Reservation[]} */
-	const reservations = getReservations(agentFilter, undefined);  // Show all reservations
 	/** @type {Task[]} */
 	const tasks = getCachedTasks(projectFilter, forceFresh);  // Filter tasks only (cached to avoid expensive JSONL parsing)
 
@@ -389,19 +384,10 @@ async function computeAgentsData({ projectFilter, agentFilter, includeUsage, inc
 
 	// Calculate agent statistics
 	const agentStats = agents.map(agent => {
-		// Count reservations per agent
-		const agentReservations = reservations.filter(r => r.agent_name === agent.name);
-
 		// Count tasks assigned to agent
 		const agentTasks = tasks.filter(t => t.assignee === agent.name);
 		const openTasks = agentTasks.filter(t => t.status === 'open').length;
 		const inProgressTasks = agentTasks.filter(t => t.status === 'in_progress').length;
-
-		// Determine if agent is active based on reservations or active tasks
-		const hasActiveReservations = agentReservations.some(r => {
-			const expiresAt = new Date(r.expires_ts);
-			return expiresAt > new Date() && !r.released_ts;
-		});
 
 		// Get recent activities from JAT task history (last 10 task updates)
 		/** @type {Activity[]} */
@@ -462,35 +448,13 @@ async function computeAgentsData({ projectFilter, agentFilter, includeUsage, inc
 			}
 		}
 
-		// Check reservations in date range
-		if (dateRange.hasRange) {
-			const reservationsInRange = agentReservations.filter(r =>
-				isInDateRange(r.created_ts, dateRange.from, dateRange.to)
-			);
-
-			if (reservationsInRange.length > 0) {
-				activityInRange = (activityInRange || 0) + reservationsInRange.length;
-
-				const lastReservation = reservationsInRange
-					.map(r => new Date(r.created_ts))
-					.sort((a, b) => b.getTime() - a.getTime())[0];
-
-				if (lastReservation) {
-					if (!lastActiveInRange || lastReservation > new Date(lastActiveInRange)) {
-						lastActiveInRange = lastReservation.toISOString();
-					}
-				}
-			}
-		}
-
 		/** @type {any} */
 		const baseStats = {
 			...agent,
-			reservation_count: agentReservations.length,
 			task_count: agentTasks.length,
 			open_tasks: openTasks,
 			in_progress_tasks: inProgressTasks,
-			active: hasActiveReservations || inProgressTasks > 0,
+			active: inProgressTasks > 0,
 			hasSession: agentsWithSessions.has(agent.name),
 			// Session creation timestamp for "connecting" state detection
 			session_created_ts: agentSessionCreatedAt.get(agent.name) || null,
@@ -533,16 +497,6 @@ async function computeAgentsData({ projectFilter, agentFilter, includeUsage, inc
 		}
 
 		return baseStats;
-	});
-
-	// Group reservations by agent for easy lookup
-	/** @type {Record<string, Reservation[]>} */
-	const reservationsByAgent = {};
-	reservations.forEach(r => {
-		if (!reservationsByAgent[r.agent_name]) {
-			reservationsByAgent[r.agent_name] = [];
-		}
-		reservationsByAgent[r.agent_name].push(r);
 	});
 
 	// Calculate task statistics
@@ -603,8 +557,6 @@ async function computeAgentsData({ projectFilter, agentFilter, includeUsage, inc
 	// Build response data
 	return {
 		agents: filteredAgentStats,
-		reservations,
-		reservations_by_agent: reservationsByAgent,
 		tasks: tasks, // Return all tasks (frontend handles pagination/filtering)
 		unassigned_tasks: unassignedTasks,
 		task_stats: taskStats,

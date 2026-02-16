@@ -12,7 +12,6 @@ import { listSessions } from './sessions.js';
  * @typedef {import('../../../../lib/agent-mail.js').Message} Message
  * @typedef {import('../../../../lib/agent-mail.js').Agent} Agent
  * @typedef {import('../../../../lib/agent-mail.js').Thread} Thread
- * @typedef {import('../../../../lib/agent-mail.js').Reservation} Reservation
  */
 
 /**
@@ -139,16 +138,6 @@ export function getThreads() {
  */
 export function searchMessages(query) {
 	return agentMail.searchMessages(query);
-}
-
-/**
- * Get file reservations
- * @param {string | undefined} [agentName] - Optional agent name to filter by
- * @param {string | undefined} [projectPath] - Optional project path to filter by
- * @returns {Reservation[]} - Array of reservation objects
- */
-export function getReservations(agentName = undefined, projectPath = undefined) {
-	return agentMail.getReservations(agentName, projectPath);
 }
 
 /**

@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { getAgents, getReservations } from '$lib/server/agent-mail.js';
+import { getAgents } from '$lib/server/agent-mail.js';
 import { getTasks } from '$lib/server/jat-tasks.js';
 
 /**
@@ -15,14 +15,10 @@ export async function GET({ url }) {
 
 		// Fetch all data sources
 		const agents = getAgents(projectFilter);
-		const reservations = getReservations(agentFilter, projectFilter);
 		const tasks = getTasks({ projectName: projectFilter });
 
 		// Calculate agent statistics
 		const agentStats = agents.map(agent => {
-			// Count reservations per agent
-			const agentReservations = reservations.filter(r => r.agent_name === agent.name);
-
 			// Count tasks assigned to agent
 			const agentTasks = tasks.filter(t => t.assignee === agent.name);
 			const openTasks = agentTasks.filter(t => t.status === 'open').length;
@@ -30,22 +26,11 @@ export async function GET({ url }) {
 
 			return {
 				...agent,
-				reservation_count: agentReservations.length,
 				task_count: agentTasks.length,
 				open_tasks: openTasks,
 				in_progress_tasks: inProgressTasks,
-				active: agentReservations.length > 0 || inProgressTasks > 0
+				active: inProgressTasks > 0
 			};
-		});
-
-		// Calculate reservation statistics
-		/** @type {Record<string, typeof reservations>} */
-		const reservationsByAgent = {};
-		reservations.forEach(r => {
-			if (!reservationsByAgent[r.agent_name]) {
-				reservationsByAgent[r.agent_name] = [];
-			}
-			reservationsByAgent[r.agent_name].push(r);
 		});
 
 		// Calculate task statistics
@@ -71,8 +56,6 @@ export async function GET({ url }) {
 
 		return json({
 			agents: agentStats,
-			reservations,
-			reservations_by_agent: reservationsByAgent,
 			tasks: tasks.slice(0, 50), // Limit to 50 most recent tasks
 			task_stats: taskStats,
 			tasks_with_deps: tasksWithDeps.length,
@@ -84,7 +67,6 @@ export async function GET({ url }) {
 			error: 'Failed to fetch agent data',
 			message: error instanceof Error ? error.message : String(error),
 			agents: [],
-			reservations: [],
 			tasks: [],
 			task_stats: {},
 			timestamp: new Date().toISOString()

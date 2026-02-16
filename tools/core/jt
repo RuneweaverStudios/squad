@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     priority INTEGER NOT NULL DEFAULT 2,
     issue_type TEXT NOT NULL DEFAULT "task",
     assignee TEXT,
+    reserved_files TEXT,
     parent_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,
     command TEXT DEFAULT "/jat:start",
     agent_program TEXT,
@@ -187,6 +188,14 @@ cmd_init() {
     $quiet || echo "Migrated: added scheduling columns (command, agent_program, model, schedule_cron, next_run_at, due_date)"
   fi
 
+  # Migrate: add reserved_files column if missing
+  local has_reserved_files
+  has_reserved_files="$(sqlite3 "$jat_dir/tasks.db" "PRAGMA table_info(tasks);" | grep -c 'reserved_files' || true)"
+  if [[ "$has_reserved_files" == "0" ]]; then
+    sqlite3 "$jat_dir/tasks.db" "ALTER TABLE tasks ADD COLUMN reserved_files TEXT;"
+    $quiet || echo "Migrated: added reserved_files column"
+  fi
+
   touch_sentinel
 
   $quiet || echo "Initialized .jat/ in $PROJECT_ROOT"
@@ -194,7 +203,7 @@ cmd_init() {
 
 cmd_create() {
   require_db
-  local title="" description="" type="task" priority=2 labels="" deps="" assignee="" json_out=false explicit_id="" parent_id=""
+  local title="" description="" type="task" priority=2 labels="" deps="" assignee="" json_out=false explicit_id="" parent_id="" reserved_files=""
   local command="" agent_program="" model="" schedule_cron="" next_run_at="" due_date=""
 
   # First positional arg is title
@@ -210,6 +219,7 @@ cmd_create() {
       --labels)         labels="$2"; shift 2 ;;
       --deps)           deps="$2"; shift 2 ;;
       --assignee)       assignee="$2"; shift 2 ;;
+      --files)          reserved_files="$2"; shift 2 ;;
       --id)             explicit_id="$2"; shift 2 ;;
       --parent)         parent_id="$2"; shift 2 ;;
       --command)        command="$2"; shift 2 ;;
@@ -223,7 +233,7 @@ cmd_create() {
     esac
   done
 
-  [[ -n "$title" ]] || die "Usage: jt create \"title\" [--type X] [--priority N] [--description \"...\"] [--labels \"a,b\"] [--deps \"id1,id2\"] [--assignee \"X\"] [--parent EPIC_ID] [--command CMD] [--agent-program X] [--model X] [--schedule-cron EXPR] [--next-run-at ISO] [--due-date ISO] [--json]"
+  [[ -n "$title" ]] || die "Usage: jt create \"title\" [--type X] [--priority N] [--description \"...\"] [--labels \"a,b\"] [--deps \"id1,id2\"] [--assignee \"X\"] [--files \"glob1,glob2\"] [--parent EPIC_ID] [--command CMD] [--agent-program X] [--model X] [--schedule-cron EXPR] [--next-run-at ISO] [--due-date ISO] [--json]"
 
   require_integer "$priority" "--priority"
   local id="${explicit_id:-$(gen_id)}"
@@ -254,6 +264,9 @@ cmd_create() {
   local esc_type
   esc_type="$(sql_escape "$type")"
 
+  local esc_reserved_files
+  esc_reserved_files="$(sql_escape "$reserved_files")"
+
   local esc_command esc_agent_program esc_model esc_cron esc_next_run esc_due_date
   esc_command="$(sql_escape "$command")"
   esc_agent_program="$(sql_escape "$agent_program")"
@@ -263,8 +276,8 @@ cmd_create() {
   esc_due_date="$(sql_escape "$due_date")"
 
   sql_exec "
-    INSERT INTO tasks (id, title, description, status, priority, issue_type, assignee, parent_id, command, agent_program, model, schedule_cron, next_run_at, due_date, created_at, updated_at)
-    VALUES ('$id', '$esc_title', '$esc_desc', 'open', $priority, '$esc_type', $([ -n "$assignee" ] && echo "'$esc_assignee'" || echo "NULL"), $([ -n "$parent_id" ] && echo "'$esc_parent_id'" || echo "NULL"), $([ -n "$command" ] && echo "'$esc_command'" || echo "NULL"), $([ -n "$agent_program" ] && echo "'$esc_agent_program'" || echo "NULL"), $([ -n "$model" ] && echo "'$esc_model'" || echo "NULL"), $([ -n "$schedule_cron" ] && echo "'$esc_cron'" || echo "NULL"), $([ -n "$next_run_at" ] && echo "'$esc_next_run'" || echo "NULL"), $([ -n "$due_date" ] && echo "'$esc_due_date'" || echo "NULL"), '$ts', '$ts');"
+    INSERT INTO tasks (id, title, description, status, priority, issue_type, assignee, reserved_files, parent_id, command, agent_program, model, schedule_cron, next_run_at, due_date, created_at, updated_at)
+    VALUES ('$id', '$esc_title', '$esc_desc', 'open', $priority, '$esc_type', $([ -n "$assignee" ] && echo "'$esc_assignee'" || echo "NULL"), $([ -n "$reserved_files" ] && echo "'$esc_reserved_files'" || echo "NULL"), $([ -n "$parent_id" ] && echo "'$esc_parent_id'" || echo "NULL"), $([ -n "$command" ] && echo "'$esc_command'" || echo "NULL"), $([ -n "$agent_program" ] && echo "'$esc_agent_program'" || echo "NULL"), $([ -n "$model" ] && echo "'$esc_model'" || echo "NULL"), $([ -n "$schedule_cron" ] && echo "'$esc_cron'" || echo "NULL"), $([ -n "$next_run_at" ] && echo "'$esc_next_run'" || echo "NULL"), $([ -n "$due_date" ] && echo "'$esc_due_date'" || echo "NULL"), '$ts', '$ts');"
 
   # Auto-wire epic→child dependency: parent depends on child (child is READY, parent is BLOCKED)
   if [[ -n "$parent_id" ]]; then
@@ -317,6 +330,7 @@ cmd_update() {
       --notes)          sets+=("notes = '$(sql_escape "$2")'"); shift 2 ;;
       --type)           sets+=("issue_type = '$(sql_escape "$2")'"); shift 2 ;;
       --assignee)       sets+=("assignee = '$(sql_escape "$2")'"); shift 2 ;;
+      --files)          sets+=("reserved_files = '$(sql_escape "$2")'"); shift 2 ;;
       --labels)         new_labels="$2"; shift 2 ;;
       --command)        sets+=("command = '$(sql_escape "$2")'"); shift 2 ;;
       --agent-program)  sets+=("agent_program = '$(sql_escape "$2")'"); shift 2 ;;
@@ -329,7 +343,7 @@ cmd_update() {
     esac
   done
 
-  [[ -n "$task_id" ]] || die "Usage: jt update TASK_ID [--status X] [--priority N] [--assignee X] [--title X] [--command CMD] [--agent-program X] [--model X] [--schedule-cron EXPR] [--next-run-at ISO] [--due-date ISO] [--json]"
+  [[ -n "$task_id" ]] || die "Usage: jt update TASK_ID [--status X] [--priority N] [--assignee X] [--files \"globs\"] [--title X] [--command CMD] [--agent-program X] [--model X] [--schedule-cron EXPR] [--next-run-at ISO] [--due-date ISO] [--json]"
 
   # Check task exists
   local exists
@@ -401,7 +415,7 @@ cmd_close() {
 
   local ts
   ts="$(now_ts)"
-  sql_exec "UPDATE tasks SET status = 'closed', closed_at = '$ts', close_reason = '$(sql_escape "$reason")', updated_at = '$ts' WHERE id = '$(sql_escape "$task_id")';"
+  sql_exec "UPDATE tasks SET status = 'closed', closed_at = '$ts', close_reason = '$(sql_escape "$reason")', reserved_files = NULL, updated_at = '$ts' WHERE id = '$(sql_escape "$task_id")';"
 
   touch_sentinel
 
@@ -422,7 +436,7 @@ _task_json() {
   sql_json "
     SELECT
       t.id, t.title, t.description, t.status, t.priority, t.issue_type,
-      t.assignee, t.parent_id, t.command, t.agent_program, t.model,
+      t.assignee, t.reserved_files, t.parent_id, t.command, t.agent_program, t.model,
       t.schedule_cron, t.next_run_at, t.due_date,
       t.created_at, t.updated_at, t.closed_at, t.close_reason,
       COALESCE(
@@ -527,6 +541,8 @@ for t in data:
     print(f\"  Status: {t['status']}  Type: {t['issue_type']}\")
     if t.get('assignee'):
         print(f\"  Assignee: {t['assignee']}\")
+    if t.get('reserved_files'):
+        print(f\"  Files: {t['reserved_files']}\")
     if t.get('description'):
         desc = t['description'][:200]
         print(f\"  Description: {desc}\")
@@ -587,7 +603,7 @@ cmd_list() {
   result="$(sql_json "
     SELECT
       t.id, t.title, t.description, t.status, t.priority, t.issue_type,
-      t.assignee, t.command, t.agent_program, t.model,
+      t.assignee, t.reserved_files, t.command, t.agent_program, t.model,
       t.schedule_cron, t.next_run_at, t.due_date,
       t.created_at, t.updated_at, t.closed_at,
       COALESCE(
@@ -644,7 +660,7 @@ cmd_ready() {
   result="$(sql_json "
     SELECT
       t.id, t.title, t.description, t.status, t.priority, t.issue_type,
-      t.assignee, t.command, t.agent_program, t.model,
+      t.assignee, t.reserved_files, t.command, t.agent_program, t.model,
       t.schedule_cron, t.next_run_at, t.due_date,
       t.created_at, t.updated_at,
       COALESCE(
@@ -929,9 +945,10 @@ Usage: jt <command> [options]
 Commands:
   create  "title" [--type X] [--priority N] [--description "..."]
                    [--labels "a,b"] [--deps "id1,id2"] [--assignee "X"]
-                   [--parent EPIC_ID] [--json]
+                   [--files "glob1,glob2"] [--parent EPIC_ID] [--json]
   update  TASK_ID  [--status X] [--priority N] [--assignee X] [--title X]
-                   [--description "..."] [--notes "..."] [--labels "a,b"] [--json]
+                   [--description "..."] [--notes "..."] [--labels "a,b"]
+                   [--files "glob1,glob2"] [--json]
   close   TASK_ID  [--reason "..."] [--json]
   delete  TASK_ID
   show    TASK_ID  [--json]

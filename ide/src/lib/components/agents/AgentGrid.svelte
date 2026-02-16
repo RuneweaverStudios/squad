@@ -85,7 +85,6 @@
 
 	// Helper to compute agent status (matches AgentCard.svelte and store logic)
 	function getAgentStatus(agent: Agent): AgentStatus {
-		const hasActiveLocks = agent.reservation_count > 0;
 		const hasInProgressTask = agent.in_progress_tasks > 0;
 
 		let timeSinceActive = Infinity;
@@ -97,9 +96,9 @@
 			timeSinceActive = Date.now() - lastActivity.getTime();
 		}
 
-		// Priority 1: WORKING - Has active task or locks (regardless of time)
+		// Priority 1: WORKING - Has active task (regardless of time)
 		// Show "working" if agent has actual work assigned, even if recently active
-		if (hasInProgressTask || hasActiveLocks) {
+		if (hasInProgressTask) {
 			return 'working';
 		}
 

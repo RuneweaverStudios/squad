@@ -95,34 +95,7 @@ CREATE TABLE IF NOT EXISTS message_recipients (
 CREATE INDEX IF NOT EXISTS idx_recipients_agent_id ON message_recipients(agent_id);
 CREATE INDEX IF NOT EXISTS idx_recipients_read_ts ON message_recipients(read_ts);
 
--- File Reservations: Advisory locks to prevent edit conflicts
-CREATE TABLE IF NOT EXISTS file_reservations (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    project_id INTEGER NOT NULL,
-    agent_id INTEGER NOT NULL,
-    path_pattern TEXT NOT NULL,          -- Glob pattern (e.g., "src/**/*.ts")
-    exclusive INTEGER DEFAULT 1,         -- Boolean: exclusive lock
-    reason TEXT DEFAULT '',              -- Why reserved (e.g., "task-123")
-    created_ts TEXT NOT NULL DEFAULT (datetime('now')),
-    expires_ts TEXT NOT NULL,            -- Automatic expiry (TTL)
-    released_ts TEXT,                    -- When manually released (NULL = still active)
-
-    FOREIGN KEY (project_id) REFERENCES projects(id),
-    FOREIGN KEY (agent_id) REFERENCES agents(id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_reservations_project_id ON file_reservations(project_id);
-CREATE INDEX IF NOT EXISTS idx_reservations_agent_id ON file_reservations(agent_id);
-CREATE INDEX IF NOT EXISTS idx_reservations_expires_ts ON file_reservations(expires_ts);
-CREATE INDEX IF NOT EXISTS idx_reservations_released_ts ON file_reservations(released_ts);
-
 -- Views for common queries
-
--- Active (unexpired, unreleased) reservations
-CREATE VIEW IF NOT EXISTS active_reservations AS
-SELECT * FROM file_reservations
-WHERE released_ts IS NULL
-  AND datetime(expires_ts) > datetime('now');
 
 -- Unread messages per agent (excluding expired broadcasts)
 CREATE VIEW IF NOT EXISTS unread_messages AS

@@ -73,14 +73,7 @@
 		// Fields needed for agent status computation (from agentStatusUtils)
 		hasSession?: boolean;
 		in_progress_tasks?: number;
-		reservation_count?: number;
 		session_created_ts?: number | null;
-	}
-
-	interface Reservation {
-		agent_name: string;
-		path_pattern: string;
-		expires_ts: string;
 	}
 
 	// Grouping mode for task table - determines how tasks are grouped in the view
