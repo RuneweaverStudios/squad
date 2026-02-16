@@ -23,6 +23,12 @@
 		after?: string[];
 	}
 
+	interface FileResult {
+		path: string;
+		name: string;
+		folder: string;
+	}
+
 	interface Props {
 		isOpen: boolean;
 		project: string;
@@ -53,11 +59,15 @@
 	let globFilter = $state('');
 	let useRegex = $state(false);
 	let caseSensitive = $state(false);
+	let fileResults = $state<FileResult[]>([]);
 	let results = $state<SearchResult[]>([]);
 	let selectedIndex = $state(0);
 	let isLoading = $state(false);
 	let truncated = $state(false);
 	let searchInput: HTMLInputElement | null = $state(null);
+
+	// Total selectable items: file results + content results
+	const totalResults = $derived(fileResults.length + results.length);
 
 	// Debounce timer
 	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -82,6 +92,7 @@
 		const query = searchQuery.trim();
 
 		if (!query) {
+			fileResults = [];
 			results = [];
 			selectedIndex = 0;
 			truncated = false;
@@ -100,6 +111,7 @@
 		if (isOpen) {
 			// Reset state immediately
 			searchQuery = '';
+			fileResults = [];
 			results = [];
 			selectedIndex = 0;
 			truncated = false;
@@ -114,6 +126,7 @@
 	// Handle project change
 	function handleProjectChange(newProject: string) {
 		selectedProject = newProject;
+		fileResults = [];
 		results = [];
 		selectedIndex = 0;
 		truncated = false;
@@ -124,11 +137,12 @@
 		}
 	}
 
-	// Perform search
+	// Perform search (content + filename in parallel)
 	async function performSearch(query: string) {
 		isLoading = true;
 		try {
-			const params = new URLSearchParams({
+			// Content search params
+			const grepParams = new URLSearchParams({
 				project: selectedProject,
 				q: query,
 				limit: '100',
@@ -136,30 +150,55 @@
 			});
 
 			if (globFilter.trim()) {
-				params.set('glob', globFilter.trim());
+				grepParams.set('glob', globFilter.trim());
 			}
 			if (useRegex) {
-				params.set('regex', 'true');
+				grepParams.set('regex', 'true');
 			}
 			if (caseSensitive) {
-				params.set('case', 'true');
+				grepParams.set('case', 'true');
 			}
 
-			const response = await fetch(`/api/files/grep?${params}`);
-			if (!response.ok) {
-				const error = await response.json();
+			// Filename search params (skip for regex mode - user is searching content patterns)
+			const fileSearchPromise = (!useRegex && query.length >= 2)
+				? fetch(`/api/files/search?${new URLSearchParams({
+					project: selectedProject,
+					query: query,
+					limit: '10'
+				})}`)
+				: null;
+
+			// Run both searches in parallel
+			const [grepResponse, fileResponse] = await Promise.all([
+				fetch(`/api/files/grep?${grepParams}`),
+				fileSearchPromise
+			]);
+
+			if (!grepResponse.ok) {
+				const error = await grepResponse.json();
 				console.error('[GlobalSearch] Search failed:', error);
+				fileResults = [];
 				results = [];
 				truncated = false;
 				return;
 			}
 
-			const data = await response.json();
-			results = data.results || [];
-			truncated = data.truncated || false;
+			const grepData = await grepResponse.json();
+			results = grepData.results || [];
+			truncated = grepData.truncated || false;
+
+			// Process filename results
+			if (fileResponse?.ok) {
+				const fileData = await fileResponse.json();
+				fileResults = fileData.files || [];
+			} else {
+				fileResults = [];
+			}
+
 			selectedIndex = 0;
 		} catch (err) {
 			console.error('[GlobalSearch] Search error:', err);
+			fileResults = [];
 			results = [];
 			truncated = false;
 		} finally {
@@ -174,24 +213,32 @@
 		switch (e.key) {
 			case 'ArrowDown':
 				e.preventDefault();
-				if (results.length > 0) {
-					selectedIndex = (selectedIndex + 1) % results.length;
+				if (totalResults > 0) {
+					selectedIndex = (selectedIndex + 1) % totalResults;
 					scrollSelectedIntoView();
 				}
 				break;
 
 			case 'ArrowUp':
 				e.preventDefault();
-				if (results.length > 0) {
-					selectedIndex = selectedIndex <= 0 ? results.length - 1 : selectedIndex - 1;
+				if (totalResults > 0) {
+					selectedIndex = selectedIndex <= 0 ? totalResults - 1 : selectedIndex - 1;
 					scrollSelectedIntoView();
 				}
 				break;
 
 			case 'Enter':
 				e.preventDefault();
-				if (results.length > 0 && results[selectedIndex]) {
-					selectResult(results[selectedIndex]);
+				if (totalResults > 0) {
+					// File results come first, then content results
+					if (selectedIndex < fileResults.length) {
+						selectFileResult(fileResults[selectedIndex]);
+					} else {
+						const contentIndex = selectedIndex - fileResults.length;
+						if (results[contentIndex]) {
+							selectResult(results[contentIndex]);
+						}
+					}
 				}
 				break;
 
@@ -212,7 +259,13 @@
 		});
 	}
 
-	// Select and open result
+	// Select and open file result (filename match)
+	function selectFileResult(file: FileResult) {
+		onResultSelect(file.path, 1, selectedProject);
+		onClose();
+	}
+
+	// Select and open content result (grep match)
 	function selectResult(result: SearchResult) {
 		onResultSelect(result.file, result.line, selectedProject);
 		onClose();
@@ -386,52 +439,83 @@
 				{#if !searchQuery.trim()}
 					<div class="search-hint">
 						<div class="hint-icon">🔍</div>
-						<div class="hint-text">Search file contents in {project}</div>
+						<div class="hint-text">Search files and contents in {selectedProject}</div>
 						<div class="hint-examples">
 							<span>Examples: <code>function handleClick</code>, <code>TODO:</code>, <code>import.*from</code> (with Regex)</span>
 						</div>
 					</div>
-				{:else if results.length === 0 && !isLoading}
+				{:else if totalResults === 0 && !isLoading}
 					<div class="search-empty">
 						<span>No matches found for "{searchQuery}"</span>
 					</div>
 				{:else}
 					<div class="results-list" role="listbox">
-						{#each results as result, index (`${result.file}:${result.line}`)}
-							<button
-								class="result-item"
-								class:selected={index === selectedIndex}
-								onclick={() => selectResult(result)}
-								onmouseenter={() => { selectedIndex = index; }}
-								role="option"
-								aria-selected={index === selectedIndex}
-							>
-								<div class="result-header">
-									<span class="result-icon">{getFileIcon(result.file)}</span>
-									{#if result.file.includes("/")}
-										<span class="result-dir">{result.file.slice(0, result.file.lastIndexOf("/") + 1)}</span><span class="result-file">{result.file.slice(result.file.lastIndexOf("/") + 1)}</span>
-									{:else}
-										<span class="result-file">{result.file}</span>
-									{/if}
-									<span class="result-line">:{result.line}</span>
-								</div>
-								<div class="result-content">
-									{#if result.before && result.before.length > 0}
-										{#each result.before as line}
-											<div class="context-line">{line}</div>
-										{/each}
-									{/if}
-									<div class="match-line">
-										{@html highlightMatch(result.content, searchQuery)}
+						<!-- Filename matches (shown first) -->
+						{#if fileResults.length > 0}
+							<div class="section-header">Files</div>
+							{#each fileResults as file, index (file.path)}
+								<button
+									class="result-item file-result-item"
+									class:selected={index === selectedIndex}
+									onclick={() => selectFileResult(file)}
+									onmouseenter={() => { selectedIndex = index; }}
+									role="option"
+									aria-selected={index === selectedIndex}
+								>
+									<div class="result-header">
+										<span class="result-icon">{getFileIcon(file.name)}</span>
+										{#if file.folder}
+											<span class="result-dir">{file.folder}/</span><span class="result-file">{@html highlightMatch(file.name, searchQuery)}</span>
+										{:else}
+											<span class="result-file">{@html highlightMatch(file.name, searchQuery)}</span>
+										{/if}
 									</div>
-									{#if result.after && result.after.length > 0}
-										{#each result.after as line}
-											<div class="context-line">{line}</div>
-										{/each}
-									{/if}
-								</div>
-							</button>
-						{/each}
+								</button>
+							{/each}
+						{/if}
+
+						<!-- Content matches -->
+						{#if results.length > 0}
+							{#if fileResults.length > 0}
+								<div class="section-header">Content</div>
+							{/if}
+							{#each results as result, index (`${result.file}:${result.line}`)}
+								{@const globalIndex = fileResults.length + index}
+								<button
+									class="result-item"
+									class:selected={globalIndex === selectedIndex}
+									onclick={() => selectResult(result)}
+									onmouseenter={() => { selectedIndex = globalIndex; }}
+									role="option"
+									aria-selected={globalIndex === selectedIndex}
+								>
+									<div class="result-header">
+										<span class="result-icon">{getFileIcon(result.file)}</span>
+										{#if result.file.includes("/")}
+											<span class="result-dir">{result.file.slice(0, result.file.lastIndexOf("/") + 1)}</span><span class="result-file">{result.file.slice(result.file.lastIndexOf("/") + 1)}</span>
+										{:else}
+											<span class="result-file">{result.file}</span>
+										{/if}
+										<span class="result-line">:{result.line}</span>
+									</div>
+									<div class="result-content">
+										{#if result.before && result.before.length > 0}
+											{#each result.before as line}
+												<div class="context-line">{line}</div>
+											{/each}
+										{/if}
+										<div class="match-line">
+											{@html highlightMatch(result.content, searchQuery)}
+										</div>
+										{#if result.after && result.after.length > 0}
+											{#each result.after as line}
+												<div class="context-line">{line}</div>
+											{/each}
+										{/if}
+									</div>
+								</button>
+							{/each}
+						{/if}
 					</div>
 
 					{#if truncated}
@@ -445,8 +529,8 @@
 			<!-- Footer -->
 			<div class="search-footer">
 				<div class="result-count">
-					{#if results.length > 0}
-						<span>{results.length} result{results.length !== 1 ? 's' : ''}</span>
+					{#if totalResults > 0}
+						<span>{#if fileResults.length > 0}{fileResults.length} file{fileResults.length !== 1 ? 's' : ''}{#if results.length > 0}, {/if}{/if}{#if results.length > 0}{results.length} match{results.length !== 1 ? 'es' : ''}{/if}</span>
 					{/if}
 				</div>
 				<div class="shortcut-hints">
@@ -725,6 +809,19 @@
 
 	.results-list {
 		padding: 0.25rem;
+	}
+
+	.section-header {
+		padding: 0.375rem 0.75rem 0.25rem;
+		font-size: 0.6875rem;
+		font-weight: 600;
+		color: oklch(0.55 0.02 250);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.file-result-item {
+		border-left: 2px solid oklch(0.55 0.15 145 / 0.5);
 	}
 
 	.result-item {

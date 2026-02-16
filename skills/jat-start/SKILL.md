@@ -32,136 +32,93 @@ Add `quick` to skip conflict checks.
 
 ## Step-by-Step Instructions
 
-### STEP 1: Parse Arguments
+**IMPORTANT: Minimize round-trips by issuing independent tool calls in parallel.**
 
-Check what was passed: `$ARGUMENTS` may contain agent-name, task-id, both, or nothing.
+Startup uses 3 parallel rounds. Each round issues all calls simultaneously, then processes results before the next round.
 
-```bash
-# Test if a param is a valid task ID
-jt show "$PARAM" --json >/dev/null 2>&1 && echo "task-id" || echo "agent-name"
+```
+ROUND 1 (parallel) → ROUND 2 (parallel) → ROUND 3 (parallel) → Banner
+  Identity              Starting signal       Task update
+  Task details          Memory search          Working signal
+  Git status            Prior task search
 ```
 
-### STEP 2: Get/Create Agent Identity
+### ROUND 1: Gather Context (all parallel)
 
-#### 2A: Check for IDE Pre-Registration
+**Issue ALL of these tool calls in a single message:**
 
-If spawned by the IDE, your identity file already exists:
-
+**1A: Identity** — Check for IDE pre-registration + get session ID:
 ```bash
-TMUX_SESSION=$(tmux display-message -p '#S' 2>/dev/null)
-PRE_REG_FILE=".claude/sessions/.tmux-agent-${TMUX_SESSION}"
-test -f "$PRE_REG_FILE" && cat "$PRE_REG_FILE"
+TMUX_SESSION=$(tmux display-message -p '#S' 2>/dev/null); PRE_REG_FILE=".claude/sessions/.tmux-agent-${TMUX_SESSION}"; test -f "$PRE_REG_FILE" && cat "$PRE_REG_FILE" || echo "NO_PRE_REG"
+```
+```bash
+get-current-session-id
 ```
 
-If found, use that name and skip to Step 3.
-
-#### 2B: Register Manually (CLI only)
-
-If no pre-registration file exists, pick a name and register:
-
+**1B: Task details** (if task-id provided):
 ```bash
-# Generate or use provided name
+jt show "$TASK_ID" --json
+```
+If no task-id, show `jt ready` and stop here.
+
+**1C: Git status:**
+```bash
+git branch --show-current && git diff-index --quiet HEAD -- && echo "clean" || echo "dirty"
+```
+
+**Manual Registration** (only if `NO_PRE_REG`):
+```bash
 am-register --name "$AGENT_NAME" --program pi --model "$MODEL_ID"
 tmux rename-session "jat-${AGENT_NAME}" 2>/dev/null
-```
-
-#### 2C: Write Session Identity
-
-For manual sessions, write the identity file so the IDE can track you:
-
-```bash
 mkdir -p .claude/sessions
 echo "$AGENT_NAME" > ".claude/sessions/agent-${SESSION_ID}.txt"
 ```
 
-### STEP 3: Select Task
+### ROUND 2: Signal + Context Search (all parallel)
 
-If a task-id was provided, use it. Otherwise, show available work:
+**Issue ALL of these tool calls in a single message:**
 
+**2A: Starting signal:**
 ```bash
-jt ready --json | jq -r '.[] | "  [P\(.priority)] \(.id) - \(.title)"'
+jat-signal starting '{
+  "agentName": "NAME", "sessionId": "ID", "taskId": "TASK_ID",
+  "taskTitle": "TITLE", "project": "PROJECT", "model": "MODEL_ID",
+  "tools": ["bash","read","write","edit"], "gitBranch": "BRANCH",
+  "gitStatus": "clean", "uncommittedFiles": []
+}'
 ```
 
-If no task-id provided, display recommendations and stop here.
-
-### STEP 4: Search Memory
-
-Search project memory for relevant context from past sessions:
-
+**2B: Memory search:**
 ```bash
-jat-memory search "key terms from task title" --limit 5
+jat-memory search "key terms from task title" --limit 5 2>/dev/null || echo "NO_MEMORY_INDEX"
 ```
 
-Returns JSON with matching chunks (taskId, section, snippet, score). Use results to:
-- Incorporate lessons and gotchas into your approach
-- Avoid repeating documented mistakes
-- Build on established patterns
-
-If no memory index exists, skip silently.
-
-### STEP 5: Review Prior Tasks
-
-Search for related or duplicate work from the last 7 days:
-
+**2C: Prior task search:**
 ```bash
-DATE_7D=$(date -d '7 days ago' +%Y-%m-%d 2>/dev/null || date -v-7d +%Y-%m-%d)
-jt search "$SEARCH_TERM" --updated-after "$DATE_7D" --limit 20 --json
+DATE_7=$(date -d '7 days ago' +%Y-%m-%d 2>/dev/null || date -v-7d +%Y-%m-%d); jt search "$SEARCH_TERM" --updated-after "$DATE_7" --limit 20 --json
 ```
 
-Look for:
-- **Duplicates** (closed tasks with nearly identical titles) - ask user before proceeding
-- **Related work** (same files/features) - note for context
-- **In-progress** by other agents - coordinate to avoid conflicts
+Look for duplicates, related work, and in-progress tasks in similar areas.
 
-### STEP 6: Conflict Detection
+### ROUND 3: Start Work (all parallel)
 
+**Issue BOTH of these tool calls in a single message:**
+
+**3A: Update task status:**
 ```bash
-git diff-index --quiet HEAD --  # Check uncommitted changes
-```
-
-### STEP 7: Start the Task
-
-```bash
-# Update task status and declare files you'll edit
 jt update "$TASK_ID" --status in_progress --assignee "$AGENT_NAME" --files "relevant/files/**"
 ```
 
-### STEP 8: Emit Signals
-
-**Both signals are required before starting actual work.**
-
-#### 8A: Starting Signal
-
-```bash
-jat-signal starting '{
-  "agentName": "AGENT_NAME",
-  "sessionId": "SESSION_ID",
-  "taskId": "TASK_ID",
-  "taskTitle": "TASK_TITLE",
-  "project": "PROJECT",
-  "model": "MODEL_ID",
-  "tools": ["bash", "read", "write", "edit"],
-  "gitBranch": "BRANCH",
-  "gitStatus": "clean",
-  "uncommittedFiles": []
-}'
-```
-
-#### 8B: Working Signal
-
-After reading the task and planning your approach:
-
+**3B: Working signal** (incorporate memory results into approach):
 ```bash
 jat-signal working '{
-  "taskId": "TASK_ID",
-  "taskTitle": "TASK_TITLE",
+  "taskId": "TASK_ID", "taskTitle": "TASK_TITLE",
   "approach": "Brief description of implementation plan",
-  "expectedFiles": ["src/**/*.ts"],
-  "baselineCommit": "COMMIT_HASH"
+  "expectedFiles": ["src/**/*.ts"], "baselineCommit": "COMMIT_HASH"
 }'
 ```
 
-#### 8C: Output Banner
+### Output Banner
 
 ```
 ╔════════════════════════════════════════════════════════════╗

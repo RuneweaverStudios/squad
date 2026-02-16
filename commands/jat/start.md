@@ -32,64 +32,64 @@ argument-hint: [agent-name | task-id | agent-name task-id]
 
 ## Implementation Steps
 
-### STEP 1: Parse Parameters
+**IMPORTANT: Minimize LLM round-trips by issuing independent tool calls in parallel.**
 
-Detect what was passed: task-id, agent-name, both, or none.
+The startup sequence is organized into 3 parallel rounds. Each round issues all its calls simultaneously in a single message, then processes the results before moving to the next round. This cuts startup from ~7 sequential turns to ~3.
 
-```bash
-# Check if param is a valid task
-jt show "$PARAM" --json >/dev/null 2>&1 && PARAM_TYPE="task-id"
+```
+ROUND 1 (parallel) ──► ROUND 2 (parallel) ──► ROUND 3 (parallel) ──► Banner
+  Identity                 Starting signal        Task update
+  Task details             Memory search           Working signal
+  Git status               Prior task search
 ```
 
 ---
 
-### STEP 2: Get/Create Agent
+### ROUND 1: Gather Context (all parallel)
 
-#### 2A: Get Session ID
+**Issue ALL of these tool calls in a single message:**
+
+#### 1A: Identity — Pre-reg check + Session ID (one Bash call)
+
+```bash
+TMUX_SESSION=$(tmux display-message -p '#S' 2>/dev/null); PRE_REG_FILE=".claude/sessions/.tmux-agent-${TMUX_SESSION}"; test -f "$PRE_REG_FILE" && cat "$PRE_REG_FILE" || echo "NO_PRE_REG"
+```
+
 ```bash
 get-current-session-id
 ```
 
-This automatically retries if the session file hasn't been created yet.
+If `NO_PRE_REG` → manual/CLI session, must register (see Manual Registration below).
 
-#### 2B: Check for Pre-Registered Agent (IDE-Spawned)
-
-**IDE-spawned agents are already registered.** The spawn API:
-- Generates the agent name
-- Registers it in the Agent Registry database
-- Creates the tmux session as `jat-{AgentName}`
-- Writes an identity file for the agent to read
+#### 1B: Task Details
 
 ```bash
-# Check if agent was pre-registered by IDE spawn API
-TMUX_SESSION=$(tmux display-message -p '#S' 2>/dev/null)
-PRE_REG_FILE=".claude/sessions/.tmux-agent-${TMUX_SESSION}"
-if [[ -f "$PRE_REG_FILE" ]]; then
-    AGENT_NAME=$(cat "$PRE_REG_FILE")
-    echo "✓ Using pre-registered agent: $AGENT_NAME"
-    # Skip Steps 2C and 2D - registration, tmux naming, and session file already done
-fi
+jt show "$TASK_ID" --json
 ```
 
-If the pre-registration file exists:
-- Use that agent name
-- Skip Steps 2C and 2D entirely (registration, tmux naming, and session file all done by spawn API + hook)
-- Proceed directly to Step 3
+**If no task-id was provided**, show recommendations and EXIT instead:
+```bash
+jt ready --json | jq -r '.[] | "  [\(.priority)] \(.id) - \(.title)"'
+```
 
-#### 2C: Register Agent (Manual/CLI Only)
+#### 1C: Git Status
 
-**Only needed if NOT spawned by IDE** (no pre-registration file found):
+```bash
+git branch --show-current && git diff-index --quiet HEAD -- && echo "clean" || echo "dirty"
+```
+
+**All three calls above go out in one parallel batch.** Wait for results before Round 2.
+
+#### Manual Registration (only if NO_PRE_REG)
+
+If not pre-registered by IDE, register before proceeding:
 
 ```bash
 am-register --name "$AGENT_NAME" --program claude-code --model sonnet-4.5
 tmux rename-session "jat-${AGENT_NAME}"
 ```
 
-#### 2D: Write Session File
-
-**Only needed for Manual/CLI** - the SessionStart hook automatically writes this for IDE-spawned agents (by reading the `.tmux-agent-{session}` file).
-
-For manual/CLI sessions only:
+Then write session file:
 ```bash
 mkdir -p .claude/sessions
 # Use Write tool: Write(.claude/sessions/agent-{session_id}.txt, "AgentName")
@@ -97,72 +97,54 @@ mkdir -p .claude/sessions
 
 ---
 
-### STEP 3: Select Task
+### ROUND 2: Signal + Context Search (all parallel, skip searches with quick mode)
 
-**If task-id provided** → continue to Step 4
+**Issue ALL of these tool calls in a single message.** These all depend on Round 1 results (agent name, session ID, task title, git status) but are independent of each other.
 
-**If no task-id** → show recommendations and EXIT:
-
-```bash
-jt ready --json | jq -r '.[] | "  [\(.priority)] \(.id) - \(.title)"'
-```
-
----
-
-### STEP 4: Search Memory (skip with quick mode)
-
-**Search project memory for relevant context from past sessions.**
-
-This surfaces lessons, patterns, gotchas, and approaches from previous work on related areas.
+#### 2A: Emit Starting Signal
 
 ```bash
-# Extract key terms from task title and description
-# Search project memory for relevant entries
-jat-memory search "key terms from task title" --limit 5
+jat-signal starting '{
+  "agentName": "AgentName",
+  "sessionId": "abc123-...",
+  "taskId": "jat-xyz",
+  "taskTitle": "Task title",
+  "project": "projectname",
+  "model": "claude-opus-4-5-20251101",
+  "tools": ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebFetch", "WebSearch", "Task", "AskUserQuestion"],
+  "gitBranch": "master",
+  "gitStatus": "clean",
+  "uncommittedFiles": []
+}'
 ```
 
-The search returns JSON with matching memory chunks. Each result includes:
-- `path` - Memory file name
-- `taskId` - The task that created this memory
-- `section` - Which section matched (summary, approach, decisions, lessons, etc.)
-- `snippet` - The matching text
-- `score` - Relevance score
+**Required fields:**
+- `agentName` - Your assigned agent name
+- `sessionId` - Claude Code session ID (from Round 1)
+- `project` - Project name (e.g., "jat", "chimaro")
+- `model` - Full model ID (e.g., "claude-opus-4-6")
+- `tools` - Array of available tools in this session
+- `gitBranch` - Current git branch name
+- `gitStatus` - "clean" or "dirty"
+- `uncommittedFiles` - Array of modified file paths (if dirty)
 
-**Output format** (if results found):
+#### 2B: Search Memory
+
+```bash
+jat-memory search "key terms from task title" --limit 5 2>/dev/null || echo "NO_MEMORY_INDEX"
 ```
-┌─ MEMORY: Found N relevant entries ──────────────────────────────┐
-│                                                                 │
-│  From jat-abc "Fix OAuth timeout":                              │
-│    [lessons] Always use env vars for timeout values             │
-│    [approach] Traced OAuth flow end-to-end, found upstream...   │
-│                                                                 │
-│  From jat-def "Add login page":                                 │
-│    [gotchas] Refresh endpoint returns 200 on partial failures   │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
+
+Extract key terms from the task title and description. If no memory index exists, skip silently.
 
 **How to use memory results:**
 - Incorporate relevant lessons and gotchas into your approach
 - Avoid repeating mistakes documented in past sessions
 - Build on patterns established by previous agents
-- Reference specific files and line numbers mentioned in memories
 
-**If no memory index exists** (first run), skip silently. Memory builds up over time as tasks complete.
-
-**If no results found**, proceed to Step 5.
-
----
-
-### STEP 5: Review Prior Tasks (skip with quick mode)
-
-**Search for related or duplicate work before starting.**
-
-This helps avoid duplicate effort and surfaces relevant context from recent work.
+#### 2C: Search Prior Tasks
 
 ```bash
-DATE_7_DAYS_AGO=$(date -d '7 days ago' +%Y-%m-%d 2>/dev/null || date -v-7d +%Y-%m-%d)
-jt search "$SEARCH_TERM" --updated-after "$DATE_7_DAYS_AGO" --limit 20 --json
+DATE_7=$(date -d '7 days ago' +%Y-%m-%d 2>/dev/null || date -v-7d +%Y-%m-%d); jt search "$SEARCH_TERM" --updated-after "$DATE_7" --limit 20 --json
 ```
 
 **What to look for:**
@@ -174,63 +156,17 @@ jt search "$SEARCH_TERM" --updated-after "$DATE_7_DAYS_AGO" --limit 20 --json
 
 ---
 
-### STEP 6: Conflict Detection (skip with quick mode)
+### ROUND 3: Start Work (all parallel)
 
-```bash
-git diff-index --quiet HEAD --  # Check uncommitted changes
-jt show "$TASK_ID" --json | jq -r '.[0].dependencies[]'  # Check deps
-```
+**Issue BOTH of these tool calls in a single message.** Use memory and prior task results to inform your approach.
 
----
-
-### STEP 7: Start Task
+#### 3A: Update Task Status
 
 ```bash
 jt update "$TASK_ID" --status in_progress --assignee "$AGENT_NAME" --files "relevant/files/**"
 ```
 
----
-
-### STEP 8: Emit Signals & Begin Work
-
-**CRITICAL: You must emit BOTH signals in sequence before starting actual work.**
-
-The IDE tracks agent state through these signals. Without them, your session shows incorrect status.
-
-#### 8A: Emit Starting Signal (immediately after registration)
-
-```bash
-jat-signal starting '{
-  "agentName": "AgentName",
-  "sessionId": "abc123-...",
-  "taskId": "jat-xyz",
-  "taskTitle": "Task title",
-  "project": "projectname",
-  "model": "claude-opus-4-5-20251101",
-  "tools": ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebFetch", "WebSearch", "Task", "TodoWrite", "AskUserQuestion"],
-  "gitBranch": "master",
-  "gitStatus": "clean",
-  "uncommittedFiles": []
-}'
-```
-
-**Required fields:**
-- `agentName` - Your assigned agent name
-- `sessionId` - Claude Code session ID (from get-current-session-id)
-- `project` - Project name (e.g., "jat", "chimaro")
-- `model` - Full model ID (e.g., "claude-opus-4-5-20251101", "claude-sonnet-4-20250514")
-- `tools` - Array of available tools in this session
-- `gitBranch` - Current git branch name
-- `gitStatus` - "clean" or "dirty"
-- `uncommittedFiles` - Array of modified file paths (if dirty)
-
-**Optional fields:**
-- `taskId` - Task ID if starting on a specific task
-- `taskTitle` - Task title if starting on a specific task
-
-#### 8B: Emit Working Signal (REQUIRED before coding)
-
-**Do NOT skip this step.** After reading the task, reviewing memory results, and planning your approach, emit the working signal:
+#### 3B: Emit Working Signal
 
 ```bash
 jat-signal working '{
@@ -245,29 +181,30 @@ jat-signal working '{
 **Required fields:**
 - `taskId` - The task ID you're working on
 - `taskTitle` - The task title
-- `approach` - Brief description of your implementation plan
+- `approach` - Brief description of your implementation plan (incorporate memory results)
 
 **Optional fields:**
 - `expectedFiles` - Array of file patterns you expect to modify
 - `baselineCommit` - Current commit hash before changes
 
-#### 8C: Output the Banner
+---
 
-After BOTH signals are emitted, output the banner:
+### Output the Banner
+
+After Round 3 completes, output:
 ```
 ╔════════════════════════════════════════════════════════╗
-║         🚀 STARTING WORK: {TASK_ID}                    ║
+║         STARTING WORK: {TASK_ID}                       ║
 ╚════════════════════════════════════════════════════════╝
 
-✅ Agent: {AGENT_NAME}
-📋 Task: {TASK_TITLE}
-🎯 Priority: P{X}
-🧠 Memory: {N relevant entries found | no index yet | no matches}
+Agent: {AGENT_NAME}
+Task: {TASK_TITLE}
+Priority: P{X}
+Memory: {N relevant entries found | no index yet | no matches}
 
-┌─ APPROACH ──────────────────────────────────────────────┐
-│  {YOUR_APPROACH_DESCRIPTION}                            │
-│  (incorporating lessons from past sessions if any)      │
-└─────────────────────────────────────────────────────────┘
+APPROACH:
+  {YOUR_APPROACH_DESCRIPTION}
+  (incorporating lessons from past sessions if any)
 ```
 
 ---
