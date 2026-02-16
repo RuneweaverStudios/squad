@@ -15,7 +15,7 @@
  *   Format: [{ timestamp: ISO string, tokens: number, cost: number }, ...]
  *
  * Query params:
- * - lines: Number of output lines to capture (default: 50, max: 500)
+ * - lines: Number of output lines to capture (default: 50, max: 200)
  */
 
 import { json } from '@sveltejs/kit';
@@ -24,7 +24,7 @@ import { promisify } from 'util';
 import { readFileSync, existsSync, statSync } from 'fs';
 import { getTasks } from '$lib/server/jat-tasks.js';
 import { getAgentUsageAsync, getAgentHourlyUsageAsync, getAgentContextPercent } from '$lib/utils/tokenUsage.js';
-import { apiCache, cacheKey, CACHE_TTL } from '$lib/server/cache.js';
+import { apiCache, cacheKey, CACHE_TTL, singleFlight } from '$lib/server/cache.js';
 import { SIGNAL_TTL } from '$lib/config/constants.js';
 
 const execAsync = promisify(exec);
@@ -368,7 +368,9 @@ function agentUsageCacheKey(agentName) {
 export async function GET({ url }) {
 	try {
 		const linesParam = url.searchParams.get('lines');
-		const lines = Math.min(Math.max(parseInt(linesParam || '50', 10) || 50, 1), 500);
+		// Cap at 200 lines max (down from 500). WebSocket streams real-time output,
+		// so HTTP polling only needs enough for state detection + initial display.
+		const lines = Math.min(Math.max(parseInt(linesParam || '50', 10) || 50, 1), 200);
 		// Only fetch token usage/sparkline if requested (slow operation)
 		const includeUsage = url.searchParams.get('usage') === 'true';
 		// Force task cache refresh (used after spawn to ensure new task assignments are visible)
@@ -377,9 +379,45 @@ export async function GET({ url }) {
 		if (bustCache) {
 			// Reset cache timestamp to force refresh
 			taskCacheTimestamp = 0;
+			apiCache.invalidate('work*');
 		}
 
-		// Step 1: List jat-* tmux sessions
+		const responseCacheKey = cacheKey('work', {
+			lines: String(lines),
+			usage: includeUsage ? 'true' : undefined
+		});
+
+		// Bust cache: skip cached result but still deduplicate concurrent requests
+		if (bustCache) {
+			apiCache.delete(responseCacheKey);
+		}
+
+		// singleFlight: cache + request deduplication in one call.
+		// Prevents thundering herd when multiple polls arrive concurrently.
+		const responseData = await singleFlight(
+			responseCacheKey,
+			() => computeWorkData(lines, includeUsage),
+			CACHE_TTL.MEDIUM // 5s — SSE handles real-time updates
+		);
+
+		return json(responseData);
+	} catch (error) {
+		console.error('Error in GET /api/work:', error);
+		return json({
+			error: 'Internal server error',
+			message: error instanceof Error ? error.message : String(error)
+		}, { status: 500 });
+	}
+}
+
+/**
+ * Core computation for work session data.
+ * Extracted to enable single-flight deduplication.
+ * @param {number} lines
+ * @param {boolean} includeUsage
+ */
+async function computeWorkData(lines, includeUsage) {
+	// Step 1: List jat-* tmux sessions
 		const sessionsCommand = `tmux list-sessions -F "#{session_name}:#{session_created}:#{session_attached}" 2>/dev/null || echo ""`;
 
 		let sessionsOutput = '';
@@ -388,23 +426,23 @@ export async function GET({ url }) {
 			sessionsOutput = stdout.trim();
 		} catch (err) {
 			// No tmux server or no sessions - return empty
-			return json({
+			return {
 				success: true,
 				sessions: [],
 				count: 0,
 				stateCounts: { needsInput: 0, working: 0, review: 0, completed: 0, starting: 0, idle: 0 },
 				timestamp: new Date().toISOString()
-			});
+			};
 		}
 
 		if (!sessionsOutput) {
-			return json({
+			return {
 				success: true,
 				sessions: [],
 				count: 0,
 				stateCounts: { needsInput: 0, working: 0, review: 0, completed: 0, starting: 0, idle: 0 },
 				timestamp: new Date().toISOString()
-			});
+			};
 		}
 
 		// Parse sessions and filter for jat-* prefix (excluding jat-pending-* which are still being set up)
@@ -424,13 +462,13 @@ export async function GET({ url }) {
 			.filter(session => !session.name.startsWith('jat-pending-'));
 
 		if (rawSessions.length === 0) {
-			return json({
+			return {
 				success: true,
 				sessions: [],
 				count: 0,
 				stateCounts: { needsInput: 0, working: 0, review: 0, completed: 0, starting: 0, idle: 0 },
 				timestamp: new Date().toISOString()
-			});
+			};
 		}
 
 		// Step 1b: Skip terminal resize - now handled at session creation time
@@ -489,7 +527,99 @@ export async function GET({ url }) {
 		// Step 3: Get project path for token usage
 		const projectPath = process.cwd().replace('/ide', '');
 
-		// Step 4: Build WorkSession for each tmux session
+		// Step 3b: Pre-read signal states for all sessions (cheap sync FS reads).
+		// This lets us skip terminal capture for idle/completed sessions, which is
+		// the single biggest optimization: with 29 sessions, ~15 may be idle and
+		// capturing their terminal output is wasted work.
+		/** @type {Map<string, string>} */
+		const preSignalStates = new Map();
+		/** @type {Set<string>} */
+		const activeSessionNames = new Set();
+
+		for (const session of rawSessions) {
+			const agentName = session.name.replace(/^jat-/, '');
+			const signalState = readSignalState(session.name);
+			if (signalState) {
+				preSignalStates.set(session.name, signalState);
+			}
+
+			// Session is "active" (needs terminal capture) if:
+			// 1. It has an in_progress task, OR
+			// 2. Its signal state indicates active work (not idle/completed), OR
+			// 3. It has no signal AND no task — but was recently completed (has lastCompleted)
+			//    → skip capture, it's idle
+			// 4. It has no signal AND no task AND no lastCompleted — unknown, capture to detect
+			const hasActiveTask = agentTaskMap.has(agentName);
+			const hasCompletedRecently = agentLastCompletedMap.has(agentName);
+
+			if (hasActiveTask) {
+				// Has in_progress task — definitely active
+				activeSessionNames.add(session.name);
+			} else if (signalState) {
+				// Has signal — check if it's an active state
+				if (!['idle', 'completed'].includes(signalState)) {
+					activeSessionNames.add(session.name);
+				}
+			} else if (!hasCompletedRecently) {
+				// No task, no signal, no recent completion — unknown state,
+				// capture to detect (might be starting up or in an unusual state)
+				activeSessionNames.add(session.name);
+			}
+			// else: no task + no signal + recently completed = idle, skip capture
+		}
+
+		// Step 4: Capture terminal output ONLY for active sessions.
+		// Idle/completed sessions get empty output — no need to capture their
+		// terminal when they're just sitting at a prompt doing nothing.
+		// Previously captured ALL sessions (29+), now only active ones (~10-15).
+		/** @type {Map<string, { output: string, lineCount: number }>} */
+		const captureMap = new Map();
+
+		{
+			const sessionsToCap = rawSessions
+				.filter(s => activeSessionNames.has(s.name))
+				.map(s => s.name);
+
+			if (sessionsToCap.length > 0) {
+				// Build a single shell command that captures active sessions with delimiters.
+				const DELIM = '___JAT_SESSION_DELIM___';
+				const captureScript = sessionsToCap.map(name =>
+					`echo '${DELIM}${name}${DELIM}'; tmux capture-pane -p -e -t '${name}' -S -${lines} 2>/dev/null || true`
+				).join('; ');
+
+				try {
+					const { stdout } = await execAsync(captureScript, {
+						maxBuffer: 512 * 1024 * Math.max(sessionsToCap.length, 1)
+					});
+
+					// Parse the delimited output into per-session data
+					const sections = stdout.split(DELIM);
+					// sections format: ['', sessionName1, '\noutput1', sessionName2, '\noutput2', ...]
+					for (let i = 1; i < sections.length - 1; i += 2) {
+						const name = sections[i];
+						const rawOutput = sections[i + 1] || '';
+						// Trim leading newline from output (echo adds \n after delimiter line)
+						const output = rawOutput.startsWith('\n') ? rawOutput.slice(1) : rawOutput;
+						captureMap.set(name, {
+							output,
+							lineCount: output.split('\n').length
+						});
+					}
+				} catch {
+					// If batch capture fails, initialize empty entries
+				}
+			}
+
+			// Ensure all sessions have entries — active ones that failed get empty,
+			// idle/completed ones always get empty (no capture attempted)
+			for (const session of rawSessions) {
+				if (!captureMap.has(session.name)) {
+					captureMap.set(session.name, { output: '', lineCount: 0 });
+				}
+			}
+		}
+
+		// Step 5: Build WorkSession for each tmux session (no more subprocess calls in here)
 		/** @type {WorkSession[]} */
 		const workSessions = await Promise.all(
 			rawSessions.map(async (session) => {
@@ -506,19 +636,10 @@ export async function GET({ url }) {
 				/** @type {Task|null} */
 				const lastCompletedTask = /** @type {Task|undefined} */ (agentLastCompletedMap.get(agentName)) || null;
 
-				// Capture output
-				let output = '';
-				let lineCount = 0;
-				try {
-					const captureCommand = `tmux capture-pane -p -e -t "${session.name}" -S -${lines}`;
-					const { stdout } = await execAsync(captureCommand, { maxBuffer: 1024 * 1024 * 5 });
-					output = stdout;
-					lineCount = stdout.split('\n').length;
-				} catch (err) {
-					// Session might have closed, continue with empty output
-					output = '';
-					lineCount = 0;
-				}
+				// Use pre-captured output from Step 4
+				const captured = captureMap.get(session.name) || { output: '', lineCount: 0 };
+				const output = captured.output;
+				const lineCount = captured.lineCount;
 
 				// Get token usage for today (only if requested - slow operation)
 				let tokens = 0;
@@ -582,8 +703,16 @@ export async function GET({ url }) {
 					}
 				}
 
-				// Detect session state - prefers signal file over marker parsing
-				const sessionState = detectSessionState(output, task, lastCompletedTask, session.name);
+				// Detect session state - for skipped (idle) sessions, use pre-read
+				// signal or infer from task data. For active sessions, do full detection.
+				let sessionState;
+				if (!activeSessionNames.has(session.name)) {
+					// Skipped session — use pre-read signal or infer idle/completed
+					const preSignal = preSignalStates.get(session.name);
+					sessionState = preSignal || (lastCompletedTask ? 'completed' : 'idle');
+				} else {
+					sessionState = detectSessionState(output, task, lastCompletedTask, session.name);
+				}
 
 				return {
 					sessionName: session.name,
@@ -640,18 +769,11 @@ export async function GET({ url }) {
 			}
 		});
 
-		return json({
+		return {
 			success: true,
 			sessions: workSessions,
 			count: workSessions.length,
 			stateCounts,
 			timestamp: new Date().toISOString()
-		});
-	} catch (error) {
-		console.error('Error in GET /api/work:', error);
-		return json({
-			error: 'Internal server error',
-			message: error instanceof Error ? error.message : String(error)
-		}, { status: 500 });
-	}
+		};
 }

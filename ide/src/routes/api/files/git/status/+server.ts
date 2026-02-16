@@ -7,11 +7,19 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getGitForProject, formatGitError } from '$lib/server/git.js';
+import { apiCache, cacheKey, CACHE_TTL } from '$lib/server/cache.js';
 
 export const GET: RequestHandler = async ({ url }) => {
 	const projectName = url.searchParams.get('project');
 	if (!projectName) {
 		throw error(400, 'Missing required parameter: project');
+	}
+
+	// Cache git status for 10 seconds — git operations are expensive on large repos
+	const key = cacheKey('git-status', { project: projectName });
+	const cached = apiCache.get(key);
+	if (cached) {
+		return json(cached);
 	}
 
 	const result = await getGitForProject(projectName);
@@ -66,7 +74,7 @@ export const GET: RequestHandler = async ({ url }) => {
 			// Stash list may fail on fresh repos with no stash
 		}
 
-		return json({
+		const responseData = {
 			project: projectName,
 			projectPath,
 			current: status.current,
@@ -82,7 +90,12 @@ export const GET: RequestHandler = async ({ url }) => {
 			conflicted: status.conflicted,
 			isClean: status.isClean(),
 			stashCount
-		});
+		};
+
+		// Cache for 10 seconds
+		apiCache.set(key, responseData, 10000);
+
+		return json(responseData);
 	} catch (err) {
 		const gitError = formatGitError(err as Error);
 		throw error(gitError.status, gitError.error);

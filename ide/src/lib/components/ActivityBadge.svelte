@@ -12,7 +12,7 @@
 	 * - Task completion history
 	 */
 
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import AnimatedDigits from './AnimatedDigits.svelte';
 	import AnimatedCost from './AnimatedCost.svelte';
 	import Sparkline from './Sparkline.svelte';
@@ -118,6 +118,11 @@
 	let justIncremented = $state(false);
 	let hitMilestone = $state(false);
 	let milestoneNumber = $state(0);
+	let completedTasksInterval: ReturnType<typeof setInterval> | null = null;
+	let justIncrementedTimeout: ReturnType<typeof setTimeout> | null = null;
+	let hitMilestoneTimeout: ReturnType<typeof setTimeout> | null = null;
+	let completedTasksAbortController: AbortController | null = null;
+	let completedTasksInFlight = false;
 
 	const MILESTONES = [5, 10, 25, 50, 100];
 
@@ -188,23 +193,30 @@
 
 	// Fetch completed tasks
 	async function fetchCompletedToday() {
+		if (completedTasksInFlight) {
+			completedTasksAbortController?.abort();
+		}
+
+		const controller = new AbortController();
+		completedTasksAbortController = controller;
+		completedTasksInFlight = true;
+
 		try {
-			const response = await fetch('/api/tasks?status=closed');
+			// Only fetch tasks closed today — avoids pulling entire closed task history
+			const today = new Date();
+			today.setHours(0, 0, 0, 0);
+			const closedAfter = today.toISOString();
+			const response = await fetch(`/api/tasks?status=closed&closedAfter=${encodeURIComponent(closedAfter)}`, {
+				signal: controller.signal
+			});
 			if (!response.ok) return;
 
 			const data = await response.json();
-			const today = new Date();
-			today.setHours(0, 0, 0, 0);
 
 			allClosedTasks = data.tasks || [];
 
-			const completedToday = allClosedTasks.filter((task: CompletedTask) => {
-				if (!task.updated_at) return false;
-				const taskDate = new Date(task.updated_at);
-				return taskDate >= today;
-			});
-
-			completedToday.sort((a, b) =>
+			// Server already filters by closedAfter — just sort
+			const completedToday = [...allClosedTasks].sort((a: CompletedTask, b: CompletedTask) =>
 				new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
 			);
 
@@ -212,13 +224,21 @@
 
 			if (newCount > completedCount && completedCount > 0) {
 				justIncremented = true;
-				setTimeout(() => { justIncremented = false; }, 1000);
+				if (justIncrementedTimeout) clearTimeout(justIncrementedTimeout);
+				justIncrementedTimeout = setTimeout(() => {
+					justIncremented = false;
+					justIncrementedTimeout = null;
+				}, 1000);
 
 				const crossedMilestone = MILESTONES.find(m => newCount >= m && completedCount < m);
 				if (crossedMilestone) {
 					hitMilestone = true;
 					milestoneNumber = crossedMilestone;
-					setTimeout(() => { hitMilestone = false; }, 2000);
+					if (hitMilestoneTimeout) clearTimeout(hitMilestoneTimeout);
+					hitMilestoneTimeout = setTimeout(() => {
+						hitMilestone = false;
+						hitMilestoneTimeout = null;
+					}, 2000);
 				}
 			}
 
@@ -226,15 +246,55 @@
 			tasks = completedToday;
 			loading = false;
 		} catch (error) {
+			if (error instanceof Error && error.name === 'AbortError') {
+				return;
+			}
 			console.error('Error fetching completed tasks:', error);
 			loading = false;
+		} finally {
+			if (completedTasksAbortController === controller) {
+				completedTasksAbortController = null;
+			}
+			completedTasksInFlight = false;
 		}
 	}
 
 	onMount(() => {
 		fetchCompletedToday();
-		const interval = setInterval(fetchCompletedToday, 30000);
-		return () => clearInterval(interval);
+		completedTasksInterval = setInterval(fetchCompletedToday, 30000);
+		return () => {
+			if (completedTasksInterval) {
+				clearInterval(completedTasksInterval);
+				completedTasksInterval = null;
+			}
+		};
+	});
+
+	onDestroy(() => {
+		if (dropdownTimeout) {
+			clearTimeout(dropdownTimeout);
+			dropdownTimeout = null;
+		}
+		if (searchDebounceTimer) {
+			clearTimeout(searchDebounceTimer);
+			searchDebounceTimer = null;
+		}
+		if (justIncrementedTimeout) {
+			clearTimeout(justIncrementedTimeout);
+			justIncrementedTimeout = null;
+		}
+		if (hitMilestoneTimeout) {
+			clearTimeout(hitMilestoneTimeout);
+			hitMilestoneTimeout = null;
+		}
+		if (completedTasksInterval) {
+			clearInterval(completedTasksInterval);
+			completedTasksInterval = null;
+		}
+		if (completedTasksAbortController) {
+			completedTasksAbortController.abort();
+			completedTasksAbortController = null;
+		}
 	});
 
 	// Focus search input when dropdown opens

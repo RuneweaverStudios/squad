@@ -29,7 +29,7 @@ import { json } from '@sveltejs/kit';
 import { getAgents, getReservations, getTaskActivities, getAgentCounts } from '$lib/server/agent-mail.js';
 import { getTasks } from '$lib/server/jat-tasks.js';
 import { getAllAgentUsageAsync, getHourlyUsageAsync, getAgentHourlyUsageAsync, getAgentContextPercent } from '$lib/utils/tokenUsage.js';
-import { apiCache, cacheKey, CACHE_TTL, invalidateCache } from '$lib/server/cache.js';
+import { apiCache, cacheKey, CACHE_TTL, invalidateCache, singleFlight } from '$lib/server/cache.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { trackApiPerformance } from '$lib/utils/performance';
@@ -232,7 +232,9 @@ export async function GET({ url, locals }) {
 	// Determine TTL based on whether usage is included (expensive operation)
 	const ttl = includeUsage ? CACHE_TTL.LONG : CACHE_TTL.SHORT;
 
-	// Check cache (skip if forceFresh requested)
+	// singleFlight: cache + deduplication in one call.
+	// If 5 concurrent requests arrive for the same key, only the first computes;
+	// the rest share that result.
 	if (!forceFresh) {
 		const cached = apiCache.get(key);
 		if (cached) {
@@ -242,345 +244,15 @@ export async function GET({ url, locals }) {
 		}
 	}
 
-	locals.logger?.info({
-		projectFilter,
-		agentFilter,
-		includeUsage,
-		includeHourly,
-		includeActivities,
-		rangeParam
-	}, 'Fetching full agent orchestration data');
-
 	try {
-		// Parse date range parameters
-		const dateRange = parseDateRange(url.searchParams);
-
-		const projectPath = process.cwd().replace('/ide', '');
-
-		// Fetch core data (agents, reservations, tasks) - always needed
-		/** @type {Agent[]} */
-		const agents = getAgents(undefined);  // Show all agents (don't filter by project)
-		/** @type {Reservation[]} */
-		const reservations = getReservations(agentFilter, undefined);  // Show all reservations
-		/** @type {Task[]} */
-		const tasks = getCachedTasks(projectFilter, forceFresh);  // Filter tasks only (cached to avoid expensive JSONL parsing)
-
-		// Fetch tmux session status to determine which agents have active sessions
-		// Also get session creation time for "connecting" state detection
-		/** @type {Map<string, number>} */
-		const agentSessionCreatedAt = new Map();
-		try {
-			const { stdout } = await execAsync(
-				'tmux list-sessions -F "#{session_name}:#{session_created}" 2>/dev/null'
-			);
-			stdout.trim().split('\n').forEach(line => {
-				const [sessionName, createdUnix] = line.split(':');
-				// Extract agent name from session name (jat-AgentName -> AgentName)
-				if (sessionName.startsWith('jat-')) {
-					const agentName = sessionName.replace('jat-', '');
-					// Store creation timestamp (unix seconds)
-					agentSessionCreatedAt.set(agentName, parseInt(createdUnix, 10) * 1000);
-				}
-			});
-		} catch {
-			// No tmux server or no sessions - that's fine, map will be empty
-		}
-		// For backward compat: create Set for hasSession check
-		const agentsWithSessions = new Set(agentSessionCreatedAt.keys());
-
-		// Optionally fetch token usage data (using worker threads to avoid blocking)
-		/** @type {Map<string, import('$lib/utils/tokenUsage.js').TokenUsage> | null} */
-		let usageToday = null;
-		/** @type {Map<string, import('$lib/utils/tokenUsage.js').TokenUsage> | null} */
-		let usageWeek = null;
-		/** @type {Map<string, import('$lib/utils/tokenUsage.js').HourlyUsage[]>} */
-		const agentSparklineData = new Map();
-		/** @type {Map<string, number | null>} */
-		const agentContextPercent = new Map();
-
-		if (includeUsage) {
-			locals.logger?.debug('Fetching token usage data...');
-			const usageStart = Date.now();
-
-			// Fetch aggregated usage data
-			[usageToday, usageWeek] = await Promise.all([
-				getAllAgentUsageAsync('today', projectPath),
-				getAllAgentUsageAsync('week', projectPath)
-			]);
-
-			// Fetch per-agent sparklineData and contextPercent for agents with active sessions
-			// (only for agents that have tmux sessions - others don't need sparklines)
-			const agentsWithActiveSessions = agents.filter(a => agentsWithSessions.has(a.name));
-			await Promise.all(
-				agentsWithActiveSessions.map(async (agent) => {
-					try {
-						const [sparkline, contextPct] = await Promise.all([
-							getAgentHourlyUsageAsync(agent.name, projectPath),
-							getAgentContextPercent(agent.name, projectPath)
-						]);
-						agentSparklineData.set(agent.name, sparkline);
-						agentContextPercent.set(agent.name, contextPct);
-					} catch (err) {
-						locals.logger?.debug({ agent: agent.name, error: err }, 'Failed to fetch agent usage data');
-					}
-				})
-			);
-
-			locals.logger?.info({
-				duration: Date.now() - usageStart,
-				agentCount: agentsWithActiveSessions.length
-			}, 'Token usage data fetched');
-		}
-
-		// Optionally fetch hourly token usage data (raw data for sparklines, using worker threads)
-		/** @type {import('$lib/utils/tokenUsage.js').HourlyUsage[] | null} */
-		let hourlyUsage = null;
-		if (includeHourly) {
-			hourlyUsage = await getHourlyUsageAsync(projectPath);
-		}
-
-		// Calculate agent statistics
-		const agentStats = agents.map(agent => {
-			// Count reservations per agent
-			const agentReservations = reservations.filter(r => r.agent_name === agent.name);
-
-			// Count tasks assigned to agent
-			const agentTasks = tasks.filter(t => t.assignee === agent.name);
-			const openTasks = agentTasks.filter(t => t.status === 'open').length;
-			const inProgressTasks = agentTasks.filter(t => t.status === 'in_progress').length;
-
-			// Determine if agent is active based on reservations or active tasks
-			const hasActiveReservations = agentReservations.some(r => {
-				const expiresAt = new Date(r.expires_ts);
-				return expiresAt > new Date() && !r.released_ts;
-			});
-
-			// Get recent activities from JAT task history (last 10 task updates)
-			/** @type {Activity[]} */
-			let activities = [];
-			if (includeActivities) {
-				try {
-					activities = getTaskActivities(agent.name, tasks);
-				} catch (err) {
-					console.error(`Failed to fetch activities for agent ${agent.name}:`, err);
-					// Continue with empty activities array
-				}
-			}
-
-			// Apply date range filtering to activities if requested
-			/** @type {Activity[]} */
-			let filteredActivities = activities;
-			/** @type {number | null} */
-			let activityInRange = null;
-			/** @type {string | null} */
-			let lastActiveInRange = null;
-
-			if (dateRange.hasRange && activities.length > 0) {
-				filteredActivities = filterActivitiesByDateRange(activities, dateRange.from, dateRange.to);
-				activityInRange = filteredActivities.length;
-
-				// Find the most recent activity in range
-				if (filteredActivities.length > 0) {
-					const sorted = [...filteredActivities].sort((a, b) =>
-						new Date(b.ts).getTime() - new Date(a.ts).getTime()
-					);
-					lastActiveInRange = sorted[0]?.ts || null;
-				}
-			}
-
-			// Also check task updates within range
-			if (dateRange.hasRange) {
-				const tasksInRange = agentTasks.filter(t =>
-					isInDateRange(t.updated_at, dateRange.from, dateRange.to)
-				);
-
-				// Update activity count to include tasks if higher
-				const taskActivityCount = tasksInRange.length;
-				if (activityInRange === null) {
-					activityInRange = taskActivityCount;
-				} else {
-					activityInRange = Math.max(activityInRange, taskActivityCount);
-				}
-
-				// Update last active if a task was updated more recently
-				const lastTaskUpdate = tasksInRange
-					.map(t => new Date(t.updated_at))
-					.sort((a, b) => b.getTime() - a.getTime())[0];
-
-				if (lastTaskUpdate) {
-					if (!lastActiveInRange || new Date(lastTaskUpdate) > new Date(lastActiveInRange)) {
-						lastActiveInRange = lastTaskUpdate.toISOString();
-					}
-				}
-			}
-
-			// Check reservations in date range
-			if (dateRange.hasRange) {
-				const reservationsInRange = agentReservations.filter(r =>
-					isInDateRange(r.created_ts, dateRange.from, dateRange.to)
-				);
-
-				if (reservationsInRange.length > 0) {
-					activityInRange = (activityInRange || 0) + reservationsInRange.length;
-
-					const lastReservation = reservationsInRange
-						.map(r => new Date(r.created_ts))
-						.sort((a, b) => b.getTime() - a.getTime())[0];
-
-					if (lastReservation) {
-						if (!lastActiveInRange || lastReservation > new Date(lastActiveInRange)) {
-							lastActiveInRange = lastReservation.toISOString();
-						}
-					}
-				}
-			}
-
-			/** @type {any} */
-			const baseStats = {
-				...agent,
-				reservation_count: agentReservations.length,
-				task_count: agentTasks.length,
-				open_tasks: openTasks,
-				in_progress_tasks: inProgressTasks,
-				active: hasActiveReservations || inProgressTasks > 0,
-				hasSession: agentsWithSessions.has(agent.name),
-				// Session creation timestamp for "connecting" state detection
-				session_created_ts: agentSessionCreatedAt.get(agent.name) || null,
-				activities: filteredActivities
-			};
-
-			// Add date range specific stats if applicable
-			if (dateRange.hasRange) {
-				baseStats.activityInRange = activityInRange || 0;
-				baseStats.lastActiveInRange = lastActiveInRange;
-			}
-
-			// Optionally include token usage data
-			if (includeUsage && usageToday && usageWeek) {
-				const todayUsage = usageToday.get(agent.name);
-				const weekUsage = usageWeek.get(agent.name);
-
-				baseStats.usage = {
-					today: todayUsage ? {
-						total_tokens: todayUsage.total_tokens,
-						cost: todayUsage.cost,
-						sessionCount: todayUsage.sessionCount
-					} : { total_tokens: 0, cost: 0, sessionCount: 0 },
-					week: weekUsage ? {
-						total_tokens: weekUsage.total_tokens,
-						cost: weekUsage.cost,
-						sessionCount: weekUsage.sessionCount
-					} : { total_tokens: 0, cost: 0, sessionCount: 0 }
-				};
-
-				// Include per-agent sparklineData and contextPercent
-				const sparkline = agentSparklineData.get(agent.name);
-				if (sparkline && sparkline.length > 0) {
-					baseStats.sparklineData = sparkline;
-				}
-				const contextPct = agentContextPercent.get(agent.name);
-				if (contextPct !== undefined) {
-					baseStats.contextPercent = contextPct;
-				}
-			}
-
-			return baseStats;
-		});
-
-		// Group reservations by agent for easy lookup
-		/** @type {Record<string, Reservation[]>} */
-		const reservationsByAgent = {};
-		reservations.forEach(r => {
-			if (!reservationsByAgent[r.agent_name]) {
-				reservationsByAgent[r.agent_name] = [];
-			}
-			reservationsByAgent[r.agent_name].push(r);
-		});
-
-		// Calculate task statistics
-		const taskStats = {
-			total: tasks.length,
-			open: tasks.filter(t => t.status === 'open').length,
-			in_progress: tasks.filter(t => t.status === 'in_progress').length,
-			blocked: tasks.filter(t => t.status === 'blocked').length,
-			closed: tasks.filter(t => t.status === 'closed').length,
-			by_priority: {
-				p0: tasks.filter(t => t.priority === 0).length,
-				p1: tasks.filter(t => t.priority === 1).length,
-				p2: tasks.filter(t => t.priority === 2).length,
-				p3: tasks.filter(t => t.priority === 3).length,
-				p4: tasks.filter(t => t.priority === 4).length
-			}
-		};
-
-		// Find tasks with dependencies for visualization
-		const tasksWithDeps = tasks.filter(t =>
-			(t.depends_on && t.depends_on.length > 0) ||
-			(t.blocked_by && t.blocked_by.length > 0)
-		);
-
-		// Find unassigned tasks (ready for assignment)
-		const unassignedTasks = tasks.filter(t =>
-			!t.assignee && t.status === 'open'
-		);
-
-		// Build meta object with optional date range
-		/** @type {{ poll_interval_ms: number, data_sources: string[], cache_ttl_ms: number, dateRange?: { from: string | null, to: string | null } }} */
-		const meta = {
-			poll_interval_ms: 3000, // Recommended poll interval for frontend
-			data_sources: ['agent-mail', 'jat'],
-			cache_ttl_ms: 2000 // Data freshness guarantee
-		};
-
-		// Include date range in meta if filtering was applied
-		if (dateRange.hasRange) {
-			meta.dateRange = {
-				from: dateRange.from ? dateRange.from.toISOString() : null,
-				to: dateRange.to ? dateRange.to.toISOString() : null
-			};
-		}
-
-		// Optionally filter agents to only those with activity in range
-		let filteredAgentStats = agentStats;
-		if (dateRange.hasRange) {
-			// Only include agents who had activity in the date range
-			filteredAgentStats = agentStats.filter(agent =>
-				agent.activityInRange > 0 || agent.active
-			);
-		}
-
-		// Get agent counts (active sessions vs total registered)
-		const agentCounts = getAgentCounts(projectPath);
-
-		// Build response data
-		const responseData = {
-			agents: filteredAgentStats,
-			reservations,
-			reservations_by_agent: reservationsByAgent,
-			tasks: tasks, // Return all tasks (frontend handles pagination/filtering)
-			unassigned_tasks: unassignedTasks,
-			task_stats: taskStats,
-			tasks_with_deps_count: tasksWithDeps.length,
-			tasks_with_deps: tasksWithDeps,
-			hourlyUsage: hourlyUsage, // Raw hourly token usage (last 24 hours)
-			agent_counts: agentCounts, // Active vs total agent counts
-			timestamp: new Date().toISOString(),
-			meta
-		};
-
-		// Cache the response
-		apiCache.set(key, responseData, ttl);
-
-		locals.logger?.info({
-			agentCount: filteredAgentStats.length,
-			taskCount: tasks.length,
-			reservationCount: reservations.length,
-			cached: false
-		}, 'Full agent orchestration data fetched successfully');
+		const responseData = await singleFlight(key, () => computeAgentsData({
+			projectFilter, agentFilter, includeUsage, includeHourly,
+			includeActivities, forceFresh, searchParams: url.searchParams, locals
+		}), ttl);
 
 		perf.end({
-			agentCount: filteredAgentStats.length,
-			taskCount: tasks.length,
+			agentCount: responseData.agents?.length || 0,
+			taskCount: responseData.tasks?.length || 0,
 			mode: 'full',
 			cached: false,
 			includeUsage
@@ -620,6 +292,329 @@ export async function GET({ url, locals }) {
 			timestamp: new Date().toISOString()
 		}, { status: 500 });
 	}
+}
+
+/**
+ * Core computation for agent orchestration data.
+ * Extracted to enable singleFlight deduplication.
+ * @param {{ projectFilter?: string, agentFilter?: string, includeUsage: boolean, includeHourly: boolean, includeActivities: boolean, forceFresh: boolean, searchParams: URLSearchParams, locals: any }} opts
+ */
+async function computeAgentsData({ projectFilter, agentFilter, includeUsage, includeHourly, includeActivities, forceFresh, searchParams, locals }) {
+	// Parse date range parameters
+	const dateRange = parseDateRange(searchParams);
+
+	const projectPath = process.cwd().replace('/ide', '');
+
+	// Fetch core data (agents, reservations, tasks) - always needed
+	/** @type {Agent[]} */
+	const agents = getAgents(undefined);  // Show all agents (don't filter by project)
+	/** @type {Reservation[]} */
+	const reservations = getReservations(agentFilter, undefined);  // Show all reservations
+	/** @type {Task[]} */
+	const tasks = getCachedTasks(projectFilter, forceFresh);  // Filter tasks only (cached to avoid expensive JSONL parsing)
+
+	// Fetch tmux session status to determine which agents have active sessions
+	// Also get session creation time for "connecting" state detection
+	/** @type {Map<string, number>} */
+	const agentSessionCreatedAt = new Map();
+	try {
+		const { stdout } = await execAsync(
+			'tmux list-sessions -F "#{session_name}:#{session_created}" 2>/dev/null'
+		);
+		stdout.trim().split('\n').forEach(line => {
+			const [sessionName, createdUnix] = line.split(':');
+			// Extract agent name from session name (jat-AgentName -> AgentName)
+			if (sessionName.startsWith('jat-')) {
+				const agentName = sessionName.replace('jat-', '');
+				// Store creation timestamp (unix seconds)
+				agentSessionCreatedAt.set(agentName, parseInt(createdUnix, 10) * 1000);
+			}
+		});
+	} catch {
+		// No tmux server or no sessions - that's fine, map will be empty
+	}
+	// For backward compat: create Set for hasSession check
+	const agentsWithSessions = new Set(agentSessionCreatedAt.keys());
+
+	// Optionally fetch token usage data (using worker threads to avoid blocking)
+	/** @type {Map<string, import('$lib/utils/tokenUsage.js').TokenUsage> | null} */
+	let usageToday = null;
+	/** @type {Map<string, import('$lib/utils/tokenUsage.js').TokenUsage> | null} */
+	let usageWeek = null;
+	/** @type {Map<string, import('$lib/utils/tokenUsage.js').HourlyUsage[]>} */
+	const agentSparklineData = new Map();
+	/** @type {Map<string, number | null>} */
+	const agentContextPercent = new Map();
+
+	if (includeUsage) {
+		locals.logger?.debug('Fetching token usage data...');
+		const usageStart = Date.now();
+
+		// Fetch aggregated usage data
+		[usageToday, usageWeek] = await Promise.all([
+			getAllAgentUsageAsync('today', projectPath),
+			getAllAgentUsageAsync('week', projectPath)
+		]);
+
+		// Fetch per-agent sparklineData and contextPercent for agents with active sessions
+		// (only for agents that have tmux sessions - others don't need sparklines)
+		const agentsWithActiveSessions = agents.filter(a => agentsWithSessions.has(a.name));
+		await Promise.all(
+			agentsWithActiveSessions.map(async (agent) => {
+				try {
+					const [sparkline, contextPct] = await Promise.all([
+						getAgentHourlyUsageAsync(agent.name, projectPath),
+						getAgentContextPercent(agent.name, projectPath)
+					]);
+					agentSparklineData.set(agent.name, sparkline);
+					agentContextPercent.set(agent.name, contextPct);
+				} catch (err) {
+					locals.logger?.debug({ agent: agent.name, error: err }, 'Failed to fetch agent usage data');
+				}
+			})
+		);
+
+		locals.logger?.info({
+			duration: Date.now() - usageStart,
+			agentCount: agentsWithActiveSessions.length
+		}, 'Token usage data fetched');
+	}
+
+	// Optionally fetch hourly token usage data (raw data for sparklines, using worker threads)
+	/** @type {import('$lib/utils/tokenUsage.js').HourlyUsage[] | null} */
+	let hourlyUsage = null;
+	if (includeHourly) {
+		hourlyUsage = await getHourlyUsageAsync(projectPath);
+	}
+
+	// Calculate agent statistics
+	const agentStats = agents.map(agent => {
+		// Count reservations per agent
+		const agentReservations = reservations.filter(r => r.agent_name === agent.name);
+
+		// Count tasks assigned to agent
+		const agentTasks = tasks.filter(t => t.assignee === agent.name);
+		const openTasks = agentTasks.filter(t => t.status === 'open').length;
+		const inProgressTasks = agentTasks.filter(t => t.status === 'in_progress').length;
+
+		// Determine if agent is active based on reservations or active tasks
+		const hasActiveReservations = agentReservations.some(r => {
+			const expiresAt = new Date(r.expires_ts);
+			return expiresAt > new Date() && !r.released_ts;
+		});
+
+		// Get recent activities from JAT task history (last 10 task updates)
+		/** @type {Activity[]} */
+		let activities = [];
+		if (includeActivities) {
+			try {
+				activities = getTaskActivities(agent.name, tasks);
+			} catch (err) {
+				console.error(`Failed to fetch activities for agent ${agent.name}:`, err);
+				// Continue with empty activities array
+			}
+		}
+
+		// Apply date range filtering to activities if requested
+		/** @type {Activity[]} */
+		let filteredActivities = activities;
+		/** @type {number | null} */
+		let activityInRange = null;
+		/** @type {string | null} */
+		let lastActiveInRange = null;
+
+		if (dateRange.hasRange && activities.length > 0) {
+			filteredActivities = filterActivitiesByDateRange(activities, dateRange.from, dateRange.to);
+			activityInRange = filteredActivities.length;
+
+			// Find the most recent activity in range
+			if (filteredActivities.length > 0) {
+				const sorted = [...filteredActivities].sort((a, b) =>
+					new Date(b.ts).getTime() - new Date(a.ts).getTime()
+				);
+				lastActiveInRange = sorted[0]?.ts || null;
+			}
+		}
+
+		// Also check task updates within range
+		if (dateRange.hasRange) {
+			const tasksInRange = agentTasks.filter(t =>
+				isInDateRange(t.updated_at, dateRange.from, dateRange.to)
+			);
+
+			// Update activity count to include tasks if higher
+			const taskActivityCount = tasksInRange.length;
+			if (activityInRange === null) {
+				activityInRange = taskActivityCount;
+			} else {
+				activityInRange = Math.max(activityInRange, taskActivityCount);
+			}
+
+			// Update last active if a task was updated more recently
+			const lastTaskUpdate = tasksInRange
+				.map(t => new Date(t.updated_at))
+				.sort((a, b) => b.getTime() - a.getTime())[0];
+
+			if (lastTaskUpdate) {
+				if (!lastActiveInRange || new Date(lastTaskUpdate) > new Date(lastActiveInRange)) {
+					lastActiveInRange = lastTaskUpdate.toISOString();
+				}
+			}
+		}
+
+		// Check reservations in date range
+		if (dateRange.hasRange) {
+			const reservationsInRange = agentReservations.filter(r =>
+				isInDateRange(r.created_ts, dateRange.from, dateRange.to)
+			);
+
+			if (reservationsInRange.length > 0) {
+				activityInRange = (activityInRange || 0) + reservationsInRange.length;
+
+				const lastReservation = reservationsInRange
+					.map(r => new Date(r.created_ts))
+					.sort((a, b) => b.getTime() - a.getTime())[0];
+
+				if (lastReservation) {
+					if (!lastActiveInRange || lastReservation > new Date(lastActiveInRange)) {
+						lastActiveInRange = lastReservation.toISOString();
+					}
+				}
+			}
+		}
+
+		/** @type {any} */
+		const baseStats = {
+			...agent,
+			reservation_count: agentReservations.length,
+			task_count: agentTasks.length,
+			open_tasks: openTasks,
+			in_progress_tasks: inProgressTasks,
+			active: hasActiveReservations || inProgressTasks > 0,
+			hasSession: agentsWithSessions.has(agent.name),
+			// Session creation timestamp for "connecting" state detection
+			session_created_ts: agentSessionCreatedAt.get(agent.name) || null,
+			activities: filteredActivities
+		};
+
+		// Add date range specific stats if applicable
+		if (dateRange.hasRange) {
+			baseStats.activityInRange = activityInRange || 0;
+			baseStats.lastActiveInRange = lastActiveInRange;
+		}
+
+		// Optionally include token usage data
+		if (includeUsage && usageToday && usageWeek) {
+			const todayUsage = usageToday.get(agent.name);
+			const weekUsage = usageWeek.get(agent.name);
+
+			baseStats.usage = {
+				today: todayUsage ? {
+					total_tokens: todayUsage.total_tokens,
+					cost: todayUsage.cost,
+					sessionCount: todayUsage.sessionCount
+				} : { total_tokens: 0, cost: 0, sessionCount: 0 },
+				week: weekUsage ? {
+					total_tokens: weekUsage.total_tokens,
+					cost: weekUsage.cost,
+					sessionCount: weekUsage.sessionCount
+				} : { total_tokens: 0, cost: 0, sessionCount: 0 }
+			};
+
+			// Include per-agent sparklineData and contextPercent
+			const sparkline = agentSparklineData.get(agent.name);
+			if (sparkline && sparkline.length > 0) {
+				baseStats.sparklineData = sparkline;
+			}
+			const contextPct = agentContextPercent.get(agent.name);
+			if (contextPct !== undefined) {
+				baseStats.contextPercent = contextPct;
+			}
+		}
+
+		return baseStats;
+	});
+
+	// Group reservations by agent for easy lookup
+	/** @type {Record<string, Reservation[]>} */
+	const reservationsByAgent = {};
+	reservations.forEach(r => {
+		if (!reservationsByAgent[r.agent_name]) {
+			reservationsByAgent[r.agent_name] = [];
+		}
+		reservationsByAgent[r.agent_name].push(r);
+	});
+
+	// Calculate task statistics
+	const taskStats = {
+		total: tasks.length,
+		open: tasks.filter(t => t.status === 'open').length,
+		in_progress: tasks.filter(t => t.status === 'in_progress').length,
+		blocked: tasks.filter(t => t.status === 'blocked').length,
+		closed: tasks.filter(t => t.status === 'closed').length,
+		by_priority: {
+			p0: tasks.filter(t => t.priority === 0).length,
+			p1: tasks.filter(t => t.priority === 1).length,
+			p2: tasks.filter(t => t.priority === 2).length,
+			p3: tasks.filter(t => t.priority === 3).length,
+			p4: tasks.filter(t => t.priority === 4).length
+		}
+	};
+
+	// Find tasks with dependencies for visualization
+	const tasksWithDeps = tasks.filter(t =>
+		(t.depends_on && t.depends_on.length > 0) ||
+		(t.blocked_by && t.blocked_by.length > 0)
+	);
+
+	// Find unassigned tasks (ready for assignment)
+	const unassignedTasks = tasks.filter(t =>
+		!t.assignee && t.status === 'open'
+	);
+
+	// Build meta object with optional date range
+	/** @type {{ poll_interval_ms: number, data_sources: string[], cache_ttl_ms: number, dateRange?: { from: string | null, to: string | null } }} */
+	const meta = {
+		poll_interval_ms: 3000, // Recommended poll interval for frontend
+		data_sources: ['agent-mail', 'jat'],
+		cache_ttl_ms: 2000 // Data freshness guarantee
+	};
+
+	// Include date range in meta if filtering was applied
+	if (dateRange.hasRange) {
+		meta.dateRange = {
+			from: dateRange.from ? dateRange.from.toISOString() : null,
+			to: dateRange.to ? dateRange.to.toISOString() : null
+		};
+	}
+
+	// Optionally filter agents to only those with activity in range
+	let filteredAgentStats = agentStats;
+	if (dateRange.hasRange) {
+		// Only include agents who had activity in the date range
+		filteredAgentStats = agentStats.filter(agent =>
+			agent.activityInRange > 0 || agent.active
+		);
+	}
+
+	// Get agent counts (active sessions vs total registered)
+	const agentCounts = getAgentCounts(projectPath);
+
+	// Build response data
+	return {
+		agents: filteredAgentStats,
+		reservations,
+		reservations_by_agent: reservationsByAgent,
+		tasks: tasks, // Return all tasks (frontend handles pagination/filtering)
+		unassigned_tasks: unassignedTasks,
+		task_stats: taskStats,
+		tasks_with_deps_count: tasksWithDeps.length,
+		tasks_with_deps: tasksWithDeps,
+		hourlyUsage: hourlyUsage, // Raw hourly token usage (last 24 hours)
+		agent_counts: agentCounts, // Active vs total agent counts
+		timestamp: new Date().toISOString(),
+		meta
+	};
 }
 
 /** @type {import('./$types').RequestHandler} */

@@ -2,12 +2,11 @@
  * Batch Session Activity API - Get activity states for all sessions in one request
  *
  * GET /api/sessions/activity
- *   Returns activity states for all jat-* tmux sessions
- *   This batch endpoint replaces N parallel requests to /api/sessions/[name]/activity
- *   solving the ERR_INSUFFICIENT_RESOURCES browser connection limit issue.
+ *   Returns activity states for all requested jat-* tmux sessions.
+ *   Builds file paths directly from session names (avoids scanning /tmp).
  *
  * Query params:
- *   - sessions: Optional comma-separated list of session names to filter
+ *   - sessions: Comma-separated list of session names to check
  *
  * Activity States:
  *   - generating: Agent is actively outputting text (output growing)
@@ -16,7 +15,8 @@
  */
 
 import { json } from '@sveltejs/kit';
-import { readdirSync, readFileSync, statSync, existsSync } from 'fs';
+import { readFileSync, statSync } from 'fs';
+import { singleFlight, cacheKey } from '$lib/server/cache.js';
 import type { RequestHandler } from './$types';
 
 interface ActivityState {
@@ -34,35 +34,32 @@ interface SessionActivity {
 }
 
 export const GET: RequestHandler = async ({ url }) => {
-	// Optional filter by session names
 	const sessionsParam = url.searchParams.get('sessions');
-	const sessionFilter = sessionsParam ? new Set(sessionsParam.split(',').map(s => s.trim())) : null;
+	if (!sessionsParam) {
+		return json({
+			success: true,
+			activities: {},
+			count: 0,
+			timestamp: new Date().toISOString()
+		});
+	}
 
-	const results: Record<string, SessionActivity> = {};
+	const sessionNames = sessionsParam.split(',').map(s => s.trim()).filter(Boolean);
+	const key = cacheKey('activity', { sessions: sessionNames.sort().join(',') });
 
-	try {
-		// Read all activity files from /tmp
-		const tmpDir = '/tmp';
-		const files = readdirSync(tmpDir);
+	// singleFlight: cache + deduplication. Activity is polled every few seconds
+	// by the client — avoid redundant FS reads for concurrent/rapid requests.
+	const responseData = await singleFlight(key, async () => {
+		const results: Record<string, SessionActivity> = {};
 
-		// Filter for jat-activity-*.json files
-		const activityFiles = files.filter(f => f.startsWith('jat-activity-') && f.endsWith('.json'));
-
-		for (const file of activityFiles) {
-			// Extract session name from filename: jat-activity-{sessionName}.json
-			const sessionName = file.replace('jat-activity-', '').replace('.json', '');
-
-			// Skip if we have a filter and this session isn't in it
-			if (sessionFilter && !sessionFilter.has(sessionName)) {
-				continue;
-			}
-
-			const filePath = `${tmpDir}/${file}`;
+		// Build file paths directly from session names — no /tmp directory scan
+		for (const sessionName of sessionNames) {
+			const filePath = `/tmp/jat-activity-${sessionName}.json`;
 
 			try {
+				const stats = statSync(filePath);
 				const content = readFileSync(filePath, 'utf-8');
 				const activity: ActivityState = JSON.parse(content);
-				const stats = statSync(filePath);
 
 				results[sessionName] = {
 					sessionName,
@@ -70,51 +67,28 @@ export const GET: RequestHandler = async ({ url }) => {
 					activity,
 					fileModifiedAt: stats.mtime.toISOString()
 				};
-			} catch (err) {
-				const error = err as Error;
+			} catch {
+				// File doesn't exist or can't be read — session is idle
 				results[sessionName] = {
 					sessionName,
-					hasActivity: false,
-					activity: null,
-					fileModifiedAt: null,
-					error: error.message
+					hasActivity: true,
+					activity: {
+						state: 'idle',
+						since: new Date().toISOString(),
+						tmux_session: sessionName
+					},
+					fileModifiedAt: new Date().toISOString()
 				};
 			}
 		}
 
-		// If we have a filter, also include sessions that don't have activity files (as idle)
-		if (sessionFilter) {
-			for (const sessionName of sessionFilter) {
-				if (!results[sessionName]) {
-					results[sessionName] = {
-						sessionName,
-						hasActivity: true,
-						activity: {
-							state: 'idle',
-							since: new Date().toISOString(),
-							tmux_session: sessionName
-						},
-						fileModifiedAt: new Date().toISOString()
-					};
-				}
-			}
-		}
-
-		return json({
+		return {
 			success: true,
 			activities: results,
 			count: Object.keys(results).length,
 			timestamp: new Date().toISOString()
-		});
-	} catch (err) {
-		const error = err as Error;
-		return json({
-			success: false,
-			error: 'Failed to read activity files',
-			message: error.message,
-			activities: {},
-			count: 0,
-			timestamp: new Date().toISOString()
-		}, { status: 500 });
-	}
+		};
+	}, 2000); // 2s TTL — activity files update every ~1s, 2s cache is sufficient
+
+	return json(responseData);
 };

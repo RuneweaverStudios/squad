@@ -15,6 +15,7 @@ import {
 import { getJatDefaults } from '$lib/server/projectPaths.js';
 import { CLAUDE_READY_PATTERNS, SHELL_PROMPT_PATTERNS } from '$lib/server/shellPatterns.js';
 import { stripAnsi } from '$lib/utils/ansiToHtml.js';
+import { singleFlight, cacheKey } from '$lib/server/cache.js';
 
 const execAsync = promisify(exec);
 
@@ -104,78 +105,80 @@ async function getProjectFromTmuxCwd(sessionName) {
 export async function GET({ url }) {
 	try {
 		const filter = url.searchParams.get('filter') || 'jat';
+		const key = cacheKey('sessions', { filter });
 
-		// List tmux sessions with format: name:created:attached:windows
-		const command = `tmux list-sessions -F "#{session_name}:#{session_created}:#{session_attached}:#{session_windows}"`;
+		// singleFlight: cache + deduplication. Sessions endpoint runs tmux
+		// display-message per session for project detection — expensive with 33 sessions.
+		const responseData = await singleFlight(key, async () => {
+			// List tmux sessions with format: name:created:attached:windows
+			const command = `tmux list-sessions -F "#{session_name}:#{session_created}:#{session_attached}:#{session_windows}"`;
 
-		try {
-			const { stdout } = await execAsync(command);
+			try {
+				const { stdout } = await execAsync(command);
 
-			const rawSessions = stdout
-				.trim()
-				.split('\n')
-				.filter(line => line.length > 0)
-				.map(line => {
-					const [name, created, attached, windows] = line.split(':');
-					return {
-						name,
-						created: new Date(parseInt(created, 10) * 1000).toISOString(),
-						attached: parseInt(attached, 10) > 0,
-						windows: parseInt(windows, 10) || 1
-					};
-				})
-				.filter(session => {
-					if (filter === 'all') return true;
-					return session.name.startsWith('jat-');
-				});
+				const rawSessions = stdout
+					.trim()
+					.split('\n')
+					.filter(line => line.length > 0)
+					.map(line => {
+						const [name, created, attached, windows] = line.split(':');
+						return {
+							name,
+							created: new Date(parseInt(created, 10) * 1000).toISOString(),
+							attached: parseInt(attached, 10) > 0,
+							windows: parseInt(windows, 10) || 1
+						};
+					})
+					.filter(session => {
+						if (filter === 'all') return true;
+						return session.name.startsWith('jat-');
+					});
 
-			// Get project and resume info for each session
-			const sessions = await Promise.all(
-				rawSessions.map(async (session) => {
-					// Try signal file first (fast, sync)
-					let project = getProjectFromSignal(session.name);
-					// Fall back to tmux working directory (slower, async)
-					if (!project && session.name.startsWith('jat-')) {
-						project = await getProjectFromTmuxCwd(session.name);
-					}
-					// Check if this is a resumed session
-					const resumeInfo = getResumeInfo(session.name);
-					return {
-						...session,
-						project,
-						...(resumeInfo || {})
-					};
-				})
-			);
+				// Get project and resume info for each session
+				const sessions = await Promise.all(
+					rawSessions.map(async (session) => {
+						// Try signal file first (fast, sync)
+						let project = getProjectFromSignal(session.name);
+						// Fall back to tmux working directory (slower, async)
+						if (!project && session.name.startsWith('jat-')) {
+							project = await getProjectFromTmuxCwd(session.name);
+						}
+						// Check if this is a resumed session
+						const resumeInfo = getResumeInfo(session.name);
+						return {
+							...session,
+							project,
+							...(resumeInfo || {})
+						};
+					})
+				);
 
-			return json({
-				success: true,
-				sessions,
-				count: sessions.length,
-				filter,
-				timestamp: new Date().toISOString()
-			});
-		} catch (execError) {
-			const execErr = /** @type {{ stderr?: string, stdout?: string, message?: string }} */ (execError);
-			// Check both stderr and stdout (some error messages go to stdout)
-			const errorMessage = execErr.stderr || execErr.stdout || execErr.message || String(execError);
-
-			// No server running = no sessions (this is normal, not an error)
-			if (errorMessage.includes('no server running') || errorMessage.includes('no sessions')) {
-				return json({
+				return {
 					success: true,
-					sessions: [],
-					count: 0,
+					sessions,
+					count: sessions.length,
 					filter,
 					timestamp: new Date().toISOString()
-				});
-			}
+				};
+			} catch (execError) {
+				const execErr = /** @type {{ stderr?: string, stdout?: string, message?: string }} */ (execError);
+				const errorMessage = execErr.stderr || execErr.stdout || execErr.message || String(execError);
 
-			return json({
-				error: 'Failed to list sessions',
-				message: errorMessage
-			}, { status: 500 });
-		}
+				if (errorMessage.includes('no server running') || errorMessage.includes('no sessions')) {
+					return {
+						success: true,
+						sessions: [],
+						count: 0,
+						filter,
+						timestamp: new Date().toISOString()
+					};
+				}
+
+				throw execError;
+			}
+		}, 2000); // 2s TTL — sessions change infrequently
+
+		return json(responseData);
 	} catch (error) {
 		console.error('Error in GET /api/sessions:', error);
 		return json({

@@ -97,10 +97,36 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 const CACHE_MAX_STALE_MS = 30 * 60 * 1000;
 
 /**
+ * Prevent unbounded cache growth (session ids can be high-cardinality)
+ */
+const MAX_CACHE_ENTRIES = 200;
+
+/**
  * Track which keys are currently being refreshed (prevent parallel refreshes)
  * @type {Set<string>}
  */
 const refreshingKeys = new Set();
+
+/**
+ * Remove expired entries and cap cache size.
+ */
+function pruneCache() {
+	const now = Date.now();
+	for (const [key, entry] of cache.entries()) {
+		if (now - entry.timestamp > CACHE_MAX_STALE_MS) {
+			cache.delete(key);
+		}
+	}
+
+	if (cache.size <= MAX_CACHE_ENTRIES) return;
+
+	const entries = Array.from(cache.entries())
+		.sort((a, b) => a[1].timestamp - b[1].timestamp);
+	const excess = cache.size - MAX_CACHE_ENTRIES;
+	for (let i = 0; i < excess; i++) {
+		cache.delete(entries[i][0]);
+	}
+}
 
 /**
  * Get cached data with stale-while-revalidate semantics
@@ -404,6 +430,8 @@ export async function GET({ url }) {
 				{ status: 400 }
 			);
 		}
+
+		pruneCache();
 
 		// Generate cache key (includes source)
 		const cacheKey = getCacheKey({ range, agent: agentName, session: sessionId, bucketSize, multiProject, source });

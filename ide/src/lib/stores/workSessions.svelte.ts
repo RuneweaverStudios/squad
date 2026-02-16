@@ -297,8 +297,10 @@ export async function fetch(includeUsage: boolean = false, bustCache: boolean = 
 
 		state.isLoading = true;
 		state.error = null;
-		// Use scrollback preference for line count (defaults to 2000 if not initialized)
-		const lines = getTerminalScrollback() || 2000;
+		// When WebSocket output streaming is active, the HTTP poll only needs enough
+		// lines for state detection + initial display (~50). Full terminal output is
+		// streamed via WebSocket in real-time. Without WebSocket, use full scrollback.
+		const lines = isOutputStreamingActive() ? 50 : (getTerminalScrollback() || 2000);
 		// Add cache-busting parameter to prevent request deduplication in throttler
 		// This ensures each poll gets its own request that can be safely aborted
 		let url = `/api/work?lines=${lines}&_t=${Date.now()}`;
@@ -448,7 +450,9 @@ export async function fetchUsage(): Promise<void> {
 	}
 
 	try {
-		const lines = getTerminalScrollback() || 2000;
+		// Usage fetch only needs token data — terminal output is ignored.
+		// Use minimal lines to avoid expensive batch capture.
+		const lines = 50;
 		const response = await throttledFetch(`/api/work?lines=${lines}&usage=true`);
 		const data = await response.json();
 
@@ -763,8 +767,9 @@ export function startPolling(intervalMs: number = 5000, useWebSocket: boolean = 
 		subscribeToOutputUpdates();
 	}
 
-	// Start activity polling for shimmer effect (1500ms - balances responsiveness vs server load)
-	startActivityPolling(1500);
+	// Activity polling is started by +layout.svelte globally (5000ms).
+	// Don't start a duplicate interval here — startActivityPolling() is idempotent
+	// but restarting it resets the timer, wasting the first tick.
 
 	// Set up polling for metadata (task changes, token usage, new/removed sessions)
 	// With WebSocket, we only need occasional HTTP polls for metadata

@@ -34,6 +34,25 @@ const execAsync = promisify(exec);
 // Simple in-memory cache with 1-minute TTL
 const cache = new Map();
 const CACHE_TTL = 60 * 1000; // 1 minute
+const MAX_CACHE_ENTRIES = 200;
+
+function pruneCache() {
+	const now = Date.now();
+	for (const [key, entry] of cache.entries()) {
+		if (now - entry.timestamp > CACHE_TTL) {
+			cache.delete(key);
+		}
+	}
+
+	if (cache.size <= MAX_CACHE_ENTRIES) return;
+
+	const entries = Array.from(cache.entries())
+		.sort((a, b) => a[1].timestamp - b[1].timestamp);
+	const excess = cache.size - MAX_CACHE_ENTRIES;
+	for (let i = 0; i < excess; i++) {
+		cache.delete(entries[i][0]);
+	}
+}
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ params, url }) {
@@ -49,6 +68,8 @@ export async function GET({ params, url }) {
 			{ status: 400 }
 		);
 	}
+
+	pruneCache();
 
 	// Check cache
 	const cacheKey = `${agentName}:${range}`;

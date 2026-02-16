@@ -4,7 +4,7 @@
  */
 import { json } from '@sveltejs/kit';
 import { getTasks, getProjects, getTaskById, createTask, updateTask, getScheduledTasks } from '$lib/server/jat-tasks.js';
-import { invalidateCache } from '$lib/server/cache.js';
+import { invalidateCache, singleFlight, cacheKey } from '$lib/server/cache.js';
 import { _resetTaskCache } from '../../api/agents/+server.js';
 import { getProjectPath } from '$lib/server/projectPaths.js';
 import { emitEvent } from '$lib/utils/eventBus.server.js';
@@ -24,89 +24,97 @@ export async function GET({ url }) {
 	const offset = url.searchParams.get('offset');
 	const cursor = url.searchParams.get('cursor'); // For cursor-based pagination (task ID)
 
-	// If ?scheduled=true, return only tasks with schedule_cron or next_run_at
-	let tasks;
-	if (scheduled === 'true') {
-		tasks = getScheduledTasks({ projectName: project || undefined });
-	} else {
-		const filters = {};
-		if (project) filters.projectName = project;
-		if (status) filters.status = status;
-		if (priority !== null) filters.priority = parseInt(priority);
-		if (closedAfter) filters.closedAfter = closedAfter;
-		if (closedBefore) filters.closedBefore = closedBefore;
+	const key = cacheKey('tasks', { project, status, priority, search, scheduled, closedAfter, closedBefore, limit, offset, cursor });
 
-		tasks = getTasks(filters);
-	}
-	const projects = getProjects();
+	// singleFlight: cache + deduplication. Tasks endpoint queries SQLite
+	// across multiple projects — avoid redundant concurrent queries.
+	const responseData = await singleFlight(key, async () => {
+		// If ?scheduled=true, return only tasks with schedule_cron or next_run_at
+		let tasks;
+		if (scheduled === 'true') {
+			tasks = getScheduledTasks({ projectName: project || undefined });
+		} else {
+			const filters = {};
+			if (project) filters.projectName = project;
+			if (status) filters.status = status;
+			if (priority !== null) filters.priority = parseInt(priority);
+			if (closedAfter) filters.closedAfter = closedAfter;
+			if (closedBefore) filters.closedBefore = closedBefore;
 
-	// Apply search filter if provided
-	if (search && search.trim()) {
-		const searchLower = search.toLowerCase().trim();
-		tasks = tasks.filter(task => {
-			// Search in task ID
-			if (task.id && task.id.toLowerCase().includes(searchLower)) {
-				return true;
-			}
-			// Search in title
-			if (task.title && task.title.toLowerCase().includes(searchLower)) {
-				return true;
-			}
-			// Search in description
-			if (task.description && task.description.toLowerCase().includes(searchLower)) {
-				return true;
-			}
-			// Search in labels
-			if (task.labels && Array.isArray(task.labels)) {
-				return task.labels.some(label =>
-					label.toLowerCase().includes(searchLower)
-				);
-			}
-			return false;
-		});
-	}
-
-	// Store total count before pagination
-	const totalCount = tasks.length;
-
-	// Apply cursor-based pagination (skip to after the cursor task ID)
-	if (cursor) {
-		const cursorIndex = tasks.findIndex(t => t.id === cursor);
-		if (cursorIndex !== -1) {
-			tasks = tasks.slice(cursorIndex + 1);
+			tasks = getTasks(filters);
 		}
-	}
+		const projects = getProjects();
 
-	// Apply offset-based pagination
-	if (offset) {
-		const offsetNum = parseInt(offset);
-		if (!isNaN(offsetNum) && offsetNum > 0) {
-			tasks = tasks.slice(offsetNum);
+		// Apply search filter if provided
+		if (search && search.trim()) {
+			const searchLower = search.toLowerCase().trim();
+			tasks = tasks.filter(task => {
+				// Search in task ID
+				if (task.id && task.id.toLowerCase().includes(searchLower)) {
+					return true;
+				}
+				// Search in title
+				if (task.title && task.title.toLowerCase().includes(searchLower)) {
+					return true;
+				}
+				// Search in description
+				if (task.description && task.description.toLowerCase().includes(searchLower)) {
+					return true;
+				}
+				// Search in labels
+				if (task.labels && Array.isArray(task.labels)) {
+					return task.labels.some(label =>
+						label.toLowerCase().includes(searchLower)
+					);
+				}
+				return false;
+			});
 		}
-	}
 
-	// Apply limit
-	let hasMore = false;
-	let nextCursor = null;
-	if (limit) {
-		const limitNum = parseInt(limit);
-		if (!isNaN(limitNum) && limitNum > 0) {
-			hasMore = tasks.length > limitNum;
-			if (hasMore) {
-				nextCursor = tasks[limitNum - 1]?.id;
+		// Store total count before pagination
+		const totalCount = tasks.length;
+
+		// Apply cursor-based pagination (skip to after the cursor task ID)
+		if (cursor) {
+			const cursorIndex = tasks.findIndex(t => t.id === cursor);
+			if (cursorIndex !== -1) {
+				tasks = tasks.slice(cursorIndex + 1);
 			}
-			tasks = tasks.slice(0, limitNum);
 		}
-	}
 
-	return json({
-		tasks,
-		projects,
-		count: tasks.length,
-		totalCount,
-		hasMore,
-		nextCursor
-	});
+		// Apply offset-based pagination
+		if (offset) {
+			const offsetNum = parseInt(offset);
+			if (!isNaN(offsetNum) && offsetNum > 0) {
+				tasks = tasks.slice(offsetNum);
+			}
+		}
+
+		// Apply limit
+		let hasMore = false;
+		let nextCursor = null;
+		if (limit) {
+			const limitNum = parseInt(limit);
+			if (!isNaN(limitNum) && limitNum > 0) {
+				hasMore = tasks.length > limitNum;
+				if (hasMore) {
+					nextCursor = tasks[limitNum - 1]?.id;
+				}
+				tasks = tasks.slice(0, limitNum);
+			}
+		}
+
+		return {
+			tasks,
+			projects,
+			count: tasks.length,
+			totalCount,
+			hasMore,
+			nextCursor
+		};
+	}, 5000); // 5s TTL — SSE handles real-time updates; matches /api/work TTL
+
+	return json(responseData);
 }
 
 /**

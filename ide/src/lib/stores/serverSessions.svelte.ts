@@ -90,6 +90,8 @@ function hashOutput(output: string): string {
 
 // Polling interval reference
 let pollingInterval: ReturnType<typeof setInterval> | null = null;
+let fetchAbortController: AbortController | null = null;
+let fetchPromise: Promise<void> | null = null;
 
 /**
  * Fetch all active server sessions from the API
@@ -97,105 +99,130 @@ let pollingInterval: ReturnType<typeof setInterval> | null = null;
  * @param lines - Number of output lines to capture (default: 50)
  */
 export async function fetch(lines: number = 50): Promise<void> {
-	// Only show loading state on initial load - never on subsequent polls
-	// This prevents flashing between skeleton and empty state when no servers are running
-	if (!state.initialLoadComplete) {
-		state.isLoading = true;
+	if (fetchPromise) {
+		return fetchPromise;
 	}
-	state.error = null;
 
-	try {
-		const response = await globalThis.fetch(`/api/servers?lines=${lines}`);
-		const data = await response.json();
+	fetchPromise = (async () => {
+		const controller = new AbortController();
+		fetchAbortController = controller;
+		const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-		if (!response.ok) {
-			throw new Error(data.message || data.error || 'Failed to fetch server sessions');
+		// Only show loading state on initial load - never on subsequent polls
+		// This prevents flashing between skeleton and empty state when no servers are running
+		if (!state.initialLoadComplete) {
+			state.isLoading = true;
 		}
+		state.error = null;
 
-		const newSessions: ServerSession[] = data.sessions || [];
+		try {
+			const response = await globalThis.fetch(`/api/servers?lines=${lines}`, {
+				signal: controller.signal
+			});
+			const data = await response.json();
 
-		// Track activity by detecting output changes
-		for (const session of newSessions) {
-			const currentHash = hashOutput(session.output || '');
-			const prevHash = previousOutputHashes.get(session.sessionName);
-
-			// Activity: 0 = no change, 1 = output changed (could enhance with diff size later)
-			const hasActivity = prevHash !== undefined && prevHash !== currentHash;
-			const activityValue = hasActivity ? 1 : 0;
-
-			// Update previous hash
-			previousOutputHashes.set(session.sessionName, currentHash);
-
-			// Update activity history - create new array for reactivity
-			const oldHistory = activityHistory.get(session.sessionName) ?? [];
-			const newHistory = [...oldHistory, activityValue].slice(-MAX_ACTIVITY_HISTORY);
-
-			activityHistory.set(session.sessionName, newHistory);
-		}
-
-		// Clean up history for sessions that no longer exist
-		const activeSessionNames = new Set(newSessions.map((s) => s.sessionName));
-		for (const sessionName of activityHistory.keys()) {
-			if (!activeSessionNames.has(sessionName)) {
-				activityHistory.delete(sessionName);
-				previousOutputHashes.delete(sessionName);
+			if (!response.ok) {
+				throw new Error(data.message || data.error || 'Failed to fetch server sessions');
 			}
-		}
 
-		// Trigger reactivity by creating new Map
-		activityHistory = new Map(activityHistory);
+			const newSessions: ServerSession[] = data.sessions || [];
 
-		// SMART MERGE: Use in-place mutation to avoid re-rendering unchanged components
-		// Only replace the array when sessions are added/removed
-		const existingSessionMap = new Map(state.sessions.map((s, i) => [s.sessionName, { session: s, index: i }]));
-		const newSessionNames = new Set(newSessions.map(s => s.sessionName));
+			// Track activity by detecting output changes
+			for (const session of newSessions) {
+				const currentHash = hashOutput(session.output || '');
+				const prevHash = previousOutputHashes.get(session.sessionName);
 
-		// Check if we need to add/remove sessions (requires new array)
-		const sessionsAdded = newSessions.some(s => !existingSessionMap.has(s.sessionName));
-		const sessionsRemoved = state.sessions.some(s => !newSessionNames.has(s.sessionName));
+				// Activity: 0 = no change, 1 = output changed (could enhance with diff size later)
+				const hasActivity = prevHash !== undefined && prevHash !== currentHash;
+				const activityValue = hasActivity ? 1 : 0;
 
-		if (sessionsAdded || sessionsRemoved) {
-			// Sessions added or removed - need new array
-			state.sessions = newSessions;
-		} else {
-			// Same sessions - update in-place for fine-grained reactivity
-			for (const newSession of newSessions) {
-				const existing = existingSessionMap.get(newSession.sessionName);
-				if (existing) {
-					const idx = existing.index;
-					// Only update fields that changed (Svelte 5 $state tracks individual properties)
-					if (state.sessions[idx].status !== newSession.status) {
-						state.sessions[idx].status = newSession.status;
-					}
-					if (state.sessions[idx].portRunning !== newSession.portRunning) {
-						state.sessions[idx].portRunning = newSession.portRunning;
-					}
-					if (state.sessions[idx].port !== newSession.port) {
-						state.sessions[idx].port = newSession.port;
-					}
-					if (state.sessions[idx].lineCount !== newSession.lineCount) {
-						state.sessions[idx].lineCount = newSession.lineCount;
-					}
-					if (state.sessions[idx].attached !== newSession.attached) {
-						state.sessions[idx].attached = newSession.attached;
-					}
-					if (state.sessions[idx].output !== newSession.output) {
-						state.sessions[idx].output = newSession.output;
-					}
-					if (state.sessions[idx].created !== newSession.created) {
-						state.sessions[idx].created = newSession.created;
+				// Update previous hash
+				previousOutputHashes.set(session.sessionName, currentHash);
+
+				// Update activity history - create new array for reactivity
+				const oldHistory = activityHistory.get(session.sessionName) ?? [];
+				const newHistory = [...oldHistory, activityValue].slice(-MAX_ACTIVITY_HISTORY);
+
+				activityHistory.set(session.sessionName, newHistory);
+			}
+
+			// Clean up history for sessions that no longer exist
+			const activeSessionNames = new Set(newSessions.map((s) => s.sessionName));
+			for (const sessionName of activityHistory.keys()) {
+				if (!activeSessionNames.has(sessionName)) {
+					activityHistory.delete(sessionName);
+					previousOutputHashes.delete(sessionName);
+				}
+			}
+
+			// Trigger reactivity by creating new Map
+			activityHistory = new Map(activityHistory);
+
+			// SMART MERGE: Use in-place mutation to avoid re-rendering unchanged components
+			// Only replace the array when sessions are added/removed
+			const existingSessionMap = new Map(state.sessions.map((s, i) => [s.sessionName, { session: s, index: i }]));
+			const newSessionNames = new Set(newSessions.map(s => s.sessionName));
+
+			// Check if we need to add/remove sessions (requires new array)
+			const sessionsAdded = newSessions.some(s => !existingSessionMap.has(s.sessionName));
+			const sessionsRemoved = state.sessions.some(s => !newSessionNames.has(s.sessionName));
+
+			if (sessionsAdded || sessionsRemoved) {
+				// Sessions added or removed - need new array
+				state.sessions = newSessions;
+			} else {
+				// Same sessions - update in-place for fine-grained reactivity
+				for (const newSession of newSessions) {
+					const existing = existingSessionMap.get(newSession.sessionName);
+					if (existing) {
+						const idx = existing.index;
+						// Only update fields that changed (Svelte 5 $state tracks individual properties)
+						if (state.sessions[idx].status !== newSession.status) {
+							state.sessions[idx].status = newSession.status;
+						}
+						if (state.sessions[idx].portRunning !== newSession.portRunning) {
+							state.sessions[idx].portRunning = newSession.portRunning;
+						}
+						if (state.sessions[idx].port !== newSession.port) {
+							state.sessions[idx].port = newSession.port;
+						}
+						if (state.sessions[idx].lineCount !== newSession.lineCount) {
+							state.sessions[idx].lineCount = newSession.lineCount;
+						}
+						if (state.sessions[idx].attached !== newSession.attached) {
+							state.sessions[idx].attached = newSession.attached;
+						}
+						if (state.sessions[idx].output !== newSession.output) {
+							state.sessions[idx].output = newSession.output;
+						}
+						if (state.sessions[idx].created !== newSession.created) {
+							state.sessions[idx].created = newSession.created;
+						}
 					}
 				}
 			}
-		}
 
-		state.lastFetch = new Date();
-		state.initialLoadComplete = true;
-	} catch (err) {
-		state.error = err instanceof Error ? err.message : 'Failed to fetch server sessions';
-		console.error('serverSessions.fetch error:', err);
+			state.lastFetch = new Date();
+			state.initialLoadComplete = true;
+		} catch (err) {
+			if (err instanceof Error && err.name === 'AbortError') {
+				return;
+			}
+			state.error = err instanceof Error ? err.message : 'Failed to fetch server sessions';
+			console.error('serverSessions.fetch error:', err);
+		} finally {
+			clearTimeout(timeoutId);
+			if (fetchAbortController === controller) {
+				fetchAbortController = null;
+			}
+			state.isLoading = false;
+		}
+	})();
+
+	try {
+		await fetchPromise;
 	} finally {
-		state.isLoading = false;
+		fetchPromise = null;
 	}
 }
 
@@ -385,6 +412,11 @@ export function stopPolling(): void {
 	if (pollingInterval) {
 		clearInterval(pollingInterval);
 		pollingInterval = null;
+	}
+
+	if (fetchAbortController) {
+		fetchAbortController.abort();
+		fetchAbortController = null;
 	}
 }
 

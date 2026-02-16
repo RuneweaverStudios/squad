@@ -22,6 +22,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { readdir, readFile, stat } from 'fs/promises';
 import { join } from 'path';
 import type { RequestHandler } from './$types';
+import { singleFlight, cacheKey } from '$lib/server/cache.js';
 
 const execAsync = promisify(exec);
 
@@ -256,86 +257,93 @@ function getConfiguredProjects(): string[] {
 
 export const GET: RequestHandler = async ({ url }) => {
 	try {
-		// Check if we should scan all projects or just one
 		const singleProject = url.searchParams.get('project');
-		const projectPaths = singleProject
-			? [singleProject]
-			: getConfiguredProjects();
+		const key = cacheKey('recovery', { project: singleProject ?? undefined });
 
-		// Get active tmux sessions (fast, single exec call)
-		const activeSessions = await getActiveTmuxSessions();
+		// singleFlight: cache + deduplication. Recovery scans 19+ projects
+		// and reads hundreds of files — no reason to do it concurrently.
+		const responseData = await singleFlight(key, async () => {
+			const projectPaths = singleProject
+				? [singleProject]
+				: getConfiguredProjects();
 
-		// Process ALL projects in parallel (was sequential — 19 projects × ~700ms each = 13s)
-		const projectResults = await Promise.all(
-			projectPaths.map(async (projectPath) => {
-				// Get in_progress tasks with assignees for this project
-				const inProgressTasks = await getInProgressTasks(projectPath);
+			// Get active tmux sessions (fast, single exec call)
+			const activeSessions = await getActiveTmuxSessions();
 
-				// Filter to only agents without active tmux sessions
-				const needsRecovery = inProgressTasks.filter(
-					(t) => t.assignee && !activeSessions.has(t.assignee)
-				);
+			// Process ALL projects in parallel (was sequential — 19 projects × ~700ms each = 13s)
+			const projectResults = await Promise.all(
+				projectPaths.map(async (projectPath) => {
+					// Get in_progress tasks with assignees for this project
+					const inProgressTasks = await getInProgressTasks(projectPath);
 
-				if (needsRecovery.length === 0) {
-					return { projectPath, tasks: inProgressTasks, recoverable: [] as RecoverableSession[] };
-				}
+					// Filter to only agents without active tmux sessions
+					const needsRecovery = inProgressTasks.filter(
+						(t) => t.assignee && !activeSessions.has(t.assignee)
+					);
 
-				// Only build session map for agents that actually need recovery
-				// (targeted lookup avoids reading all 583+ agent files)
-				const neededAgents = new Set(needsRecovery.map((t) => t.assignee!));
-				const agentSessionMap = await buildAgentSessionMap(projectPath, neededAgents);
+					if (needsRecovery.length === 0) {
+						return { projectPath, tasks: inProgressTasks, recoverable: [] as RecoverableSession[] };
+					}
 
-				const recoverable: RecoverableSession[] = needsRecovery.map((task) => {
-					const agentName = task.assignee!;
-					const sessionInfo = agentSessionMap.get(agentName);
+					// Only build session map for agents that actually need recovery
+					// (targeted lookup avoids reading all 583+ agent files)
+					const neededAgents = new Set(needsRecovery.map((t) => t.assignee!));
+					const agentSessionMap = await buildAgentSessionMap(projectPath, neededAgents);
 
-					// Skip expensive JSONL fallback — agent-*.txt files are the authoritative source.
-					// If no .txt file exists, mark as orphaned (resumable=false) instead of scanning GBs of JSONL.
+					const recoverable: RecoverableSession[] = needsRecovery.map((task) => {
+						const agentName = task.assignee!;
+						const sessionInfo = agentSessionMap.get(agentName);
 
-					return {
-						agentName,
-						sessionId: sessionInfo?.sessionId || null,
-						resumable: !!sessionInfo,
-						taskId: task.id,
-						taskTitle: task.title,
-						taskPriority: task.priority,
-						taskType: task.issue_type,
-						taskDescription: task.description,
-						project: getProjectFromTaskId(task.id),
-						projectPath,
-						lastActivity: sessionInfo?.lastActivity || new Date().toISOString()
-					};
-				});
+						// Skip expensive JSONL fallback — agent-*.txt files are the authoritative source.
+						// If no .txt file exists, mark as orphaned (resumable=false) instead of scanning GBs of JSONL.
 
-				return { projectPath, tasks: inProgressTasks, recoverable };
-			})
-		);
+						return {
+							agentName,
+							sessionId: sessionInfo?.sessionId || null,
+							resumable: !!sessionInfo,
+							taskId: task.id,
+							taskTitle: task.title,
+							taskPriority: task.priority,
+							taskType: task.issue_type,
+							taskDescription: task.description,
+							project: getProjectFromTaskId(task.id),
+							projectPath,
+							lastActivity: sessionInfo?.lastActivity || new Date().toISOString()
+						};
+					});
 
-		// Aggregate results
-		const recoverable: RecoverableSession[] = [];
-		let totalInProgressTasks = 0;
+					return { projectPath, tasks: inProgressTasks, recoverable };
+				})
+			);
 
-		for (const result of projectResults) {
-			totalInProgressTasks += result.tasks.length;
-			recoverable.push(...result.recoverable);
-		}
+			// Aggregate results
+			const recoverable: RecoverableSession[] = [];
+			let totalInProgressTasks = 0;
 
-		// Sort by priority (lower = higher priority), then by last activity (most recent first)
-		recoverable.sort((a, b) => {
-			if (a.taskPriority !== b.taskPriority) {
-				return a.taskPriority - b.taskPriority;
+			for (const result of projectResults) {
+				totalInProgressTasks += result.tasks.length;
+				recoverable.push(...result.recoverable);
 			}
-			return new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime();
-		});
 
-		return json({
-			count: recoverable.length,
-			sessions: recoverable,
-			activeTmuxCount: activeSessions.size,
-			inProgressTaskCount: totalInProgressTasks,
-			projectsScanned: projectPaths.length,
-			timestamp: new Date().toISOString()
-		});
+			// Sort by priority (lower = higher priority), then by last activity (most recent first)
+			recoverable.sort((a, b) => {
+				if (a.taskPriority !== b.taskPriority) {
+					return a.taskPriority - b.taskPriority;
+				}
+				return new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime();
+			});
+
+			return {
+				count: recoverable.length,
+				sessions: recoverable,
+				activeTmuxCount: activeSessions.size,
+				inProgressTaskCount: totalInProgressTasks,
+				projectsScanned: projectPaths.length,
+				timestamp: new Date().toISOString()
+			};
+		}, 10000); // 10s TTL — recovery data is relatively static
+
+		return json(responseData);
 	} catch (error) {
 		console.error('Error in GET /api/recovery:', error);
 		return json(

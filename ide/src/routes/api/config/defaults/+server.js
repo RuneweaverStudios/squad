@@ -10,6 +10,7 @@ import { existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { JAT_DEFAULTS } from '$lib/config/constants';
+import { singleFlight, apiCache } from '$lib/server/cache.js';
 
 const CONFIG_PATH = join(homedir(), '.config', 'jat', 'projects.json');
 
@@ -50,17 +51,23 @@ async function writeConfig(config) {
 /** @type {import('./$types').RequestHandler} */
 export async function GET() {
 	try {
-		const config = await readConfig();
-		const defaults = config.defaults || {};
+		// singleFlight: cache + deduplication. Config rarely changes;
+		// avoid redundant file reads during event-loop pressure.
+		const responseData = await singleFlight('config-defaults', async () => {
+			const config = await readConfig();
+			const defaults = config.defaults || {};
 
-		// Merge with default values (user values override defaults)
-		const merged = { ...JAT_DEFAULTS, ...defaults };
+			// Merge with default values (user values override defaults)
+			const merged = { ...JAT_DEFAULTS, ...defaults };
 
-		return json({
-			success: true,
-			defaults: merged,
-			configPath: CONFIG_PATH
-		});
+			return {
+				success: true,
+				defaults: merged,
+				configPath: CONFIG_PATH
+			};
+		}, 30000); // 30s TTL — config file changes infrequently
+
+		return json(responseData);
 	} catch (error) {
 		console.error('[config/defaults] GET error:', error);
 		return json({
@@ -147,6 +154,9 @@ export async function PUT({ request }) {
 		// Write back
 		await writeConfig(config);
 
+		// Invalidate cached GET response
+		apiCache.delete('config-defaults');
+
 		return json({
 			success: true,
 			defaults: config.defaults,
@@ -176,6 +186,9 @@ export async function DELETE() {
 
 		// Write back (preserves projects and other sections)
 		await writeConfig(config);
+
+		// Invalidate cached GET response
+		apiCache.delete('config-defaults');
 
 		return json({
 			success: true,

@@ -237,6 +237,62 @@ export async function getOrCompute<T>(
 	return result;
 }
 
+// ============================================================================
+// Single-flight / Request Deduplication
+// ============================================================================
+
+/**
+ * In-flight request map for deduplication.
+ * Prevents thundering herd: if 5 requests arrive for the same key while the
+ * first is still computing, the other 4 wait for that result instead of each
+ * starting their own expensive computation (e.g., 33 tmux captures).
+ */
+const inflight = new Map<string, Promise<unknown>>();
+
+/**
+ * Get cached value, or compute it with request deduplication.
+ *
+ * Unlike getOrCompute, this coalesces concurrent requests: if a computation
+ * is already in-flight for the same key, callers share its result.
+ *
+ * @example
+ * const data = await singleFlight(
+ *   cacheKey('work', { lines: '50' }),
+ *   async () => expensiveWorkComputation(),
+ *   5000
+ * );
+ */
+export async function singleFlight<T>(
+	key: string,
+	compute: () => Promise<T>,
+	ttlMs: number
+): Promise<T> {
+	// 1. Check cache first
+	const cached = apiCache.get<T>(key);
+	if (cached !== null) {
+		return cached;
+	}
+
+	// 2. Check if there's already an in-flight request for this key
+	const existing = inflight.get(key);
+	if (existing) {
+		return existing as Promise<T>;
+	}
+
+	// 3. Start computation and register it
+	const promise = compute()
+		.then((result) => {
+			apiCache.set(key, result, ttlMs);
+			return result;
+		})
+		.finally(() => {
+			inflight.delete(key);
+		});
+
+	inflight.set(key, promise);
+	return promise;
+}
+
 /**
  * Invalidation helpers for common patterns
  */

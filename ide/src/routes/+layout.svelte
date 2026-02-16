@@ -330,8 +330,9 @@
 		}, 5000);
 
 		// Activity polling (deferred until after initial data settles)
-		// 500ms interval for responsive UI, but delayed start to not compete with initial loads
-		setTimeout(() => startActivityPolling(500), 3000);
+		// 5000ms interval — activity endpoint has 2s cache and shimmer is cosmetic.
+		// Lower intervals (e.g. 500ms) saturate the event loop with 29+ sessions.
+		setTimeout(() => startActivityPolling(5000), 3000);
 
 	});
 

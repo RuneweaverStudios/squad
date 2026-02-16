@@ -27,9 +27,68 @@
 import { json } from '@sveltejs/kit';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { apiCache, cacheKey, CACHE_TTL } from '$lib/server/cache.js';
+import { readFileSync, statSync } from 'fs';
+import { apiCache, cacheKey, CACHE_TTL, singleFlight } from '$lib/server/cache.js';
 
 const execAsync = promisify(exec);
+
+/** @type {object|null} */
+let _projectsConfig = null;
+/** @type {number} */
+let _projectsConfigMtime = 0;
+
+/**
+ * Load projects.json config with simple mtime-based caching.
+ * Avoids spawning a jq subprocess per server session.
+ * @returns {object|null}
+ */
+function loadProjectsConfig() {
+	const configPath = `${process.env.HOME}/.config/jat/projects.json`;
+	try {
+		const { mtimeMs } = statSync(configPath);
+		if (_projectsConfig && mtimeMs === _projectsConfigMtime) {
+			return _projectsConfig;
+		}
+		_projectsConfig = JSON.parse(readFileSync(configPath, 'utf-8'));
+		_projectsConfigMtime = mtimeMs;
+		return _projectsConfig;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Get project config for a given project name from cached config.
+ * @param {string} projectName
+ * @returns {{ path?: string, server_path?: string, port?: number }|null}
+ */
+function getProjectConfig(projectName) {
+	const config = loadProjectsConfig();
+	if (!config?.projects?.[projectName]) return null;
+	return config.projects[projectName];
+}
+
+/**
+ * Batch check which ports are listening.
+ * Single `ss` call parsed for all ports instead of one call per port.
+ * @param {number[]} ports - Ports to check
+ * @returns {Promise<Set<number>>} - Set of ports that are listening
+ */
+async function getListeningPorts(ports) {
+	if (ports.length === 0) return new Set();
+	try {
+		const { stdout } = await execAsync('ss -tlnp 2>/dev/null', { maxBuffer: 64 * 1024 });
+		const listeningPorts = new Set();
+		for (const port of ports) {
+			if (stdout.includes(`:${port} `)) {
+				listeningPorts.add(port);
+			}
+		}
+		return listeningPorts;
+	} catch {
+		return new Set();
+	}
+}
 
 /**
  * Strip ANSI escape codes from text
@@ -77,22 +136,7 @@ function detectPort(output) {
 	return null;
 }
 
-/**
- * Check if a port is actively listening
- * @param {number} port - Port number to check
- * @returns {Promise<boolean>} - Whether port is listening
- */
-async function isPortListening(port) {
-	try {
-		// Use ss (faster) or netstat to check if port is listening
-		const { stdout } = await execAsync(
-			`ss -tlnp 2>/dev/null | grep -q ":${port} " && echo "yes" || echo "no"`
-		);
-		return stdout.trim() === 'yes';
-	} catch {
-		return false;
-	}
-}
+// isPortListening removed — replaced by batched getListeningPorts() above
 
 /**
  * Detect server status from output
@@ -226,15 +270,31 @@ export async function GET({ url }) {
 		const linesParam = url.searchParams.get('lines');
 		const lines = Math.min(Math.max(parseInt(linesParam || '50', 10) || 50, 1), 500);
 
-		// Build cache key (servers don't change often, 5s cache)
+		// singleFlight: cache + deduplication in one call.
+		// If 5 concurrent requests arrive, only the first computes;
+		// the rest share that result. Cache TTL = 15s.
 		const key = cacheKey('servers', { lines: String(lines) });
+		const responseData = await singleFlight(key, () => computeServersData(lines), 15000);
+		return json(responseData);
 
-		// Check cache
-		const cached = apiCache.get(key);
-		if (cached) {
-			return json(cached);
-		}
+	} catch (error) {
+		console.error('Error in GET /api/servers:', error);
+		return json(
+			{
+				error: 'Internal server error',
+				message: error instanceof Error ? error.message : String(error)
+			},
+			{ status: 500 }
+		);
+	}
+}
 
+/**
+ * Core computation for server session data.
+ * Extracted to enable singleFlight deduplication.
+ * @param {number} lines
+ */
+async function computeServersData(lines) {
 		// Step 1: List server-* tmux sessions
 		const sessionsCommand = `tmux list-sessions -F "#{session_name}:#{session_created}:#{session_attached}" 2>/dev/null || echo ""`;
 
@@ -244,21 +304,21 @@ export async function GET({ url }) {
 			sessionsOutput = stdout.trim();
 		} catch {
 			// No tmux server or no sessions - return empty
-			return json({
+			return {
 				success: true,
 				sessions: [],
 				count: 0,
 				timestamp: new Date().toISOString()
-			});
+			};
 		}
 
 		if (!sessionsOutput) {
-			return json({
+			return {
 				success: true,
 				sessions: [],
 				count: 0,
 				timestamp: new Date().toISOString()
-			});
+			};
 		}
 
 		// Parse sessions and filter for server-* prefix
@@ -276,138 +336,103 @@ export async function GET({ url }) {
 			.filter((session) => session.name.startsWith('server-'));
 
 		if (rawSessions.length === 0) {
-			return json({
+			return {
 				success: true,
 				sessions: [],
 				count: 0,
 				timestamp: new Date().toISOString()
-			});
+			};
 		}
 
-		// Step 2: Build ServerSession for each tmux session
-		const serverSessions = await Promise.all(
+		// Step 2: Capture output from all sessions in parallel
+		// One tmux call per session (down from 3) — capture with ANSI for display,
+		// use same output for port detection. History line count derived from output.
+		const captureResults = await Promise.all(
 			rawSessions.map(async (session) => {
-				// Extract project name from session name (server-projectName -> projectName)
-				const projectName = session.name.replace(/^server-/, '');
-
-				// Capture output - two captures:
-				// 1. Deep capture for port detection (startup line may have scrolled)
-				// 2. Recent capture for display
-				// 3. Get total history line count for activity tracking
-				let output = '';
-				let deepOutput = '';
-				let lineCount = 0;
 				try {
-					// Deep capture for port detection (200 lines back - ports appear in first ~20 lines)
-					const deepCaptureCommand = `tmux capture-pane -p -t "${session.name}" -S -200`;
-					const { stdout: deepStdout } = await execAsync(deepCaptureCommand, { maxBuffer: 512 * 1024 });
-					deepOutput = deepStdout;
-
-					// Recent capture for display (with ANSI codes for colors)
-					const captureCommand = `tmux capture-pane -p -e -t "${session.name}" -S -${lines}`;
+					// Single capture: deep enough for port detection (200 lines), with ANSI for display
+					const captureCommand = `tmux capture-pane -p -e -t "${session.name}" -S -${Math.max(lines, 200)}`;
 					const { stdout } = await execAsync(captureCommand, { maxBuffer: 512 * 1024 });
-					output = stdout;
-
-					// Get total history line count from tmux for activity tracking
-					// This counts all lines ever written, not just visible buffer
-					const historyCommand = `tmux display-message -p -t "${session.name}" '#{history_size}'`;
-					try {
-						const { stdout: historyStdout } = await execAsync(historyCommand);
-						lineCount = parseInt(historyStdout.trim(), 10) || 0;
-					} catch {
-						// Fallback to deep output line count
-						lineCount = deepOutput.split('\n').length;
-					}
+					return { name: session.name, output: stdout };
 				} catch {
-					// Session might have closed, continue with empty output
-					output = '';
-					deepOutput = '';
-					lineCount = 0;
+					return { name: session.name, output: '' };
 				}
-
-				// Detect port from deep output (better chance of finding startup line)
-				let port = detectPort(deepOutput || output);
-
-				// Try to get project config (path, server_path, and port) from jat config
-				let projectPath = null;
-				let configPort = null;
-				try {
-					const configPath = `${process.env.HOME}/.config/jat/projects.json`;
-					// Note: \\( creates literal \( for jq interpolation
-					const { stdout: configOutput } = await execAsync(
-						`jq -r '.projects["${projectName}"] | "\\(.path // empty)|\\(.server_path // empty)|\\(.port // empty)"' "${configPath}" 2>/dev/null`
-					);
-					const [pathPart, serverPathPart, portPart] = configOutput.trim().split('|');
-					// Use server_path if available, otherwise use path
-					let effectiveServerPath = serverPathPart;
-					// Resolve relative server_path against project path
-					if (effectiveServerPath && !effectiveServerPath.startsWith('/') && !effectiveServerPath.startsWith('~') && pathPart) {
-						const resolvedBase = pathPart.replace(/^~/, process.env.HOME || '');
-						effectiveServerPath = `${resolvedBase}/${effectiveServerPath}`;
-					}
-					const effectivePath = effectiveServerPath || pathPart;
-					projectPath = effectivePath ? effectivePath.replace(/^~/, process.env.HOME || '') : null;
-					configPort = portPart ? parseInt(portPart, 10) : null;
-				} catch {
-					// Config not available, use default path
-					projectPath = `${process.env.HOME}/code/${projectName}`;
-				}
-
-				// Use config port if output detection failed
-				if (!port && configPort) {
-					port = configPort;
-				}
-
-				// Check if port is actually listening
-				const portRunning = port ? await isPortListening(port) : false;
-
-				// Detect status
-				const status = detectStatus(output, portRunning);
-
-				// Detect command
-				const command = detectCommand(output);
-
-				// Generate display name
-				const displayName = generateDisplayName(projectName);
-
-				return {
-					mode: 'server',
-					sessionName: session.name,
-					projectName,
-					displayName,
-					port,
-					portRunning,
-					status,
-					output,
-					lineCount,
-					created: session.created,
-					attached: session.attached,
-					projectPath,
-					command
-				};
 			})
 		);
 
+		// Step 3: Detect ports from output + config (no subprocesses)
+		const sessionPorts = captureResults.map(({ name, output }) => {
+			const projectName = name.replace(/^server-/, '');
+			let port = detectPort(output);
+			// Fall back to config port
+			if (!port) {
+				const config = getProjectConfig(projectName);
+				if (config?.port) port = config.port;
+			}
+			return port;
+		});
+
+		// Step 4: Batch port check — single ss call for all ports
+		const uniquePorts = [...new Set(sessionPorts.filter(Boolean))];
+		const listeningPorts = await getListeningPorts(uniquePorts);
+
+		// Step 5: Build ServerSession objects (no more subprocess calls)
+		const serverSessions = rawSessions.map((session, i) => {
+			const projectName = session.name.replace(/^server-/, '');
+			const fullOutput = captureResults[i].output;
+			// For display, take only the requested number of lines from the end
+			const outputLines = fullOutput.split('\n');
+			const output = outputLines.length > lines
+				? outputLines.slice(-lines).join('\n')
+				: fullOutput;
+			const lineCount = outputLines.length;
+
+			const port = sessionPorts[i];
+			const portRunning = port ? listeningPorts.has(port) : false;
+
+			// Get project path from config (no subprocess)
+			let projectPath = null;
+			const config = getProjectConfig(projectName);
+			if (config) {
+				let effectiveServerPath = config.server_path;
+				const pathPart = config.path;
+				if (effectiveServerPath && !effectiveServerPath.startsWith('/') && !effectiveServerPath.startsWith('~') && pathPart) {
+					const resolvedBase = pathPart.replace(/^~/, process.env.HOME || '');
+					effectiveServerPath = `${resolvedBase}/${effectiveServerPath}`;
+				}
+				const effectivePath = effectiveServerPath || pathPart;
+				projectPath = effectivePath ? effectivePath.replace(/^~/, process.env.HOME || '') : null;
+			}
+			if (!projectPath) {
+				projectPath = `${process.env.HOME}/code/${projectName}`;
+			}
+
+			const status = detectStatus(output, portRunning);
+			const command = detectCommand(output);
+			const displayName = generateDisplayName(projectName);
+
+			return {
+				mode: 'server',
+				sessionName: session.name,
+				projectName,
+				displayName,
+				port,
+				portRunning,
+				status,
+				output,
+				lineCount,
+				created: session.created,
+				attached: session.attached,
+				projectPath,
+				command
+			};
+		});
+
 		// Build response
-		const responseData = {
+		return {
 			success: true,
 			sessions: serverSessions,
 			count: serverSessions.length,
 			timestamp: new Date().toISOString()
 		};
-
-		// Cache for 5 seconds (servers are relatively static)
-		apiCache.set(key, responseData, CACHE_TTL.MEDIUM);
-
-		return json(responseData);
-	} catch (error) {
-		console.error('Error in GET /api/servers:', error);
-		return json(
-			{
-				error: 'Internal server error',
-				message: error instanceof Error ? error.message : String(error)
-			},
-			{ status: 500 }
-		);
-	}
 }
