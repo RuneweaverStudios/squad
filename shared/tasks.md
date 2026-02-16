@@ -127,7 +127,7 @@ Use **underscores** not hyphens:
 - `blocked` - Waiting on something
 - `closed` - Completed
 
-**Common types:** `bug`, `feature`, `task`, `epic`, `chore`
+**Common types:** `bug`, `feature`, `task`, `epic`, `chore`, `chat` (conversational/external-channel threads, typically with `/jat:chat`)
 **Common labels:** Project-specific (e.g., `security`, `ui`, `backend`, `frontend`, `urgent`)
 
 ### Epics: When to Use Hierarchical Tasks

@@ -46,7 +46,7 @@ jt search "keyword"         # Search tasks
 - `blocked` - Waiting on something
 - `closed` - Completed
 
-**Task types:** `bug`, `feature`, `task`, `epic`, `chore`
+**Task types:** `bug`, `feature`, `task`, `epic`, `chore`, `chat`
 
 ### Dependencies
 

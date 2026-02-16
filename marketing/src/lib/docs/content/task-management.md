@@ -60,6 +60,7 @@ When agents run in auto mode, they always pick the highest-priority (lowest numb
 | `task` | Technical work, implementation |
 | `chore` | Maintenance, cleanup, upgrades |
 | `epic` | Parent container for related tasks |
+| `chat` | Conversational threads from external channels (typically handled with `/jat:chat`) |
 
 ## Dependencies
 
