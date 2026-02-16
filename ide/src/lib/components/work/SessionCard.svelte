@@ -990,13 +990,14 @@
 	async function fetchTasksCompletedToday(): Promise<number> {
 		if (!agentName) return 1;
 		try {
-			// Fetch closed tasks from the tasks API
-			const response = await fetch("/api/tasks?status=closed");
+			// Fetch closed tasks from today only (avoid fetching entire history)
+			const today = new Date();
+			today.setHours(0, 0, 0, 0);
+			const closedAfter = today.toISOString();
+			const response = await fetch(`/api/tasks?status=closed&closedAfter=${encodeURIComponent(closedAfter)}`);
 			if (!response.ok) return 1;
 
 			const data = await response.json();
-			const today = new Date();
-			today.setHours(0, 0, 0, 0);
 
 			// Filter tasks completed today by this agent
 			const completedToday = (data.tasks || []).filter((task: any) => {
@@ -1322,9 +1323,9 @@
 	// Fetch existing task titles from JAT (normalized for comparison)
 	async function fetchExistingTaskTitles(): Promise<void> {
 		try {
-			// Use repeated status params (API doesn't support comma-separated)
+			// Only check open/in_progress titles for dedup (no need to fetch all closed tasks)
 			const response = await fetch(
-				"/api/tasks?status=open&status=in_progress&status=closed",
+				"/api/tasks?status=open&status=in_progress",
 			);
 			if (!response.ok) {
 				console.warn(

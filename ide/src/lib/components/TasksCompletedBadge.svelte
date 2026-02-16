@@ -90,17 +90,20 @@
 		return streakCount;
 	});
 
-	// Fetch tasks completed today
+	// Fetch tasks completed recently (90-day window covers streaks + 14-day display)
 	async function fetchCompletedToday() {
 		try {
-			const response = await fetch('/api/tasks?status=closed');
+			const lookback = new Date();
+			lookback.setDate(lookback.getDate() - 90);
+			const closedAfter = lookback.toISOString();
+			const response = await fetch(`/api/tasks?status=closed&closedAfter=${encodeURIComponent(closedAfter)}`);
 			if (!response.ok) return;
 
 			const data = await response.json();
 			const today = new Date();
 			today.setHours(0, 0, 0, 0);
 
-			// Store all closed tasks for streak calculation
+			// Store closed tasks for streak calculation (capped at 90 days)
 			allClosedTasks = data.tasks || [];
 
 			// Filter tasks closed today
