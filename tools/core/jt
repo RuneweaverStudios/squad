@@ -82,6 +82,90 @@ require_integer() {
   [[ "$1" =~ ^-?[0-9]+$ ]] || die "$2 must be an integer, got: $1"
 }
 
+# Escape FTS5 query: add prefix matching for natural search behavior
+escape_fts_query() {
+  local query="$1"
+  local result="" word
+  for word in $query; do
+    [[ -n "$word" ]] || continue
+    if [[ "$word" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+      # Simple token: add * suffix for prefix matching (auth → auth*)
+      result="$result ${word}*"
+    else
+      # Special chars: quote the token, no prefix
+      word="${word//\"/\"\"}"
+      result="$result \"$word\""
+    fi
+  done
+  echo "${result# }"
+}
+
+# Ensure FTS5 index exists (auto-migration for existing databases)
+ensure_fts() {
+  local has_fts
+  has_fts="$(sqlite3 "$DB" "SELECT name FROM sqlite_master WHERE type='table' AND name='tasks_fts';" 2>/dev/null || true)"
+  [[ -z "$has_fts" ]] || return 0
+
+  # Add labels_text column if missing
+  local has_labels_text
+  has_labels_text="$(sqlite3 "$DB" "PRAGMA table_info(tasks);" | grep -c 'labels_text' || true)"
+  if [[ "$has_labels_text" == "0" ]]; then
+    sqlite3 "$DB" "ALTER TABLE tasks ADD COLUMN labels_text TEXT DEFAULT '';"
+  fi
+
+  # Populate labels_text from labels table
+  sqlite3 "$DB" "
+    UPDATE tasks SET labels_text = COALESCE(
+      (SELECT GROUP_CONCAT(label, ' ') FROM labels WHERE issue_id = tasks.id), ''
+    );
+  "
+
+  # Create FTS5 table, backfill, and add triggers
+  sqlite3 "$DB" "
+    CREATE VIRTUAL TABLE tasks_fts USING fts5(
+      title, description, labels_text,
+      content=tasks, content_rowid=rowid,
+      tokenize='porter unicode61'
+    );
+
+    INSERT INTO tasks_fts(rowid, title, description, labels_text)
+    SELECT rowid, title, COALESCE(description, ''), COALESCE(labels_text, '')
+    FROM tasks;
+
+    CREATE TRIGGER IF NOT EXISTS tasks_fts_ai AFTER INSERT ON tasks BEGIN
+      INSERT INTO tasks_fts(rowid, title, description, labels_text)
+      VALUES (new.rowid, new.title, COALESCE(new.description, ''), COALESCE(new.labels_text, ''));
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS tasks_fts_bd BEFORE DELETE ON tasks BEGIN
+      INSERT INTO tasks_fts(tasks_fts, rowid, title, description, labels_text)
+      VALUES('delete', old.rowid, old.title, COALESCE(old.description, ''), COALESCE(old.labels_text, ''));
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS tasks_fts_bu BEFORE UPDATE OF title, description, labels_text ON tasks BEGIN
+      INSERT INTO tasks_fts(tasks_fts, rowid, title, description, labels_text)
+      VALUES('delete', old.rowid, old.title, COALESCE(old.description, ''), COALESCE(old.labels_text, ''));
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS tasks_fts_au AFTER UPDATE OF title, description, labels_text ON tasks BEGIN
+      INSERT INTO tasks_fts(rowid, title, description, labels_text)
+      VALUES (new.rowid, new.title, COALESCE(new.description, ''), COALESCE(new.labels_text, ''));
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS labels_ai_fts AFTER INSERT ON labels BEGIN
+      UPDATE tasks SET labels_text = COALESCE(
+        (SELECT GROUP_CONCAT(label, ' ') FROM labels WHERE issue_id = NEW.issue_id), ''
+      ) WHERE id = NEW.issue_id;
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS labels_ad_fts AFTER DELETE ON labels BEGIN
+      UPDATE tasks SET labels_text = COALESCE(
+        (SELECT GROUP_CONCAT(label, ' ') FROM labels WHERE issue_id = OLD.issue_id), ''
+      ) WHERE id = OLD.issue_id;
+    END;
+  "
+}
+
 # ---------------------------------------------------------------------------
 # Schema (embedded)
 # ---------------------------------------------------------------------------
@@ -104,6 +188,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     schedule_cron TEXT,
     next_run_at TEXT,
     due_date TEXT,
+    labels_text TEXT DEFAULT "",
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     closed_at TEXT,
@@ -195,6 +280,12 @@ cmd_init() {
     sqlite3 "$jat_dir/tasks.db" "ALTER TABLE tasks ADD COLUMN reserved_files TEXT;"
     $quiet || echo "Migrated: added reserved_files column"
   fi
+
+  # Migrate: add FTS5 full-text search index
+  local saved_db="$DB"
+  DB="$jat_dir/tasks.db"
+  ensure_fts && { $quiet || echo "FTS5 search index ready"; }
+  DB="$saved_db"
 
   touch_sentinel
 
@@ -861,7 +952,8 @@ for item in json.load(sys.stdin):
 
 cmd_search() {
   require_db
-  local query="" updated_after="" limit=50 json_out=false
+  ensure_fts
+  local query="" updated_after="" limit=50 json_out=false status="" type="" labels_filter=""
 
   if [[ $# -gt 0 && ! "$1" =~ ^-- ]]; then
     query="$1"; shift
@@ -871,33 +963,85 @@ cmd_search() {
     case "$1" in
       --updated-after) updated_after="$2"; shift 2 ;;
       --limit)         limit="$2"; shift 2 ;;
+      --status)        status="$2"; shift 2 ;;
+      --type)          type="$2"; shift 2 ;;
+      --labels)        labels_filter="$2"; shift 2 ;;
       --json)          json_out=true; shift ;;
       *)               [[ -z "$query" ]] && query="$1"; shift ;;
     esac
   done
 
-  [[ -n "$query" ]] || die "Usage: jt search \"query\" [--updated-after DATE] [--limit N] [--json]"
+  [[ -n "$query" ]] || die "Usage: jt search \"query\" [--status X] [--type X] [--labels \"a,b\"] [--updated-after DATE] [--limit N] [--json]"
 
   require_integer "$limit" "--limit"
-  local esc_query
-  esc_query="$(sql_escape "$query")"
-  local where="(title LIKE '%${esc_query}%' OR description LIKE '%${esc_query}%')"
-  [[ -n "$updated_after" ]] && where="$where AND updated_at >= '$(sql_escape "$updated_after")'"
 
-  local result
-  result="$(sql_json "
+  # Build SQL filter clauses
+  local filters=""
+  [[ -n "$status" ]] && filters="$filters AND t.status = '$(sql_escape "$status")'"
+  [[ -n "$type" ]] && filters="$filters AND t.issue_type = '$(sql_escape "$type")'"
+  [[ -n "$updated_after" ]] && filters="$filters AND t.updated_at >= '$(sql_escape "$updated_after")'"
+
+  if [[ -n "$labels_filter" ]]; then
+    local lbl
+    IFS=',' read -ra FILTER_LABELS <<< "$labels_filter"
+    for lbl in "${FILTER_LABELS[@]}"; do
+      lbl="$(echo "$lbl" | xargs)"
+      [[ -n "$lbl" ]] && filters="$filters AND EXISTS (SELECT 1 FROM labels l WHERE l.issue_id = t.id AND l.label = '$(sql_escape "$lbl")')"
+    done
+  fi
+
+  local fts_query result fts_ok=true
+  fts_query="$(escape_fts_query "$query")"
+
+  # Try FTS5 MATCH query (BM25 ranked)
+  result="$(sqlite3 -json "$DB" "
     SELECT
       t.id, t.title, t.description, t.status, t.priority, t.issue_type,
       t.assignee, t.created_at, t.updated_at, t.closed_at,
+      ROUND(-tasks_fts.rank, 4) AS relevance,
       COALESCE(
         (SELECT json_group_array(l.label) FROM labels l WHERE l.issue_id = t.id),
         '[]'
       ) as labels
-    FROM tasks t
-    WHERE $where
-    ORDER BY t.updated_at DESC
+    FROM tasks_fts
+    JOIN tasks t ON t.rowid = tasks_fts.rowid
+    WHERE tasks_fts MATCH '$(sql_escape "$fts_query")'
+      $filters
+    ORDER BY tasks_fts.rank
     LIMIT $limit;
-  ")"
+  " 2>/dev/null)" || fts_ok=false
+  [[ -z "$result" ]] && result="[]"
+
+  # Fallback: if FTS query had a syntax error, try quoting each word
+  if ! $fts_ok; then
+    local fallback_words fallback_query=""
+    for fallback_words in $query; do
+      [[ ${#fallback_words} -ge 2 ]] || continue
+      fallback_words="${fallback_words//\"/\"\"}"
+      fallback_query="$fallback_query \"$fallback_words\""
+    done
+    fallback_query="${fallback_query# }"
+
+    if [[ -n "$fallback_query" ]]; then
+      result="$(sqlite3 -json "$DB" "
+        SELECT
+          t.id, t.title, t.description, t.status, t.priority, t.issue_type,
+          t.assignee, t.created_at, t.updated_at, t.closed_at,
+          ROUND(-tasks_fts.rank, 4) AS relevance,
+          COALESCE(
+            (SELECT json_group_array(l.label) FROM labels l WHERE l.issue_id = t.id),
+            '[]'
+          ) as labels
+        FROM tasks_fts
+        JOIN tasks t ON t.rowid = tasks_fts.rowid
+        WHERE tasks_fts MATCH '$(sql_escape "$fallback_query")'
+          $filters
+        ORDER BY tasks_fts.rank
+        LIMIT $limit;
+      " 2>/dev/null)" || true
+      [[ -z "$result" ]] && result="[]"
+    fi
+  fi
 
   if $json_out; then
     echo "$result" | _fix_json_arrays
@@ -910,7 +1054,9 @@ cmd_search() {
 import sys, json
 data = json.load(sys.stdin)
 for t in data:
-    print(f\"  [P{t['priority']}] {t['id']}: {t['title']} ({t['status']})\")
+    rel = t.get('relevance', 0)
+    rel_str = f' (score: {rel:.4f})' if rel else ''
+    print(f\"  [P{t['priority']}] {t['id']}: {t['title']} ({t['status']}){rel_str}\")
 "
     fi
   fi
@@ -954,7 +1100,8 @@ Commands:
   show    TASK_ID  [--json]
   list    [--status X] [--type X] [--limit N] [--json]
   ready   [--json] [--limit N]
-  search  "query"  [--updated-after DATE] [--limit N] [--json]
+  search  "query"  [--status X] [--type X] [--labels "a,b"]
+                   [--updated-after DATE] [--limit N] [--json]
   dep     add TASK_ID DEPENDS_ON_ID
   dep     remove TASK_ID DEPENDS_ON_ID
   dep     tree TASK_ID [--reverse] [--json]

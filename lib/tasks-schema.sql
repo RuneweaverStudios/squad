@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     schedule_cron TEXT,
     next_run_at TEXT,
     due_date TEXT,
+    labels_text TEXT DEFAULT '',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     closed_at TEXT,
@@ -58,3 +59,45 @@ CREATE INDEX IF NOT EXISTS idx_labels_label ON labels(label);
 CREATE INDEX IF NOT EXISTS idx_comments_issue ON comments(issue_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_next_run ON tasks(next_run_at);
 CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
+
+-- FTS5 full-text search index over tasks (porter stemming + unicode)
+CREATE VIRTUAL TABLE IF NOT EXISTS tasks_fts USING fts5(
+    title, description, labels_text,
+    content=tasks,
+    content_rowid=rowid,
+    tokenize='porter unicode61'
+);
+
+-- Sync triggers: tasks table → FTS index
+CREATE TRIGGER IF NOT EXISTS tasks_fts_ai AFTER INSERT ON tasks BEGIN
+    INSERT INTO tasks_fts(rowid, title, description, labels_text)
+    VALUES (new.rowid, new.title, COALESCE(new.description, ''), COALESCE(new.labels_text, ''));
+END;
+
+CREATE TRIGGER IF NOT EXISTS tasks_fts_bd BEFORE DELETE ON tasks BEGIN
+    INSERT INTO tasks_fts(tasks_fts, rowid, title, description, labels_text)
+    VALUES('delete', old.rowid, old.title, COALESCE(old.description, ''), COALESCE(old.labels_text, ''));
+END;
+
+CREATE TRIGGER IF NOT EXISTS tasks_fts_bu BEFORE UPDATE OF title, description, labels_text ON tasks BEGIN
+    INSERT INTO tasks_fts(tasks_fts, rowid, title, description, labels_text)
+    VALUES('delete', old.rowid, old.title, COALESCE(old.description, ''), COALESCE(old.labels_text, ''));
+END;
+
+CREATE TRIGGER IF NOT EXISTS tasks_fts_au AFTER UPDATE OF title, description, labels_text ON tasks BEGIN
+    INSERT INTO tasks_fts(rowid, title, description, labels_text)
+    VALUES (new.rowid, new.title, COALESCE(new.description, ''), COALESCE(new.labels_text, ''));
+END;
+
+-- Sync triggers: labels table → tasks.labels_text → FTS index (cascading)
+CREATE TRIGGER IF NOT EXISTS labels_ai_fts AFTER INSERT ON labels BEGIN
+    UPDATE tasks SET labels_text = COALESCE(
+        (SELECT GROUP_CONCAT(label, ' ') FROM labels WHERE issue_id = NEW.issue_id), ''
+    ) WHERE id = NEW.issue_id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS labels_ad_fts AFTER DELETE ON labels BEGIN
+    UPDATE tasks SET labels_text = COALESCE(
+        (SELECT GROUP_CONCAT(label, ' ') FROM labels WHERE issue_id = OLD.issue_id), ''
+    ) WHERE id = OLD.issue_id;
+END;
