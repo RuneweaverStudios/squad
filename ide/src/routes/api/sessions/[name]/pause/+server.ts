@@ -131,6 +131,14 @@ export const POST: RequestHandler = async ({ params, request }) => {
 		// Guard: refuse to auto-pause protected sessions
 		if (reason?.startsWith('Auto-paused')) {
 			const tmux = sessionName.startsWith('jat-') ? sessionName : `jat-${sessionName}`;
+
+			// Don't auto-pause sessions whose tmux is already dead
+			try {
+				execSync(`tmux has-session -t "${tmux}" 2>/dev/null`, { encoding: 'utf-8' });
+			} catch {
+				return json({ error: 'Session tmux already dead', skipped: true }, { status: 409 });
+			}
+
 			const sigFile = `/tmp/jat-signal-tmux-${tmux}.json`;
 			try {
 				if (existsSync(sigFile)) {
