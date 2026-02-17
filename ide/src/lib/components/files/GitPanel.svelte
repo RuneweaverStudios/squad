@@ -456,38 +456,41 @@
 				throw new Error(data.message || 'Failed to stage files');
 			}
 
-			await fetchStatus();
+			// Optimistically move files from changes to staged immediately
+			// so the UI updates before the slower fetchStatus() round-trip
+			const changedSet = new Set(allChanges);
+			stagedFiles = [...new Set([...stagedFiles, ...allChanges])];
+			modifiedFiles = modifiedFiles.filter(f => !changedSet.has(f));
+			deletedFiles = deletedFiles.filter(f => !changedSet.has(f));
+			untrackedFiles = untrackedFiles.filter(f => !changedSet.has(f));
+			createdFiles = createdFiles.filter(f => !changedSet.has(f));
+			renamedFiles = renamedFiles.filter(r => !changedSet.has(r.from) && !changedSet.has(r.to));
+			isStagingAll = false;
 			showToast(`Staged ${allChanges.length} file(s)`);
+
+			// Sync authoritative state from git in the background
+			fetchStatus();
+
 			// Auto-generate commit message when staging all files (if no message yet)
-			console.log('[GitPanel] stageAll complete, commitMessage:', JSON.stringify(commitMessage), 'isGeneratingMessage:', isGeneratingMessage);
 			if (!commitMessage.trim() && !isGeneratingMessage) {
 				isGeneratingMessage = true;
-				console.log('[GitPanel] Starting auto-generate commit message for project:', project);
 				fetch('/api/files/git/generate-commit-message', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({ project })
-				}).then(r => {
-					console.log('[GitPanel] Generate response status:', r.status);
-					return r.ok ? r.json() : Promise.reject(r);
-				}).then(data => {
-					console.log('[GitPanel] Generate result:', data);
+				}).then(r => r.ok ? r.json() : Promise.reject(r)).then(data => {
 					if (data.message) {
 						commitMessage = data.message;
 						showToast('Generated commit message');
 					}
-				}).catch((err) => {
-					console.error('[GitPanel] Generate commit message failed:', err);
+				}).catch(() => {
 					showToast('Failed to generate commit message', 'error');
 				}).finally(() => {
 					isGeneratingMessage = false;
 				});
-			} else {
-				console.log('[GitPanel] Skipping auto-generate:', commitMessage.trim() ? 'has existing message' : 'already generating');
 			}
 		} catch (err) {
 			showToast(err instanceof Error ? err.message : 'Failed to stage files', 'error');
-		} finally {
 			isStagingAll = false;
 		}
 	}

@@ -766,6 +766,25 @@
 	animation: input-text-flash 0.4s ease-out forwards;
 }
 
+/* AI suggestion flash - uses --anim-primary (blue/purple) for AI-populated fields */
+@keyframes ai-suggest-flash {
+	0% {
+		border-color: var(--anim-primary);
+		box-shadow: 0 0 8px 2px color-mix(in oklch, var(--anim-primary) 60%, transparent);
+	}
+	50% {
+		border-color: var(--anim-primary-bright);
+		box-shadow: 0 0 12px 3px color-mix(in oklch, var(--anim-primary-bright) 40%, transparent);
+	}
+	100% {
+		border-color: var(--anim-base-hover);
+		box-shadow: none;
+	}
+}
+.ai-suggest-flash {
+	animation: ai-suggest-flash 0.5s ease-out forwards;
+}
+
 /* Rocket Launch Animation */
 .rocket-btn {
 	position: relative;

@@ -281,6 +281,7 @@
 	let logsLoading = $state(false);
 	let logsExpanded = $state(false);
 	let selectedLog = $state<string | null>(null);
+	let resumingLogAgent = $state<string | null>(null);  // Track which session log agent is being resumed
 	let logContent = $state<string | null>(null);
 	let logContentLoading = $state(false);
 
@@ -1613,6 +1614,36 @@
 			showToast('error', `✗ ${error.message}`);
 		} finally {
 			resumingSessionId = null;
+		}
+	}
+
+	/**
+	 * Resume a session from a session log entry (legacy logs)
+	 * Uses the agent name to look up the session ID via the resume API
+	 */
+	async function handleResumeFromLog(agentName: string) {
+		if (!agentName || resumingLogAgent) return;
+
+		resumingLogAgent = agentName;
+		try {
+			const response = await fetch(`/api/sessions/${agentName}/resume`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({})
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.message || 'Failed to resume session');
+			}
+
+			const data = await response.json();
+			showToast('success', `Resuming session for ${data.agentName || agentName}`);
+		} catch (error: any) {
+			console.error('Resume from log error:', error);
+			showToast('error', `Resume failed: ${error.message}`);
+		} finally {
+			resumingLogAgent = null;
 		}
 	}
 
@@ -3181,37 +3212,58 @@
 							{:else if sessionLogs.length > 0}
 								<div class="space-y-2">
 									{#each logsExpanded ? sessionLogs : sessionLogs.slice(0, 3) as log (log.filename)}
-										<button
-											class="w-full text-left p-3 rounded group transition-colors industrial-hover bg-base-200 border-l-2 border-info"
-											onclick={() => fetchLogContent(log.filename)}
-										>
-											<div class="flex items-center justify-between mb-1">
-												<div class="flex items-center gap-2">
-													<!-- Terminal icon -->
-													<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-info" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-														<path stroke-linecap="round" stroke-linejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-													</svg>
-													{#if log.agentName}
-														<span class="badge badge-xs badge-primary">{log.agentName}</span>
+										<div class="flex gap-2">
+											<button
+												class="flex-1 text-left p-3 rounded group transition-colors industrial-hover bg-base-200 border-l-2 border-info"
+												onclick={() => fetchLogContent(log.filename)}
+											>
+												<div class="flex items-center justify-between mb-1">
+													<div class="flex items-center gap-2">
+														<!-- Terminal icon -->
+														<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-info" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+															<path stroke-linecap="round" stroke-linejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+														</svg>
+														{#if log.agentName}
+															<span class="badge badge-xs badge-primary">{log.agentName}</span>
+														{/if}
+														<span class="text-xs font-mono text-base-content/60">{log.sizeFormatted}</span>
+													</div>
+													<span class="text-xs text-base-content/50">
+														{log.sessionTime ? formatRelativeTimestamp(log.sessionTime) : formatRelativeTimestamp(log.modifiedAt)}
+													</span>
+												</div>
+												<div class="text-xs font-mono truncate text-base-content/60" title={log.filename}>
+													{log.filename}
+												</div>
+												{#if log.preview}
+													<div class="text-xs mt-1 line-clamp-2 text-base-content/50">
+														{log.preview}
+													</div>
+												{/if}
+												<div class="text-xs mt-1 opacity-0 group-hover:opacity-100 transition-opacity text-info">
+													Click to view log
+												</div>
+											</button>
+											{#if log.agentName}
+												<button
+													class="self-start px-2 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap
+														{resumingLogAgent === log.agentName
+															? 'bg-info/20 text-info cursor-wait'
+															: 'bg-base-300 text-base-content/60 hover:bg-success/20 hover:text-success'}"
+													onclick={(e) => { e.stopPropagation(); handleResumeFromLog(log.agentName!); }}
+													disabled={resumingLogAgent !== null}
+													title="Resume {log.agentName}'s session"
+												>
+													{#if resumingLogAgent === log.agentName}
+														<span class="loading loading-spinner loading-xs"></span>
+													{:else}
+														<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+															<path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+														</svg>
 													{/if}
-													<span class="text-xs font-mono text-base-content/60">{log.sizeFormatted}</span>
-												</div>
-												<span class="text-xs text-base-content/50">
-													{log.sessionTime ? formatRelativeTimestamp(log.sessionTime) : formatRelativeTimestamp(log.modifiedAt)}
-												</span>
-											</div>
-											<div class="text-xs font-mono truncate text-base-content/60" title={log.filename}>
-												{log.filename}
-											</div>
-											{#if log.preview}
-												<div class="text-xs mt-1 line-clamp-2 text-base-content/50">
-													{log.preview}
-												</div>
+												</button>
 											{/if}
-											<div class="text-xs mt-1 opacity-0 group-hover:opacity-100 transition-opacity text-info">
-												Click to view log
-											</div>
-										</button>
+										</div>
 									{/each}
 									{#if !logsExpanded && sessionLogs.length > 3}
 										<button

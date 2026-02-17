@@ -731,6 +731,9 @@ function handleSessionComplete(data: SessionEvent): void {
 	}
 	console.log('[SessionEvents] Found session at index:', sessionIndex);
 
+	// Detect duplicate completion events (signal file can be rewritten)
+	const alreadyCompleted = !!workSessionsState.sessions[sessionIndex]._completionBundle;
+
 	// Store the completion bundle for display in SessionCard
 	workSessionsState.sessions[sessionIndex]._completionBundle = completionBundle;
 	workSessionsState.sessions[sessionIndex]._completionBundleTimestamp = data.timestamp;
@@ -750,8 +753,8 @@ function handleSessionComplete(data: SessionEvent): void {
 		workSessionsState.sessions[sessionIndex]._sseStateTimestamp = data.timestamp;
 	}
 
-	// Toast notification for task completion (if enabled)
-	if (getToastComplete()) {
+	// Toast notification for task completion (if enabled, and only on first completion event)
+	if (getToastComplete() && !alreadyCompleted) {
 		const completedSession = workSessionsState.sessions[sessionIndex];
 		const completedAgentName = sessionName.startsWith('jat-') ? sessionName.slice(4) : sessionName;
 		const completedTaskId = completedSession.task?.id;

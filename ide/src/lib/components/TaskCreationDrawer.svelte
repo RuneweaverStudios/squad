@@ -379,6 +379,7 @@
 	let suggestionsApplied = $state(false);
 	let suggestionReasoning = $state('');
 	let suggestionError = $state<string | null>(null);
+	let aiFlashFields = $state<Set<string>>(new Set());
 
 	// Track if user has manually changed fields (to avoid overwriting)
 	let userModifiedFields = $state<Set<string>>(new Set());
@@ -719,6 +720,16 @@
 
 				suggestionReasoning = suggestions.reasoning || '';
 				suggestionsApplied = true;
+
+				// Flash the fields that AI populated
+				const flashSet = new Set<string>();
+				if (!userModifiedFields.has('type') && suggestions.type) flashSet.add('type');
+				if (!userModifiedFields.has('priority') && suggestions.priority !== undefined) flashSet.add('priority');
+				if (!userModifiedFields.has('labels') && suggestions.labels?.length > 0) flashSet.add('labels');
+				if (flashSet.size > 0) {
+					aiFlashFields = flashSet;
+					setTimeout(() => { aiFlashFields = new Set(); }, 600);
+				}
 			}
 		} catch (err: any) {
 			console.error('Error fetching suggestions:', err);
@@ -1224,6 +1235,7 @@
 		suggestionsApplied = false;
 		suggestionReasoning = '';
 		suggestionError = null;
+		aiFlashFields = new Set();
 		userModifiedFields = new Set();
 		prefetchedOpenTasks = []; // Will re-fetch next time drawer opens
 
@@ -1785,37 +1797,6 @@
 						</div>
 					</details>
 
-					<!-- AI Suggestion Reasoning - Show when suggestions applied -->
-					{#if suggestionReasoning}
-						<div
-							class="rounded-lg p-3 bg-primary/10 border border-primary/30"
-						>
-							<div class="flex items-start gap-2">
-								<svg class="w-4 h-4 mt-0.5 flex-shrink-0 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-								</svg>
-								<div>
-									<p class="text-xs font-semibold font-mono uppercase tracking-wider mb-1 text-primary">
-										AI Analysis
-									</p>
-									<p class="text-sm text-base-content/90">
-										{suggestionReasoning}
-									</p>
-								</div>
-								<button
-									type="button"
-									class="btn btn-xs btn-ghost btn-circle ml-auto"
-									onclick={() => suggestionReasoning = ''}
-									title="Dismiss"
-								>
-									<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-									</svg>
-								</button>
-							</div>
-						</div>
-					{/if}
-
 					<!-- AI Suggestion Error -->
 					{#if suggestionError}
 						<div
@@ -1853,7 +1834,7 @@
 							</label>
 							<select
 								id="task-type"
-								class="select select-sm w-full font-mono bg-base-200 border-base-content/30 text-base-content {validationErrors.type ? 'select-error' : ''} {formDisabled ? 'opacity-50' : ''}"
+								class="select select-sm w-full font-mono bg-base-200 border-base-content/30 text-base-content {validationErrors.type ? 'select-error' : ''} {formDisabled ? 'opacity-50' : ''} {aiFlashFields.has('type') ? 'ai-suggest-flash' : ''}"
 								bind:value={formData.type}
 								onchange={() => markFieldModified('type')}
 								disabled={formDisabled || isSubmitting}
@@ -1877,7 +1858,7 @@
 							</label>
 							<select
 								id="task-priority"
-								class="select select-sm w-full font-mono bg-base-200 border-base-content/30 text-base-content {formDisabled ? 'opacity-50' : ''}"
+								class="select select-sm w-full font-mono bg-base-200 border-base-content/30 text-base-content {formDisabled ? 'opacity-50' : ''} {aiFlashFields.has('priority') ? 'ai-suggest-flash' : ''}"
 								bind:value={formData.priority}
 								onchange={() => markFieldModified('priority')}
 								disabled={formDisabled || isSubmitting}
@@ -1903,7 +1884,7 @@
 								id="task-labels"
 								type="text"
 								placeholder={formDisabled ? "" : "frontend, urgent"}
-								class="input input-sm w-full font-mono bg-base-200 border-base-content/30 text-base-content {formDisabled ? 'opacity-50' : ''}"
+								class="input input-sm w-full font-mono bg-base-200 border-base-content/30 text-base-content {formDisabled ? 'opacity-50' : ''} {aiFlashFields.has('labels') ? 'ai-suggest-flash' : ''}"
 								bind:value={formData.labels}
 								oninput={() => markFieldModified('labels')}
 								disabled={formDisabled || isSubmitting}
@@ -2333,6 +2314,31 @@
 							</div>
 						{/if}
 					</div>
+
+					<!-- AI Analysis Reasoning — bottom of form -->
+					{#if suggestionReasoning}
+						<details class="group" open>
+							<summary class="cursor-pointer list-none flex items-center gap-1.5 text-xs font-semibold font-mono uppercase tracking-wider text-primary/70 py-1">
+								<svg class="w-3 h-3 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+								</svg>
+								AI Analysis
+								<button
+									type="button"
+									class="btn btn-xs btn-ghost btn-circle ml-auto opacity-50 hover:opacity-100"
+									onclick={(e) => { e.stopPropagation(); suggestionReasoning = ''; }}
+									title="Dismiss"
+								>
+									<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+									</svg>
+								</button>
+							</summary>
+							<p class="text-sm text-base-content/70 mt-1 pl-4.5">
+								{suggestionReasoning}
+							</p>
+						</details>
+					{/if}
 
 					<!-- Error Message - Industrial -->
 					{#if submitError}
