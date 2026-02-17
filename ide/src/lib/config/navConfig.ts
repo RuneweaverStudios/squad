@@ -97,6 +97,13 @@ export const unifiedNavConfig: UnifiedNavConfig = {
 			category: 'main'
 		},
 		{
+			id: 'search',
+			label: 'Search',
+			href: '/search',
+			icon: 'search',
+			category: 'main'
+		},
+		{
 			id: 'memory',
 			label: 'Memory',
 			href: '/memory',

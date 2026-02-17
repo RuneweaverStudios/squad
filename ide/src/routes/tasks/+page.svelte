@@ -1139,6 +1139,7 @@
 	function selectProject(project: string) {
 		selectedProject = project;
 		completedDayGroups = []; // Reset completed tasks for new project
+		fetchCompletedTasks(); // Re-fetch completed tasks for the new project
 
 		const projectSessions = sessionsByProject.get(project) || [];
 		const projectTasks = tasksByProject.get(project) || [];
