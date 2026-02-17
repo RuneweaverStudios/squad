@@ -17,7 +17,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { fade, slide } from 'svelte/transition';
+	import { fade } from 'svelte/transition';
 	import { FileEditor, type OpenFile } from '$lib/components/files';
 	import FileTree from '$lib/components/files/FileTree.svelte';
 	import QuickFileFinder from '$lib/components/files/QuickFileFinder.svelte';
@@ -496,8 +496,7 @@
 		});
 
 		const filename = path.split('/').pop() || path;
-		fileInfo = `Accepted disk version of ${filename}`;
-		setTimeout(() => { fileInfo = null; }, 2000);
+		infoToast(`Accepted disk version of ${filename}`);
 	}
 
 	/**
@@ -541,17 +540,15 @@
 				return f;
 			});
 
-			fileInfo = `Saved your version of ${filename}`;
-			setTimeout(() => { fileInfo = null; }, 2000);
+			infoToast(`Saved your version of ${filename}`);
 
 		} catch (err: unknown) {
 			console.error('[Files] Failed to save file:', err);
 			if (err && typeof err === 'object' && 'message' in err && 'status' in err) {
-				fileError = getSaveErrorMessage(err.message as string, err.status as number, filename);
+				errorToast(getSaveErrorMessage(err.message as string, err.status as number, filename));
 			} else {
-				fileError = err instanceof Error ? err.message : `Failed to save "${filename}"`;
+				errorToast(err instanceof Error ? err.message : `Failed to save "${filename}"`);
 			}
-			setTimeout(() => { fileError = null; }, 5000);
 		}
 	}
 
@@ -636,14 +633,12 @@
 
 	// Handle tree operation error (show as toast)
 	function handleTreeError(message: string) {
-		fileError = message;
-		setTimeout(() => { fileError = null; }, 5000);
+		errorToast(message);
 	}
 
 	// Handle tree operation success (show as toast)
 	function handleTreeSuccess(message: string) {
-		fileInfo = message;
-		setTimeout(() => { fileInfo = null; }, 3000);
+		infoToast(message);
 	}
 
 	// localStorage key for persisting open files per project
@@ -1166,51 +1161,6 @@
 	{/if}
 </div>
 
-<!-- Toast Notifications -->
-<div class="toast toast-end toast-bottom z-50">
-	{#if saveSuccess}
-		<div class="alert alert-success shadow-lg" transition:slide={{ duration: 200 }}>
-			<svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-5 w-5" fill="none" viewBox="0 0 24 24">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-			</svg>
-			<span>{saveSuccess}</span>
-		</div>
-	{/if}
-	{#if saveError}
-		<div class="alert alert-error shadow-lg" transition:slide={{ duration: 200 }}>
-			<svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-5 w-5" fill="none" viewBox="0 0 24 24">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-			</svg>
-			<span>{saveError}</span>
-			<button class="btn btn-ghost btn-xs" onclick={() => { saveError = null; }}>
-				<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-				</svg>
-			</button>
-		</div>
-	{/if}
-	{#if fileError}
-		<div class="alert alert-warning shadow-lg" transition:slide={{ duration: 200 }}>
-			<svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-5 w-5" fill="none" viewBox="0 0 24 24">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-			</svg>
-			<span>{fileError}</span>
-			<button class="btn btn-ghost btn-xs" onclick={() => { fileError = null; }}>
-				<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-				</svg>
-			</button>
-		</div>
-	{/if}
-	{#if fileInfo}
-		<div class="alert alert-info shadow-lg" transition:slide={{ duration: 200 }}>
-			<svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-5 w-5" fill="none" viewBox="0 0 24 24">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-			</svg>
-			<span>{fileInfo}</span>
-		</div>
-	{/if}
-</div>
 
 <!-- Quick File Finder Modal (Alt+P) -->
 {#if selectedProject}
