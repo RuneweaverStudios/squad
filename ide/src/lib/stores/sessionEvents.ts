@@ -370,7 +370,7 @@ async function scanAndPauseIdleSessions(): Promise<void> {
 
 	for (const session of sessions) {
 		const state = session._sseState;
-		// Only target idle or completed sessions (not working, needs_input, review, etc.)
+		// Only target idle or completed sessions (not working, needs_input, review, planning, etc.)
 		if (state !== 'idle' && state !== 'completed') continue;
 
 		// Don't pause sessions that already have an auto-kill pending

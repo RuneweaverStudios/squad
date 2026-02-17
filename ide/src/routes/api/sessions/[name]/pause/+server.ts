@@ -128,6 +128,21 @@ export const POST: RequestHandler = async ({ params, request }) => {
 			return json({ error: 'taskId is required' }, { status: 400 });
 		}
 
+		// Guard: refuse to auto-pause planning sessions (they have no task/workflow signals
+		// and can appear idle when their signal TTL expires, but the user is still using them)
+		if (reason?.startsWith('Auto-paused')) {
+			const tmux = sessionName.startsWith('jat-') ? sessionName : `jat-${sessionName}`;
+			const sigFile = `/tmp/jat-signal-tmux-${tmux}.json`;
+			try {
+				if (existsSync(sigFile)) {
+					const sig = JSON.parse(readFileSync(sigFile, 'utf-8'));
+					if (sig.type === 'planning' || sig.state === 'planning') {
+						return json({ error: 'Cannot auto-pause planning session', skipped: true }, { status: 409 });
+					}
+				}
+			} catch { /* ignore — proceed with pause */ }
+		}
+
 		// Normalize session name (ensure jat- prefix)
 		const tmuxSession = sessionName.startsWith('jat-') ? sessionName : `jat-${sessionName}`;
 		const agentNameFromSession = tmuxSession.replace(/^jat-/, '');

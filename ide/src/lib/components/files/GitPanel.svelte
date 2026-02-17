@@ -462,8 +462,22 @@
 			await fetchStatus();
 			showToast(`Staged ${allChanges.length} file(s)`);
 			// Auto-generate commit message when staging all files (if no message yet)
-			if (!commitMessage.trim()) {
-				handleGenerateMessage();
+			if (!commitMessage.trim() && !isGeneratingMessage) {
+				isGeneratingMessage = true;
+				fetch('/api/files/git/generate-commit-message', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ project })
+				}).then(r => r.ok ? r.json() : Promise.reject(r)).then(data => {
+					if (data.message) {
+						commitMessage = data.message;
+						showToast('Generated commit message');
+					}
+				}).catch(() => {
+					showToast('Failed to generate commit message', 'error');
+				}).finally(() => {
+					isGeneratingMessage = false;
+				});
 			}
 		} catch (err) {
 			showToast(err instanceof Error ? err.message : 'Failed to stage files', 'error');
@@ -1544,24 +1558,26 @@
 					>
 						<polyline points="9 18 15 12 9 6" />
 					</svg>
-					{#if isStagingAll}
-						<span class="changes-title staging-label"><span class="loading loading-spinner" style="width: 10px; height: 10px;"></span> Staging...</span>
-					{:else}
-						<span class="changes-title">CHANGES</span>
-						{#if changesCount > 0}
-							<span class="changes-count changes">{changesCount}</span>
-						{/if}
-					{/if}
+					<span class="changes-title">{isStagingAll ? 'STAGING...' : 'CHANGES'}</span>
 					{#if changesCount > 0 && !isStagingAll}
+						<span class="changes-count changes">{changesCount}</span>
+					{/if}
+					{#if changesCount > 0 || isStagingAll}
 						<button
 							class="stage-all-btn"
+							class:staging={isStagingAll}
 							onclick={(e) => { e.stopPropagation(); stageAll(); }}
-							title="Stage all files"
+							disabled={isStagingAll}
+							title={isStagingAll ? 'Staging files...' : 'Stage all files'}
 						>
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-								<line x1="12" y1="5" x2="12" y2="19" />
-								<line x1="5" y1="12" x2="19" y2="12" />
-							</svg>
+							{#if isStagingAll}
+								<span class="loading loading-spinner loading-xs"></span>
+							{:else}
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<line x1="12" y1="5" x2="12" y2="19" />
+									<line x1="5" y1="12" x2="19" y2="12" />
+								</svg>
+							{/if}
 						</button>
 						{@const discardableCount = modifiedFiles.filter(f => !stagedFiles.includes(f)).length + deletedFiles.filter(f => !stagedFiles.includes(f)).length}
 						{#if discardableCount > 0 && !pendingDiscardAll}
@@ -4070,11 +4086,10 @@
 		text-align: left;
 	}
 
-	.staging-label {
-		display: flex;
-		align-items: center;
-		gap: 0.375rem;
+	.stage-all-btn.staging {
+		border-color: oklch(0.55 0.15 85 / 0.5);
 		color: oklch(0.70 0.15 85);
+		cursor: wait;
 	}
 
 	.changes-count {

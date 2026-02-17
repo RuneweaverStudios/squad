@@ -69,8 +69,10 @@ function readSignalState(sessionName) {
 		// See SIGNAL_TTL in constants.ts for configuration
 		const stats = statSync(signalFile);
 		const ageMs = Date.now() - stats.mtimeMs;
-		const isUserWaitingState = signal.type === 'state' && signal.state && SIGNAL_TTL.USER_WAITING_STATES.includes(/** @type {typeof SIGNAL_TTL.USER_WAITING_STATES[number]} */ (signal.state));
-		const ttl = signal.type === 'complete' || isUserWaitingState ? SIGNAL_TTL.USER_WAITING_MS : SIGNAL_TTL.TRANSIENT_MS;
+		const isAgentEmittedWaiting = signal.type === 'state' && signal.state && SIGNAL_TTL.USER_WAITING_STATES.includes(/** @type {typeof SIGNAL_TTL.USER_WAITING_STATES[number]} */ (signal.state));
+		// IDE-initiated signals use type directly (e.g., { type: 'planning' }) instead of { type: 'state', state: 'planning' }
+		const isIdeInitiatedWaiting = signal.type !== 'state' && signal.type !== 'complete' && SIGNAL_TTL.USER_WAITING_STATES.includes(/** @type {typeof SIGNAL_TTL.USER_WAITING_STATES[number]} */ (signal.type));
+		const ttl = signal.type === 'complete' || isAgentEmittedWaiting || isIdeInitiatedWaiting ? SIGNAL_TTL.USER_WAITING_MS : SIGNAL_TTL.TRANSIENT_MS;
 		if (ageMs > ttl) {
 			return null;
 		}
