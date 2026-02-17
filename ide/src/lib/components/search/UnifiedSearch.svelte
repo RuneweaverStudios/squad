@@ -476,18 +476,28 @@
 			}
 		}
 
-		// Arrow up/down for result navigation (all tabs except 'all')
-		if (activeTab !== 'all' && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
-			const maxIndex = activeTabResultCount();
-			if (maxIndex > 0) {
+		// Arrow up/down for result navigation
+		if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+			if (activeTab === 'all' && e.key === 'ArrowDown') {
+				// From 'all' tab, ArrowDown enters tab navigation — switch to first specific tab
 				e.preventDefault();
-				if (e.key === 'ArrowDown') {
-					selectedResultIndex = selectedResultIndex < maxIndex - 1 ? selectedResultIndex + 1 : -1;
-				} else {
-					selectedResultIndex = selectedResultIndex > 0 ? selectedResultIndex - 1 : selectedResultIndex === 0 ? -1 : maxIndex - 1;
+				focusedColumn = null;
+				activeTab = 'tasks';
+				selectedResultIndex = -1;
+				if (mode === 'route') updateUrl();
+				if (query.trim()) doSearchForActiveTab();
+			} else if (activeTab !== 'all') {
+				const maxIndex = activeTabResultCount();
+				if (maxIndex > 0) {
+					e.preventDefault();
+					if (e.key === 'ArrowDown') {
+						selectedResultIndex = selectedResultIndex < maxIndex - 1 ? selectedResultIndex + 1 : -1;
+					} else {
+						selectedResultIndex = selectedResultIndex > 0 ? selectedResultIndex - 1 : selectedResultIndex === 0 ? -1 : maxIndex - 1;
+					}
+					if (selectedResultIndex >= 0) scrollSelectedIntoView();
+					else searchInputEl?.focus();
 				}
-				if (selectedResultIndex >= 0) scrollSelectedIntoView();
-				else searchInputEl?.focus();
 			}
 		}
 
@@ -598,20 +608,19 @@
 	}
 
 	function navigateToMemory(file: string) {
-		closeModal();
-		goto(`/memory?file=${encodeURIComponent(file)}`);
+		window.open(`/memory?file=${encodeURIComponent(file)}`, '_blank');
 	}
 
 	function navigateToFile(path: string, line?: number) {
-		closeModal();
 		if (onFileSelect && selectedProject) {
 			onFileSelect(path, line || 1, selectedProject);
+			closeModal();
 			return;
 		}
 		const params = new URLSearchParams({ path });
 		if (line) params.set('line', String(line));
 		if (selectedProject) params.set('project', selectedProject);
-		goto(`/files?${params}`);
+		window.open(`/files?${params}`, '_blank');
 	}
 
 	function openFilename(file: FilenameResult) {
