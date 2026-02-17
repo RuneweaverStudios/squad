@@ -20,6 +20,7 @@
 	interface Props {
 		projects: string[];
 		initialProject?: string;
+		initialText?: string;
 		hideProjectSelector?: boolean;
 		stacked?: boolean;
 		onTasksCreated?: () => void;
@@ -28,13 +29,14 @@
 	let {
 		projects = [],
 		initialProject = '',
+		initialText = '',
 		hideProjectSelector = false,
 		stacked = false,
 		onTasksCreated = () => {},
 	}: Props = $props();
 
 	// State
-	let textInput = $state('');
+	let textInput = $state(initialText);
 	let selectedProject = $state(initialProject || projects[0] || '');
 
 	// Sync selectedProject when initialProject changes (e.g., drawer project badge)

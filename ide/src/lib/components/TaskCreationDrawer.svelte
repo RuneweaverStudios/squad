@@ -2386,6 +2386,7 @@
 					<CreatePaste
 						projects={dynamicProjects}
 						initialProject={formData.project}
+						initialText={formData.description}
 						hideProjectSelector={true}
 						stacked={true}
 						onTasksCreated={handleNonTaskModeCreated}
@@ -2394,6 +2395,7 @@
 					<CreateTemplate
 						projects={dynamicProjects}
 						initialProject={formData.project}
+						initialText={formData.description}
 						hideProjectSelector={true}
 						stacked={true}
 						onTasksCreated={handleNonTaskModeCreated}
@@ -2402,6 +2404,7 @@
 					<CreateGenerator
 						projects={dynamicProjects}
 						initialProject={formData.project}
+						initialText={formData.description}
 						hideProjectSelector={true}
 						stacked={true}
 						onTasksCreated={handleNonTaskModeCreated}
@@ -2410,6 +2413,7 @@
 					<CreatePlan
 						projects={dynamicProjects}
 						initialProject={formData.project}
+						initialText={formData.description}
 						hideProjectSelector={true}
 						stacked={true}
 						onTasksCreated={handleNonTaskModeCreated}

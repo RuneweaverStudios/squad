@@ -10,6 +10,7 @@
 	 * - Migration timeline (local vs remote status)
 	 */
 	import { onMount } from 'svelte';
+	import { successToast, errorToast } from '$lib/stores/toasts.svelte';
 
 	interface Props {
 		project: string;
@@ -140,22 +141,14 @@
 		}
 	}
 
-	// Toast state
-	let toastMessage = $state<string | null>(null);
-	let toastType = $state<'success' | 'error'>('success');
-
 	function showToast(message: string, type: 'success' | 'error' = 'success') {
-		toastMessage = message;
-		toastType = type;
-		// Log to console so user can see full message and copy it
 		if (type === 'error') {
 			console.error('[Supabase]', message);
+			errorToast(message);
 		} else {
 			console.log('[Supabase]', message);
+			successToast(message);
 		}
-		setTimeout(() => {
-			toastMessage = null;
-		}, 4000);
 	}
 
 	/**
@@ -1194,14 +1187,6 @@
 		</div>
 	{/if}
 
-	<!-- Toast -->
-	{#if toastMessage}
-		<div class="toast-container">
-			<div class="toast" class:toast-success={toastType === 'success'} class:toast-error={toastType === 'error'}>
-				{toastMessage}
-			</div>
-		</div>
-	{/if}
 </div>
 
 <style>
@@ -1822,47 +1807,6 @@
 		to {
 			opacity: 1;
 			transform: scale(1);
-		}
-	}
-
-	/* Toast */
-	.toast-container {
-		position: absolute;
-		bottom: 1rem;
-		left: 0.5rem;
-		right: 0.5rem;
-		z-index: 100;
-	}
-
-	.toast {
-		padding: 0.5rem 0.75rem;
-		border-radius: 0.375rem;
-		font-size: 0.6875rem;
-		font-weight: 500;
-		box-shadow: 0 4px 12px oklch(0 0 0 / 0.3);
-		animation: toast-in 0.2s ease-out;
-		word-break: break-word;
-		line-height: 1.4;
-	}
-
-	.toast-success {
-		background: oklch(0.65 0.15 145);
-		color: oklch(0.98 0.02 145);
-	}
-
-	.toast-error {
-		background: oklch(0.60 0.18 25);
-		color: oklch(0.98 0.02 25);
-	}
-
-	@keyframes toast-in {
-		from {
-			opacity: 0;
-			transform: translateY(10px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
 		}
 	}
 

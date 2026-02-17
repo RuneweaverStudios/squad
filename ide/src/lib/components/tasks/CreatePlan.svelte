@@ -29,6 +29,7 @@
 	interface Props {
 		projects: string[];
 		initialProject?: string;
+		initialText?: string;
 		hideProjectSelector?: boolean;
 		stacked?: boolean;
 		onTasksCreated?: () => void;
@@ -37,6 +38,7 @@
 	let {
 		projects = [],
 		initialProject = '',
+		initialText = '',
 		hideProjectSelector = false,
 		stacked = false,
 		onTasksCreated = () => {},
@@ -47,7 +49,7 @@
 	let selectedHarness = $state<string>('claude-code');
 	let selectedModel = $state<string>('opus');
 	let harnessDropdownOpen = $state(false);
-	let description = $state('');
+	let description = $state(initialText);
 
 	// Derive available models from selected harness
 	const availableModels = $derived(() => {

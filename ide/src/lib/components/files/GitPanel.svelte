@@ -13,6 +13,7 @@
 	import { goto } from '$app/navigation';
 	import BranchSwitcherModal from './BranchSwitcherModal.svelte';
 	import { openDiffPreviewDrawer } from '$lib/stores/drawerStore';
+	import { successToast, errorToast } from '$lib/stores/toasts.svelte';
 
 	interface FileChange {
 		path: string;
@@ -241,16 +242,12 @@
 	let showStashDropdown = $state(false);
 	let stashEntries = $state<Array<{ index: number; hash: string; message: string; date: string }>>([]);
 
-	// Toast state
-	let toastMessage = $state<string | null>(null);
-	let toastType = $state<'success' | 'error'>('success');
-
 	function showToast(message: string, type: 'success' | 'error' = 'success') {
-		toastMessage = message;
-		toastType = type;
-		setTimeout(() => {
-			toastMessage = null;
-		}, 3000);
+		if (type === 'error') {
+			errorToast(message);
+		} else {
+			successToast(message);
+		}
 	}
 
 	/**
@@ -462,22 +459,31 @@
 			await fetchStatus();
 			showToast(`Staged ${allChanges.length} file(s)`);
 			// Auto-generate commit message when staging all files (if no message yet)
+			console.log('[GitPanel] stageAll complete, commitMessage:', JSON.stringify(commitMessage), 'isGeneratingMessage:', isGeneratingMessage);
 			if (!commitMessage.trim() && !isGeneratingMessage) {
 				isGeneratingMessage = true;
+				console.log('[GitPanel] Starting auto-generate commit message for project:', project);
 				fetch('/api/files/git/generate-commit-message', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({ project })
-				}).then(r => r.ok ? r.json() : Promise.reject(r)).then(data => {
+				}).then(r => {
+					console.log('[GitPanel] Generate response status:', r.status);
+					return r.ok ? r.json() : Promise.reject(r);
+				}).then(data => {
+					console.log('[GitPanel] Generate result:', data);
 					if (data.message) {
 						commitMessage = data.message;
 						showToast('Generated commit message');
 					}
-				}).catch(() => {
+				}).catch((err) => {
+					console.error('[GitPanel] Generate commit message failed:', err);
 					showToast('Failed to generate commit message', 'error');
 				}).finally(() => {
 					isGeneratingMessage = false;
 				});
+			} else {
+				console.log('[GitPanel] Skipping auto-generate:', commitMessage.trim() ? 'has existing message' : 'already generating');
 			}
 		} catch (err) {
 			showToast(err instanceof Error ? err.message : 'Failed to stage files', 'error');
@@ -2465,23 +2471,6 @@
 		</div>
 	{/snippet}
 
-	<!-- Toast -->
-	{#if toastMessage}
-		<div class="toast-container" class:error={toastType === 'error'}>
-			{#if toastType === 'success'}
-				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-					<polyline points="20 6 9 17 4 12" />
-				</svg>
-			{:else}
-				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-					<circle cx="12" cy="12" r="10" />
-					<line x1="15" y1="9" x2="9" y2="15" />
-					<line x1="9" y1="9" x2="15" y2="15" />
-				</svg>
-			{/if}
-			<span>{toastMessage}</span>
-		</div>
-	{/if}
 </div>
 
 <!-- Branch Switcher Modal -->
@@ -3154,47 +3143,6 @@
 		display: flex;
 		justify-content: flex-end;
 		gap: 0.375rem;
-	}
-
-	/* Toast */
-	.toast-container {
-		position: absolute;
-		bottom: 0.75rem;
-		left: 0.75rem;
-		right: 0.75rem;
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.5rem 0.75rem;
-		background: oklch(0.45 0.12 145 / 0.2);
-		border: 1px solid oklch(0.55 0.15 145 / 0.3);
-		border-radius: 0.5rem;
-		color: oklch(0.75 0.12 145);
-		font-size: 0.8125rem;
-		animation: slide-up 0.2s ease;
-	}
-
-	.toast-container.error {
-		background: oklch(0.45 0.12 25 / 0.2);
-		border-color: oklch(0.55 0.15 25 / 0.3);
-		color: oklch(0.75 0.12 25);
-	}
-
-	.toast-container svg {
-		width: 16px;
-		height: 16px;
-		flex-shrink: 0;
-	}
-
-	@keyframes slide-up {
-		from {
-			opacity: 0;
-			transform: translateY(8px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
 	}
 
 	/* Timeline Section */
