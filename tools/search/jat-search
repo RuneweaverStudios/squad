@@ -1,0 +1,18 @@
+#!/bin/bash
+# jat-search - Unified search across tasks, memory, and files
+#
+# Usage:
+#   jat-search "query"                   Meta search (tasks + memory + files)
+#   jat-search tasks "query"             Deep task search (FTS5)
+#   jat-search memory "query"            Memory search (FTS5 + vector)
+#   jat-search files "query"             File search (ripgrep + filename)
+#   jat-search --help
+
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+  DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+exec bash "$SCRIPT_DIR/run.sh" "$@"

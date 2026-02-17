@@ -387,8 +387,8 @@
 			onclick={copyId}
 			title="Click to copy task ID"
 		>
-			{#if isClosed}
-				<!-- Checkmark circle for closed tasks (replaces avatar) -->
+			{#if isClosed && !agentName}
+				<!-- Checkmark circle for closed tasks without agent avatar -->
 				<div
 					class="rounded-full shrink-0 flex items-center justify-center"
 					style="
@@ -402,6 +402,9 @@
 						<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
 					</svg>
 				</div>
+			{:else if isClosed && agentName}
+				<!-- Agent avatar with green completion ring for closed tasks -->
+				<AgentAvatar name={agentName} size={avatarSize - 4} showRing={true} ringColor="oklch(0.65 0.20 145)" showGlow={false} {exiting} />
 			{:else}
 				<!-- Avatar with status ring using AgentAvatar's built-in ring support -->
 				{#if agentName}
@@ -445,6 +448,22 @@
 			{/if}
 			<!-- Task ID -->
 			<span class="{animate ? 'tracking-in-expand' : ''} {isClosed ? 'line-through opacity-70' : ''}" style={animate ? 'animation-delay: 100ms;' : ''}>{task.id}</span>
+			{#if isClosed && !copied}
+				<!-- Small completion checkmark for closed tasks -->
+				<div
+					class="rounded-full shrink-0 flex items-center justify-center"
+					style="
+						width: {Math.round(avatarSize * 0.7)}px;
+						height: {Math.round(avatarSize * 0.7)}px;
+						background: oklch(0.65 0.20 145 / 0.25);
+						border: 1.5px solid oklch(0.65 0.20 145);
+					"
+				>
+					<svg class="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="oklch(0.65 0.20 145)" stroke-width="3">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+					</svg>
+				</div>
+			{/if}
 			{#if copied}
 				<svg class="{iconSizes[size]} text-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />

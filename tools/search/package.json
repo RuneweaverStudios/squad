@@ -1,0 +1,10 @@
+{
+  "name": "jat-search",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "JAT unified search - meta search across tasks, memory, and files",
+  "main": "index.js",
+  "dependencies": {
+    "better-sqlite3": "^11.0.0"
+  }
+}
