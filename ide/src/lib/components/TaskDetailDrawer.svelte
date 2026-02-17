@@ -35,6 +35,7 @@
 	import { getProjectFromTaskId } from '$lib/utils/projectUtils';
 	import { availableProjects as availableProjectsStore } from '$lib/stores/drawerStore';
 	import { loadCommands, getCommands } from '$lib/stores/configStore.svelte';
+	import { addToast } from '$lib/stores/toasts.svelte';
 
 	// Task interface for drawer (extends API Task with additional optional fields)
 	interface DrawerTask {
@@ -139,7 +140,6 @@
 	let fetchController: AbortController | null = null;
 
 	// UI state
-	let toastMessage = $state<{ type: 'success' | 'error' | 'warning'; text: string } | null>(null);
 	let showHelp = $state(false);
 	let copiedTaskId = $state(false);
 	let editingLabels = $state(false);
@@ -1184,12 +1184,9 @@
 		};
 	});
 
-	// Show toast notification
-	function showToast(type: 'success' | 'error' | 'warning', text: string) {
-		toastMessage = { type, text };
-		setTimeout(() => {
-			toastMessage = null;
-		}, 3000); // Hide after 3 seconds
+	// Show toast notification via global toast system
+	function showToast(type: 'success' | 'error' | 'warning' | 'info', text: string) {
+		addToast({ message: text, type: type as any, duration: type === 'error' ? 6000 : 4000 });
 	}
 
 	// Copy task ID to clipboard
@@ -3769,16 +3766,6 @@
 
 <!-- Modals and Toast - placed OUTSIDE drawer to avoid stacking context issues -->
 
-<!-- Toast Notification (Fixed position, bottom-right) - Industrial -->
-	{#if toastMessage}
-		<div class="toast toast-end toast-bottom z-[60]">
-			<div
-				class="alert font-mono text-sm {toastMessage.type === 'success' ? 'alert-success' : 'alert-error'}"
-			>
-				<span>{toastMessage.text}</span>
-			</div>
-		</div>
-	{/if}
 
 	<!-- Send Message Modal - Industrial -->
 	{#if showMessageModal && task?.assignee}

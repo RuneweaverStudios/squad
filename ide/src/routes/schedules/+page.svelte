@@ -11,15 +11,13 @@
 	import SchedulerControls from '$lib/components/schedules/SchedulerControls.svelte';
 	import ScheduledTasksTable from '$lib/components/schedules/ScheduledTasksTable.svelte';
 	import TaskDetailDrawer from '$lib/components/TaskDetailDrawer.svelte';
+	import { successToast, errorToast } from '$lib/stores/toasts.svelte';
 
 	// State
 	let schedulerStatus = $state<any>(null);
 	let scheduledTasks = $state<any[]>([]);
 	let statusLoading = $state(true);
 	let tasksLoading = $state(true);
-	let toastMessage = $state<string | null>(null);
-	let toastType = $state<'success' | 'error'>('success');
-
 	// Task detail drawer
 	let selectedTaskId = $state<string | null>(null);
 	let drawerOpen = $state(false);
@@ -188,9 +186,11 @@
 	}
 
 	function showToast(message: string, type: 'success' | 'error') {
-		toastMessage = message;
-		toastType = type;
-		setTimeout(() => { toastMessage = null; }, 3000);
+		if (type === 'error') {
+			errorToast(message);
+		} else {
+			successToast(message);
+		}
 	}
 
 	// Polling
@@ -334,14 +334,6 @@
 	</div>
 {/if}
 
-<!-- Toast -->
-{#if toastMessage}
-	<div class="toast-container">
-		<div class="toast-item" class:toast-success={toastType === 'success'} class:toast-error={toastType === 'error'}>
-			{toastMessage}
-		</div>
-	</div>
-{/if}
 
 <!-- Task Detail Drawer -->
 <TaskDetailDrawer bind:taskId={selectedTaskId} bind:isOpen={drawerOpen} />
@@ -544,36 +536,4 @@
 		cursor: not-allowed;
 	}
 
-	/* Toast */
-	.toast-container {
-		position: fixed;
-		bottom: 1.5rem;
-		right: 1.5rem;
-		z-index: 1000;
-	}
-
-	.toast-item {
-		padding: 0.5rem 1rem;
-		border-radius: 0.5rem;
-		font-size: 0.8125rem;
-		font-weight: 500;
-		animation: toast-in 0.2s ease-out;
-	}
-
-	.toast-success {
-		background: oklch(0.30 0.10 145 / 0.3);
-		border: 1px solid oklch(0.45 0.12 145 / 0.4);
-		color: oklch(0.80 0.15 145);
-	}
-
-	.toast-error {
-		background: oklch(0.30 0.10 25 / 0.3);
-		border: 1px solid oklch(0.45 0.12 25 / 0.4);
-		color: oklch(0.80 0.15 25);
-	}
-
-	@keyframes toast-in {
-		from { opacity: 0; transform: translateY(8px); }
-		to { opacity: 1; transform: translateY(0); }
-	}
 </style>

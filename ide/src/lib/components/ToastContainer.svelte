@@ -18,6 +18,7 @@
 	import { toasts, removeToast, type Toast, type ToastType } from '$lib/stores/toasts.svelte';
 	import { getProjectColor } from '$lib/utils/projectColors';
 	import { goto } from '$app/navigation';
+	import { openTaskDetailDrawer } from '$lib/stores/drawerStore';
 
 	// Visual config for each toast type
 	const typeConfig: Record<
@@ -56,7 +57,10 @@
 	}
 
 	function handleToastClick(toast: Toast) {
-		if (toast.route) {
+		if (toast.taskId) {
+			removeToast(toast.id);
+			openTaskDetailDrawer(toast.taskId);
+		} else if (toast.route) {
 			removeToast(toast.id);
 			goto(toast.route);
 		}
@@ -72,7 +76,7 @@
 <div class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none max-w-sm">
 	{#each toasts.value as toast (toast.id)}
 		{@const config = typeConfig[toast.type]}
-		{@const isClickable = !!toast.route}
+		{@const isClickable = !!toast.taskId || !!toast.route}
 		{@const projectColor = toast.projectId ? getProjectColor(toast.projectId) : null}
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<div
@@ -160,7 +164,7 @@
 						<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
 						</svg>
-						Click to open
+						{toast.taskId ? 'Click to view task' : 'Click to open'}
 					</p>
 				{/if}
 			</div>

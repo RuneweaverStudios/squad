@@ -26,6 +26,7 @@
 	import { setActiveProject } from '$lib/stores/preferences.svelte';
 	import { FilesSkeleton } from '$lib/components/skeleton';
 	import { setGitChangesCount, setGitAheadCount } from '$lib/stores/drawerStore';
+	import { successToast, errorToast, warningToast, infoToast } from '$lib/stores/toasts.svelte';
 
 	// Types
 	interface Project {
@@ -252,8 +253,7 @@
 			if (!response.ok) {
 				const data = await response.json();
 				const errorMsg = getFileErrorMessage(data.error || data.message, response.status, filename);
-				fileError = errorMsg;
-				setTimeout(() => { fileError = null; }, 5000);
+				warningToast(errorMsg);
 				console.error('[Files] Failed to load file:', data.error || data.message);
 				return;
 			}
@@ -275,8 +275,7 @@
 			activeFilePath = path;
 		} catch (err) {
 			const errorMsg = err instanceof Error ? err.message : 'Failed to load file';
-			fileError = `Could not open "${filename}": ${errorMsg}`;
-			setTimeout(() => { fileError = null; }, 5000);
+			warningToast(`Could not open "${filename}": ${errorMsg}`);
 			console.error('[Files] Failed to load file:', err);
 		}
 	}
@@ -313,15 +312,8 @@
 
 	// Saving state for UI feedback
 	let savingFiles = $state<Set<string>>(new Set());
-	let saveError = $state<string | null>(null);
-	let saveSuccess = $state<string | null>(null);
-
 	// Disk change detection state
 	let diskChangePollingInterval: ReturnType<typeof setInterval> | null = null;
-
-	// File operation feedback
-	let fileError = $state<string | null>(null);
-	let fileInfo = $state<string | null>(null);
 
 	/**
 	 * Get a user-friendly error message for save operations
@@ -369,8 +361,6 @@
 
 		// Add to saving state
 		savingFiles = new Set([...savingFiles, path]);
-		saveError = null;
-
 		try {
 			const params = new URLSearchParams({
 				project: selectedProject,
@@ -397,17 +387,15 @@
 			});
 
 			// Show success toast
-			saveSuccess = `Saved ${filename}`;
-			setTimeout(() => { saveSuccess = null; }, 2000);
+			successToast(`Saved ${filename}`);
 
 		} catch (err: unknown) {
 			console.error('[Files] Failed to save file:', err);
 			if (err && typeof err === 'object' && 'message' in err && 'status' in err) {
-				saveError = getSaveErrorMessage(err.message as string, err.status as number, filename);
+				errorToast(getSaveErrorMessage(err.message as string, err.status as number, filename));
 			} else {
-				saveError = err instanceof Error ? err.message : `Failed to save "${filename}"`;
+				errorToast(err instanceof Error ? err.message : `Failed to save "${filename}"`);
 			}
-			setTimeout(() => { saveError = null; }, 5000);
 		} finally {
 			// Remove from saving state
 			const updated = new Set(savingFiles);

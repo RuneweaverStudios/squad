@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { successToast, errorToast } from '$lib/stores/toasts.svelte';
 	import type {
 		Workflow,
 		WorkflowNode,
@@ -67,8 +68,6 @@
 	// Confirm delete
 	let showDeleteConfirm = $state(false);
 
-	// Toast
-	let toast = $state<{ message: string; type: 'success' | 'error' } | null>(null);
 
 	// =========================================================================
 	// COMPUTED
@@ -109,10 +108,11 @@
 	// =========================================================================
 
 	function showToast(message: string, type: 'success' | 'error' = 'success') {
-		toast = { message, type };
-		setTimeout(() => {
-			toast = null;
-		}, 3000);
+		if (type === 'error') {
+			errorToast(message);
+		} else {
+			successToast(message);
+		}
 	}
 
 	// =========================================================================
@@ -1115,31 +1115,3 @@
 	</div>
 {/if}
 
-<!-- ===== TOAST ===== -->
-{#if toast}
-	<div
-		class="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-3 py-2 rounded-lg shadow-lg"
-		style="background: {toast.type === 'success'
-			? 'oklch(0.25 0.06 145)'
-			: 'oklch(0.25 0.06 20)'}; border: 1px solid {toast.type === 'success'
-			? 'oklch(0.40 0.10 145)'
-			: 'oklch(0.40 0.10 20)'}; color: {toast.type === 'success'
-			? 'oklch(0.80 0.15 145)'
-			: 'oklch(0.80 0.15 20)'}"
-	>
-		<svg
-			class="w-4 h-4 shrink-0"
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			stroke-width="2"
-		>
-			{#if toast.type === 'success'}
-				<path d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-			{:else}
-				<path d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-			{/if}
-		</svg>
-		<span class="text-xs font-medium">{toast.message}</span>
-	</div>
-{/if}
