@@ -11,6 +11,7 @@ tools/
 ├── browser/      # Browser automation via CDP (12 tools)
 ├── media/        # Image generation with Gemini (7 tools)
 ├── scheduler/    # Task scheduling daemon (cron + one-shot spawning)
+├── search/       # Unified search (tasks, memory, files)
 ├── scripts/      # Installation and setup (33 scripts)
 └── signal/       # JAT signal emission (3 tools)
 ```
@@ -155,6 +156,27 @@ JAT signal emission for IDE state updates.
 ```bash
 jat-signal working '{"taskId":"jat-abc","taskTitle":"Add feature","approach":"..."}'
 ```
+
+---
+
+### Search Tools (tools/search/)
+
+Unified search across tasks, memory, and files.
+
+| Tool | Purpose |
+|------|---------|
+| `jat-search` | Meta search or per-source subcommands |
+
+**Usage:**
+```bash
+jat-search "query"                     # Meta search (all sources)
+jat-search tasks "query" [--json]      # FTS5 task search
+jat-search memory "query"              # FTS5 + vector memory search
+jat-search files "query"               # ripgrep + filename search
+jat-search "query" --summarize         # Meta search with LLM synthesis
+```
+
+**Options:** `--project PATH`, `--limit N`, `--json`, `--summarize`, `--verbose`
 
 ---
 

@@ -8,6 +8,12 @@ export const metadata = {
   name: 'Signal',
   description: 'Ingest messages from Signal via signal-cli',
   version: '1.0.0',
+  icon: {
+    svg: 'M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 2.25a9.75 9.75 0 016.508 17.022.62.62 0 00-.169.358l-.347 2.476-2.476-.347a.62.62 0 00-.358.169A9.75 9.75 0 0112 2.25z',
+    viewBox: '0 0 24 24',
+    fill: true,
+    color: '#3A76F0'
+  },
   configFields: [
     {
       key: 'signalNumber',
