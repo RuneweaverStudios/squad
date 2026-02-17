@@ -26,7 +26,7 @@ Lightweight bash tools for agent orchestration, database operations, monitoring,
 jat/
 ├── tools/               # All executable tools
 │   ├── core/            # Database, monitoring, task review tools
-│   ├── mail/            # Agent Registry (identity)
+│   ├── agents/          # Agent Registry (identity)
 │   ├── browser/         # Browser automation (11 tools)
 │   ├── media/           # Image generation tools (gemini-*, avatar-*)
 │   ├── signal/          # JAT signal tools (jat-signal, jat-signal-validate)

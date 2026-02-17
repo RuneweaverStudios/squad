@@ -118,7 +118,7 @@ The agent actively participates in the system. It reads `CLAUDE.md` for instruct
 | Layer | Files |
 |-------|-------|
 | Layer 1 | `.claude/hooks/`, `.claude/settings.json`, `/tmp/claude-question-*.json`, `ide/src/routes/api/sessions/` |
-| Layer 2 | `CLAUDE.md`, `shared/*.md`, `tools/mail/`, `commands/jat/`, `.jat/` |
+| Layer 2 | `CLAUDE.md`, `shared/*.md`, `tools/agents/`, `commands/jat/`, `.jat/` |
 
 ## Next steps
 

@@ -7,7 +7,7 @@
 ```
 tools/
 ├── core/         # Database, monitoring, credentials, task review, skills (18 tools)
-├── mail/         # Agent Registry (identity)
+├── agents/       # Agent Registry (identity)
 ├── browser/      # Browser automation via CDP (12 tools)
 ├── media/        # Image generation with Gemini (7 tools)
 ├── scheduler/    # Task scheduling daemon (cron + one-shot spawning)

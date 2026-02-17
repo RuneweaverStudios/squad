@@ -27,7 +27,7 @@ CORE_DIR="$TOOLS_DIR/core"
 BROWSER_DIR="$TOOLS_DIR/browser"
 SIGNAL_DIR="$TOOLS_DIR/signal"
 MEDIA_DIR="$TOOLS_DIR/media"
-MAIL_DIR="$TOOLS_DIR/mail"
+AGENTS_DIR="$TOOLS_DIR/agents"
 INGEST_DIR="$TOOLS_DIR/ingest"
 MEMORY_DIR="$TOOLS_DIR/memory"
 SEARCH_DIR="$TOOLS_DIR/search"
@@ -44,9 +44,9 @@ fi
 # Count tools in each directory
 CORE_COUNT=$(find "$CORE_DIR" -maxdepth 1 -type f -executable 2>/dev/null | wc -l)
 BROWSER_COUNT=$(find "$BROWSER_DIR" -maxdepth 1 -type f -executable 2>/dev/null | wc -l)
-MAIL_COUNT=0
-if [ -d "$MAIL_DIR" ]; then
-    MAIL_COUNT=$(find "$MAIL_DIR" -maxdepth 1 -type f -executable 2>/dev/null | wc -l)
+AGENTS_COUNT=0
+if [ -d "$AGENTS_DIR" ]; then
+    AGENTS_COUNT=$(find "$AGENTS_DIR" -maxdepth 1 -type f -executable 2>/dev/null | wc -l)
 fi
 SIGNAL_COUNT=0
 if [ -d "$SIGNAL_DIR" ]; then
@@ -68,12 +68,12 @@ SEARCH_COUNT=0
 if [ -d "$SEARCH_DIR" ]; then
     SEARCH_COUNT=$(find "$SEARCH_DIR" -maxdepth 1 -type f -executable 2>/dev/null | wc -l)
 fi
-TOOL_COUNT=$(( CORE_COUNT + BROWSER_COUNT + MAIL_COUNT + SIGNAL_COUNT + MEDIA_COUNT + INGEST_COUNT + MEMORY_COUNT + SEARCH_COUNT ))
+TOOL_COUNT=$(( CORE_COUNT + BROWSER_COUNT + AGENTS_COUNT + SIGNAL_COUNT + MEDIA_COUNT + INGEST_COUNT + MEMORY_COUNT + SEARCH_COUNT ))
 echo "  Found $TOOL_COUNT tools"
 echo "    - $CORE_COUNT in tools/core/"
 echo "    - $BROWSER_COUNT in tools/browser/"
-if [ "$MAIL_COUNT" -gt 0 ]; then
-    echo "    - $MAIL_COUNT in tools/mail/"
+if [ "$AGENTS_COUNT" -gt 0 ]; then
+    echo "    - $AGENTS_COUNT in tools/agents/"
 fi
 if [ "$SIGNAL_COUNT" -gt 0 ]; then
     echo "    - $SIGNAL_COUNT in tools/signal/"
@@ -137,8 +137,8 @@ symlink_tools() {
 # Symlink tools from all directories
 symlink_tools "$CORE_DIR"
 symlink_tools "$BROWSER_DIR"
-if [ -d "$MAIL_DIR" ]; then
-    symlink_tools "$MAIL_DIR"
+if [ -d "$AGENTS_DIR" ]; then
+    symlink_tools "$AGENTS_DIR"
 fi
 if [ -d "$SIGNAL_DIR" ]; then
     symlink_tools "$SIGNAL_DIR"

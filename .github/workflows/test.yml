@@ -73,7 +73,7 @@ jobs:
       run: |
         echo "Verifying executable permissions..."
         # Check that all .sh files are executable
-        find tools/mail examples/workflows test -name "*.sh" -type f ! -executable -print | while read file; do
+        find tools/agents examples/workflows test -name "*.sh" -type f ! -executable -print | while read file; do
           echo "Warning: $file is not executable"
         done
 
@@ -91,7 +91,7 @@ jobs:
         test -f README.md || (echo "Missing README.md" && exit 1)
         test -f package.json || (echo "Missing package.json" && exit 1)
         test -f install.sh || (echo "Missing install.sh" && exit 1)
-        test -d tools/mail || (echo "Missing tools/mail/ directory" && exit 1)
+        test -d tools/agents || (echo "Missing tools/agents/ directory" && exit 1)
         test -d lib || (echo "Missing lib/ directory" && exit 1)
         test -d test || (echo "Missing test/ directory" && exit 1)
         echo "✓ All essential files present"
@@ -100,7 +100,7 @@ jobs:
       run: |
         echo "Verifying am-* tools exist..."
         for tool in am-register am-agents am-whoami am-delete-agent; do
-          test -f "tools/mail/$tool" || (echo "Missing mail/$tool" && exit 1)
+          test -f "tools/agents/$tool" || (echo "Missing agents/$tool" && exit 1)
         done
         echo "✓ All Agent Registry tools present"
 

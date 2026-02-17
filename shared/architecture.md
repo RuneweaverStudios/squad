@@ -133,6 +133,6 @@ Agent reads CLAUDE.md ──► Uses Agent Registry ──► Picks tasks from J
 **Layer 2 (Explicit):**
 - `CLAUDE.md` - Agent instructions
 - `shared/*.md` - Agent documentation
-- `tools/mail/` - Agent Registry tools (identity, messaging)
+- `tools/agents/` - Agent Registry tools (identity)
 - `commands/jat/` - Workflow commands
 - `.jat/` - Task database

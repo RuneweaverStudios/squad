@@ -22,7 +22,7 @@ import { existsSync } from 'fs';
 import { homedir } from 'os';
 
 // Allowed tool directories (relative to JAT root)
-const ALLOWED_DIRECTORIES = ['tools/mail', 'tools/browser', 'tools/core', 'tools/scripts', 'tools/media', 'tools/signal', 'commands/jat'];
+const ALLOWED_DIRECTORIES = ['tools/agents', 'tools/browser', 'tools/core', 'tools/scripts', 'tools/media', 'tools/signal', 'commands/jat'];
 
 /**
  * Find JAT installation directory (same as in parent +server.ts)
