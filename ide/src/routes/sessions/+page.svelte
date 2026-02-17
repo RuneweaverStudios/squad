@@ -1124,11 +1124,13 @@
 	function closeCtxMenu() {
 		ctxVisible = false;
 		ctxStatusSubmenuOpen = false;
+		recentCtxVisible = false;
+		recentCtxStatusSubmenuOpen = false;
 	}
 
 	// Auto-close on click outside or Escape
 	$effect(() => {
-		if (!ctxVisible) return;
+		if (!ctxVisible && !recentCtxVisible) return;
 		function handleClick() { closeCtxMenu(); }
 		function handleKeyDown(e: KeyboardEvent) { if (e.key === 'Escape') closeCtxMenu(); }
 		const timer = setTimeout(() => {
@@ -1141,6 +1143,34 @@
 			document.removeEventListener('keydown', handleKeyDown);
 		};
 	});
+
+	// Recently closed context menu state
+	let recentCtxData = $state<RecentSession | null>(null);
+	let recentCtxX = $state(0);
+	let recentCtxY = $state(0);
+	let recentCtxVisible = $state(false);
+	let recentCtxStatusSubmenuOpen = $state(false);
+
+	function handleRecentContextMenu(recent: RecentSession, event: MouseEvent) {
+		event.preventDefault();
+		event.stopPropagation();
+		const menuWidth = 200;
+		const menuHeight = 250;
+		recentCtxData = recent;
+		recentCtxX = Math.min(event.clientX, window.innerWidth - menuWidth - 8);
+		recentCtxY = Math.min(event.clientY, window.innerHeight - menuHeight - 8);
+		recentCtxVisible = true;
+		recentCtxStatusSubmenuOpen = false;
+		// Close the active sessions context menu if open
+		ctxVisible = false;
+	}
+
+	function handleRecentRowClick(recent: RecentSession) {
+		if (recent.taskId && recent.taskId !== 'unknown') {
+			expandedTaskId = recent.taskId;
+			taskDetailOpen = true;
+		}
+	}
 
 	async function ctxChangeStatus(taskId: string, newStatus: string) {
 		closeCtxMenu();
@@ -1269,7 +1299,8 @@
 							{@const sessionTask = agentTasks.get(sessionAgentName)}
 							{@const sessionInfo = agentSessionInfo.get(sessionAgentName)}
 							{@const activityState = sessionInfo?.activityState}
-							{@const effectiveState = optimisticStates.get(session.name) || activityState || 'idle'}
+							{@const rawEffectiveState = optimisticStates.get(session.name) || activityState || 'idle'}
+							{@const effectiveState = rawEffectiveState === 'completing' && sessionTask?.status === 'closed' ? 'completed' : rawEffectiveState}
 							{@const statusDotColor = getSessionStateVisual(effectiveState).accent}
 							{@const derivedProject = agentProjects.get(sessionAgentName) || session.project || null}
 							{@const rowProjectColor = sessionTask?.id
@@ -1898,9 +1929,12 @@
 								{@const projectColor = recent.project ? getProjectColorReactive(recent.taskId || recent.project) : null}
 								{@const stateVisual = getSessionStateVisual(recent.lastState as SessionState)}
 								{@const recentStatusDotColor = stateVisual.accent}
-								<div
+								<!-- svelte-ignore a11y_no_static_element_interactions -->
+							<div
 									class="recent-row"
-									style="border-left: 3px solid {projectColor || 'oklch(0.30 0.02 250)'};"
+									style="border-left: 3px solid {projectColor || 'oklch(0.30 0.02 250)'}; cursor: pointer;"
+									onclick={() => handleRecentRowClick(recent)}
+									oncontextmenu={(e) => handleRecentContextMenu(recent, e)}
 								>
 									<div class="recent-row-left">
 										{#if recent.taskId && recent.taskId !== 'unknown'}
@@ -2225,6 +2259,86 @@
 			</svg>
 			<span>{ctxData.task ? 'Close & Kill' : 'Kill Session'}</span>
 		</button>
+	</div>
+{/if}
+
+<!-- Recently Closed Context Menu -->
+{#if recentCtxData}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div
+		class="ctx-menu"
+		class:ctx-menu-hidden={!recentCtxVisible}
+		style="left: {recentCtxX}px; top: {recentCtxY}px;"
+		onclick={(e) => e.stopPropagation()}
+	>
+		<!-- View Details -->
+		{#if recentCtxData.taskId && recentCtxData.taskId !== 'unknown'}
+			<button class="ctx-item" onmouseenter={() => { recentCtxStatusSubmenuOpen = false; }} onclick={() => {
+				const id = recentCtxData!.taskId!;
+				closeCtxMenu();
+				expandedTaskId = id;
+				taskDetailOpen = true;
+			}}>
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+					<circle cx="12" cy="12" r="3" />
+				</svg>
+				<span>View Details</span>
+			</button>
+		{/if}
+
+		<!-- Resume Session -->
+		<button class="ctx-item" onmouseenter={() => { recentCtxStatusSubmenuOpen = false; }} onclick={() => {
+			const recent = recentCtxData!;
+			closeCtxMenu();
+			resumeSession(recent);
+		}}>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<polygon points="5 3 19 12 5 21 5 3" />
+			</svg>
+			<span>Resume Session</span>
+		</button>
+
+		{#if recentCtxData.taskId && recentCtxData.taskId !== 'unknown'}
+			<div class="ctx-divider"></div>
+
+			<!-- Change Status (submenu) -->
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div
+				class="ctx-submenu-container"
+				onmouseenter={() => { recentCtxStatusSubmenuOpen = true; }}
+				onmouseleave={() => { recentCtxStatusSubmenuOpen = false; }}
+			>
+				<button class="ctx-item ctx-item-has-submenu">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+						<polyline points="22 4 12 14.01 9 11.01" />
+					</svg>
+					<span>Change Status</span>
+					<svg class="ctx-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<polyline points="9 18 15 12 9 6" />
+					</svg>
+				</button>
+				{#if recentCtxStatusSubmenuOpen}
+					<div class="ctx-submenu">
+						{#each [
+							{ value: 'open', label: 'Open', color: 'oklch(0.70 0.15 220)' },
+							{ value: 'in_progress', label: 'In Progress', color: 'oklch(0.75 0.15 85)' },
+							{ value: 'blocked', label: 'Blocked', color: 'oklch(0.65 0.18 30)' },
+							{ value: 'closed', label: 'Closed', color: 'oklch(0.65 0.18 145)' }
+						] as status}
+							<button
+								class="ctx-item"
+								onclick={() => { ctxChangeStatus(recentCtxData!.taskId!, status.value); closeCtxMenu(); }}
+							>
+								<span class="ctx-status-dot" style="background: {status.color};"></span>
+								<span>{status.label}</span>
+							</button>
+						{/each}
+					</div>
+				{/if}
+			</div>
+		{/if}
 	</div>
 {/if}
 

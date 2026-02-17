@@ -515,9 +515,18 @@
 		return `${days}d ago`;
 	}
 
-	function getTypeColor(type: string): { bg: string; text: string } {
+	function getTypeColor(type: string): { bg: string; text: string; border?: string } {
 		const t = templates.find((t) => t.type === type);
-		return t ? { bg: t.color.bg, text: t.color.text } : { bg: 'oklch(0.22 0.02 250)', text: 'oklch(0.70 0.02 250)' };
+		if (t) return { bg: t.color.bg, text: t.color.text };
+		const pluginIcon = getPluginIcon(type);
+		if (pluginIcon?.color) {
+			return {
+				bg: `color-mix(in oklch, ${pluginIcon.color} 12%, oklch(0.16 0.01 250))`,
+				text: pluginIcon.color,
+				border: `color-mix(in oklch, ${pluginIcon.color} 25%, oklch(0.25 0.01 250))`
+			};
+		}
+		return { bg: 'oklch(0.22 0.02 250)', text: 'oklch(0.70 0.02 250)' };
 	}
 
 	function getPluginIcon(type: string): { svg: string; viewBox: string; fill?: boolean; color?: string } | null {
@@ -1407,8 +1416,8 @@ cd ../ide && npm run build:widget`}</pre>
 						{@const tmpl = templates.find(t => t.type === plugin.type)}
 						{@const isConfigured = sources.some(s => s.type === plugin.type)}
 						{@const color = tmpl?.color || {
-							bg: plugin.icon?.color ? 'oklch(0.22 0.06 45)' : 'oklch(0.22 0.04 250)',
-							border: plugin.icon?.color ? 'oklch(0.30 0.08 45)' : 'oklch(0.30 0.04 250)',
+							bg: plugin.icon?.color ? `color-mix(in oklch, ${plugin.icon.color} 12%, oklch(0.16 0.01 250))` : 'oklch(0.22 0.04 250)',
+							border: plugin.icon?.color ? `color-mix(in oklch, ${plugin.icon.color} 25%, oklch(0.25 0.01 250))` : 'oklch(0.30 0.04 250)',
 							text: 'oklch(0.75 0.02 250)',
 							icon: plugin.icon?.color || 'oklch(0.60 0.04 250)'
 						}}

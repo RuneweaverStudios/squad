@@ -988,7 +988,8 @@
 					{@const sessionTask = agentTasks.get(sessionAgentName) || (isExiting ? cachedAgentTasks.get(sessionAgentName) : null)}
 					{@const sessionInfo = agentSessionInfo.get(sessionAgentName)}
 					{@const activityState = sessionInfo?.activityState}
-					{@const effectiveState = optimisticStates.get(session.name) || activityState || 'idle'}
+					{@const rawEffectiveState = optimisticStates.get(session.name) || activityState || 'idle'}
+					{@const effectiveState = rawEffectiveState === 'completing' && sessionTask?.status === 'closed' ? 'completed' : rawEffectiveState}
 					{@const statusDotColor = getSessionStateVisual(effectiveState).accent}
 					{@const derivedProject = agentProjects.get(sessionAgentName) || session.project || null}
 					{@const rowProjectColor = sessionTask?.id
@@ -1106,8 +1107,8 @@
 								{@const reviewBasedDefault = reviewStatus?.action !== 'auto'}
 								{@const autoCompleteDisabled = autoCompleteDisabledMap.get(session.name) ?? reviewBasedDefault}
 								<div class="status-cell-content">
-									<StatusActionBadge
-										sessionState={(optimisticStates.get(session.name) || activityState || 'idle') as SessionState}
+								<StatusActionBadge
+										sessionState={effectiveState as SessionState}
 										{elapsed}
 										stacked={true}
 										sessionName={session.name}

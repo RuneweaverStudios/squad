@@ -191,6 +191,20 @@ All tools are bash commands in `~/.local/bin/`. Every tool has `--help`.
 | `db-schema` | Show table structure |
 | `jat-secret` | Retrieve secrets |
 
+### Search
+| Tool | Purpose |
+|------|---------|
+| `jat-search` | Unified search across tasks, memory, and files |
+
+Use `jat-search` as your primary context retrieval tool. Search broadly first, then drill into specific sources:
+
+```bash
+jat-search "auth middleware"             # Meta search (all sources)
+jat-search tasks "OAuth timeout" --json  # Deep task search
+jat-search memory "browser automation"   # Memory search (past sessions)
+jat-search files "refreshToken"          # File content search
+```
+
 ### Skills
 | Tool | Purpose |
 |------|---------|

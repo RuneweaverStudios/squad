@@ -6,6 +6,12 @@ export const metadata = {
   name: 'BlueBubbles (iMessage)',
   description: 'Ingest iMessage conversations via BlueBubbles server REST API',
   version: '1.0.0',
+  icon: {
+    svg: 'M5.285 0A5.273 5.273 0 000 5.285v13.43A5.273 5.273 0 005.285 24h13.43A5.273 5.273 0 0024 18.715V5.285A5.273 5.273 0 0018.715 0ZM12 4.154a8.809 7.337 0 018.809 7.338A8.809 7.337 0 0112 18.828a8.809 7.337 0 01-2.492-.303A8.656 7.337 0 015.93 19.93a9.929 7.337 0 001.54-2.155 8.809 7.337 0 01-4.279-6.283A8.809 7.337 0 0112 4.154',
+    viewBox: '0 0 24 24',
+    fill: true,
+    color: '#34DA50'
+  },
   configFields: [
     {
       key: 'serverUrl',

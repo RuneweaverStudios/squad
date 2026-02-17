@@ -161,22 +161,47 @@ jat-signal working '{"taskId":"jat-abc","taskTitle":"Add feature","approach":"..
 
 ### Search Tools (tools/search/)
 
-Unified search across tasks, memory, and files.
+Unified search across tasks, memory, and files. Use `jat-search` as your primary context retrieval tool before starting work.
 
 | Tool | Purpose |
 |------|---------|
 | `jat-search` | Meta search or per-source subcommands |
 
-**Usage:**
+**Subcommands:**
 ```bash
-jat-search "query"                     # Meta search (all sources)
-jat-search tasks "query" [--json]      # FTS5 task search
-jat-search memory "query"              # FTS5 + vector memory search
-jat-search files "query"               # ripgrep + filename search
+jat-search "query"                     # Meta search (all sources in parallel)
+jat-search tasks "query" [--json]      # Deep task search (FTS5)
+jat-search memory "query"              # Memory search (FTS5 + vector hybrid)
+jat-search files "query"               # File search (ripgrep + filename)
 jat-search "query" --summarize         # Meta search with LLM synthesis
 ```
 
 **Options:** `--project PATH`, `--limit N`, `--json`, `--summarize`, `--verbose`
+
+**Context retrieval funnel pattern:**
+```bash
+# 1. Broad meta search to find relevant context
+jat-search "auth middleware" --json
+# Returns grouped results from tasks, memory, and files
+
+# 2. Drill into memory for lessons learned
+jat-search memory "auth race condition"
+# Shows past session context with gotchas and patterns
+
+# 3. Drill into tasks for history
+jat-search tasks "OAuth timeout" --json
+# Shows related/duplicate tasks with status and priority
+
+# 4. Drill into files for code references
+jat-search files "refreshToken"
+# Shows file paths and matching lines via ripgrep
+```
+
+**How agents should use search:**
+- Run `jat-search` at task start to gather context before writing code
+- Check memory for lessons from past sessions working on similar areas
+- Check tasks for duplicates or related in-progress work
+- Use `--summarize` for LLM-synthesized context when results are noisy
 
 ---
 

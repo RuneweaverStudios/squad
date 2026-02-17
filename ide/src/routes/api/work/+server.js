@@ -247,6 +247,13 @@ function detectSessionState(output, task, lastCompletedTask, sessionName) {
 	if (sessionName) {
 		const signalState = readSignalState(sessionName);
 		if (signalState) {
+			// Fix state sync: during /jat:complete, the "closing" step marks the
+			// task as closed in the DB before the "complete" signal is emitted.
+			// If signal says "completing" but task is already closed (no active task),
+			// the completion is effectively done — show "completed" instead.
+			if (signalState === 'completing' && !task && lastCompletedTask) {
+				return 'completed';
+			}
 			return signalState;
 		}
 	}

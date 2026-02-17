@@ -12,6 +12,12 @@ export const metadata = {
   name: 'Feishu / Lark',
   description: 'Ingest messages from Feishu or Lark group chats via app credentials',
   version: '1.0.0',
+  icon: {
+    svg: 'M2.9 6.98c1.58-3.53 4.16-5.53 6.71-6.62l.19.42c-1.45 2.1-2.36 4.65-2.36 7.41 0 3.73 1.66 7.06 4.27 9.32l.02.01c2.14 1.85 4.93 2.98 7.98 2.98 1.37 0 2.67-.24 3.87-.66-1.9 2.57-5.42 4.16-9.09 4.16C6.93 24 0 18.63 0 12.37 0 10.39 1.06 8.58 2.9 6.98z',
+    viewBox: '0 0 24 24',
+    fill: true,
+    color: '#3370FF'
+  },
   configFields: [
     {
       key: 'appIdSecret',
