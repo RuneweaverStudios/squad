@@ -31,7 +31,7 @@
 	import { browser } from '$app/environment';
 	import { initPreferences, getActiveProject, setActiveProject, setMaxSessions, type MaxSessions } from '$lib/stores/preferences.svelte';
 	import { isSetupSkipped } from '$lib/stores/onboardingStore.svelte';
-	import GlobalSearch from '$lib/components/files/GlobalSearch.svelte';
+	import UnifiedSearch from '$lib/components/search/UnifiedSearch.svelte';
 	import { getSessions as getWorkSessions, startActivityPolling, stopActivityPolling, fetch as fetchWorkSessions } from '$lib/stores/workSessions.svelte';
 	import { getSessions as getServerSessions } from '$lib/stores/serverSessions.svelte';
 	import { initKeyboardShortcuts, findMatchingCommand, findMatchingGlobalShortcut } from '$lib/stores/keyboardShortcuts.svelte';
@@ -95,7 +95,7 @@
 	}
 	let reviewRules = $state<ReviewRule[]>([]);
 
-	// Global search state (Ctrl+Shift+F from any page)
+	// Global search state (Ctrl+K from any page)
 	let globalSearchOpen = $state(false);
 
 	// Token usage state for TopBar
@@ -978,13 +978,6 @@
 
 	// Global keyboard shortcuts
 	async function handleGlobalKeydown(event: KeyboardEvent) {
-		// Cmd+K / Ctrl+K → Focus quick-add bar (dispatch custom event)
-		if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
-			event.preventDefault();
-			document.dispatchEvent(new CustomEvent('focus-quick-add'));
-			return;
-		}
-
 		// First check for user-defined command shortcuts (unless in an input field that should capture the event)
 		// User shortcuts take priority over global shortcuts (except Shift variants)
 		if (!event.shiftKey) {
@@ -1125,17 +1118,15 @@
 <!-- Global Toast Notifications -->
 <ToastContainer />
 
-<!-- Global Search Modal (Ctrl+Shift+F from any page) -->
-{#if getActiveProject() || configProjects[0]}
-	<GlobalSearch
-		isOpen={globalSearchOpen}
-		project={getActiveProject() || configProjects[0]}
-		availableProjects={configProjects}
-		{projectColors}
-		onClose={() => { globalSearchOpen = false; }}
-		onResultSelect={handleGlobalSearchResult}
-	/>
-{/if}
+<!-- Global Search Modal (Ctrl+K from any page) -->
+<UnifiedSearch
+	mode="modal"
+	bind:isOpen={globalSearchOpen}
+	projects={configProjects}
+	selectedProject={getActiveProject() || configProjects[0] || ''}
+	onClose={() => { globalSearchOpen = false; }}
+	onFileSelect={handleGlobalSearchResult}
+/>
 
 <!-- Sound Permission Toast -->
 {#if showSoundPrompt}

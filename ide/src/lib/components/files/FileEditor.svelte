@@ -14,6 +14,7 @@
 	import { onMount } from 'svelte';
 	import FileTabBar from './FileTabBar.svelte';
 	import MonacoWrapper from '$lib/components/config/MonacoWrapper.svelte';
+	import MarkdownPreview from './MarkdownPreview.svelte';
 	import MediaPreview from './MediaPreview.svelte';
 	import InlineDiffViewer from './InlineDiffViewer.svelte';
 	import LLMTransformModal from '$lib/components/LLMTransformModal.svelte';
@@ -117,6 +118,26 @@
 
 	function toggleHelp() {
 		showHelpModal = !showHelpModal;
+	}
+
+	// Markdown preview state: track which files have preview enabled
+	let previewEnabled = $state(new Set<string>());
+
+	// Derived: is the active file a markdown file?
+	const isMarkdownFile = $derived(activeFilePath ? getLanguage(activeFilePath) === 'markdown' : false);
+
+	// Derived: should we show preview for the active file?
+	const showPreview = $derived(activeFilePath ? previewEnabled.has(activeFilePath) : false);
+
+	function togglePreview() {
+		if (!activeFilePath) return;
+		const next = new Set(previewEnabled);
+		if (next.has(activeFilePath)) {
+			next.delete(activeFilePath);
+		} else {
+			next.add(activeFilePath);
+		}
+		previewEnabled = next;
 	}
 
 	// LLM Transform modal state
@@ -348,6 +369,14 @@
 			}
 		}
 
+		// Alt+M to toggle markdown preview
+		if (e.altKey && e.key === 'm') {
+			e.preventDefault();
+			if (isMarkdownFile) {
+				togglePreview();
+			}
+		}
+
 		// Alt+S to save (Alt instead of Ctrl to avoid browser conflict)
 		if (e.altKey && e.key === 's') {
 			e.preventDefault();
@@ -485,6 +514,28 @@
 					</svg>
 				</button>
 			{/if}
+			<!-- Markdown Preview Toggle (only for .md files) -->
+			{#if isMarkdownFile}
+				<button
+					class="header-btn"
+					class:preview-active={showPreview}
+					onclick={togglePreview}
+					title={showPreview ? 'Show editor (Alt+M)' : 'Preview markdown (Alt+M)'}
+				>
+					{#if showPreview}
+						<!-- Code/editor icon -->
+						<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+						</svg>
+					{:else}
+						<!-- Eye/preview icon -->
+						<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+						</svg>
+					{/if}
+				</button>
+			{/if}
 			<!-- Save Button -->
 			<button
 				class="save-btn"
@@ -556,6 +607,9 @@
 						path={activeFile.path}
 						filename={getFilename(activeFile.path)}
 					/>
+				{:else if showPreview}
+					<!-- Markdown rendered preview -->
+					<MarkdownPreview content={activeFile.content} />
 				{:else}
 					<!-- Monaco Editor for text files -->
 					{@const language = getLanguage(activeFile.path)}
@@ -859,6 +913,16 @@
 	.header-btn:disabled {
 		cursor: not-allowed;
 		opacity: 0.35;
+	}
+
+	.header-btn.preview-active {
+		background: oklch(0.55 0.15 200 / 0.15);
+		color: oklch(0.80 0.15 200);
+	}
+
+	.header-btn.preview-active:hover {
+		background: oklch(0.55 0.15 200 / 0.25);
+		color: oklch(0.85 0.15 200);
 	}
 
 	.save-btn {

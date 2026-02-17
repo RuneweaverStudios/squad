@@ -444,26 +444,8 @@
 		}
 	}
 
-	// Global keyboard shortcut listener
-	onMount(() => {
-		function handleGlobalKeyDown(e: KeyboardEvent) {
-			// Cmd+K on Mac, Ctrl+K on Windows/Linux
-			if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-				e.preventDefault();
-				if (isOpen) {
-					close();
-				} else {
-					open();
-				}
-			}
-		}
-
-		window.addEventListener("keydown", handleGlobalKeyDown);
-
-		return () => {
-			window.removeEventListener("keydown", handleGlobalKeyDown);
-		};
-	});
+	// Note: Ctrl+K is handled by UnifiedSearch (global-search shortcut in layout).
+	// CommandPalette is opened via the button click only.
 
 	// Reset selected index when query changes
 	$effect(() => {
@@ -516,7 +498,7 @@
 			d="m6.75 7.5 3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0 0 21 18V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v12a2.25 2.25 0 0 0 2.25 2.25Z"
 		/>
 	</svg>
-	<span class="inline-block max-w-0 overflow-hidden whitespace-nowrap opacity-0 group-hover:max-w-16 group-hover:opacity-100 transition-all duration-200 pl-1.5 pt-0.5">Ctrl+K</span>
+	<span class="inline-block max-w-0 overflow-hidden whitespace-nowrap opacity-0 group-hover:max-w-16 group-hover:opacity-100 transition-all duration-200 pl-1.5 pt-0.5">Actions</span>
 </button>
 
 <!-- Modal (stays in DOM, toggle modal-open class) - Industrial -->

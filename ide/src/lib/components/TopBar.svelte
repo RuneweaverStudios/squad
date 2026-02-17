@@ -659,7 +659,7 @@
 					color: oklch(0.60 0.02 250);
 				"
 				onclick={onGlobalSearchOpen}
-				aria-label="Global file search (Ctrl+Shift+F)"
+				aria-label="Unified search (Ctrl+K)"
 			>
 				<!-- Search/Magnifying glass icon -->
 				<svg
@@ -677,7 +677,7 @@
 						d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
 					/>
 				</svg>
-				<span class="inline-block max-w-0 overflow-hidden whitespace-nowrap opacity-0 group-hover:max-w-28 group-hover:opacity-100 transition-all duration-200 pl-1.5 pt-0.5">Ctrl+Shift+F</span>
+				<span class="inline-block max-w-0 overflow-hidden whitespace-nowrap opacity-0 group-hover:max-w-28 group-hover:opacity-100 transition-all duration-200 pl-1.5 pt-0.5">Ctrl+K</span>
 			</button>
 		{/if}
 	</div>

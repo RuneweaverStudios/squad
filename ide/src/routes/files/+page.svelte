@@ -21,7 +21,7 @@
 	import { FileEditor, type OpenFile } from '$lib/components/files';
 	import FileTree from '$lib/components/files/FileTree.svelte';
 	import QuickFileFinder from '$lib/components/files/QuickFileFinder.svelte';
-	import GlobalSearch from '$lib/components/files/GlobalSearch.svelte';
+	import UnifiedSearch from '$lib/components/search/UnifiedSearch.svelte';
 	import ResizableDivider from '$lib/components/ResizableDivider.svelte';
 	import { setActiveProject } from '$lib/stores/preferences.svelte';
 	import { FilesSkeleton } from '$lib/components/skeleton';
@@ -68,7 +68,7 @@
 	// Quick file finder state
 	let quickFinderOpen = $state(false);
 
-	// Global search state (Ctrl+Shift+F)
+	// Global search state (Ctrl+K)
 	let globalSearchOpen = $state(false);
 
 	// FileTree component reference for scrolling
@@ -839,9 +839,8 @@
 			}
 		}
 
-		// Ctrl+Shift+F - Open global search (content search)
-		// Use e.code instead of e.key for reliability with modifiers
-		if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.code === 'KeyF') {
+		// Ctrl+K - Open unified search
+		if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
 			e.preventDefault();
 			e.stopPropagation();
 			if (selectedProject) {
@@ -1073,7 +1072,7 @@
 						<!-- Search button -->
 						<button
 							class="search-button"
-							title="Search in files (Ctrl+Shift+F)"
+							title="Search in files (Ctrl+K)"
 							onclick={() => { if (selectedProject) globalSearchOpen = true; }}
 							disabled={!selectedProject}
 						>
@@ -1172,14 +1171,15 @@
 	/>
 {/if}
 
-<!-- Global Search Modal (Ctrl+Shift+F) -->
+<!-- Global Search Modal (Ctrl+K) -->
 {#if selectedProject}
-	<GlobalSearch
-		isOpen={globalSearchOpen}
-		project={selectedProject}
-		availableProjects={projects.map(p => p.name)}
+	<UnifiedSearch
+		mode="modal"
+		bind:isOpen={globalSearchOpen}
+		projects={projects.map(p => p.name)}
+		{selectedProject}
 		onClose={() => { globalSearchOpen = false; }}
-		onResultSelect={handleGlobalSearchResult}
+		onFileSelect={handleGlobalSearchResult}
 	/>
 {/if}
 
