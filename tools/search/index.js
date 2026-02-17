@@ -121,22 +121,28 @@ function printResult(r) {
     return;
   }
   // Memory result
-  if (r.path && r.section) {
+  if ((r.file || r.path) && r.section) {
     const score = r.score ? ` (${r.score})` : '';
     const task = r.taskId ? ` [${r.taskId}]` : '';
-    console.log(`  ${r.path}:${r.startLine || '?'}${task} §${r.section}${score}`);
-    if (r.snippet) console.log(`    ${r.snippet.slice(0, 120)}`);
+    const file = r.file || r.path;
+    console.log(`  ${file}:${r.startLine || '?'}${task} §${r.section}${score}`);
+    if (r.snippet) console.log(`    ${firstLine(r.snippet, 120)}`);
     return;
   }
   // File result
   if (r.path) {
     const line = r.line ? `:${r.line}` : '';
     console.log(`  ${r.path}${line}`);
-    if (r.snippet) console.log(`    ${r.snippet.slice(0, 120)}`);
+    if (r.snippet) console.log(`    ${firstLine(r.snippet, 120)}`);
     return;
   }
   // Fallback
   console.log(`  ${JSON.stringify(r)}`);
+}
+
+function firstLine(text, maxLen = 120) {
+  const line = text.split('\n')[0].trim();
+  return line.length > maxLen ? line.slice(0, maxLen) + '...' : line;
 }
 
 function printHelp() {

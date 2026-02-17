@@ -1220,6 +1220,18 @@
 						</p>
 					</div>
 					<div class="flex items-center gap-2 shrink-0">
+						<a
+							href="/widget"
+							class="font-mono text-[10px] font-semibold px-3 py-1.5 rounded transition-colors duration-150"
+							style="
+								background: oklch(0.30 0.10 270);
+								color: oklch(0.85 0.12 270);
+								border: 1px solid oklch(0.40 0.12 270);
+							"
+							onclick={(e) => e.stopPropagation()}
+						>
+							Docs
+						</a>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
 							fill="none"

@@ -20,14 +20,16 @@ export function searchTasks(query, options = {}) {
 
   log(`Searching tasks for "${query}" (limit=${limit})`);
 
-  const results = _searchTasks(query, { limit });
+  // When filtering by project, fetch more results to ensure we have enough after filtering
+  const fetchLimit = project ? limit * 5 : limit;
+  const results = _searchTasks(query, { limit: fetchLimit });
 
   // Filter to specific project if requested
   let filtered = results;
   if (project) {
     const projName = projectNameFromPath(project);
     if (projName) {
-      filtered = results.filter(t => t.id.startsWith(projName + '-'));
+      filtered = results.filter(t => t.id.startsWith(projName + '-')).slice(0, limit);
       log(`Filtered to project "${projName}": ${filtered.length} results`);
     }
   }

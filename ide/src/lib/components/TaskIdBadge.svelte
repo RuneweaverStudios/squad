@@ -376,6 +376,9 @@
 	{@const avatarSize = size === 'xs' ? 20 : size === 'sm' ? 24 : 28}
 	{@const badgeColor = isClosed ? 'oklch(0.65 0.20 145)' : projectColor}
 	<div class="inline-flex flex-col items-start">
+		{#if agentName}
+			<span class="text-[10px] font-medium leading-none mb-0.5 self-center opacity-70" style="color: {ringColor};">{agentName}</span>
+		{/if}
 		<button
 			class="inline-flex items-center gap-2 font-mono rounded-full cursor-pointer whitespace-nowrap
 				   hover:opacity-90 transition-all {size === 'xs' ? 'text-xs pr-2 pl-0.5 py-0.5' : size === 'sm' ? 'text-sm pr-2.5 pl-0.5 py-0.5' : 'text-base pr-3 pl-1 py-1'}"

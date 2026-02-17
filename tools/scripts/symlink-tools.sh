@@ -30,6 +30,7 @@ MEDIA_DIR="$TOOLS_DIR/media"
 MAIL_DIR="$TOOLS_DIR/mail"
 INGEST_DIR="$TOOLS_DIR/ingest"
 MEMORY_DIR="$TOOLS_DIR/memory"
+SEARCH_DIR="$TOOLS_DIR/search"
 
 # Verify directories exist
 if [ ! -d "$CORE_DIR" ] || [ ! -d "$BROWSER_DIR" ]; then
@@ -63,7 +64,11 @@ MEMORY_COUNT=0
 if [ -d "$MEMORY_DIR" ]; then
     MEMORY_COUNT=$(find "$MEMORY_DIR" -maxdepth 1 -type f -executable 2>/dev/null | wc -l)
 fi
-TOOL_COUNT=$(( CORE_COUNT + BROWSER_COUNT + MAIL_COUNT + SIGNAL_COUNT + MEDIA_COUNT + INGEST_COUNT + MEMORY_COUNT ))
+SEARCH_COUNT=0
+if [ -d "$SEARCH_DIR" ]; then
+    SEARCH_COUNT=$(find "$SEARCH_DIR" -maxdepth 1 -type f -executable 2>/dev/null | wc -l)
+fi
+TOOL_COUNT=$(( CORE_COUNT + BROWSER_COUNT + MAIL_COUNT + SIGNAL_COUNT + MEDIA_COUNT + INGEST_COUNT + MEMORY_COUNT + SEARCH_COUNT ))
 echo "  Found $TOOL_COUNT tools"
 echo "    - $CORE_COUNT in tools/core/"
 echo "    - $BROWSER_COUNT in tools/browser/"
@@ -81,6 +86,9 @@ if [ "$INGEST_COUNT" -gt 0 ]; then
 fi
 if [ "$MEMORY_COUNT" -gt 0 ]; then
     echo "    - $MEMORY_COUNT in tools/memory/"
+fi
+if [ "$SEARCH_COUNT" -gt 0 ]; then
+    echo "    - $SEARCH_COUNT in tools/search/"
 fi
 echo ""
 
@@ -143,6 +151,9 @@ if [ -d "$INGEST_DIR" ]; then
 fi
 if [ -d "$MEMORY_DIR" ]; then
     symlink_tools "$MEMORY_DIR"
+fi
+if [ -d "$SEARCH_DIR" ]; then
+    symlink_tools "$SEARCH_DIR"
 fi
 
 echo ""
