@@ -1897,29 +1897,32 @@
 							{#each recentSessions as recent (recent.sessionName)}
 								{@const projectColor = recent.project ? getProjectColorReactive(recent.taskId || recent.project) : null}
 								{@const stateVisual = getSessionStateVisual(recent.lastState as SessionState)}
+								{@const recentStatusDotColor = stateVisual.accent}
 								<div
 									class="recent-row"
 									style="border-left: 3px solid {projectColor || 'oklch(0.30 0.02 250)'};"
 								>
 									<div class="recent-row-left">
-										<AgentAvatar name={recent.agentName} size={24} />
-										<div class="recent-info">
-											<div class="recent-agent-line">
-												<span class="recent-agent-name">{recent.agentName}</span>
-												{#if recent.taskId && recent.taskId !== 'unknown'}
-													<TaskIdBadge
-														task={{ id: recent.taskId, status: recent.lastState === 'complete' || recent.lastState === 'completed' ? 'closed' : 'open', title: recent.taskTitle || undefined }}
-														size="xs"
-														showStatus={false}
-														showType={false}
-														copyOnly={true}
-													/>
+										{#if recent.taskId && recent.taskId !== 'unknown'}
+											<div class="badge-and-text">
+												<TaskIdBadge
+													task={{ id: recent.taskId, status: recent.lastState === 'complete' || recent.lastState === 'completed' ? 'closed' : 'open', title: recent.taskTitle || undefined }}
+													size="sm"
+													variant="agentPill"
+													agentName={recent.agentName}
+													showType={false}
+													statusDotColor={recentStatusDotColor}
+												/>
+												{#if recent.taskTitle}
+													<div class="text-column">
+														<span class="task-title" title={recent.taskTitle}>{recent.taskTitle}</span>
+													</div>
 												{/if}
 											</div>
-											{#if recent.taskTitle}
-												<div class="recent-task-title">{recent.taskTitle}</div>
-											{/if}
-										</div>
+										{:else}
+											<AgentAvatar name={recent.agentName} size={24} />
+											<span class="recent-agent-name">{recent.agentName}</span>
+										{/if}
 									</div>
 									<div class="recent-row-right">
 										<span
@@ -2726,32 +2729,10 @@
 		flex: 1;
 	}
 
-	.recent-info {
-		display: flex;
-		flex-direction: column;
-		gap: 0.125rem;
-		min-width: 0;
-	}
-
-	.recent-agent-line {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
 	.recent-agent-name {
 		font-size: 0.8rem;
 		font-weight: 600;
 		color: oklch(0.75 0.02 250);
-	}
-
-	.recent-task-title {
-		font-size: 0.725rem;
-		color: oklch(0.55 0.02 250);
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		max-width: 400px;
 	}
 
 	.recent-row-right {
