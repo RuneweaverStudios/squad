@@ -2,6 +2,7 @@
 	import { onDestroy } from 'svelte';
 	import { slide } from 'svelte/transition';
 	import MonacoWrapper from '$lib/components/config/MonacoWrapper.svelte';
+	import MarkdownPreview from '$lib/components/files/MarkdownPreview.svelte';
 	import { openTaskDrawer } from '$lib/stores/drawerStore';
 
 	// Props
@@ -27,6 +28,7 @@
 	let saveError = $state<string | null>(null);
 	let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 	let copySuccess = $state(false);
+	let showPreview = $state(false);
 	let monacoRef: { focus: () => void; focusEnd: () => void; layout: () => void; getSelection: () => string; deleteSelection: () => boolean } | undefined;
 
 	// Auto-size constants
@@ -257,6 +259,24 @@
 		<div class="header-actions">
 			<button
 				class="action-btn"
+				class:preview-active={showPreview}
+				onclick={() => { showPreview = !showPreview; }}
+				disabled={!localNotes}
+				title={showPreview ? 'Show editor' : 'Preview markdown'}
+			>
+				{#if showPreview}
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5" />
+					</svg>
+				{:else}
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+						<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+					</svg>
+				{/if}
+			</button>
+			<button
+				class="action-btn"
 				onclick={copyNotes}
 				disabled={!localNotes}
 				title="Copy to clipboard"
@@ -306,15 +326,21 @@
 
 	{#if !internalCollapsed}
 		<div class="notes-content" transition:slide={{ duration: 200 }}>
-			<div class="notes-editor" style="height: min({editorHeight}px, 70vh);">
-				<MonacoWrapper
-					bind:this={monacoRef}
-					bind:value={localNotes}
-					language="markdown"
-					onchange={handleNotesChange}
-					disableSuggestions={true}
-				/>
-			</div>
+			{#if showPreview}
+				<div class="notes-preview" style="height: min({editorHeight}px, 70vh);">
+					<MarkdownPreview content={localNotes} />
+				</div>
+			{:else}
+				<div class="notes-editor" style="height: min({editorHeight}px, 70vh);">
+					<MonacoWrapper
+						bind:this={monacoRef}
+						bind:value={localNotes}
+						language="markdown"
+						onchange={handleNotesChange}
+						disableSuggestions={true}
+					/>
+				</div>
+			{/if}
 		</div>
 	{/if}
 </div>
@@ -470,5 +496,22 @@
 	.notes-editor {
 		min-height: 100px;
 		transition: height 0.2s ease-out;
+	}
+
+	.notes-preview {
+		min-height: 100px;
+		overflow-y: auto;
+		transition: height 0.2s ease-out;
+	}
+
+	.action-btn.preview-active {
+		background: oklch(0.55 0.15 200 / 0.15);
+		color: oklch(0.80 0.15 200);
+		border-color: oklch(0.55 0.15 200 / 0.3);
+	}
+
+	.action-btn.preview-active:hover:not(:disabled) {
+		background: oklch(0.55 0.15 200 / 0.25);
+		color: oklch(0.85 0.15 200);
 	}
 </style>

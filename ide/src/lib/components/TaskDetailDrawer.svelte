@@ -1977,7 +1977,6 @@
 			originalTask = null;
 			error = null;
 			saveError = null;
-			toastMessage = null;
 			lastSaved = null;
 			showHelp = false;
 			// Reset logs state

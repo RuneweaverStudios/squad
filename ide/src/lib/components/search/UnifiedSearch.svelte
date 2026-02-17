@@ -187,7 +187,10 @@
 			synthesis = null;
 			activeTab = 'all';
 			selectedResultIndex = -1;
+			// tick alone isn't enough — modal DOM mounts async after isOpen changes
 			tick().then(() => searchInputEl?.focus());
+			setTimeout(() => searchInputEl?.focus(), 50);
+			setTimeout(() => searchInputEl?.focus(), 150);
 		}
 	});
 
@@ -412,19 +415,44 @@
 		}, 300);
 	}
 
+	function activeTabResultCount(): number {
+		switch (activeTab) {
+			case 'tasks': return taskResults.length;
+			case 'memory': return memoryResults.length;
+			case 'filenames': return filenameResults.length;
+			case 'content': return contentResults.length;
+			default: return 0;
+		}
+	}
+
+	function openSelectedResult(): boolean {
+		if (selectedResultIndex < 0) return false;
+		if (activeTab === 'tasks' && selectedResultIndex < taskResults.length) {
+			openTask(taskResults[selectedResultIndex].id);
+			return true;
+		}
+		if (activeTab === 'memory' && selectedResultIndex < memoryResults.length) {
+			navigateToMemory(memoryResults[selectedResultIndex].file);
+			return true;
+		}
+		if (activeTab === 'filenames' && selectedResultIndex < filenameResults.length) {
+			openFilename(filenameResults[selectedResultIndex]);
+			return true;
+		}
+		if (activeTab === 'content' && selectedResultIndex < contentResults.length) {
+			openContentResult(contentResults[selectedResultIndex]);
+			return true;
+		}
+		return false;
+	}
+
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Enter') {
 			if (debounceTimer) clearTimeout(debounceTimer);
 
-			// If a result is selected in filenames/content, open it
-			if (activeTab === 'filenames' && selectedResultIndex >= 0 && selectedResultIndex < filenameResults.length) {
+			// If a result is selected, open it
+			if (openSelectedResult()) {
 				e.preventDefault();
-				openFilename(filenameResults[selectedResultIndex]);
-				return;
-			}
-			if (activeTab === 'content' && selectedResultIndex >= 0 && selectedResultIndex < contentResults.length) {
-				e.preventDefault();
-				openContentResult(contentResults[selectedResultIndex]);
 				return;
 			}
 
@@ -448,17 +476,18 @@
 			}
 		}
 
-		// Arrow up/down for result navigation (filenames/content tabs)
-		if ((activeTab === 'filenames' || activeTab === 'content') && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
-			e.preventDefault();
-			const maxIndex = activeTab === 'filenames' ? filenameResults.length : contentResults.length;
+		// Arrow up/down for result navigation (all tabs except 'all')
+		if (activeTab !== 'all' && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+			const maxIndex = activeTabResultCount();
 			if (maxIndex > 0) {
+				e.preventDefault();
 				if (e.key === 'ArrowDown') {
-					selectedResultIndex = selectedResultIndex < maxIndex - 1 ? selectedResultIndex + 1 : 0;
+					selectedResultIndex = selectedResultIndex < maxIndex - 1 ? selectedResultIndex + 1 : -1;
 				} else {
-					selectedResultIndex = selectedResultIndex > 0 ? selectedResultIndex - 1 : maxIndex - 1;
+					selectedResultIndex = selectedResultIndex > 0 ? selectedResultIndex - 1 : selectedResultIndex === 0 ? -1 : maxIndex - 1;
 				}
-				scrollSelectedIntoView();
+				if (selectedResultIndex >= 0) scrollSelectedIntoView();
+				else searchInputEl?.focus();
 			}
 		}
 
@@ -472,7 +501,15 @@
 				const currentIndex = TABS.findIndex(t => t.id === activeTab);
 				const direction = e.key === 'ArrowLeft' ? -1 : 1;
 				const nextIndex = (currentIndex + direction + TABS.length) % TABS.length;
-				switchTab(TABS[nextIndex].id);
+				// Direct tab switch (bypass cover-flow scroll behavior)
+				focusedColumn = null;
+				activeTab = TABS[nextIndex].id;
+				selectedResultIndex = -1;
+				if (mode === 'route') updateUrl();
+				if (query.trim()) doSearchForActiveTab();
+				if (TABS[nextIndex].id === 'all' && columnsContainerEl) {
+					columnsContainerEl.scrollLeft = 0;
+				}
 			}
 		}
 	}
@@ -702,6 +739,7 @@
 				/>
 				{#if query}
 					<button
+						tabindex={-1}
 						onclick={() => { query = ''; taskResults = []; memoryResults = []; fileResults = []; filenameResults = []; contentResults = []; meta = null; synthesis = null; if (mode === 'route') updateUrl(); searchInputEl?.focus(); }}
 						class="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded transition-colors hover:bg-base-300/30"
 						style="color: oklch(0.50 0.02 250);"
@@ -838,7 +876,7 @@
 	{#if isModal}
 		<div class="flex items-center justify-between px-3 py-2" style="border-top: 1px solid oklch(0.25 0.02 250); background: oklch(0.14 0.01 250); border-radius: 0 0 0.75rem 0.75rem;">
 			<span class="text-[11px]" style="color: oklch(0.45 0.02 250);">
-				{#if !query.trim()}Use arrows to switch tabs{:else if activeTab === 'filenames' || activeTab === 'content'}<kbd class="px-1 py-0.5 rounded text-[9px] font-mono" style="background: oklch(0.22 0.02 250); border: 1px solid oklch(0.30 0.02 250);">↑↓</kbd> navigate <kbd class="px-1 py-0.5 rounded text-[9px] font-mono" style="background: oklch(0.22 0.02 250); border: 1px solid oklch(0.30 0.02 250);">↵</kbd> open{/if}
+				{#if !query.trim()}Use arrows to switch tabs{:else if activeTab !== 'all'}<kbd class="px-1 py-0.5 rounded text-[9px] font-mono" style="background: oklch(0.22 0.02 250); border: 1px solid oklch(0.30 0.02 250);">↑↓</kbd> navigate <kbd class="px-1 py-0.5 rounded text-[9px] font-mono" style="background: oklch(0.22 0.02 250); border: 1px solid oklch(0.30 0.02 250);">↵</kbd> open <kbd class="px-1 py-0.5 rounded text-[9px] font-mono" style="background: oklch(0.22 0.02 250); border: 1px solid oklch(0.30 0.02 250);">←→</kbd> tabs{/if}
 			</span>
 			<span class="text-[11px]" style="color: oklch(0.45 0.02 250);">
 				<kbd class="px-1 py-0.5 rounded text-[9px] font-mono" style="background: oklch(0.22 0.02 250); border: 1px solid oklch(0.30 0.02 250);">esc</kbd> close
@@ -1127,10 +1165,12 @@
 
 {#snippet tasksList(isModal: boolean)}
 	<div class="{isModal ? 'px-2' : 'max-w-3xl mx-auto'} space-y-1">
-		{#each taskResults as task}
+		{#each taskResults as task, index}
 			<button
 				onclick={() => openTask(task.id)}
+				onmouseenter={() => { selectedResultIndex = index; }}
 				class="us-result-card w-full"
+				class:result-selected={index === selectedResultIndex}
 			>
 				<div class="flex items-center gap-2 min-w-0">
 					<div class="flex-none"><TaskIdBadge {task} size="xs" /></div>
@@ -1148,10 +1188,12 @@
 
 {#snippet memoryList(isModal: boolean)}
 	<div class="{isModal ? 'px-2' : 'max-w-3xl mx-auto'} space-y-1">
-		{#each memoryResults as mem}
+		{#each memoryResults as mem, index}
 			<button
 				onclick={() => navigateToMemory(mem.file)}
+				onmouseenter={() => { selectedResultIndex = index; }}
 				class="us-result-card w-full"
+				class:result-selected={index === selectedResultIndex}
 			>
 				<div class="flex items-center gap-2 flex-wrap">
 					{#if mem.taskId}
@@ -1301,9 +1343,15 @@
 		transition: all 0.12s ease;
 	}
 
-	.us-result-card:hover {
+	.us-result-card:hover,
+	.us-result-card.result-selected {
 		border-color: oklch(0.35 0.06 200);
 		background: oklch(0.22 0.02 250);
+	}
+
+	.us-result-card.result-selected {
+		border-color: oklch(0.45 0.10 200);
+		background: oklch(0.24 0.03 220);
 	}
 
 	/* Filename result item */
