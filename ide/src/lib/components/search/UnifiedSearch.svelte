@@ -446,7 +446,41 @@
 		return false;
 	}
 
+	// --- Tab cycling helpers ---
+	function cycleTab(direction: number): SourceTab {
+		const currentIndex = TABS.findIndex(t => t.id === activeTab);
+		const nextIndex = (currentIndex + direction + TABS.length) % TABS.length;
+		const newTab = TABS[nextIndex].id;
+		focusedColumn = null;
+		activeTab = newTab;
+		selectedResultIndex = -1;
+		if (mode === 'route') updateUrl();
+		if (query.trim()) doSearchForActiveTab();
+		if (newTab === 'all' && columnsContainerEl) {
+			columnsContainerEl.scrollLeft = 0;
+		}
+		return newTab;
+	}
+
+	function focusTabButton(tabId: SourceTab) {
+		tick().then(() => {
+			const btn = document.querySelector(`[data-tab="${tabId}"]`) as HTMLElement;
+			btn?.focus();
+		});
+	}
+
+	// --- Keyboard: 3-zone navigation (Input ↔ Tab Bar ↔ Results) ---
 	function handleKeydown(e: KeyboardEvent) {
+		const target = e.target as HTMLElement;
+		const isInput = target === searchInputEl;
+		const isTabButton = !!target.getAttribute?.('data-tab');
+
+		// When focused on tab bar, redirect typing to search input
+		if (isTabButton && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+			searchInputEl?.focus();
+			return;
+		}
+
 		if (e.key === 'Enter') {
 			if (debounceTimer) clearTimeout(debounceTimer);
 
@@ -463,6 +497,8 @@
 		if (e.key === 'Escape') {
 			if (mode === 'modal') {
 				onClose?.();
+			} else if (isTabButton) {
+				searchInputEl?.focus();
 			} else {
 				query = '';
 				taskResults = [];
@@ -476,49 +512,76 @@
 			}
 		}
 
-		// Arrow up/down for result navigation
+		// Arrow down/up: zone navigation (Input → Tab Bar → Results)
 		if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-			if (activeTab === 'all' && e.key === 'ArrowDown') {
-				// From 'all' tab, ArrowDown enters tab navigation — switch to first specific tab
-				e.preventDefault();
-				focusedColumn = null;
-				activeTab = 'tasks';
-				selectedResultIndex = -1;
-				if (mode === 'route') updateUrl();
-				if (query.trim()) doSearchForActiveTab();
-			} else if (activeTab !== 'all') {
-				const maxIndex = activeTabResultCount();
-				if (maxIndex > 0) {
-					e.preventDefault();
-					if (e.key === 'ArrowDown') {
-						selectedResultIndex = selectedResultIndex < maxIndex - 1 ? selectedResultIndex + 1 : -1;
+			if (e.key === 'ArrowDown') {
+				if (isInput) {
+					if (activeTab !== 'all' && selectedResultIndex >= 0) {
+						// Continue navigating results downward
+						e.preventDefault();
+						const maxIndex = activeTabResultCount();
+						if (selectedResultIndex < maxIndex - 1) {
+							selectedResultIndex += 1;
+							scrollSelectedIntoView();
+						} else {
+							// Past last result: deselect and return to tab bar
+							selectedResultIndex = -1;
+							focusTabButton(activeTab);
+						}
 					} else {
-						selectedResultIndex = selectedResultIndex > 0 ? selectedResultIndex - 1 : selectedResultIndex === 0 ? -1 : maxIndex - 1;
+						// From input (no result selected): move focus to tab bar
+						e.preventDefault();
+						focusTabButton(activeTab);
 					}
-					if (selectedResultIndex >= 0) scrollSelectedIntoView();
-					else searchInputEl?.focus();
+				} else if (isTabButton) {
+					// From tab bar: enter result navigation (non-all tabs only)
+					e.preventDefault();
+					if (activeTab !== 'all') {
+						const maxIndex = activeTabResultCount();
+						if (maxIndex > 0) {
+							selectedResultIndex = 0;
+							scrollSelectedIntoView();
+							searchInputEl?.focus(); // keep input focused for continued key nav
+						}
+					}
+				}
+			} else { // ArrowUp
+				if (isInput) {
+					if (activeTab !== 'all' && selectedResultIndex > 0) {
+						e.preventDefault();
+						selectedResultIndex -= 1;
+						scrollSelectedIntoView();
+					} else if (activeTab !== 'all' && selectedResultIndex === 0) {
+						// At first result: deselect and return to tab bar
+						e.preventDefault();
+						selectedResultIndex = -1;
+						focusTabButton(activeTab);
+					}
+				} else if (isTabButton) {
+					// From tab bar: return to input
+					e.preventDefault();
+					searchInputEl?.focus();
 				}
 			}
 		}
 
-		// Arrow left/right for tab navigation (when cursor is at input boundary or input is empty)
+		// Arrow left/right: tab cycling
 		if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-			const input = e.target as HTMLInputElement;
-			const atStart = !input.value || (input.selectionStart === 0 && input.selectionEnd === 0);
-			const atEnd = !input.value || (input.selectionStart === input.value.length && input.selectionEnd === input.value.length);
-			if ((e.key === 'ArrowLeft' && atStart) || (e.key === 'ArrowRight' && atEnd)) {
+			const direction = e.key === 'ArrowLeft' ? -1 : 1;
+
+			if (isTabButton) {
+				// Smooth tab cycling from tab bar — focus follows selection
 				e.preventDefault();
-				const currentIndex = TABS.findIndex(t => t.id === activeTab);
-				const direction = e.key === 'ArrowLeft' ? -1 : 1;
-				const nextIndex = (currentIndex + direction + TABS.length) % TABS.length;
-				// Direct tab switch (bypass cover-flow scroll behavior)
-				focusedColumn = null;
-				activeTab = TABS[nextIndex].id;
-				selectedResultIndex = -1;
-				if (mode === 'route') updateUrl();
-				if (query.trim()) doSearchForActiveTab();
-				if (TABS[nextIndex].id === 'all' && columnsContainerEl) {
-					columnsContainerEl.scrollLeft = 0;
+				const newTab = cycleTab(direction);
+				focusTabButton(newTab);
+			} else if (isInput) {
+				// Only cycle tabs when cursor is at input boundary
+				const input = target as HTMLInputElement;
+				const atStart = !input.value || (input.selectionStart === 0 && input.selectionEnd === 0);
+				const atEnd = !input.value || (input.selectionStart === input.value.length && input.selectionEnd === input.value.length);
+				if ((e.key === 'ArrowLeft' && atStart) || (e.key === 'ArrowRight' && atEnd)) {
+					e.preventDefault();
+					cycleTab(direction);
 				}
 			}
 		}
@@ -701,7 +764,8 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 
 {#if mode === 'route'}
-	<div class="flex flex-col h-full overflow-hidden" style="background: oklch(0.16 0.01 250);">
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="flex flex-col h-full overflow-hidden" style="background: oklch(0.16 0.01 250);" onkeydown={handleKeydown}>
 		{@render searchUI(false)}
 	</div>
 {:else if isOpen}
@@ -734,7 +798,6 @@
 					bind:this={searchInputEl}
 					bind:value={query}
 					oninput={handleInput}
-					onkeydown={handleKeydown}
 					type="text"
 					placeholder="Search tasks, memory, and files...{isModal ? '' : ' (Ctrl+K)'}"
 					class="w-full pl-11 pr-4 py-3 rounded-lg text-sm font-mono outline-none transition-all duration-200"
@@ -772,6 +835,7 @@
 					{@const isActive = activeTab === tab.id}
 					{@const isFocused = activeTab === 'all' && focusedColumn === tab.id}
 					<button
+						data-tab={tab.id}
 						onclick={() => switchTab(tab.id)}
 						class="px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-150 flex items-center gap-1"
 						style="
