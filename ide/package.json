@@ -19,7 +19,8 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"test": "vitest",
 		"test:ui": "vitest --ui",
-		"certs:generate": "mkdir -p certs && cd certs && openssl req -x509 -newkey rsa:2048 -keyout localhost-key.pem -out localhost.pem -days 365 -nodes -subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1'"
+		"certs:generate": "mkdir -p certs && cd certs && openssl req -x509 -newkey rsa:2048 -keyout localhost-key.pem -out localhost.pem -days 365 -nodes -subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1'",
+		"build:widget": "cd ../widget && npm run build && cp dist/jat-feedback.js ../ide/static/widget/jat-feedback.js"
 	},
 	"dependencies": {
 		"@anthropic-ai/sdk": "^0.70.1",

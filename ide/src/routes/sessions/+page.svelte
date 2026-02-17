@@ -1902,12 +1902,18 @@
 									style="border-left: 3px solid {projectColor || 'oklch(0.30 0.02 250)'};"
 								>
 									<div class="recent-row-left">
-										<AgentAvatar agentName={recent.agentName} size={24} />
+										<AgentAvatar name={recent.agentName} size={24} />
 										<div class="recent-info">
 											<div class="recent-agent-line">
 												<span class="recent-agent-name">{recent.agentName}</span>
 												{#if recent.taskId && recent.taskId !== 'unknown'}
-													<span class="recent-task-id">{recent.taskId}</span>
+													<TaskIdBadge
+														task={{ id: recent.taskId, status: recent.lastState === 'complete' || recent.lastState === 'completed' ? 'closed' : 'open', title: recent.taskTitle || undefined }}
+														size="xs"
+														showStatus={false}
+														showType={false}
+														copyOnly={true}
+													/>
 												{/if}
 											</div>
 											{#if recent.taskTitle}
@@ -2737,13 +2743,6 @@
 		font-size: 0.8rem;
 		font-weight: 600;
 		color: oklch(0.75 0.02 250);
-	}
-
-	.recent-task-id {
-		font-size: 0.7rem;
-		font-weight: 500;
-		color: oklch(0.55 0.02 250);
-		font-family: ui-monospace, monospace;
 	}
 
 	.recent-task-title {

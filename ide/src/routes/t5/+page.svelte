@@ -66,7 +66,7 @@
 			const q = searchQuery.toLowerCase();
 			result = result.filter(t =>
 				t.title.toLowerCase().includes(q) ||
-				t.id.toLowerCase().includes(q) ||
+				t.id.toLowerCase() === q ||
 				t.assignee?.toLowerCase().includes(q)
 			);
 		}

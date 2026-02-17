@@ -9,7 +9,7 @@
 	 * - Push/Pull action buttons
 	 * - Timeline with commit history
 	 */
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { goto } from '$app/navigation';
 	import BranchSwitcherModal from './BranchSwitcherModal.svelte';
 	import { openDiffPreviewDrawer } from '$lib/stores/drawerStore';
@@ -94,6 +94,7 @@
 	let unstagingFiles = $state<Set<string>>(new Set());
 	let isStagingAll = $state(false);
 	let isUnstagingAll = $state(false);
+	let suppressPoll = $state(false);
 
 	// Discard changes state
 	let discardingFiles = $state<Set<string>>(new Set());
@@ -350,8 +351,19 @@
 				throw new Error(data.message || 'Failed to stage file');
 			}
 
-			await fetchStatus();
+			// Optimistic update: move file from changes to staged
+			if (!stagedFiles.includes(filePath)) {
+				stagedFiles = [...stagedFiles, filePath];
+			}
+			modifiedFiles = modifiedFiles.filter(f => f !== filePath);
+			deletedFiles = deletedFiles.filter(f => f !== filePath);
+			untrackedFiles = untrackedFiles.filter(f => f !== filePath);
+			createdFiles = createdFiles.filter(f => f !== filePath);
 			showToast(`Staged: ${getFileName(filePath)}`);
+
+			suppressPoll = true;
+			await tick();
+			setTimeout(() => { suppressPoll = false; }, 3000);
 		} catch (err) {
 			showToast(err instanceof Error ? err.message : 'Failed to stage file', 'error');
 		} finally {
@@ -381,8 +393,16 @@
 				throw new Error(data.message || 'Failed to stage renamed file');
 			}
 
-			await fetchStatus();
+			// Optimistic update: move renamed file to staged
+			if (!stagedFiles.includes(renamed.to)) {
+				stagedFiles = [...stagedFiles, renamed.from, renamed.to];
+			}
+			renamedFiles = renamedFiles.filter(r => r.from !== renamed.from && r.to !== renamed.to);
 			showToast(`Staged: ${getFileName(renamed.from)} → ${getFileName(renamed.to)}`);
+
+			suppressPoll = true;
+			await tick();
+			setTimeout(() => { suppressPoll = false; }, 3000);
 		} catch (err) {
 			showToast(err instanceof Error ? err.message : 'Failed to stage renamed file', 'error');
 		} finally {
@@ -411,8 +431,16 @@
 				throw new Error(data.message || 'Failed to unstage file');
 			}
 
-			await fetchStatus();
+			// Optimistic update: move file from staged back to changes
+			stagedFiles = stagedFiles.filter(f => f !== filePath);
+			if (!modifiedFiles.includes(filePath)) {
+				modifiedFiles = [...modifiedFiles, filePath];
+			}
 			showToast(`Unstaged: ${getFileName(filePath)}`);
+
+			suppressPoll = true;
+			await tick();
+			setTimeout(() => { suppressPoll = false; }, 3000);
 		} catch (err) {
 			showToast(err instanceof Error ? err.message : 'Failed to unstage file', 'error');
 		} finally {
@@ -468,8 +496,12 @@
 			isStagingAll = false;
 			showToast(`Staged ${allChanges.length} file(s)`);
 
-			// Sync authoritative state from git in the background
-			fetchStatus();
+			// Suppress polling briefly so it doesn't overwrite optimistic state
+			suppressPoll = true;
+			// Force Svelte to flush the optimistic state to the DOM
+			await tick();
+			// Let polling resume after 3s to sync authoritative git state
+			setTimeout(() => { suppressPoll = false; }, 3000);
 
 			// Auto-generate commit message when staging all files (if no message yet)
 			if (!commitMessage.trim() && !isGeneratingMessage) {
@@ -503,12 +535,13 @@
 
 		if (stagedFiles.length === 0) return;
 
+		const filesToUnstage = [...stagedFiles];
 		isUnstagingAll = true;
 		try {
 			const response = await fetch('/api/files/git/unstage', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ project, paths: stagedFiles })
+				body: JSON.stringify({ project, paths: filesToUnstage })
 			});
 
 			if (!response.ok) {
@@ -516,11 +549,19 @@
 				throw new Error(data.message || 'Failed to unstage files');
 			}
 
-			await fetchStatus();
-			showToast(`Unstaged ${stagedFiles.length} file(s)`);
+			// Optimistically move files from staged back to changes
+			const unstagedSet = new Set(filesToUnstage);
+			modifiedFiles = [...new Set([...modifiedFiles, ...filesToUnstage])];
+			stagedFiles = stagedFiles.filter(f => !unstagedSet.has(f));
+			isUnstagingAll = false;
+			showToast(`Unstaged ${filesToUnstage.length} file(s)`);
+
+			// Suppress polling briefly so it doesn't overwrite optimistic state
+			suppressPoll = true;
+			await tick();
+			setTimeout(() => { suppressPoll = false; }, 3000);
 		} catch (err) {
 			showToast(err instanceof Error ? err.message : 'Failed to unstage files', 'error');
-		} finally {
 			isUnstagingAll = false;
 		}
 	}
@@ -1229,7 +1270,7 @@
 				return;
 			}
 			// Only poll if not currently loading or performing an operation
-			if (!isLoading && !isCommitting && !isPushing && !isPulling && !isFetching) {
+			if (!isLoading && !isCommitting && !isPushing && !isPulling && !isFetching && !suppressPoll) {
 				await fetchStatus();
 				// Refresh timeline when ahead/behind counts change (new commits pushed/pulled by agents)
 				if (ahead !== prevAhead || behind !== prevBehind) {

@@ -1,11 +1,13 @@
 /**
- * Extension Bug Report API
+ * Feedback Widget Report API
  *
- * Receives bug reports from the JAT Browser Extension and creates tasks.
+ * Receives bug reports from the <jat-feedback> widget and creates tasks.
  * Screenshots are saved to .jat/screenshots/ and referenced in the task description.
+ * Includes CORS headers for cross-origin widget usage.
  *
  * POST - Submit a bug report (creates a task)
- * GET  - Health check (extension uses this to test connection)
+ * GET  - Health check (widget uses this to test connection)
+ * OPTIONS - CORS preflight
  */
 import { json } from '@sveltejs/kit';
 import { createTask } from '$lib/server/jat-tasks.js';
@@ -15,7 +17,14 @@ import { emitEvent } from '$lib/utils/eventBus.server.js';
 import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { resolve } from 'path';
 
-/** Map extension priority strings to JAT numeric priorities */
+const CORS_HEADERS = {
+	'Access-Control-Allow-Origin': '*',
+	'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+	'Access-Control-Allow-Headers': 'Content-Type',
+	'Access-Control-Max-Age': '86400'
+};
+
+/** Map widget priority strings to JAT numeric priorities */
 const PRIORITY_MAP = {
 	critical: 0,
 	high: 1,
@@ -23,7 +32,7 @@ const PRIORITY_MAP = {
 	low: 3
 };
 
-/** Map extension type strings to JAT task types */
+/** Map widget type strings to JAT task types */
 const TYPE_MAP = {
 	bug: 'bug',
 	enhancement: 'feature',
@@ -31,18 +40,28 @@ const TYPE_MAP = {
 };
 
 /**
- * GET /api/extension/report - Health check
+ * OPTIONS /api/feedback/report - CORS preflight
  */
-export async function GET() {
-	return json({
-		status: 'ok',
-		service: 'jat-extension-report',
-		timestamp: new Date().toISOString()
-	});
+export async function OPTIONS() {
+	return new Response(null, { status: 204, headers: CORS_HEADERS });
 }
 
 /**
- * POST /api/extension/report - Submit a bug report
+ * GET /api/feedback/report - Health check
+ */
+export async function GET() {
+	return json(
+		{
+			status: 'ok',
+			service: 'jat-feedback-report',
+			timestamp: new Date().toISOString()
+		},
+		{ headers: CORS_HEADERS }
+	);
+}
+
+/**
+ * POST /api/feedback/report - Submit a bug report
  */
 export async function POST({ request }) {
 	try {
@@ -50,7 +69,7 @@ export async function POST({ request }) {
 
 		// Validate required fields
 		if (!body.title || typeof body.title !== 'string' || body.title.trim() === '') {
-			return json({ ok: false, error: 'Title is required' }, { status: 400 });
+			return json({ ok: false, error: 'Title is required' }, { status: 400, headers: CORS_HEADERS });
 		}
 
 		const title = body.title.trim();
@@ -96,40 +115,55 @@ export async function POST({ request }) {
 
 					const mime = header.match(/:(.*?);/)?.[1] || 'image/png';
 					const ext = mime === 'image/png' ? 'png' : 'jpg';
-					const filename = `report-${timestamp}-${i}.${ext}`;
+					const filename = `feedback-${timestamp}-${i}.${ext}`;
 					const filepath = resolve(screenshotsDir, filename);
 
 					writeFileSync(filepath, Buffer.from(base64, 'base64'));
 					screenshotPaths.push(`.jat/screenshots/${filename}`);
 				} catch (err) {
-					console.warn(`[extension-report] Screenshot save failed (${i}):`, err.message);
+					console.warn(`[feedback-report] Screenshot save failed (${i}):`, err.message);
 				}
 			}
 
 			if (screenshotPaths.length > 0) {
-				descParts.push(`**Screenshots:** ${screenshotPaths.length} saved\n${screenshotPaths.map(p => `- \`${p}\``).join('\n')}`);
+				descParts.push(
+					`**Screenshots:** ${screenshotPaths.length} saved\n${screenshotPaths.map((p) => `- \`${p}\``).join('\n')}`
+				);
 			}
 		}
 
 		// Add console logs summary
 		if (body.console_logs && Array.isArray(body.console_logs) && body.console_logs.length > 0) {
-			const logSummary = body.console_logs.slice(0, 10).map(log => {
-				const level = log.level || 'log';
-				const msg = typeof log.message === 'string' ? log.message : JSON.stringify(log.message);
-				return `- [${level}] ${msg.substring(0, 200)}`;
-			}).join('\n');
+			const logSummary = body.console_logs
+				.slice(0, 10)
+				.map((log) => {
+					const level = log.type || log.level || 'log';
+					const msg =
+						typeof log.message === 'string' ? log.message : JSON.stringify(log.message);
+					return `- [${level}] ${msg.substring(0, 200)}`;
+				})
+				.join('\n');
 			descParts.push(`**Console Logs** (${body.console_logs.length}):\n${logSummary}`);
 		}
 
 		// Add selected elements summary
-		if (body.selected_elements && Array.isArray(body.selected_elements) && body.selected_elements.length > 0) {
-			const elemSummary = body.selected_elements.slice(0, 5).map(el => {
-				const tag = el.tagName || el.tag || 'element';
-				const id = el.id ? `#${el.id}` : '';
-				const classes = el.className ? `.${el.className.split(' ').join('.')}` : '';
-				return `- \`${tag}${id}${classes}\``;
-			}).join('\n');
-			descParts.push(`**Selected Elements** (${body.selected_elements.length}):\n${elemSummary}`);
+		if (
+			body.selected_elements &&
+			Array.isArray(body.selected_elements) &&
+			body.selected_elements.length > 0
+		) {
+			const elemSummary = body.selected_elements
+				.slice(0, 5)
+				.map((el) => {
+					const tag = el.tagName || el.tag || 'element';
+					const id = el.id ? `#${el.id}` : '';
+					const classes = el.className ? `.${el.className.split(' ').join('.')}` : '';
+					return `- \`${tag}${id}${classes}\``;
+				})
+				.join('\n');
+			descParts.push(
+				`**Selected Elements** (${body.selected_elements.length}):\n${elemSummary}`
+			);
 		}
 
 		const fullDescription = descParts.join('\n\n');
@@ -138,11 +172,11 @@ export async function POST({ request }) {
 		const projectPath = process.cwd().replace(/\/ide$/, '');
 		const createdTask = createTask({
 			projectPath,
-			title: `[Extension] ${title}`,
+			title: `[Feedback] ${title}`,
 			description: fullDescription,
 			type,
 			priority,
-			labels: ['extension', 'bug-report'],
+			labels: ['widget', 'bug-report'],
 			deps: [],
 			assignee: null,
 			notes: ''
@@ -157,30 +191,35 @@ export async function POST({ request }) {
 		try {
 			emitEvent({
 				type: 'task_created',
-				source: 'extension',
+				source: 'widget',
 				data: {
 					taskId: createdTask.id,
 					title: createdTask.title,
 					type,
 					priority,
-					labels: ['extension', 'bug-report']
+					labels: ['widget', 'bug-report']
 				}
 			});
 		} catch (e) {
-			console.error('[extension-report] Failed to emit event:', e);
+			console.error('[feedback-report] Failed to emit event:', e);
 		}
 
-		return json({
-			ok: true,
-			id: createdTask.id,
-			message: `Bug report submitted as task ${createdTask.id}`
-		}, { status: 201 });
-
+		return json(
+			{
+				ok: true,
+				id: createdTask.id,
+				message: `Report submitted as task ${createdTask.id}`
+			},
+			{ status: 201, headers: CORS_HEADERS }
+		);
 	} catch (err) {
-		console.error('[extension-report] Error:', err);
-		return json({
-			ok: false,
-			error: err.message || 'Failed to submit bug report'
-		}, { status: 500 });
+		console.error('[feedback-report] Error:', err);
+		return json(
+			{
+				ok: false,
+				error: err.message || 'Failed to submit report'
+			},
+			{ status: 500, headers: CORS_HEADERS }
+		);
 	}
 }

@@ -149,7 +149,9 @@
 			if (searchQuery.trim()) {
 				const query = searchQuery.toLowerCase();
 				const matchesTitle = task.title.toLowerCase().includes(query);
-				const matchesId = task.id.toLowerCase().includes(query);
+				// Exact match for task IDs to avoid parent matching all children
+			// (e.g. searching "jat-abc" would otherwise match "jat-abc.1", "jat-abc.2")
+			const matchesId = task.id.toLowerCase() === query;
 				if (!matchesTitle && !matchesId) return false;
 			}
 

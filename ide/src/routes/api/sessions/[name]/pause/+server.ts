@@ -128,16 +128,20 @@ export const POST: RequestHandler = async ({ params, request }) => {
 			return json({ error: 'taskId is required' }, { status: 400 });
 		}
 
-		// Guard: refuse to auto-pause planning sessions (they have no task/workflow signals
-		// and can appear idle when their signal TTL expires, but the user is still using them)
+		// Guard: refuse to auto-pause protected sessions
 		if (reason?.startsWith('Auto-paused')) {
 			const tmux = sessionName.startsWith('jat-') ? sessionName : `jat-${sessionName}`;
 			const sigFile = `/tmp/jat-signal-tmux-${tmux}.json`;
 			try {
 				if (existsSync(sigFile)) {
 					const sig = JSON.parse(readFileSync(sigFile, 'utf-8'));
+					// Don't auto-pause planning sessions (TTL expires but user is still using them)
 					if (sig.type === 'planning' || sig.state === 'planning') {
 						return json({ error: 'Cannot auto-pause planning session', skipped: true }, { status: 409 });
+					}
+					// Don't auto-pause already-paused sessions (prevents infinite pause loop)
+					if (sig.type === 'paused') {
+						return json({ error: 'Session already paused', skipped: true }, { status: 409 });
 					}
 				}
 			} catch { /* ignore — proceed with pause */ }

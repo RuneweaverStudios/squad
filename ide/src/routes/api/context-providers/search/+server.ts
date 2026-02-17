@@ -47,7 +47,7 @@ async function searchTasks(query: string, cwd: string): Promise<ProviderResult[]
 			const tasks = JSON.parse(stdout);
 			const filtered = query
 				? tasks.filter((t: { id: string; title: string }) =>
-					t.id.toLowerCase().includes(query.toLowerCase()) ||
+					t.id.toLowerCase() === query.toLowerCase() ||
 					t.title.toLowerCase().includes(query.toLowerCase())
 				)
 				: tasks;

@@ -69,8 +69,9 @@
 	// Create Your Own - language toggle
 	let exampleLang = $state<'js' | 'ts'>('js');
 
-	// Browser Extension state
-	let extensionExpanded = $state(false);
+	// Feedback Widget state
+	let widgetExpanded = $state(false);
+	let widgetCopied = $state(false);
 
 	// Template card definitions
 	const templates = [
@@ -1189,48 +1190,36 @@
 				{/if}
 			</div>
 
-			<!-- Browser Extension -->
+			<!-- Feedback Widget -->
 			<div
 				class="mb-6 rounded-lg overflow-hidden"
 				style="background: oklch(0.16 0.02 270); border: 1px solid oklch(0.28 0.06 270);"
 			>
 				<button
 					class="w-full flex items-center gap-3 px-4 py-4 text-left cursor-pointer group"
-					onclick={() => extensionExpanded = !extensionExpanded}
+					onclick={() => widgetExpanded = !widgetExpanded}
 				>
 					<div
 						class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-110"
 						style="background: oklch(0.30 0.08 270);"
 					>
 						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4" style="color: oklch(0.75 0.15 270);">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0a.64.64 0 01-.657.643 48.39 48.39 0 01-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 01-.658.663v0c-.355 0-.676-.186-.959-.401a1.647 1.647 0 00-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401v0c.31 0 .555.26.532.57a48.039 48.039 0 01-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 00.657-.643v0c0-.355-.186-.676-.401-.959a1.647 1.647 0 01-.349-1.003c0-1.035 1.008-1.875 2.25-1.875 1.243 0 2.25.84 2.25 1.875 0 .369-.128.713-.349 1.003-.215.283-.401.604-.401.959v0c0 .333.277.599.61.58a48.1 48.1 0 005.427-.63 48.05 48.05 0 00.582-4.717.532.532 0 00-.533-.57v0c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.959.401v0a.656.656 0 00.659-.663 47.703 47.703 0 00-.31-4.82 48.847 48.847 0 01-6.067.176.64.64 0 01-.657-.643v0z" />
+							<path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
 						</svg>
 					</div>
 					<div class="flex-1 min-w-0">
 						<div class="flex items-center gap-2">
-							<h3 class="font-mono text-xs font-semibold" style="color: oklch(0.80 0.10 270);">Browser Extension</h3>
+							<h3 class="font-mono text-xs font-semibold" style="color: oklch(0.80 0.10 270);">Feedback Widget</h3>
 							<span
 								class="font-mono text-[8px] px-1.5 py-0.5 rounded"
 								style="background: oklch(0.55 0.15 145 / 0.15); color: oklch(0.70 0.12 145); border: 1px solid oklch(0.55 0.15 145 / 0.2);"
 							>v1.0.0</span>
 						</div>
 						<p class="font-mono text-[10px] mt-0.5 leading-relaxed" style="color: oklch(0.55 0.04 270);">
-							Capture screenshots, console logs, network requests, and element details. Submit bug reports directly to JAT as tasks.
+							Drop-in web component for end-user bug reports. Captures screenshots, console logs, and element details. Reports become JAT tasks.
 						</p>
 					</div>
 					<div class="flex items-center gap-2 shrink-0">
-						<a
-							href="/api/extension/download"
-							class="font-mono text-[10px] font-semibold px-3 py-1.5 rounded transition-colors duration-150"
-							style="
-								background: oklch(0.30 0.10 270);
-								color: oklch(0.85 0.12 270);
-								border: 1px solid oklch(0.40 0.12 270);
-							"
-							onclick={(e) => e.stopPropagation()}
-						>
-							Download .zip
-						</a>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
 							fill="none"
@@ -1238,24 +1227,24 @@
 							stroke-width="2"
 							stroke="currentColor"
 							class="w-3.5 h-3.5 transition-transform duration-200"
-							style="color: oklch(0.45 0.04 270); transform: rotate({extensionExpanded ? 180 : 0}deg);"
+							style="color: oklch(0.45 0.04 270); transform: rotate({widgetExpanded ? 180 : 0}deg);"
 						>
 							<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
 						</svg>
 					</div>
 				</button>
 
-				{#if extensionExpanded}
+				{#if widgetExpanded}
 					<div class="px-4 pb-4 space-y-4" style="border-top: 1px solid oklch(0.25 0.04 270);">
 
 						<!-- Features -->
 						<div class="flex flex-wrap gap-2 pt-3">
 							{#each [
-								{ icon: '📸', label: 'Screenshots', desc: 'Full page + visible area' },
+								{ icon: '📸', label: 'Screenshots', desc: 'Viewport capture via html2canvas' },
 								{ icon: '🐛', label: 'Console Logs', desc: 'Errors, warnings, logs' },
-								{ icon: '🌐', label: 'Network', desc: 'Requests with status + timing' },
 								{ icon: '🎯', label: 'Element Picker', desc: 'Click to inspect any element' },
-								{ icon: '📝', label: 'Bug Reports', desc: 'Structured form to JAT tasks' }
+								{ icon: '📝', label: 'Bug Reports', desc: 'Structured form to JAT tasks' },
+								{ icon: '📡', label: 'Offline Queue', desc: 'Queues reports when endpoint is down' }
 							] as feat}
 								<div
 									class="flex items-center gap-1.5 px-2 py-1 rounded"
@@ -1267,39 +1256,76 @@
 							{/each}
 						</div>
 
-						<!-- Chrome Install -->
+						<!-- Quick Start -->
 						<div>
 							<h4 class="font-mono text-[10px] font-semibold tracking-widest uppercase mb-2" style="color: oklch(0.45 0.04 270);">
-								Chrome
+								Quick Start
 							</h4>
-							<ol class="space-y-1.5">
-								{#each [
-									{ text: 'Open chrome://extensions/' },
-									{ text: 'Enable Developer mode (top-right toggle)' },
-									{ text: 'Click "Load unpacked"' },
-									{ text: 'Extract the zip, select the dist/ folder' }
-								] as step, i}
-									<li class="flex items-start gap-2">
-										<span
-											class="flex items-center justify-center w-4 h-4 rounded-full shrink-0 font-mono text-[8px] font-bold mt-0.5"
-											style="background: oklch(0.55 0.15 270 / 0.2); color: oklch(0.75 0.10 270);"
-										>{i + 1}</span>
-										<span class="font-mono text-[10px]" style="color: oklch(0.65 0.02 250);">{step.text}</span>
-									</li>
-								{/each}
-							</ol>
+							<p class="font-mono text-[10px] mb-2" style="color: oklch(0.55 0.04 200);">
+								Add these two lines to any HTML page:
+							</p>
+							<div class="relative">
+								<pre
+									class="font-mono text-[9px] leading-relaxed px-2.5 py-2 rounded overflow-x-auto"
+									style="background: oklch(0.12 0.01 250); color: oklch(0.60 0.06 200); border: 1px solid oklch(0.20 0.02 250); margin: 0;"
+								>{`<script src="http://localhost:3333/widget/jat-feedback.js"><\/script>
+<jat-feedback endpoint="http://localhost:3333"></jat-feedback>`}</pre>
+								<button
+									class="absolute top-1.5 right-1.5 font-mono text-[8px] px-1.5 py-0.5 rounded cursor-pointer transition-colors duration-150"
+									style="
+										background: {widgetCopied ? 'oklch(0.30 0.08 145)' : 'oklch(0.25 0.04 270)'};
+										color: {widgetCopied ? 'oklch(0.80 0.12 145)' : 'oklch(0.60 0.04 270)'};
+										border: 1px solid {widgetCopied ? 'oklch(0.40 0.10 145)' : 'oklch(0.35 0.04 270)'};
+									"
+									onclick={() => {
+										navigator.clipboard.writeText(`<script src="http://localhost:3333/widget/jat-feedback.js"><\/script>\n<jat-feedback endpoint="http://localhost:3333"></jat-feedback>`);
+										widgetCopied = true;
+										setTimeout(() => widgetCopied = false, 2000);
+									}}
+								>
+									{widgetCopied ? 'Copied!' : 'Copy'}
+								</button>
+							</div>
 						</div>
 
-						<!-- Firefox Install -->
+						<!-- Config Options -->
 						<div>
-							<h4 class="font-mono text-[10px] font-semibold tracking-widest uppercase mb-2" style="color: oklch(0.45 0.04 270);">
-								Firefox
+							<h4 class="font-mono text-[10px] font-semibold tracking-widest uppercase mb-2" style="color: oklch(0.45 0.04 145);">
+								Configuration
 							</h4>
+							<div class="space-y-1.5">
+								{#each [
+									{ attr: 'endpoint', desc: 'JAT IDE URL (required)', example: 'http://localhost:3333' },
+									{ attr: 'position', desc: 'Button position', example: 'bottom-right | bottom-left | top-right | top-left' },
+									{ attr: 'theme', desc: 'Color theme', example: 'dark | light' },
+									{ attr: 'buttoncolor', desc: 'Button color', example: '#3b82f6' }
+								] as opt}
+									<div
+										class="flex items-start gap-2 px-2 py-1.5 rounded"
+										style="background: oklch(0.14 0.01 250); border: 1px solid oklch(0.22 0.02 250);"
+									>
+										<code class="font-mono text-[9px] font-bold shrink-0" style="color: oklch(0.75 0.12 270);">{opt.attr}</code>
+										<span class="font-mono text-[9px]" style="color: oklch(0.55 0.04 200);">{opt.desc}</span>
+										<code class="font-mono text-[8px] ml-auto shrink-0" style="color: oklch(0.50 0.04 200);">{opt.example}</code>
+									</div>
+								{/each}
+							</div>
+						</div>
+
+						<!-- Production Setup -->
+						<div>
+							<h4 class="font-mono text-[10px] font-semibold tracking-widest uppercase mb-2" style="color: oklch(0.45 0.04 30);">
+								Production Setup (Cloudflare Tunnel)
+							</h4>
+							<p class="font-mono text-[10px] mb-2" style="color: oklch(0.55 0.04 200);">
+								Expose your local JAT IDE to production apps via a Cloudflare Tunnel:
+							</p>
 							<ol class="space-y-1.5">
 								{#each [
-									{ text: 'Open about:debugging#/runtime/this-firefox' },
-									{ text: 'Click "Load Temporary Add-on"' },
-									{ text: 'Select manifest.json from the dist/ folder' }
+									{ text: 'Install cloudflared: brew install cloudflared or sudo apt install cloudflared' },
+									{ text: 'Start tunnel: cloudflared tunnel --url http://localhost:3333' },
+									{ text: 'Copy the generated URL (e.g. https://abc-xyz.trycloudflare.com)' },
+									{ text: 'Update the widget endpoint attribute with your tunnel URL' }
 								] as step, i}
 									<li class="flex items-start gap-2">
 										<span
@@ -1310,34 +1336,11 @@
 									</li>
 								{/each}
 							</ol>
-						</div>
-
-						<!-- Configure Extension -->
-						<div>
-							<h4 class="font-mono text-[10px] font-semibold tracking-widest uppercase mb-2" style="color: oklch(0.45 0.04 145);">
-								Configure
-							</h4>
-							<ol class="space-y-1.5">
-								{#each [
-									{ text: 'Click the JAT extension icon in your toolbar' },
-									{ text: 'Click the Settings gear icon' },
-									{ text: 'Enter your JAT IDE URL (default: http://localhost:3333)' },
-									{ text: 'Click Test Connection to verify the IDE is running' }
-								] as step, i}
-									<li class="flex items-start gap-2">
-										<span
-											class="flex items-center justify-center w-4 h-4 rounded-full shrink-0 font-mono text-[8px] font-bold mt-0.5"
-											style="background: oklch(0.55 0.15 145 / 0.2); color: oklch(0.75 0.10 145);"
-										>{i + 1}</span>
-										<span class="font-mono text-[10px]" style="color: oklch(0.65 0.02 250);">{step.text}</span>
-									</li>
-								{/each}
-							</ol>
 							<div
 								class="mt-2 px-2.5 py-1.5 rounded font-mono text-[9px] leading-relaxed"
 								style="background: oklch(0.14 0.01 250); border: 1px solid oklch(0.22 0.02 250); color: oklch(0.55 0.04 200);"
 							>
-								Bug reports are submitted as JAT tasks with screenshots saved locally. No external database needed.
+								Free quick tunnels (no account needed) rotate URLs on restart. For persistent URLs, set up a named tunnel with <code style="color: oklch(0.65 0.06 200);">cloudflared tunnel create</code>.
 							</div>
 						</div>
 
@@ -1353,9 +1356,11 @@
 								<pre
 									class="font-mono text-[9px] leading-relaxed px-2.5 py-2 rounded overflow-x-auto"
 									style="background: oklch(0.12 0.01 250); color: oklch(0.60 0.06 200); border: 1px solid oklch(0.20 0.02 250); margin: 0;"
-								>{`cd extension
-npm install
-npm run build`}</pre>
+								>{`cd widget && npm install && npm run build
+# Copy to IDE static
+cp dist/jat-feedback.js ../ide/static/widget/
+# Or use the IDE script:
+cd ../ide && npm run build:widget`}</pre>
 							</div>
 						</details>
 					</div>

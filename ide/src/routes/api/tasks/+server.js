@@ -49,8 +49,9 @@ export async function GET({ url }) {
 		if (search && search.trim()) {
 			const searchLower = search.toLowerCase().trim();
 			tasks = tasks.filter(task => {
-				// Search in task ID
-				if (task.id && task.id.toLowerCase().includes(searchLower)) {
+				// Search in task ID (exact match to avoid parent matching all children,
+				// e.g. searching "jat-abc" should not match "jat-abc.1", "jat-abc.2")
+				if (task.id && task.id.toLowerCase() === searchLower) {
 					return true;
 				}
 				// Search in title

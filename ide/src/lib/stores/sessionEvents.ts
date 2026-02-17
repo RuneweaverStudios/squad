@@ -422,6 +422,9 @@ async function scanAndPauseIdleSessions(): Promise<void> {
 					taskTitle: taskTitle || undefined,
 					route: taskId !== 'unknown' ? `/tasks?taskDetailDrawer=${taskId}` : '/work',
 				});
+			} else if (response.status === 409) {
+				// Already paused or planning — silently skip
+				console.log(`[AutoPauseIdle] Skipped ${sessionName}: already paused or protected`);
 			} else {
 				console.warn(`[AutoPauseIdle] Failed to pause ${sessionName}: ${response.status}`);
 			}

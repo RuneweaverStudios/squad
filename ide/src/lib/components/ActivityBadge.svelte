@@ -366,8 +366,8 @@
 		for (const task of allClosedTasks) {
 			if (results.length >= MAX_RESULTS) break;
 
-			// Check id first (shortest, most likely to match for task searches)
-			if (task.id.toLowerCase().includes(query)) {
+			// Check id first (exact match to avoid parent matching all children)
+			if (task.id.toLowerCase() === query) {
 				results.push(task);
 				continue;
 			}

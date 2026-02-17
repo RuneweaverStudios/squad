@@ -282,7 +282,7 @@ export const SIGNAL_TTL = {
 	 * - needs_input: waiting for user to answer a question
 	 * - working: agents can work for 20+ mins without emitting new signals
 	 */
-	USER_WAITING_STATES: ['completed', 'review', 'needs_input', 'working', 'planning'] as const
+	USER_WAITING_STATES: ['completed', 'review', 'needs_input', 'working', 'planning', 'paused'] as const
 } as const;
 
 // =============================================================================

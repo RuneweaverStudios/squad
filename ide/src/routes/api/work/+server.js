@@ -45,6 +45,7 @@ const SIGNAL_STATE_MAP = {
 	'completing': 'completing',
 	'polishing': 'polishing',  // Post-completion follow-up tweaks
 	'planning': 'planning',    // Interactive planning session
+	'paused': 'paused',        // Session paused by IDE auto-pause or user action
 };
 
 /**
