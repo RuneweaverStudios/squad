@@ -5,12 +5,12 @@
 **Copy and paste this single line:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/joewinke/squad/master/install.sh | bash && source ~/.zshrc
+curl -fsSL https://raw.githubusercontent.com/RuneweaverStudios/squad/master/install.sh | bash && source ~/.zshrc
 ```
 
 For bash users (Linux):
 ```bash
-curl -fsSL https://raw.githubusercontent.com/joewinke/squad/master/install.sh | bash && source ~/.bashrc
+curl -fsSL https://raw.githubusercontent.com/RuneweaverStudios/squad/master/install.sh | bash && source ~/.bashrc
 ```
 
 Then start the IDE:
@@ -72,7 +72,7 @@ sudo apt install tmux sqlite3 jq nodejs npm
 sudo pacman -S tmux sqlite jq nodejs npm
 
 # 2. Clone the repository
-git clone https://github.com/joewinke/squad ~/.local/share/squad
+git clone https://github.com/RuneweaverStudios/squad ~/.local/share/squad
 cd ~/.local/share/squad
 
 # 3. Install IDE dependencies
@@ -115,12 +115,12 @@ echo $PATH | grep squad
 **DON'T DO THIS:**
 ```bash
 # Install and launch IDE
-curl -fsSL https://raw.githubusercontent.com/joewinke/squad/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/RuneweaverStudios/squad/master/install.sh | bash
 ```
 
 **DO THIS:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/joewinke/squad/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/RuneweaverStudios/squad/master/install.sh | bash
 ```
 
 ### "source ~/.bashrc && squad" fails on macOS
@@ -177,7 +177,7 @@ npm run dev
 **Solution**: Create it manually and re-run:
 ```bash
 mkdir -p ~/.local/share/squad
-curl -fsSL https://raw.githubusercontent.com/joewinke/squad/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/RuneweaverStudios/squad/master/install.sh | bash
 ```
 
 ### Want to change installation directory?
@@ -186,7 +186,7 @@ Set the `SQUAD_INSTALL_DIR` environment variable:
 
 ```bash
 export SQUAD_INSTALL_DIR=~/my/custom/path
-curl -fsSL https://raw.githubusercontent.com/joewinke/squad/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/RuneweaverStudios/squad/master/install.sh | bash
 ```
 
 ## Uninstalling
@@ -244,8 +244,8 @@ npm install  # update IDE dependencies
 ## Getting Help
 
 - **Documentation**: [README.md](README.md)
-- **Issues**: https://github.com/joewinke/squad/issues
-- **Discussions**: https://github.com/joewinke/squad/discussions
+- **Issues**: https://github.com/RuneweaverStudios/squad/issues
+- **Discussions**: https://github.com/RuneweaverStudios/squad/discussions
 
 ## Next Steps
 

@@ -42,7 +42,7 @@ echo ""
 
 if [ ! -d "$OLD_DIR" ] && [ ! -d "$NEW_DIR" ]; then
     echo -e "${YELLOW}No SQUAD installation found.${NC}"
-    echo "Run the installer: curl -fsSL https://raw.githubusercontent.com/joewinke/squad/master/tools/scripts/bootstrap.sh | bash"
+    echo "Run the installer: curl -fsSL https://raw.githubusercontent.com/RuneweaverStudios/squad/master/tools/scripts/bootstrap.sh | bash"
     exit 0
 fi
 

@@ -33,7 +33,7 @@ brew install tmux sqlite jq node
 
 ```bash
 # One-line installer (works on Linux and macOS)
-curl -fsSL https://raw.githubusercontent.com/joewinke/squad/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/RuneweaverStudios/squad/master/install.sh | bash
 ```
 
 **This symlinks all tools to `~/.local/bin/`:**
@@ -375,7 +375,7 @@ am-agents                       # List all registered agents
 - [shared/tools.md](shared/tools.md) - All 40+ tools
 
 ### Having Issues?
-- Check [GitHub Issues](https://github.com/joewinke/squad/issues)
+- Check [GitHub Issues](https://github.com/RuneweaverStudios/squad/issues)
 - Read troubleshooting in [CLAUDE.md](CLAUDE.md)
 - Join community discussions
 
@@ -394,4 +394,4 @@ Karpathy said programmers could be **10X more powerful** if they could just stri
 
 **You're ready to claim the 10X boost. Happy orchestrating! 🚀**
 
-[Full Docs](GETTING_STARTED.md) | [README](README.md) | [Issues](https://github.com/joewinke/squad/issues)
+[Full Docs](GETTING_STARTED.md) | [README](README.md) | [Issues](https://github.com/RuneweaverStudios/squad/issues)

@@ -241,7 +241,7 @@ The magic is in agent orchestration. Everything else is just table stakes.
 
 ```bash
 # Install (one command)
-curl -sSL https://raw.githubusercontent.com/joewinke/squad/master/tools/scripts/bootstrap.sh | bash
+curl -sSL https://raw.githubusercontent.com/RuneweaverStudios/squad/master/tools/scripts/bootstrap.sh | bash
 
 # Restart shell and launch
 source ~/.bashrc && squad

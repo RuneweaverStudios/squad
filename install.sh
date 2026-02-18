@@ -2,7 +2,7 @@
 
 # Squad IDE Installer
 # Complete AI-assisted development environment setup
-# Fork: https://github.com/joewinke/squad
+# Fork: https://github.com/RuneweaverStudios/squad
 
 set -e  # Exit on error
 
@@ -234,7 +234,7 @@ else
     INSTALL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/squad"
     echo -e "${BLUE}Installing to: $INSTALL_DIR${NC}"
     mkdir -p "$(dirname "$INSTALL_DIR")"
-    git clone https://github.com/joewinke/squad.git "$INSTALL_DIR"
+    git clone https://github.com/RuneweaverStudios/squad.git "$INSTALL_DIR"
 fi
 
 cd "$INSTALL_DIR"
@@ -529,7 +529,7 @@ fi
 echo ""
 echo "The IDE will guide you through adding your first project."
 echo ""
-echo "Documentation: https://github.com/joewinke/squad (upstream)"
+echo "Documentation: https://github.com/RuneweaverStudios/squad (upstream)"
 echo ""
 if prompt_yes_no "${BOLD}Launch Squad IDE now? [Y/n]${NC} " "y"; then
     echo ""

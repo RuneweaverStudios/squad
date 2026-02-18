@@ -106,7 +106,7 @@ if [ -d "$INSTALL_DIR/.git" ]; then
             echo -e "${YELLOW}Removing existing installation...${NC}"
             rm -rf "$INSTALL_DIR"
             echo -e "${BLUE}Cloning SQUAD...${NC}"
-            git clone https://github.com/joewinke/squad.git "$INSTALL_DIR"
+            git clone https://github.com/RuneweaverStudios/squad.git "$INSTALL_DIR"
             ;;
         3)
             echo "Cancelled"
@@ -136,7 +136,7 @@ elif [ -d "$INSTALL_DIR" ]; then
             echo -e "${BLUE}Cloning SQUAD into existing directory...${NC}"
             # Clone to temp, then move .git and files in
             TMPDIR="$(mktemp -d)"
-            git clone https://github.com/joewinke/squad.git "$TMPDIR"
+            git clone https://github.com/RuneweaverStudios/squad.git "$TMPDIR"
             # Move git history and working tree into existing dir
             mv "$TMPDIR/.git" "$INSTALL_DIR/.git"
             # Checkout files (won't overwrite existing non-tracked files)
@@ -150,7 +150,7 @@ elif [ -d "$INSTALL_DIR" ]; then
             echo -e "${YELLOW}Removing existing directory...${NC}"
             rm -rf "$INSTALL_DIR"
             echo -e "${BLUE}Cloning SQUAD...${NC}"
-            git clone https://github.com/joewinke/squad.git "$INSTALL_DIR"
+            git clone https://github.com/RuneweaverStudios/squad.git "$INSTALL_DIR"
             ;;
         3)
             echo "Cancelled"
@@ -166,7 +166,7 @@ else
     echo -e "${BLUE}Installing SQUAD to: $INSTALL_DIR${NC}"
     echo ""
     mkdir -p "$(dirname "$INSTALL_DIR")"
-    git clone https://github.com/joewinke/squad.git "$INSTALL_DIR"
+    git clone https://github.com/RuneweaverStudios/squad.git "$INSTALL_DIR"
 fi
 
 # Run the main installer

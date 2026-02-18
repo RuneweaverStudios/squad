@@ -28,7 +28,7 @@ function getFixHint(name: string, plat: string): string {
 		sqlite3: isMac ? 'brew install sqlite' : 'sudo apt install -y sqlite3',
 		jq: isMac ? 'brew install jq' : 'sudo apt install -y jq',
 		git: isMac ? 'brew install git' : 'sudo apt install -y git',
-		st: 'curl -sSL https://raw.githubusercontent.com/joewinke/squad/master/tools/scripts/bootstrap.sh | bash',
+		st: 'curl -sSL https://raw.githubusercontent.com/RuneweaverStudios/squad/master/tools/scripts/bootstrap.sh | bash',
 		node: isMac ? 'brew install node' : 'sudo apt install -y nodejs npm'
 	};
 	return hints[name] || `Install ${name}`;

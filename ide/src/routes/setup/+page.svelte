@@ -312,12 +312,12 @@
 						<p class="text-xs" style="color: oklch(0.55 0.02 250);">
 							Contribute or report issues on GitHub:<br/>
 							<a
-								href="https://github.com/joewinke/squad"
+								href="https://github.com/RuneweaverStudios/squad"
 								target="_blank"
 								rel="noopener noreferrer"
 								class="font-mono hover:underline"
 								style="color: oklch(0.70 0.15 240);"
-							>https://github.com/joewinke/squad</a><br/>
+							>https://github.com/RuneweaverStudios/squad</a><br/>
 							<span style="color: oklch(0.50 0.02 250);">Or just star the repo to share the love!</span>
 						</p>
 					</div>

@@ -40,7 +40,7 @@
 				Docs
 			</a>
 			<a
-				href="https://github.com/joewinke/squad"
+				href="https://github.com/RuneweaverStudios/squad"
 				target="_blank"
 				rel="noopener noreferrer"
 				class="text-sm text-gray-400 hover:text-white transition-colors font-medium"

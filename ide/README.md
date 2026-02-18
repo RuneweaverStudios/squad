@@ -31,8 +31,8 @@ The SQUAD IDE provides a unified web interface for viewing and managing tasks ac
 ### Prerequisites
 
 - Node.js 18+ (or bun/pnpm)
-- [Jomarchy Agent Tools](https://github.com/joewinke/squad) installed
-- [SQUAD Tasks CLI](https://github.com/joewinke/squad) (`st`) installed and configured
+- [Jomarchy Agent Tools](https://github.com/RuneweaverStudios/squad) installed
+- [SQUAD Tasks CLI](https://github.com/RuneweaverStudios/squad) (`st`) installed and configured
 - Projects with `.squad/` directories in `~/code/*`
 
 ### Quick Start
@@ -557,11 +557,11 @@ MIT - See [LICENSE](../LICENSE) for details.
 ## Related Projects
 
 - [Beads CLI](https://github.com/steveyegge/beads) - Original dependency-aware task planning (SQUAD Tasks fork)
-- [Jomarchy Agent Tools](https://github.com/joewinke/squad) - Multi-agent coordination
+- [Jomarchy Agent Tools](https://github.com/RuneweaverStudios/squad) - Multi-agent coordination
 - [Agent Mail](../tools/am-*) - Bash-based agent messaging and file locks
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/joewinke/squad/issues)
+- **Issues**: [GitHub Issues](https://github.com/RuneweaverStudios/squad/issues)
 - **Docs**: [Main README](../README.md)
 - **Discord**: [Join Community](https://discord.gg/example) <!-- Update with real link -->

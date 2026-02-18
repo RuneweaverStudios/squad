@@ -114,7 +114,7 @@
 		<!-- Logo (Industrial) -->
 		<div class="py-4 flex justify-center relative">
 			<a
-				href="https://github.com/joewinke/squad"
+				href="https://github.com/RuneweaverStudios/squad"
 				target="_blank"
 				rel="noopener noreferrer"
 				class="group transition-all duration-200 hover:scale-105"
@@ -981,7 +981,7 @@
 							<h4 class="text-lg font-semibold mb-3">Quick Start</h4>
 							<div class="mockup-code text-xs">
 								<pre><code># 1. Install (run in your terminal/bash)</code></pre>
-								<pre><code>curl -fsSL https://raw.githubusercontent.com/joewinke/squad/master/install.sh | bash</code></pre>
+								<pre><code>curl -fsSL https://raw.githubusercontent.com/RuneweaverStudios/squad/master/install.sh | bash</code></pre>
 								<pre><code></code></pre>
 								<pre><code># 2. Initialize SQUAD in your project</code></pre>
 								<pre><code>st init</code></pre>
@@ -1091,7 +1091,7 @@
 							<h4 class="text-lg font-semibold mb-3">Learn More</h4>
 							<div class="flex flex-col gap-2">
 								<a
-									href="https://github.com/joewinke/squad"
+									href="https://github.com/RuneweaverStudios/squad"
 									target="_blank"
 									class="btn btn-sm btn-primary"
 								>

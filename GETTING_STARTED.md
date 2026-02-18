@@ -11,7 +11,7 @@ SQUAD (Jomarchy Agent Tools) lets you coordinate multiple AI coding agents worki
 ### 1. Install SQUAD
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/joewinke/squad/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/RuneweaverStudios/squad/master/install.sh | bash
 source ~/.bashrc
 ```
 

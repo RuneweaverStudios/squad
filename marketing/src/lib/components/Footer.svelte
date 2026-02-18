@@ -8,7 +8,7 @@
 	let currentCreditIndex = $state(0);
 	let creditElements: HTMLAnchorElement[] = [];
 
-	const installCommand = 'curl -fsSL https://raw.githubusercontent.com/joewinke/squad/master/tools/scripts/bootstrap.sh | bash';
+	const installCommand = 'curl -fsSL https://raw.githubusercontent.com/RuneweaverStudios/squad/master/tools/scripts/bootstrap.sh | bash';
 
 	async function copyCommand() {
 		await navigator.clipboard.writeText(installCommand);
@@ -191,7 +191,7 @@
 			<!-- Action buttons -->
 			<div class="flex flex-col sm:flex-row items-center justify-center gap-4">
 				<a
-					href="https://github.com/joewinke/squad"
+					href="https://github.com/RuneweaverStudios/squad"
 					target="_blank"
 					rel="noopener noreferrer"
 					class="btn btn-primary btn-lg btn-glow rounded-full px-8 font-semibold shadow-xl flex items-center gap-2"
@@ -202,7 +202,7 @@
 					View on GitHub
 				</a>
 				<a
-					href="https://github.com/joewinke/squad#readme"
+					href="https://github.com/RuneweaverStudios/squad#readme"
 					target="_blank"
 					rel="noopener noreferrer"
 					class="btn btn-outline btn-lg rounded-full px-8 font-semibold border-gray-600 text-gray-300 hover:border-[var(--color-primary)] hover:text-white"
@@ -261,7 +261,7 @@
 						Discord
 					</a>
 					<span class="text-gray-700">|</span>
-					<a href="https://github.com/joewinke/squad/issues" target="_blank" rel="noopener noreferrer" class="hover:text-white transition-colors">
+					<a href="https://github.com/RuneweaverStudios/squad/issues" target="_blank" rel="noopener noreferrer" class="hover:text-white transition-colors">
 						Report Issue
 					</a>
 					<span class="text-gray-700">|</span>
