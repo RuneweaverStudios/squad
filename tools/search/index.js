@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * jat-search - Unified search across tasks, memory, and files.
+ * squad-search - Unified search across tasks, memory, and files.
  *
  * Usage:
- *   jat-search "query"                        Meta search (all sources)
- *   jat-search tasks "query" [options]         Deep task search (FTS5)
- *   jat-search memory "query" [options]        Memory search (FTS5 + vector)
- *   jat-search files "query" [options]         File search (ripgrep + filename)
+ *   squad-search "query"                        Meta search (all sources)
+ *   squad-search tasks "query" [options]         Deep task search (FTS5)
+ *   squad-search memory "query" [options]        Memory search (FTS5 + vector)
+ *   squad-search files "query" [options]         File search (ripgrep + filename)
  *
  * Options:
  *   --project PATH    Project path (default: cwd)
@@ -58,7 +58,7 @@ if (firstArg && SUBCOMMANDS.includes(firstArg)) {
 
 if (!query) {
   console.error('Error: No search query provided.');
-  console.error('Usage: jat-search "query" or jat-search tasks "query"');
+  console.error('Usage: squad-search "query" or squad-search tasks "query"');
   process.exit(1);
 }
 
@@ -67,7 +67,7 @@ const verbose = hasFlag('verbose');
 const jsonOutput = hasFlag('json');
 const summarize = hasFlag('summarize');
 const limit = parseInt(getArg('limit', subcommand ? '10' : '5'), 10);
-const log = verbose ? (...a) => console.error('[jat-search]', ...a) : () => {};
+const log = verbose ? (...a) => console.error('[squad-search]', ...a) : () => {};
 
 log(`subcommand=${subcommand || 'meta'} query="${query}" limit=${limit}`);
 
@@ -146,13 +146,13 @@ function firstLine(text, maxLen = 120) {
 }
 
 function printHelp() {
-  console.log(`jat-search - Unified search across tasks, memory, and files
+  console.log(`squad-search - Unified search across tasks, memory, and files
 
 Usage:
-  jat-search "query"                        Meta search (all sources)
-  jat-search tasks "query" [options]        Deep task search (FTS5)
-  jat-search memory "query" [options]       Memory search (FTS5 + vector)
-  jat-search files "query" [options]        File search (ripgrep + filename)
+  squad-search "query"                        Meta search (all sources)
+  squad-search tasks "query" [options]        Deep task search (FTS5)
+  squad-search memory "query" [options]       Memory search (FTS5 + vector)
+  squad-search files "query" [options]        File search (ripgrep + filename)
 
 Options:
   --project PATH    Project path (default: current directory)
@@ -163,9 +163,9 @@ Options:
   --help            Show this help
 
 Examples:
-  jat-search "authentication"               Search everything
-  jat-search tasks "OAuth timeout" --json    Search tasks only
-  jat-search memory "browser automation"     Search memory
-  jat-search files "searchTasks"             Search file contents
-  jat-search "auth" --summarize              Meta search with LLM synthesis`);
+  squad-search "authentication"               Search everything
+  squad-search tasks "OAuth timeout" --json    Search tasks only
+  squad-search memory "browser automation"     Search memory
+  squad-search files "searchTasks"             Search file contents
+  squad-search "auth" --summarize              Meta search with LLM synthesis`);
 }

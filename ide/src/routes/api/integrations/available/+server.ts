@@ -25,7 +25,7 @@ function getBuiltinDir(): string {
 }
 
 /** User plugins directory */
-const USER_PLUGINS_DIR = join(homedir(), '.config', 'jat', 'ingest-plugins');
+const USER_PLUGINS_DIR = join(homedir(), '.config', 'squad', 'ingest-plugins');
 
 /**
  * List subdirectories in a directory. Returns empty array if directory doesn't exist.

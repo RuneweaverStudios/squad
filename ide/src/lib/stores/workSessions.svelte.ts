@@ -92,7 +92,7 @@ export interface WorkSession {
 	_autoProceedNextTaskId?: string;
 	/** Next task title for auto-proceed display */
 	_autoProceedNextTaskTitle?: string;
-	/** Suggested tasks from jat-signal (via WS session-signal event) */
+	/** Suggested tasks from squad-signal (via WS session-signal event) */
 	_signalSuggestedTasks?: Array<{
 		id?: string;
 		type: string;
@@ -106,7 +106,7 @@ export interface WorkSession {
 	}>;
 	/** Timestamp when signal suggested tasks were last updated */
 	_signalSuggestedTasksTimestamp?: number;
-	/** Human action from jat-signal (via WS session-signal event) */
+	/** Human action from squad-signal (via WS session-signal event) */
 	_signalAction?: {
 		action?: string;
 		title?: string;
@@ -117,7 +117,7 @@ export interface WorkSession {
 	};
 	/** Timestamp when signal action was last updated */
 	_signalActionTimestamp?: number;
-	/** Completion bundle from jat-signal complete (via WS session-complete event) */
+	/** Completion bundle from squad-signal complete (via WS session-complete event) */
 	_completionBundle?: {
 		taskId: string;
 		agentName: string;
@@ -151,7 +151,7 @@ export interface WorkSession {
 	};
 	/** Timestamp when completion bundle was received */
 	_completionBundleTimestamp?: number;
-	/** Rich signal payload from jat-signal state commands (working, review, needs_input, completing) */
+	/** Rich signal payload from squad-signal state commands (working, review, needs_input, completing) */
 	_richSignalPayload?: {
 		type: string;
 		// Working signal fields

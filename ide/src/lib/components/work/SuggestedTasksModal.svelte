@@ -2,13 +2,13 @@
 	/**
 	 * SuggestedTasksModal Component
 	 *
-	 * Modal for reviewing and creating tasks from JAT:SUGGESTED_TASKS markers.
+	 * Modal for reviewing and creating tasks from SQUAD:SUGGESTED_TASKS markers.
 	 * Opened by clicking the suggested tasks badge on SessionCard.
 	 *
 	 * Features:
 	 * - List all suggested tasks with type icon, priority badge, title, description
 	 * - Checkbox selection for each task
-	 * - 'Create in JAT' button for individual tasks
+	 * - 'Create in SQUAD' button for individual tasks
 	 * - 'Create All' bulk action
 	 * - Select All / Deselect All quick actions
 	 * - Inline editing of priority and type
@@ -22,7 +22,7 @@
 	export interface SuggestedTaskWithState extends SuggestedTask {
 		selected: boolean;
 		edited: boolean;
-		/** Whether this task already exists in JAT (matched by title) */
+		/** Whether this task already exists in SQUAD (matched by title) */
 		alreadyCreated?: boolean;
 		/** Task ID if this task was already created (for displaying clickable badge) */
 		taskId?: string;
@@ -399,7 +399,7 @@
 							{#if task.alreadyCreated}
 								<div
 									class="flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center mt-0.5 checkbox-created"
-									title="Already created in JAT"
+									title="Already created in SQUAD"
 								>
 									<svg
 										class="w-3 h-3 text-success"
@@ -547,7 +547,7 @@
 										{:else}
 											<span
 												class="flex-shrink-0 badge badge-sm badge-success gap-1"
-												title="This task already exists in JAT"
+												title="This task already exists in SQUAD"
 											>
 												<svg
 													class="w-3 h-3"
@@ -571,7 +571,7 @@
 											class="flex-shrink-0 btn btn-xs btn-success gap-1"
 											onclick={() => handleCreateSingle(task, index)}
 											disabled={isCreating}
-											title="Create this task in JAT"
+											title="Create this task in SQUAD"
 										>
 											<svg
 												class="w-3 h-3"
@@ -691,7 +691,7 @@
 			<!-- Footer actions -->
 			<div class="flex items-center justify-between mt-4 pt-3 border-t border-base-content/20 flex-shrink-0">
 				<p class="text-[10px] text-base-content/50">
-					Tasks will be created in JAT with the current project context.
+					Tasks will be created in SQUAD with the current project context.
 				</p>
 				<div class="flex gap-2">
 					<button

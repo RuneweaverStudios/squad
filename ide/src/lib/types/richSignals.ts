@@ -21,8 +21,8 @@ import type { SuggestedTask, HumanAction, QualitySignals, CrossAgentIntel } from
  *
  * @example
  * ```bash
- * jat-signal working '{
- *   "taskId": "jat-abc",
+ * squad-signal working '{
+ *   "taskId": "squad-abc",
  *   "taskTitle": "Add user authentication",
  *   "approach": "Implementing OAuth flow using Supabase",
  *   "expectedFiles": ["src/lib/auth/*", "src/routes/login/*"],
@@ -34,11 +34,11 @@ export interface WorkingSignal {
 	type: 'working';
 
 	// Task context
-	/** Task ID (e.g., "jat-abc") */
+	/** Task ID (e.g., "squad-abc") */
 	taskId: string;
 	/** Task title (e.g., "Add user authentication") */
 	taskTitle: string;
-	/** Full description from JAT Tasks */
+	/** Full description from SQUAD Tasks */
 	taskDescription: string;
 	/** Priority level: 0-4 (P0=critical, P4=lowest) */
 	taskPriority: number;
@@ -131,8 +131,8 @@ export interface ReviewFocusItem {
  *
  * @example
  * ```bash
- * jat-signal review '{
- *   "taskId": "jat-abc",
+ * squad-signal review '{
+ *   "taskId": "squad-abc",
  *   "summary": ["Implemented OAuth flow", "Added login page"],
  *   "filesModified": [{"path": "src/lib/auth.ts", "changeType": "added", ...}],
  *   ...
@@ -216,8 +216,8 @@ export interface QuestionOption {
  *
  * @example
  * ```bash
- * jat-signal needs_input '{
- *   "taskId": "jat-abc",
+ * squad-signal needs_input '{
+ *   "taskId": "squad-abc",
  *   "question": "Which authentication method should we use?",
  *   "options": [{"id": "oauth", "label": "OAuth", ...}],
  *   ...
@@ -280,8 +280,8 @@ export type CompletionStep = 'verifying' | 'committing' | 'closing' | 'releasing
  *
  * @example
  * ```bash
- * jat-signal completing '{
- *   "taskId": "jat-abc",
+ * squad-signal completing '{
+ *   "taskId": "squad-abc",
  *   "currentStep": "committing",
  *   "progress": 40,
  *   ...
@@ -340,8 +340,8 @@ export interface SessionStats {
  *
  * @example
  * ```bash
- * jat-signal complete '{
- *   "taskId": "jat-abc",
+ * squad-signal complete '{
+ *   "taskId": "squad-abc",
  *   "agentName": "WisePrairie",
  *   "summary": ["Implemented feature", "Added tests"],
  *   "sessionStats": {"duration": 45, "tokensUsed": 15000, ...},
@@ -443,9 +443,9 @@ export interface SuggestedNextTask {
  *
  * @example
  * ```bash
- * jat-signal idle '{
- *   "sessionSummary": {"tasksCompleted": ["jat-abc"], "totalDuration": 120, ...},
- *   "suggestedNextTask": {"taskId": "jat-def", "title": "Add tests", ...},
+ * squad-signal idle '{
+ *   "sessionSummary": {"tasksCompleted": ["squad-abc"], "totalDuration": 120, ...},
+ *   "suggestedNextTask": {"taskId": "squad-def", "title": "Add tests", ...},
  *   ...
  * }'
  * ```
@@ -479,9 +479,9 @@ export interface IdleSignal {
  *
  * @example
  * ```bash
- * jat-signal starting '{
+ * squad-signal starting '{
  *   "agentName": "WisePrairie",
- *   "project": "jat",
+ *   "project": "squad",
  *   "model": "sonnet-4.5",
  *   ...
  * }'
@@ -527,7 +527,7 @@ export interface StartingSignal {
  *
  * @example
  * ```bash
- * jat-signal compacting '{
+ * squad-signal compacting '{
  *   "reason": "Context limit approaching",
  *   "contextSizeBefore": 180000,
  *   "estimatedAfter": 50000,
@@ -562,8 +562,8 @@ export interface CompactingSignal {
  *
  * @example
  * ```bash
- * jat-signal paused '{
- *   "taskId": "jat-abc",
+ * squad-signal paused '{
+ *   "taskId": "squad-abc",
  *   "taskTitle": "Add authentication",
  *   "reason": "Waiting for design review",
  *   "resumable": true
@@ -678,8 +678,8 @@ export function isAutoProceedSignal(signal: RichSignal): signal is CompletedSign
 /**
  * All signals require JSON payloads.
  *
- * Signal format: [JAT-SIGNAL:<type>] <json-payload>
- * Example: jat-signal working '{"taskId":"jat-abc","taskTitle":"Add auth"}'
+ * Signal format: [SQUAD-SIGNAL:<type>] <json-payload>
+ * Example: squad-signal working '{"taskId":"squad-abc","taskTitle":"Add auth"}'
  *
  * There is no backward-compatible thin signal format.
  */

@@ -77,7 +77,7 @@
 			if (task.project) {
 				projectSet.add(task.project);
 			} else {
-				// Extract from task ID (e.g., "jat-abc" → "jat")
+				// Extract from task ID (e.g., "squad-abc" → "squad")
 				const prefix = task.id.split('-')[0];
 				if (prefix) projectSet.add(prefix);
 			}

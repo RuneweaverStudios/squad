@@ -8,7 +8,7 @@
  * ```md
  * ---
  * description: Start working on a task
- * author: jat
+ * author: squad
  * version: 1.0.0
  * tags: workflow, agent
  * shortcut: Alt+S

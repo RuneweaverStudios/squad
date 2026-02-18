@@ -192,7 +192,7 @@
 </script>
 
 <svelte:head>
-	<title>T5 Compact | JAT IDE</title>
+	<title>T5 Compact | SQUAD IDE</title>
 </svelte:head>
 
 <div class="compact-page">

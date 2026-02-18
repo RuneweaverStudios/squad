@@ -2,7 +2,7 @@
 	/**
 	 * ToolsList Component
 	 *
-	 * Displays categorized list of JAT tools.
+	 * Displays categorized list of SQUAD tools.
 	 * Each category is collapsible, tools are selectable for editing.
 	 *
 	 * @see ide/src/routes/config/+page.svelte for usage
@@ -38,7 +38,7 @@
 
 	// State
 	let categories = $state<ToolCategory[]>([]);
-	let jatPath = $state<string | null>(null);
+	let squadPath = $state<string | null>(null);
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
 	let expandedCategories = $state<Set<string>>(new Set(['mail', 'browser'])); // Default expanded
@@ -82,7 +82,7 @@
 			}
 			const data = await response.json();
 			categories = data.categories || [];
-			jatPath = data.jatPath;
+			squadPath = data.squadPath;
 
 			// Auto-select first tool if none selected
 			if (!selectedPath && categories.length > 0) {
@@ -108,7 +108,7 @@
 
 <div class="tools-list">
 	<div class="list-header">
-		<h3 class="list-title">JAT Tools</h3>
+		<h3 class="list-title">SQUAD Tools</h3>
 		<button class="refresh-btn" onclick={fetchTools} disabled={isLoading}>
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
@@ -128,8 +128,8 @@
 		</button>
 	</div>
 
-	{#if jatPath}
-		<div class="jat-path" title={jatPath}>
+	{#if squadPath}
+		<div class="squad-path" title={squadPath}>
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				fill="none"
@@ -144,7 +144,7 @@
 					d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"
 				/>
 			</svg>
-			<span class="path-text">{jatPath}</span>
+			<span class="path-text">{squadPath}</span>
 		</div>
 	{/if}
 
@@ -319,8 +319,8 @@
 		animation: spin 1s linear infinite;
 	}
 
-	/* JAT Path indicator */
-	.jat-path {
+	/* SQUAD Path indicator */
+	.squad-path {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;

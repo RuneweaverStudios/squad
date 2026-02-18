@@ -20,7 +20,7 @@ const execAsync = promisify(exec);
 
 /**
  * Extract project name from a task ID
- * @param {string} taskId - Task ID like "steelbridge-xx5" or "jat-abc"
+ * @param {string} taskId - Task ID like "steelbridge-xx5" or "squad-abc"
  * @returns {string|null} Project name like "steelbridge" or null if invalid
  */
 function getProjectFromTaskId(taskId) {
@@ -33,7 +33,7 @@ function getProjectFromTaskId(taskId) {
 // Path to store task image mappings
 const getImageStorePath = () => {
 	const projectPath = process.cwd().replace('/ide', '');
-	return join(projectPath, '.jat', 'task-images.json');
+	return join(projectPath, '.squad', 'task-images.json');
 };
 
 /**
@@ -96,7 +96,7 @@ async function saveTaskImages(images) {
 }
 
 /**
- * Sync image paths to task's notes field so agents can see them via `jt show`
+ * Sync image paths to task's notes field so agents can see them via `st show`
  * @param {string} taskId
  * @param {ImageData[]} taskImages
  */
@@ -119,7 +119,7 @@ async function syncNotesToTask(taskId, taskImages) {
 
 		if (!taskImages || taskImages.length === 0) {
 			// Clear notes if no images
-			const command = `cd "${projectPath}" && jt update ${taskId} --notes ""`;
+			const command = `cd "${projectPath}" && st update ${taskId} --notes ""`;
 			await execAsync(command);
 			return;
 		}
@@ -133,7 +133,7 @@ async function syncNotesToTask(taskId, taskImages) {
 
 		// Escape for shell
 		const escapedNotes = notes.replace(/"/g, '\\"');
-		const command = `cd "${projectPath}" && jt update ${taskId} --notes "${escapedNotes}"`;
+		const command = `cd "${projectPath}" && st update ${taskId} --notes "${escapedNotes}"`;
 
 		await execAsync(command);
 		console.log(`[image-sync] Synced ${taskImages.length} image(s) to task ${taskId} notes (project: ${projectName})`);
@@ -202,7 +202,7 @@ export async function PUT({ params, request }) {
 
 		await saveTaskImages(images);
 
-		// Sync image paths to task notes so agents see them via `jt show`
+		// Sync image paths to task notes so agents see them via `st show`
 		await syncNotesToTask(taskId, images[taskId]);
 
 		return json({

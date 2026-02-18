@@ -31,7 +31,7 @@ interface ProjectPaths {
 }
 
 function getProjectPaths(projectName: string): ProjectPaths {
-	const configPath = join(process.env.HOME || '~', '.config', 'jat', 'projects.json');
+	const configPath = join(process.env.HOME || '~', '.config', 'squad', 'projects.json');
 
 	if (!existsSync(configPath)) {
 		const defaultPath = join(process.env.HOME || '~', 'code', projectName);

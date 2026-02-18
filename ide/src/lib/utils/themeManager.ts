@@ -1,7 +1,7 @@
 // src/lib/utils/themeManager.ts
 
 /**
- * Theme management utility for JAT IDE.
+ * Theme management utility for SQUAD IDE.
  *
  * Theme preference is managed by the unified preferences store.
  * This module provides theme validation and the list of available themes.
@@ -12,11 +12,11 @@ import {
 	setTheme as setThemeInStore
 } from '$lib/stores/preferences.svelte';
 
-const DEFAULT_THEME = 'jat';
+const DEFAULT_THEME = 'squad';
 
 // All available DaisyUI themes
 export const AVAILABLE_THEMES = [
-	'jat',
+	'squad',
 	'light',
 	'dark',
 	'cupcake',
@@ -96,7 +96,7 @@ export function isValidTheme(theme: string): theme is Theme {
  * DaisyUI dark themes - used for Monaco Editor theme sync
  */
 const DARK_THEMES: Set<Theme> = new Set([
-	'jat',
+	'squad',
 	'dark',
 	'synthwave',
 	'halloween',

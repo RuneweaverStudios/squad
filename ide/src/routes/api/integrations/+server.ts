@@ -1,7 +1,7 @@
 /**
  * Integrations API Endpoint
  *
- * Manages ingest source configuration in ~/.config/jat/integrations.json
+ * Manages ingest source configuration in ~/.config/squad/integrations.json
  * (auto-migrates from feeds.json if needed)
  *
  * Endpoints:
@@ -18,7 +18,7 @@ import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
 import type { IntegrationSource, IntegrationsConfig } from '$lib/types/integration';
 
-const CONFIG_DIR = join(homedir(), '.config/jat');
+const CONFIG_DIR = join(homedir(), '.config/squad');
 const INTEGRATIONS_PATH = join(CONFIG_DIR, 'integrations.json');
 const LEGACY_PATH = join(CONFIG_DIR, 'feeds.json');
 

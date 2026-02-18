@@ -52,7 +52,7 @@ export async function POST({ params }) {
 		// Get the project name from session name
 		const projectName = sessionName.replace(/^server-/, '');
 
-		// Get project config (path and port) from jat config
+		// Get project config (path and port) from squad config
 		let projectPath = null;
 		let configPort = null;
 		let detectedPort = null;
@@ -86,7 +86,7 @@ export async function POST({ params }) {
 		// Get project config as fallback
 		let serverPath = null;
 		try {
-			const configPath = `${process.env.HOME}/.config/jat/projects.json`;
+			const configPath = `${process.env.HOME}/.config/squad/projects.json`;
 			// Note: Using "" fallback instead of empty - empty causes jq to suppress
 			// the entire output if ANY field is null/empty (e.g., when port is not set)
 			const { stdout: configOutput } = await execAsync(
@@ -124,11 +124,11 @@ export async function POST({ params }) {
 
 		if (projectName === 'ingest') {
 			// Special handling for ingest daemon
-			restartCommand = 'node jat-ingest';
-			// Resolve the ingest directory directly from the jat-ingest symlink
+			restartCommand = 'node squad-ingest';
+			// Resolve the ingest directory directly from the squad-ingest symlink
 			workDir = await (async () => {
 				try {
-					const { stdout } = await execAsync('readlink -f "$(which jat-ingest)" 2>/dev/null');
+					const { stdout } = await execAsync('readlink -f "$(which squad-ingest)" 2>/dev/null');
 					const resolved = stdout.trim();
 					if (resolved) {
 						const { stdout: dirOut } = await execAsync(`dirname "${resolved}"`);
@@ -136,9 +136,9 @@ export async function POST({ params }) {
 					}
 				} catch { /* fall through */ }
 				const fallbacks = [
-					`${process.env.JAT_INSTALL_DIR || ''}/tools/ingest`,
-					`${process.env.HOME}/.local/share/jat/tools/ingest`,
-					`${process.env.HOME}/code/jat/tools/ingest`
+					`${process.env.SQUAD_INSTALL_DIR || ''}/tools/ingest`,
+					`${process.env.HOME}/.local/share/squad/tools/ingest`,
+					`${process.env.HOME}/code/squad/tools/ingest`
 				];
 				for (const p of fallbacks) {
 					if (!p.startsWith('/tools')) {
@@ -148,7 +148,7 @@ export async function POST({ params }) {
 						} catch { /* continue */ }
 					}
 				}
-				return `${process.env.HOME}/code/jat/tools/ingest`;
+				return `${process.env.HOME}/code/squad/tools/ingest`;
 			})();
 		} else {
 			// Standard project: build the restart command with port if available

@@ -5,7 +5,7 @@ import { BaseAdapter, makeAttachment } from '../base.js';
 const parser = new RssParser({
   timeout: 15000,
   headers: {
-    'User-Agent': 'jat-ingest/1.0'
+    'User-Agent': 'squad-ingest/1.0'
   }
 });
 

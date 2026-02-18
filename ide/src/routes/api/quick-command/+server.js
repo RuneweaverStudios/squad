@@ -122,7 +122,7 @@ const CONTEXT_PROVIDERS = [
 		type: 'task',
 		resolve: async (match, cwd) => {
 			const taskId = match[1];
-			const stdout = await execCommand('jt', ['show', taskId, '--json'], cwd);
+			const stdout = await execCommand('st', ['show', taskId, '--json'], cwd);
 			const tasks = JSON.parse(stdout);
 			if (!tasks || tasks.length === 0) throw new Error(`Task '${taskId}' not found`);
 			const t = tasks[0];
@@ -190,7 +190,7 @@ const CONTEXT_PROVIDERS = [
 		type: 'memory',
 		resolve: async (match, cwd) => {
 			const query = match[1].trim();
-			const stdout = await execCommand('jat-memory', ['search', query, '--limit', '5', '--json'], cwd, 15000);
+			const stdout = await execCommand('squad-memory', ['search', query, '--limit', '5', '--json'], cwd, 15000);
 			const results = JSON.parse(stdout);
 			if (!results || results.length === 0) return { content: '(no matching memories)', ref: query };
 			const formatted = results.map((/** @type {{ section?: string, path?: string, score?: number, snippet?: string }} */ r) =>
@@ -221,7 +221,7 @@ const CONTEXT_PROVIDERS = [
 			try {
 				const res = await fetch(url, {
 					signal: controller.signal,
-					headers: { 'User-Agent': 'JAT-IDE/1.0' }
+					headers: { 'User-Agent': 'SQUAD-IDE/1.0' }
 				});
 				clearTimeout(timer);
 				if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);

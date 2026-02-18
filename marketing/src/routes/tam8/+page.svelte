@@ -369,7 +369,7 @@
 
 		<section class="install">
 			<div class="install-box">
-				<code>git clone https://github.com/jomarchy/jat.git</code>
+				<code>git clone https://github.com/jomarchy/squad.git</code>
 			</div>
 		</section>
 	</div>

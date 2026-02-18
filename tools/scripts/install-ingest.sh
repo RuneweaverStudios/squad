@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install jat-ingest: content ingestion daemon
+# Install squad-ingest: content ingestion daemon
 # Creates directories, initializes database, installs npm deps, seeds config
 
 set -euo pipefail
@@ -9,13 +9,13 @@ BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-echo -e "${BLUE}Installing jat-ingest...${NC}"
+echo -e "${BLUE}Installing squad-ingest...${NC}"
 echo ""
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INGEST_DIR="$(cd "$SCRIPT_DIR/../ingest" && pwd)"
-DATA_DIR="$HOME/.local/share/jat"
-CONFIG_DIR="$HOME/.config/jat"
+DATA_DIR="$HOME/.local/share/squad"
+CONFIG_DIR="$HOME/.config/squad"
 
 # 1. Create data directories
 echo -e "${BLUE}Creating directories...${NC}"
@@ -49,18 +49,18 @@ echo -e "${BLUE}Checking config...${NC}"
 mkdir -p "$CONFIG_DIR"
 FEEDS_FILE="$CONFIG_DIR/feeds.json"
 if [ ! -f "$FEEDS_FILE" ]; then
-    node "$INGEST_DIR/jat-ingest-test" --init
+    node "$INGEST_DIR/squad-ingest-test" --init
     echo -e "  ${GREEN}✓${NC} Created sample $FEEDS_FILE"
 else
     echo -e "  ${GREEN}✓${NC} $FEEDS_FILE already exists"
 fi
 
 echo ""
-echo -e "${GREEN}jat-ingest installed${NC}"
+echo -e "${GREEN}squad-ingest installed${NC}"
 echo ""
 echo "Next steps:"
 echo "  1. Edit $FEEDS_FILE to configure sources"
 echo "  2. Add secrets: Settings -> API Keys -> Custom Keys"
-echo "  3. Test: jat-ingest-test --source <id>"
-echo "  4. Start: jat-ingest-server"
+echo "  3. Test: squad-ingest-test --source <id>"
+echo "  4. Start: squad-ingest-server"
 echo ""

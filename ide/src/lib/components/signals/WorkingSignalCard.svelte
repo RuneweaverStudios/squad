@@ -10,14 +10,14 @@
 	 */
 
 	import type { WorkingSignal } from '$lib/types/richSignals';
-	import { openInJatEditor, isGlobPattern, getFileLink, openInFilePreviewDrawer } from '$lib/utils/fileLinks';
+	import { openInSquadEditor, isGlobPattern, getFileLink, openInFilePreviewDrawer } from '$lib/utils/fileLinks';
 
 	interface Props {
 		/** The rich working signal data */
 		signal: WorkingSignal;
 		/** Agent name to display in the header */
 		agentName?: string;
-		/** Project name for file links (e.g., 'jat', 'chimaro') - required for /files navigation */
+		/** Project name for file links (e.g., 'squad', 'chimaro') - required for /files navigation */
 		projectName?: string;
 		/** Callback when task ID is clicked */
 		onTaskClick?: (taskId: string) => void;
@@ -27,7 +27,7 @@
 		onRollbackClick?: (commit: string) => void;
 		/** Callback when interrupt (Ctrl+C) is clicked - cancels current operation */
 		onInterrupt?: () => Promise<void>;
-		/** Callback when pause is clicked - runs /jat:pause to pause work */
+		/** Callback when pause is clicked - runs /squad:pause to pause work */
 		onPause?: () => Promise<void>;
 		/** Whether an action is being submitted */
 		submitting?: boolean;
@@ -122,8 +122,8 @@
 			if (projectName) {
 				openInFilePreviewDrawer(filePath, projectName);
 			} else {
-				// Fallback: open in JAT file editor (without project context)
-				openInJatEditor(filePath);
+				// Fallback: open in SQUAD file editor (without project context)
+				openInSquadEditor(filePath);
 			}
 		}
 	}

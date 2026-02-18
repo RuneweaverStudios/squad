@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 
-const DB_PATH = join(homedir(), '.local/share/jat/ingest.db');
+const DB_PATH = join(homedir(), '.local/share/squad/ingest.db');
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ params, url }) {

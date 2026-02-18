@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
-# session-start-agent-identity.sh - Unified SessionStart hook for JAT
+# session-start-agent-identity.sh - Unified SessionStart hook for SQUAD
 #
 # Combines agent identity restoration (from tmux/WINDOWID) with workflow
 # state injection (task ID, signal state, next action reminder).
 #
 # This is the GLOBAL hook - installed to ~/.claude/hooks/ by setup-statusline-and-hooks.sh
-# It works with or without .jat/ directory (graceful degradation).
+# It works with or without .squad/ directory (graceful degradation).
 #
 # Input (stdin): {"session_id": "...", "source": "startup|resume|clear|compact", ...}
 # Output: Context about agent identity + workflow state (if found)
@@ -20,7 +20,7 @@
 
 set -euo pipefail
 
-DEBUG_LOG="/tmp/jat-session-start-hook.log"
+DEBUG_LOG="/tmp/squad-session-start-hook.log"
 log() {
     echo "$(date -Iseconds) $*" >> "$DEBUG_LOG"
 }
@@ -100,9 +100,9 @@ CLAUDE_DIR="$PROJECT_DIR/.claude"
 mkdir -p "$CLAUDE_DIR/sessions"
 
 SEARCH_DIRS="$PROJECT_DIR"
-JAT_CONFIG="$HOME/.config/jat/projects.json"
-if [[ -f "$JAT_CONFIG" ]]; then
-    PROJECT_PATHS=$(jq -r '.projects[].path // empty' "$JAT_CONFIG" 2>/dev/null | sed "s|^~|$HOME|g")
+SQUAD_CONFIG="$HOME/.config/squad/projects.json"
+if [[ -f "$SQUAD_CONFIG" ]]; then
+    PROJECT_PATHS=$(jq -r '.projects[].path // empty' "$SQUAD_CONFIG" 2>/dev/null | sed "s|^~|$HOME|g")
     for PP in $PROJECT_PATHS; do
         # Skip current dir (already included) and non-existent dirs
         [[ "$PP" == "$PROJECT_DIR" ]] && continue
@@ -164,7 +164,7 @@ if [[ -z "$AGENT_NAME" ]]; then
     if [[ "$IN_TMUX" == false ]]; then
         echo ""
         echo "NOT IN TMUX SESSION - IDE cannot track this session."
-        echo "Exit and restart with: jat-projectname (e.g. jat-jat, jat-chimaro)"
+        echo "Exit and restart with: squad-projectname (e.g. squad-squad, squad-chimaro)"
     fi
     exit 0
 fi
@@ -185,7 +185,7 @@ done
 # OUTPUT IDENTITY CONTEXT
 # ============================================================================
 
-echo "=== JAT Agent Identity Restored ==="
+echo "=== SQUAD Agent Identity Restored ==="
 echo "Agent: $AGENT_NAME"
 echo "Session: ${SESSION_ID:0:8}..."
 echo "Tmux: ${TMUX_SESSION:-NOT_IN_TMUX}"
@@ -219,7 +219,7 @@ if [[ -f "$PERSISTENT_STATE_FILE" ]]; then
                 WORKFLOW_STEP="Waiting for user input"
                 ;;
             "review")
-                NEXT_ACTION="Present findings to user. Run /jat:complete when approved"
+                NEXT_ACTION="Present findings to user. Run /squad:complete when approved"
                 WORKFLOW_STEP="Ready for review"
                 ;;
             *)
@@ -229,9 +229,9 @@ if [[ -f "$PERSISTENT_STATE_FILE" ]]; then
         esac
 
         echo ""
-        echo "[JAT:WORKING task=$TASK_ID]"
+        echo "[SQUAD:WORKING task=$TASK_ID]"
         echo ""
-        echo "=== JAT WORKFLOW CONTEXT (restored after compaction) ==="
+        echo "=== SQUAD WORKFLOW CONTEXT (restored after compaction) ==="
         echo "Agent: $AGENT_NAME"
         echo "Task: $TASK_ID - $TASK_TITLE"
         echo "Last Signal: $SIGNAL_STATE"
@@ -243,24 +243,24 @@ if [[ -f "$PERSISTENT_STATE_FILE" ]]; then
     fi
 fi
 
-# Fallback: If no state file but agent has in_progress task, query jt (if available)
-if [[ -z "$TASK_ID" ]] && command -v jt &>/dev/null; then
-    # Only try jt if we're in a directory with .jat/ (graceful degradation)
-    if [[ -d "$PROJECT_DIR/.jat" ]]; then
-        TASK_ID=$(jt list --json 2>/dev/null | jq -r --arg a "$AGENT_NAME" '.[] | select(.assignee == $a and .status == "in_progress") | .id' 2>/dev/null | head -1)
+# Fallback: If no state file but agent has in_progress task, query st (if available)
+if [[ -z "$TASK_ID" ]] && command -v st &>/dev/null; then
+    # Only try st if we're in a directory with .squad/ (graceful degradation)
+    if [[ -d "$PROJECT_DIR/.squad" ]]; then
+        TASK_ID=$(st list --json 2>/dev/null | jq -r --arg a "$AGENT_NAME" '.[] | select(.assignee == $a and .status == "in_progress") | .id' 2>/dev/null | head -1)
         if [[ -n "$TASK_ID" ]]; then
-            TASK_TITLE=$(jt show "$TASK_ID" --json 2>/dev/null | jq -r '.[0].title // ""' 2>/dev/null)
+            TASK_TITLE=$(st show "$TASK_ID" --json 2>/dev/null | jq -r '.[0].title // ""' 2>/dev/null)
             echo ""
-            echo "[JAT:WORKING task=$TASK_ID]"
+            echo "[SQUAD:WORKING task=$TASK_ID]"
             echo ""
-            echo "=== JAT WORKFLOW CONTEXT (restored from JAT Tasks) ==="
+            echo "=== SQUAD WORKFLOW CONTEXT (restored from SQUAD Tasks) ==="
             echo "Agent: $AGENT_NAME"
             echo "Task: $TASK_ID - $TASK_TITLE"
             echo "Last Signal: unknown (no state file)"
             echo "NEXT ACTION: Emit 'working' signal if continuing work, or 'review' signal if done"
             echo "=================================================="
 
-            log "Fallback context from JAT Tasks: task=$TASK_ID"
+            log "Fallback context from SQUAD Tasks: task=$TASK_ID"
         fi
     fi
 fi
@@ -269,7 +269,7 @@ fi
 if [[ "$IN_TMUX" == false ]]; then
     echo ""
     echo "NOT IN TMUX SESSION - IDE cannot track this session."
-    echo "Exit and restart with: jat-projectname (e.g. jat-jat, jat-chimaro)"
+    echo "Exit and restart with: squad-projectname (e.g. squad-squad, squad-chimaro)"
 fi
 
 log "Hook completed successfully"

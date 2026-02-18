@@ -3,7 +3,7 @@
  * Caches prerequisite check results in localStorage and tracks skip state.
  */
 
-const STORAGE_KEY = 'jat-onboarding';
+const STORAGE_KEY = 'squad-onboarding';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export interface PrerequisiteResult {

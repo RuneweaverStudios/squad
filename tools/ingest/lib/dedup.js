@@ -5,7 +5,7 @@ import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DB_PATH = join(process.env.HOME, '.local/share/jat/ingest.db');
+const DB_PATH = join(process.env.HOME, '.local/share/squad/ingest.db');
 const SCHEMA_PATH = join(__dirname, '..', 'schema.sql');
 
 let db = null;

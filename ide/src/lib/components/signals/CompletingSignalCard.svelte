@@ -2,7 +2,7 @@
 	/**
 	 * CompletingSignalCard.svelte
 	 *
-	 * Displays completion progress when an agent is running /jat:complete.
+	 * Displays completion progress when an agent is running /squad:complete.
 	 * Shows a progress bar with step indicators, current step highlighted,
 	 * animated spinner on active step, and step descriptions.
 	 *

@@ -2,7 +2,7 @@
  * Credentials Management Utility
  *
  * Handles secure storage and retrieval of API keys and service credentials.
- * Storage location: ~/.config/jat/credentials.json
+ * Storage location: ~/.config/squad/credentials.json
  *
  * Security:
  * - File created with 0600 permissions (user read/write only)
@@ -10,7 +10,7 @@
  * - Full keys only used server-side
  *
  * Fallback chain for API keys:
- * 1. ~/.config/jat/credentials.json (preferred)
+ * 1. ~/.config/squad/credentials.json (preferred)
  * 2. ide/.env file
  * 3. Environment variables
  */
@@ -163,7 +163,7 @@ export const API_KEY_PROVIDERS: ApiKeyProvider[] = [
 ];
 
 // Paths
-const CONFIG_DIR = join(homedir(), '.config', 'jat');
+const CONFIG_DIR = join(homedir(), '.config', 'squad');
 const CREDENTIALS_FILE = join(CONFIG_DIR, 'credentials.json');
 
 /**

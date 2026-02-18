@@ -4,8 +4,8 @@
 	 * Unified project selector + action hub for the TopBar.
 	 * Combines project switching with task creation, start, and swarm actions.
 	 *
-	 * Default: [● jat ▾] - compact project chip
-	 * Hover:  [● jat ▾|+] - plus button slides out
+	 * Default: [● squad ▾] - compact project chip
+	 * Hover:  [● squad ▾|+] - plus button slides out
 	 * Click chip: dropdown with projects, ready tasks, and actions
 	 * Click +: opens task creation drawer for current project
 	 */

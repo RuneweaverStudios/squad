@@ -111,9 +111,9 @@
 </script>
 
 <svelte:head>
-	<title>Kanban | JAT IDE</title>
+	<title>Kanban | SQUAD IDE</title>
 	<meta name="description" content="Agent kanban board. Sessions organized by activity state: starting, working, needs input, review, completed." />
-	<meta property="og:title" content="Kanban | JAT IDE" />
+	<meta property="og:title" content="Kanban | SQUAD IDE" />
 	<meta property="og:description" content="Agent kanban board. Sessions organized by activity state: starting, working, needs input, review, completed." />
 	<meta property="og:image" content="/favicons/kanban.svg" />
 	<link rel="icon" href="/favicons/kanban.svg" />
@@ -217,7 +217,7 @@
 				<h3 class="text-lg font-medium mb-2 text-base-content/60">No Active Sessions</h3>
 				<p class="text-sm text-base-content/40 max-w-md">
 					Claude Code sessions will appear here when agents start working.
-					Use the <code class="text-xs px-1 py-0.5 bg-base-300 rounded">/jat:start</code> command to begin.
+					Use the <code class="text-xs px-1 py-0.5 bg-base-300 rounded">/squad:start</code> command to begin.
 				</p>
 			</div>
 		</div>

@@ -2,18 +2,18 @@
 
 ## Overview
 
-Add a centralized settings UI for managing API keys, service subscriptions, and coding agent configurations. This makes JAT installation more user-friendly and lays the foundation for agent-agnostic operation.
+Add a centralized settings UI for managing API keys, service subscriptions, and coding agent configurations. This makes SQUAD installation more user-friendly and lays the foundation for agent-agnostic operation.
 
 ## Goals
 
 1. **User-friendly API key management** - No more editing .bashrc or .env files
-2. **Centralized credential storage** - `~/.config/jat/credentials.json`
+2. **Centralized credential storage** - `~/.config/squad/credentials.json`
 3. **Agent-agnostic foundation** - Support Claude Code, Codex, OpenCode, Gemini Code, Aider, etc.
 4. **Service tracking** - Track subscriptions and rate limits for various AI services
 
 ## Storage Design
 
-### File: `~/.config/jat/credentials.json`
+### File: `~/.config/squad/credentials.json`
 
 ```json
 {
@@ -183,7 +183,7 @@ Settings: [Projects] [Defaults] [Credentials] [Autopilot] [Shortcuts] [Actions] 
 
 When code needs an API key:
 ```
-1. ~/.config/jat/credentials.json (new, preferred)
+1. ~/.config/squad/credentials.json (new, preferred)
 2. ide/.env file (legacy)
 3. Environment variable (e.g., ANTHROPIC_API_KEY)
 ```
@@ -205,13 +205,13 @@ When code needs an API key:
 1. **File permissions**: `credentials.json` created with mode 0600
 2. **Never expose full keys**: API returns `sk-ant-...7x4k` format
 3. **No keys in browser storage**: Keys stay server-side
-4. **Gitignore**: `~/.config/jat/credentials.json` not in any repo
+4. **Gitignore**: `~/.config/squad/credentials.json` not in any repo
 5. **Input validation**: Verify key format before storing
 
 ## Success Criteria
 
 - [ ] Users can add API keys via Settings UI
-- [ ] Keys are stored securely in ~/.config/jat/credentials.json
+- [ ] Keys are stored securely in ~/.config/squad/credentials.json
 - [ ] Task suggestions work after adding Anthropic key
 - [ ] Gemini tools work after adding Google key
 - [ ] Keys display masked in UI (sk-ant-...7x4k)

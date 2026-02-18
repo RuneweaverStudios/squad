@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * jat-scheduler - Polls task databases and workflow files for scheduled execution.
+ * squad-scheduler - Polls task databases and workflow files for scheduled execution.
  *
  * Task scheduling:
- *   Scans all projects in ~/code/ that have .jat/tasks.db for tasks where:
+ *   Scans all projects in ~/code/ that have .squad/tasks.db for tasks where:
  *     next_run_at <= now AND status = 'open'
  *
  *   For recurring tasks (schedule_cron set):
@@ -18,8 +18,8 @@
  *     - Clears next_run_at after spawn
  *
  * Workflow scheduling (direct from workflow JSON files):
- *   Reads ~/.config/jat/workflows/*.json for enabled workflows with trigger_cron nodes.
- *   Tracks next_run_at per workflow in ~/.config/jat/workflows/.scheduler-state.json.
+ *   Reads ~/.config/squad/workflows/*.json for enabled workflows with trigger_cron nodes.
+ *   Tracks next_run_at per workflow in ~/.config/squad/workflows/.scheduler-state.json.
  *   Executes due workflows via POST /api/workflows/{id}/run with trigger='cron'.
  *
  * Usage:
@@ -60,7 +60,7 @@ function debug(msg) { if (VERBOSE) log(msg); }
 // --- Read timezone from projects.json ---
 function getTimezone() {
   try {
-    const configPath = join(homedir(), '.config/jat/projects.json');
+    const configPath = join(homedir(), '.config/squad/projects.json');
     if (existsSync(configPath)) {
       const config = JSON.parse(readFileSync(configPath, 'utf-8'));
       return config.defaults?.timezone || 'UTC';
@@ -104,7 +104,7 @@ async function spawnTask(taskId, project, model, agentProgram) {
 // --- Quick command template loading ---
 function readTemplates() {
   try {
-    const templatesFile = join(homedir(), '.config/jat/quick-commands.json');
+    const templatesFile = join(homedir(), '.config/squad/quick-commands.json');
     if (!existsSync(templatesFile)) return [];
     const content = readFileSync(templatesFile, 'utf-8');
     const data = JSON.parse(content);
@@ -434,7 +434,7 @@ function schedulePoll() {
 }
 
 // --- Entry point ---
-log(`Starting jat-scheduler (poll=${POLL_INTERVAL / 1000}s, ide=${IDE_URL}, port=${HTTP_PORT})`);
+log(`Starting squad-scheduler (poll=${POLL_INTERVAL / 1000}s, ide=${IDE_URL}, port=${HTTP_PORT})`);
 if (DRY_RUN) log('[DRY-RUN] No tasks will actually be spawned');
 
 startHttpServer();

@@ -1,7 +1,7 @@
 /**
  * Project Configuration Utility
  *
- * Reads project configuration from ~/.config/jat/projects.json
+ * Reads project configuration from ~/.config/squad/projects.json
  * Provides type-safe access to project settings with caching and color conversion.
  *
  * @example
@@ -11,10 +11,10 @@
  * const projects = getAllProjects();
  *
  * // Get single project config
- * const jatConfig = getProjectConfig('jat');
+ * const squadConfig = getProjectConfig('squad');
  *
  * // Get hex color for a project
- * const color = getProjectColor('jat'); // → '#5588ff'
+ * const color = getProjectColor('squad'); // → '#5588ff'
  */
 
 import { readFileSync, existsSync } from 'fs';
@@ -54,7 +54,7 @@ interface RawProjectConfig {
  * Processed project entry with hex colors
  */
 export interface ProjectConfig {
-	/** Project key (e.g., 'jat', 'chimaro') */
+	/** Project key (e.g., 'squad', 'chimaro') */
 	key: string;
 	/** Display name (usually uppercase) */
 	name: string;
@@ -87,7 +87,7 @@ export interface FullProjectConfig {
 // CONSTANTS
 // =============================================================================
 
-const CONFIG_PATH = join(homedir(), '.config', 'jat', 'projects.json');
+const CONFIG_PATH = join(homedir(), '.config', 'squad', 'projects.json');
 
 /**
  * Default colors for projects without config
@@ -282,7 +282,7 @@ export function getAllProjects(): Map<string, ProjectConfig> {
  * @returns Array of project keys (lowercase)
  *
  * @example
- * const keys = getProjectKeys(); // → ['jat', 'chimaro', 'jomarchy', ...]
+ * const keys = getProjectKeys(); // → ['squad', 'chimaro', 'jomarchy', ...]
  */
 export function getProjectKeys(): string[] {
 	return Array.from(getAllProjects().keys());
@@ -295,7 +295,7 @@ export function getProjectKeys(): string[] {
  * @returns ProjectConfig or null if not found
  *
  * @example
- * const config = getProjectConfig('jat');
+ * const config = getProjectConfig('squad');
  * if (config) {
  *   console.log(config.activeColor); // → '#5588ff'
  * }
@@ -311,7 +311,7 @@ export function getProjectConfig(projectKey: string): ProjectConfig | null {
  * @returns Hex color string (#rrggbb) or default color if project not found
  *
  * @example
- * getProjectColor('jat') // → '#5588ff'
+ * getProjectColor('squad') // → '#5588ff'
  * getProjectColor('unknown') // → '#888888' (default)
  */
 export function getProjectColor(projectKey: string): string {
@@ -326,7 +326,7 @@ export function getProjectColor(projectKey: string): string {
  * @returns Hex color string (#rrggbb) or default color if project not found
  *
  * @example
- * getProjectInactiveColor('jat') // → '#3366dd'
+ * getProjectInactiveColor('squad') // → '#3366dd'
  */
 export function getProjectInactiveColor(projectKey: string): string {
 	const config = getProjectConfig(projectKey);
@@ -340,7 +340,7 @@ export function getProjectInactiveColor(projectKey: string): string {
  * @returns Full path to project directory or null if not found
  *
  * @example
- * getProjectPath('jat') // → '/home/user/code/jat'
+ * getProjectPath('squad') // → '/home/user/code/squad'
  */
 export function getProjectPath(projectKey: string): string | null {
 	const config = getProjectConfig(projectKey);

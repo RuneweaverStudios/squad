@@ -1,38 +1,38 @@
 # Projects configuration
 
-JAT discovers projects automatically. Any git repository under `~/code/` that has a `.jat/` directory shows up in the IDE. No config file needed for the basics.
+SQUAD discovers projects automatically. Any git repository under `~/code/` that has a `.squad/` directory shows up in the IDE. No config file needed for the basics.
 
 ## Auto-discovery
 
-The IDE scans `~/code/` for directories containing `.jat/`. When it finds one, that project appears in the sidebar, task views and agent routing.
+The IDE scans `~/code/` for directories containing `.squad/`. When it finds one, that project appears in the sidebar, task views and agent routing.
 
-To make any repo a JAT project:
+To make any repo a SQUAD project:
 
 ```bash
 cd ~/code/my-project
-jt init
+st init
 ```
 
-The `jt init` command creates a `.jat/` directory with the task database. The SQLite database stays local.
+The `st init` command creates a `.squad/` directory with the task database. The SQLite database stays local.
 
 After initialization, refresh the IDE to see your project.
 
-You can also add projects from the IDE. Go to the Tasks page and click "Add Project." This runs `jt init` for you and adds the project to the IDE automatically.
+You can also add projects from the IDE. Go to the Tasks page and click "Add Project." This runs `st init` for you and adds the project to the IDE automatically.
 
 ## What gets committed
 
-The `.jat/` directory contains both committed and ignored files:
+The `.squad/` directory contains both committed and ignored files:
 
 | Path | Committed | Purpose |
 |------|-----------|---------|
-| `.jat/.gitignore` | Yes | Ignore rules for SQLite files |
-| `.jat/tasks.db*` | No | Local SQLite task database |
+| `.squad/.gitignore` | Yes | Ignore rules for SQLite files |
+| `.squad/tasks.db*` | No | Local SQLite task database |
 
-Do not add `.jat/` to your root `.gitignore`. The `.jat/.gitignore` file handles ignoring the SQLite files.
+Do not add `.squad/` to your root `.gitignore`. The `.squad/.gitignore` file handles ignoring the SQLite files.
 
 ## The projects.json file
 
-For projects that need custom ports, colors, or database URLs, edit `~/.config/jat/projects.json`:
+For projects that need custom ports, colors, or database URLs, edit `~/.config/squad/projects.json`:
 
 ```json
 {
@@ -110,11 +110,11 @@ The `terminal` setting controls which terminal emulator the IDE opens for new se
 
 ## Multi-project aggregation
 
-The IDE aggregates tasks from all projects into a single view. Task IDs are prefixed with the project name (like `jat-abc` or `chimaro-xyz`) so there are never collisions.
+The IDE aggregates tasks from all projects into a single view. Task IDs are prefixed with the project name (like `squad-abc` or `chimaro-xyz`) so there are never collisions.
 
 You can filter by project using the dropdown in the navigation bar. The URL updates with a `?project=chimaro` parameter so filtered views are bookmarkable.
 
-The `jt` CLI works within whatever project directory youre in. Run `jt ready` in `~/code/jat` and you see only JAT tasks. Run it in `~/code/chimaro` and you see Chimaro tasks. The IDE shows everything.
+The `st` CLI works within whatever project directory youre in. Run `st ready` in `~/code/squad` and you see only SQUAD tasks. Run it in `~/code/chimaro` and you see Chimaro tasks. The IDE shows everything.
 
 ## See also
 

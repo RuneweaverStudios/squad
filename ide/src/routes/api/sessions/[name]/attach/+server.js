@@ -2,7 +2,7 @@
  * Session Attach API
  * POST /api/sessions/[name]/attach - Attach to an existing tmux session
  *
- * Creates a new window in the parent tmux session (server-jat or configurable)
+ * Creates a new window in the parent tmux session (server-squad or configurable)
  * that attaches to the specified agent session. This keeps all sessions organized
  * within tmux for IDE tracking.
  *
@@ -19,15 +19,15 @@ import { homedir } from 'os';
 const execAsync = promisify(exec);
 
 /**
- * Session name prefix for JAT agent sessions
+ * Session name prefix for SQUAD agent sessions
  */
-const SESSION_PREFIX = 'jat-';
+const SESSION_PREFIX = 'squad-';
 
 /**
  * Default parent session names to try (in order of preference)
- * server-jat is the naming convention for the IDE dev server
+ * server-squad is the naming convention for the IDE dev server
  */
-const DEFAULT_PARENT_SESSIONS = ['server-jat', 'jat'];
+const DEFAULT_PARENT_SESSIONS = ['server-squad', 'squad'];
 
 /**
  * Get the full tmux session name from a name parameter.
@@ -183,7 +183,7 @@ async function applyBorderColorToWindow(address, activeColor, inactiveColor) {
  */
 async function getProjectColors(projectName) {
 	try {
-		const configPath = join(homedir(), '.config', 'jat', 'projects.json');
+		const configPath = join(homedir(), '.config', 'squad', 'projects.json');
 		if (!existsSync(configPath)) return null;
 
 		const config = JSON.parse(readFileSync(configPath, 'utf-8'));
@@ -372,7 +372,7 @@ export async function POST({ params }) {
 		// Get config
 		let terminal = 'auto';
 		let parentSessionConfig = null;
-		const configPath = `${process.env.HOME}/.config/jat/projects.json`;
+		const configPath = `${process.env.HOME}/.config/squad/projects.json`;
 		if (existsSync(configPath)) {
 			try {
 				const config = JSON.parse(readFileSync(configPath, 'utf-8'));
@@ -439,7 +439,7 @@ export async function POST({ params }) {
 		const attachCommand = `tmux attach-session -t "${sessionName}"`;
 		// Find project for this agent to use project-specific title
 		const foundProject = await findProjectForAgent(agentName);
-		const displayName = foundProject ? foundProject.toUpperCase() : 'JAT';
+		const displayName = foundProject ? foundProject.toUpperCase() : 'SQUAD';
 		const windowTitle = `${displayName}: ${sessionName}`;
 
 		// Capture window addresses before spawning terminal for color application

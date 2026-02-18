@@ -6,9 +6,9 @@
  * 1. Evaluate routing rules (or use explicit agentId/model)
  * 2. Validate agent is enabled and auth is available
  * 3. Generate agent name and register in Agent Mail
- * 4. Create tmux session jat-{AgentName}
- * 5. If taskId provided: Assign task to agent in JAT Tasks (jt update)
- * 6. Run agent CLI with /jat:start (with agent name, optionally with task)
+ * 4. Create tmux session squad-{AgentName}
+ * 5. If taskId provided: Assign task to agent in SQUAD Tasks (st update)
+ * 6. Run agent CLI with /squad:start (with agent name, optionally with task)
  * 7. Return new WorkSession with agent selection info
  *
  * Body:
@@ -31,8 +31,8 @@ import {
 	DEFAULT_MODEL,
 	AGENT_MAIL_URL
 } from '$lib/config/spawnConfig.js';
-import { getTaskById } from '$lib/server/jat-tasks.js';
-import { getProjectPath, getJatDefaults } from '$lib/server/projectPaths.js';
+import { getTaskById } from '$lib/server/squad-tasks.js';
+import { getProjectPath, getSquadDefaults } from '$lib/server/projectPaths.js';
 import {
 	evaluateRouting,
 	getAgentProgram,
@@ -117,12 +117,12 @@ function shellEscape(str) {
 }
 
 /**
- * Get a compact summary of enabled skills from jat-skills installed.json.
+ * Get a compact summary of enabled skills from squad-skills installed.json.
  * Used to inject skill awareness into non-native agent prompts (Codex, Gemini, etc.)
  * @returns {string} Multi-line text block listing available skills, or empty string
  */
 function getEnabledSkillsSummary() {
-	const skillsDir = `${homedir()}/.config/jat/skills`;
+	const skillsDir = `${homedir()}/.config/squad/skills`;
 	const installedFile = `${skillsDir}/installed.json`;
 
 	if (!existsSync(installedFile)) return '';
@@ -142,7 +142,7 @@ function getEnabledSkillsSummary() {
 
 		if (lines.length === 0) return '';
 
-		return `Available skills (in ~/.config/jat/skills/):\n${lines.join('\n')}\nRead each skill's SKILL.md for full usage instructions.`;
+		return `Available skills (in ~/.config/squad/skills/):\n${lines.join('\n')}\nRead each skill's SKILL.md for full usage instructions.`;
 	} catch {
 		return '';
 	}
@@ -448,7 +448,7 @@ function selectAgentAndModel({ agentId, model, task }) {
 }
 
 /**
- * @typedef {Object} JatDefaults
+ * @typedef {Object} SquadDefaults
  * @property {boolean} [skip_permissions]
  * @property {number} [claude_startup_timeout]
  * @property {string} [model]
@@ -457,7 +457,7 @@ function selectAgentAndModel({ agentId, model, task }) {
 
 /**
  * Build a self-contained prompt for non-native agents (Codex, Gemini, OpenCode).
- * These agents don't have /jat:start, so the prompt must include all context.
+ * These agents don't have /squad:start, so the prompt must include all context.
  *
  * @param {object} params
  * @param {string} [params.agentName]
@@ -469,10 +469,10 @@ function selectAgentAndModel({ agentId, model, task }) {
  */
 function buildNonNativePrompt({ agentName, taskId, taskTitle, taskCommand, projName }) {
 	const parts = [];
-	const isChat = taskCommand === '/jat:chat';
+	const isChat = taskCommand === '/squad:chat';
 
 	parts.push(`You are agent ${agentName} in the ${projName} project.`);
-	parts.push('You are already registered in the agent registry. Do NOT run am-register or /jat:start.');
+	parts.push('You are already registered in the agent registry. Do NOT run am-register or /squad:start.');
 
 	if (isChat) {
 		if (taskId) parts.push(`Task: ${taskId}`);
@@ -480,9 +480,9 @@ function buildNonNativePrompt({ agentName, taskId, taskTitle, taskCommand, projN
 		parts.push('This is a conversational task. Research and respond to the question.');
 	} else if (taskId) {
 		parts.push(`Task: ${taskId}${taskTitle ? ' - ' + taskTitle : ''}`);
-		parts.push(`Run jt show ${taskId} --json to get full task details.`);
+		parts.push(`Run st show ${taskId} --json to get full task details.`);
 		parts.push("Read the project's CLAUDE.md for project context, then implement the task.");
-		parts.push(`When finished, close the task: jt close ${taskId} --reason "brief summary"`);
+		parts.push(`When finished, close the task: st close ${taskId} --reason "brief summary"`);
 	} else {
 		parts.push("Read the project's CLAUDE.md for project context.");
 	}
@@ -497,15 +497,15 @@ function buildNonNativePrompt({ agentName, taskId, taskTitle, taskCommand, projN
  * @param {import('$lib/types/agentProgram.js').AgentProgram} params.agent
  * @param {import('$lib/types/agentProgram.js').AgentModel} params.model
  * @param {string} params.projectPath
- * @param {JatDefaults} params.jatDefaults
+ * @param {SquadDefaults} params.squadDefaults
  * @param {string} [params.agentName] - Agent name for task injection
  * @param {string} [params.taskId] - Task ID for task injection
  * @param {string} [params.taskTitle] - Task title for task injection
- * @param {string} [params.taskCommand] - Task command (e.g. '/jat:start', '/jat:chat')
+ * @param {string} [params.taskCommand] - Task command (e.g. '/squad:start', '/squad:chat')
  * @param {string} [params.mode] - Spawn mode (e.g. 'planning')
- * @returns {{ command: string, env: Record<string, string>, needsJatStart: boolean }}
+ * @returns {{ command: string, env: Record<string, string>, needsSquadStart: boolean }}
  */
-function buildAgentCommand({ agent, model, projectPath, jatDefaults, agentName, taskId, taskTitle, taskCommand, mode }) {
+function buildAgentCommand({ agent, model, projectPath, squadDefaults, agentName, taskId, taskTitle, taskCommand, mode }) {
 	// Build environment variables
 	/** @type {Record<string, string>} */
 	const env = { AGENT_MAIL_URL };
@@ -578,7 +578,7 @@ function buildAgentCommand({ agent, model, projectPath, jatDefaults, agentName, 
 
 		// For plan mode without autonomous, skip permission flags entirely
 		// (--permission-mode plan takes precedence for non-autonomous sessions)
-		const wantsAutonomous = jatDefaults.skip_permissions;
+		const wantsAutonomous = squadDefaults.skip_permissions;
 		if (mode === 'plan' && agent.command === 'claude' && !wantsAutonomous) {
 			// plan mode already uses --permission-mode plan below
 		}
@@ -589,7 +589,7 @@ function buildAgentCommand({ agent, model, projectPath, jatDefaults, agentName, 
 		}
 
 		// Inject permission flags from the autonomous mode toggle only
-		if (jatDefaults.skip_permissions) {
+		if (squadDefaults.skip_permissions) {
 			if (agent.command === 'claude') {
 				agentCmd += ' --dangerously-skip-permissions';
 			} else if (agent.command === 'codex') {
@@ -603,7 +603,7 @@ function buildAgentCommand({ agent, model, projectPath, jatDefaults, agentName, 
 
 		// Handle task injection based on agent configuration
 		// taskInjection modes:
-		// - 'stdin' (default for Claude Code): Send /jat:start command after agent starts
+		// - 'stdin' (default for Claude Code): Send /squad:start command after agent starts
 		// - 'prompt': Pass initial prompt via --prompt flag (e.g., OpenCode)
 		// - 'argument': Pass as positional command argument (e.g., Codex)
 		const taskInjectionMode = agent.taskInjection || 'stdin';
@@ -612,18 +612,18 @@ function buildAgentCommand({ agent, model, projectPath, jatDefaults, agentName, 
 			// Claude Code: system prompt + initial command as positional argument
 			const projName = projectPath.split('/').filter(Boolean).pop() || 'project';
 			if (mode === 'plan') {
-				const jatBootstrap = `You are a planning assistant for the ${projName} project. Help the user plan features, discuss architecture, and think through requirements. When the user is ready to create tasks, they can use /jat:tasktree. Do NOT run /jat:start.`;
-				agentCmd += ` --append-system-prompt '${jatBootstrap}'`;
+				const squadBootstrap = `You are a planning assistant for the ${projName} project. Help the user plan features, discuss architecture, and think through requirements. When the user is ready to create tasks, they can use /squad:tasktree. Do NOT run /squad:start.`;
+				agentCmd += ` --append-system-prompt '${squadBootstrap}'`;
 				agentCmd += ' --permission-mode plan';
 			} else {
-				agentCmd += ` --append-system-prompt 'You are a JAT agent.'`;
+				agentCmd += ` --append-system-prompt 'You are a SQUAD agent.'`;
 				// Pass initial command as positional argument — Claude processes it
 				// as the first user message in interactive mode. If a YOLO permissions
 				// dialog appears, the prompt queues behind it automatically.
-				const taskCmd = taskCommand || '/jat:start';
+				const taskCmd = taskCommand || '/squad:start';
 				const initialPrompt = taskId
 					? `${taskCmd} ${agentName} ${taskId}`
-					: `/jat:start ${agentName}`;
+					: `/squad:start ${agentName}`;
 				const escapedPrompt = initialPrompt.replace(/'/g, "'\\''");
 				agentCmd += ` '${escapedPrompt}'`;
 			}
@@ -658,16 +658,16 @@ function buildAgentCommand({ agent, model, projectPath, jatDefaults, agentName, 
 		cmdParts.push(agentCmd);
 	}
 
-	// Determine if we need to send /jat:start after the agent starts via tmux send-keys.
+	// Determine if we need to send /squad:start after the agent starts via tmux send-keys.
 	// All known agents receive their task via CLI args (positional, --prompt, or argument).
 	// Only agents with explicit 'stdin' taskInjection AND not Claude would need this.
 	const taskInjectionMode = agent.taskInjection || 'stdin';
-	const needsJatStart = mode !== 'plan' && agent.command !== 'claude' && taskInjectionMode === 'stdin';
+	const needsSquadStart = mode !== 'plan' && agent.command !== 'claude' && taskInjectionMode === 'stdin';
 
 	return {
 		command: cmdParts.join(' && '),
 		env,
-		needsJatStart
+		needsSquadStart
 	};
 }
 
@@ -694,9 +694,9 @@ export async function POST({ request }) {
 		// project is optional - if provided, use name or path; otherwise infer from task ID prefix
 
 		// Determine project path:
-		// 1. If explicit project provided, look it up in JAT config
-		// 2. If taskId provided, infer from prefix and look up in JAT config
-		// 3. Fall back to current project (jat)
+		// 1. If explicit project provided, look it up in SQUAD config
+		// 2. If taskId provided, infer from prefix and look up in SQUAD config
+		// 3. Fall back to current project (squad)
 		let projectPath = null;
 		let inferredFromTaskId = false;
 
@@ -707,7 +707,7 @@ export async function POST({ request }) {
 			if (explicitPath) {
 				projectPath = explicitPath;
 			} else {
-				// Look up project path from JAT config (supports custom paths)
+				// Look up project path from SQUAD config (supports custom paths)
 				const projectInfo = await getProjectPath(projectInput);
 				if (projectInfo.exists) {
 					projectPath = projectInfo.path;
@@ -718,7 +718,7 @@ export async function POST({ request }) {
 		if (explicitProjectProvided && !projectPath) {
 			return json({
 				error: 'Project not found',
-				message: `Project '${String(project)}' not found in JAT config`,
+				message: `Project '${String(project)}' not found in SQUAD config`,
 				project: String(project)
 			}, { status: 400 });
 		}
@@ -729,8 +729,8 @@ export async function POST({ request }) {
 			const lastDashIndex = taskId.lastIndexOf('-');
 			const taskPrefix = lastDashIndex > 0 ? taskId.substring(0, lastDashIndex) : taskId.split('-')[0];
 
-			if (taskPrefix && taskPrefix.toLowerCase() !== 'jat') {
-				// Look up project path from JAT config (supports custom paths)
+			if (taskPrefix && taskPrefix.toLowerCase() !== 'squad') {
+				// Look up project path from SQUAD config (supports custom paths)
 				const projectInfo = await getProjectPath(taskPrefix);
 				if (projectInfo.exists) {
 					projectPath = projectInfo.path;
@@ -741,7 +741,7 @@ export async function POST({ request }) {
 			}
 		}
 
-		// Fall back to current project (jat) if no valid path determined
+		// Fall back to current project (squad) if no valid path determined
 		projectPath = projectPath || process.cwd().replace('/ide', '');
 
 		// Final validation: ensure project path exists
@@ -753,12 +753,12 @@ export async function POST({ request }) {
 			}, { status: 400 });
 		}
 
-		// Validate JAT task database exists in project
-		const jatPath = `${projectPath}/.jat`;
-		if (!existsSync(jatPath)) {
+		// Validate SQUAD task database exists in project
+		const squadPath = `${projectPath}/.squad`;
+		if (!existsSync(squadPath)) {
 			return json({
-				error: 'JAT task database not found',
-				message: `No .jat directory found in ${projectPath}. Run 'jt init' to initialize.`,
+				error: 'SQUAD task database not found',
+				message: `No .squad directory found in ${projectPath}. Run 'st init' to initialize.`,
 				projectPath,
 				taskId
 			}, { status: 400 });
@@ -767,11 +767,11 @@ export async function POST({ request }) {
 		console.log('[spawn] Project path:', projectPath, inferredFromTaskId ? '(inferred from task ID)' : '');
 
 		// Extract project name from path early (needed for signal and response)
-		// e.g., "/home/jw/code/jat" -> "jat"
+		// e.g., "/home/jw/code/squad" -> "squad"
 		const projectName = projectPath.split('/').filter(Boolean).pop() || null;
 
-		// Get JAT config defaults (used for skip_permissions, timeout, etc.)
-		const jatDefaults = await getJatDefaults();
+		// Get SQUAD config defaults (used for skip_permissions, timeout, etc.)
+		const squadDefaults = await getSquadDefaults();
 
 		// Step 0: Fetch task data early (needed for routing rule evaluation)
 		let task = null;
@@ -787,7 +787,7 @@ export async function POST({ request }) {
 		// If task is already in_progress with an assigned agent that has an active tmux session,
 		// reject the spawn to prevent creating orphan "planning sessions"
 		if (task && task.status === 'in_progress' && task.assignee) {
-			const existingSessionName = `jat-${task.assignee}`;
+			const existingSessionName = `squad-${task.assignee}`;
 			try {
 				const { stdout } = await execAsync(`tmux has-session -t ${shellEscape(existingSessionName)} 2>/dev/null && echo "exists" || echo "none"`);
 				if (stdout.trim() === 'exists') {
@@ -835,10 +835,10 @@ export async function POST({ request }) {
 		}
 		console.log(`[spawn] Registered agent ${agentName} in Agent Mail database (id: ${registerResult.agentId})`)
 
-		// Step 2: Assign task to new agent in JAT (if taskId provided)
+		// Step 2: Assign task to new agent in SQUAD (if taskId provided)
 		if (taskId) {
 			try {
-				await execAsync(`jt update "${taskId}" --status in_progress --assignee "${agentName}" --agent-program "${selectedAgent.id}" --model "${selectedModel.shortName}"`, {
+				await execAsync(`st update "${taskId}" --status in_progress --assignee "${agentName}" --agent-program "${selectedAgent.id}" --model "${selectedModel.shortName}"`, {
 					cwd: projectPath,
 					timeout: 10000
 				});
@@ -857,7 +857,7 @@ export async function POST({ request }) {
 				return json({
 					error: 'Failed to assign task',
 					message: errorDetail,
-					detail: `Task ${taskId} may not exist in ${projectPath}/.jat`,
+					detail: `Task ${taskId} may not exist in ${projectPath}/.squad`,
 					agentName,
 					taskId,
 					projectPath
@@ -866,7 +866,7 @@ export async function POST({ request }) {
 		}
 
 		// Step 3: Create tmux session with Claude Code
-		const sessionName = `jat-${agentName}`;
+		const sessionName = `squad-${agentName}`;
 
 		// Step 3a: Write agent identity file for session-start hook to restore
 		// The hook (session-start-agent-identity.sh) uses this to set up .claude/sessions/agent-{sessionId}.txt
@@ -892,20 +892,20 @@ export async function POST({ request }) {
 		const TMUX_INITIAL_HEIGHT = 40;
 
 		// Build the agent command dynamically based on selected agent program
-		const { command: agentCmd, needsJatStart } = buildAgentCommand({
+		const { command: agentCmd, needsSquadStart } = buildAgentCommand({
 			agent: selectedAgent,
 			model: selectedModel,
 			projectPath,
-			jatDefaults,
+			squadDefaults,
 			agentName,
 			taskId,
 			taskTitle: task?.title,
-			taskCommand: task?.command || '/jat:start',
+			taskCommand: task?.command || '/squad:start',
 			mode
 		});
 
 		console.log(`[spawn] Agent command: ${agentCmd.substring(0, 100)}...`);
-		console.log(`[spawn] needsJatStart: ${needsJatStart}`);
+		console.log(`[spawn] needsSquadStart: ${needsSquadStart}`);
 
 		// Create session with explicit dimensions to ensure proper terminal width from the start
 		// Without -x and -y, tmux uses default 80x24 which may not match IDE card width
@@ -956,7 +956,7 @@ export async function POST({ request }) {
 				taskTitle: task?.title || null,
 				timestamp: new Date().toISOString()
 			};
-			const signalFile = `/tmp/jat-signal-tmux-${sessionName}.json`;
+			const signalFile = `/tmp/squad-signal-tmux-${sessionName}.json`;
 			writeFileSync(signalFile, JSON.stringify(startingSignal, null, 2), 'utf-8');
 			console.log(`[spawn] Wrote IDE-initiated ${signalType} signal: ${signalFile}`);
 		} catch (err) {
@@ -995,7 +995,7 @@ export async function POST({ request }) {
 			try {
 				const { spawn } = await import('child_process');
 				const isMacOS = process.platform === 'darwin';
-				const displayName = projectName ? projectName.toUpperCase() : 'JAT';
+				const displayName = projectName ? projectName.toUpperCase() : 'SQUAD';
 				const windowTitle = `${displayName}: ${sessionName}`;
 				const attachCmd = `tmux attach-session -t "${sessionName}"`;
 

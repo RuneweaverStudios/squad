@@ -63,10 +63,10 @@ export async function POST({ request }) {
 		let effectivePort = null;
 
 		if (projectName === 'ingest') {
-			// Resolve the ingest directory directly from the jat-ingest symlink
+			// Resolve the ingest directory directly from the squad-ingest symlink
 			executionPath = await (async () => {
 				try {
-					const { stdout } = await execAsync('readlink -f "$(which jat-ingest)" 2>/dev/null');
+					const { stdout } = await execAsync('readlink -f "$(which squad-ingest)" 2>/dev/null');
 					const resolved = stdout.trim();
 					if (resolved) {
 						const { stdout: dirOut } = await execAsync(`dirname "${resolved}"`);
@@ -75,9 +75,9 @@ export async function POST({ request }) {
 				} catch { /* fall through */ }
 				// Fallback paths
 				const fallbacks = [
-					`${process.env.JAT_INSTALL_DIR || ''}/tools/ingest`,
-					`${process.env.HOME}/.local/share/jat/tools/ingest`,
-					`${process.env.HOME}/code/jat/tools/ingest`
+					`${process.env.SQUAD_INSTALL_DIR || ''}/tools/ingest`,
+					`${process.env.HOME}/.local/share/squad/tools/ingest`,
+					`${process.env.HOME}/code/squad/tools/ingest`
 				];
 				for (const p of fallbacks) {
 					if (!p.startsWith('/tools')) {
@@ -87,9 +87,9 @@ export async function POST({ request }) {
 						} catch { /* continue */ }
 					}
 				}
-				return `${process.env.HOME}/code/jat/tools/ingest`;
+				return `${process.env.HOME}/code/squad/tools/ingest`;
 			})();
-			serverCommand = `node jat-ingest`;
+			serverCommand = `node squad-ingest`;
 
 			// Verify execution path exists
 			try {
@@ -118,7 +118,7 @@ export async function POST({ request }) {
 			let serverPath = null;
 			let configPort = null;
 			try {
-				const configPath = `${process.env.HOME}/.config/jat/projects.json`;
+				const configPath = `${process.env.HOME}/.config/squad/projects.json`;
 				// Read all project settings at once
 				// Note: \\n creates literal \n for jq to interpret as newline
 				const { stdout: configOutput } = await execAsync(

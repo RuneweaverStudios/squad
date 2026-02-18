@@ -11,7 +11,7 @@
 #
 # Features:
 #   Agent Status (Line 1) - COMPACT, NO WRAPPING:
-#     1. Agent identification (set by /jat:start via .claude/agent-{session_id}.txt)
+#     1. Agent identification (set by /squad:start via .claude/agent-{session_id}.txt)
 #     2. Task priority badge [P0/P1/P2] with color coding (Red/Yellow/Green)
 #     3. Task type icon (🐛/✨/🔧/🎯) and task ID from tasks database
 #     4. Active time on task (⏲ since updated_at)
@@ -40,11 +40,11 @@
 #   Idle status:    Gray        (\033[0;37m)
 #
 # Example output:
-#   GreatWind · [P1] 🔧 jat-4p0 ⏲ 1h23m
-#   ▪▪▪▪▪▪▫▫▫▫ · ⎇ jat@master*
+#   GreatWind · [P1] 🔧 squad-4p0 ⏲ 1h23m
+#   ▪▪▪▪▪▪▫▫▫▫ · ⎇ squad@master*
 #   💬 12m yes implement top 3
 #
-#   chimaro · no agent registered (new session, run /jat:start)
+#   chimaro · no agent registered (new session, run /squad:start)
 #   ▪▪▪▪▪▪▪▪▪▫ · ⎇ chimaro@main
 #
 
@@ -130,7 +130,7 @@ parse_date_to_epoch() {
 }
 
 # Extract regex capture group (cross-platform bash/zsh)
-# Usage: if regex_match "$string" "^jat-(.+)$"; then echo "$REGEX_MATCH"; fi
+# Usage: if regex_match "$string" "^squad-(.+)$"; then echo "$REGEX_MATCH"; fi
 # Sets: REGEX_MATCH to the first capture group
 REGEX_MATCH=""
 regex_match() {
@@ -154,7 +154,7 @@ regex_match() {
 # ============================================================================
 # CACHING LAYER
 # ============================================================================
-# Cache expensive queries (jt list) to reduce
+# Cache expensive queries (st list) to reduce
 # statusline render latency from ~300ms to ~5ms for cached hits.
 #
 # Cache files stored in /tmp with TTL-based invalidation.
@@ -263,7 +263,7 @@ fi
 agent_name=""
 
 if [[ -n "$session_id" ]]; then
-    # Try git root first (handles working in subdirectories like jat/dashboard)
+    # Try git root first (handles working in subdirectories like squad/dashboard)
     if [[ -n "$git_root" ]] && [[ -f "$git_root/.claude/sessions/agent-${session_id}.txt" ]]; then
         agent_name=$(cat "$git_root/.claude/sessions/agent-${session_id}.txt" 2>/dev/null | tr -d '\n')
     # Fall back to current directory if not found in git root
@@ -278,13 +278,13 @@ if [[ -z "$agent_name" ]] && [[ -n "$AGENT_NAME" ]]; then
 fi
 
 # Get tmux session name for verification and fallback
-# The tmux session name (jat-AgentName) is the authoritative source since /jat:start
+# The tmux session name (squad-AgentName) is the authoritative source since /squad:start
 # updates both the agent file AND the tmux session name atomically
 tmux_session=$(tmux display-message -p '#S' 2>/dev/null || echo "")
 tmux_agent_name=""
-# Match jat-AgentName but NOT jat-pending-* (which are sessions still being set up)
+# Match squad-AgentName but NOT squad-pending-* (which are sessions still being set up)
 # Uses regex_match() for bash/zsh compatibility
-if regex_match "$tmux_session" "^jat-(.+)$"; then
+if regex_match "$tmux_session" "^squad-(.+)$"; then
     tmux_agent_name="$REGEX_MATCH"
     # Filter out pending sessions
     if regex_match "$tmux_agent_name" "^pending-"; then
@@ -296,7 +296,7 @@ fi
 # This handles the case where a stale agent file exists from a previous session
 if [[ -n "$agent_name" ]] && [[ -n "$tmux_agent_name" ]] && [[ "$agent_name" != "$tmux_agent_name" ]]; then
     # Agent file and tmux session name don't match - tmux is authoritative
-    # (tmux session is renamed by /jat:start which is the registration source)
+    # (tmux session is renamed by /squad:start which is the registration source)
     agent_name="$tmux_agent_name"
 fi
 
@@ -378,7 +378,7 @@ generate_battery_bar() {
 
 # If no agent name, show "not registered" status with git branch and context
 if [[ -z "$agent_name" ]]; then
-    # Use project folder name instead of hardcoded "jat"
+    # Use project folder name instead of hardcoded "squad"
     project_display=$(basename "$cwd" 2>/dev/null || echo "project")
     base_status="${GRAY}${project_display}${RESET} ${GRAY}·${RESET} ${CYAN}no agent registered${RESET}"
 
@@ -414,7 +414,7 @@ fi
 # ============================================================================
 # Determines what task/status to display:
 #
-# 1. Check JAT Tasks for in_progress tasks assigned to this agent
+# 1. Check SQUAD Tasks for in_progress tasks assigned to this agent
 #    - Source of truth for current work
 #
 # 2. If no in_progress task found, show "idle" state
@@ -429,7 +429,7 @@ task_type=""
 task_updated_at=""
 
 # Priority 1: Check tasks for in_progress tasks (matches IDE logic)
-if command -v jt &>/dev/null; then
+if command -v st &>/dev/null; then
     # Change to project directory if provided
     if [[ -n "$cwd" ]] && [[ -d "$cwd" ]]; then
         cd "$cwd" 2>/dev/null || true
@@ -438,7 +438,7 @@ if command -v jt &>/dev/null; then
     # Get in_progress task assigned to this agent (cached)
     project_name=$(basename "$cwd")
     jt_cache_key="${agent_name}-${project_name}-tasks"
-    jt_list_json=$(cache_get_or_run "$jt_cache_key" "jt list --json")
+    jt_list_json=$(cache_get_or_run "$jt_cache_key" "st list --json")
     task_json=$(echo "$jt_list_json" | jq -r --arg agent "$agent_name" '.[] | select(.assignee == $agent and .status == "in_progress") | @json' 2>/dev/null | head -1)
 
     if [[ -n "$task_json" ]]; then
@@ -457,10 +457,10 @@ time_remaining=""
 
 # Count tasks blocked by current task (shows impact/leverage of current work)
 blocked_count=0
-if [[ -n "$task_id" ]] && command -v jt &>/dev/null; then
+if [[ -n "$task_id" ]] && command -v st &>/dev/null; then
     # Get dependent tasks (cached) - tasks that are blocked waiting on this task
     blocked_cache_key="${agent_name}-${task_id}-blocked"
-    blocked_json=$(cache_get_or_run "$blocked_cache_key" "jt dep tree '$task_id' --reverse --json")
+    blocked_json=$(cache_get_or_run "$blocked_cache_key" "st dep tree '$task_id' --reverse --json")
     # Count tasks with depth > 0 (children of current task in dependency tree)
     blocked_count=$(echo "$blocked_json" | jq '[.[] | select(.depth > 0)] | length' 2>/dev/null || echo "0")
     blocked_count=$(echo "$blocked_count" | tr -d '\n' | tr -d ' ')
@@ -587,15 +587,15 @@ status_line=""
 
 # Get ANSI avatar if available (cached .ansi file in avatars directory)
 # Multi-line avatar (6x3 chars) - each row prepended to corresponding status line
-# Detect JAT install dir: env var → XDG standard → projects.json path
+# Detect SQUAD install dir: env var → XDG standard → projects.json path
 AVATARS_DIR=""
-if [[ -n "${JAT_INSTALL_DIR:-}" ]] && [[ -d "${JAT_INSTALL_DIR}/avatars" ]]; then
-    AVATARS_DIR="${JAT_INSTALL_DIR}/avatars"
-elif [[ -d "${XDG_DATA_HOME:-$HOME/.local/share}/jat/avatars" ]]; then
-    AVATARS_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/jat/avatars"
-elif [[ -f "$HOME/.config/jat/projects.json" ]]; then
-    _jat_path=$(jq -r '.projects.jat.path // empty' "$HOME/.config/jat/projects.json" 2>/dev/null | sed "s|^~|$HOME|g")
-    [[ -n "$_jat_path" ]] && [[ -d "${_jat_path}/avatars" ]] && AVATARS_DIR="${_jat_path}/avatars"
+if [[ -n "${SQUAD_INSTALL_DIR:-}" ]] && [[ -d "${SQUAD_INSTALL_DIR}/avatars" ]]; then
+    AVATARS_DIR="${SQUAD_INSTALL_DIR}/avatars"
+elif [[ -d "${XDG_DATA_HOME:-$HOME/.local/share}/squad/avatars" ]]; then
+    AVATARS_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/squad/avatars"
+elif [[ -f "$HOME/.config/squad/projects.json" ]]; then
+    _squad_path=$(jq -r '.projects.squad.path // empty' "$HOME/.config/squad/projects.json" 2>/dev/null | sed "s|^~|$HOME|g")
+    [[ -n "$_squad_path" ]] && [[ -d "${_squad_path}/avatars" ]] && AVATARS_DIR="${_squad_path}/avatars"
 fi
 avatar_row1=""
 avatar_row2=""
@@ -642,7 +642,7 @@ if [[ -n "$task_id" ]]; then
     status_line="${status_line} ${GREEN}${task_id}${RESET}"
 
     # Task title removed from line 1 to prevent wrapping that breaks avatar alignment
-    # Title is available via: IDE, jt show <task-id>, or line 3 (optional)
+    # Title is available via: IDE, st show <task-id>, or line 3 (optional)
 
     # Add active time if available
     if [[ -n "$active_time" ]]; then

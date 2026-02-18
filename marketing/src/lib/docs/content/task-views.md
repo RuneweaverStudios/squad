@@ -1,6 +1,6 @@
 # Task Views
 
-JAT provides multiple ways to view and manage tasks across your projects. Each view serves a different workflow, from detailed table operations to visual boards and dependency graphs.
+SQUAD provides multiple ways to view and manage tasks across your projects. Each view serves a different workflow, from detailed table operations to visual boards and dependency graphs.
 
 ## Task table
 
@@ -12,7 +12,7 @@ The primary task view at `/tasks` renders a sortable, filterable table of all ta
 
 | Filter | Type | Example |
 |--------|------|---------|
-| Project | Dropdown | `?project=jat` |
+| Project | Dropdown | `?project=squad` |
 | Status | Multi-select | `open`, `in_progress`, `blocked`, `closed` |
 | Priority | Multi-select | P0 through P4 |
 | Type | Multi-select | `bug`, `feature`, `task`, `epic`, `chore` |
@@ -21,7 +21,7 @@ The primary task view at `/tasks` renders a sortable, filterable table of all ta
 
 **Grouping** organizes rows under collapsible headers. Group by status, priority, type, project, or assignee. Grouped views show task counts per group.
 
-All filters persist in URL parameters. The URL `/tasks?project=jat&status=open&priority=0,1` is bookmarkable and shareable.
+All filters persist in URL parameters. The URL `/tasks?project=squad&status=open&priority=0,1` is bookmarkable and shareable.
 
 ## Kanban board
 
@@ -78,17 +78,17 @@ Voice input is available if whisper.cpp is installed. Click the microphone icon 
 
 ## Multi-project filtering
 
-Projects are detected automatically from task ID prefixes. A task with ID `jat-abc` belongs to the `jat` project, `chimaro-xyz` belongs to `chimaro`.
+Projects are detected automatically from task ID prefixes. A task with ID `squad-abc` belongs to the `squad` project, `chimaro-xyz` belongs to `chimaro`.
 
 The project filter dropdown appears in the navigation bar and shows task counts per project:
 
 ```
-All Projects (45) | jat (18) | chimaro (27)
+All Projects (45) | squad (18) | chimaro (27)
 ```
 
-Project selection updates the URL parameter (`?project=jat`) so you can bookmark filtered views. Multiple tabs can show different projects simultaneously since the filter is URL-based, not stored in localStorage.
+Project selection updates the URL parameter (`?project=squad`) so you can bookmark filtered views. Multiple tabs can show different projects simultaneously since the filter is URL-based, not stored in localStorage.
 
-Filters combine with AND logic. `/tasks?project=jat&status=open&priority=0` shows only P0 open tasks from the JAT project.
+Filters combine with AND logic. `/tasks?project=squad&status=open&priority=0` shows only P0 open tasks from the SQUAD project.
 
 ## See also
 

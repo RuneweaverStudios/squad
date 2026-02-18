@@ -20,7 +20,7 @@ export const metadata = {
       label: 'OAuth Token Secret',
       type: 'secret',
       required: true,
-      helpText: 'Name of the secret containing the Twitch OAuth token (stored in jat-secret). Token needs chat:read scope.'
+      helpText: 'Name of the secret containing the Twitch OAuth token (stored in squad-secret). Token needs chat:read scope.'
     },
     {
       key: 'botUsername',

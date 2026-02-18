@@ -83,7 +83,7 @@
 
 	let { task, size = 'sm', showStatus = true, showType = true, showCopyIcon = false, showAssignee = false, minimal = false, color, onOpenTask, onAgentClick, dropdownAlign = 'start', copyOnly = false, blockedBy = [], blocks = [], showDependencies = false, showDepGraph = true, showUnblocksCount = false, statusDotColor, variant = 'default', agentName, animate = false, resumed = false, attached = false, onClick, exiting = false, harness, onHarnessClick }: Props = $props();
 
-	// Extract project prefix from task ID (e.g., "jat-abc" -> "jat")
+	// Extract project prefix from task ID (e.g., "squad-abc" -> "squad")
 	const projectPrefix = $derived(task.id.split('-')[0] || task.id);
 
 	// Dependency graph state
@@ -139,7 +139,7 @@
 	let copied = $state(false);
 	let dropdownOpen = $state(false);
 
-	// Portal-based dropdown to escape stacking context (jat-1xa13)
+	// Portal-based dropdown to escape stacking context (squad-1xa13)
 	// The dropdown is rendered to document.body via portalAction to be truly above all other elements
 	let dropdownRef: HTMLDivElement | null = $state(null);
 	let dropdownPosition = $state({ top: 0, left: 0 });
@@ -796,7 +796,7 @@
 				{/if}
 			</div>
 
-			<!-- Hover dropdown with task info and quick actions - uses portal to escape stacking context (jat-1xa13) -->
+			<!-- Hover dropdown with task info and quick actions - uses portal to escape stacking context (squad-1xa13) -->
 			{#if isDropdownVisible}
 			<div
 				use:portalAction

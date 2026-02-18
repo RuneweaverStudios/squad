@@ -4,7 +4,7 @@
  * This file runs on server startup and handles background tasks.
  *
  * Features:
- * - Cleans up stale JAT signal files from /tmp on startup
+ * - Cleans up stale SQUAD signal files from /tmp on startup
  * - Cleans up orphaned .claude/sessions/agent-*.txt files (where Claude session no longer exists)
  * - Runs token usage aggregation on startup
  * - Schedules periodic aggregation every 5 minutes
@@ -29,40 +29,40 @@ import { getSessionFromCookie } from '$lib/auth/session';
 let aggregationInterval: ReturnType<typeof setInterval> | null = null;
 
 /**
- * Clean up stale JAT signal/activity files from /tmp
+ * Clean up stale SQUAD signal/activity files from /tmp
  *
  * These files are ephemeral state indicators for agent sessions.
  * When the IDE restarts, old session states are stale and useless.
  * Cleaning on startup prevents accumulation over time.
  *
  * File patterns cleaned:
- * - jat-signal-*.json - Signal files by session UUID
- * - jat-signal-tmux-*.json - Signal files by tmux session name
- * - jat-activity-*.json - Activity files
- * - jat-question-*.json - Question files
- * - jat-monitor-*.pid - Monitor PID files
+ * - squad-signal-*.json - Signal files by session UUID
+ * - squad-signal-tmux-*.json - Signal files by tmux session name
+ * - squad-activity-*.json - Activity files
+ * - squad-question-*.json - Question files
+ * - squad-monitor-*.pid - Monitor PID files
  * - claude-*-cwd - Claude Code working directory markers (hex IDs)
  *
  * NOT cleaned (preserved across restarts):
- * - jat-timeline-*.jsonl - Append-only session history for EventStack
+ * - squad-timeline-*.jsonl - Append-only session history for EventStack
  */
 function cleanupStaleSignalFiles(): { cleaned: number; errors: number; preserved: number } {
 	const tmpDir = '/tmp';
 
 	// Patterns that should be deleted unconditionally (always stale on restart)
 	const unconditionalPatterns = [
-		/^jat-activity-.*\.json$/,
-		// NOTE: jat-timeline-*.jsonl files are NOT deleted - they're append-only session history
+		/^squad-activity-.*\.json$/,
+		// NOTE: squad-timeline-*.jsonl files are NOT deleted - they're append-only session history
 		// that agents need for displaying EventStack. They should persist across IDE restarts.
 		// Old timeline files are naturally cleaned up on system reboot (/tmp is ephemeral).
-		/^jat-question-.*\.json$/,
-		/^jat-monitor-.*\.pid$/,
+		/^squad-question-.*\.json$/,
+		/^squad-monitor-.*\.pid$/,
 		/^claude-[0-9a-f]+-cwd$/ // Claude Code working directory markers
 	];
 
 	// Signal files need age-based cleanup - only delete if older than TTL
 	// This preserves recent signals from active agents across IDE restarts
-	const signalPattern = /^jat-signal-.*\.json$/;
+	const signalPattern = /^squad-signal-.*\.json$/;
 
 	let cleaned = 0;
 	let errors = 0;
@@ -139,7 +139,7 @@ function cleanupStaleSignalFiles(): { cleaned: number; errors: number; preserved
  * Claude session format: ~/.claude/projects/{project-slug}/{sessionId}.jsonl
  *
  * The project-slug is derived from the project path by replacing / with -
- * Example: /home/jw/code/jat -> -home-jw-code-jat
+ * Example: /home/jw/code/squad -> -home-jw-code-squad
  */
 function cleanupOrphanedSessionFiles(): { cleaned: number; errors: number; scanned: number } {
 	const home = homedir();
@@ -166,7 +166,7 @@ function cleanupOrphanedSessionFiles(): { cleaned: number; errors: number; scann
 			if (!existsSync(sessionsDir)) continue;
 
 			// Determine the Claude project slug for this project
-			// Path /home/jw/code/jat -> slug -home-jw-code-jat
+			// Path /home/jw/code/squad -> slug -home-jw-code-squad
 			const projectSlug = projectPath.replace(/\//g, '-');
 			const claudeProjectDir = join(claudeProjectsDir, projectSlug);
 

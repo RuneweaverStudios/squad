@@ -1,8 +1,8 @@
-# JAT Tools
+# SQUAD Tools
 
 ## Overview
 
-This directory contains CLI tools for JAT task management.
+This directory contains CLI tools for SQUAD task management.
 
 ---
 
@@ -10,32 +10,32 @@ This directory contains CLI tools for JAT task management.
 
 Configure which tasks auto-proceed vs require human review on completion.
 
-### jt-review-rules
+### st-review-rules
 
 Manage review rules that determine task completion behavior.
 
 ```bash
 # Show all current rules
-jt-review-rules
+st-review-rules
 
 # Set max auto-proceed priority for a type
-jt-review-rules --type bug --max-auto 1    # P0-P1 bugs auto, P2-P4 review
+st-review-rules --type bug --max-auto 1    # P0-P1 bugs auto, P2-P4 review
 
 # Show rule for specific type
-jt-review-rules --type feature
+st-review-rules --type feature
 
 # Set default action for unconfigured types
-jt-review-rules --default auto             # Default to auto-proceed
+st-review-rules --default auto             # Default to auto-proceed
 
 # Reset all rules to defaults
-jt-review-rules --reset
+st-review-rules --reset
 ```
 
 #### Configuration Schema
 
 Rules are stored in two places (automatically synced):
-1. **`jt config`** key-value pairs (for CLI access)
-2. **`.jat/review-rules.json`** (human-readable, version-controllable)
+1. **`st config`** key-value pairs (for CLI access)
+2. **`.squad/review-rules.json`** (human-readable, version-controllable)
 
 ##### JSON File Schema (v1)
 
@@ -50,7 +50,7 @@ Rules are stored in two places (automatically synced):
     { "type": "epic", "maxAutoPriority": -1, "note": "Always review" }
   ],
   "overrides": [
-    { "taskId": "jat-abc", "action": "always_review", "reason": "Security" }
+    { "taskId": "squad-abc", "action": "always_review", "reason": "Security" }
   ]
 }
 ```
@@ -67,9 +67,9 @@ Rules are stored in two places (automatically synced):
 | `overrides[].action` | string | `always_review` or `always_auto` |
 | `overrides[].reason` | string | Optional explanation |
 
-##### jt config Keys
+##### st config Keys
 
-Rules are also stored as `jt config` key-value pairs:
+Rules are also stored as `st config` key-value pairs:
 
 | Key | Values | Description |
 |-----|--------|-------------|
@@ -85,93 +85,93 @@ Types: `bug`, `feature`, `task`, `chore`, `epic`
 - `max_auto = -1` → All priorities require review
 - `max_auto = 4` → All priorities auto-proceed
 
-### jt-review-rules-loader
+### st-review-rules-loader
 
-Low-level tool for managing `.jat/review-rules.json` directly.
+Low-level tool for managing `.squad/review-rules.json` directly.
 
 ```bash
 # Load rules (creates defaults if missing)
-jt-review-rules-loader
+st-review-rules-loader
 
 # Initialize with default rules
-jt-review-rules-loader --init
+st-review-rules-loader --init
 
 # Validate existing rules file
-jt-review-rules-loader --validate
+st-review-rules-loader --validate
 
-# Sync JSON to jt config
-jt-review-rules-loader --sync-to-config
+# Sync JSON to st config
+st-review-rules-loader --sync-to-config
 
-# Sync jt config to JSON
-jt-review-rules-loader --sync-from-config
+# Sync st config to JSON
+st-review-rules-loader --sync-from-config
 
 # Get maxAutoPriority for a type
-jt-review-rules-loader --get bug           # Returns: 3
+st-review-rules-loader --get bug           # Returns: 3
 
 # Get override for a task
-jt-review-rules-loader --get-override jat-abc  # Returns: always_review or none
+st-review-rules-loader --get-override squad-abc  # Returns: always_review or none
 
 # Output as JSON
-jt-review-rules-loader --json
+st-review-rules-loader --json
 
 # Override management (JSON file overrides)
-jt-review-rules-loader --add-override jat-abc always_review "Security sensitive"
-jt-review-rules-loader --add-override jat-xyz always_auto
-jt-review-rules-loader --remove-override jat-abc
-jt-review-rules-loader --list-overrides
+st-review-rules-loader --add-override squad-abc always_review "Security sensitive"
+st-review-rules-loader --add-override squad-xyz always_auto
+st-review-rules-loader --remove-override squad-abc
+st-review-rules-loader --list-overrides
 ```
 
-**Note:** Changes made via `jt-review-rules` are automatically synced to the JSON file. The loader is primarily for:
+**Note:** Changes made via `st-review-rules` are automatically synced to the JSON file. The loader is primarily for:
 - Direct JSON file manipulation
 - Schema migration between versions
 - Programmatic access to rules
 - Managing centralized task overrides
 
-### jt-set-review-override
+### st-set-review-override
 
 Set task-level overrides (stored on the task itself, not in JSON file).
 
 ```bash
 # Set override on a task
-jt-set-review-override jat-abc always_review "Security sensitive"
-jt-set-review-override jat-xyz always_auto
+st-set-review-override squad-abc always_review "Security sensitive"
+st-set-review-override squad-xyz always_auto
 
 # Show current override
-jt-set-review-override jat-abc --show
+st-set-review-override squad-abc --show
 
 # Clear override
-jt-set-review-override jat-abc --clear
+st-set-review-override squad-abc --clear
 ```
 
 **Two types of overrides:**
 
 | Type | Command | Storage | Use Case |
 |------|---------|---------|----------|
-| JSON file | `--add-override` | `.jat/review-rules.json` | Standing rules, version-controlled |
-| Task-level | `jt-set-review-override` | Task's notes field | One-off decisions |
+| JSON file | `--add-override` | `.squad/review-rules.json` | Standing rules, version-controlled |
+| Task-level | `st-set-review-override` | Task's notes field | One-off decisions |
 
 Task-level overrides take precedence over JSON file overrides.
 
-### jt-check-review
+### st-check-review
 
 Preview what review action would be taken for a task.
 
 ```bash
 # Check single task
-jt-check-review jat-abc
+st-check-review squad-abc
 
 # JSON output
-jt-check-review jat-xyz --json
+st-check-review squad-xyz --json
 
 # Check all open/in_progress tasks
-jt-check-review --batch
+st-check-review --batch
 ```
 
 #### Example Output
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════╗
-║                    🔍 Review Check: jat-abc                              ║
+║                    🔍 Review Check: squad-abc                              ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 
   Task: Fix authentication timeout
@@ -191,36 +191,36 @@ jt-check-review --batch
   └────────────────────────────────────────────────────────────────────────┘
 
   To change this behavior:
-    • Increase max_auto: jt-review-rules --type bug --max-auto 2
-    • Set task override: jt update jat-abc --review-override always_auto
+    • Increase max_auto: st-review-rules --type bug --max-auto 2
+    • Set task override: st update squad-abc --review-override always_auto
 ```
 
 ---
 
 ## Database Tools
 
-Two complementary tools for safe JAT task database backup and rollback:
+Two complementary tools for safe SQUAD task database backup and rollback:
 
-1. **backup-jat.sh** - Standalone backup utility
-2. **rollback-jat.sh** - Restore from backup
+1. **backup-squad.sh** - Standalone backup utility
+2. **rollback-squad.sh** - Restore from backup
 
 ---
 
-## backup-jat.sh
+## backup-squad.sh
 
-Standalone utility to create timestamped backups of JAT task and Agent Mail databases.
+Standalone utility to create timestamped backups of SQUAD task and Agent Mail databases.
 
 ### Usage
 
 ```bash
 # Basic backup
-./tools/backup-jat.sh --project ~/code/chimaro
+./tools/backup-squad.sh --project ~/code/chimaro
 
 # Labeled backup (for specific purpose)
-./tools/backup-jat.sh --project ~/code/chimaro --label "before-migration"
+./tools/backup-squad.sh --project ~/code/chimaro --label "before-migration"
 
 # Backup with integrity verification
-./tools/backup-jat.sh --project ~/code/chimaro --verify
+./tools/backup-squad.sh --project ~/code/chimaro --verify
 ```
 
 ### Features
@@ -229,12 +229,12 @@ Standalone utility to create timestamped backups of JAT task and Agent Mail data
 - SHA256 checksum verification
 - Metadata file with backup details
 - Optional integrity verification
-- Backs up both JAT task and Agent Mail databases
+- Backs up both SQUAD task and Agent Mail databases
 
 ### Backup Location
 
 ```
-<project>/.jat/backups/backup_<timestamp>[_<label>]/
+<project>/.squad/backups/backup_<timestamp>[_<label>]/
   ├── tasks.db.backup
   ├── tasks.db.sha256
   ├── agent-mail.db.backup (if exists)
@@ -246,7 +246,7 @@ Standalone utility to create timestamped backups of JAT task and Agent Mail data
 
 | Option | Description |
 |--------|-------------|
-| `--project PATH` | Path to JAT project (required) |
+| `--project PATH` | Path to SQUAD project (required) |
 | `--label LABEL` | Optional label for backup |
 | `--verify` | Verify backup integrity after creation |
 | `--help` | Show help message |
@@ -254,21 +254,21 @@ Standalone utility to create timestamped backups of JAT task and Agent Mail data
 
 ---
 
-## rollback-jat.sh
+## rollback-squad.sh
 
-Restore JAT task and Agent Mail databases from a backup.
+Restore SQUAD task and Agent Mail databases from a backup.
 
 ### Usage
 
 ```bash
 # Restore with confirmation prompt
-./tools/rollback-jat.sh --backup ~/code/chimaro/.jat/backups/backup_20231124_123456
+./tools/rollback-squad.sh --backup ~/code/chimaro/.squad/backups/backup_20231124_123456
 
 # Restore with integrity verification
-./tools/rollback-jat.sh --backup <backup-dir> --verify
+./tools/rollback-squad.sh --backup <backup-dir> --verify
 
 # Restore without confirmation (automated)
-./tools/rollback-jat.sh --backup <backup-dir> --force
+./tools/rollback-squad.sh --backup <backup-dir> --force
 ```
 
 ### Safety Features

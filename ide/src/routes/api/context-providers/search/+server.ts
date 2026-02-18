@@ -33,7 +33,7 @@ function execCommand(cmd: string, args: string[], cwd: string, timeoutMs = 10000
 
 async function searchTasks(query: string, cwd: string): Promise<ProviderResult[]> {
 	try {
-		const stdout = await execCommand('jt', ['search', query, '--limit', '10', '--json'], cwd);
+		const stdout = await execCommand('st', ['search', query, '--limit', '10', '--json'], cwd);
 		const tasks = JSON.parse(stdout);
 		return tasks.map((t: { id: string; title: string; status: string; priority: number }) => ({
 			value: t.id,
@@ -43,7 +43,7 @@ async function searchTasks(query: string, cwd: string): Promise<ProviderResult[]
 	} catch {
 		// Fallback: list ready tasks if search fails
 		try {
-			const stdout = await execCommand('jt', ['list', '--status', 'open', '--json'], cwd);
+			const stdout = await execCommand('st', ['list', '--status', 'open', '--json'], cwd);
 			const tasks = JSON.parse(stdout);
 			const filtered = query
 				? tasks.filter((t: { id: string; title: string }) =>
@@ -75,7 +75,7 @@ function getGitSubcommands(): ProviderResult[] {
 async function searchMemory(query: string, cwd: string): Promise<ProviderResult[]> {
 	try {
 		const searchQuery = query || '*';
-		const stdout = await execCommand('jat-memory', ['search', searchQuery, '--limit', '10', '--json'], cwd, 15000);
+		const stdout = await execCommand('squad-memory', ['search', searchQuery, '--limit', '10', '--json'], cwd, 15000);
 		const results = JSON.parse(stdout);
 		if (!Array.isArray(results)) return [];
 		// Deduplicate by value (same taskId can appear in multiple sections)

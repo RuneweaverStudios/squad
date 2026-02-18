@@ -21,9 +21,9 @@ const execAsync = promisify(exec);
 const AGENT_MAIL_DB_PATH = process.env.AGENT_MAIL_DB || `${process.env.HOME}/.agent-mail.db`;
 
 /**
- * Session name prefix for JAT agent sessions
+ * Session name prefix for SQUAD agent sessions
  */
-const SESSION_PREFIX = 'jat-';
+const SESSION_PREFIX = 'squad-';
 
 /**
  * Get the full tmux session name from a name parameter.
@@ -45,8 +45,8 @@ function resolveSessionName(name) {
 
 /**
  * Convert a project path to Claude's project slug format
- * @param {string} projectPath - e.g., "/home/jw/code/jat"
- * @returns {string} - e.g., "-home-jw-code-jat"
+ * @param {string} projectPath - e.g., "/home/jw/code/squad"
+ * @returns {string} - e.g., "-home-jw-code-squad"
  */
 function getProjectSlug(projectPath) {
 	return projectPath.replace(/\//g, '-');
@@ -113,10 +113,10 @@ function findSessionIdFromJsonl(agentName, projectPath) {
 			.sort((a, b) => b.mtime - a.mtime); // Newest first
 
 		// Search for agent name in multiple patterns:
-		// 1. "agentName":"TrueCave" in tool output - from jat-signal
-		// 2. <command-args>TrueCave in early messages - from /jat:start command
+		// 1. "agentName":"TrueCave" in tool output - from squad-signal
+		// 2. <command-args>TrueCave in early messages - from /squad:start command
 		// Pattern 2 is checked only in the first 5 lines to avoid false positives from
-		// tool_results that contain context from OTHER sessions. The /jat:start command
+		// tool_results that contain context from OTHER sessions. The /squad:start command
 		// always appears in line 1-3 of the JSONL file.
 		const signalPattern = new RegExp(`"agentName"\\s*:\\s*"${agentName}"`, 'i');
 		const commandPattern = new RegExp(`<command-args>${agentName}\\s`, 'i');
@@ -132,7 +132,7 @@ function findSessionIdFromJsonl(agentName, projectPath) {
 				}
 
 				// Check command pattern only in first 5 lines (session start)
-				// The /jat:start command is always in lines 1-3, so 5 lines is safe
+				// The /squad:start command is always in lines 1-3, so 5 lines is safe
 				// but prevents matching tool_results that contain other session contexts
 				const lines = content.split('\n').slice(0, 5).join('\n');
 				if (commandPattern.test(lines)) {
@@ -152,13 +152,13 @@ function findSessionIdFromJsonl(agentName, projectPath) {
 
 /**
  * Find session_id from signal files or persistent agent session files
- * @param {string} sessionName - tmux session name (e.g., "jat-QuickOcean")
+ * @param {string} sessionName - tmux session name (e.g., "squad-QuickOcean")
  * @param {string | null} projectPath - project path to search for persistent session files
  * @returns {string | null} - Claude session_id or null if not found
  */
 function findSessionId(sessionName, projectPath = null) {
 	// Try tmux-named signal file first (in /tmp, cleared on restart)
-	const tmuxSignalFile = `/tmp/jat-signal-tmux-${sessionName}.json`;
+	const tmuxSignalFile = `/tmp/squad-signal-tmux-${sessionName}.json`;
 	if (existsSync(tmuxSignalFile)) {
 		try {
 			const data = JSON.parse(readFileSync(tmuxSignalFile, 'utf-8'));
@@ -171,8 +171,8 @@ function findSessionId(sessionName, projectPath = null) {
 	}
 
 	// Fallback: search timeline for the session (in /tmp, cleared on restart)
-	const agentName = sessionName.replace(/^jat-/, '');
-	const timelineFile = `/tmp/jat-timeline-${sessionName}.jsonl`;
+	const agentName = sessionName.replace(/^squad-/, '');
+	const timelineFile = `/tmp/squad-timeline-${sessionName}.jsonl`;
 	if (existsSync(timelineFile)) {
 		try {
 			const lines = readFileSync(timelineFile, 'utf-8').trim().split('\n');
@@ -235,7 +235,7 @@ function findSessionId(sessionName, projectPath = null) {
 	// Final fallback: scan Claude JSONL session files for agent's signals
 	// This catches sessions where .claude/sessions/agent-*.txt was never created
 	if (projectPath) {
-		const agentName = sessionName.replace(/^jat-/, '');
+		const agentName = sessionName.replace(/^squad-/, '');
 		const jsonlSessionId = findSessionIdFromJsonl(agentName, projectPath);
 		if (jsonlSessionId) {
 			return jsonlSessionId;
@@ -247,7 +247,7 @@ function findSessionId(sessionName, projectPath = null) {
 
 /**
  * Resolve a project name or path to a full path
- * @param {string} project - Project name (e.g., "jat") or path (e.g., "~/code/jat")
+ * @param {string} project - Project name (e.g., "squad") or path (e.g., "~/code/squad")
  * @returns {string | null} - Full path or null
  */
 function resolveProjectPath(project) {
@@ -261,7 +261,7 @@ function resolveProjectPath(project) {
 	}
 
 	// It's a project name - look up in config
-	const configPath = `${homeDir}/.config/jat/projects.json`;
+	const configPath = `${homeDir}/.config/squad/projects.json`;
 	if (existsSync(configPath)) {
 		try {
 			const config = JSON.parse(readFileSync(configPath, 'utf-8'));
@@ -290,7 +290,7 @@ function resolveProjectPath(project) {
  */
 async function getProjectPath(agentName) {
 	// Check signal file for project info
-	const signalFile = `/tmp/jat-signal-tmux-jat-${agentName}.json`;
+	const signalFile = `/tmp/squad-signal-tmux-squad-${agentName}.json`;
 	if (existsSync(signalFile)) {
 		try {
 			const data = JSON.parse(readFileSync(signalFile, 'utf-8'));
@@ -304,7 +304,7 @@ async function getProjectPath(agentName) {
 	}
 
 	// Check timeline for project
-	const timelineFile = `/tmp/jat-timeline-jat-${agentName}.jsonl`;
+	const timelineFile = `/tmp/squad-timeline-squad-${agentName}.jsonl`;
 	if (existsSync(timelineFile)) {
 		try {
 			const lines = readFileSync(timelineFile, 'utf-8').trim().split('\n');
@@ -397,7 +397,7 @@ export async function POST({ params, request }) {
 
 		// Get terminal emulator from config or use defaults
 		let terminal = 'auto';
-		const configPath = `${process.env.HOME}/.config/jat/projects.json`;
+		const configPath = `${process.env.HOME}/.config/squad/projects.json`;
 		if (existsSync(configPath)) {
 			try {
 				const config = JSON.parse(readFileSync(configPath, 'utf-8'));
@@ -435,7 +435,7 @@ export async function POST({ params, request }) {
 		}
 
 		// Write resume marker file so IDE can show "RESUMED" badge
-		const resumeMarker = `/tmp/jat-resumed-${sessionName}.json`;
+		const resumeMarker = `/tmp/squad-resumed-${sessionName}.json`;
 		const resumeData = JSON.stringify({
 			resumed: true,
 			originalSessionId: sessionId,

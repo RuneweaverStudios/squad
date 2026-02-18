@@ -1,6 +1,6 @@
 ## Agent/App Interface Pattern
 
-This document describes the architecture for building external applications that interface with Claude Code agents. The JAT IDE is an implementation of this pattern.
+This document describes the architecture for building external applications that interface with Claude Code agents. The SQUAD IDE is an implementation of this pattern.
 
 ### Why This Matters
 
@@ -131,7 +131,7 @@ Temp files enable cross-process communication without sockets.
 
 **Why both session ID and tmux session?**
 - Session ID: Unique per Claude Code instance, stable across restarts
-- tmux session: Human-readable, matches IDE naming (`jat-AgentName`)
+- tmux session: Human-readable, matches IDE naming (`squad-AgentName`)
 - Write to both for flexible lookup
 
 **File Lifecycle:**
@@ -146,30 +146,30 @@ tmux provides session management and bidirectional communication.
 
 **Session Naming:**
 ```
-jat-pending-{timestamp}  → Initial session (before registration)
-jat-{AgentName}          → After /jat:start renames session
+squad-pending-{timestamp}  → Initial session (before registration)
+squad-{AgentName}          → After /squad:start renames session
 ```
 
 **Sending Input to Agent:**
 ```bash
 # Send keystrokes to agent's terminal
-tmux send-keys -t "jat-AgentName" "2" Enter
+tmux send-keys -t "squad-AgentName" "2" Enter
 
 # Send text without executing
-tmux send-keys -t "jat-AgentName" "some text"
+tmux send-keys -t "squad-AgentName" "some text"
 
 # Send special keys
-tmux send-keys -t "jat-AgentName" Escape
-tmux send-keys -t "jat-AgentName" Tab
+tmux send-keys -t "squad-AgentName" Escape
+tmux send-keys -t "squad-AgentName" Tab
 ```
 
 **Reading Terminal Output:**
 ```bash
 # Capture visible pane content
-tmux capture-pane -t "jat-AgentName" -p
+tmux capture-pane -t "squad-AgentName" -p
 
 # Capture with history
-tmux capture-pane -t "jat-AgentName" -p -S -100
+tmux capture-pane -t "squad-AgentName" -p -S -100
 ```
 
 **Terminal Parsing (Fallback):**
@@ -200,7 +200,7 @@ DELETE /api/work/{sessionId}/question → Remove temp file
 ```typescript
 // +server.ts
 export async function GET({ params }) {
-    const questionFile = `/tmp/claude-question-tmux-jat-${params.sessionId}.json`;
+    const questionFile = `/tmp/claude-question-tmux-squad-${params.sessionId}.json`;
     if (existsSync(questionFile)) {
         const data = JSON.parse(readFileSync(questionFile, 'utf-8'));
         return json({ hasQuestion: true, question: data });
@@ -224,14 +224,14 @@ Understanding how session IDs map to agent names is critical.
 │  2. Process writes PPID mapping                                 │
 │     └─► /tmp/claude-session-{PPID}.txt contains session_id     │
 │                                                                 │
-│  3. User runs /jat:start, picks agent name "FreeMarsh"         │
+│  3. User runs /squad:start, picks agent name "FreeMarsh"         │
 │     └─► Writes "FreeMarsh" to .claude/sessions/agent-{id}.txt  │
-│     └─► Renames tmux session to "jat-FreeMarsh"                │
+│     └─► Renames tmux session to "squad-FreeMarsh"                │
 │                                                                 │
 │  4. Hooks can now map session_id → agent name → tmux session   │
 │     └─► session_id from hook input                              │
 │     └─► agent name from .claude/sessions/agent-{session_id}.txt│
-│     └─► tmux session is "jat-{agent_name}"                     │
+│     └─► tmux session is "squad-{agent_name}"                     │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -245,7 +245,7 @@ SESSION_ID=$(echo "$TOOL_INFO" | jq -r '.session_id')
 AGENT_NAME=$(cat ".claude/sessions/agent-${SESSION_ID}.txt")
 
 # 3. Derive tmux session name
-TMUX_SESSION="jat-${AGENT_NAME}"
+TMUX_SESSION="squad-${AGENT_NAME}"
 
 # 4. Write state file for IDE
 echo "$DATA" > "/tmp/claude-question-tmux-${TMUX_SESSION}.json"
@@ -305,7 +305,7 @@ if [[ -z "$TMUX_SESSION" ]]; then
     fi
     if [[ -f "$AGENT_FILE" ]]; then
         AGENT_NAME=$(cat "$AGENT_FILE")
-        TMUX_SESSION="jat-${AGENT_NAME}"
+        TMUX_SESSION="squad-${AGENT_NAME}"
     fi
 fi
 ```

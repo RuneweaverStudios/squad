@@ -58,7 +58,7 @@
 			</div>
 
 			<h1 class="text-3xl font-bold mb-3" style="color: oklch(0.90 0.02 250);">
-				Welcome to JAT IDE
+				Welcome to SQUAD IDE
 			</h1>
 			<p class="text-lg" style="color: oklch(0.65 0.02 250);">
 				Your multi-agent development command center
@@ -82,7 +82,7 @@
 			</h2>
 
 			<p class="mb-6" style="color: oklch(0.70 0.02 250);">
-				JAT tracks tasks across your projects using <strong style="color: oklch(0.80 0.10 200);">JAT Tasks</strong> - a lightweight, git-friendly task system. To start, add a project from your <code class="px-1 py-0.5 rounded text-sm" style="background: oklch(0.25 0.02 250); color: oklch(0.80 0.02 250);">~/code/</code> directory.
+				SQUAD tracks tasks across your projects using <strong style="color: oklch(0.80 0.10 200);">SQUAD Tasks</strong> - a lightweight, git-friendly task system. To start, add a project from your <code class="px-1 py-0.5 rounded text-sm" style="background: oklch(0.25 0.02 250); color: oklch(0.80 0.02 250);">~/code/</code> directory.
 			</p>
 
 			<!-- What is a project? -->
@@ -107,7 +107,7 @@
 						<svg class="w-5 h-5 flex-shrink-0 mt-0.5" style="color: oklch(0.70 0.18 145);" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
 						</svg>
-						<span>Initialized with <strong>JAT Tasks</strong> (creates a <code class="px-1 rounded text-sm" style="background: oklch(0.25 0.02 250);">.jat/</code> directory)</span>
+						<span>Initialized with <strong>SQUAD Tasks</strong> (creates a <code class="px-1 rounded text-sm" style="background: oklch(0.25 0.02 250);">.squad/</code> directory)</span>
 					</li>
 				</ul>
 			</div>
@@ -180,9 +180,9 @@
 								style="background: oklch(0.12 0.01 250); border: 1px solid oklch(0.22 0.02 250);"
 							>
 								<div class="flex items-center gap-2 mb-2" style="color: oklch(0.50 0.02 250);">
-									<span class="text-xs uppercase tracking-wider">Step 2: Initialize JAT Tasks</span>
+									<span class="text-xs uppercase tracking-wider">Step 2: Initialize SQUAD Tasks</span>
 								</div>
-								<code style="color: oklch(0.75 0.15 85);">jt init</code>
+								<code style="color: oklch(0.75 0.15 85);">st init</code>
 							</div>
 
 							<div
@@ -205,7 +205,7 @@
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
 						</svg>
 						<div class="text-sm" style="color: oklch(0.75 0.10 85);">
-							<strong>Tip:</strong> The IDE automatically discovers any project in <code class="px-1 rounded" style="background: oklch(0.25 0.02 250);">~/code/</code> that has a <code class="px-1 rounded" style="background: oklch(0.25 0.02 250);">.jat/</code> directory.
+							<strong>Tip:</strong> The IDE automatically discovers any project in <code class="px-1 rounded" style="background: oklch(0.25 0.02 250);">~/code/</code> that has a <code class="px-1 rounded" style="background: oklch(0.25 0.02 250);">.squad/</code> directory.
 						</div>
 					</div>
 				</div>
@@ -227,13 +227,13 @@
 				</a>
 				&middot;
 				<a
-					href="https://github.com/joewinke/jat"
+					href="https://github.com/joewinke/squad"
 					target="_blank"
 					rel="noopener noreferrer"
 					class="underline hover:no-underline transition-colors"
 					style="color: oklch(0.65 0.12 240);"
 				>
-					JAT documentation
+					SQUAD documentation
 				</a>
 			</p>
 		</div>

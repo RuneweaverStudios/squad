@@ -42,7 +42,7 @@ export interface Agent {
 	open_tasks: number;
 	in_progress_tasks: number;
 	active: boolean;
-	hasSession?: boolean;  // True if agent has an active tmux session (jat-{name})
+	hasSession?: boolean;  // True if agent has an active tmux session (squad-{name})
 	activities?: AgentActivity[];
 	current_activity?: AgentActivity | null;
 }
@@ -58,7 +58,7 @@ export interface TaskDependency {
 }
 
 /**
- * JAT task
+ * SQUAD task
  */
 export interface Task {
 	id: string;

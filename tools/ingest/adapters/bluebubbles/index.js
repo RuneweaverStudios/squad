@@ -26,7 +26,7 @@ export const metadata = {
       label: 'Server Password Secret',
       type: 'secret',
       required: true,
-      helpText: 'Name of the secret containing the BlueBubbles server password (stored in jat-secret)'
+      helpText: 'Name of the secret containing the BlueBubbles server password (stored in squad-secret)'
     },
     {
       key: 'chatFilter',

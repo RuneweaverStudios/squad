@@ -1,6 +1,6 @@
 /**
  * Server-side tmux session management
- * Wraps tmux CLI commands for managing jat-{AgentName} sessions
+ * Wraps tmux CLI commands for managing squad-{AgentName} sessions
  */
 
 import { execSync, exec } from 'child_process';
@@ -10,7 +10,7 @@ const execAsync = promisify(exec);
 
 /**
  * @typedef {Object} Session
- * @property {string} name - Session name (e.g., "jat-WisePrairie")
+ * @property {string} name - Session name (e.g., "squad-WisePrairie")
  * @property {string} agentName - Agent name extracted from session name
  * @property {number} windows - Number of windows in session
  * @property {string} created - Creation timestamp
@@ -26,9 +26,9 @@ const execAsync = promisify(exec);
  */
 
 /**
- * Session name prefix for JAT agent sessions
+ * Session name prefix for SQUAD agent sessions
  */
-const SESSION_PREFIX = 'jat-';
+const SESSION_PREFIX = 'squad-';
 
 /**
  * Check if tmux is available
@@ -44,7 +44,7 @@ export function isTmuxAvailable() {
 }
 
 /**
- * List all JAT tmux sessions
+ * List all SQUAD tmux sessions
  * @returns {Session[]} Array of session objects
  */
 export function listSessions() {
@@ -68,7 +68,7 @@ export function listSessions() {
 			.split('\n')
 			.filter(line => line.startsWith(SESSION_PREFIX))
 			// Filter out pending sessions (still being set up, not yet renamed)
-			.filter(line => !line.startsWith('jat-pending-'))
+			.filter(line => !line.startsWith('squad-pending-'))
 			.map(line => {
 				const [name, windows, created, attached] = line.split(':');
 				return {
@@ -86,7 +86,7 @@ export function listSessions() {
 }
 
 /**
- * List all JAT tmux sessions (async version)
+ * List all SQUAD tmux sessions (async version)
  * @returns {Promise<Session[]>} Array of session objects
  */
 export async function listSessionsAsync() {
@@ -108,7 +108,7 @@ export async function listSessionsAsync() {
 			.split('\n')
 			.filter(line => line.startsWith(SESSION_PREFIX))
 			// Filter out pending sessions (still being set up, not yet renamed)
-			.filter(line => !line.startsWith('jat-pending-'))
+			.filter(line => !line.startsWith('squad-pending-'))
 			.map(line => {
 				const [name, windows, created, attached] = line.split(':');
 				return {

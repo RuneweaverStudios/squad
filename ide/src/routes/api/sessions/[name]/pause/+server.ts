@@ -12,8 +12,8 @@
  *   - killSession?: boolean - Whether to kill the tmux session (default: true)
  *
  * Writes to:
- *   - /tmp/jat-signal-tmux-{session}.json - Current signal state
- *   - /tmp/jat-timeline-{session}.jsonl - Timeline history (append)
+ *   - /tmp/squad-signal-tmux-{session}.json - Current signal state
+ *   - /tmp/squad-timeline-{session}.jsonl - Timeline history (append)
  */
 
 import { json } from '@sveltejs/kit';
@@ -27,7 +27,7 @@ import type { RequestHandler } from './$types';
  */
 function captureSessionLog(sessionName: string, reason: string): string | null {
 	const projectPath = process.cwd().replace('/ide', '');
-	const logsDir = path.join(projectPath, '.jat', 'logs');
+	const logsDir = path.join(projectPath, '.squad', 'logs');
 	const logFile = path.join(logsDir, `session-${sessionName}.log`);
 
 	// Ensure logs directory exists
@@ -130,7 +130,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 
 		// Guard: refuse to auto-pause protected sessions
 		if (reason?.startsWith('Auto-paused')) {
-			const tmux = sessionName.startsWith('jat-') ? sessionName : `jat-${sessionName}`;
+			const tmux = sessionName.startsWith('squad-') ? sessionName : `squad-${sessionName}`;
 
 			// Don't auto-pause sessions whose tmux is already dead
 			try {
@@ -139,7 +139,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 				return json({ error: 'Session tmux already dead', skipped: true }, { status: 409 });
 			}
 
-			const sigFile = `/tmp/jat-signal-tmux-${tmux}.json`;
+			const sigFile = `/tmp/squad-signal-tmux-${tmux}.json`;
 			try {
 				if (existsSync(sigFile)) {
 					const sig = JSON.parse(readFileSync(sigFile, 'utf-8'));
@@ -155,9 +155,9 @@ export const POST: RequestHandler = async ({ params, request }) => {
 			} catch { /* ignore — proceed with pause */ }
 		}
 
-		// Normalize session name (ensure jat- prefix)
-		const tmuxSession = sessionName.startsWith('jat-') ? sessionName : `jat-${sessionName}`;
-		const agentNameFromSession = tmuxSession.replace(/^jat-/, '');
+		// Normalize session name (ensure squad- prefix)
+		const tmuxSession = sessionName.startsWith('squad-') ? sessionName : `squad-${sessionName}`;
+		const agentNameFromSession = tmuxSession.replace(/^squad-/, '');
 
 		// Build the paused signal
 		const timestamp = new Date().toISOString();
@@ -174,11 +174,11 @@ export const POST: RequestHandler = async ({ params, request }) => {
 		};
 
 		// 1. Write current signal state to signal file
-		const signalFile = `/tmp/jat-signal-tmux-${tmuxSession}.json`;
+		const signalFile = `/tmp/squad-signal-tmux-${tmuxSession}.json`;
 		writeFileSync(signalFile, JSON.stringify(pausedSignal, null, 2));
 
 		// 2. Append to timeline JSONL
-		const timelineFile = `/tmp/jat-timeline-${tmuxSession}.jsonl`;
+		const timelineFile = `/tmp/squad-timeline-${tmuxSession}.jsonl`;
 		const timelineEvent = {
 			type: 'signal',
 			session_id: sessionId || '',
@@ -248,8 +248,8 @@ export const GET: RequestHandler = async ({ params }) => {
 		return json({ error: 'Missing session name' }, { status: 400 });
 	}
 
-	const tmuxSession = sessionName.startsWith('jat-') ? sessionName : `jat-${sessionName}`;
-	const signalFile = `/tmp/jat-signal-tmux-${tmuxSession}.json`;
+	const tmuxSession = sessionName.startsWith('squad-') ? sessionName : `squad-${sessionName}`;
+	const signalFile = `/tmp/squad-signal-tmux-${tmuxSession}.json`;
 
 	if (!existsSync(signalFile)) {
 		return json({

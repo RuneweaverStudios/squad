@@ -6,7 +6,7 @@
  * Returns grouped results from all sources in parallel.
  * Imports search modules directly from tools/search/lib/ for in-process performance.
  *
- * Task: jat-tvos9.3 - Build unified /api/search endpoint
+ * Task: squad-tvos9.3 - Build unified /api/search endpoint
  */
 
 import { json } from '@sveltejs/kit';
@@ -15,7 +15,7 @@ import { existsSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 
-// Import search modules from tools/search/lib/ (shared with jat-search CLI)
+// Import search modules from tools/search/lib/ (shared with squad-search CLI)
 // @ts-ignore - JS module without type declarations
 import { searchTasks } from '../../../../../tools/search/lib/tasks.js';
 // @ts-ignore - JS module without type declarations
@@ -127,11 +127,11 @@ export const GET: RequestHandler = async ({ url }) => {
 
 /**
  * Resolve project name to filesystem path.
- * Checks ~/code/{project} for a .jat/ directory.
+ * Checks ~/code/{project} for a .squad/ directory.
  */
 function resolveProjectPath(project: string): string | undefined {
 	const codePath = join(homedir(), 'code', project);
-	if (existsSync(join(codePath, '.jat'))) {
+	if (existsSync(join(codePath, '.squad'))) {
 		return codePath;
 	}
 	return undefined;

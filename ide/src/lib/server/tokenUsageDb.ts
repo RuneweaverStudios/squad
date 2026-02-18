@@ -461,7 +461,7 @@ export async function runAggregation(): Promise<{
 			if (!dir.isDirectory()) continue;
 
 			const projectSlug = dir.name;
-			// Extract project name from slug (e.g., "-home-jw-code-jat" -> "jat")
+			// Extract project name from slug (e.g., "-home-jw-code-squad" -> "squad")
 			const projectName = projectSlug.split('-').pop() || projectSlug;
 			const projectDir = path.join(projectsDir, projectSlug);
 

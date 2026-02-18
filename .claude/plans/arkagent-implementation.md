@@ -2,7 +2,7 @@
 
 ## Overview
 
-Fork JAT into a cloud-native SaaS product using CMSaasStarter as the foundation, then transplant components from JAT (task management) and Flush (messaging).
+Fork SQUAD into a cloud-native SaaS product using CMSaasStarter as the foundation, then transplant components from SQUAD (task management) and Flush (messaging).
 
 **Domain:** arkagent.io
 **Tech Stack:** SvelteKit + Supabase + Stripe + Cloudflare Pages
@@ -91,11 +91,11 @@ ALTER TABLE profiles ADD COLUMN current_organization_id uuid REFERENCES organiza
 
 ---
 
-## Phase 3: Task System (Port from JAT)
+## Phase 3: Task System (Port from SQUAD)
 
 ### 3.1 Database Schema
 ```sql
--- Tasks table (from JAT schema)
+-- Tasks table (from SQUAD schema)
 CREATE TABLE tasks (
   id text PRIMARY KEY,  -- e.g., "ark-abc123"
   organization_id uuid REFERENCES organizations NOT NULL,
@@ -138,14 +138,14 @@ CREATE TABLE task_sequences (
 - [ ] `GET /api/tasks/ready` - Get ready tasks (no blockers)
 - [ ] `POST /api/tasks/[id]/dependencies` - Manage deps
 
-### 3.3 UI Components (Port from JAT)
+### 3.3 UI Components (Port from SQUAD)
 - [ ] Task list view with filters
 - [ ] Task detail drawer/page
 - [ ] Task creation form
 - [ ] Kanban board view (optional)
 - [ ] Epic tree view
 
-**Milestone:** Full task management working, parity with JAT Tasks
+**Milestone:** Full task management working, parity with SQUAD Tasks
 
 ---
 
@@ -225,7 +225,7 @@ CREATE TABLE client_tokens (
 ### 6.2 Signals/Webhooks
 - [ ] Webhook on task status change
 - [ ] Webhook on new comment
-- [ ] Integration with JAT local (sync tasks)
+- [ ] Integration with SQUAD local (sync tasks)
 
 ---
 
@@ -306,4 +306,4 @@ arkagent/
 1. Clone CMSaasStarter → `~/code/arkagent`
 2. Create Supabase project
 3. Configure and deploy base template
-4. Create epic in JAT for tracking
+4. Create epic in SQUAD for tracking

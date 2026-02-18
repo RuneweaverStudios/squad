@@ -92,7 +92,7 @@
 
 	// Command input state
 	let commandPrompt = $state('');
-	let selectedProject = $state('jat');
+	let selectedProject = $state('squad');
 	let selectedModel = $state('haiku');
 	let isExecuting = $state(false);
 	let executionResult = $state<ExecutionResult | null>(null);
@@ -164,7 +164,7 @@
 	let pipelineRunSteps = $state<PipelineRunStep[]>([]);
 	let pipelineRunning = $state(false);
 	let pipelineCurrentStep = $state(-1);
-	let pipelineRunProject = $state('jat');
+	let pipelineRunProject = $state('squad');
 	let pipelineRunError = $state('');
 
 	// Active tab
@@ -183,7 +183,7 @@
 		{ id: 'opus', label: 'Opus', desc: 'Most capable' }
 	];
 
-	const HISTORY_KEY = 'jat-quick-command-history';
+	const HISTORY_KEY = 'squad-quick-command-history';
 	const MAX_HISTORY = 20;
 
 	// --- Lifecycle ---
@@ -993,7 +993,7 @@
 </script>
 
 <svelte:head>
-	<title>Quick Commands - JAT</title>
+	<title>Quick Commands - SQUAD</title>
 </svelte:head>
 
 <div

@@ -668,7 +668,7 @@ describe('Timeline API Response Handling', () => {
 			json: () => Promise.resolve(mockResponse)
 		});
 
-		const response = await fetch('/api/files/git/log?project=jat&limit=30');
+		const response = await fetch('/api/files/git/log?project=squad&limit=30');
 		const data = await response.json();
 
 		expect(data.commits).toBeDefined();
@@ -682,7 +682,7 @@ describe('Timeline API Response Handling', () => {
 			json: () => Promise.resolve({ message: 'Git repository not found' })
 		});
 
-		const response = await fetch('/api/files/git/log?project=jat&limit=30');
+		const response = await fetch('/api/files/git/log?project=squad&limit=30');
 		const data = await response.json();
 
 		expect(response.ok).toBe(false);
@@ -692,7 +692,7 @@ describe('Timeline API Response Handling', () => {
 	it('should handle network error', async () => {
 		mockFetch.mockRejectedValue(new Error('Network error'));
 
-		await expect(fetch('/api/files/git/log?project=jat&limit=30')).rejects.toThrow(
+		await expect(fetch('/api/files/git/log?project=squad&limit=30')).rejects.toThrow(
 			'Network error'
 		);
 	});
@@ -707,7 +707,7 @@ describe('Timeline API Response Handling', () => {
 			json: () => Promise.resolve(mockResponse)
 		});
 
-		const response = await fetch('/api/files/git/log?project=jat&limit=30');
+		const response = await fetch('/api/files/git/log?project=squad&limit=30');
 		const data = await response.json();
 
 		expect(data.commits).toBeDefined();

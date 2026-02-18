@@ -3,7 +3,7 @@
  *
  * GET /api/work/[sessionId]/question
  *
- * The sessionId parameter is the tmux session name (e.g., "jat-WisePrairie")
+ * The sessionId parameter is the tmux session name (e.g., "squad-WisePrairie")
  *
  * Returns the current AskUserQuestion prompt data if one is active,
  * or { active: false } if no question is pending.

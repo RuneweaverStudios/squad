@@ -46,10 +46,10 @@
 </script>
 
 <svelte:head>
-	<title>API Demo | JAT IDE</title>
-	<meta name="description" content="API demonstration page for testing JAT IDE endpoints. View agent data and task statistics." />
-	<meta property="og:title" content="API Demo | JAT IDE" />
-	<meta property="og:description" content="API demonstration page for testing JAT IDE endpoints. View agent data and task statistics." />
+	<title>API Demo | SQUAD IDE</title>
+	<meta name="description" content="API demonstration page for testing SQUAD IDE endpoints. View agent data and task statistics." />
+	<meta property="og:title" content="API Demo | SQUAD IDE" />
+	<meta property="og:description" content="API demonstration page for testing SQUAD IDE endpoints. View agent data and task statistics." />
 	<meta property="og:image" content="/favicons/config.svg" />
 	<link rel="icon" href="/favicons/config.svg" />
 </svelte:head>

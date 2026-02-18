@@ -564,7 +564,7 @@
 			<div class="install-conduit">
 				<div class="conduit-end left">◆</div>
 				<div class="conduit-body">
-					<code>git clone https://github.com/jomarchy/jat.git</code>
+					<code>git clone https://github.com/jomarchy/squad.git</code>
 				</div>
 				<div class="conduit-end right">◆</div>
 			</div>

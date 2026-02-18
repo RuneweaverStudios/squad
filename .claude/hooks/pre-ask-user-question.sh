@@ -30,9 +30,9 @@ fi
 if [[ -z "$TMUX_SESSION" ]]; then
     # Build list of directories to search: current dir + configured projects
     SEARCH_DIRS="."
-    JAT_CONFIG="$HOME/.config/jat/projects.json"
-    if [[ -f "$JAT_CONFIG" ]]; then
-        PROJECT_PATHS=$(jq -r '.projects[].path // empty' "$JAT_CONFIG" 2>/dev/null | sed "s|^~|$HOME|g")
+    SQUAD_CONFIG="$HOME/.config/squad/projects.json"
+    if [[ -f "$SQUAD_CONFIG" ]]; then
+        PROJECT_PATHS=$(jq -r '.projects[].path // empty' "$SQUAD_CONFIG" 2>/dev/null | sed "s|^~|$HOME|g")
         for PROJECT_PATH in $PROJECT_PATHS; do
             if [[ -d "${PROJECT_PATH}/.claude" ]]; then
                 SEARCH_DIRS="$SEARCH_DIRS $PROJECT_PATH"
@@ -51,7 +51,7 @@ if [[ -z "$TMUX_SESSION" ]]; then
             if [[ -f "$AGENT_FILE" ]]; then
                 AGENT_NAME=$(cat "$AGENT_FILE" 2>/dev/null | tr -d '\n')
                 if [[ -n "$AGENT_NAME" ]]; then
-                    TMUX_SESSION="jat-${AGENT_NAME}"
+                    TMUX_SESSION="squad-${AGENT_NAME}"
                     break 2
                 fi
             fi
@@ -84,10 +84,10 @@ if [[ -n "$TMUX_SESSION" ]]; then
     QUESTION_TEXT=$(echo "$TOOL_INFO" | jq -r '.tool_input.questions[0].question // "Question from agent"' 2>/dev/null || echo "Question from agent")
     QUESTION_TYPE=$(echo "$TOOL_INFO" | jq -r 'if .tool_input.questions[0].multiSelect then "multi-select" else "choice" end' 2>/dev/null || echo "choice")
 
-    # Get current task ID from JAT Tasks if available
+    # Get current task ID from SQUAD Tasks if available
     TASK_ID=""
-    if command -v jt &>/dev/null && [[ -n "$AGENT_NAME" ]]; then
-        TASK_ID=$(jt list --json 2>/dev/null | jq -r --arg agent "$AGENT_NAME" '.[] | select(.assignee == $agent and .status == "in_progress") | .id' 2>/dev/null | head -1 || echo "")
+    if command -v st &>/dev/null && [[ -n "$AGENT_NAME" ]]; then
+        TASK_ID=$(st list --json 2>/dev/null | jq -r --arg agent "$AGENT_NAME" '.[] | select(.assignee == $agent and .status == "in_progress") | .id' 2>/dev/null | head -1 || echo "")
     fi
 
     # Build signal data - use type: "state" and state: "needs_input"
@@ -115,11 +115,11 @@ if [[ -n "$TMUX_SESSION" ]]; then
         }' 2>/dev/null || echo "{}")
 
     # Write signal files
-    echo "$SIGNAL_DATA" > "/tmp/jat-signal-${SESSION_ID}.json" 2>/dev/null || true
-    echo "$SIGNAL_DATA" > "/tmp/jat-signal-tmux-${TMUX_SESSION}.json" 2>/dev/null || true
+    echo "$SIGNAL_DATA" > "/tmp/squad-signal-${SESSION_ID}.json" 2>/dev/null || true
+    echo "$SIGNAL_DATA" > "/tmp/squad-signal-tmux-${TMUX_SESSION}.json" 2>/dev/null || true
 
     # Also append to timeline for history tracking (JSONL format)
-    TIMELINE_FILE="/tmp/jat-timeline-${TMUX_SESSION}.jsonl"
+    TIMELINE_FILE="/tmp/squad-timeline-${TMUX_SESSION}.jsonl"
     echo "$SIGNAL_DATA" >> "$TIMELINE_FILE" 2>/dev/null || true
 fi
 

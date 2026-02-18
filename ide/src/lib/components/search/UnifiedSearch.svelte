@@ -12,7 +12,7 @@
 	 * - route: full page, URL-synced state
 	 * - modal: overlay triggered by Ctrl+K or topbar icon
 	 *
-	 * Task: jat-fqaqf
+	 * Task: squad-fqaqf
 	 */
 
 	import { onMount, tick } from 'svelte';

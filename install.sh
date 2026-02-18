@@ -2,7 +2,7 @@
 
 # Squad IDE Installer
 # Complete AI-assisted development environment setup
-# Fork: https://github.com/joewinke/jat
+# Fork: https://github.com/joewinke/squad
 
 set -e  # Exit on error
 
@@ -211,30 +211,30 @@ if [ -n "$MISSING_DEPS" ]; then
 fi
 
 # Determine installation directory
-# Priority: SQUAD_INSTALL_DIR or JAT_INSTALL_DIR env var > current dir (Squad repo) > XDG location
+# Priority: SQUAD_INSTALL_DIR or SQUAD_INSTALL_DIR env var > current dir (Squad repo) > XDG location
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [ -n "$SQUAD_INSTALL_DIR" ]; then
     INSTALL_DIR="$SQUAD_INSTALL_DIR"
     echo -e "${BLUE}Using SQUAD_INSTALL_DIR: $INSTALL_DIR${NC}"
-elif [ -n "$JAT_INSTALL_DIR" ]; then
-    INSTALL_DIR="$JAT_INSTALL_DIR"
+elif [ -n "$SQUAD_INSTALL_DIR" ]; then
+    INSTALL_DIR="$SQUAD_INSTALL_DIR"
     echo -e "${BLUE}Using install dir: $INSTALL_DIR${NC}"
 elif [ -f "$SCRIPT_DIR/install.sh" ] && [ -d "$SCRIPT_DIR/tools" ] && [ -d "$SCRIPT_DIR/ide" ]; then
     # Running from Squad repo (developer mode)
     INSTALL_DIR="$SCRIPT_DIR"
     echo -e "${BLUE}Using current Squad repo: $INSTALL_DIR${NC}"
-elif [ -d "${XDG_DATA_HOME:-$HOME/.local/share}/jat" ]; then
+elif [ -d "${XDG_DATA_HOME:-$HOME/.local/share}/squad" ]; then
     # Existing XDG installation
-    INSTALL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/jat"
+    INSTALL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/squad"
     echo -e "${BLUE}Using existing installation: $INSTALL_DIR${NC}"
 else
     # New installation - clone to XDG location
-    INSTALL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/jat"
+    INSTALL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/squad"
     echo -e "${BLUE}Installing to: $INSTALL_DIR${NC}"
     mkdir -p "$(dirname "$INSTALL_DIR")"
-    git clone https://github.com/joewinke/jat.git "$INSTALL_DIR"
+    git clone https://github.com/joewinke/squad.git "$INSTALL_DIR"
 fi
 
 cd "$INSTALL_DIR"
@@ -288,12 +288,12 @@ echo -e "${BOLD}Step 2/9: Setting Up Task CLI${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-# jt CLI is symlinked via symlink-tools.sh (Step 3)
+# st CLI is symlinked via symlink-tools.sh (Step 3)
 # Just verify the binary exists
-if [ -f "$INSTALL_DIR/cli/jat" ]; then
+if [ -f "$INSTALL_DIR/cli/squad" ]; then
     echo -e "  ${GREEN}✓${NC} CLI found (will be symlinked in next step)"
 else
-    echo -e "  ${YELLOW}⚠${NC} CLI not found at $INSTALL_DIR/cli/jat"
+    echo -e "  ${YELLOW}⚠${NC} CLI not found at $INSTALL_DIR/cli/squad"
 fi
 
 echo ""
@@ -323,9 +323,9 @@ if command -v npm &> /dev/null; then
         echo -e "  Or Homebrew:  ${BOLD}brew install node@22 && brew link --overwrite node@22${NC}"
         echo ""
     fi
-    # Install root jat dependencies (better-sqlite3 for lib/tasks.js)
+    # Install root squad dependencies (better-sqlite3 for lib/tasks.js)
     if [ -f "$INSTALL_DIR/package.json" ]; then
-        echo "  → Installing jat core dependencies..."
+        echo "  → Installing squad core dependencies..."
         (cd "$INSTALL_DIR" && npm install --silent 2>/dev/null) && \
             echo -e "  ${GREEN}✓${NC} core dependencies installed" || \
             echo -e "  ${YELLOW}⚠${NC} npm install failed (run manually: cd $INSTALL_DIR && npm install)"
@@ -489,10 +489,10 @@ echo ""
 echo "What was installed:"
 echo ""
 echo "  ✓ Agent Registry (4 bash/SQLite tools: am-register, am-agents, am-whoami, am-delete-agent)"
-echo "  ✓ Task CLI (jt command + 4 review tools)"
+echo "  ✓ Task CLI (st command + 4 review tools)"
 echo "  ✓ Browser Tools (12 CDP automation tools: browser-*.js)"
 echo "  ✓ Database Tools (4 tools: db-query, db-schema, etc.)"
-echo "  ✓ Signal Tools (2 tools: jat-signal, jat-signal-validate)"
+echo "  ✓ Signal Tools (2 tools: squad-signal, squad-signal-validate)"
 if [ ! -z "$SELECTED_STACKS" ] && echo "$SELECTED_STACKS" | grep -q "SvelteKit"; then
     echo "  ✓ SvelteKit + Supabase Stack (11 additional tools)"
 fi
@@ -500,13 +500,13 @@ if [ "$INSTALL_WHISPER" = "yes" ]; then
     echo "  ✓ Voice-to-Text (whisper.cpp + large-v3-turbo model)"
 fi
 if [ "$INSTALL_PI_SKILLS" = "yes" ]; then
-    echo "  ✓ Pi Skills (jat-start, jat-complete, jat-verify + AGENTS.md)"
+    echo "  ✓ Pi Skills (squad-start, squad-complete, squad-verify + AGENTS.md)"
 fi
 echo "  ✓ Multi-line statusline (agent, task, git, context)"
-echo "  ✓ Real-time hooks (auto-refresh on jt/am-* commands)"
+echo "  ✓ Real-time hooks (auto-refresh on st/am-* commands)"
 echo "  ✓ Git pre-commit hook (agent registration check)"
 echo "  ✓ Global ~/.claude/CLAUDE.md (multi-project instructions)"
-echo "  ✓ Per-repo setup (jt init, CLAUDE.md templates)"
+echo "  ✓ Per-repo setup (st init, CLAUDE.md templates)"
 echo ""
 # Detect shell config file
 SHELL_NAME=$(basename "$SHELL")
@@ -529,10 +529,10 @@ fi
 echo ""
 echo "The IDE will guide you through adding your first project."
 echo ""
-echo "Documentation: https://github.com/joewinke/jat (upstream)"
+echo "Documentation: https://github.com/joewinke/squad (upstream)"
 echo ""
 if prompt_yes_no "${BOLD}Launch Squad IDE now? [Y/n]${NC} " "y"; then
     echo ""
-    exec "$HOME/.local/bin/jat"
+    exec "$HOME/.local/bin/squad"
 fi
 echo ""

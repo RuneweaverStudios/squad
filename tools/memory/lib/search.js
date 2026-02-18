@@ -24,7 +24,7 @@ const RRF_K = 60;
  * Run hybrid search over the memory index.
  *
  * @param {object} options
- * @param {string} options.projectPath - Project root (contains .jat/)
+ * @param {string} options.projectPath - Project root (contains .squad/)
  * @param {string} options.query - Search query text
  * @param {number} [options.limit=5] - Max results to return
  * @param {number} [options.candidates=20] - Candidates per search method

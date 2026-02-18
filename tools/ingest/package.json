@@ -1,7 +1,7 @@
 {
-  "name": "jat-ingest",
+  "name": "squad-ingest",
   "version": "1.0.0",
-  "description": "Content ingestion daemon for JAT - watches Telegram, Slack, RSS, WhatsApp and creates tasks",
+  "description": "Content ingestion daemon for SQUAD - watches Telegram, Slack, RSS, WhatsApp and creates tasks",
   "type": "module",
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.16",

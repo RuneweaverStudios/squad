@@ -1,17 +1,17 @@
-# JAT IDE
+# SQUAD IDE
 
-A modern, real-time task management IDE for multi-project JAT Tasks workflows. Built with SvelteKit 5, Tailwind CSS, and DaisyUI.
+A modern, real-time task management IDE for multi-project SQUAD Tasks workflows. Built with SvelteKit 5, Tailwind CSS, and DaisyUI.
 
 [![Svelte 5](https://img.shields.io/badge/Svelte-5-FF3E00?logo=svelte)](https://svelte.dev)
 [![SvelteKit](https://img.shields.io/badge/SvelteKit-2-FF3E00)](https://kit.svelte.dev)
 [![DaisyUI](https://img.shields.io/badge/DaisyUI-32%20Themes-5A0EF8)](https://daisyui.com)
 
 ![IDE Screenshot](./ide-screenshot.png)
-*JAT IDE with dependency graph visualization showing task relationships*
+*SQUAD IDE with dependency graph visualization showing task relationships*
 
 ## Overview
 
-The JAT IDE provides a unified web interface for viewing and managing tasks across multiple projects using JAT Tasks (`jt` CLI). It aggregates tasks from all your project repositories in `~/code/*` and displays them with powerful filtering, search, and real-time updates.
+The SQUAD IDE provides a unified web interface for viewing and managing tasks across multiple projects using SQUAD Tasks (`st` CLI). It aggregates tasks from all your project repositories in `~/code/*` and displays them with powerful filtering, search, and real-time updates.
 
 **Key Features:**
 
@@ -31,15 +31,15 @@ The JAT IDE provides a unified web interface for viewing and managing tasks acro
 ### Prerequisites
 
 - Node.js 18+ (or bun/pnpm)
-- [Jomarchy Agent Tools](https://github.com/joewinke/jat) installed
-- [JAT Tasks CLI](https://github.com/joewinke/jat) (`jt`) installed and configured
-- Projects with `.jat/` directories in `~/code/*`
+- [Jomarchy Agent Tools](https://github.com/joewinke/squad) installed
+- [SQUAD Tasks CLI](https://github.com/joewinke/squad) (`st`) installed and configured
+- Projects with `.squad/` directories in `~/code/*`
 
 ### Quick Start
 
 ```bash
 # Navigate to IDE directory
-cd ~/code/jat/ide
+cd ~/code/squad/ide
 
 # Install dependencies
 npm install
@@ -50,13 +50,13 @@ npm run dev
 # Open browser to http://127.0.0.1:5173
 ```
 
-The IDE will automatically scan `~/code/*` for projects with JAT Tasks databases and aggregate all tasks.
+The IDE will automatically scan `~/code/*` for projects with SQUAD Tasks databases and aggregate all tasks.
 
 ## Usage
 
 ### Viewing Tasks
 
-The IDE displays all tasks from your JAT-enabled projects. Each task shows:
+The IDE displays all tasks from your SQUAD-enabled projects. Each task shows:
 
 - **Project Badge** - Color-coded by project (e.g., `chimaro-abc`, `jomarchy-xyz`)
 - **Priority Badge** - P0 (Critical/Red) through P3 (Low/Green)
@@ -77,7 +77,7 @@ Filters are reactive and update instantly using Svelte 5's `$derived` rune.
 
 #### Multi-Project Filtering
 
-The IDE automatically detects projects from task ID prefixes (e.g., `chimaro-abc`, `jat-xyz`, `jomarchy-123`) and provides intelligent filtering:
+The IDE automatically detects projects from task ID prefixes (e.g., `chimaro-abc`, `squad-xyz`, `jomarchy-123`) and provides intelligent filtering:
 
 **Key Features:**
 - **Automatic Detection** - Projects discovered from task IDs, no configuration needed
@@ -90,13 +90,13 @@ The IDE automatically detects projects from task ID prefixes (e.g., `chimaro-abc
 ```
 /agents                      → All projects
 /agents?project=chimaro      → Only chimaro tasks
-/agents?project=jat          → Only jat tasks
+/agents?project=squad          → Only squad tasks
 ```
 
 **Combined Filters:**
 ```
-/agents?project=jat&priority=P0&status=open
-→ Shows P0 open tasks from jat project only
+/agents?project=squad&priority=P0&status=open
+→ Shows P0 open tasks from squad project only
 ```
 
 For developer documentation on project filtering, see `ide/CLAUDE.md`.
@@ -152,7 +152,7 @@ Theme preference is saved to localStorage and persists across sessions.
 
 ### Auto-Refresh
 
-The IDE auto-refreshes every 30 seconds to stay in sync with JAT task changes. You can also manually refresh using the "Refresh" button.
+The IDE auto-refreshes every 30 seconds to stay in sync with SQUAD task changes. You can also manually refresh using the "Refresh" button.
 
 ## Architecture
 
@@ -161,7 +161,7 @@ The IDE auto-refreshes every 30 seconds to stay in sync with JAT task changes. Y
 - **Framework**: SvelteKit 2 with Svelte 5
 - **Styling**: Tailwind CSS 4 + DaisyUI 5
 - **Visualization**: D3.js 7 (force-directed graphs, interactive SVG)
-- **Database**: Better-SQLite3 (reads JAT `.jat/tasks.db` databases)
+- **Database**: Better-SQLite3 (reads SQUAD `.squad/tasks.db` databases)
 - **Build**: Vite 7
 - **Adapter**: @sveltejs/adapter-node (for production deployment)
 
@@ -195,7 +195,7 @@ ide/
 
 1. **Frontend** (`+page.svelte`) renders filters and `TaskList` component
 2. **TaskList** fetches data from `/api/tasks` endpoint
-3. **API** (`/api/tasks/+server.ts`) scans `~/code/*/.jat/tasks.db` databases
+3. **API** (`/api/tasks/+server.ts`) scans `~/code/*/.squad/tasks.db` databases
 4. **API** queries tasks, aggregates across projects, extracts project names from IDs
 5. **TaskList** receives `{ tasks, projects }` and displays with reactive filtering
 6. **Auto-refresh** polls every 30s via `setInterval` + `$effect` cleanup
@@ -405,7 +405,7 @@ npm run check      # Type-check with svelte-check
 
 #### `GET /api/tasks`
 
-Returns aggregated task data from all JAT projects:
+Returns aggregated task data from all SQUAD projects:
 
 ```json
 {
@@ -422,7 +422,7 @@ Returns aggregated task data from all JAT projects:
       "updated_at": "2025-11-19T15:45:00Z"
     }
   ],
-  "projects": ["chimaro", "jomarchy", "jat"]
+  "projects": ["chimaro", "jomarchy", "squad"]
 }
 ```
 
@@ -479,7 +479,7 @@ node build/index.js
 Or use a process manager:
 
 ```bash
-pm2 start build/index.js --name jat-ide
+pm2 start build/index.js --name squad-ide
 ```
 
 ### Environment Variables
@@ -496,7 +496,7 @@ PORT=8080 HOST=0.0.0.0 node build/index.js
 ```nginx
 server {
   listen 80;
-  server_name jat.example.com;
+  server_name squad.example.com;
 
   location / {
     proxy_pass http://127.0.0.1:3000;
@@ -516,9 +516,9 @@ server {
 **Issue**: IDE shows "No tasks found"
 
 **Solutions**:
-- Ensure JAT task databases exist in `~/code/*/.jat/tasks.db`
+- Ensure SQUAD task databases exist in `~/code/*/.squad/tasks.db`
 - Check API response at `http://127.0.0.1:5173/api/tasks`
-- Verify permissions on `.jat/` directories
+- Verify permissions on `.squad/` directories
 - Check browser console for fetch errors
 
 ### Theme Not Persisting
@@ -556,12 +556,12 @@ MIT - See [LICENSE](../LICENSE) for details.
 
 ## Related Projects
 
-- [Beads CLI](https://github.com/steveyegge/beads) - Original dependency-aware task planning (JAT Tasks fork)
-- [Jomarchy Agent Tools](https://github.com/joewinke/jat) - Multi-agent coordination
+- [Beads CLI](https://github.com/steveyegge/beads) - Original dependency-aware task planning (SQUAD Tasks fork)
+- [Jomarchy Agent Tools](https://github.com/joewinke/squad) - Multi-agent coordination
 - [Agent Mail](../tools/am-*) - Bash-based agent messaging and file locks
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/joewinke/jat/issues)
+- **Issues**: [GitHub Issues](https://github.com/joewinke/squad/issues)
 - **Docs**: [Main README](../README.md)
 - **Discord**: [Join Community](https://discord.gg/example) <!-- Update with real link -->

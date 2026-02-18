@@ -1,10 +1,10 @@
 # Installation
 
-JAT runs on Linux and macOS. The whole setup takes about five minutes if you already have the prerequisites.
+SQUAD runs on Linux and macOS. The whole setup takes about five minutes if you already have the prerequisites.
 
 ## Prerequisites
 
-You need three tools installed before running the JAT installer.
+You need three tools installed before running the SQUAD installer.
 
 | Tool | Purpose | Required |
 |------|---------|----------|
@@ -38,13 +38,13 @@ brew install tmux sqlite jq
 
 Node.js is optional but recommended. Without it, you wont have access to the IDE or browser automation tools. Any recent LTS version (v20+) works.
 
-## Install JAT
+## Install SQUAD
 
 Clone the repository and run the installer:
 
 ```bash
-git clone https://github.com/jomarchy/jat.git ~/code/jat
-cd ~/code/jat
+git clone https://github.com/jomarchy/squad.git ~/code/squad
+cd ~/code/squad
 ./install.sh
 ```
 
@@ -53,7 +53,7 @@ The installer creates symlinks in `~/.local/bin/` pointing to the actual tool sc
 - Agent Registry database at `~/.agent-mail.db`
 - Claude Code hooks in `~/.claude/hooks/`
 - Statusline script at `~/.claude/statusline.sh`
-- Task CLI (`jt` command)
+- Task CLI (`st` command)
 
 Make sure `~/.local/bin` is in your PATH. Add this to your `~/.bashrc` or `~/.zshrc` if it isnt already:
 
@@ -76,12 +76,12 @@ am-whoami            # Should print "Not registered" or an agent name
 am-agents            # Lists all registered agents
 
 # Task CLI
-jt --version         # Should print jt x.x.x
-jt --help            # Shows available commands
+st --version         # Should print st x.x.x
+st --help            # Shows available commands
 
 # Check symlink counts
 ls ~/.local/bin/am-* | wc -l        # Expected: 13
-ls ~/.local/bin/jt* | wc -l         # Expected: 5
+ls ~/.local/bin/st* | wc -l         # Expected: 5
 ls ~/.local/bin/browser-* | wc -l   # Expected: 11
 ```
 
@@ -89,19 +89,19 @@ If any command returns `command not found`, the most likely cause is `~/.local/b
 
 ## Add your first project
 
-JAT needs at least one project before the IDE or agents can do anything useful. A valid project is a git repository with a `.jat/` directory.
+SQUAD needs at least one project before the IDE or agents can do anything useful. A valid project is a git repository with a `.squad/` directory.
 
 ```bash
 cd ~/code/my-project
-jt init
+st init
 ```
 
-The `jt init` command creates a `.jat/` directory with the task database.
+The `st init` command creates a `.squad/` directory with the task database.
 
 After initialization, verify it worked:
 
 ```bash
-jt list --status open    # Should return an empty list (no tasks yet)
+st list --status open    # Should return an empty list (no tasks yet)
 ```
 
 You can also add projects through the IDE once its running. Go to the Tasks page and click "Add Project."
@@ -109,7 +109,7 @@ You can also add projects through the IDE once its running. Go to the Tasks page
 ## Start the IDE
 
 ```bash
-jat
+squad
 ```
 
 This launches the SvelteKit-based IDE, checks for updates, and opens your browser. The IDE typically runs at `http://127.0.0.1:5174`.
@@ -119,10 +119,10 @@ This launches the SvelteKit-based IDE, checks for updates, and opens your browse
 | Problem | Cause | Fix |
 |---------|-------|-----|
 | `command not found` | PATH not configured | Add `~/.local/bin` to your PATH |
-| `am-whoami` fails | Database not initialized | Run `bash ~/code/jat/tools/scripts/install-agent-mail.sh` |
-| `jt: command not found` | Task CLI not installed | Run `./install.sh` to create symlinks |
-| Browser tools fail | npm dependencies missing | Run `cd ~/code/jat/tools/browser && npm install` |
-| IDE wont start | Dependencies missing | Run `cd ~/code/jat/ide && npm install` |
+| `am-whoami` fails | Database not initialized | Run `bash ~/code/squad/tools/scripts/install-agent-mail.sh` |
+| `st: command not found` | Task CLI not installed | Run `./install.sh` to create symlinks |
+| Browser tools fail | npm dependencies missing | Run `cd ~/code/squad/tools/browser && npm install` |
+| IDE wont start | Dependencies missing | Run `cd ~/code/squad/ide && npm install` |
 | Broken symlinks | Stale installation | Run `./install.sh` again to refresh |
 
 ## Next steps

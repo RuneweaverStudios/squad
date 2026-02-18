@@ -34,13 +34,13 @@ jobs:
     - name: Install Node dependencies
       run: npm ci
 
-    - name: Create mock JAT directories for tests
+    - name: Create mock SQUAD directories for tests
       run: |
-        mkdir -p ~/code/jomarchy-agent-tools/.jat
-        mkdir -p ~/code/chimaro/.jat
-        mkdir -p ~/code/test-project/.jat
+        mkdir -p ~/code/jomarchy-agent-tools/.squad
+        mkdir -p ~/code/chimaro/.squad
+        mkdir -p ~/code/test-project/.squad
         # Create minimal test databases for query layer tests
-        echo "Creating test JAT databases..."
+        echo "Creating test SQUAD databases..."
         # Note: The actual test databases will be created by test scripts
 
     - name: Run all tests

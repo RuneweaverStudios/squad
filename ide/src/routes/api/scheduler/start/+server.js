@@ -2,7 +2,7 @@
  * Scheduler Start API
  * POST /api/scheduler/start
  *
- * Starts the jat-scheduler service in a tmux session.
+ * Starts the squad-scheduler service in a tmux session.
  * The scheduler polls for tasks with next_run_at <= now and spawns agents.
  *
  * Returns 200 if started successfully, 409 if already running.
@@ -34,9 +34,9 @@ export async function POST() {
 		}
 
 		// Find the scheduler script
-		const jatPath = process.cwd().replace(/\/ide$/, '');
-		const schedulerScript = join(jatPath, 'tools', 'scheduler', 'run.sh');
-		const fallbackScript = join(homedir(), 'code', 'jat', 'tools', 'scheduler', 'run.sh');
+		const squadPath = process.cwd().replace(/\/ide$/, '');
+		const schedulerScript = join(squadPath, 'tools', 'scheduler', 'run.sh');
+		const fallbackScript = join(homedir(), 'code', 'squad', 'tools', 'scheduler', 'run.sh');
 
 		let scriptPath = null;
 		if (existsSync(schedulerScript)) {
@@ -49,7 +49,7 @@ export async function POST() {
 			return json(
 				{
 					success: false,
-					message: 'Scheduler script not found. The jat-scheduler service has not been built yet.',
+					message: 'Scheduler script not found. The squad-scheduler service has not been built yet.',
 					hint: 'The scheduler service will be implemented in a future task.'
 				},
 				{ status: 404 }

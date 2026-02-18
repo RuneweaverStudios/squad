@@ -27,8 +27,8 @@ import {
 // CONSTANTS
 // =============================================================================
 
-const STORAGE_KEY = 'jat-automation-rules';
-const CONFIG_STORAGE_KEY = 'jat-automation-config';
+const STORAGE_KEY = 'squad-automation-rules';
+const CONFIG_STORAGE_KEY = 'squad-automation-config';
 
 // =============================================================================
 // STATE

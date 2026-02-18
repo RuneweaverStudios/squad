@@ -24,27 +24,27 @@ import {
 
 describe('getStorageKey', () => {
 	it('should return correct key for simple project name', () => {
-		expect(getStorageKey('jat')).toBe('jat-files-open-jat');
+		expect(getStorageKey('squad')).toBe('squad-files-open-squad');
 	});
 
 	it('should return correct key for hyphenated project name', () => {
-		expect(getStorageKey('my-project')).toBe('jat-files-open-my-project');
+		expect(getStorageKey('my-project')).toBe('squad-files-open-my-project');
 	});
 
 	it('should return correct key for project name with underscores', () => {
-		expect(getStorageKey('my_cool_project')).toBe('jat-files-open-my_cool_project');
+		expect(getStorageKey('my_cool_project')).toBe('squad-files-open-my_cool_project');
 	});
 
 	it('should handle numeric project names', () => {
-		expect(getStorageKey('project123')).toBe('jat-files-open-project123');
+		expect(getStorageKey('project123')).toBe('squad-files-open-project123');
 	});
 
 	it('should handle empty string (edge case)', () => {
-		expect(getStorageKey('')).toBe('jat-files-open-');
+		expect(getStorageKey('')).toBe('squad-files-open-');
 	});
 
 	it('should handle project names with special characters', () => {
-		expect(getStorageKey('proj@ect')).toBe('jat-files-open-proj@ect');
+		expect(getStorageKey('proj@ect')).toBe('squad-files-open-proj@ect');
 	});
 });
 

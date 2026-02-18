@@ -175,7 +175,7 @@
 				<div class="terminal-header">
 					<span>// INIT_SEQUENCE</span>
 				</div>
-				<code>$ git clone https://github.com/jomarchy/jat.git</code>
+				<code>$ git clone https://github.com/jomarchy/squad.git</code>
 			</div>
 		</section>
 	</div>

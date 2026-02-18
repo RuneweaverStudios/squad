@@ -75,7 +75,7 @@ export type ActivityState =
 	| 'working' // Actively coding
 	| 'needs-input' // Waiting for user response
 	| 'ready-for-review' // Asking to mark complete
-	| 'completing' // Running /jat:complete
+	| 'completing' // Running /squad:complete
 	| 'completed' // Task finished
 	| 'polishing' // Post-completion follow-up tweaks
 	| 'idle'; // No active task

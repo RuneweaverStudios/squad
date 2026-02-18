@@ -118,7 +118,7 @@ export const NODE_TYPE_META: Record<NodeType, NodeTypeMeta> = {
 	trigger_event: {
 		type: 'trigger_event',
 		label: 'Event Trigger',
-		description: 'Fires when a JAT event occurs',
+		description: 'Fires when a SQUAD event occurs',
 		category: 'trigger',
 		icon: ICONS.event,
 		color: 'oklch(0.72 0.17 145)',
@@ -161,7 +161,7 @@ export const NODE_TYPE_META: Record<NodeType, NodeTypeMeta> = {
 	action_create_task: {
 		type: 'action_create_task',
 		label: 'Create Task',
-		description: 'Create a new task in JAT',
+		description: 'Create a new task in SQUAD',
 		category: 'action',
 		icon: ICONS.task,
 		color: 'oklch(0.72 0.17 220)',
@@ -294,7 +294,7 @@ export const EVENT_TYPES: { value: string; label: string; description: string }[
 	{ value: 'task_completed', label: 'Task Completed', description: 'Fires when any task is closed' },
 	{ value: 'task_created', label: 'Task Created', description: 'Fires when a new task is created' },
 	{ value: 'agent_idle', label: 'Agent Idle', description: 'Fires when an agent has no active task' },
-	{ value: 'signal_received', label: 'Signal Received', description: 'Fires on a specific JAT signal' }
+	{ value: 'signal_received', label: 'Signal Received', description: 'Fires on a specific SQUAD signal' }
 ];
 
 /** Browser action types */

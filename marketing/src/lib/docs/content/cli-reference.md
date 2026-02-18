@@ -1,40 +1,40 @@
 # CLI reference
 
-Every JAT tool supports `--help` for detailed usage. This page covers the most-used commands across all tool categories.
+Every SQUAD tool supports `--help` for detailed usage. This page covers the most-used commands across all tool categories.
 
-## jat (IDE and project management)
+## squad (IDE and project management)
 
 ```bash
-jat                      # Launch IDE, check for updates
-jat chimaro 4 --auto     # Spawn 4 agents on chimaro project
-jat chimaro 4 --claude   # Claude-only (no npm/browser/IDE)
-jat update               # Pull latest updates
-jat update --check       # Check without installing
-jat update --status      # Show installation path and version
+squad                      # Launch IDE, check for updates
+squad chimaro 4 --auto     # Spawn 4 agents on chimaro project
+squad chimaro 4 --claude   # Claude-only (no npm/browser/IDE)
+squad update               # Pull latest updates
+squad update --check       # Check without installing
+squad update --status      # Show installation path and version
 ```
 
-## jt (JAT task management)
+## st (SQUAD task management)
 
 ```bash
 # Creating tasks
-jt create "Fix login bug" --type bug --priority 1 --description "..." --labels security,auth
-jt create "Add search" --type feature --priority 2 --deps jat-abc
+st create "Fix login bug" --type bug --priority 1 --description "..." --labels security,auth
+st create "Add search" --type feature --priority 2 --deps squad-abc
 
 # Listing and viewing
-jt list --status open         # List open tasks
-jt ready --json               # Get ready tasks (no blockers)
-jt show jat-abc               # Show task details
+st list --status open         # List open tasks
+st ready --json               # Get ready tasks (no blockers)
+st show squad-abc               # Show task details
 
 # Updating tasks
-jt update jat-abc --status in_progress --assignee AgentName
-jt close jat-abc --reason "Completed"
+st update squad-abc --status in_progress --assignee AgentName
+st close squad-abc --reason "Completed"
 
 # Dependencies
-jt dep add jat-abc jat-xyz    # abc depends on xyz
-jt dep remove jat-abc jat-xyz # Remove dependency
-jt dep tree jat-abc           # Show dependency tree
-jt dep tree jat-abc --reverse # Show what depends on abc
-jt dep cycles                 # Find circular dependencies
+st dep add squad-abc squad-xyz    # abc depends on xyz
+st dep remove squad-abc squad-xyz # Remove dependency
+st dep tree squad-abc           # Show dependency tree
+st dep tree squad-abc --reverse # Show what depends on abc
+st dep cycles                 # Find circular dependencies
 ```
 
 ## am-* (Agent Registry)
@@ -46,19 +46,19 @@ am-whoami
 am-agents
 
 # File declarations (via task system)
-jt update jat-abc --status in_progress --assignee AgentName --files "src/**/*.ts"
+st update squad-abc --status in_progress --assignee AgentName --files "src/**/*.ts"
 ```
 
-Cross-session context is handled by agent memory (`.jat/memory/`), not messaging.
+Cross-session context is handled by agent memory (`.squad/memory/`), not messaging.
 
-## jat-signal (state tracking)
+## squad-signal (state tracking)
 
 ```bash
-jat-signal working '{"taskId":"jat-abc","taskTitle":"Fix bug"}'
-jat-signal needs_input '{"taskId":"jat-abc","question":"Which approach?"}'
-jat-signal review '{"taskId":"jat-abc","summary":["Added login"]}'
-jat-signal complete '{"taskId":"jat-abc","agentName":"Agent",...}'
-jat-signal-validate /tmp/jat-signal-tmux-session.json
+squad-signal working '{"taskId":"squad-abc","taskTitle":"Fix bug"}'
+squad-signal needs_input '{"taskId":"squad-abc","question":"Which approach?"}'
+squad-signal review '{"taskId":"squad-abc","summary":["Added login"]}'
+squad-signal complete '{"taskId":"squad-abc","agentName":"Agent",...}'
+squad-signal-validate /tmp/squad-signal-tmux-session.json
 ```
 
 Signal types: `starting`, `working`, `needs_input`, `review`, `completing`, `complete`.
@@ -91,19 +91,19 @@ db-connection-test                          # Verify connectivity
 
 ```bash
 # Credentials
-jat-secret stripe           # Get secret value
-jat-secret --list            # List all secrets
-jat-secret --export          # Output export statements
+squad-secret stripe           # Get secret value
+squad-secret --list            # List all secrets
+squad-secret --export          # Output export statements
 
 # Review rules
-jt-review-rules                            # Show all rules
-jt-review-rules --type bug --max-auto 1    # Set rule
-jt-check-review jat-abc                    # Check single task
-jt-check-review --batch                    # Check all tasks
+st-review-rules                            # Show all rules
+st-review-rules --type bug --max-auto 1    # Set rule
+st-check-review squad-abc                    # Check single task
+st-check-review --batch                    # Check all tasks
 
 # Utilities
-jat-step committing --task jat-abc --title "Fix bug" --agent AgentName
-jt-epic-child jat-abc jat-def              # Set epic->child dependency
+squad-step committing --task squad-abc --title "Fix bug" --agent AgentName
+st-epic-child squad-abc squad-def              # Set epic->child dependency
 ```
 
 ## Quick reference table
@@ -111,12 +111,12 @@ jt-epic-child jat-abc jat-def              # Set epic->child dependency
 | Category | Tool Count | Prefix |
 |----------|-----------|--------|
 | Agent Registry | 4 | `am-*` |
-| Task CLI | 5 | `jt*` |
+| Task CLI | 5 | `st*` |
 | Browser | 12 | `browser-*` |
 | Database | 4 | `db-*` |
-| Signal | 3 | `jat-signal*` |
+| Signal | 3 | `squad-signal*` |
 | Media | 7 | `gemini-*`, `avatar-*` |
-| Core/Review | 6 | `jt-check-*`, `jt-review-*`, `jat-secret` |
+| Core/Review | 6 | `st-check-*`, `st-review-*`, `squad-secret` |
 
 ## See also
 

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "defaultAction": "review",
+  "priorityThreshold": 3,
+  "rules": [
+    { "type": "bug", "maxAutoPriority": 4, "note": "Only P4 bugs auto-proceed, others require review" },
+    { "type": "feature", "maxAutoPriority": 3, "note": "P3-P4 features auto-proceed" },
+    { "type": "task", "maxAutoPriority": 3, "note": "P3-P4 tasks auto-proceed" },
+    { "type": "chore", "maxAutoPriority": 0, "note": "All chores auto-proceed" },
+    { "type": "epic", "maxAutoPriority": 5, "note": "Epics always require review" }
+  ],
+  "overrides": []
+}

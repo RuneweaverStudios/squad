@@ -7,7 +7,7 @@
 	 * - Shows current provider status and availability
 	 * - Model selection for both API and CLI
 	 *
-	 * Task: jat-ce8x8 - Implement Claude CLI Fallback Configuration System
+	 * Task: squad-ce8x8 - Implement Claude CLI Fallback Configuration System
 	 */
 
 	import { onMount } from 'svelte';

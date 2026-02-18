@@ -14,9 +14,9 @@ import { homedir } from 'os';
 const execAsync = promisify(exec);
 
 /**
- * Session name prefix for JAT agent sessions
+ * Session name prefix for SQUAD agent sessions
  */
-const SESSION_PREFIX = 'jat-';
+const SESSION_PREFIX = 'squad-';
 
 /**
  * Check if Hyprland is available
@@ -77,7 +77,7 @@ async function applyBorderColorToWindow(address, activeColor, inactiveColor) {
  */
 async function getProjectColors(projectName) {
 	try {
-		const configPath = join(homedir(), '.config', 'jat', 'projects.json');
+		const configPath = join(homedir(), '.config', 'squad', 'projects.json');
 		if (!existsSync(configPath)) return null;
 
 		const config = JSON.parse(readFileSync(configPath, 'utf-8'));
@@ -200,19 +200,19 @@ export async function POST({ params }) {
 			return json({ error: `Session '${sessionId}' not found` }, { status: 404 });
 		}
 
-		// Extract agent name from session ID (strip jat- prefix)
+		// Extract agent name from session ID (strip squad- prefix)
 		const agentName = sessionId.startsWith(SESSION_PREFIX)
 			? sessionId.slice(SESSION_PREFIX.length)
 			: sessionId;
 
 		// Find project for this agent to determine window title and colors
 		const projectName = await findProjectForAgent(agentName);
-		const displayName = projectName ? projectName.toUpperCase() : 'JAT';
+		const displayName = projectName ? projectName.toUpperCase() : 'SQUAD';
 		const windowTitle = `${displayName}: ${sessionId}`;
 
 		// Get terminal from config or detect platform default
 		let terminal = 'auto';
-		const configPath = `${process.env.HOME}/.config/jat/projects.json`;
+		const configPath = `${process.env.HOME}/.config/squad/projects.json`;
 		try {
 			const { existsSync, readFileSync } = await import('fs');
 			if (existsSync(configPath)) {

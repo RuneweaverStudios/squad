@@ -101,7 +101,7 @@
 
 	onMount(() => {
 		// Restore session from sessionStorage (persists across tab switches)
-		const stored = sessionStorage.getItem('jat-plan-session');
+		const stored = sessionStorage.getItem('squad-plan-session');
 		if (stored) {
 			try {
 				const { sessionName, agentName, wasSent } = JSON.parse(stored);
@@ -112,7 +112,7 @@
 					// $effect will auto-collapse
 				}
 			} catch {
-				sessionStorage.removeItem('jat-plan-session');
+				sessionStorage.removeItem('squad-plan-session');
 			}
 		}
 
@@ -163,7 +163,7 @@
 				});
 
 				// Persist across tab switches
-				sessionStorage.setItem('jat-plan-session', JSON.stringify({
+				sessionStorage.setItem('squad-plan-session', JSON.stringify({
 					sessionName: data.session.sessionName,
 					agentName: data.session.agentName,
 				}));
@@ -194,12 +194,12 @@
 		if (sent) {
 			contextSent = true;
 			// Persist contextSent so collapsed state survives tab switches
-			const stored = sessionStorage.getItem('jat-plan-session');
+			const stored = sessionStorage.getItem('squad-plan-session');
 			if (stored) {
 				try {
 					const data = JSON.parse(stored);
 					data.wasSent = true;
-					sessionStorage.setItem('jat-plan-session', JSON.stringify(data));
+					sessionStorage.setItem('squad-plan-session', JSON.stringify(data));
 				} catch { /* ignore */ }
 			}
 		}
@@ -207,7 +207,7 @@
 
 	async function handleConvertToTasks() {
 		if (!activeSessionName) return;
-		await sendInput(activeSessionName, 'Please convert our plan into a structured task tree. Create the tasks in JAT using jt create with proper types, priorities, labels, descriptions, and dependency ordering.', 'text');
+		await sendInput(activeSessionName, 'Please convert our plan into a structured task tree. Create the tasks in SQUAD using st create with proper types, priorities, labels, descriptions, and dependency ordering.', 'text');
 	}
 
 	async function handleEndSession() {
@@ -219,7 +219,7 @@
 			activeAgentName = null;
 			contextSent = false;
 			controlsCollapsed = false;
-			sessionStorage.removeItem('jat-plan-session');
+			sessionStorage.removeItem('squad-plan-session');
 			successToast('Planning session ended');
 		}
 	}

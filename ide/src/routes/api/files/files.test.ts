@@ -255,15 +255,15 @@ describe('Directory Listing API Response', () => {
 		mockFetch.mockResolvedValue({
 			ok: true,
 			json: () => Promise.resolve({
-				project: 'jat',
-				projectPath: '~/code/jat',
+				project: 'squad',
+				projectPath: '~/code/squad',
 				path: '/',
 				entries: MOCK_DIRECTORY_ENTRIES,
 				count: 3
 			})
 		});
 
-		const response = await fetch('/api/files?project=jat');
+		const response = await fetch('/api/files?project=squad');
 		const data = await response.json();
 
 		expect(data).toHaveProperty('project');
@@ -281,7 +281,7 @@ describe('Directory Listing API Response', () => {
 			})
 		});
 
-		const response = await fetch('/api/files?project=jat');
+		const response = await fetch('/api/files?project=squad');
 		const data = await response.json();
 
 		for (const entry of data.entries) {
@@ -309,7 +309,7 @@ describe('Directory Listing API Response', () => {
 			json: () => Promise.resolve({ entries: sorted })
 		});
 
-		const response = await fetch('/api/files?project=jat');
+		const response = await fetch('/api/files?project=squad');
 		const data = await response.json();
 
 		// Verify the sort order: folders first, then files
@@ -369,7 +369,7 @@ describe('Directory Listing API Errors', () => {
 			json: () => Promise.resolve({ message: 'Path traversal not allowed' })
 		});
 
-		const response = await fetch('/api/files?project=jat&path=../../../etc');
+		const response = await fetch('/api/files?project=squad&path=../../../etc');
 		expect(response.ok).toBe(false);
 		expect(response.status).toBe(403);
 	});
@@ -381,7 +381,7 @@ describe('Directory Listing API Errors', () => {
 			json: () => Promise.resolve({ message: 'Path not found: /nonexistent' })
 		});
 
-		const response = await fetch('/api/files?project=jat&path=nonexistent');
+		const response = await fetch('/api/files?project=squad&path=nonexistent');
 		expect(response.ok).toBe(false);
 		expect(response.status).toBe(404);
 	});
@@ -393,7 +393,7 @@ describe('Directory Listing API Errors', () => {
 			json: () => Promise.resolve({ message: 'Path is not a directory. Use /api/files/content to read files.' })
 		});
 
-		const response = await fetch('/api/files?project=jat&path=package.json');
+		const response = await fetch('/api/files?project=squad&path=package.json');
 		expect(response.ok).toBe(false);
 		expect(response.status).toBe(400);
 	});
@@ -421,7 +421,7 @@ describe('Hidden Files Handling', () => {
 			})
 		});
 
-		const response = await fetch('/api/files?project=jat');
+		const response = await fetch('/api/files?project=squad');
 		const data = await response.json();
 
 		const hiddenEntries = data.entries.filter((e: { name: string }) => e.name.startsWith('.'));
@@ -440,7 +440,7 @@ describe('Hidden Files Handling', () => {
 			json: () => Promise.resolve({ entries: entriesWithHidden })
 		});
 
-		const response = await fetch('/api/files?project=jat&showHidden=true');
+		const response = await fetch('/api/files?project=squad&showHidden=true');
 		const data = await response.json();
 
 		const hiddenEntries = data.entries.filter((e: { name: string }) => e.name.startsWith('.'));
@@ -464,7 +464,7 @@ describe('Nested Directory Listing', () => {
 			})
 		});
 
-		const response = await fetch('/api/files?project=jat&path=src');
+		const response = await fetch('/api/files?project=squad&path=src');
 		const data = await response.json();
 
 		expect(data.path).toBe('src');
@@ -484,7 +484,7 @@ describe('Nested Directory Listing', () => {
 			})
 		});
 
-		const response = await fetch('/api/files?project=jat&path=src/lib/components');
+		const response = await fetch('/api/files?project=squad&path=src/lib/components');
 		const data = await response.json();
 
 		expect(data.path).toBe('src/lib/components');

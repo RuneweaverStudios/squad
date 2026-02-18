@@ -1,6 +1,6 @@
 # IDE Spacing Guidelines
 
-This document establishes standardized spacing values for consistent UI component layout across the JAT IDE.
+This document establishes standardized spacing values for consistent UI component layout across the SQUAD IDE.
 
 ## Spacing Scale
 

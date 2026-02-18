@@ -5,7 +5,7 @@
 # This script provides a structured JSON file for review rules with schema
 # validation and migration support.
 #
-# Schema location: .jat/review-rules.json
+# Schema location: .squad/review-rules.json
 #
 # Usage:
 #   bd-review-rules-loader                    # Load rules, create defaults if missing
@@ -53,12 +53,12 @@ VALID_OVERRIDE_ACTIONS=("always_review" "always_auto")
 DEFAULT_ACTION="review"
 DEFAULT_PRIORITY_THRESHOLD=3
 
-# Find .jat directory (walk up tree)
-find_jat_dir() {
+# Find .squad directory (walk up tree)
+find_squad_dir() {
     local dir="$PWD"
     while [[ "$dir" != "/" ]]; do
-        if [[ -d "$dir/.jat" ]]; then
-            echo "$dir/.jat"
+        if [[ -d "$dir/.squad" ]]; then
+            echo "$dir/.squad"
             return 0
         fi
         dir=$(dirname "$dir")
@@ -69,14 +69,14 @@ find_jat_dir() {
 
 # Get the rules file path
 get_rules_file() {
-    local jat_dir
-    jat_dir=$(find_jat_dir)
-    if [[ -z "$jat_dir" ]]; then
-        echo -e "${RED}Error: No .jat directory found${NC}" >&2
-        echo "Run 'jt init' to initialize a project" >&2
+    local squad_dir
+    squad_dir=$(find_squad_dir)
+    if [[ -z "$squad_dir" ]]; then
+        echo -e "${RED}Error: No .squad directory found${NC}" >&2
+        echo "Run 'st init' to initialize a project" >&2
         exit 1
     fi
-    echo "$jat_dir/review-rules.json"
+    echo "$squad_dir/review-rules.json"
 }
 
 # Generate default rules JSON
@@ -613,7 +613,7 @@ case $ACTION in
     add_override)
         if [[ -z "$ADD_OVERRIDE_ID" ]]; then
             echo -e "${RED}Error: --add-override requires TASK_ID ACTION [REASON]${NC}" >&2
-            echo "  Example: bd-review-rules-loader --add-override jat-abc always_review \"Security sensitive\"" >&2
+            echo "  Example: bd-review-rules-loader --add-override squad-abc always_review \"Security sensitive\"" >&2
             exit 1
         fi
         if [[ -z "$ADD_OVERRIDE_ACTION" ]]; then

@@ -1,12 +1,12 @@
 # File Explorer
 
-The Files page (`/files`) gives you a built-in code editor with multi-tab support, a lazy-loading file tree, and quick file finding. It works across all your JAT projects without leaving the IDE.
+The Files page (`/files`) gives you a built-in code editor with multi-tab support, a lazy-loading file tree, and quick file finding. It works across all your SQUAD projects without leaving the IDE.
 
 ## FileTree with lazy loading
 
 The left sidebar shows a tree view of your project directories. Directories load their children on-demand when you expand them, keeping the initial render fast even for large codebases.
 
-The tree respects your file watcher ignore list. Directories like `node_modules`, `.git`, `.svelte-kit`, and `dist` are hidden by default. Configure ignored directories in `~/.config/jat/projects.json`:
+The tree respects your file watcher ignore list. Directories like `node_modules`, `.git`, `.svelte-kit`, and `dist` are hidden by default. Configure ignored directories in `~/.config/squad/projects.json`:
 
 ```json
 {
@@ -81,7 +81,7 @@ The file explorer includes two layers of protection:
 - `.env`, `.env.local`, `.env.production`
 - `credentials.json`, `secrets.json`
 - `*.pem`, `*.key` files
-- `~/.config/jat/credentials.json`
+- `~/.config/squad/credentials.json`
 
 These files show a warning instead of their contents when you try to open them. The block list is configurable but defaults to common secret file patterns.
 

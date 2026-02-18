@@ -191,7 +191,7 @@ function getCacheKey(params) {
 // ============================================================================
 
 /**
- * Get project colors from JAT config
+ * Get project colors from SQUAD config
  * Falls back to a default color for unknown projects
  * @returns {Record<string, string>}
  */
@@ -264,7 +264,7 @@ async function fetchFromSQLite({ range, bucketSize, agentName, multiProject }) {
 
 	if (multiProject) {
 		// Multi-project mode: get usage by project
-		const PROJECT_COLORS = getProjectColors(); // Get colors from JAT config
+		const PROJECT_COLORS = getProjectColors(); // Get colors from SQUAD config
 		const projectData = getUsageByProject(startTime, endTime);
 
 		if (!projectData || projectData.length === 0) {
@@ -494,7 +494,7 @@ export async function GET({ url }) {
 					bucketSize: validatedBucketSize
 				});
 			} else if (multiProject) {
-				// System-wide multi-project mode: aggregate across all projects from jat config
+				// System-wide multi-project mode: aggregate across all projects from squad config
 				// Using async worker thread version to avoid blocking the event loop
 				result = await getMultiProjectTimeSeriesAsync({
 					range: validatedRange,

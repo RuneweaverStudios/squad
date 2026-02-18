@@ -258,7 +258,7 @@
 								{/if}
 							</td>
 							<td class="col-command">
-								<code class="command-text">{task.command || '/jat:start'}</code>
+								<code class="command-text">{task.command || '/squad:start'}</code>
 							</td>
 							<td class="col-agent">
 								{#if task.agent_program || task.model}

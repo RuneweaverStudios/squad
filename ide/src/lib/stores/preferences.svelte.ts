@@ -85,7 +85,7 @@ export type SessionMaximizeHeight = 50 | 60 | 70 | 80 | 90;
 const DEFAULTS = {
 	sparklineVisible: true,
 	soundsEnabled: false,
-	theme: 'jat',
+	theme: 'squad',
 	terminalHeight: 50, // Match UserProfile's DEFAULT_TERMINAL_HEIGHT
 	sessionMaximizeHeight: 70 as SessionMaximizeHeight, // Viewport % when clicking to maximize session
 	taskSaveAction: 'close' as TaskSaveAction,

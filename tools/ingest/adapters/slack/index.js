@@ -29,7 +29,7 @@ export const metadata = {
       label: 'Bot Token Secret',
       type: 'secret',
       required: true,
-      helpText: 'Name of the secret containing the Slack bot token (stored in jat-secret)'
+      helpText: 'Name of the secret containing the Slack bot token (stored in squad-secret)'
     },
     {
       key: 'channel',

@@ -29,7 +29,7 @@ export const metadata = {
       label: 'Access Token Secret',
       type: 'secret',
       required: true,
-      helpText: 'Name of the secret containing the Matrix access token (stored in jat-secret)'
+      helpText: 'Name of the secret containing the Matrix access token (stored in squad-secret)'
     },
     {
       key: 'userId',
@@ -236,7 +236,7 @@ export default class MatrixAdapter extends BaseAdapter {
 
     const hs = this._sourceConfig.homeserver.replace(/\/$/, '');
     const roomId = encodeURIComponent(target.channelId);
-    const txnId = `jat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const txnId = `squad-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     const body = { msgtype: 'm.text', body: message.text };
 

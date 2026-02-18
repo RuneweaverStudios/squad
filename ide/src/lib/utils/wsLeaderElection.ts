@@ -53,7 +53,7 @@ type SubscriptionChangeHandler = (channels: Channel[]) => void;
 // Configuration
 // ============================================================================
 
-const CHANNEL_NAME = 'jat-ws-leader';
+const CHANNEL_NAME = 'squad-ws-leader';
 const CLAIM_TIMEOUT = 300; // ms to wait for REJECT before becoming leader
 const HEARTBEAT_INTERVAL = 3000; // ms between leader heartbeats
 const HEARTBEAT_TIMEOUT = 8000; // ms without heartbeat before re-election

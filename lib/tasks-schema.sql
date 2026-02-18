@@ -1,4 +1,4 @@
--- JAT task database schema
+-- SQUAD task database schema
 -- Lightweight task tracking with 4 clean tables
 
 CREATE TABLE IF NOT EXISTS tasks (
@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     assignee TEXT,
     reserved_files TEXT,
     parent_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,
-    command TEXT DEFAULT '/jat:start',
+    command TEXT DEFAULT '/squad:start',
     agent_program TEXT,
     model TEXT,
     schedule_cron TEXT,

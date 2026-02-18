@@ -16,7 +16,7 @@
 	interface Props {
 		/** The rich needs_input signal data */
 		signal: NeedsInputSignal;
-		/** Project name for /files page navigation (e.g., 'jat', 'chimaro') */
+		/** Project name for /files page navigation (e.g., 'squad', 'chimaro') */
 		projectName?: string;
 		/** Callback when user selects an option */
 		onSelectOption?: (optionId: string) => void;
@@ -36,7 +36,7 @@
 
 	let {
 		signal,
-		projectName = 'jat',
+		projectName = 'squad',
 		onSelectOption,
 		onSubmitText,
 		onFileClick,

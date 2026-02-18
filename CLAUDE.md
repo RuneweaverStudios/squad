@@ -2,44 +2,44 @@
 
 Lightweight bash tools for agent orchestration, database operations, monitoring, development, and browser automation.
 
-@~/code/jat/AGENTS.md
-@~/code/jat/shared/agent-registry.md
-@~/code/jat/shared/bash-patterns.md
-@~/code/jat/shared/tasks.md
-@~/code/jat/shared/tools.md
-@~/code/jat/shared/agent-app-interface.md
-@~/code/jat/shared/automation.md
-@~/code/jat/shared/architecture.md
-@~/code/jat/shared/agent-programs.md
-@~/code/jat/shared/scheduler.md
+@~/code/squad/AGENTS.md
+@~/code/squad/shared/agent-registry.md
+@~/code/squad/shared/bash-patterns.md
+@~/code/squad/shared/tasks.md
+@~/code/squad/shared/tools.md
+@~/code/squad/shared/agent-app-interface.md
+@~/code/squad/shared/automation.md
+@~/code/squad/shared/architecture.md
+@~/code/squad/shared/agent-programs.md
+@~/code/squad/shared/scheduler.md
 
 <!-- NOTE: AGENTS.md is the canonical agent workflow instructions (replaces
      shared/overview.md for this repo). Other projects still import
      shared/overview.md via their own CLAUDE.md.
-     Detailed workflow steps are in command files (/jat:start.md,
-     /jat:complete.md) which load on-demand when agents invoke those commands. -->
+     Detailed workflow steps are in command files (/squad:start.md,
+     /squad:complete.md) which load on-demand when agents invoke those commands. -->
 
 
 ## Project Structure
 
 ```
-jat/
+squad/
 ├── tools/               # All executable tools
 │   ├── core/            # Database, monitoring, task review tools
 │   ├── agents/          # Agent Registry (identity)
 │   ├── browser/         # Browser automation (11 tools)
 │   ├── media/           # Image generation tools (gemini-*, avatar-*)
-│   ├── signal/          # JAT signal tools (jat-signal, jat-signal-validate)
-│   ├── search/          # Unified search (jat-search CLI)
+│   ├── signal/          # SQUAD signal tools (squad-signal, squad-signal-validate)
+│   ├── search/          # Unified search (squad-search CLI)
 │   ├── ingest/          # Feed ingest daemon (RSS, Slack, Telegram)
 │   ├── scheduler/       # Task scheduling daemon (cron + one-shot)
 │   └── scripts/         # Installation and setup scripts
 ├── skills/              # Pi agent skills (SKILL.md format)
-│   ├── jat-start/       # Begin working on a task
-│   ├── jat-complete/    # Complete current task
-│   └── jat-verify/      # Browser verification
-├── commands/jat/        # JAT workflow commands (9 commands)
-├── ide/                 # JAT IDE (SvelteKit app)
+│   ├── squad-start/       # Begin working on a task
+│   ├── squad-complete/    # Complete current task
+│   └── squad-verify/      # Browser verification
+├── commands/squad/        # SQUAD workflow commands (9 commands)
+├── ide/                 # SQUAD IDE (SvelteKit app)
 ├── shared/              # Shared documentation (imported by projects)
 └── install.sh           # Installation script
 ```
@@ -77,17 +77,17 @@ brew install tmux sqlite jq
 
 # Verify installation
 am-whoami
-jt --version
+st --version
 browser-start.js --help
 ```
 
-## Keeping JAT Updated
+## Keeping SQUAD Updated
 
-JAT includes a self-update mechanism similar to VS Code - it checks for updates and prompts you before installing.
+SQUAD includes a self-update mechanism similar to VS Code - it checks for updates and prompts you before installing.
 
 ### Update Behavior
 
-When you launch the IDE with `jat` (no arguments), it checks for updates (at most once per 24 hours). If updates are available, you'll be prompted:
+When you launch the IDE with `squad` (no arguments), it checks for updates (at most once per 24 hours). If updates are available, you'll be prompted:
 
 ```
   ╔───────────────────────────────────────────╗
@@ -105,47 +105,47 @@ When you launch the IDE with `jat` (no arguments), it checks for updates (at mos
 
 Checking for updates...
 
-JAT update available (3 new commit(s)). Update now? [y/N] y
-Updating JAT...
+SQUAD update available (3 new commit(s)). Update now? [y/N] y
+Updating SQUAD...
 ✓ Updated successfully
 ```
 
 - **Prompt-based** - You're always asked before updates install
-- **IDE only** - Other commands like `jat list` don't check
+- **IDE only** - Other commands like `squad list` don't check
 - **Throttled** - Checks at most once per 24 hours
 
 ### Manual Update Commands
 
 ```bash
 # Pull latest updates
-jat update
+squad update
 
 # Check for updates without installing
-jat update --check
+squad update --check
 
 # Show installation path and version
-jat update --status
+squad update --status
 
 # Disable update checks on IDE launch
-jat update --disable
+squad update --disable
 
 # Re-enable update checks
-jat update --enable
+squad update --enable
 ```
 
 ### How Updates Work
 
-1. JAT detects its installation location (in order of priority):
-   - `$JAT_INSTALL_DIR` environment variable
-   - `~/.local/share/jat` (XDG standard, recommended for users)
-   - `~/code/jat` (for developers)
-2. `jat update` runs `git pull origin master` to fetch latest changes
+1. SQUAD detects its installation location (in order of priority):
+   - `$SQUAD_INSTALL_DIR` environment variable
+   - `~/.local/share/squad` (XDG standard, recommended for users)
+   - `~/code/squad` (for developers)
+2. `squad update` runs `git pull origin master` to fetch latest changes
 3. If you have local changes, they're stashed and restored after the update
 4. Symlinks in `~/.local/bin/` are automatically refreshed
 
 ### Configuration
 
-Add to `~/.config/jat/projects.json` to disable update checks:
+Add to `~/.config/squad/projects.json` to disable update checks:
 
 ```json
 {
@@ -191,18 +191,18 @@ am-register --name TestAgent --program test --model test && \
 ### Task CLI
 ```bash
 # Version and help
-jt --version                 # Expected: jt 0.x.x
-jt --help                    # Shows available commands
+st --version                 # Expected: st 0.x.x
+st --help                    # Shows available commands
 
 # Test commands (safe to run - only reads)
-jt ready --json              # Lists ready tasks (may be empty)
-jt list --status open        # Lists open tasks
+st ready --json              # Lists ready tasks (may be empty)
+st list --status open        # Lists open tasks
 
 # If no project initialized yet:
-cd ~/code/my-project && jt init  # Initialize a project
+cd ~/code/my-project && st init  # Initialize a project
 ```
 
-Current task types in JAT workflows: `bug`, `feature`, `task`, `epic`, `chore`, `chat` (`chat` is used for conversational external-channel threads, typically with `/jat:chat`).
+Current task types in SQUAD workflows: `bug`, `feature`, `task`, `epic`, `chore`, `chat` (`chat` is used for conversational external-channel threads, typically with `/squad:chat`).
 
 ### Browser Tools (12 tools)
 ```bash
@@ -233,12 +233,12 @@ db-query "SELECT COUNT(*) as agent_count FROM agents"
 ### Signal Tools (2 tools)
 ```bash
 # Help and validation
-jat-signal --help            # Shows signal types and options
-jat-signal-validate --help   # Shows validation options
+squad-signal --help            # Shows signal types and options
+squad-signal-validate --help   # Shows validation options
 
 # Test signal emission (dry run style)
-jat-signal starting '{"agentName":"Test","sessionId":"test-123","project":"test","model":"test","gitBranch":"main","gitStatus":"clean","tools":[],"uncommittedFiles":[]}'
-# Expected: Writes to /tmp/jat-signal-*.json
+squad-signal starting '{"agentName":"Test","sessionId":"test-123","project":"test","model":"test","gitBranch":"main","gitStatus":"clean","tools":[],"uncommittedFiles":[]}'
+# Expected: Writes to /tmp/squad-signal-*.json
 ```
 
 ### Statusline and Hooks
@@ -255,7 +255,7 @@ ls ~/.claude/statusline.sh   # Should exist
 ### IDE
 ```bash
 # Check IDE can start
-cd ~/code/jat/ide
+cd ~/code/squad/ide
 npm run build                # Should compile without errors
 
 # Start dev server (Ctrl+C to stop)
@@ -266,14 +266,14 @@ npm run dev                  # Expected: http://127.0.0.1:5174
 ```bash
 # Quick verification of all symlinks
 ls ~/.local/bin/am-* | wc -l   # Expected: 13 (Agent Registry)
-ls ~/.local/bin/jt* | wc -l    # Expected: 5 (Task CLI + review tools)
+ls ~/.local/bin/st* | wc -l    # Expected: 5 (Task CLI + review tools)
 ls ~/.local/bin/browser-* | wc -l  # Expected: 11 (Browser tools)
 ls ~/.local/bin/db-* | wc -l   # Expected: 4 (Database tools)
-ls ~/.local/bin/jat-* | wc -l  # Expected: 5 (JAT tools)
+ls ~/.local/bin/squad-* | wc -l  # Expected: 5 (SQUAD tools)
 
 # Check for broken symlinks
 find ~/.local/bin -type l -name "am-*" -exec test ! -e {} \; -print
-find ~/.local/bin -type l -name "jt*" -exec test ! -e {} \; -print
+find ~/.local/bin -type l -name "st*" -exec test ! -e {} \; -print
 find ~/.local/bin -type l -name "browser-*" -exec test ! -e {} \; -print
 # Expected: No output (no broken symlinks)
 ```
@@ -283,10 +283,10 @@ find ~/.local/bin -type l -name "browser-*" -exec test ! -e {} \; -print
 | Issue | Cause | Fix |
 |-------|-------|-----|
 | `command not found` | ~/.local/bin not in PATH | Add to ~/.bashrc: `export PATH="$HOME/.local/bin:$PATH"` |
-| `am-whoami` fails | Database not initialized | Run: `bash ~/code/jat/tools/scripts/install-agent-mail.sh` |
-| `jt: command not found` | Task CLI not installed | Run: `./install.sh` to create symlinks |
-| `browser-*.js` fails | npm dependencies missing | Run: `cd ~/code/jat/tools/browser && npm install` |
-| IDE won't start | Dependencies missing | Run: `cd ~/code/jat/ide && npm install` |
+| `am-whoami` fails | Database not initialized | Run: `bash ~/code/squad/tools/scripts/install-agent-mail.sh` |
+| `st: command not found` | Task CLI not installed | Run: `./install.sh` to create symlinks |
+| `browser-*.js` fails | npm dependencies missing | Run: `cd ~/code/squad/tools/browser && npm install` |
+| IDE won't start | Dependencies missing | Run: `cd ~/code/squad/ide && npm install` |
 | Broken symlinks | Old installation | Run: `./install.sh` to refresh symlinks |
 
 ### Post-Installation: Add a Project
@@ -295,16 +295,16 @@ find ~/.local/bin -type l -name "browser-*" -exec test ! -e {} \; -print
 
 A valid project is:
 - A **git repository** in `~/code/`
-- Has a **`.jat/` directory** (created by `jt init`)
+- Has a **`.squad/` directory** (created by `st init`)
 
 ```bash
 # Option 1: Initialize an existing project (recommended)
 cd ~/code/my-project
-jt init
-# Creates .jat/ directory with task database
+st init
+# Creates .squad/ directory with task database
 
 # Option 2: From the IDE
-jat        # Start the IDE
+squad        # Start the IDE
 # Go to Tasks page → click "Add Project"
 ```
 
@@ -312,10 +312,10 @@ After adding a project, you can start working:
 
 ```bash
 # Start working (registers agent + picks task)
-/jat:start
+/squad:start
 
 # Auto-attack mode (pick highest priority task immediately)
-/jat:start auto
+/squad:start auto
 ```
 
 ## IDE AI Features
@@ -323,7 +323,7 @@ After adding a project, you can start working:
 The IDE uses AI for task suggestions, usage metrics, and avatar generation. These features work automatically if you have **any** of the following:
 
 1. **Claude Code CLI installed** (recommended) - The IDE falls back to your Claude subscription via `claude -p`. No API key needed.
-2. **Anthropic API key** - Configure via Settings → API Keys tab, or add to `~/code/jat/ide/.env`.
+2. **Anthropic API key** - Configure via Settings → API Keys tab, or add to `~/code/squad/ide/.env`.
 
 **How the fallback works:**
 The LLM service tries the API key first, then falls back to the Claude CLI subprocess. If you have a Claude Pro/Max subscription and `claude` is installed, AI features work out of the box with zero configuration.
@@ -345,15 +345,15 @@ Most supported coding agents use subscription-based auth (no API keys required):
 | Gemini CLI | Google Account (free tier included) | First run triggers OAuth |
 | Aider | API keys only | Set provider key in env |
 
-See `~/.config/jat/agents.json` for full agent configuration and Settings → Agents in the IDE.
+See `~/.config/squad/agents.json` for full agent configuration and Settings → Agents in the IDE.
 
 ## Credentials & Secrets Management
 
-JAT provides a secure credential storage system for API keys and per-project secrets.
+SQUAD provides a secure credential storage system for API keys and per-project secrets.
 
 ### Storage Location
 
-All credentials stored in `~/.config/jat/credentials.json` with `0600` permissions (user read/write only).
+All credentials stored in `~/.config/squad/credentials.json` with `0600` permissions (user read/write only).
 
 ### API Keys (Global)
 
@@ -376,19 +376,19 @@ Add your own API keys for custom services:
 **Access in scripts/hooks:**
 ```bash
 # Get a secret value
-jat-secret stripe              # Outputs: sk_live_xxx...
+squad-secret stripe              # Outputs: sk_live_xxx...
 
 # Get the env var name
-jat-secret --env stripe        # Outputs: STRIPE_API_KEY
+squad-secret --env stripe        # Outputs: STRIPE_API_KEY
 
 # List all keys
-jat-secret --list
+squad-secret --list
 
 # Load all keys as environment variables
-eval $(jat-secret --export)
+eval $(squad-secret --export)
 
 # Use in scripts
-MY_KEY=$(jat-secret my-service)
+MY_KEY=$(squad-secret my-service)
 ```
 
 ### Per-Project Secrets
@@ -404,7 +404,7 @@ Configure project-specific credentials via **Settings → Project Secrets** tab:
 | `database_url` | PostgreSQL connection string | `DATABASE_URL` |
 
 **Fallback chain:** The system checks credentials in this order:
-1. `~/.config/jat/credentials.json` (Settings UI)
+1. `~/.config/squad/credentials.json` (Settings UI)
 2. Environment variables
 3. `.env` files in project directory
 
@@ -436,35 +436,35 @@ Configure project-specific credentials via **Settings → Project Secrets** tab:
 
 **All Claude Code sessions MUST run inside tmux for IDE tracking.**
 
-The IDE tracks agents via tmux sessions named `jat-{AgentName}`. Sessions not running in tmux will show as "offline" or "disconnected" in the IDE.
+The IDE tracks agents via tmux sessions named `squad-{AgentName}`. Sessions not running in tmux will show as "offline" or "disconnected" in the IDE.
 
 ### Correct Launch Methods
 
 ```bash
-# Via jat CLI (recommended for multi-agent)
-jat chimaro 4 --claude      # 4 agents, Claude only (no npm/browser)
-jat chimaro 4 --auto        # 4 agents, auto-attack mode
+# Via squad CLI (recommended for multi-agent)
+squad chimaro 4 --claude      # 4 agents, Claude only (no npm/browser)
+squad chimaro 4 --auto        # 4 agents, auto-attack mode
 
 # Via bash launcher functions (recommended for single agent)
-jat-chimaro                 # Single agent for chimaro project
-jat-jat                     # Single agent for jat project
+squad-chimaro                 # Single agent for chimaro project
+squad-squad                     # Single agent for squad project
 
 # Generate launcher functions (if not installed)
-~/code/jat/tools/scripts/setup-bash-functions.sh
+~/code/squad/tools/scripts/setup-bash-functions.sh
 source ~/.bashrc
 ```
 
 ### Session Naming Flow
 
-1. Launch creates `jat-pending-{id}` tmux session
-2. `/jat:start` registers agent and renames session to `jat-{AgentName}`
-3. IDE sees `jat-{AgentName}` and tracks the agent
+1. Launch creates `squad-pending-{id}` tmux session
+2. `/squad:start` registers agent and renames session to `squad-{AgentName}`
+3. IDE sees `squad-{AgentName}` and tracks the agent
 
 ### What NOT To Do
 
 ```bash
 # WRONG - runs Claude directly without tmux
-cd ~/code/chimaro && claude "/jat:start"
+cd ~/code/chimaro && claude "/squad:start"
 
 # This will show a statusline error:
 # "NOT IN TMUX SESSION - IDE cannot track this session"
@@ -481,7 +481,7 @@ The IDE provides two different ways to interact with agent sessions from the UI:
 **API:** `POST /api/sessions/[name]/attach`
 
 **What it does:**
-1. Creates a new window in your parent tmux session (e.g., `jat-ide`)
+1. Creates a new window in your parent tmux session (e.g., `squad-ide`)
 2. Attaches to the existing agent's tmux session
 3. Falls back to spawning a new terminal if no parent session found
 
@@ -494,7 +494,7 @@ The IDE provides two different ways to interact with agent sessions from the UI:
 
 ```bash
 # Equivalent manual command
-tmux attach-session -t jat-AgentName
+tmux attach-session -t squad-AgentName
 ```
 
 ### Resume Session (Offline Agents)
@@ -515,8 +515,8 @@ tmux attach-session -t jat-AgentName
 - You need to ask follow-up questions about completed work
 
 **Session ID lookup order:**
-1. `/tmp/jat-signal-tmux-{session}.json` - Signal files (cleared on reboot)
-2. `/tmp/jat-timeline-{session}.jsonl` - Timeline events (cleared on reboot)
+1. `/tmp/squad-signal-tmux-{session}.json` - Signal files (cleared on reboot)
+2. `/tmp/squad-timeline-{session}.jsonl` - Timeline events (cleared on reboot)
 3. `.claude/sessions/agent-{sessionId}.txt` - Persistent mapping (survives reboot)
 
 **IDE UI:** "Resume Session" action (only shown for offline agents)
@@ -538,14 +538,14 @@ claude -r abc123-def456-session-id
 
 ### Configuration
 
-Both features use these settings from `~/.config/jat/projects.json`:
+Both features use these settings from `~/.config/squad/projects.json`:
 
 ```json
 {
   "defaults": {
     "terminal": "alacritty",           // Terminal emulator to spawn
     "claude_flags": "--dangerously-skip-permissions",
-    "parent_session": "jat-ide"  // For attach: where to create windows
+    "parent_session": "squad-ide"  // For attach: where to create windows
   }
 }
 ```
@@ -556,20 +556,20 @@ Both features use these settings from `~/.config/jat/projects.json`:
 
 ```bash
 # Launch 4 agents that each auto-start the highest priority task
-jat chimaro 4 --auto
+squad chimaro 4 --auto
 
 # This will:
 # 1. Start npm dev server + browser + IDE
 # 2. Launch 4 Claude sessions in tmux (15s stagger between each)
-# 3. Each session runs /jat:start auto → picks & starts top task
+# 3. Each session runs /squad:start auto → picks & starts top task
 
 # Claude-only (no npm server, browser, or IDE)
-jat chimaro 4 --claude --auto
+squad chimaro 4 --claude --auto
 ```
 
 ## IDE Development
 
-**The JAT IDE is a SvelteKit 5 application in the `ide/` directory.**
+**The SQUAD IDE is a SvelteKit 5 application in the `ide/` directory.**
 
 ### Important: IDE-Specific Documentation
 
@@ -589,7 +589,7 @@ This contains critical information about:
 
 **Launcher Script (Recommended):**
 ```bash
-jat       # Checks dependencies, starts server, opens browser
+squad       # Checks dependencies, starts server, opens browser
 ```
 
 **Manual Commands:**
@@ -633,7 +633,7 @@ The IDE supports voice input using local whisper.cpp - 100% private, no data lea
 # During initial install, select "Yes" when prompted for Voice-to-Text
 
 # Or install later:
-bash ~/code/jat/tools/scripts/install-whisper.sh
+bash ~/code/squad/tools/scripts/install-whisper.sh
 ```
 
 ### Requirements
@@ -644,9 +644,9 @@ bash ~/code/jat/tools/scripts/install-whisper.sh
 
 ### What Gets Installed
 
-- `~/.local/share/jat/whisper/` - whisper.cpp source and build
-- `~/.local/share/jat/whisper/build/bin/whisper-cli` - transcription binary
-- `~/.local/share/jat/whisper/models/ggml-large-v3-turbo-q5_1.bin` - 624MB model
+- `~/.local/share/squad/whisper/` - whisper.cpp source and build
+- `~/.local/share/squad/whisper/build/bin/whisper-cli` - transcription binary
+- `~/.local/share/squad/whisper/models/ggml-large-v3-turbo-q5_1.bin` - 624MB model
 
 ### Where Voice Input Appears
 
@@ -665,22 +665,22 @@ bash ~/code/jat/tools/scripts/install-whisper.sh
 
 Projects are automatically discovered by the IDE in two ways:
 
-### Method 1: Run `jt init` (Recommended for quick start)
+### Method 1: Run `st init` (Recommended for quick start)
 
 ```bash
 cd ~/code/my-new-project
-jt init
-# Creates .jat/ directory with task database
+st init
+# Creates .squad/ directory with task database
 ```
 
-The IDE automatically scans `~/code/` for directories with `.jat/` and adds them to the project list. After running `jt init`, refresh the IDE to see your project.
+The IDE automatically scans `~/code/` for directories with `.squad/` and adds them to the project list. After running `st init`, refresh the IDE to see your project.
 
-### Method 2: Add to JAT Config (Full configuration)
+### Method 2: Add to SQUAD Config (Full configuration)
 
 For projects that need custom ports, colors, or database URLs:
 
 ```bash
-# Edit ~/.config/jat/projects.json
+# Edit ~/.config/squad/projects.json
 {
   "projects": {
     "my-project": {
@@ -693,7 +693,7 @@ For projects that need custom ports, colors, or database URLs:
 }
 ```
 
-**JAT config fields (per-project):**
+**SQUAD config fields (per-project):**
 - `path` - Project directory (required)
 - `port` - Dev server port (optional, enables server controls)
 - `server_path` - Where to run `npm run dev` (optional, defaults to path)
@@ -701,9 +701,9 @@ For projects that need custom ports, colors, or database URLs:
 - `active_color` / `inactive_color` - Badge colors (optional)
 - `database_url` - For database tools (optional)
 
-**JAT defaults (global settings):**
+**SQUAD defaults (global settings):**
 
-Add a `defaults` section to `~/.config/jat/projects.json` for global configuration:
+Add a `defaults` section to `~/.config/squad/projects.json` for global configuration:
 
 ```json
 {
@@ -723,7 +723,7 @@ Add a `defaults` section to `~/.config/jat/projects.json` for global configurati
 
 - `terminal` - Terminal emulator for new sessions (default: "alacritty")
 - `editor` - Code editor command (default: "code")
-- `tools_path` - Path to jat tools (default: "~/.local/bin")
+- `tools_path` - Path to squad tools (default: "~/.local/bin")
 - `claude_flags` - Claude CLI flags (default: "--dangerously-skip-permissions")
 - `model` - Default Claude model: "opus", "sonnet", "haiku" (default: "opus")
 - `agent_stagger` - Seconds between agent spawns in batch mode (default: 15)
@@ -732,9 +732,9 @@ Add a `defaults` section to `~/.config/jat/projects.json` for global configurati
 
 ## macOS and zsh Compatibility
 
-JAT supports both Linux (GNU tools) and macOS (BSD tools). The following platform differences are handled automatically:
+SQUAD supports both Linux (GNU tools) and macOS (BSD tools). The following platform differences are handled automatically:
 
-| Tool | Linux (GNU) | macOS (BSD) | JAT Handling |
+| Tool | Linux (GNU) | macOS (BSD) | SQUAD Handling |
 |------|-------------|-------------|--------------|
 | `stat` (file mtime) | `stat -c %Y` | `stat -f %m` | Auto-detects platform |
 | `date` (parse string) | `date -d "..."` | `date -j -f "..."` | Uses `parse_date_to_epoch()` |
@@ -750,8 +750,8 @@ JAT supports both Linux (GNU tools) and macOS (BSD tools). The following platfor
 # Prerequisites
 brew install tmux sqlite jq
 
-# Install JAT
-cd ~/code/jat
+# Install SQUAD
+cd ~/code/squad
 ./install.sh
 ```
 
@@ -759,49 +759,49 @@ cd ~/code/jat
 
 ## Demo System
 
-JAT includes a streamlined demo system for recording videos and showcasing IDE features. The demo uses three pre-configured projects with distinct colors for visual differentiation.
+SQUAD includes a streamlined demo system for recording videos and showcasing IDE features. The demo uses three pre-configured projects with distinct colors for visual differentiation.
 
 ### Demo Projects
 
 | Project | Description | Color Scheme |
 |---------|-------------|--------------|
-| `jat-demo-blog` | Blog platform | Red/Pink |
-| `jat-demo-shop` | E-commerce store | Green |
-| `jat-demo-dashboard` | Analytics dashboard | Blue |
+| `squad-demo-blog` | Blog platform | Red/Pink |
+| `squad-demo-shop` | E-commerce store | Green |
+| `squad-demo-dashboard` | Analytics dashboard | Blue |
 
 ### Quick Start
 
 ```bash
 # One-time setup (creates projects, clears tasks, configures colors)
-jat-demo setup
+squad-demo setup
 
 # Show only demo projects in IDE (hide regular projects)
-jat-demo on
+squad-demo on
 
 # After recording, restore regular projects
-jat-demo off
+squad-demo off
 
 # Optionally remove demo projects (with confirmation)
-jat-demo clean
+squad-demo clean
 ```
 
 ### Commands
 
 | Command | Description |
 |---------|-------------|
-| `jat-demo setup` | Creates demo projects in ~/code/, initializes with jt, adds to config with distinct colors |
-| `jat-demo on` | Hides all non-demo projects in IDE, shows only demo projects |
-| `jat-demo off` | Shows regular projects, hides demo projects |
-| `jat-demo status` | Shows visibility status of all projects |
-| `jat-demo clean` | Removes all demo projects (interactive confirmation) |
+| `squad-demo setup` | Creates demo projects in ~/code/, initializes with st, adds to config with distinct colors |
+| `squad-demo on` | Hides all non-demo projects in IDE, shows only demo projects |
+| `squad-demo off` | Shows regular projects, hides demo projects |
+| `squad-demo status` | Shows visibility status of all projects |
+| `squad-demo clean` | Removes all demo projects (interactive confirmation) |
 
-### What `jat-demo setup` Does
+### What `squad-demo setup` Does
 
 1. **Creates project directories** in `~/code/` (skips if they exist)
-2. **Initializes tasks** for each project (`jt init`)
+2. **Initializes tasks** for each project (`st init`)
 3. **Clears task lists** (empty task database)
-4. **Adds to JAT config** with distinct `active_color` and `inactive_color`
-5. **Kills stale tmux sessions** (any old `jat-*Agent` sessions)
+4. **Adds to SQUAD config** with distinct `active_color` and `inactive_color`
+5. **Kills stale tmux sessions** (any old `squad-*Agent` sessions)
 
 ### Recording Scripts
 
@@ -821,14 +821,14 @@ Demo recording scripts are located in `assets/`:
 
 ```bash
 # Restore normal IDE view
-jat-demo off
+squad-demo off
 
 # Optional: Remove demo projects entirely
-jat-demo clean
+squad-demo clean
 ```
 
 **Files:**
-- `tools/scripts/jat-demo` - Demo management CLI
+- `tools/scripts/squad-demo` - Demo management CLI
 - `assets/RECORDING-SCRIPT-FINAL.md` - Recording instructions
 - `assets/demo-task-*.txt` - Sample task descriptions
 
@@ -840,14 +840,14 @@ jat-demo clean
 
 ### Agent Registry "not registered"
 ```bash
-/jat:start                # Quick fix (auto-registers)
+/squad:start                # Quick fix (auto-registers)
 # Or manually:
 am-register --name YourAgentName --program claude-code --model sonnet-4.5
 ```
 
 ### Browser tools not found
 ```bash
-cd /home/jw/code/jat
+cd /home/jw/code/squad
 ./install.sh
 ```
 
@@ -869,23 +869,23 @@ session_id=$(cat /tmp/claude-session-${PPID}.txt | tr -d '\n') && mkdir -p .clau
 # Cause: Claude session not running inside tmux
 # Fix: Exit and restart with a launcher function
 exit
-jat-chimaro    # or jat-jat, jat-myproject, etc.
+squad-chimaro    # or squad-squad, squad-myproject, etc.
 
 # If launcher functions not installed:
-~/code/jat/tools/scripts/setup-bash-functions.sh
+~/code/squad/tools/scripts/setup-bash-functions.sh
 source ~/.bashrc
 ```
 
 ### Voice input not working
 ```bash
 # Check if whisper is installed
-ls ~/.local/share/jat/whisper/build/bin/whisper-cli
+ls ~/.local/share/squad/whisper/build/bin/whisper-cli
 
 # If not found, install it
-bash ~/code/jat/tools/scripts/install-whisper.sh
+bash ~/code/squad/tools/scripts/install-whisper.sh
 
 # If whisper-cli exists but fails, rebuild (ffmpeg updated)
-cd ~/.local/share/jat/whisper/build
+cd ~/.local/share/squad/whisper/build
 cmake .. -DWHISPER_FFMPEG=ON && make -j$(nproc) whisper-cli
 
 # Test transcription API
@@ -897,6 +897,6 @@ curl http://localhost:3333/api/transcribe
 
 - **Shared docs**: `./shared/*.md` (imported above)
 - **IDE docs**: `ide/CLAUDE.md`
-- **JAT commands**: `./commands/jat/*.md`
+- **SQUAD commands**: `./commands/squad/*.md`
 - **Tool source**: Each tool directory contains implementation
 - **Installation**: `install.sh` for symlink setup

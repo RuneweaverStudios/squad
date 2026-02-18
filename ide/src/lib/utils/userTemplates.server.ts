@@ -1,7 +1,7 @@
 /**
  * User Templates Utility (Server-Only)
  *
- * Manages custom user templates stored in ~/.config/jat/templates/
+ * Manages custom user templates stored in ~/.config/squad/templates/
  * Provides CRUD operations for user-defined command templates.
  *
  * This file uses Node.js fs/path/os modules and must only be imported
@@ -32,7 +32,7 @@ export type { UserTemplate, TemplateFile } from '$lib/types/userTemplates';
 /**
  * Directory where user templates are stored
  */
-export const USER_TEMPLATES_DIR = join(homedir(), '.config', 'jat', 'templates');
+export const USER_TEMPLATES_DIR = join(homedir(), '.config', 'squad', 'templates');
 
 /**
  * File extension for template files

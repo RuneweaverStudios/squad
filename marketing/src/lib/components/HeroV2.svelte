@@ -12,14 +12,14 @@
 		{
 			title: 'Documentation',
 			subtitle: 'Learn the ropes',
-			href: 'https://github.com/joewinke/jat#readme',
+			href: 'https://github.com/joewinke/squad#readme',
 			icon: 'docs',
 			external: true
 		},
 		{
 			title: 'GitHub',
 			subtitle: 'View the source',
-			href: 'https://github.com/joewinke/jat',
+			href: 'https://github.com/joewinke/squad',
 			icon: 'github',
 			external: true
 		},
@@ -54,7 +54,7 @@
 		<!-- Logo / Title -->
 		<h1 class="heading-xl text-white mb-4 animate-fade-up delay-100">
 			<span class="text-glow bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-secondary)] bg-clip-text text-transparent">
-				JAT
+				SQUAD
 			</span>
 		</h1>
 

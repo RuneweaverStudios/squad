@@ -4,7 +4,7 @@
 	 *
 	 * Manages agent harness configurations for the IDE.
 	 * Harnesses are CLI tools that wrap LLMs for coding tasks (Claude Code, Codex, OpenCode, etc.)
-	 * Storage: ~/.config/jat/agents.json
+	 * Storage: ~/.config/squad/agents.json
 	 *
 	 * Features:
 	 * - List view showing all configured harnesses with status (enabled, auth status)
@@ -1184,7 +1184,7 @@
 											type="text"
 											id="new-instructions"
 											class="input input-bordered input-sm w-full"
-											placeholder="~/.config/jat/agent-instructions.md"
+											placeholder="~/.config/squad/agent-instructions.md"
 											bind:value={newProgramForm.instructionsFile}
 										/>
 									</div>

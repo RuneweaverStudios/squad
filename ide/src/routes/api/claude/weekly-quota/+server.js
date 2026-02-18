@@ -18,7 +18,7 @@ import { json } from '@sveltejs/kit';
  * }
  */
 export async function GET({ url }) {
-	// TODO (jat-sk1): Replace with actual Cost Report API integration
+	// TODO (squad-sk1): Replace with actual Cost Report API integration
 	// For now, return mock data for development
 
 	const now = new Date();
@@ -42,7 +42,7 @@ export async function GET({ url }) {
 }
 
 /**
- * Integration notes for jat-sk1:
+ * Integration notes for squad-sk1:
  *
  * 1. Add ANTHROPIC_ADMIN_API_KEY to environment variables
  * 2. Implement Cost Report API call:

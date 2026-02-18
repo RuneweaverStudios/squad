@@ -5,7 +5,7 @@
  * PUT /api/config/commit-message - Update commit message settings
  * DELETE /api/config/commit-message - Reset to defaults
  *
- * Settings are stored in ~/.config/jat/projects.json under commit_message key
+ * Settings are stored in ~/.config/squad/projects.json under commit_message key
  */
 
 import { json } from '@sveltejs/kit';
@@ -16,7 +16,7 @@ import { homedir } from 'os';
 import { COMMIT_MESSAGE_DEFAULTS, type CommitMessageStyle, type CommitMessageModel } from '$lib/config/constants';
 import type { RequestHandler } from './$types';
 
-const CONFIG_PATH = join(homedir(), '.config', 'jat', 'projects.json');
+const CONFIG_PATH = join(homedir(), '.config', 'squad', 'projects.json');
 
 interface CommitMessageConfig {
 	model?: CommitMessageModel;
@@ -27,7 +27,7 @@ interface CommitMessageConfig {
 	custom_instructions?: string;
 }
 
-interface JatConfig {
+interface SquadConfig {
 	projects?: Record<string, unknown>;
 	defaults?: Record<string, unknown>;
 	commit_message?: CommitMessageConfig;
@@ -36,7 +36,7 @@ interface JatConfig {
 /**
  * Read the full config file
  */
-async function readConfig(): Promise<JatConfig> {
+async function readConfig(): Promise<SquadConfig> {
 	try {
 		if (!existsSync(CONFIG_PATH)) {
 			return { projects: {}, defaults: {}, commit_message: {} };
@@ -52,7 +52,7 @@ async function readConfig(): Promise<JatConfig> {
 /**
  * Write the full config file
  */
-async function writeConfig(config: JatConfig): Promise<void> {
+async function writeConfig(config: SquadConfig): Promise<void> {
 	const dir = dirname(CONFIG_PATH);
 	if (!existsSync(dir)) {
 		await mkdir(dir, { recursive: true });

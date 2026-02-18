@@ -5,7 +5,7 @@
  * PUT /api/config/state-actions - Update state actions configuration
  * DELETE /api/config/state-actions - Reset to defaults
  *
- * Config file location: ~/.config/jat/state-actions.json
+ * Config file location: ~/.config/squad/state-actions.json
  */
 
 import { json } from '@sveltejs/kit';
@@ -23,7 +23,7 @@ import {
 } from '$lib/config/stateActionsConfig';
 import { SESSION_STATE_ACTIONS as DEFAULT_ACTIONS } from '$lib/config/statusColors';
 
-const CONFIG_PATH = join(homedir(), '.config', 'jat', 'state-actions.json');
+const CONFIG_PATH = join(homedir(), '.config', 'squad', 'state-actions.json');
 
 /**
  * Read user config from file

@@ -2,7 +2,7 @@
 	/**
 	 * CommitMessageSettingsEditor Component
 	 *
-	 * Form for editing commit message generation settings from ~/.config/jat/projects.json
+	 * Form for editing commit message generation settings from ~/.config/squad/projects.json
 	 * Controls AI model, message style, and generation parameters.
 	 */
 

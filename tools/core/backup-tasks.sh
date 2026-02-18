@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# backup-tasks.sh - Backup .jat/tasks.db
+# backup-tasks.sh - Backup .squad/tasks.db
 #
 # Simple cp-based backup with SHA256 checksums.
 #
@@ -33,7 +33,7 @@ log_info() { echo -e "${CYAN}ℹ${NC}  $1"; }
 
 show_help() {
     cat <<EOF
-${SCRIPT_NAME} v${VERSION} - Backup .jat/tasks.db
+${SCRIPT_NAME} v${VERSION} - Backup .squad/tasks.db
 
 USAGE:
     $SCRIPT_NAME --project PATH [OPTIONS]
@@ -45,7 +45,7 @@ OPTIONS:
     --help              Show this help message
 
 BACKUP LOCATION:
-    <project>/.jat/backups/backup_<timestamp>[_<label>]/
+    <project>/.squad/backups/backup_<timestamp>[_<label>]/
 
 EXAMPLES:
     $SCRIPT_NAME --project ~/code/chimaro
@@ -71,7 +71,7 @@ if [[ -z "$PROJECT_PATH" ]]; then
 fi
 
 PROJECT_PATH="${PROJECT_PATH/#\~/$HOME}"
-TASKS_DB="${PROJECT_PATH}/.jat/tasks.db"
+TASKS_DB="${PROJECT_PATH}/.squad/tasks.db"
 
 # Validate
 if [[ ! -d "$PROJECT_PATH" ]]; then
@@ -91,7 +91,7 @@ echo ""
 timestamp=$(date +%Y%m%d_%H%M%S)
 backup_dir_name="backup_${timestamp}"
 [[ -n "$BACKUP_LABEL" ]] && backup_dir_name="${backup_dir_name}_${BACKUP_LABEL}"
-backup_dir="${PROJECT_PATH}/.jat/backups/${backup_dir_name}"
+backup_dir="${PROJECT_PATH}/.squad/backups/${backup_dir_name}"
 mkdir -p "$backup_dir"
 
 # Copy database

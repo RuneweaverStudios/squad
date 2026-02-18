@@ -2,8 +2,8 @@
 
 # Setup Global Claude Configuration
 # - Creates ~/.claude/CLAUDE.md with universal tool docs (browser, media, db)
-# - Symlinks agent coordination commands from jat/commands/jat/ to ~/.claude/commands/jat/
-# - Source of truth: ~/code/jat/commands/jat/*.md
+# - Symlinks agent coordination commands from squad/commands/squad/ to ~/.claude/commands/squad/
+# - Source of truth: ~/code/squad/commands/squad/*.md
 
 set -e
 
@@ -18,14 +18,14 @@ echo ""
 
 # Ensure ~/.claude directory exists
 mkdir -p ~/.claude
-mkdir -p ~/.claude/commands/jat
+mkdir -p ~/.claude/commands/squad
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-JAT_ROOT="$( cd "$SCRIPT_DIR/../.." && pwd )"
+SQUAD_ROOT="$( cd "$SCRIPT_DIR/../.." && pwd )"
 
 # Create/update ~/.claude/CLAUDE.md with universal tool docs
 GLOBAL_CLAUDE_MD="$HOME/.claude/CLAUDE.md"
-GLOBAL_TOOLS_IMPORT="@~/code/jat/shared/global-tools.md"
+GLOBAL_TOOLS_IMPORT="@~/code/squad/shared/global-tools.md"
 
 if [ ! -f "$GLOBAL_CLAUDE_MD" ]; then
     echo "  → Creating global CLAUDE.md (universal tool docs)..."
@@ -34,7 +34,7 @@ if [ ! -f "$GLOBAL_CLAUDE_MD" ]; then
 
 Tools available on PATH (`~/.local/bin/`) for image generation, browser automation, database queries, and credentials.
 
-@~/code/jat/shared/global-tools.md
+@~/code/squad/shared/global-tools.md
 EOF
     echo -e "${GREEN}  ✓ Created ~/.claude/CLAUDE.md${NC}"
     echo ""
@@ -49,9 +49,9 @@ else
     echo ""
 fi
 # Resolve to absolute path (avoids /../ in symlinks)
-COMMANDS_SOURCE="$( cd "$SCRIPT_DIR/../../commands/jat" && pwd )"
+COMMANDS_SOURCE="$( cd "$SCRIPT_DIR/../../commands/squad" && pwd )"
 
-# Install agent coordination commands as symlinks (SOT: jat/commands/jat/)
+# Install agent coordination commands as symlinks (SOT: squad/commands/squad/)
 if [ -d "$COMMANDS_SOURCE" ]; then
     echo "  → Installing agent coordination commands (symlinks)..."
     COMMAND_COUNT=0
@@ -61,21 +61,21 @@ if [ -d "$COMMANDS_SOURCE" ]; then
         if [ -f "$cmd_file" ]; then
             fname=$(basename "$cmd_file")
             # Remove existing file/symlink if present
-            rm -f ~/.claude/commands/jat/"$fname"
+            rm -f ~/.claude/commands/squad/"$fname"
             # Create symlink to source
-            ln -s "$cmd_file" ~/.claude/commands/jat/"$fname"
+            ln -s "$cmd_file" ~/.claude/commands/squad/"$fname"
             COMMAND_COUNT=$((COMMAND_COUNT + 1))
         fi
     done
 
     echo -e "${GREEN}  ✓ Installed $COMMAND_COUNT coordination commands (symlinked)${NC}"
     echo "    Source: $COMMANDS_SOURCE/"
-    echo "    Target: ~/.claude/commands/jat/"
+    echo "    Target: ~/.claude/commands/squad/"
     echo ""
 fi
 
-# Create default JAT projects config if it doesn't exist
-CONFIG_DIR="$HOME/.config/jat"
+# Create default SQUAD projects config if it doesn't exist
+CONFIG_DIR="$HOME/.config/squad"
 CONFIG_FILE="$CONFIG_DIR/projects.json"
 
 if [ ! -f "$CONFIG_FILE" ]; then
@@ -112,6 +112,6 @@ fi
 echo -e "${GREEN}  ✓ Global configuration complete${NC}"
 echo ""
 echo "  Universal tools: ~/.claude/CLAUDE.md → shared/global-tools.md"
-echo "  Agent commands available via /jat:* namespace"
-echo "  Project-specific docs are imported via @~/code/jat/shared/*.md"
+echo "  Agent commands available via /squad:* namespace"
+echo "  Project-specific docs are imported via @~/code/squad/shared/*.md"
 echo ""

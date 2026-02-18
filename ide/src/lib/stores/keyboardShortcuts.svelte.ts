@@ -21,7 +21,7 @@ const GLOBAL_STORAGE_KEY = 'global-keyboard-shortcuts';
 // =============================================================================
 
 /**
- * Map of command invocation (e.g., "/jat:complete") to shortcut string (e.g., "Alt+C")
+ * Map of command invocation (e.g., "/squad:complete") to shortcut string (e.g., "Alt+C")
  */
 export type ShortcutMap = Record<string, string>;
 

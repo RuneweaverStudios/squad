@@ -2,7 +2,7 @@
  * Scheduler Stop API
  * POST /api/scheduler/stop
  *
- * Stops the jat-scheduler service by killing its tmux session.
+ * Stops the squad-scheduler service by killing its tmux session.
  * Returns 200 if stopped successfully, 404 if not running.
  */
 

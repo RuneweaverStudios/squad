@@ -117,7 +117,7 @@
 	}
 
 	function categorizeSession(name: string): { type: TmuxSession['type']; project?: string } {
-		if (name.startsWith('jat-')) {
+		if (name.startsWith('squad-')) {
 			const agentName = name.slice(4);
 			if (agentName.startsWith('pending-')) {
 				return { type: 'agent', project: undefined };
@@ -129,14 +129,14 @@
 			const project = name.slice(7);
 			return { type: 'server', project };
 		}
-		if (name === 'jat-ide' || name.startsWith('jat-ide')) {
+		if (name === 'squad-ide' || name.startsWith('squad-ide')) {
 			return { type: 'ide' };
 		}
 		return { type: 'other' };
 	}
 
 	function getAgentName(sessionName: string): string {
-		if (sessionName.startsWith('jat-')) {
+		if (sessionName.startsWith('squad-')) {
 			return sessionName.slice(4);
 		}
 		return sessionName;
@@ -375,9 +375,9 @@
 </script>
 
 <svelte:head>
-	<title>Tasks | JAT IDE</title>
+	<title>Tasks | SQUAD IDE</title>
 	<meta name="description" content="Task management for AI coding agents. Create, assign, and track tasks with dependency management." />
-	<meta property="og:title" content="Tasks | JAT IDE" />
+	<meta property="og:title" content="Tasks | SQUAD IDE" />
 	<meta property="og:description" content="Task management for AI coding agents. Create, assign, and track tasks with dependency management." />
 	<meta property="og:image" content="/favicons/tasks.svg" />
 	<link rel="icon" href="/favicons/tasks.svg" />

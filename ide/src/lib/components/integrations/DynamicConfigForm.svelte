@@ -163,7 +163,7 @@
 					}}
 				/>
 				<p class="font-mono text-[10px] mt-1" style="color: oklch(0.45 0.02 250);">
-					Name used in <code>jat-secret</code> to retrieve the token
+					Name used in <code>squad-secret</code> to retrieve the token
 				</p>
 
 				<!-- Secret status -->

@@ -133,7 +133,7 @@
 	}
 
 	interface TimelineEvent {
-		type: 'jat_event' | 'agent_mail' | 'signal';
+		type: 'squad_event' | 'agent_mail' | 'signal';
 		event?: string;
 		timestamp: string;
 		description?: string;
@@ -150,7 +150,7 @@
 		updated_at?: string;
 		attachments: TaskAttachment[];
 		timeline: TimelineEvent[];
-		timelineCounts: { total: number; jat_events: number; agent_mail: number; signals?: number };
+		timelineCounts: { total: number; squad_events: number; agent_mail: number; signals?: number };
 	}
 
 	let expandedTaskDetails = $state<ExtendedTaskDetails | null>(null);
@@ -245,7 +245,7 @@
 	// Project order (from /api/projects, sorted by last activity)
 	let projectOrder = $state<string[]>([]);
 
-	// Extract project from task ID (e.g., "jat-abc" → "jat", "chimaro-xyz" → "chimaro")
+	// Extract project from task ID (e.g., "squad-abc" → "squad", "chimaro-xyz" → "chimaro")
 	function getProjectFromTaskId(taskId: string): string | undefined {
 		if (!taskId) return undefined;
 		const match = taskId.match(/^([a-zA-Z0-9_-]+)-[a-zA-Z0-9]+/);
@@ -254,8 +254,8 @@
 
 	// Categorize sessions
 	function categorizeSession(name: string): { type: TmuxSession['type']; project?: string } {
-		if (name.startsWith('jat-')) {
-			// Agent session: jat-AgentName
+		if (name.startsWith('squad-')) {
+			// Agent session: squad-AgentName
 			const agentName = name.slice(4);
 			if (agentName.startsWith('pending-')) {
 				return { type: 'agent', project: undefined };
@@ -269,7 +269,7 @@
 			const project = name.slice(7);
 			return { type: 'server', project };
 		}
-		if (name === 'jat-ide' || name.startsWith('jat-ide')) {
+		if (name === 'squad-ide' || name.startsWith('squad-ide')) {
 			return { type: 'ide' };
 		}
 		return { type: 'other' };
@@ -418,7 +418,7 @@
 
 	function handleTaskTableAgentClick(agentName: string) {
 		// Find and expand that agent's session
-		const session = sessions.find(s => s.name === `jat-${agentName}`);
+		const session = sessions.find(s => s.name === `squad-${agentName}`);
 		if (session) {
 			toggleExpanded(session.name);
 		}
@@ -666,7 +666,7 @@
 
 			const taskData = taskRes.ok ? await taskRes.json() : null;
 			const attachmentsData = attachmentsRes.ok ? await attachmentsRes.json() : { images: [] };
-			const historyData = historyRes.ok ? await historyRes.json() : { timeline: [], count: { total: 0, jat_events: 0, agent_mail: 0 } };
+			const historyData = historyRes.ok ? await historyRes.json() : { timeline: [], count: { total: 0, squad_events: 0, agent_mail: 0 } };
 			const signalsData = signalsRes.ok ? await signalsRes.json() : { signals: [] };
 
 			// Convert signals to timeline event format and merge with history
@@ -700,7 +700,7 @@
 				timeline: mergedTimeline,
 				timelineCounts: {
 					total: mergedTimeline.length,
-					jat_events: historyData.count?.jat_events || 0,
+					squad_events: historyData.count?.squad_events || 0,
 					agent_mail: historyData.count?.agent_mail || 0,
 					signals: signalEvents.length
 				}
@@ -711,7 +711,7 @@
 				labels: [],
 				attachments: [],
 				timeline: [],
-				timelineCounts: { total: 0, jat_events: 0, agent_mail: 0 }
+				timelineCounts: { total: 0, squad_events: 0, agent_mail: 0 }
 			};
 		} finally {
 			taskDetailsLoading = false;
@@ -882,9 +882,9 @@
 		}
 	}
 
-	// Get agent name from session name (jat-AgentName -> AgentName)
+	// Get agent name from session name (squad-AgentName -> AgentName)
 	function getAgentName(sessionName: string): string {
-		if (sessionName.startsWith('jat-')) {
+		if (sessionName.startsWith('squad-')) {
 			return sessionName.slice(4);
 		}
 		return sessionName;
@@ -1078,9 +1078,9 @@
 </script>
 
 <svelte:head>
-	<title>Tasks Table | JAT IDE</title>
+	<title>Tasks Table | SQUAD IDE</title>
 	<meta name="description" content="Sessions view with task table below - review tasks, spawn sessions, and track agent progress." />
-	<meta property="og:title" content="Tasks Table | JAT IDE" />
+	<meta property="og:title" content="Tasks Table | SQUAD IDE" />
 	<meta property="og:description" content="Sessions view with task table below - review tasks, spawn sessions, and track agent progress." />
 	<meta property="og:image" content="/favicons/tmux.svg" />
 	<link rel="icon" href="/favicons/tmux.svg" />
@@ -1317,7 +1317,7 @@
 													} else if (actionId === 'view-task' && sessionTask) {
 														window.location.href = `/tasks?task=${sessionTask.id}`;
 													} else if (actionId === 'complete') {
-														// Send /jat:complete command to session
+														// Send /squad:complete command to session
 														// Claude Code slash commands need: Ctrl+U clear, text, extra Enter
 														const sessionId = encodeURIComponent(session.name);
 														await fetch(`/api/work/${sessionId}/input`, {
@@ -1329,7 +1329,7 @@
 														await fetch(`/api/work/${sessionId}/input`, {
 															method: 'POST',
 															headers: { 'Content-Type': 'application/json' },
-															body: JSON.stringify({ input: '/jat:complete', type: 'text' })
+															body: JSON.stringify({ input: '/squad:complete', type: 'text' })
 														});
 														await new Promise(r => setTimeout(r, 100));
 														await fetch(`/api/work/${sessionId}/input`, {
@@ -1338,7 +1338,7 @@
 															body: JSON.stringify({ type: 'enter' })
 														});
 													} else if (actionId === 'complete-kill') {
-														// Send /jat:complete --kill command to session
+														// Send /squad:complete --kill command to session
 														// Claude Code slash commands need: Ctrl+U clear, text, extra Enter
 														const sessionId = encodeURIComponent(session.name);
 														await fetch(`/api/work/${sessionId}/input`, {
@@ -1350,7 +1350,7 @@
 														await fetch(`/api/work/${sessionId}/input`, {
 															method: 'POST',
 															headers: { 'Content-Type': 'application/json' },
-															body: JSON.stringify({ input: '/jat:complete --kill', type: 'text' })
+															body: JSON.stringify({ input: '/squad:complete --kill', type: 'text' })
 														});
 														await new Promise(r => setTimeout(r, 100));
 														await fetch(`/api/work/${sessionId}/input`, {
@@ -1646,7 +1646,7 @@
 																				class:active={timelineFilter === 'tasks'}
 																				onclick={() => timelineFilter = 'tasks'}
 																			>
-																				Tasks ({expandedTaskDetails.timelineCounts.jat_events})
+																				Tasks ({expandedTaskDetails.timelineCounts.squad_events})
 																			</button>
 																			<button
 																				class="timeline-tab"
@@ -1660,13 +1660,13 @@
 																	<div class="task-panel-timeline">
 																		{#each expandedTaskDetails.timeline.filter(e =>
 																			timelineFilter === 'all' ||
-																			(timelineFilter === 'tasks' && (e.type === 'jat_event' || e.type === 'signal')) ||
+																			(timelineFilter === 'tasks' && (e.type === 'squad_event' || e.type === 'signal')) ||
 																			(timelineFilter === 'messages' && e.type === 'agent_mail')
 																		) as event}
-																			<div class="timeline-event" class:task-event={event.type === 'jat_event'} class:message-event={event.type === 'agent_mail'} class:signal-event={event.type === 'signal'}>
+																			<div class="timeline-event" class:task-event={event.type === 'squad_event'} class:message-event={event.type === 'agent_mail'} class:signal-event={event.type === 'signal'}>
 																				<div class="timeline-event-header">
 																					<span class="timeline-event-type">
-																						{#if event.type === 'jat_event'}
+																						{#if event.type === 'squad_event'}
 																							📋
 																						{:else if event.type === 'signal'}
 																							⚡

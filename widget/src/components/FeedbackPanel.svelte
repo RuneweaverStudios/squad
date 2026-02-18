@@ -148,27 +148,27 @@
 
   <form class="panel-body" onsubmit={handleSubmit}>
     <div class="field">
-      <label for="jat-fb-title">Title <span class="req">*</span></label>
-      <input id="jat-fb-title" type="text" bind:value={title} placeholder="Brief description" required disabled={submitting} />
+      <label for="squad-fb-title">Title <span class="req">*</span></label>
+      <input id="squad-fb-title" type="text" bind:value={title} placeholder="Brief description" required disabled={submitting} />
     </div>
 
     <div class="field">
-      <label for="jat-fb-desc">Description</label>
-      <textarea id="jat-fb-desc" bind:value={description} placeholder="Steps to reproduce, expected vs actual..." rows="3" disabled={submitting}></textarea>
+      <label for="squad-fb-desc">Description</label>
+      <textarea id="squad-fb-desc" bind:value={description} placeholder="Steps to reproduce, expected vs actual..." rows="3" disabled={submitting}></textarea>
     </div>
 
     <div class="field-row">
       <div class="field half">
-        <label for="jat-fb-type">Type</label>
-        <select id="jat-fb-type" bind:value={type} disabled={submitting}>
+        <label for="squad-fb-type">Type</label>
+        <select id="squad-fb-type" bind:value={type} disabled={submitting}>
           {#each typeOptions as opt}
             <option value={opt.value}>{opt.label}</option>
           {/each}
         </select>
       </div>
       <div class="field half">
-        <label for="jat-fb-priority">Priority</label>
-        <select id="jat-fb-priority" bind:value={priority} disabled={submitting}>
+        <label for="squad-fb-priority">Priority</label>
+        <select id="squad-fb-priority" bind:value={priority} disabled={submitting}>
           {#each priorityOptions as opt}
             <option value={opt.value}>{opt.label}</option>
           {/each}

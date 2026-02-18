@@ -1,7 +1,7 @@
 <script>
 	/**
 	 * TaskList Component
-	 * Displays JAT tasks with filtering using Svelte 5 $derived runes
+	 * Displays SQUAD tasks with filtering using Svelte 5 $derived runes
 	 */
 
 	import TaskDetailDrawer from './TaskDetailDrawer.svelte';

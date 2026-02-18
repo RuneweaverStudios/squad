@@ -6,7 +6,7 @@
 	 * Simple colored text with brackets: [agents] [servers] [terminal] [all]
 	 *
 	 * Tabs (in display order):
-	 * - agents: Agent sessions (jat-* tmux sessions) - default
+	 * - agents: Agent sessions (squad-* tmux sessions) - default
 	 * - servers: Dev server sessions (server-* tmux sessions)
 	 * - terminal: Other terminal sessions
 	 * - all: Show all sessions (last option)

@@ -8,7 +8,7 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
-const CONFIG_DIR = join(homedir(), '.config', 'jat');
+const CONFIG_DIR = join(homedir(), '.config', 'squad');
 const PIPELINES_FILE = join(CONFIG_DIR, 'quick-command-pipelines.json');
 
 /**

@@ -5,7 +5,7 @@
  *   Detects sessions that can be recovered after a crash/reboot:
  *   - Tasks in_progress with an assignee
  *   - Agent session file exists (.claude/sessions/agent-{sessionId}.txt)
- *   - No active tmux session jat-{agentName}
+ *   - No active tmux session squad-{agentName}
  *
  * POST /api/recovery
  *   Batch recover all recoverable sessions
@@ -28,8 +28,8 @@ const execAsync = promisify(exec);
 
 /**
  * Convert a project path to Claude's project slug format
- * @param projectPath - e.g., "/home/jw/code/jat"
- * @returns e.g., "-home-jw-code-jat"
+ * @param projectPath - e.g., "/home/jw/code/squad"
+ * @returns e.g., "-home-jw-code-squad"
  */
 function getProjectSlug(projectPath: string): string {
 	return projectPath.replace(/\//g, '-');
@@ -60,8 +60,8 @@ function findSessionIdFromJsonl(agentName: string, projectPath: string): { sessi
 			.sort((a, b) => b.mtime.getTime() - a.mtime.getTime()); // Newest first
 
 		// Search for agent name in multiple patterns:
-		// 1. "agentName":"AgentName" in tool output - from jat-signal
-		// 2. <command-args>AgentName in early messages - from /jat:start command
+		// 1. "agentName":"AgentName" in tool output - from squad-signal
+		// 2. <command-args>AgentName in early messages - from /squad:start command
 		const signalPattern = new RegExp(`"agentName"\\s*:\\s*"${agentName}"`, 'i');
 		const commandPattern = new RegExp(`<command-args>${agentName}\\s`, 'i');
 
@@ -124,8 +124,8 @@ async function getActiveTmuxSessions(): Promise<Set<string>> {
 			stdout
 				.trim()
 				.split('\n')
-				.filter((s) => s.startsWith('jat-'))
-				.map((s) => s.replace('jat-', ''))
+				.filter((s) => s.startsWith('squad-'))
+				.map((s) => s.replace('squad-', ''))
 		);
 		return sessions;
 	} catch {
@@ -139,7 +139,7 @@ async function getActiveTmuxSessions(): Promise<Set<string>> {
  */
 async function getInProgressTasks(projectPath: string): Promise<Task[]> {
 	try {
-		const { stdout } = await execAsync(`cd "${projectPath}" && jt list --status in_progress --json`);
+		const { stdout } = await execAsync(`cd "${projectPath}" && st list --status in_progress --json`);
 		const tasks: Task[] = JSON.parse(stdout);
 		return tasks.filter((t) => t.assignee);
 	} catch {
@@ -210,17 +210,17 @@ async function buildAgentSessionMap(projectPath: string, agentNames?: Set<string
  */
 function getProjectFromTaskId(taskId: string): string {
 	// Match project prefix before the first hyphen followed by the hash
-	// Examples: jat-abc -> jat, steelbridge-b2y.15 -> steelbridge
+	// Examples: squad-abc -> squad, steelbridge-b2y.15 -> steelbridge
 	const match = taskId.match(/^([a-zA-Z0-9_-]+)-[a-zA-Z0-9]+(?:\.[a-zA-Z0-9]+)*$/);
 	return match ? match[1] : 'unknown';
 }
 
 /**
- * Get configured projects from ~/.config/jat/projects.json
+ * Get configured projects from ~/.config/squad/projects.json
  */
 function getConfiguredProjects(): string[] {
 	const homeDir = process.env.HOME || '';
-	const configPath = join(homeDir, '.config', 'jat', 'projects.json');
+	const configPath = join(homeDir, '.config', 'squad', 'projects.json');
 	const projects: string[] = [];
 
 	if (!existsSync(configPath)) {
@@ -242,8 +242,8 @@ function getConfiguredProjects(): string[] {
 					projectPath = join(homeDir, projectPath.slice(2));
 				}
 
-				// Only include if it has a .jat directory
-				if (existsSync(join(projectPath, '.jat'))) {
+				// Only include if it has a .squad directory
+				if (existsSync(join(projectPath, '.squad'))) {
 					projects.push(projectPath);
 				}
 			}

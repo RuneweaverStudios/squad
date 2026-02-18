@@ -183,7 +183,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		const sedScript = sedLines.join('\n') + '\n';
 
 		// Write sed script to temp file
-		const tmpFile = join(tmpdir(), `jat-rebase-${randomBytes(4).toString('hex')}.sed`);
+		const tmpFile = join(tmpdir(), `squad-rebase-${randomBytes(4).toString('hex')}.sed`);
 		writeFileSync(tmpFile, sedScript, 'utf-8');
 
 		try {

@@ -15,12 +15,12 @@
 
 	// Sample agents for the demo
 	const agents = [
-		{ name: 'BluePeak', task: 'jat-a1', status: 'working', color: 'oklch(65% 0.2 180)' },
-		{ name: 'GoldBay', task: 'jat-b3', status: 'working', color: 'oklch(80% 0.18 85)' },
-		{ name: 'RedMarsh', task: 'jat-c2', status: 'review', color: 'oklch(70% 0.25 25)' },
-		{ name: 'FairCove', task: 'jat-d1', status: 'working', color: 'oklch(75% 0.18 145)' },
-		{ name: 'MistHaven', task: 'jat-e5', status: 'idle', color: 'oklch(70% 0.25 280)' },
-		{ name: 'DarkPine', task: 'jat-f2', status: 'working', color: 'oklch(65% 0.15 320)' }
+		{ name: 'BluePeak', task: 'squad-a1', status: 'working', color: 'oklch(65% 0.2 180)' },
+		{ name: 'GoldBay', task: 'squad-b3', status: 'working', color: 'oklch(80% 0.18 85)' },
+		{ name: 'RedMarsh', task: 'squad-c2', status: 'review', color: 'oklch(70% 0.25 25)' },
+		{ name: 'FairCove', task: 'squad-d1', status: 'working', color: 'oklch(75% 0.18 145)' },
+		{ name: 'MistHaven', task: 'squad-e5', status: 'idle', color: 'oklch(70% 0.25 280)' },
+		{ name: 'DarkPine', task: 'squad-f2', status: 'working', color: 'oklch(65% 0.15 320)' }
 	];
 
 	// Task flow items
@@ -141,12 +141,12 @@
 				<div class="message">
 					<span class="msg-time">12:34:18</span>
 					<span class="msg-agent" style="color: oklch(70% 0.25 25)">RedMarsh</span>
-					<span class="msg-text">Requesting review for jat-c2</span>
+					<span class="msg-text">Requesting review for squad-c2</span>
 				</div>
 				<div class="message">
 					<span class="msg-time">12:34:15</span>
 					<span class="msg-agent" style="color: oklch(75% 0.18 145)">FairCove</span>
-					<span class="msg-text">Completed jat-d0, picking jat-d1</span>
+					<span class="msg-text">Completed squad-d0, picking squad-d1</span>
 				</div>
 				<div class="message">
 					<span class="msg-time">12:34:12</span>

@@ -174,7 +174,7 @@ export function formatDependencyChain(chain: Array<{ level: number; task: Task }
  * 2. For each incomplete task, calculate the longest path to the epic
  * 3. The critical path is the set of tasks on the longest path(s)
  *
- * Task: jat-puza.5 - Critical path highlighting in TaskTable
+ * Task: squad-puza.5 - Critical path highlighting in TaskTable
  */
 
 export interface CriticalPathResult {
@@ -188,7 +188,7 @@ export interface CriticalPathResult {
 
 /**
  * Get parent epic ID from a task ID
- * e.g., "jat-puza.4" -> "jat-puza"
+ * e.g., "squad-puza.4" -> "squad-puza"
  */
 function getParentEpicId(taskId: string): string | null {
 	const dotIndex = taskId.lastIndexOf('.');
@@ -214,7 +214,7 @@ function isTaskReady(task: Task): boolean {
  * For a given epic, finds the longest chain of incomplete tasks that must
  * be completed before the epic can be finished.
  *
- * @param epicId - The epic task ID (e.g., "jat-puza")
+ * @param epicId - The epic task ID (e.g., "squad-puza")
  * @param allTasks - All tasks in the system
  * @returns Critical path analysis result
  */

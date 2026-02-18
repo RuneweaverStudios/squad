@@ -2,7 +2,7 @@
 	/**
 	 * HelpGuide.svelte
 	 *
-	 * Comprehensive help documentation modal for the JAT IDE.
+	 * Comprehensive help documentation modal for the SQUAD IDE.
 	 * Documents the drawer sidebar navigation pattern and all IDE features.
 	 */
 
@@ -43,7 +43,7 @@
 						Getting Started
 					</h3>
 					<div class="space-y-2 text-sm">
-						<p>Welcome to the JAT IDE! This IDE helps you manage tasks across multiple projects with powerful filtering, visualization, and agent coordination features.</p>
+						<p>Welcome to the SQUAD IDE! This IDE helps you manage tasks across multiple projects with powerful filtering, visualization, and agent coordination features.</p>
 						<p class="font-semibold mt-3">Key Features:</p>
 						<ul class="list-disc list-inside space-y-1 ml-2">
 							<li><strong>Drawer Sidebar Navigation:</strong> Quick access to all 5 main views</li>
@@ -194,7 +194,7 @@
 						<div class="bg-base-200 p-3 rounded-lg">
 							<p class="font-semibold mb-2">How It Works:</p>
 							<ul class="list-disc list-inside space-y-1 ml-2">
-								<li>Projects are auto-detected from task ID prefixes (e.g., <code>jat-abc</code>, <code>chimaro-xyz</code>)</li>
+								<li>Projects are auto-detected from task ID prefixes (e.g., <code>squad-abc</code>, <code>chimaro-xyz</code>)</li>
 								<li>Select a project to filter all views to that project's tasks</li>
 								<li>Select "All Projects" to see tasks from all projects</li>
 								<li>Project selection persists across navigation and page reloads</li>

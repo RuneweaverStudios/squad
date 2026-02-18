@@ -6,11 +6,11 @@
 	 * - Spawn settings (model, max sessions, agent count, stagger)
 	 * - Review rules (via embedded ReviewRulesEditor)
 	 *
-	 * Settings are persisted to ~/.config/jat/projects.json under defaults.
+	 * Settings are persisted to ~/.config/squad/projects.json under defaults.
 	 */
 
 	import { onMount } from 'svelte';
-	import { JAT_DEFAULTS } from '$lib/config/constants';
+	import { SQUAD_DEFAULTS } from '$lib/config/constants';
 	import { successToast, errorToast } from '$lib/stores/toasts.svelte';
 	import { setMaxSessions, type MaxSessions } from '$lib/stores/preferences.svelte';
 	import ReviewRulesEditor from '$lib/components/ReviewRulesEditor.svelte';
@@ -37,19 +37,19 @@
 	let hasChanges = $state(false);
 
 	// Form state - spawn settings
-	let model = $state(JAT_DEFAULTS.model);
-	let maxSessions = $state(JAT_DEFAULTS.max_sessions);
-	let defaultAgentCount = $state(JAT_DEFAULTS.default_agent_count);
-	let agentStagger = $state(JAT_DEFAULTS.agent_stagger);
-	let claudeStartupTimeout = $state(JAT_DEFAULTS.claude_startup_timeout);
+	let model = $state(SQUAD_DEFAULTS.model);
+	let maxSessions = $state(SQUAD_DEFAULTS.max_sessions);
+	let defaultAgentCount = $state(SQUAD_DEFAULTS.default_agent_count);
+	let agentStagger = $state(SQUAD_DEFAULTS.agent_stagger);
+	let claudeStartupTimeout = $state(SQUAD_DEFAULTS.claude_startup_timeout);
 
 	// Original values for comparison
 	let originalValues = $state({
-		model: JAT_DEFAULTS.model,
-		max_sessions: JAT_DEFAULTS.max_sessions,
-		default_agent_count: JAT_DEFAULTS.default_agent_count,
-		agent_stagger: JAT_DEFAULTS.agent_stagger,
-		claude_startup_timeout: JAT_DEFAULTS.claude_startup_timeout
+		model: SQUAD_DEFAULTS.model,
+		max_sessions: SQUAD_DEFAULTS.max_sessions,
+		default_agent_count: SQUAD_DEFAULTS.default_agent_count,
+		agent_stagger: SQUAD_DEFAULTS.agent_stagger,
+		claude_startup_timeout: SQUAD_DEFAULTS.claude_startup_timeout
 	});
 
 	// Model options
@@ -80,11 +80,11 @@
 			const defaults = data.defaults || {};
 
 			// Update form state
-			model = defaults.model ?? JAT_DEFAULTS.model;
-			maxSessions = defaults.max_sessions ?? JAT_DEFAULTS.max_sessions;
-			defaultAgentCount = defaults.default_agent_count ?? JAT_DEFAULTS.default_agent_count;
-			agentStagger = defaults.agent_stagger ?? JAT_DEFAULTS.agent_stagger;
-			claudeStartupTimeout = defaults.claude_startup_timeout ?? JAT_DEFAULTS.claude_startup_timeout;
+			model = defaults.model ?? SQUAD_DEFAULTS.model;
+			maxSessions = defaults.max_sessions ?? SQUAD_DEFAULTS.max_sessions;
+			defaultAgentCount = defaults.default_agent_count ?? SQUAD_DEFAULTS.default_agent_count;
+			agentStagger = defaults.agent_stagger ?? SQUAD_DEFAULTS.agent_stagger;
+			claudeStartupTimeout = defaults.claude_startup_timeout ?? SQUAD_DEFAULTS.claude_startup_timeout;
 
 			// Store original values
 			originalValues = {
@@ -161,11 +161,11 @@
 
 	// Reset spawn settings to factory defaults (doesn't save automatically)
 	function resetSpawnToFactory() {
-		model = JAT_DEFAULTS.model;
-		maxSessions = JAT_DEFAULTS.max_sessions;
-		defaultAgentCount = JAT_DEFAULTS.default_agent_count;
-		agentStagger = JAT_DEFAULTS.agent_stagger;
-		claudeStartupTimeout = JAT_DEFAULTS.claude_startup_timeout;
+		model = SQUAD_DEFAULTS.model;
+		maxSessions = SQUAD_DEFAULTS.max_sessions;
+		defaultAgentCount = SQUAD_DEFAULTS.default_agent_count;
+		agentStagger = SQUAD_DEFAULTS.agent_stagger;
+		claudeStartupTimeout = SQUAD_DEFAULTS.claude_startup_timeout;
 	}
 
 	onMount(() => {

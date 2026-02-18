@@ -1,23 +1,23 @@
-# JAT Demo Environment
+# SQUAD Demo Environment
 
-This directory contains everything needed to run an isolated JAT demo.
+This directory contains everything needed to run an isolated SQUAD demo.
 
 ## Quick Start
 
 ```bash
 # Initialize/reset the demo environment
-jat demo init
+squad demo init
 
 # Launch the demo IDE
-jat demo
+squad demo
 
 # Reset to clean state (for video retakes)
-jat demo reset
+squad demo reset
 ```
 
 ## What Gets Created
 
-The demo creates a temporary environment at `/tmp/jat-demo/` with:
+The demo creates a temporary environment at `/tmp/squad-demo/` with:
 
 ### Demo Projects
 
@@ -43,12 +43,12 @@ The demo creates a temporary environment at `/tmp/jat-demo/` with:
 
 ### Demo Flow
 
-1. **Launch demo**: `jat demo` opens IDE with demo projects
+1. **Launch demo**: `squad demo` opens IDE with demo projects
 2. **Create task**: Use UI to add a task (shows AI suggestions)
-3. **Spawn agent**: Click "New Session" or `jat acme-saas`
+3. **Spawn agent**: Click "New Session" or `squad acme-saas`
 4. **Watch workflow**: Agent picks task, starts working, signals progress
-5. **Epic swarm**: Launch multiple agents: `jat acme-saas 3 --auto`
-6. **Complete task**: `/jat:complete` closes task, ends session
+5. **Epic swarm**: Launch multiple agents: `squad acme-saas 3 --auto`
+6. **Complete task**: `/squad:complete` closes task, ends session
 
 ## Files
 
@@ -59,5 +59,5 @@ The demo creates a temporary environment at `/tmp/jat-demo/` with:
 
 ## Resetting
 
-Each `jat demo reset` fully removes and recreates the demo environment.
+Each `squad demo reset` fully removes and recreates the demo environment.
 This is designed for video takes where you need a clean slate.

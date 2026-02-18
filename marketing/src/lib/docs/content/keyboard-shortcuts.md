@@ -1,6 +1,6 @@
 # Keyboard Shortcuts
 
-JAT uses keyboard shortcuts for fast navigation and common actions. All shortcuts use the Alt key as the primary modifier since its less likely to conflict with browser defaults.
+SQUAD uses keyboard shortcuts for fast navigation and common actions. All shortcuts use the Alt key as the primary modifier since its less likely to conflict with browser defaults.
 
 ## Global shortcuts
 

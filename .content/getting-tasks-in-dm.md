@@ -1,4 +1,4 @@
-hey so you asked how to get tasks into jat. there are basically 3 tiers depending on how much structure you already have.
+hey so you asked how to get tasks into squad. there are basically 3 tiers depending on how much structure you already have.
 
 **if you just want to type stuff in:**
 
@@ -55,27 +55,27 @@ Generator tab - describe the feature in english, AI spits out a task list, you e
 
 Plan tab - spawns a live claude session inside the drawer. you have a conversation about scope and approach, it creates tasks as you agree on them. this is the one for hairy features where the breakdown isn't obvious.
 
-`/jat:tasktree` in a claude code session - point it at a PRD or spec file and it generates a full epic with dependency chains:
+`/squad:tasktree` in a claude code session - point it at a PRD or spec file and it generates a full epic with dependency chains:
 
 ```
-/jat:tasktree path/to/auth-prd.md
+/squad:tasktree path/to/auth-prd.md
 ```
 
 produces:
 ```
-jat-auth (Epic)
-  jat-auth.1: Supabase auth config (P0)
-  jat-auth.2: Users table with RLS (P0)
-  jat-auth.3: Google OAuth (P1, depends on .1, .2)
-  jat-auth.4: Email/password (P1, depends on .2)
-  jat-auth.5: Login UI (P1, depends on .3, .4)
+squad-auth (Epic)
+  squad-auth.1: Supabase auth config (P0)
+  squad-auth.2: Users table with RLS (P0)
+  squad-auth.3: Google OAuth (P1, depends on .1, .2)
+  squad-auth.4: Email/password (P1, depends on .2)
+  squad-auth.5: Login UI (P1, depends on .3, .4)
 ```
 
 **programmatic:**
 
 CLI:
 ```bash
-jat create "Fix OAuth timeout" --type bug --priority 1 --labels security,auth --description "..."
+squad create "Fix OAuth timeout" --type bug --priority 1 --labels security,auth --description "..."
 ```
 
 single task API:
@@ -104,7 +104,7 @@ my_tasks = [
     {"name": "AUTH-002", "desc": "Session management", "severity": "medium"},
 ]
 
-jat_tasks = [{
+squad_tasks = [{
     "title": f"{t['name']}: {t['desc']}",
     "type": "feature",
     "priority": 1 if t["severity"] == "high" else 2,
@@ -112,7 +112,7 @@ jat_tasks = [{
 } for t in my_tasks]
 
 requests.post("http://localhost:3333/api/tasks/bulk",
-    json={"project": "myapp", "tasks": jat_tasks})
+    json={"project": "myapp", "tasks": squad_tasks})
 ```
 
 50 lines max to wire up any source. lmk if you want to walk through it

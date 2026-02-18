@@ -11,7 +11,7 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { randomBytes } from 'crypto';
 
-const CONFIG_DIR = join(homedir(), '.config', 'jat');
+const CONFIG_DIR = join(homedir(), '.config', 'squad');
 const TEMPLATES_FILE = join(CONFIG_DIR, 'quick-commands.json');
 
 /**

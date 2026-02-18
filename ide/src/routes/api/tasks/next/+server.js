@@ -31,11 +31,11 @@ const execAsync = promisify(exec);
 
 /**
  * Get the project path for a given project name from projects.json config
- * @param {string} projectName - Project name (e.g., "steelbridge", "jat")
+ * @param {string} projectName - Project name (e.g., "steelbridge", "squad")
  * @returns {string} - Full path to project directory
  */
 function getProjectPath(projectName) {
-	const configPath = join(homedir(), '.config/jat/projects.json');
+	const configPath = join(homedir(), '.config/squad/projects.json');
 	const defaultPath = process.cwd().replace('/ide', '');
 
 	if (!existsSync(configPath)) {
@@ -64,7 +64,7 @@ function getProjectPath(projectName) {
 
 /**
  * Get the parent epic ID from a task ID (dot notation only)
- * Task IDs with dots (e.g., jat-puza.8) have parent epic (e.g., jat-puza)
+ * Task IDs with dots (e.g., squad-puza.8) have parent epic (e.g., squad-puza)
  * For non-dot notation tasks, use findEpicContainingTask() instead
  * @param {string} taskId
  * @returns {string | null}
@@ -77,7 +77,7 @@ function getParentEpicIdFromDotNotation(taskId) {
 
 /**
  * Find the epic that contains a given task in its dependencies
- * This handles tasks with jat-{hash} format that don't use dot notation
+ * This handles tasks with squad-{hash} format that don't use dot notation
  * @param {string} taskId
  * @param {string} projectPath
  * @returns {Promise<{epicId: string, epicTitle: string} | null>}
@@ -85,7 +85,7 @@ function getParentEpicIdFromDotNotation(taskId) {
 async function findEpicContainingTask(taskId, projectPath) {
 	try {
 		// First, check if the task itself has a parent field
-		const { stdout: taskStdout } = await execAsync(`jt show "${taskId}" --json`, {
+		const { stdout: taskStdout } = await execAsync(`st show "${taskId}" --json`, {
 			cwd: projectPath,
 			timeout: 10000
 		});
@@ -96,7 +96,7 @@ async function findEpicContainingTask(taskId, projectPath) {
 		if (task?.parent) {
 			// Task has a parent field - fetch the parent to get its title
 			try {
-				const { stdout: parentStdout } = await execAsync(`jt show "${task.parent}" --json`, {
+				const { stdout: parentStdout } = await execAsync(`st show "${task.parent}" --json`, {
 					cwd: projectPath,
 					timeout: 10000
 				});
@@ -112,10 +112,10 @@ async function findEpicContainingTask(taskId, projectPath) {
 		}
 
 		// No parent field - search for epics that have this task as a dependency
-		// Use jt list to find epics in the same project
+		// Use st list to find epics in the same project
 		const projectPrefix = taskId.split('-')[0];
 		const { stdout: epicsStdout } = await execAsync(
-			`jt list --type epic --status open --json`,
+			`st list --type epic --status open --json`,
 			{
 				cwd: projectPath,
 				timeout: 10000
@@ -131,7 +131,7 @@ async function findEpicContainingTask(taskId, projectPath) {
 
 			// Fetch full epic with dependencies
 			try {
-				const { stdout: epicFullStdout } = await execAsync(`jt show "${epic.id}" --json`, {
+				const { stdout: epicFullStdout } = await execAsync(`st show "${epic.id}" --json`, {
 					cwd: projectPath,
 					timeout: 5000
 				});
@@ -189,8 +189,8 @@ function isTaskReady(task) {
  */
 async function findNextEpicSibling(completedTaskId, epicId, projectPath, project) {
 	try {
-		// Fetch the epic with its children using jt show
-		const { stdout } = await execAsync(`jt show "${epicId}" --json`, {
+		// Fetch the epic with its children using st show
+		const { stdout } = await execAsync(`st show "${epicId}" --json`, {
 			cwd: projectPath,
 			timeout: 10000
 		});
@@ -251,10 +251,10 @@ async function findNextEpicSibling(completedTaskId, epicId, projectPath, project
  */
 async function findFromBacklog(projectPath, project) {
 	try {
-		// Use jt ready which returns ready tasks sorted by priority
+		// Use st ready which returns ready tasks sorted by priority
 		// When filtering by project, we need to fetch more tasks since the top task might not be from the target project
 		const limit = (project && project !== 'All Projects') ? 50 : 1;
-		const { stdout } = await execAsync(`jt ready --json --limit ${limit} --sort hybrid`, {
+		const { stdout } = await execAsync(`st ready --json --limit ${limit} --sort hybrid`, {
 			cwd: projectPath,
 			timeout: 10000
 		});
@@ -300,7 +300,7 @@ async function pickNextTask(completedTaskId, options = {}) {
 
 	// Try epic-aware selection first
 	if (completedTaskId && preferEpic) {
-		// First try dot notation (e.g., jat-puza.8 → jat-puza)
+		// First try dot notation (e.g., squad-puza.8 → squad-puza)
 		let epicId = getParentEpicIdFromDotNotation(completedTaskId);
 		let epicTitle = undefined;
 

@@ -51,7 +51,7 @@
 	// Shared project state for entire app (always a specific project, never "All Projects")
 	let selectedProject = $state('');
 	let allTasks = $state([]);
-	let configProjects = $state<string[]>([]); // Projects from JAT config (visible ones)
+	let configProjects = $state<string[]>([]); // Projects from SQUAD config (visible ones)
 
 	// Agent count state
 	let activeAgentCount = $state(0);
@@ -426,12 +426,12 @@
 	// Update active agent sessions count for Tasks sidebar badge (agents only, not servers/IDE)
 	async function loadAgentSessionsCount() {
 		try {
-			const response = await fetch('/api/sessions?filter=jat');
+			const response = await fetch('/api/sessions?filter=squad');
 			if (response.ok) {
 				const data = await response.json();
-				// Filter to only include agent sessions (jat-*, excluding jat-ide)
+				// Filter to only include agent sessions (squad-*, excluding squad-ide)
 				const agentSessions = (data.sessions || []).filter((s: { name: string }) =>
-					s.name.startsWith('jat-') && !s.name.startsWith('jat-ide')
+					s.name.startsWith('squad-') && !s.name.startsWith('squad-ide')
 				);
 				setActiveAgentSessionsCount(agentSessions.length);
 			}
@@ -628,7 +628,7 @@
 		}
 	}
 
-	// Fetch visible projects from JAT config (with stats for sorting by activity)
+	// Fetch visible projects from SQUAD config (with stats for sorting by activity)
 	// Retries on failure since network may not be ready during page load
 	async function loadConfigProjects(retries = 3, withStats = false) {
 		try {
@@ -776,8 +776,8 @@
 		const sessionName = get(hoveredSessionName);
 		if (!sessionName) return;
 
-		// Special handling for /jat:complete to trigger visual flash
-		if (commandInvocation === '/jat:complete') {
+		// Special handling for /squad:complete to trigger visual flash
+		if (commandInvocation === '/squad:complete') {
 			triggerCompleteFlash(sessionName);
 		}
 
@@ -920,7 +920,7 @@
 						headers: { 'Content-Type': 'application/json' },
 						body: JSON.stringify({
 							type: 'text',
-							input: '/jat:pause'
+							input: '/squad:pause'
 						})
 					});
 					if (!response.ok) {
@@ -1076,7 +1076,7 @@
 			<!-- Task Creation Drawer (must be inside drawer-content for proper positioning) -->
 			<TaskCreationDrawer />
 
-			<!-- Create Project Drawer (for adding new projects to JAT) -->
+			<!-- Create Project Drawer (for adding new projects to SQUAD) -->
 			<CreateProjectDrawer onProjectCreated={loadConfigProjects} />
 		</div>
 

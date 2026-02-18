@@ -53,7 +53,7 @@ curl -sSL https://raw.githubusercontent.com/RuneweaverStudios/squad/master/tools
 source ~/.bashrc
 
 # Launch
-jat
+squad
 ```
 
 Open http://localhost:3333 → Add a project → Create a task → Spawn an agent → Supervise
@@ -172,7 +172,7 @@ Full commit history and repository management:
 │                                                              │
 │   1. PLAN WITH AI        Describe your feature, get PRD      │
 │         ↓                                                    │
-│   2. /JAT:TASKTREE           Convert PRD → structured tasks  │
+│   2. /SQUAD:TASKTREE           Convert PRD → structured tasks  │
 │         ↓                                                    │
 │   3. EPIC SWARM          Spawn agents on subtasks            │
 │         ↓                                                    │
@@ -233,7 +233,7 @@ Squad connects to external sources. When events arrive, tasks are created and ag
 
 ### Task Scheduler
 
-The built-in scheduler daemon (`jat scheduler start`) handles cron and one-shot triggers. It polls task databases, spawns agents for due tasks, and manages recurring schedules automatically. See [scheduler docs](./shared/scheduler.md).
+The built-in scheduler daemon (`squad scheduler start`) handles cron and one-shot triggers. It polls task databases, spawns agents for due tasks, and manages recurring schedules automatically. See [scheduler docs](./shared/scheduler.md).
 
 ### Custom Integrations
 
@@ -267,7 +267,7 @@ Build your own adapter with the plugin system. See [PLUGINS.md](./tools/ingest/P
 | **Autonomous triggers** | Events spawn agents automatically (immediate/delay/schedule/cron) |
 | **Task scheduling** | Cron-based recurring tasks and one-shot scheduled spawns |
 | **Error recovery** | Automatic retry patterns for failures |
-| **PRD → Tasks** | `/jat:tasktree` converts requirements to structured tasks |
+| **PRD → Tasks** | `/squad:tasktree` converts requirements to structured tasks |
 | **Skill marketplace** | Install community skills, auto-synced to all agents |
 | **Enterprise auth** | Optional Keycloak OIDC for team/shared deployments |
 
@@ -318,7 +318,7 @@ Squad isn't trying to replace your editor — it's the control tower for your ag
 │   ├── ingest/         # Feed ingest daemon (RSS, Slack, Telegram, Gmail)
 │   ├── scheduler/      # Task scheduling daemon (cron + one-shot)
 │   └── signal/         # State sync
-├── commands/           # /jat:start, /jat:complete, /jat:tasktree
+├── commands/           # /squad:start, /squad:complete, /squad:tasktree
 └── shared/             # Agent documentation
 ```
 
@@ -358,7 +358,7 @@ If you have Claude Code installed and authenticated, AI features work out of the
 
 ## Configuration
 
-`~/.config/jat/projects.json`:
+`~/.config/squad/projects.json`:
 
 ```json
 {
@@ -377,7 +377,7 @@ If you have Claude Code installed and authenticated, AI features work out of the
 }
 ```
 
-**Optional:** API keys and project secrets can be managed at `/config` → API Keys tab, or stored in `~/.config/jat/credentials.json`:
+**Optional:** API keys and project secrets can be managed at `/config` → API Keys tab, or stored in `~/.config/squad/credentials.json`:
 
 ```json
 {
@@ -395,8 +395,8 @@ If you have Claude Code installed and authenticated, AI features work out of the
 
 Access secrets in scripts:
 ```bash
-jat-secret stripe              # Get value
-eval $(jat-secret --export)    # Load all as env vars
+squad-secret stripe              # Get value
+eval $(squad-secret --export)    # Load all as env vars
 ```
 
 IDE settings at `/config`:
@@ -431,7 +431,7 @@ Any terminal-based AI: Claude Code, Aider, Cline, Codex, etc.
 Tested with 20+. Limited by your machine and API limits, not Squad.
 
 **Can I use existing projects?**
-Yes. Run `jt init` in any git repo to initialize task tracking, then add the project via `/config` → Projects tab, or use the "Add Project" button on the Tasks page.
+Yes. Run `st init` in any git repo to initialize task tracking, then add the project via `/config` → Projects tab, or use the "Add Project" button on the Tasks page.
 
 **Can Squad act on Slack/Telegram messages?**
 Yes. The ingest daemon connects to Telegram bots, Slack channels, RSS feeds, and Gmail. Incoming events create tasks and spawn agents automatically — immediately, on a delay, at a scheduled time, or on a cron. See [Integrations](#integrations--autonomous-triggers).

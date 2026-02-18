@@ -1,6 +1,6 @@
 # IDE API reference
 
-The JAT IDE exposes REST endpoints for sessions, tasks, agents, configuration, and file operations. All endpoints are served by the SvelteKit application (default port 5174).
+The SQUAD IDE exposes REST endpoints for sessions, tasks, agents, configuration, and file operations. All endpoints are served by the SvelteKit application (default port 5174).
 
 ## Sessions
 
@@ -28,10 +28,10 @@ Spawn request body:
 
 ```json
 {
-  "taskId": "jat-abc",
+  "taskId": "squad-abc",
   "model": "opus",
   "attach": false,
-  "project": "jat"
+  "project": "squad"
 }
 ```
 

@@ -573,7 +573,7 @@
 			<div class="install-crystal">
 				<div class="crystal-top"></div>
 				<div class="crystal-body">
-					<code>git clone https://github.com/jomarchy/jat.git</code>
+					<code>git clone https://github.com/jomarchy/squad.git</code>
 				</div>
 				<div class="crystal-bottom"></div>
 			</div>

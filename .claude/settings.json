@@ -61,7 +61,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/post-bash-jat-signal.sh",
+            "command": "~/.claude/hooks/post-bash-squad-signal.sh",
             "statusMessage": "",
             "streamStdinJson": true
           },

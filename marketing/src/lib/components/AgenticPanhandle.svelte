@@ -61,30 +61,30 @@
 	// Task cycles
 	const taskCycles = [
 		{
-			task: { id: 'jat-7kx', name: 'OAuth setup' },
-			agents: ['BluePeak → jat-7kx', 'FairMist → jat-7ky', 'GreenRidge → jat-7kz'],
+			task: { id: 'squad-7kx', name: 'OAuth setup' },
+			agents: ['BluePeak → squad-7kx', 'FairMist → squad-7ky', 'GreenRidge → squad-7kz'],
 			workingFiles: 'src/auth/oauth.ts\nsrc/lib/google.ts\n+ 47 lines',
 			question: 'Auth provider?\n❯ 1. Supabase\n  2. Auth0\n  3. Custom',
 			diff: '+3 files changed\n+142 insertions\n-12 deletions',
-			nextTask: 'jat-7ky: Sessions',
+			nextTask: 'squad-7ky: Sessions',
 			suggested: { name: 'Add MFA', reason: 'Security enhancement' }
 		},
 		{
-			task: { id: 'jat-8ab', name: 'Add MFA' },
-			agents: ['BluePeak → jat-8ab', 'FairMist → jat-8ac', 'GreenRidge → jat-8ad'],
+			task: { id: 'squad-8ab', name: 'Add MFA' },
+			agents: ['BluePeak → squad-8ab', 'FairMist → squad-8ac', 'GreenRidge → squad-8ad'],
 			workingFiles: 'src/auth/mfa.ts\nsrc/lib/totp.ts\n+ 89 lines',
 			question: 'MFA method?\n❯ 1. TOTP App\n  2. SMS\n  3. Email',
 			diff: '+5 files changed\n+203 insertions\n-8 deletions',
-			nextTask: 'jat-8ac: MFA UI',
+			nextTask: 'squad-8ac: MFA UI',
 			suggested: { name: 'Rate Limiting', reason: 'Prevent brute force' }
 		},
 		{
-			task: { id: 'jat-9cd', name: 'Rate Limiting' },
-			agents: ['BluePeak → jat-9cd', 'FairMist → jat-9ce', 'GreenRidge → jat-9cf'],
+			task: { id: 'squad-9cd', name: 'Rate Limiting' },
+			agents: ['BluePeak → squad-9cd', 'FairMist → squad-9ce', 'GreenRidge → squad-9cf'],
 			workingFiles: 'src/middleware/rateLimit.ts\nsrc/lib/redis.ts\n+ 62 lines',
 			question: 'Rate limit strategy?\n❯ 1. Token bucket\n  2. Sliding window\n  3. Fixed window',
 			diff: '+4 files changed\n+156 insertions\n-3 deletions',
-			nextTask: 'jat-9ce: Rate limit UI',
+			nextTask: 'squad-9ce: Rate limit UI',
 			suggested: { name: 'OAuth Refresh', reason: 'Token expiry handling' }
 		}
 	];
@@ -111,7 +111,7 @@
 
 	let taskStates = $derived([
 		{ title: 'Add user authentication', status: 'idle', statusLabel: 'Idea', content: '"Users should be able to log in with Google or email..."', visual: 'thought-bubble', isCode: false },
-		{ title: 'Auth System Epic', status: 'open', statusLabel: 'Tasks Created', content: '├─ jat-7kx: OAuth setup\n├─ jat-7ky: Sessions\n└─ jat-7kz: Login UI', visual: 'tree', isCode: false },
+		{ title: 'Auth System Epic', status: 'open', statusLabel: 'Tasks Created', content: '├─ squad-7kx: OAuth setup\n├─ squad-7ky: Sessions\n└─ squad-7kz: Login UI', visual: 'tree', isCode: false },
 		{ title: `${currentCycle.task.id}: ${currentCycle.task.name}`, status: 'starting', statusLabel: 'Spawning', content: agentsWithAvatars, visual: 'agents', isCode: false },
 		{ title: `${currentCycle.task.id}: ${currentCycle.task.name}`, status: 'working', statusLabel: 'Working', content: currentCycle.workingFiles, visual: 'code', isCode: true },
 		{ title: `${currentCycle.task.id}: ${currentCycle.task.name}`, status: 'needs_input', statusLabel: 'Needs Input', content: currentCycle.question, visual: 'question', isCode: false },
@@ -135,12 +135,12 @@
 
 	let storySnippets = $derived([
 		{ headline: "It starts with an idea.", text: "You describe what you want: \"Add user authentication.\" The AI helps you turn it into a structured PRD." },
-		{ headline: "The PRD becomes tasks.", text: "Run /jat:tasktree and watch your requirements transform into a dependency tree of actionable work." },
+		{ headline: "The PRD becomes tasks.", text: "Run /squad:tasktree and watch your requirements transform into a dependency tree of actionable work." },
 		{ headline: "Agents swarm the work.", text: "Multiple AI agents claim tasks and start coding in parallel. No bottlenecks. No waiting." },
 		{ headline: "Parallel execution.", text: "Each agent works independently on their assigned task. Code flows from multiple sources simultaneously." },
 		{ headline: "Questions surface to you.", text: "When an agent needs a decision — \"OAuth or JWT?\" — it appears as a clickable button, not buried in terminal spam." },
 		{ headline: "Review with clarity.", text: "See the diffs, understand the changes. Every modification tracked and presented for your approval." },
-		{ headline: "One command to ship.", text: "Run /jat:complete and watch the magic: commits, closes the task, announces to the team. Done." },
+		{ headline: "One command to ship.", text: "Run /squad:complete and watch the magic: commits, closes the task, announces to the team. Done." },
 		{ headline: "Auto-proceed kicks in.", text: "Low-priority tasks complete without your input. The system knows when to ask and when to just ship." },
 		{ headline: "And then, the magic.", text: `Completed work suggests new work. \"${currentCycle.suggested.name}?\" The flywheel keeps spinning. Perpetual motion.` }
 	]);

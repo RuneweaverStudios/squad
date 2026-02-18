@@ -5,19 +5,19 @@ This guide walks you through the full lifecycle: launching the IDE, creating a t
 ## Start the IDE
 
 ```bash
-jat
+squad
 ```
 
 This command checks dependencies, starts the SvelteKit dev server, and opens your browser. The IDE usually runs at `http://127.0.0.1:5174`.
 
-If you prefer to skip the IDE and work purely from the terminal, thats fine too. Every operation in JAT has a CLI equivalent.
+If you prefer to skip the IDE and work purely from the terminal, thats fine too. Every operation in SQUAD has a CLI equivalent.
 
 ## Create a task
 
-Tasks live in the JAT task system. You can create them from the IDE's task view or from the command line:
+Tasks live in the SQUAD task system. You can create them from the IDE's task view or from the command line:
 
 ```bash
-jt create "Add user settings page" \
+st create "Add user settings page" \
   --type feature \
   --priority 1 \
   --labels frontend,ui \
@@ -33,24 +33,24 @@ You can also create tasks directly in the IDE. Go to the Tasks page and click th
 Every agent session runs inside tmux. The recommended way to start is with a launcher function:
 
 ```bash
-jat myproject 1 --auto
+squad myproject 1 --auto
 ```
 
-This creates one tmux session, starts Claude Code inside it, and automatically runs `/jat:start auto` to pick the highest-priority ready task.
+This creates one tmux session, starts Claude Code inside it, and automatically runs `/squad:start auto` to pick the highest-priority ready task.
 
 For manual control, start a session and pick your task:
 
 ```bash
-jat-myproject        # Launches a single agent session
+squad-myproject        # Launches a single agent session
 ```
 
 Then inside the Claude session:
 
 ```bash
-/jat:start myproject-abc
+/squad:start myproject-abc
 ```
 
-The `/jat:start` command does several things in sequence:
+The `/squad:start` command does several things in sequence:
 
 1. Registers the agent with a generated name (like "CalmMeadow")
 2. Searches memory for relevant context from past sessions
@@ -76,7 +76,7 @@ Summary:
   - Added profile update API endpoint
   - Wrote 12 unit tests
 
-Run /jat:complete when ready to close this task.
+Run /squad:complete when ready to close this task.
 ```
 
 At this point the work is done but the task is still `in_progress`. You review the changes before completing.
@@ -86,14 +86,14 @@ At this point the work is done but the task is still `in_progress`. You review t
 Once youre satisfied with the work:
 
 ```bash
-/jat:complete
+/squad:complete
 ```
 
 This triggers the completion protocol:
 
 1. Runs verification (tests, lint, type checking)
 2. Commits changes with a task-ID-prefixed message
-3. Closes the task (`jt close`)
+3. Closes the task (`st close`)
 4. Clears file declarations
 5. Generates a structured completion bundle with suggested follow-up tasks
 
@@ -105,7 +105,7 @@ Every session follows this state machine:
 
 ```
   ┌──────────┐
-  │ STARTING │  /jat:start registers agent, picks task
+  │ STARTING │  /squad:start registers agent, picks task
   └────┬─────┘
        │
        ▼
@@ -130,10 +130,10 @@ The one-agent-one-task rule keeps sessions focused. No context pollution between
 
 ## Run multiple agents
 
-JAT really shines when you run several agents in parallel:
+SQUAD really shines when you run several agents in parallel:
 
 ```bash
-jat myproject 4 --auto
+squad myproject 4 --auto
 ```
 
 This launches four agents with a 15-second stagger between each. Every agent picks the next highest-priority ready task automatically. File declarations prevent conflicts, and the IDE shows all sessions in a unified dashboard.
@@ -142,15 +142,15 @@ This launches four agents with a 15-second stagger between each. Every agent pic
 
 | Command | What it does |
 |---------|-------------|
-| `jat` | Start the IDE |
-| `jat myproject 4 --auto` | Launch 4 auto-attacking agents |
-| `/jat:start` | Register agent and show available tasks |
-| `/jat:start task-id` | Start a specific task |
-| `/jat:complete` | Run the full completion protocol |
-| `/jat:pause` | Pause current work and pivot |
-| `jt ready --json` | List tasks ready to start |
-| `jt list --status open` | List all open tasks |
-| `jt show task-id --json` | Check task details and file declarations |
+| `squad` | Start the IDE |
+| `squad myproject 4 --auto` | Launch 4 auto-attacking agents |
+| `/squad:start` | Register agent and show available tasks |
+| `/squad:start task-id` | Start a specific task |
+| `/squad:complete` | Run the full completion protocol |
+| `/squad:pause` | Pause current work and pivot |
+| `st ready --json` | List tasks ready to start |
+| `st list --status open` | List all open tasks |
+| `st show task-id --json` | Check task details and file declarations |
 
 ## Next steps
 

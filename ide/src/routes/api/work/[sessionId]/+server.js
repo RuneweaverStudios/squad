@@ -3,7 +3,7 @@
  * DELETE /api/work/[sessionId] - Kill session and close associated task
  *
  * Path params:
- * - sessionId: tmux session name (e.g., "jat-WisePrairie")
+ * - sessionId: tmux session name (e.g., "squad-WisePrairie")
  *
  * Behavior:
  * 1. Kill the tmux session
@@ -14,7 +14,7 @@
 import { json } from '@sveltejs/kit';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { getTasks } from '$lib/server/jat-tasks.js';
+import { getTasks } from '$lib/server/squad-tasks.js';
 
 const execAsync = promisify(exec);
 
@@ -32,8 +32,8 @@ export async function DELETE({ params }) {
 
 		const projectPath = process.cwd().replace('/ide', '');
 
-		// Extract agent name from session name (jat-AgentName -> AgentName)
-		const agentName = sessionId.replace(/^jat-/, '');
+		// Extract agent name from session name (squad-AgentName -> AgentName)
+		const agentName = sessionId.replace(/^squad-/, '');
 
 		// Step 1: Check if session exists
 		let sessionExists = false;
@@ -74,12 +74,12 @@ export async function DELETE({ params }) {
 			}
 		}
 
-		// Step 4: Close the task in JAT if one was found
+		// Step 4: Close the task in SQUAD if one was found
 		let taskClosed = false;
 		let closedTaskId = null;
 		if (taskToClose) {
 			try {
-				await execAsync(`jt update "${taskToClose.id}" --status closed`, {
+				await execAsync(`st update "${taskToClose.id}" --status closed`, {
 					cwd: projectPath,
 					timeout: 10000
 				});

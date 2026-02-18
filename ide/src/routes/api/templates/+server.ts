@@ -1,7 +1,7 @@
 /**
  * API endpoints for user templates management
  *
- * Templates are stored in ~/.config/jat/templates/ as JSON files.
+ * Templates are stored in ~/.config/squad/templates/ as JSON files.
  *
  * Endpoints:
  *   GET  /api/templates          - List all user templates

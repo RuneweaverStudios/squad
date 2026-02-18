@@ -11,7 +11,7 @@
  *    This is checked when the complete signal arrives.
  *
  * 2. **Auto-Complete (priority-based)** - When review rules say "auto" for a task,
- *    the IDE auto-triggers /jat:complete and then auto-kills based on
+ *    the IDE auto-triggers /squad:complete and then auto-kills based on
  *    the autoKillConfig settings.
  *
  * The pendingAutoKill store takes precedence: if user clicked "Complete & Kill",
@@ -133,7 +133,7 @@ export function getAutoKillDelayForPriority(priority: number | null | undefined)
  *
  * When user clicks "Complete & Kill" in SessionCard:
  * 1. setPendingAutoKill(sessionName, true) is called
- * 2. /jat:complete --kill is sent to the session
+ * 2. /squad:complete --kill is sent to the session
  * 3. When complete signal arrives, sessionEvents checks this store
  * 4. If pending, session is killed regardless of priority settings
  * 5. clearPendingAutoKill(sessionName) cleans up

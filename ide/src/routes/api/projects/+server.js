@@ -1,12 +1,12 @@
 /**
  * Projects API
- * GET /api/projects - List projects from JAT config (~/.config/jat/projects.json)
+ * GET /api/projects - List projects from SQUAD config (~/.config/squad/projects.json)
  *
  * Query params:
  *   ?visible=true - Only return visible projects (not hidden)
  *   ?stats=true - Include task/agent/status stats for each project
  *
- * Returns projects from JAT config, falling back to ~/code/* directory scan
+ * Returns projects from SQUAD config, falling back to ~/code/* directory scan
  */
 
 import { json } from '@sveltejs/kit';
@@ -18,21 +18,21 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { apiCache, cacheKey, CACHE_TTL, invalidateCache } from '$lib/server/cache.js';
 import { rgbToHex } from '$lib/utils/projectConfig';
-import { getTasks, initProject } from '$lib/server/jat-tasks.js';
+import { getTasks, initProject } from '$lib/server/squad-tasks.js';
 
 const execAsync = promisify(exec);
 
-// Path to JAT config
-const CONFIG_DIR = join(homedir(), '.config', 'jat');
+// Path to SQUAD config
+const CONFIG_DIR = join(homedir(), '.config', 'squad');
 const CONFIG_FILE = join(CONFIG_DIR, 'projects.json');
 
-// Path to IDE visibility settings (separate from JAT config)
+// Path to IDE visibility settings (separate from SQUAD config)
 const IDE_SETTINGS_FILE = join(CONFIG_DIR, 'ide-projects.json');
 
 /**
- * Read JAT projects config
+ * Read SQUAD projects config
  */
-async function readJatConfig() {
+async function readSquadConfig() {
 	try {
 		if (!existsSync(CONFIG_FILE)) {
 			return null;
@@ -40,7 +40,7 @@ async function readJatConfig() {
 		const content = await readFile(CONFIG_FILE, 'utf-8');
 		return JSON.parse(content);
 	} catch (error) {
-		console.error('Failed to read JAT config:', error);
+		console.error('Failed to read SQUAD config:', error);
 		return null;
 	}
 }
@@ -99,17 +99,17 @@ async function scanCodeDirectory() {
 }
 
 /**
- * Scan ~/code for directories with .jat/ initialized
- * Returns projects that have JAT set up but aren't in JAT config
+ * Scan ~/code for directories with .squad/ initialized
+ * Returns projects that have SQUAD set up but aren't in SQUAD config
  */
-async function scanJatProjects() {
+async function scanSquadProjects() {
 	const codeDir = join(homedir(), 'code');
 	if (!existsSync(codeDir)) {
 		return [];
 	}
 
 	const entries = await readdir(codeDir, { withFileTypes: true });
-	const jatProjects = [];
+	const squadProjects = [];
 
 	for (const entry of entries) {
 		if (!entry.isDirectory() || entry.name.startsWith('.')) {
@@ -117,19 +117,19 @@ async function scanJatProjects() {
 		}
 
 		const projectPath = join(codeDir, entry.name);
-		const jatDir = join(projectPath, '.jat');
+		const squadDir = join(projectPath, '.squad');
 
-		// Only include if .jat/ directory exists
-		if (existsSync(jatDir)) {
-			jatProjects.push({
+		// Only include if .squad/ directory exists
+		if (existsSync(squadDir)) {
+			squadProjects.push({
 				name: entry.name,
 				path: projectPath,
-				source: 'jat-discovered'
+				source: 'squad-discovered'
 			});
 		}
 	}
 
-	return jatProjects;
+	return squadProjects;
 }
 
 /**
@@ -147,21 +147,21 @@ async function isGitRepo(dirPath) {
 }
 
 /**
- * Check if JAT is initialized in a directory
+ * Check if SQUAD is initialized in a directory
  * @param {string} dirPath
  * @returns {boolean}
  */
-function hasJatInit(dirPath) {
-	return existsSync(join(dirPath, '.jat'));
+function hasSquadInit(dirPath) {
+	return existsSync(join(dirPath, '.squad'));
 }
 
 /**
- * Initialize JAT in a project directory
+ * Initialize SQUAD in a project directory
  * Returns { success, steps, error? }
  * @param {string} projectPath
  * @returns {Promise<{ success: boolean, steps: string[], error?: string }>}
  */
-async function initializeJat(projectPath) {
+async function initializeSquad(projectPath) {
 	const steps = [];
 
 	// Initialize git if not a git repo
@@ -187,9 +187,9 @@ async function initializeJat(projectPath) {
 		}
 	}
 
-	// Check if JAT is already initialized
-	if (hasJatInit(projectPath)) {
-		steps.push('JAT already initialized');
+	// Check if SQUAD is already initialized
+	if (hasSquadInit(projectPath)) {
+		steps.push('SQUAD already initialized');
 		return { success: true, steps };
 	}
 
@@ -224,7 +224,7 @@ function getAllProjectStats() {
 	try {
 		const allTasks = getTasks({});
 		for (const task of allTasks) {
-			// Extract project prefix from task ID (e.g., "jat-abc123" -> "jat")
+			// Extract project prefix from task ID (e.g., "squad-abc123" -> "squad")
 			const match = task.id?.match(/^([a-zA-Z0-9_-]+?)-([a-zA-Z0-9.]+)$/);
 			const projectName = match ? match[1] : (task.project || 'unknown');
 
@@ -320,7 +320,7 @@ async function getServerStatus(projectName, port) {
 /**
  * Get last activity time for a project
  * Checks multiple sources and returns the most recent:
- * 1. JAT task file (.jat/issues.jsonl) - task creation/updates
+ * 1. SQUAD task file (.squad/issues.jsonl) - task creation/updates
  * 2. Agent session files (.claude/sessions/agent-*.txt) - agent activity
  * 3. Git commit time
  * 4. Directory mtime (fallback)
@@ -331,11 +331,11 @@ async function getLastActivity(projectPath) {
 	let mostRecentMs = 0;
 	let agentActivityMs = 0;
 
-	// Check .jat/tasks.db first (most meaningful for task activity)
+	// Check .squad/tasks.db first (most meaningful for task activity)
 	try {
-		const jatDb = join(projectPath, '.jat', 'tasks.db');
-		if (existsSync(jatDb)) {
-			const dbStats = await stat(jatDb);
+		const squadDb = join(projectPath, '.squad', 'tasks.db');
+		if (existsSync(squadDb)) {
+			const dbStats = await stat(squadDb);
 			if (dbStats.mtimeMs > mostRecentMs) {
 				mostRecentMs = dbStats.mtimeMs;
 			}
@@ -434,17 +434,17 @@ export async function GET({ url }) {
 			return json(cached);
 		}
 
-		// Read JAT config
-		const jatConfig = await readJatConfig();
+		// Read SQUAD config
+		const squadConfig = await readSquadConfig();
 		const ideSettings = await readIdeSettings();
 		// Normalize hidden projects to lowercase for case-insensitive comparison
 		const hiddenProjects = new Set((ideSettings.hiddenProjects || []).map((/** @type {string} */ p) => p.toLowerCase()));
 
 		let projects = [];
 
-		if (jatConfig?.projects) {
-			// Use JAT config as ONLY source (no auto-discovery)
-			for (const [key, config] of Object.entries(jatConfig.projects)) {
+		if (squadConfig?.projects) {
+			// Use SQUAD config as ONLY source (no auto-discovery)
+			for (const [key, config] of Object.entries(squadConfig.projects)) {
 				const projectPath = config.path?.replace(/^~/, homedir()) || join(homedir(), 'code', key);
 
 				// serverPath is where 'npm run dev' should be executed (optional, defaults to path)
@@ -469,12 +469,12 @@ export async function GET({ url }) {
 					notesHeight: config.notes_height || null,
 					defaultHarness: config.default_harness || null,
 					hidden: hiddenProjects.has(key.toLowerCase()),
-					source: 'jat-config'
+					source: 'squad-config'
 				});
 			}
 		} else {
 			// No config file - return empty projects array
-			// Users must create ~/.config/jat/projects.json to add projects
+			// Users must create ~/.config/squad/projects.json to add projects
 			projects = [];
 		}
 
@@ -492,9 +492,9 @@ export async function GET({ url }) {
 			const { taskCounts: taskCountsByProject, agentCounts: agentCountsByProject } = getAllProjectStats();
 
 			projects = await Promise.all(projects.map(async (project) => {
-				// Check if .jat/ directory exists
-				const jatDir = join(project.path, '.jat');
-				const hasJat = existsSync(jatDir);
+				// Check if .squad/ directory exists
+				const squadDir = join(project.path, '.squad');
+				const hasSquad = existsSync(squadDir);
 
 				// Check if CLAUDE.md or AGENTS.md exists in project root
 				const hasClaudeMd = existsSync(join(project.path, 'CLAUDE.md')) ||
@@ -512,7 +512,7 @@ export async function GET({ url }) {
 				return {
 					...project,
 					stats: {
-						hasJat,
+						hasSquad,
 						hasClaudeMd,
 						agentCount: agents.active,
 						taskCount: tasks.total,
@@ -594,7 +594,7 @@ export async function GET({ url }) {
 		// Build response
 		const responseData = {
 			projects,
-			source: jatConfig ? 'jat-config' : 'filesystem',
+			source: squadConfig ? 'squad-config' : 'filesystem',
 			configPath: CONFIG_FILE,
 			settingsPath: IDE_SETTINGS_FILE
 		};
@@ -610,10 +610,10 @@ export async function GET({ url }) {
 }
 
 /**
- * Write JAT config back to file
+ * Write SQUAD config back to file
  * @param {object} config
  */
-async function writeJatConfig(config) {
+async function writeSquadConfig(config) {
 	try {
 		// Ensure config directory exists
 		if (!existsSync(CONFIG_DIR)) {
@@ -622,7 +622,7 @@ async function writeJatConfig(config) {
 		await writeFile(CONFIG_FILE, JSON.stringify(config, null, 2));
 		return true;
 	} catch (error) {
-		console.error('Failed to write JAT config:', error);
+		console.error('Failed to write SQUAD config:', error);
 		return false;
 	}
 }
@@ -650,7 +650,7 @@ function validateProjectKey(key) {
  * PATCH /api/projects - Update project fields
  * Body: { project: string, description?: string, port?: number | null, server_path?: string, database_url?: string, active_color?: string, inactive_color?: string, notes?: string, notes_height?: number }
  *
- * Colors should be in "rgb(rrggbb)" format for consistency with JAT config.
+ * Colors should be in "rgb(rrggbb)" format for consistency with SQUAD config.
  * Example: "rgb(5588ff)" for blue, "rgb(00d4aa)" for teal
  */
 export async function PATCH({ request }) {
@@ -662,61 +662,61 @@ export async function PATCH({ request }) {
 			return json({ error: 'Project name required' }, { status: 400 });
 		}
 
-		const jatConfig = await readJatConfig();
-		if (!jatConfig?.projects?.[project]) {
+		const squadConfig = await readSquadConfig();
+		if (!squadConfig?.projects?.[project]) {
 			return json({ error: 'Project not found in config' }, { status: 404 });
 		}
 
 		// Update fields if provided
 		if (description !== undefined) {
-			jatConfig.projects[project].description = description || null;
+			squadConfig.projects[project].description = description || null;
 		}
 		if (port !== undefined) {
-			jatConfig.projects[project].port = port;
+			squadConfig.projects[project].port = port;
 		}
 		if (server_path !== undefined) {
 			if (server_path) {
-				jatConfig.projects[project].server_path = server_path;
+				squadConfig.projects[project].server_path = server_path;
 			} else {
-				delete jatConfig.projects[project].server_path;
+				delete squadConfig.projects[project].server_path;
 			}
 		}
 		if (database_url !== undefined) {
 			if (database_url) {
-				jatConfig.projects[project].database_url = database_url;
+				squadConfig.projects[project].database_url = database_url;
 			} else {
-				delete jatConfig.projects[project].database_url;
+				delete squadConfig.projects[project].database_url;
 			}
 		}
 		if (active_color !== undefined) {
-			jatConfig.projects[project].active_color = active_color || null;
+			squadConfig.projects[project].active_color = active_color || null;
 		}
 		if (inactive_color !== undefined) {
-			jatConfig.projects[project].inactive_color = inactive_color || null;
+			squadConfig.projects[project].inactive_color = inactive_color || null;
 		}
 		if (notes !== undefined) {
 			if (notes) {
-				jatConfig.projects[project].notes = notes;
+				squadConfig.projects[project].notes = notes;
 			} else {
-				delete jatConfig.projects[project].notes;
+				delete squadConfig.projects[project].notes;
 			}
 		}
 		if (notes_height !== undefined) {
 			if (notes_height && notes_height > 0) {
-				jatConfig.projects[project].notes_height = notes_height;
+				squadConfig.projects[project].notes_height = notes_height;
 			} else {
-				delete jatConfig.projects[project].notes_height;
+				delete squadConfig.projects[project].notes_height;
 			}
 		}
 		if (default_harness !== undefined) {
 			if (default_harness && default_harness !== 'claude-code') {
-				jatConfig.projects[project].default_harness = default_harness;
+				squadConfig.projects[project].default_harness = default_harness;
 			} else {
-				delete jatConfig.projects[project].default_harness;
+				delete squadConfig.projects[project].default_harness;
 			}
 		}
 
-		const success = await writeJatConfig(jatConfig);
+		const success = await writeSquadConfig(squadConfig);
 		if (!success) {
 			return json({ error: 'Failed to save config' }, { status: 500 });
 		}
@@ -727,15 +727,15 @@ export async function PATCH({ request }) {
 		return json({
 			success: true,
 			project,
-			description: jatConfig.projects[project].description,
-			port: jatConfig.projects[project].port,
-			server_path: jatConfig.projects[project].server_path,
-			database_url: jatConfig.projects[project].database_url,
-			active_color: jatConfig.projects[project].active_color,
-			inactive_color: jatConfig.projects[project].inactive_color,
-			notes: jatConfig.projects[project].notes,
-			notes_height: jatConfig.projects[project].notes_height,
-			default_harness: jatConfig.projects[project].default_harness || null
+			description: squadConfig.projects[project].description,
+			port: squadConfig.projects[project].port,
+			server_path: squadConfig.projects[project].server_path,
+			database_url: squadConfig.projects[project].database_url,
+			active_color: squadConfig.projects[project].active_color,
+			inactive_color: squadConfig.projects[project].inactive_color,
+			notes: squadConfig.projects[project].notes,
+			notes_height: squadConfig.projects[project].notes_height,
+			default_harness: squadConfig.projects[project].default_harness || null
 		});
 	} catch (error) {
 		console.error('Failed to update project:', error);
@@ -791,55 +791,55 @@ export async function POST({ request }) {
 				}
 			}
 
-			// Initialize JAT (and git if needed) in the directory
-			const jatResult = await initializeJat(resolvedPath);
-			if (!jatResult.success) {
+			// Initialize SQUAD (and git if needed) in the directory
+			const squadResult = await initializeSquad(resolvedPath);
+			if (!squadResult.success) {
 				return json({
-					error: jatResult.error || 'Failed to initialize JAT',
+					error: squadResult.error || 'Failed to initialize SQUAD',
 					path: resolvedPath,
-					steps: jatResult.steps
+					steps: squadResult.steps
 				}, { status: 500 });
 			}
 
 			// Read current config
-			let jatConfig = await readJatConfig();
-			if (!jatConfig) {
-				jatConfig = { projects: {} };
+			let squadConfig = await readSquadConfig();
+			if (!squadConfig) {
+				squadConfig = { projects: {} };
 			}
-			if (!jatConfig.projects) {
-				jatConfig.projects = {};
+			if (!squadConfig.projects) {
+				squadConfig.projects = {};
 			}
 
 			// Check if project already exists
-			if (jatConfig.projects[key]) {
+			if (squadConfig.projects[key]) {
 				return json({ error: `Project '${key}' already exists` }, { status: 409 });
 			}
 
 			// Create project entry
-			jatConfig.projects[key] = {
+			squadConfig.projects[key] = {
 				name: name || key.toUpperCase(),
 				path: resolvedPath
 			};
 
 			// Add optional fields
 			if (port !== undefined && port !== null) {
-				jatConfig.projects[key].port = port;
+				squadConfig.projects[key].port = port;
 			}
 			if (description) {
-				jatConfig.projects[key].description = description;
+				squadConfig.projects[key].description = description;
 			}
 			if (active_color) {
-				jatConfig.projects[key].active_color = active_color;
+				squadConfig.projects[key].active_color = active_color;
 			}
 			if (inactive_color) {
-				jatConfig.projects[key].inactive_color = inactive_color;
+				squadConfig.projects[key].inactive_color = inactive_color;
 			}
 			if (default_harness && default_harness !== 'claude-code') {
-				jatConfig.projects[key].default_harness = default_harness;
+				squadConfig.projects[key].default_harness = default_harness;
 			}
 
 			// Save config
-			const success = await writeJatConfig(jatConfig);
+			const success = await writeSquadConfig(squadConfig);
 			if (!success) {
 				return json({ error: 'Failed to save config' }, { status: 500 });
 			}
@@ -851,9 +851,9 @@ export async function POST({ request }) {
 				success: true,
 				project: {
 					key,
-					...jatConfig.projects[key]
+					...squadConfig.projects[key]
 				},
-				steps: [...jatResult.steps, 'Added to JAT configuration'],
+				steps: [...squadResult.steps, 'Added to SQUAD configuration'],
 				message: `Successfully created project: ${key}`
 			});
 		}
@@ -912,16 +912,16 @@ export async function DELETE({ request }) {
 		}
 
 		// Read current config
-		const jatConfig = await readJatConfig();
-		if (!jatConfig?.projects?.[project]) {
+		const squadConfig = await readSquadConfig();
+		if (!squadConfig?.projects?.[project]) {
 			return json({ error: `Project '${project}' not found in config` }, { status: 404 });
 		}
 
 		// Remove project from config
-		delete jatConfig.projects[project];
+		delete squadConfig.projects[project];
 
 		// Save config
-		const success = await writeJatConfig(jatConfig);
+		const success = await writeSquadConfig(squadConfig);
 		if (!success) {
 			return json({ error: 'Failed to save config' }, { status: 500 });
 		}

@@ -1,24 +1,24 @@
 # Query Layers
 
-Node.js query layers for JAT Tasks and Agent Registry, used by the IDE.
+Node.js query layers for SQUAD Tasks and Agent Registry, used by the IDE.
 
 ## Overview
 
-This directory contains modules for querying JAT data from Node.js:
+This directory contains modules for querying SQUAD data from Node.js:
 
-1. **tasks.js** - Query JAT task databases across multiple projects
+1. **tasks.js** - Query SQUAD task databases across multiple projects
 2. **agent-mail.js** - Query Agent Registry (agent identities)
 
 ## Usage
 
 ### Task Query Layer (tasks.js)
 
-Query JAT task databases from Node.js:
+Query SQUAD task databases from Node.js:
 
 ```javascript
 import { getProjects, getTasks, getTaskById, getReadyTasks } from './lib/tasks.js';
 
-// Get all projects with JAT databases
+// Get all projects with SQUAD databases
 const projects = getProjects();
 // → [{name: "chimaro", path: "/home/user/code/chimaro", dbPath: "..."}]
 
@@ -50,9 +50,9 @@ const agents = getAgents();
 
 ## Database Schema
 
-### JAT Tasks Schema
+### SQUAD Tasks Schema
 
-Location: `~/code/PROJECT/.jat/tasks.db`
+Location: `~/code/PROJECT/.squad/tasks.db`
 
 Key tables:
 - `issues` - Tasks with id, title, status, priority, reserved_files, etc.

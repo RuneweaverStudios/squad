@@ -15,7 +15,7 @@
 </script>
 
 <svelte:head>
-	<title>{pageInfo?.title || 'Documentation'} - JAT Docs</title>
+	<title>{pageInfo?.title || 'Documentation'} - SQUAD Docs</title>
 	{#if pageInfo?.description}
 		<meta name="description" content={pageInfo.description} />
 	{/if}

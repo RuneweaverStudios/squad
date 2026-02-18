@@ -1,6 +1,6 @@
 # Database tools
 
-JAT ships four database tools for querying, inspecting schemas, and testing connections. They work with the Agent Registry SQLite database and can be configured for project-specific databases.
+SQUAD ships four database tools for querying, inspecting schemas, and testing connections. They work with the Agent Registry SQLite database and can be configured for project-specific databases.
 
 ## Tools overview
 
@@ -80,7 +80,7 @@ But `db-query` is recommended because it handles JSON formatting and works consi
 
 ## Project databases
 
-If your project uses a database (Supabase, PostgreSQL, etc.), configure the connection string in `~/.config/jat/projects.json`:
+If your project uses a database (Supabase, PostgreSQL, etc.), configure the connection string in `~/.config/squad/projects.json`:
 
 ```json
 {

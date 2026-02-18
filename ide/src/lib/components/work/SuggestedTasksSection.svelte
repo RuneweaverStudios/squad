@@ -3,7 +3,7 @@
 	 * SuggestedTasksSection Component
 	 *
 	 * Interactive panel for reviewing and editing suggested tasks from agents.
-	 * Displays tasks detected via JAT:SUGGESTED_TASKS markers in terminal output.
+	 * Displays tasks detected via SQUAD:SUGGESTED_TASKS markers in terminal output.
 	 *
 	 * Features:
 	 * - Checkbox to select/deselect each task
@@ -30,7 +30,7 @@
 	interface SuggestedTaskWithState extends SuggestedTask {
 		selected: boolean;
 		edited: boolean;
-		/** Whether this task already exists in JAT (matched by title) */
+		/** Whether this task already exists in SQUAD (matched by title) */
 		alreadyCreated?: boolean;
 		/** Task ID if this task was already created (for displaying clickable badge) */
 		taskId?: string;
@@ -415,7 +415,7 @@
 											? 'checkbox-human-selected'
 											: 'checkbox-agent-selected'
 										: 'checkbox-default'}"
-								title={task.alreadyCreated ? 'Already created in JAT' : ''}
+								title={task.alreadyCreated ? 'Already created in SQUAD' : ''}
 							>
 								{#if task.alreadyCreated || task.selected}
 									<svg
@@ -539,7 +539,7 @@
 										{:else}
 											<span
 												class="badge badge-xs badge-success font-mono gap-1"
-												title="This task already exists in JAT"
+												title="This task already exists in SQUAD"
 											>
 												<svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
 													<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
@@ -661,7 +661,7 @@
 												value={effectiveProject}
 												oninput={(e) => updateProject(taskKey, e.currentTarget.value)}
 												class="w-full text-[11px] px-2 py-1 rounded bg-base-300 text-base-content border border-base-content/20"
-												placeholder="e.g., jat, chimaro"
+												placeholder="e.g., squad, chimaro"
 											/>
 										{/if}
 									</div>
@@ -689,7 +689,7 @@
 										value={effectiveDependsOn.join(', ')}
 										oninput={(e) => updateDependsOn(taskKey, e.currentTarget.value)}
 										class="w-full text-[11px] px-2 py-1 rounded bg-base-300 text-base-content border border-base-content/20"
-										placeholder="jat-abc, jat-xyz, ..."
+										placeholder="squad-abc, squad-xyz, ..."
 									/>
 								</div>
 

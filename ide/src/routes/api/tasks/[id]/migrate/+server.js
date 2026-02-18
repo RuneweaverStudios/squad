@@ -6,10 +6,10 @@
  *
  * POST /api/tasks/{taskId}/migrate
  * Body: { targetProject: "chimaro" }
- * Response: { success: true, oldTaskId: "jat-abc", newTaskId: "chimaro-xyz", targetProject: "chimaro" }
+ * Response: { success: true, oldTaskId: "squad-abc", newTaskId: "chimaro-xyz", targetProject: "chimaro" }
  */
 import { json } from '@sveltejs/kit';
-import { getTaskById, getProjects } from '$lib/server/jat-tasks.js';
+import { getTaskById, getProjects } from '$lib/server/squad-tasks.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { join } from 'path';
@@ -20,8 +20,8 @@ const execAsync = promisify(exec);
 
 /**
  * Get the project prefix from a task ID
- * @param {string} taskId - Task ID like "jat-abc"
- * @returns {string|null} Project prefix like "jat" or null if invalid
+ * @param {string} taskId - Task ID like "squad-abc"
+ * @returns {string|null} Project prefix like "squad" or null if invalid
  */
 function getProjectFromTaskId(taskId) {
 	if (!taskId || typeof taskId !== 'string') return null;
@@ -113,7 +113,7 @@ export async function POST({ params, request }) {
 		console.log(`Migrating task ${taskId} from ${sourceProject} (${sourcePath}) to ${targetProject} (${targetPath})`);
 
 		// Step 1: Create the new task in the target project
-		// Build the jt create command with all the task data
+		// Build the st create command with all the task data
 		const descriptionWithNote = `[Migrated from ${taskId}]\n\n${task.description || ''}`;
 		const title = escapeShellArg(task.title || 'Untitled');
 		const description = escapeShellArg(descriptionWithNote);
@@ -125,7 +125,7 @@ export async function POST({ params, request }) {
 			? `--labels ${escapeShellArg(task.labels.join(','))}`
 			: '';
 
-		const createCommand = `cd "${targetPath}" && jt create ${title} --type ${type} --priority ${priority} --description ${description} ${assignee} ${labels} --json 2>&1`;
+		const createCommand = `cd "${targetPath}" && st create ${title} --type ${type} --priority ${priority} --description ${description} ${assignee} ${labels} --json 2>&1`;
 
 		console.log(`Running: ${createCommand}`);
 
@@ -180,7 +180,7 @@ export async function POST({ params, request }) {
 			for (const dep of task.depends_on) {
 				const depId = dep.id || dep;
 				try {
-					const depCommand = `cd "${targetPath}" && jt dep add ${newTaskId} ${depId} 2>&1`;
+					const depCommand = `cd "${targetPath}" && st dep add ${newTaskId} ${depId} 2>&1`;
 					await execAsync(depCommand, { timeout: 10000 });
 					console.log(`Added dependency: ${newTaskId} -> ${depId}`);
 				} catch (depError) {
@@ -193,7 +193,7 @@ export async function POST({ params, request }) {
 
 		// Step 3: Update the new task's status if it was in_progress
 		if (task.status === 'in_progress') {
-			const updateCommand = `cd "${targetPath}" && jt update ${newTaskId} --status in_progress 2>&1`;
+			const updateCommand = `cd "${targetPath}" && st update ${newTaskId} --status in_progress 2>&1`;
 			try {
 				await execAsync(updateCommand, { timeout: 10000 });
 				console.log(`Updated ${newTaskId} status to in_progress`);
@@ -205,7 +205,7 @@ export async function POST({ params, request }) {
 
 		// Step 4: Close the original task with a migration note
 		const closeReason = escapeShellArg(`Migrated to ${newTaskId} in ${targetProject}`);
-		const closeCommand = `cd "${sourcePath}" && jt close ${taskId} --reason ${closeReason} 2>&1`;
+		const closeCommand = `cd "${sourcePath}" && st close ${taskId} --reason ${closeReason} 2>&1`;
 
 		try {
 			await execAsync(closeCommand, { timeout: 10000 });
@@ -251,8 +251,8 @@ export async function POST({ params, request }) {
  */
 async function migrateTaskAttachments(oldTaskId, newTaskId, sourcePath, targetPath) {
 	try {
-		const sourceImagesPath = join(sourcePath, '.jat', 'task-images.json');
-		const targetImagesPath = join(targetPath, '.jat', 'task-images.json');
+		const sourceImagesPath = join(sourcePath, '.squad', 'task-images.json');
+		const targetImagesPath = join(targetPath, '.squad', 'task-images.json');
 
 		// Check if source has attachments for this task
 		if (!existsSync(sourceImagesPath)) {
@@ -291,7 +291,7 @@ async function migrateTaskAttachments(oldTaskId, newTaskId, sourcePath, targetPa
 			}
 
 			// Create target images directory for this task
-			const targetImagesDir = join(targetPath, '.jat', 'images', newTaskId);
+			const targetImagesDir = join(targetPath, '.squad', 'images', newTaskId);
 			await execAsync(`mkdir -p "${targetImagesDir}"`);
 
 			// Get just the filename
@@ -334,7 +334,7 @@ async function migrateTaskAttachments(oldTaskId, newTaskId, sourcePath, targetPa
 		await writeFileAsync(sourceImagesPath, JSON.stringify(sourceImages, null, 2), 'utf-8');
 
 		// Try to clean up empty source directory
-		const sourceImagesDir = join(sourcePath, '.jat', 'images', oldTaskId);
+		const sourceImagesDir = join(sourcePath, '.squad', 'images', oldTaskId);
 		if (existsSync(sourceImagesDir)) {
 			try {
 				await execAsync(`rmdir "${sourceImagesDir}" 2>/dev/null || true`);

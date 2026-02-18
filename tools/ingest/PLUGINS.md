@@ -20,7 +20,7 @@ Every plugin must export two things:
 ```js
 import { BaseAdapter } from '../base.js';  // built-in
 // or for user plugins:
-// import { BaseAdapter } from 'jat-ingest/adapters/base.js';
+// import { BaseAdapter } from 'squad-ingest/adapters/base.js';
 
 export const metadata = {
   type: 'my-source',
@@ -47,8 +47,8 @@ Plugins are discovered from two directories:
 
 | Directory | Purpose |
 |-----------|---------|
-| `tools/ingest/adapters/*/index.js` | Built-in adapters (ship with JAT) |
-| `~/.config/jat/ingest-plugins/*/index.js` | User-installed plugins |
+| `tools/ingest/adapters/*/index.js` | Built-in adapters (ship with SQUAD) |
+| `~/.config/squad/ingest-plugins/*/index.js` | User-installed plugins |
 
 If both directories contain a plugin with the same `type`, the user plugin wins.
 
@@ -100,7 +100,7 @@ Describes a configuration field for the source. The IDE renders these as form in
 | `string` | Text input | General-purpose text |
 | `number` | Number input | Numeric value |
 | `boolean` | Toggle/checkbox | On/off flag |
-| `secret` | Password input | Value stored via `jat-secret`, not in config file |
+| `secret` | Password input | Value stored via `squad-secret`, not in config file |
 | `select` | Dropdown | Requires `options` array |
 | `multiselect` | Multi-select chips | Requires `options` array |
 
@@ -199,7 +199,7 @@ All adapters extend `BaseAdapter` and implement these methods:
 
 - `sourceConfig` - The source's configuration from integrations.json (includes all config field values)
 - `adapterState` - Persisted state from the previous poll (cursors, offsets, timestamps). Empty object `{}` on first poll.
-- `getSecret(name)` - Function to retrieve a secret by name from `jat-secret`
+- `getSecret(name)` - Function to retrieve a secret by name from `squad-secret`
 
 Returns:
 

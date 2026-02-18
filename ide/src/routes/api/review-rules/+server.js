@@ -1,6 +1,6 @@
 /**
  * Review Rules API Route
- * GET - Load current review rules from .jat/review-rules.json
+ * GET - Load current review rules from .squad/review-rules.json
  * PUT - Update review rules
  * POST /reset - Reset to default rules
  */
@@ -12,13 +12,13 @@ import { resolve } from 'path';
 
 const execAsync = promisify(exec);
 
-// Find .jat directory by walking up from cwd
-function findJatDir() {
+// Find .squad directory by walking up from cwd
+function findSquadDir() {
 	let dir = process.cwd();
 	while (dir !== '/') {
-		const jatPath = resolve(dir, '.jat');
-		if (existsSync(jatPath)) {
-			return jatPath;
+		const squadPath = resolve(dir, '.squad');
+		if (existsSync(squadPath)) {
+			return squadPath;
 		}
 		dir = resolve(dir, '..');
 	}
@@ -45,13 +45,13 @@ const DEFAULT_RULES = {
 /** @type {import('./$types').RequestHandler} */
 export async function GET() {
 	try {
-		const jatDir = findJatDir();
-		if (!jatDir) {
-			// Return defaults so UI works when running without a project .jat (e.g. dev from ide/)
+		const squadDir = findSquadDir();
+		if (!squadDir) {
+			// Return defaults so UI works when running without a project .squad (e.g. dev from ide/)
 			return json(DEFAULT_RULES);
 		}
 
-		const rulesPath = resolve(jatDir, 'review-rules.json');
+		const rulesPath = resolve(squadDir, 'review-rules.json');
 
 		if (!existsSync(rulesPath)) {
 			// Return defaults if file doesn't exist
@@ -75,12 +75,12 @@ export async function GET() {
 /** @type {import('./$types').RequestHandler} */
 export async function PUT({ request }) {
 	try {
-		const jatDir = findJatDir();
-		if (!jatDir) {
-			return json({ error: true, message: 'No .jat directory found' }, { status: 404 });
+		const squadDir = findSquadDir();
+		if (!squadDir) {
+			return json({ error: true, message: 'No .squad directory found' }, { status: 404 });
 		}
 
-		const rulesPath = resolve(jatDir, 'review-rules.json');
+		const rulesPath = resolve(squadDir, 'review-rules.json');
 		const updates = await request.json();
 
 		// Load existing rules or use defaults
@@ -117,12 +117,12 @@ export async function PUT({ request }) {
 		// Write updated rules
 		writeFileSync(rulesPath, JSON.stringify(rules, null, 2) + '\n');
 
-		// Sync to jt config
+		// Sync to st config
 		try {
-			await execAsync('jt-review-rules-loader --sync-to-config');
+			await execAsync('st-review-rules-loader --sync-to-config');
 		} catch (syncErr) {
 			const syncMessage = syncErr instanceof Error ? syncErr.message : 'Unknown sync error';
-			console.warn('Failed to sync to jt config:', syncMessage);
+			console.warn('Failed to sync to st config:', syncMessage);
 		}
 
 		return json({ success: true, rules });
@@ -143,20 +143,20 @@ export async function POST({ request }) {
 
 		// Handle reset action
 		if (body.action === 'reset') {
-			const jatDir = findJatDir();
-			if (!jatDir) {
-				return json({ error: true, message: 'No .jat directory found' }, { status: 404 });
+			const squadDir = findSquadDir();
+			if (!squadDir) {
+				return json({ error: true, message: 'No .squad directory found' }, { status: 404 });
 			}
 
-			const rulesPath = resolve(jatDir, 'review-rules.json');
+			const rulesPath = resolve(squadDir, 'review-rules.json');
 			writeFileSync(rulesPath, JSON.stringify(DEFAULT_RULES, null, 2) + '\n');
 
-			// Sync to jt config
+			// Sync to st config
 			try {
-				await execAsync('jt-review-rules-loader --sync-to-config');
+				await execAsync('st-review-rules-loader --sync-to-config');
 			} catch (syncErr) {
 				const syncMessage = syncErr instanceof Error ? syncErr.message : 'Unknown sync error';
-				console.warn('Failed to sync to jt config:', syncMessage);
+				console.warn('Failed to sync to st config:', syncMessage);
 			}
 
 			return json({ success: true, rules: DEFAULT_RULES, message: 'Rules reset to defaults' });

@@ -2,14 +2,14 @@
  * Agent Clear Queue API - Unassign All Tasks from Agent
  * POST /api/agents/[name]/clear-queue
  *
- * Unassigns all open tasks from the agent using jt update
+ * Unassigns all open tasks from the agent using st update
  */
 
 import { json } from '@sveltejs/kit';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { getProjectPath } from '$lib/utils/projectUtils.js';
-import { getTasks } from '$lib/server/jat-tasks.js';
+import { getTasks } from '$lib/server/squad-tasks.js';
 
 const execAsync = promisify(exec);
 
@@ -50,7 +50,7 @@ export async function POST({ params }) {
 				if (!projectPath) {
 					throw new Error(`Could not determine project path for task ${task.id}`);
 				}
-				return execAsync(`jt update ${task.id} --assignee ""`, { cwd: projectPath });
+				return execAsync(`st update ${task.id} --assignee ""`, { cwd: projectPath });
 			});
 
 			await Promise.all(updatePromises);

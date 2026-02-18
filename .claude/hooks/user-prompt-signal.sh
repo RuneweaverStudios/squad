@@ -6,7 +6,7 @@
 # Writes user_input event to timeline for IDE visibility.
 #
 # Input: JSON via stdin with format: {"session_id": "...", "prompt": "...", ...}
-# Output: Appends to /tmp/jat-timeline-{tmux-session}.jsonl
+# Output: Appends to /tmp/squad-timeline-{tmux-session}.jsonl
 
 set -euo pipefail
 
@@ -27,11 +27,11 @@ if [[ -z "$USER_PROMPT" ]] || [[ -z "$SESSION_ID" ]]; then
     exit 0
 fi
 
-# Skip /jat:start commands - these cause a race condition where the event gets
-# written to the OLD agent's timeline before /jat:start updates the agent file.
-# The /jat:start command emits its own "starting" signal which is the proper
+# Skip /squad:start commands - these cause a race condition where the event gets
+# written to the OLD agent's timeline before /squad:start updates the agent file.
+# The /squad:start command emits its own "starting" signal which is the proper
 # event for the new session.
-if [[ "$USER_PROMPT" =~ ^/jat:start ]]; then
+if [[ "$USER_PROMPT" =~ ^/squad:start ]]; then
     exit 0
 fi
 
@@ -41,9 +41,9 @@ TMUX_SESSION=""
 
 # Build list of directories to search: current dir + configured projects
 SEARCH_DIRS="."
-JAT_CONFIG="$HOME/.config/jat/projects.json"
-if [[ -f "$JAT_CONFIG" ]]; then
-    PROJECT_PATHS=$(jq -r '.projects[].path // empty' "$JAT_CONFIG" 2>/dev/null | sed "s|^~|$HOME|g")
+SQUAD_CONFIG="$HOME/.config/squad/projects.json"
+if [[ -f "$SQUAD_CONFIG" ]]; then
+    PROJECT_PATHS=$(jq -r '.projects[].path // empty' "$SQUAD_CONFIG" 2>/dev/null | sed "s|^~|$HOME|g")
     for PROJECT_PATH in $PROJECT_PATHS; do
         if [[ -d "${PROJECT_PATH}/.claude" ]]; then
             SEARCH_DIRS="$SEARCH_DIRS $PROJECT_PATH"
@@ -61,7 +61,7 @@ for BASE_DIR in $SEARCH_DIRS; do
         if [[ -f "$AGENT_FILE" ]]; then
             AGENT_NAME=$(cat "$AGENT_FILE" 2>/dev/null | tr -d '\n')
             if [[ -n "$AGENT_NAME" ]]; then
-                TMUX_SESSION="jat-${AGENT_NAME}"
+                TMUX_SESSION="squad-${AGENT_NAME}"
                 break 2
             fi
         fi
@@ -90,12 +90,12 @@ if [[ ${#USER_PROMPT} -gt 500 ]]; then
 fi
 
 # REMOVED: Task ID lookup from signal file
-# Previously we read task_id from /tmp/jat-signal-tmux-{session}.json, but this caused
+# Previously we read task_id from /tmp/squad-signal-tmux-{session}.json, but this caused
 # signal leaking when a user started a new task - the user_input event would inherit
 # the OLD task_id from the previous signal file.
 #
 # User input events should not be associated with a specific task since they represent
-# what the user typed, which may be switching to a new task entirely (e.g., /jat:start).
+# what the user typed, which may be switching to a new task entirely (e.g., /squad:start).
 # The task context is better represented by subsequent agent signals that actually
 # emit the new task ID.
 TASK_ID=""
@@ -121,12 +121,12 @@ EVENT_JSON=$(jq -c -n \
     }' 2>/dev/null || echo "{}")
 
 # Append to timeline log (JSONL format - preserves history)
-TIMELINE_FILE="/tmp/jat-timeline-${TMUX_SESSION}.jsonl"
+TIMELINE_FILE="/tmp/squad-timeline-${TMUX_SESSION}.jsonl"
 echo "$EVENT_JSON" >> "$TIMELINE_FILE" 2>/dev/null || true
 
 # Start output monitor for real-time activity detection (shimmer effect)
 # Kill any existing monitor for this session first
-PID_FILE="/tmp/jat-monitor-${TMUX_SESSION}.pid"
+PID_FILE="/tmp/squad-monitor-${TMUX_SESSION}.pid"
 if [[ -f "$PID_FILE" ]]; then
     kill "$(cat "$PID_FILE")" 2>/dev/null || true
     rm -f "$PID_FILE"

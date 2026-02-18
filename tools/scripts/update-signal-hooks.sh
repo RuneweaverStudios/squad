@@ -1,9 +1,9 @@
 #!/bin/bash
 #
-# update-signal-hooks.sh - Add jat-signal hook to all projects
+# update-signal-hooks.sh - Add squad-signal hook to all projects
 #
 # This script:
-# 1. Copies the latest jat-signal hook to ~/.claude/hooks/
+# 1. Copies the latest squad-signal hook to ~/.claude/hooks/
 # 2. Updates all project settings.json to include the hook
 #
 # Run this after updating the hook or to fix projects missing the hook.
@@ -17,24 +17,24 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-echo -e "${BLUE}JAT Signal Hook Updater${NC}"
+echo -e "${BLUE}SQUAD Signal Hook Updater${NC}"
 echo ""
 
-# Find JAT installation
-if [ -n "${JAT_INSTALL_DIR:-}" ] && [ -d "$JAT_INSTALL_DIR" ]; then
-    JAT_DIR="$JAT_INSTALL_DIR"
-elif [ -d "${XDG_DATA_HOME:-$HOME/.local/share}/jat" ]; then
-    JAT_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/jat"
-elif [ -f "$HOME/.config/jat/projects.json" ]; then
-    _jat_path=$(jq -r '.projects.jat.path // empty' "$HOME/.config/jat/projects.json" 2>/dev/null | sed "s|^~|$HOME|g")
-    if [ -n "$_jat_path" ] && [ -d "$_jat_path" ]; then
-        JAT_DIR="$_jat_path"
+# Find SQUAD installation
+if [ -n "${SQUAD_INSTALL_DIR:-}" ] && [ -d "$SQUAD_INSTALL_DIR" ]; then
+    SQUAD_DIR="$SQUAD_INSTALL_DIR"
+elif [ -d "${XDG_DATA_HOME:-$HOME/.local/share}/squad" ]; then
+    SQUAD_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/squad"
+elif [ -f "$HOME/.config/squad/projects.json" ]; then
+    _squad_path=$(jq -r '.projects.squad.path // empty' "$HOME/.config/squad/projects.json" 2>/dev/null | sed "s|^~|$HOME|g")
+    if [ -n "$_squad_path" ] && [ -d "$_squad_path" ]; then
+        SQUAD_DIR="$_squad_path"
     fi
 fi
 
-if [ -z "${JAT_DIR:-}" ]; then
-    echo -e "${RED}ERROR: JAT not found${NC}"
-    echo "Set \$JAT_INSTALL_DIR or add jat to ~/.config/jat/projects.json"
+if [ -z "${SQUAD_DIR:-}" ]; then
+    echo -e "${RED}ERROR: SQUAD not found${NC}"
+    echo "Set \$SQUAD_INSTALL_DIR or add squad to ~/.config/squad/projects.json"
     exit 1
 fi
 
@@ -47,13 +47,13 @@ echo -e "${BLUE}Step 1: Updating global hook...${NC}"
 GLOBAL_HOOKS_DIR="$HOME/.claude/hooks"
 mkdir -p "$GLOBAL_HOOKS_DIR"
 
-HOOK_SOURCE="$JAT_DIR/.claude/hooks/post-bash-jat-signal.sh"
-HOOK_DEST="$GLOBAL_HOOKS_DIR/post-bash-jat-signal.sh"
+HOOK_SOURCE="$SQUAD_DIR/.claude/hooks/post-bash-squad-signal.sh"
+HOOK_DEST="$GLOBAL_HOOKS_DIR/post-bash-squad-signal.sh"
 
 if [ -f "$HOOK_SOURCE" ]; then
     cp "$HOOK_SOURCE" "$HOOK_DEST"
     chmod +x "$HOOK_DEST"
-    echo -e "  ${GREEN}✓ Updated ~/.claude/hooks/post-bash-jat-signal.sh${NC}"
+    echo -e "  ${GREEN}✓ Updated ~/.claude/hooks/post-bash-squad-signal.sh${NC}"
 else
     echo -e "  ${RED}✗ Hook source not found: $HOOK_SOURCE${NC}"
     exit 1
@@ -110,7 +110,7 @@ for repo_dir in "$HOME/code"/*; do
           },
           {
             "type": "command",
-            "command": "~/.claude/hooks/post-bash-jat-signal.sh"
+            "command": "~/.claude/hooks/post-bash-squad-signal.sh"
           }
         ]
       }
@@ -123,15 +123,15 @@ EOF
         continue
     fi
 
-    # Check if jat-signal hook is already configured
-    if grep -q "post-bash-jat-signal" "$SETTINGS_FILE"; then
+    # Check if squad-signal hook is already configured
+    if grep -q "post-bash-squad-signal" "$SETTINGS_FILE"; then
         # Check if it's using the old project-specific path and update to global
-        if grep -q "~/code/jat/.claude/hooks/post-bash-jat-signal" "$SETTINGS_FILE"; then
+        if grep -q "~/code/squad/.claude/hooks/post-bash-squad-signal" "$SETTINGS_FILE"; then
             # macOS sed requires -i '' (empty backup extension), Linux uses -i alone
             if [[ "$(uname)" == "Darwin" ]]; then
-                sed -i '' 's|~/code/jat/.claude/hooks/post-bash-jat-signal.sh|~/.claude/hooks/post-bash-jat-signal.sh|g' "$SETTINGS_FILE"
+                sed -i '' 's|~/code/squad/.claude/hooks/post-bash-squad-signal.sh|~/.claude/hooks/post-bash-squad-signal.sh|g' "$SETTINGS_FILE"
             else
-                sed -i 's|~/code/jat/.claude/hooks/post-bash-jat-signal.sh|~/.claude/hooks/post-bash-jat-signal.sh|g' "$SETTINGS_FILE"
+                sed -i 's|~/code/squad/.claude/hooks/post-bash-squad-signal.sh|~/.claude/hooks/post-bash-squad-signal.sh|g' "$SETTINGS_FILE"
             fi
             echo -e "  ${GREEN}✓ $REPO_NAME: Updated to global hook path${NC}"
             ((UPDATED++))
@@ -149,7 +149,7 @@ EOF
         if .hooks.PostToolUse then
             .hooks.PostToolUse[0].hooks += [{
                 "type": "command",
-                "command": "~/.claude/hooks/post-bash-jat-signal.sh"
+                "command": "~/.claude/hooks/post-bash-squad-signal.sh"
             }]
         else
             .hooks = {
@@ -164,7 +164,7 @@ EOF
                         },
                         {
                             "type": "command",
-                            "command": "~/.claude/hooks/post-bash-jat-signal.sh"
+                            "command": "~/.claude/hooks/post-bash-squad-signal.sh"
                         }
                     ]
                 }]
@@ -172,7 +172,7 @@ EOF
         end
     ' "$SETTINGS_FILE" > "$TEMP_FILE" 2>/dev/null; then
         mv "$TEMP_FILE" "$SETTINGS_FILE"
-        echo -e "  ${GREEN}✓ $REPO_NAME: Added jat-signal hook${NC}"
+        echo -e "  ${GREEN}✓ $REPO_NAME: Added squad-signal hook${NC}"
         ((UPDATED++))
     else
         echo -e "  ${YELLOW}⚠ $REPO_NAME: Failed to update (invalid JSON?)${NC}"

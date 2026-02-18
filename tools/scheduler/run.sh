@@ -1,5 +1,5 @@
 #!/bin/bash
-# Launch jat-scheduler daemon.
+# Launch squad-scheduler daemon.
 # Called by IDE /api/scheduler/start endpoint.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

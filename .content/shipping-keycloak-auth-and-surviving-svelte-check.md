@@ -1,12 +1,12 @@
 # Shipping Keycloak auth and surviving svelte-check
 
-We added enterprise auth to JAT this week. Also one-click login buttons for agent harnesses, an edit flow for harness config, and then spent a full afternoon making `npm run check` pass with zero errors across 119 files. Here's how it went.
+We added enterprise auth to SQUAD this week. Also one-click login buttons for agent harnesses, an edit flow for harness config, and then spent a full afternoon making `npm run check` pass with zero errors across 119 files. Here's how it went.
 
 ## The auth problem
 
-JAT runs on localhost. That's fine when it's just you on your machine. But the moment you want multiple people hitting the same instance — a team deploy, a shared staging environment, a self-hosted box on your LAN — you need auth. Not "show a password prompt" auth. Real auth. OAuth flows, session management, user identity, logout that actually logs you out.
+SQUAD runs on localhost. That's fine when it's just you on your machine. But the moment you want multiple people hitting the same instance — a team deploy, a shared staging environment, a self-hosted box on your LAN — you need auth. Not "show a password prompt" auth. Real auth. OAuth flows, session management, user identity, logout that actually logs you out.
 
-We went with Keycloak. It's the most battle-tested open-source IAM out there. Red Hat backs it, it supports OAuth 2.0, OIDC, SAML, social logins, MFA, passkeys, magic links — the full enterprise menu. It's Docker-friendly, which matters because JAT already runs in containers. And the community is huge, so when something breaks at 2am you can actually find the answer.
+We went with Keycloak. It's the most battle-tested open-source IAM out there. Red Hat backs it, it supports OAuth 2.0, OIDC, SAML, social logins, MFA, passkeys, magic links — the full enterprise menu. It's Docker-friendly, which matters because SQUAD already runs in containers. And the community is huge, so when something breaks at 2am you can actually find the answer.
 
 ## The implementation
 
@@ -16,8 +16,8 @@ The auth module lives at `$lib/auth/keycloak.ts`. It reads config from environme
 
 ```
 KEYCLOAK_URL=http://localhost:8080
-KEYCLOAK_REALM=jat
-KEYCLOAK_CLIENT_ID=jat-ide
+KEYCLOAK_REALM=squad
+KEYCLOAK_CLIENT_ID=squad-ide
 KEYCLOAK_CLIENT_SECRET=your-secret
 KEYCLOAK_REDIRECT_URI=http://localhost:3333/auth/keycloak/callback
 ```
@@ -54,7 +54,7 @@ The first run reported 40+ errors. Not in our new code. In the existing `.js` an
 - `Property 'closedAfter' does not exist on type '{}'` — missing JSDoc params
 - `Element implicitly has an 'any' type because expression of type 'string' can't be used to index type` — needed `Record<string, unknown>` casts
 - `Property 'relevance' does not exist on type 'Task'` — typedef missing a field that the code clearly used
-- A wrong import path: `../../../../lib/jat-tasks.js` instead of `../../../../lib/tasks.js`
+- A wrong import path: `../../../../lib/squad-tasks.js` instead of `../../../../lib/tasks.js`
 
 We fixed those. Ran check again. More errors surfaced — the first batch had been hiding others. This is the thing about `svelte-check`: it reports errors in dependency order. Fix ten, and the files that import those files now get checked properly and reveal their own issues.
 
@@ -109,7 +109,7 @@ docker run -d --name keycloak \
   quay.io/keycloak/keycloak:latest start-dev
 ```
 
-Create a realm called `jat`, a client called `jat-ide` with client authentication enabled, set the redirect URI to `http://localhost:3333/auth/keycloak/callback`, grab the client secret, and fill in the env vars. The `README-KEYCLOAK.md` in the IDE directory has the full walkthrough.
+Create a realm called `squad`, a client called `squad-ide` with client authentication enabled, set the redirect URI to `http://localhost:3333/auth/keycloak/callback`, grab the client secret, and fill in the env vars. The `README-KEYCLOAK.md` in the IDE directory has the full walkthrough.
 
 Once configured, hit `http://localhost:3333` and you'll see the login page instead of the IDE. Authenticate through Keycloak, and you're in. Your name shows in the top bar. Logout goes through Keycloak's end-session endpoint so the SSO session is properly terminated.
 

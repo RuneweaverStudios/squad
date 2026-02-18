@@ -26,14 +26,14 @@ export const metadata = {
       label: 'Channel Access Token Secret',
       type: 'secret',
       required: true,
-      helpText: 'Name of the secret containing the LINE channel access token (stored in jat-secret)'
+      helpText: 'Name of the secret containing the LINE channel access token (stored in squad-secret)'
     },
     {
       key: 'channelSecretSecret',
       label: 'Channel Secret Secret',
       type: 'secret',
       required: true,
-      helpText: 'Name of the secret containing the LINE channel secret for webhook signature verification (stored in jat-secret)'
+      helpText: 'Name of the secret containing the LINE channel secret for webhook signature verification (stored in squad-secret)'
     },
     {
       key: 'webhookPort',

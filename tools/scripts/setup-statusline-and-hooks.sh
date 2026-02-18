@@ -17,28 +17,28 @@ NC='\033[0m'
 echo -e "${BLUE}Setting up statusline and hooks...${NC}"
 echo ""
 
-# Determine JAT installation directory
+# Determine SQUAD installation directory
 # Accept as first argument from install.sh, or auto-detect
 if [ -n "$1" ]; then
-    JAT_DIR="$1"
-    echo -e "${BLUE}Using JAT directory: $JAT_DIR${NC}"
-elif [ -n "${JAT_INSTALL_DIR:-}" ] && [ -d "$JAT_INSTALL_DIR" ]; then
-    JAT_DIR="$JAT_INSTALL_DIR"
-elif [ -d "${XDG_DATA_HOME:-$HOME/.local/share}/jat" ]; then
-    JAT_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/jat"
-elif [ -f "$HOME/.config/jat/projects.json" ]; then
-    _jat_path=$(jq -r '.projects.jat.path // empty' "$HOME/.config/jat/projects.json" 2>/dev/null | sed "s|^~|$HOME|g")
-    if [ -n "$_jat_path" ] && [ -d "$_jat_path" ]; then
-        JAT_DIR="$_jat_path"
+    SQUAD_DIR="$1"
+    echo -e "${BLUE}Using SQUAD directory: $SQUAD_DIR${NC}"
+elif [ -n "${SQUAD_INSTALL_DIR:-}" ] && [ -d "$SQUAD_INSTALL_DIR" ]; then
+    SQUAD_DIR="$SQUAD_INSTALL_DIR"
+elif [ -d "${XDG_DATA_HOME:-$HOME/.local/share}/squad" ]; then
+    SQUAD_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/squad"
+elif [ -f "$HOME/.config/squad/projects.json" ]; then
+    _squad_path=$(jq -r '.projects.squad.path // empty' "$HOME/.config/squad/projects.json" 2>/dev/null | sed "s|^~|$HOME|g")
+    if [ -n "$_squad_path" ] && [ -d "$_squad_path" ]; then
+        SQUAD_DIR="$_squad_path"
     fi
 fi
 
-if [ -z "${JAT_DIR:-}" ]; then
-    echo -e "${RED}ERROR: JAT installation not found${NC}"
+if [ -z "${SQUAD_DIR:-}" ]; then
+    echo -e "${RED}ERROR: SQUAD installation not found${NC}"
     echo "Searched in:"
-    echo "  - \$JAT_INSTALL_DIR env var"
-    echo "  - ${XDG_DATA_HOME:-$HOME/.local/share}/jat"
-    echo "  - projects.json jat.path"
+    echo "  - \$SQUAD_INSTALL_DIR env var"
+    echo "  - ${XDG_DATA_HOME:-$HOME/.local/share}/squad"
+    echo "  - projects.json squad.path"
     exit 1
 fi
 
@@ -50,7 +50,7 @@ echo -e "${BLUE}Step 1: Installing global statusline...${NC}"
 
 mkdir -p "$HOME/.claude"
 
-STATUSLINE_SOURCE="$JAT_DIR/.claude/statusline.sh"
+STATUSLINE_SOURCE="$SQUAD_DIR/.claude/statusline.sh"
 STATUSLINE_DEST="$HOME/.claude/statusline.sh"
 
 if [ -f "$STATUSLINE_SOURCE" ]; then
@@ -105,12 +105,12 @@ GLOBAL_HOOKS_DIR="$HOME/.claude/hooks"
 mkdir -p "$GLOBAL_HOOKS_DIR"
 
 # Copy post-bash hook
-HOOK_SOURCE="$JAT_DIR/.claude/hooks/post-bash-agent-state-refresh.sh"
+HOOK_SOURCE="$SQUAD_DIR/.claude/hooks/post-bash-agent-state-refresh.sh"
 
-# If hook doesn't exist in JAT yet, create it
+# If hook doesn't exist in SQUAD yet, create it
 if [ ! -f "$HOOK_SOURCE" ]; then
     echo "  → Creating post-bash hook template..."
-    mkdir -p "$JAT_DIR/.claude/hooks"
+    mkdir -p "$SQUAD_DIR/.claude/hooks"
 
     cat > "$HOOK_SOURCE" << 'EOF'
 #!/bin/bash
@@ -123,8 +123,8 @@ if [ ! -f "$HOOK_SOURCE" ]; then
 #
 # Monitored commands:
 #   - am-* (Agent Mail: reserve, release, send, reply, ack, etc.)
-#   - jt (JAT Tasks: create, update, close, etc.)
-#   - /jat:* slash commands (via SlashCommand tool)
+#   - st (SQUAD Tasks: create, update, close, etc.)
+#   - /squad:* slash commands (via SlashCommand tool)
 #
 # Hook input (stdin): JSON with tool name, input, and output
 # Hook output (stdout): Message to display (triggers statusline refresh)
@@ -141,8 +141,8 @@ if [[ -z "$command" || "$command" == "null" ]]; then
 fi
 
 # Detect agent coordination commands
-# Pattern: am-* (Agent Mail tools) or jt followed by space (JAT Tasks commands)
-if echo "$command" | grep -qE '^(am-|jt\s)'; then
+# Pattern: am-* (Agent Mail tools) or st followed by space (SQUAD Tasks commands)
+if echo "$command" | grep -qE '^(am-|st\s)'; then
     # Extract the base command for display (first word)
     base_cmd=$(echo "$command" | awk '{print $1}')
 
@@ -165,18 +165,18 @@ chmod +x "$GLOBAL_HOOKS_DIR/post-bash-agent-state-refresh.sh"
 
 echo -e "  ${GREEN}✓ Installed post-bash-agent-state-refresh.sh to ~/.claude/hooks/${NC}"
 
-# Copy jat-signal hook to global directory
-JAT_SIGNAL_HOOK="$JAT_DIR/.claude/hooks/post-bash-jat-signal.sh"
-if [ -f "$JAT_SIGNAL_HOOK" ]; then
-    cp "$JAT_SIGNAL_HOOK" "$GLOBAL_HOOKS_DIR/post-bash-jat-signal.sh"
-    chmod +x "$GLOBAL_HOOKS_DIR/post-bash-jat-signal.sh"
-    echo -e "  ${GREEN}✓ Installed post-bash-jat-signal.sh to ~/.claude/hooks/${NC}"
+# Copy squad-signal hook to global directory
+SQUAD_SIGNAL_HOOK="$SQUAD_DIR/.claude/hooks/post-bash-squad-signal.sh"
+if [ -f "$SQUAD_SIGNAL_HOOK" ]; then
+    cp "$SQUAD_SIGNAL_HOOK" "$GLOBAL_HOOKS_DIR/post-bash-squad-signal.sh"
+    chmod +x "$GLOBAL_HOOKS_DIR/post-bash-squad-signal.sh"
+    echo -e "  ${GREEN}✓ Installed post-bash-squad-signal.sh to ~/.claude/hooks/${NC}"
 else
-    echo -e "  ${YELLOW}⚠ jat-signal hook not found: $JAT_SIGNAL_HOOK${NC}"
+    echo -e "  ${YELLOW}⚠ squad-signal hook not found: $SQUAD_SIGNAL_HOOK${NC}"
 fi
 
 # Copy session-start hook to global directory
-SESSION_START_HOOK="$JAT_DIR/.claude/hooks/session-start-agent-identity.sh"
+SESSION_START_HOOK="$SQUAD_DIR/.claude/hooks/session-start-agent-identity.sh"
 if [ -f "$SESSION_START_HOOK" ]; then
     cp "$SESSION_START_HOOK" "$GLOBAL_HOOKS_DIR/session-start-agent-identity.sh"
     chmod +x "$GLOBAL_HOOKS_DIR/session-start-agent-identity.sh"
@@ -186,7 +186,7 @@ else
 fi
 
 # Copy pre-ask-user-question hook to global directory
-PRE_ASK_HOOK="$JAT_DIR/.claude/hooks/pre-ask-user-question.sh"
+PRE_ASK_HOOK="$SQUAD_DIR/.claude/hooks/pre-ask-user-question.sh"
 if [ -f "$PRE_ASK_HOOK" ]; then
     cp "$PRE_ASK_HOOK" "$GLOBAL_HOOKS_DIR/pre-ask-user-question.sh"
     chmod +x "$GLOBAL_HOOKS_DIR/pre-ask-user-question.sh"
@@ -196,7 +196,7 @@ else
 fi
 
 # Copy pre-compact-save-agent hook to global directory
-PRE_COMPACT_HOOK="$JAT_DIR/.claude/hooks/pre-compact-save-agent.sh"
+PRE_COMPACT_HOOK="$SQUAD_DIR/.claude/hooks/pre-compact-save-agent.sh"
 if [ -f "$PRE_COMPACT_HOOK" ]; then
     cp "$PRE_COMPACT_HOOK" "$GLOBAL_HOOKS_DIR/pre-compact-save-agent.sh"
     chmod +x "$GLOBAL_HOOKS_DIR/pre-compact-save-agent.sh"
@@ -206,11 +206,11 @@ else
 fi
 
 # NOTE: session-start-restore-agent.sh is no longer needed separately.
-# Its features (WINDOWID fallback, workflow state injection, jt fallback)
+# Its features (WINDOWID fallback, workflow state injection, st fallback)
 # are now merged into session-start-agent-identity.sh.
 
 # Copy user-prompt-signal hook to global directory
-USER_PROMPT_HOOK="$JAT_DIR/.claude/hooks/user-prompt-signal.sh"
+USER_PROMPT_HOOK="$SQUAD_DIR/.claude/hooks/user-prompt-signal.sh"
 if [ -f "$USER_PROMPT_HOOK" ]; then
     cp "$USER_PROMPT_HOOK" "$GLOBAL_HOOKS_DIR/user-prompt-signal.sh"
     chmod +x "$GLOBAL_HOOKS_DIR/user-prompt-signal.sh"
@@ -220,7 +220,7 @@ else
 fi
 
 # Copy monitor-output helper to global directory (used by user-prompt-signal.sh via $SCRIPT_DIR)
-MONITOR_OUTPUT="$JAT_DIR/.claude/hooks/monitor-output.sh"
+MONITOR_OUTPUT="$SQUAD_DIR/.claude/hooks/monitor-output.sh"
 if [ -f "$MONITOR_OUTPUT" ]; then
     cp "$MONITOR_OUTPUT" "$GLOBAL_HOOKS_DIR/monitor-output.sh"
     chmod +x "$GLOBAL_HOOKS_DIR/monitor-output.sh"
@@ -230,7 +230,7 @@ else
 fi
 
 # Copy log-tool-activity hook to global directory (logs tool usage to activity timeline)
-LOG_TOOL_HOOK="$JAT_DIR/.claude/hooks/log-tool-activity.sh"
+LOG_TOOL_HOOK="$SQUAD_DIR/.claude/hooks/log-tool-activity.sh"
 if [ -f "$LOG_TOOL_HOOK" ]; then
     cp "$LOG_TOOL_HOOK" "$GLOBAL_HOOKS_DIR/log-tool-activity.sh"
     chmod +x "$GLOBAL_HOOKS_DIR/log-tool-activity.sh"
@@ -390,7 +390,7 @@ else
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "~/.claude/hooks/post-bash-jat-signal.sh"
+                            "command": "~/.claude/hooks/post-bash-squad-signal.sh"
                         },
                         {
                             "type": "command",
@@ -522,7 +522,7 @@ for repo_dir in "$CODE_DIR"/*; do
                                 },
                                 {
                                     "type": "command",
-                                    "command": "~/.claude/hooks/post-bash-jat-signal.sh",
+                                    "command": "~/.claude/hooks/post-bash-squad-signal.sh",
                                     "statusMessage": "",
                                     "streamStdinJson": true
                                 }
@@ -562,7 +562,7 @@ for repo_dir in "$CODE_DIR"/*; do
           },
           {
             "type": "command",
-            "command": "~/.claude/hooks/post-bash-jat-signal.sh",
+            "command": "~/.claude/hooks/post-bash-squad-signal.sh",
             "statusMessage": "",
             "streamStdinJson": true
           }
@@ -589,7 +589,7 @@ echo "    - ~/.claude/hooks/session-start-agent-identity.sh (SessionStart - unif
 echo "    - ~/.claude/hooks/pre-ask-user-question.sh (PreToolUse)"
 echo "    - ~/.claude/hooks/pre-compact-save-agent.sh (PreCompact)"
 echo "    - ~/.claude/hooks/post-bash-agent-state-refresh.sh (PostToolUse)"
-echo "    - ~/.claude/hooks/post-bash-jat-signal.sh (PostToolUse)"
+echo "    - ~/.claude/hooks/post-bash-squad-signal.sh (PostToolUse)"
 echo "    - ~/.claude/hooks/log-tool-activity.sh (PostToolUse - activity timeline)"
 echo "    - ~/.claude/hooks/user-prompt-signal.sh (UserPromptSubmit)"
 echo "    - ~/.claude/hooks/monitor-output.sh (helper for user-prompt-signal)"
@@ -605,7 +605,7 @@ if [ $REPOS_FOUND -eq 0 ]; then
 else
     echo "  All repositories now have:"
     echo "    • Global statusline showing agent, task, git, context"
-    echo "    • Real-time updates when running am-* or jt commands"
+    echo "    • Real-time updates when running am-* or st commands"
     echo ""
     echo "  Open Claude Code in any project to see the statusline in action!"
     echo ""

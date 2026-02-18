@@ -30,11 +30,11 @@
 
 ## Installation
 
-These tools are installed automatically when you select the "SvelteKit + Supabase" stack during jat installation.
+These tools are installed automatically when you select the "SvelteKit + Supabase" stack during squad installation.
 
 Or install manually:
 ```bash
-cd ~/code/jat/stacks/sveltekit-supabase
+cd ~/code/squad/stacks/sveltekit-supabase
 bash install.sh
 ```
 

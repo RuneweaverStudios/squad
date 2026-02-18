@@ -126,7 +126,7 @@
 		{
 			value: 'signal',
 			label: 'Emit Signal',
-			description: 'Emit a jat-signal event',
+			description: 'Emit a squad-signal event',
 			icon: 'M9.348 14.651a3.75 3.75 0 010-5.303m5.304 0a3.75 3.75 0 010 5.303m-7.425 2.122a6.75 6.75 0 010-9.546m9.546 0a6.75 6.75 0 010 9.546M5.106 18.894c-3.808-3.808-3.808-9.98 0-13.789m13.788 0c3.808 3.808 3.808 9.981 0 13.79M12 12h.008v.007H12V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z'
 		},
 		{
@@ -144,7 +144,7 @@
 		{
 			value: 'run_command',
 			label: 'Run Command',
-			description: 'Run a Claude agent slash command (e.g., /jat:complete)',
+			description: 'Run a Claude agent slash command (e.g., /squad:complete)',
 			icon: 'M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z'
 		}
 	];
@@ -883,7 +883,7 @@
 												<div class="text-[0.65rem] font-semibold text-info uppercase tracking-wider mb-2 font-mono">Template Variables</div>
 												<div class="grid gap-x-3 gap-y-1 items-baseline" style="grid-template-columns: auto 1fr;">
 													<code class="py-0.5 px-1.5 rounded text-[0.6rem] font-mono whitespace-nowrap bg-success/20 text-success">{'{session}'}</code>
-													<span class="text-[0.6rem] text-base-content/60 font-mono">Tmux session name (e.g., "jat-FairBay")</span>
+													<span class="text-[0.6rem] text-base-content/60 font-mono">Tmux session name (e.g., "squad-FairBay")</span>
 
 													<code class="py-0.5 px-1.5 rounded text-[0.6rem] font-mono whitespace-nowrap bg-success/20 text-success">{'{agent}'}</code>
 													<span class="text-[0.6rem] text-base-content/60 font-mono">Agent name (e.g., "FairBay")</span>
@@ -908,7 +908,7 @@
 												<div class="flex flex-col gap-1.5">
 													<div class="flex flex-col gap-0.5">
 														<span class="text-[0.55rem] text-base-content/60 font-mono uppercase">Pattern (regex):</span>
-														<code class="py-1 px-2 rounded text-[0.6rem] font-mono break-all bg-base-300 border border-base-300 text-base-content/80">Working on task (jat-[a-z0-9]+)</code>
+														<code class="py-1 px-2 rounded text-[0.6rem] font-mono break-all bg-base-300 border border-base-300 text-base-content/80">Working on task (squad-[a-z0-9]+)</code>
 													</div>
 													<div class="flex flex-col gap-0.5">
 														<span class="text-[0.55rem] text-base-content/60 font-mono uppercase">Signal payload:</span>
@@ -916,7 +916,7 @@
 													</div>
 													<div class="flex flex-col gap-0.5">
 														<span class="text-[0.55rem] text-base-content/60 font-mono uppercase">Result:</span>
-														<code class="py-1 px-2 rounded text-[0.6rem] font-mono break-all bg-base-300 border border-base-300 text-base-content/80">{`working {"taskId":"jat-abc","agentName":"FairBay"}`}</code>
+														<code class="py-1 px-2 rounded text-[0.6rem] font-mono break-all bg-base-300 border border-base-300 text-base-content/80">{`working {"taskId":"squad-abc","agentName":"FairBay"}`}</code>
 													</div>
 												</div>
 											</div>
@@ -949,7 +949,7 @@
 												</div>
 												<div class="flex items-start gap-2 py-1">
 													<span class="flex-shrink-0 w-20 font-semibold text-success text-[0.65rem] font-mono">starting</span>
-													<code class="flex-1 py-1 px-2 rounded text-[0.6rem] font-mono break-all bg-base-100 border border-base-300 text-base-content/70">{`{"agentName":"{agent}","project":"jat"}`}</code>
+													<code class="flex-1 py-1 px-2 rounded text-[0.6rem] font-mono break-all bg-base-100 border border-base-300 text-base-content/70">{`{"agentName":"{agent}","project":"squad"}`}</code>
 												</div>
 												<div class="flex items-start gap-2 py-1">
 													<span class="flex-shrink-0 w-20 font-semibold text-success text-[0.65rem] font-mono">compacting</span>

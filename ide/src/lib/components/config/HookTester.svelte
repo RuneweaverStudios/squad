@@ -160,16 +160,16 @@
 			}
 		},
 		{
-			id: 'bash-jat-signal',
-			label: 'Bash - jat-signal',
-			description: 'JAT signal command for state tracking',
+			id: 'bash-squad-signal',
+			label: 'Bash - squad-signal',
+			description: 'SQUAD signal command for state tracking',
 			toolName: 'Bash',
 			eventType: 'PostToolUse',
 			toolInput: {
-				command: 'jat-signal working \'{"taskId":"jat-abc","taskTitle":"Add feature X"}\''
+				command: 'squad-signal working \'{"taskId":"squad-abc","taskTitle":"Add feature X"}\''
 			},
 			toolResponse: {
-				stdout: 'Signal: working (task: jat-abc - Add feature X)\n[JAT-SIGNAL:working] {"taskId":"jat-abc","taskTitle":"Add feature X"}',
+				stdout: 'Signal: working (task: squad-abc - Add feature X)\n[SQUAD-SIGNAL:working] {"taskId":"squad-abc","taskTitle":"Add feature X"}',
 				stderr: '',
 				exit_code: 0
 			}
@@ -238,7 +238,7 @@
 			toolName: 'Read',
 			eventType: 'PreToolUse',
 			toolInput: {
-				file_path: '/home/jw/code/jat/ide/src/lib/components/config/HooksEditor.svelte',
+				file_path: '/home/jw/code/squad/ide/src/lib/components/config/HooksEditor.svelte',
 				limit: 100
 			}
 		},
@@ -249,7 +249,7 @@
 			toolName: 'Edit',
 			eventType: 'PreToolUse',
 			toolInput: {
-				file_path: '/home/jw/code/jat/ide/src/app.css',
+				file_path: '/home/jw/code/squad/ide/src/app.css',
 				old_string: 'color: red;',
 				new_string: 'color: blue;'
 			}
@@ -261,7 +261,7 @@
 			toolName: 'Write',
 			eventType: 'PreToolUse',
 			toolInput: {
-				file_path: '/home/jw/code/jat/ide/src/lib/newFile.ts',
+				file_path: '/home/jw/code/squad/ide/src/lib/newFile.ts',
 				content: 'export const hello = "world";'
 			}
 		},
@@ -1040,7 +1040,7 @@
 					style="background: oklch(0.18 0.02 200 / 0.3); border-top: 1px solid oklch(0.30 0.05 200);"
 				>
 					<p class="text-[9px] font-mono" style="color: oklch(0.65 0.08 200);">
-						💡 This is a preview execution. The hook ran with JAT_HOOK_PREVIEW=true environment variable.
+						💡 This is a preview execution. The hook ran with SQUAD_HOOK_PREVIEW=true environment variable.
 						Side effects may be suppressed by hook scripts that check for this variable.
 					</p>
 				</div>

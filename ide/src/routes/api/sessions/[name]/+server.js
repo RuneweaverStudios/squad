@@ -10,7 +10,7 @@ import { promisify } from 'util';
 import { appendFile, mkdir, access, readFile, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
-import { getTasks } from '$lib/server/jat-tasks.js';
+import { getTasks } from '$lib/server/squad-tasks.js';
 
 const execAsync = promisify(exec);
 
@@ -21,7 +21,7 @@ const execAsync = promisify(exec);
  */
 async function captureSessionLog(sessionName, reason) {
 	const projectPath = process.cwd().replace('/ide', '');
-	const logsDir = path.join(projectPath, '.jat', 'logs');
+	const logsDir = path.join(projectPath, '.squad', 'logs');
 	const logFile = path.join(logsDir, `session-${sessionName}.log`);
 
 	// Ensure logs directory exists
@@ -88,16 +88,16 @@ ${label} at ${timestamp}
 }
 
 /**
- * Session name prefix for JAT agent sessions
- * Sessions are named: jat-{AgentName}
+ * Session name prefix for SQUAD agent sessions
+ * Sessions are named: squad-{AgentName}
  */
-const SESSION_PREFIX = 'jat-';
+const SESSION_PREFIX = 'squad-';
 
 /**
  * Get the full tmux session name from a name parameter.
  * Handles both:
- * - Agent name (e.g., "DullGrove") → "jat-DullGrove"
- * - Full session name (e.g., "jat-DullGrove") → "jat-DullGrove" (no double prefix)
+ * - Agent name (e.g., "DullGrove") → "squad-DullGrove"
+ * - Full session name (e.g., "squad-DullGrove") → "squad-DullGrove" (no double prefix)
  * @param {string} name - Agent name or full session name
  * @returns {{ agentName: string, sessionName: string }}
  */
@@ -223,7 +223,7 @@ export async function DELETE({ params }) {
 		}
 		console.log(`[Session DELETE] captureSessionLog took ${Date.now() - t1}ms (captured: ${!!logCaptured})`);
 
-		// Kill the tmux session (with jat- prefix)
+		// Kill the tmux session (with squad- prefix)
 		const killCommand = `tmux kill-session -t "${sessionName}" 2>&1`;
 		let sessionKilled = false;
 
@@ -254,7 +254,7 @@ export async function DELETE({ params }) {
 
 		const t3 = Date.now();
 		try {
-			// Use jat-tasks.js to find tasks across all projects
+			// Use squad-tasks.js to find tasks across all projects
 			const allTasks = getTasks({ status: 'in_progress' });
 			const agentTask = allTasks.find(t => t.assignee === agentName);
 			console.log(`[Session DELETE] getTasks scan took ${Date.now() - t3}ms (found ${allTasks.length} in_progress tasks, match: ${agentTask?.id || 'none'})`);
@@ -262,12 +262,12 @@ export async function DELETE({ params }) {
 			if (agentTask) {
 				const t4 = Date.now();
 				// Release the task: set status back to open and clear assignee
-				// Run jt update in the task's project directory
-				await execAsync(`jt update "${agentTask.id}" --status open --assignee ""`, {
+				// Run st update in the task's project directory
+				await execAsync(`st update "${agentTask.id}" --status open --assignee ""`, {
 					cwd: agentTask.project_path,
 					timeout: 10000
 				});
-				console.log(`[Session DELETE] jt update (release task) took ${Date.now() - t4}ms`);
+				console.log(`[Session DELETE] st update (release task) took ${Date.now() - t4}ms`);
 				taskReleased = true;
 				releasedTaskId = agentTask.id;
 			}

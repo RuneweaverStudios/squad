@@ -273,7 +273,7 @@ const specialFolderIcons: Record<string, { open: string; closed: string }> = {
 	docs: { open: '📚', closed: '📚' },
 	scripts: { open: '📜', closed: '📜' },
 	migrations: { open: '🔄', closed: '🔄' },
-	'.jat': { open: '📿', closed: '📿' },
+	'.squad': { open: '📿', closed: '📿' },
 	'.claude': { open: '🤖', closed: '🤖' }
 };
 

@@ -9,7 +9,7 @@
  * Saves content to the tool file.
  *
  * Security:
- * - Path must be within JAT directory
+ * - Path must be within SQUAD directory
  * - No path traversal allowed
  * - Only allows editing known tool directories
  */
@@ -21,17 +21,17 @@ import { join, normalize, dirname } from 'path';
 import { existsSync } from 'fs';
 import { homedir } from 'os';
 
-// Allowed tool directories (relative to JAT root)
-const ALLOWED_DIRECTORIES = ['tools/agents', 'tools/browser', 'tools/core', 'tools/scripts', 'tools/media', 'tools/signal', 'commands/jat'];
+// Allowed tool directories (relative to SQUAD root)
+const ALLOWED_DIRECTORIES = ['tools/agents', 'tools/browser', 'tools/core', 'tools/scripts', 'tools/media', 'tools/signal', 'commands/squad'];
 
 /**
- * Find JAT installation directory (same as in parent +server.ts)
+ * Find SQUAD installation directory (same as in parent +server.ts)
  */
-function findJatPath(): string | null {
+function findSquadPath(): string | null {
 	const candidates = [
-		join(homedir(), 'code', 'jat'),
-		join(homedir(), 'projects', 'jat'),
-		join(homedir(), '.local', 'share', 'jat'),
+		join(homedir(), 'code', 'squad'),
+		join(homedir(), 'projects', 'squad'),
+		join(homedir(), '.local', 'share', 'squad'),
 		join(process.cwd(), '..'),
 		process.cwd().replace('/ide', '')
 	];
@@ -54,7 +54,7 @@ function findJatPath(): string | null {
  */
 function validatePath(
 	path: string,
-	jatPath: string
+	squadPath: string
 ): { valid: boolean; absolutePath?: string; error?: string } {
 	if (!path) {
 		return { valid: false, error: 'Path is required' };
@@ -76,13 +76,13 @@ function validatePath(
 	}
 
 	// Resolve absolute path
-	const absolutePath = join(jatPath, normalizedPath);
+	const absolutePath = join(squadPath, normalizedPath);
 
-	// Verify it's still within JAT directory (belt and suspenders)
-	const resolvedJat = normalize(jatPath);
+	// Verify it's still within SQUAD directory (belt and suspenders)
+	const resolvedSquad = normalize(squadPath);
 	const resolvedPath = normalize(absolutePath);
-	if (!resolvedPath.startsWith(resolvedJat)) {
-		return { valid: false, error: 'Path escapes JAT directory' };
+	if (!resolvedPath.startsWith(resolvedSquad)) {
+		return { valid: false, error: 'Path escapes SQUAD directory' };
 	}
 
 	return { valid: true, absolutePath };
@@ -98,12 +98,12 @@ export const GET: RequestHandler = async ({ url }) => {
 		return json({ error: 'path parameter is required' }, { status: 400 });
 	}
 
-	const jatPath = findJatPath();
-	if (!jatPath) {
-		return json({ error: 'JAT installation not found' }, { status: 404 });
+	const squadPath = findSquadPath();
+	if (!squadPath) {
+		return json({ error: 'SQUAD installation not found' }, { status: 404 });
 	}
 
-	const validation = validatePath(path, jatPath);
+	const validation = validatePath(path, squadPath);
 	if (!validation.valid) {
 		return json({ error: validation.error }, { status: 403 });
 	}
@@ -142,12 +142,12 @@ export const PUT: RequestHandler = async ({ url, request }) => {
 		return json({ error: 'path parameter is required' }, { status: 400 });
 	}
 
-	const jatPath = findJatPath();
-	if (!jatPath) {
-		return json({ error: 'JAT installation not found' }, { status: 404 });
+	const squadPath = findSquadPath();
+	if (!squadPath) {
+		return json({ error: 'SQUAD installation not found' }, { status: 404 });
 	}
 
-	const validation = validatePath(path, jatPath);
+	const validation = validatePath(path, squadPath);
 	if (!validation.valid) {
 		return json({ error: validation.error }, { status: 403 });
 	}

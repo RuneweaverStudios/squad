@@ -1,5 +1,5 @@
 {
-  "taskId": "jat-5z78g",
+  "taskId": "squad-5z78g",
   "title": "show resumable session count badge on /tasks project",
   "summary": [
     "Implemented instant signal pattern for session state transitions",

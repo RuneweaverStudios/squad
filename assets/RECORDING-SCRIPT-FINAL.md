@@ -1,6 +1,6 @@
-# JAT IDE Demo Recording Script - Final
+# SQUAD IDE Demo Recording Script - Final
 
-**Target:** 45-60 second MP4 showcasing JAT's multi-project orchestration
+**Target:** 45-60 second MP4 showcasing SQUAD's multi-project orchestration
 **Key Message:** Manage multiple client projects simultaneously with one IDE
 
 ---
@@ -8,9 +8,9 @@
 ## DEMO PROJECTS SETUP
 
 Three realistic, independent projects:
-- **jat-demo-blog** - Personal blog platform
-- **jat-demo-shop** - E-commerce store
-- **jat-demo-dashboard** - Analytics dashboard
+- **squad-demo-blog** - Personal blog platform
+- **squad-demo-shop** - E-commerce store
+- **squad-demo-dashboard** - Analytics dashboard
 
 Each is a complete, self-contained SvelteKit application.
 
@@ -26,16 +26,16 @@ Each is a complete, self-contained SvelteKit application.
 # - Clears all task lists
 # - Kills old tmux sessions
 # - Adds projects to config
-jat-demo setup
+squad-demo setup
 
 # Show only demo projects in IDE
-jat-demo on
+squad-demo on
 ```
 
 ### 2. Start IDE
 
 ```bash
-jat
+squad
 ```
 
 ### 3. Browser Setup
@@ -47,9 +47,9 @@ jat
 
 ### 4. Have Task Descriptions Ready
 
-- Blog task: `~/code/jat/assets/demo-task-blog.txt`
-- Shop task: `~/code/jat/assets/demo-task-shop.txt`
-- IDE task: `~/code/jat/assets/demo-task-dashboard.txt`
+- Blog task: `~/code/squad/assets/demo-task-blog.txt`
+- Shop task: `~/code/squad/assets/demo-task-shop.txt`
+- IDE task: `~/code/squad/assets/demo-task-dashboard.txt`
 
 ---
 
@@ -60,9 +60,9 @@ jat
 
 1. **Start on /projects page**
 2. Three project panels visible:
-   - 🖊️ **jat-demo-blog** (Blog Platform)
-   - 🛒 **jat-demo-shop** (E-commerce Store)
-   - 📊 **jat-demo-dashboard** (Analytics)
+   - 🖊️ **squad-demo-blog** (Blog Platform)
+   - 🛒 **squad-demo-shop** (E-commerce Store)
+   - 📊 **squad-demo-dashboard** (Analytics)
 3. All show empty task lists
 
 **Narration:** "Three client projects, one IDE"
@@ -153,7 +153,7 @@ Rapid cuts:
 - `/automation` - Rules keeping everything smooth
 - Back to `/projects` - Three completed features
 
-**Final text overlay:** "JAT - Multi-Project Development Orchestration"
+**Final text overlay:** "SQUAD - Multi-Project Development Orchestration"
 
 ---
 
@@ -181,7 +181,7 @@ Rapid cuts:
 0:32 "When agents need decisions, the IDE delivers."
 0:40 "Organize your view. Focus on what matters."
 0:47 "From requirements to running code."
-0:52 "JAT. Orchestration for modern development."
+0:52 "SQUAD. Orchestration for modern development."
 ```
 
 ---
@@ -227,7 +227,7 @@ Rapid cuts:
 - Focus on project organization features
 
 ### If tasks don't create properly:
-- Have backup tasks ready via `jt create`
+- Have backup tasks ready via `st create`
 - Can manually create tasks quickly
 
 ### If recording runs long:
@@ -250,7 +250,7 @@ The demo succeeds if viewers understand:
 
 ## 🎬 FINAL STEPS
 
-1. **Record:** Save as `~/code/jat/assets/dashboard-demo-raw.mp4`
+1. **Record:** Save as `~/code/squad/assets/dashboard-demo-raw.mp4`
 2. **Edit:** Trim, speed up working sections, add text overlays
 3. **Export:** Final version as `dashboard-demo.mp4`
 4. **Upload:** To GitHub, get shareable URL
@@ -262,8 +262,8 @@ The demo succeeds if viewers understand:
 
 ```bash
 # Restore normal projects
-jat-demo off
+squad-demo off
 
 # Clean up demo projects (optional - with confirmation prompt)
-jat-demo clean
+squad-demo clean
 ```

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Import PROJECT_CONFIG from ~/.bashrc into ~/.config/jat/projects.json
+# Import PROJECT_CONFIG from ~/.bashrc into ~/.config/squad/projects.json
 # Usage: import-bashrc-config.sh [--dry-run] [--bashrc-path PATH]
 
 set -e
@@ -14,7 +14,7 @@ DIM='\033[2m'
 NC='\033[0m'
 
 # Config
-CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/jat"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/squad"
 CONFIG_FILE="$CONFIG_DIR/projects.json"
 BASHRC_PATH="$HOME/.bashrc"
 DRY_RUN=false
@@ -25,7 +25,7 @@ DRY_RUN=false
 
 show_help() {
     cat << 'EOF'
-Import PROJECT_CONFIG from ~/.bashrc into jat config
+Import PROJECT_CONFIG from ~/.bashrc into squad config
 
 USAGE:
     import-bashrc-config.sh [OPTIONS]
@@ -37,7 +37,7 @@ OPTIONS:
 
 DESCRIPTION:
     Parses the PROJECT_CONFIG associative array from your bashrc and imports
-    projects into ~/.config/jat/projects.json, preserving any existing config.
+    projects into ~/.config/squad/projects.json, preserving any existing config.
 
     Expected bashrc format:
         declare -A PROJECT_CONFIG=(
@@ -265,6 +265,6 @@ echo "  Imported: $IMPORTED_COUNT project(s)"
 echo "  Config: $CONFIG_FILE"
 echo ""
 echo "  Test with:"
-echo "    jat list"
-echo "    jat config"
+echo "    squad list"
+echo "    squad config"
 echo ""

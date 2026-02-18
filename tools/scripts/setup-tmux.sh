@@ -42,7 +42,7 @@ if [ -f "$TMUX_CONF" ]; then
 
     # Mouse setting not found, append it
     echo "" >> "$TMUX_CONF"
-    echo "# JAT: Enable mouse mode for proper scrolling in Claude Code TUI" >> "$TMUX_CONF"
+    echo "# SQUAD: Enable mouse mode for proper scrolling in Claude Code TUI" >> "$TMUX_CONF"
     echo "# Use Shift+select to copy text with mouse mode enabled" >> "$TMUX_CONF"
     echo "set -g mouse on" >> "$TMUX_CONF"
 
@@ -50,7 +50,7 @@ if [ -f "$TMUX_CONF" ]; then
 else
     # Create new ~/.tmux.conf
     cat > "$TMUX_CONF" << 'EOF'
-# JAT: Enable mouse mode for proper scrolling in Claude Code TUI
+# SQUAD: Enable mouse mode for proper scrolling in Claude Code TUI
 # Use Shift+select to copy text with mouse mode enabled
 set -g mouse on
 EOF

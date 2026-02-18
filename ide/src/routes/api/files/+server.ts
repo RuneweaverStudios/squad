@@ -3,7 +3,7 @@
  *
  * GET /api/files?project=<name>&path=<dir>
  * - Returns array of {name, type: 'file'|'folder', size, modified, path}
- * - Validates project exists in ~/.config/jat/projects.json
+ * - Validates project exists in ~/.config/squad/projects.json
  * - Resolves project path and validates requested path is within project
  * - Security: Prevent path traversal (../), resolve symlinks and verify target
  * - Error handling: 404 if path not found, 403 if outside project
@@ -101,7 +101,7 @@ function hasPathTraversal(path: string): boolean {
  * GET /api/files
  *
  * Query params:
- *   - project: Project name (required) - must exist in ~/.config/jat/projects.json
+ *   - project: Project name (required) - must exist in ~/.config/squad/projects.json
  *   - path: Relative path within project (optional, defaults to project root)
  *   - showHidden: Include hidden files/folders (default: false)
  */

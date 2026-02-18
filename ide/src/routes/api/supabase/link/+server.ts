@@ -32,7 +32,7 @@ async function sessionExists(sessionName: string): Promise<boolean> {
  * Get terminal emulator from config
  */
 function getTerminal(): string {
-	const configPath = join(homedir(), '.config', 'jat', 'projects.json');
+	const configPath = join(homedir(), '.config', 'squad', 'projects.json');
 	if (existsSync(configPath)) {
 		try {
 			const config = JSON.parse(readFileSync(configPath, 'utf-8'));
@@ -54,7 +54,7 @@ function getTerminal(): string {
  * Find parent session
  */
 async function findParentSession(): Promise<string | null> {
-	const candidates = ['server-jat', 'jat'];
+	const candidates = ['server-squad', 'squad'];
 	for (const name of candidates) {
 		if (await sessionExists(name)) {
 			return name;

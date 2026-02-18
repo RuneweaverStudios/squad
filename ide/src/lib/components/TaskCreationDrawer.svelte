@@ -246,7 +246,7 @@
 		type: 'task',
 		project: '',
 		labels: '',
-		command: '/jat:start',
+		command: '/squad:start',
 		due_date: '',
 		schedule_type: 'none',
 		schedule_cron: '',
@@ -268,8 +268,8 @@
 			groups.get(ns)!.push({ invocation: cmd.invocation, name: cmd.name });
 		}
 		const sorted = Array.from(groups.entries()).sort(([a], [b]) => {
-			if (a === 'jat') return -1;
-			if (b === 'jat') return 1;
+			if (a === 'squad') return -1;
+			if (b === 'squad') return 1;
 			if (a === 'local') return -1;
 			if (b === 'local') return 1;
 			return a.localeCompare(b);
@@ -1063,7 +1063,7 @@
 				labels: labels.length > 0 ? labels : undefined,
 				deps: dependencies.length > 0 ? dependencies : undefined,
 				review_override: reviewOverride || undefined,
-				command: resolvedCommand !== '/jat:start' ? resolvedCommand : undefined,
+				command: resolvedCommand !== '/squad:start' ? resolvedCommand : undefined,
 				agent_program: agentProgram,
 				model: modelValue,
 				schedule_cron: scheduleCron,
@@ -1121,7 +1121,7 @@
 					// Spawn an agent for the newly created task via /api/work/spawn
 					// This endpoint properly registers the agent, assigns the task, and starts Claude
 					// Pass project explicitly since the task was just created and may not be discoverable
-					// by project prefix alone (e.g., new projects not yet in JAT config)
+					// by project prefix alone (e.g., new projects not yet in SQUAD config)
 					console.log('[TaskCreationDrawer] Spawning agent for task:', taskId, 'in project:', formData.project);
 
 					const spawnResponse = await fetch('/api/work/spawn', {
@@ -1154,7 +1154,7 @@
 					broadcastTaskEvent('task-created', taskId);
 
 					// Broadcast session spawned event so other pages refresh their session lists
-					const sessionName = spawnData.session?.sessionName || `jat-${spawnData.session?.agentName}`;
+					const sessionName = spawnData.session?.sessionName || `squad-${spawnData.session?.agentName}`;
 					const agentName = spawnData.session?.agentName || '';
 					broadcastSessionEvent('session-spawned', sessionName, agentName);
 
@@ -1201,7 +1201,7 @@
 			type: 'task',
 			project: '',
 			labels: '',
-			command: '/jat:start',
+			command: '/squad:start',
 			due_date: '',
 			schedule_type: 'none',
 			schedule_cron: '',
@@ -1911,7 +1911,7 @@
 									onclick={() => { if (!formDisabled && !isSubmitting) cmdDropdownOpen = !cmdDropdownOpen; }}
 									disabled={formDisabled || isSubmitting}
 								>
-									<span class="truncate" style="color: oklch(0.85 0.02 250);">{formData.command || '/jat:start'}</span>
+									<span class="truncate" style="color: oklch(0.85 0.02 250);">{formData.command || '/squad:start'}</span>
 									<svg class="w-3 h-3 flex-shrink-0 transition-transform {cmdDropdownOpen ? 'rotate-180' : ''}" style="color: oklch(0.50 0.02 250);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 										<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
 									</svg>

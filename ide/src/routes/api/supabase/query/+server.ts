@@ -54,7 +54,7 @@ const SUPABASE_API_BASE = 'https://api.supabase.com';
  * Get project path from config
  */
 function getProjectPath(projectName: string): string | null {
-	const configPath = join(process.env.HOME || '~', '.config', 'jat', 'projects.json');
+	const configPath = join(process.env.HOME || '~', '.config', 'squad', 'projects.json');
 
 	if (!existsSync(configPath)) {
 		const defaultPath = join(process.env.HOME || '~', 'code', projectName);
@@ -241,7 +241,7 @@ async function executeViaManagementApi(
  * Get database password from credentials or .env files
  *
  * Fallback chain:
- * 1. ~/.config/jat/credentials.json (supabase_db_password)
+ * 1. ~/.config/squad/credentials.json (supabase_db_password)
  * 2. Project .env files (SUPABASE_DB_PASSWORD, DATABASE_PASSWORD, POSTGRES_PASSWORD)
  */
 function getDatabasePassword(projectName: string, projectPath: string, serverPath?: string): string | null {

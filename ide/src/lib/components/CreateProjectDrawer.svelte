@@ -7,7 +7,7 @@
 	 * - Text input for path or browse button
 	 * - Directory browser via /api/directories
 	 * - Validation that path is a git repo
-	 * - Call jt init on selected path via /api/projects/init
+	 * - Call st init on selected path via /api/projects/init
 	 * - Success/error feedback
 	 * - Refresh project list on success
 	 */
@@ -28,7 +28,7 @@
 		path: string;
 		name: string;
 		isGitRepo: boolean;
-		hasJat: boolean;
+		hasSquad: boolean;
 	}
 
 	// Reactive state from store
@@ -125,7 +125,7 @@
 		showBrowser = false;
 
 		// Update validation based on directory state
-		if (dir.hasJat) {
+		if (dir.hasSquad) {
 			validationStatus = 'already-initialized';
 			validationMessage = 'Squad already initialized in this project';
 		} else if (!dir.isGitRepo) {
@@ -300,7 +300,7 @@
 
 			if (dirInfo) {
 				selectedDirectory = dirInfo;
-				if (dirInfo.hasJat) {
+				if (dirInfo.hasSquad) {
 					validationStatus = 'already-initialized';
 					validationMessage = 'Squad already initialized in this project';
 				} else if (!dirInfo.isGitRepo) {
@@ -720,7 +720,7 @@
 
 											<!-- Status badges -->
 											<div class="flex items-center gap-1">
-												{#if dir.hasJat}
+												{#if dir.hasSquad}
 													<span
 														class="badge badge-xs"
 														style="background: oklch(0.35 0.15 145); color: oklch(0.90 0.02 250);"

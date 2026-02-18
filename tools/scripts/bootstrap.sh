@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# JAT Bootstrap Installer
-# Usage: curl -sSL https://jat.dev/install | bash
+# SQUAD Bootstrap Installer
+# Usage: curl -sSL https://squad.dev/install | bash
 #
 # This script:
-# 1. Clones JAT to ~/.local/share/jat (XDG standard)
+# 1. Clones SQUAD to ~/.local/share/squad (XDG standard)
 # 2. Runs the full install.sh
 
 set -e
@@ -38,7 +38,7 @@ prompt_choice() {
 }
 
 echo ""
-echo -e "${BOLD}JAT — The World's First Agentic IDE${NC}"
+echo -e "${BOLD}SQUAD — The World's First Agentic IDE${NC}"
 echo ""
 
 # Check for git
@@ -49,7 +49,7 @@ if ! command -v git &> /dev/null; then
 fi
 
 # Determine install location (XDG standard)
-INSTALL_DIR="${JAT_INSTALL_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/jat}"
+INSTALL_DIR="${SQUAD_INSTALL_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/squad}"
 
 # Check for existing installation
 if [ -d "$INSTALL_DIR/.git" ]; then
@@ -66,13 +66,13 @@ if [ -d "$INSTALL_DIR/.git" ]; then
     case "$choice" in
         1)
             echo ""
-            echo -e "${BLUE}Updating JAT...${NC}"
+            echo -e "${BLUE}Updating SQUAD...${NC}"
             cd "$INSTALL_DIR"
 
             # Check for local changes first
             if ! git diff-index --quiet HEAD -- 2>/dev/null; then
                 echo -e "${YELLOW}⚠ Local changes detected. Stashing...${NC}"
-                git stash push -m "jat-bootstrap-autostash" || true
+                git stash push -m "squad-bootstrap-autostash" || true
                 STASHED=1
             fi
 
@@ -105,8 +105,8 @@ if [ -d "$INSTALL_DIR/.git" ]; then
             echo ""
             echo -e "${YELLOW}Removing existing installation...${NC}"
             rm -rf "$INSTALL_DIR"
-            echo -e "${BLUE}Cloning JAT...${NC}"
-            git clone https://github.com/joewinke/jat.git "$INSTALL_DIR"
+            echo -e "${BLUE}Cloning SQUAD...${NC}"
+            git clone https://github.com/joewinke/squad.git "$INSTALL_DIR"
             ;;
         3)
             echo "Cancelled"
@@ -120,10 +120,10 @@ if [ -d "$INSTALL_DIR/.git" ]; then
     esac
 elif [ -d "$INSTALL_DIR" ]; then
     # Directory exists but is NOT a git repo (e.g. whisper data, partial install)
-    echo -e "${YELLOW}Directory exists but is not a JAT git clone: $INSTALL_DIR${NC}"
+    echo -e "${YELLOW}Directory exists but is not a SQUAD git clone: $INSTALL_DIR${NC}"
     echo ""
     echo "Options:"
-    echo "  1) Clone JAT into existing directory (preserves other files)"
+    echo "  1) Clone SQUAD into existing directory (preserves other files)"
     echo "  2) Remove and fresh install"
     echo "  3) Cancel"
     echo ""
@@ -133,24 +133,24 @@ elif [ -d "$INSTALL_DIR" ]; then
     case "$choice" in
         1)
             echo ""
-            echo -e "${BLUE}Cloning JAT into existing directory...${NC}"
+            echo -e "${BLUE}Cloning SQUAD into existing directory...${NC}"
             # Clone to temp, then move .git and files in
             TMPDIR="$(mktemp -d)"
-            git clone https://github.com/joewinke/jat.git "$TMPDIR"
+            git clone https://github.com/joewinke/squad.git "$TMPDIR"
             # Move git history and working tree into existing dir
             mv "$TMPDIR/.git" "$INSTALL_DIR/.git"
             # Checkout files (won't overwrite existing non-tracked files)
             cd "$INSTALL_DIR"
             git checkout -- . 2>/dev/null || true
             rm -rf "$TMPDIR"
-            echo -e "${GREEN}✓ JAT cloned into $INSTALL_DIR${NC}"
+            echo -e "${GREEN}✓ SQUAD cloned into $INSTALL_DIR${NC}"
             ;;
         2)
             echo ""
             echo -e "${YELLOW}Removing existing directory...${NC}"
             rm -rf "$INSTALL_DIR"
-            echo -e "${BLUE}Cloning JAT...${NC}"
-            git clone https://github.com/joewinke/jat.git "$INSTALL_DIR"
+            echo -e "${BLUE}Cloning SQUAD...${NC}"
+            git clone https://github.com/joewinke/squad.git "$INSTALL_DIR"
             ;;
         3)
             echo "Cancelled"
@@ -163,10 +163,10 @@ elif [ -d "$INSTALL_DIR" ]; then
     esac
 else
     # Fresh install
-    echo -e "${BLUE}Installing JAT to: $INSTALL_DIR${NC}"
+    echo -e "${BLUE}Installing SQUAD to: $INSTALL_DIR${NC}"
     echo ""
     mkdir -p "$(dirname "$INSTALL_DIR")"
-    git clone https://github.com/joewinke/jat.git "$INSTALL_DIR"
+    git clone https://github.com/joewinke/squad.git "$INSTALL_DIR"
 fi
 
 # Run the main installer

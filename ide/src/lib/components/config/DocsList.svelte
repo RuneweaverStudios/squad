@@ -231,7 +231,7 @@
 				{searchQuery ? 'No matching documents' : 'No documentation found'}
 			</p>
 			<p class="empty-hint">
-				{searchQuery ? 'Try a different search term' : 'Add .md files to ~/code/jat/shared/'}
+				{searchQuery ? 'Try a different search term' : 'Add .md files to ~/code/squad/shared/'}
 			</p>
 		</div>
 	{:else}

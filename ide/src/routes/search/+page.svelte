@@ -5,7 +5,7 @@
 	 * All search logic (API calls, tabs, synthesis, keyboard nav) lives in
 	 * UnifiedSearch.svelte. This page just fetches projects and passes URL params.
 	 *
-	 * Task: jat-fqaqf (replaces inline search from jat-tvos9.4)
+	 * Task: squad-fqaqf (replaces inline search from squad-tvos9.4)
 	 */
 
 	import { onMount } from 'svelte';

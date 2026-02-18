@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document proposes how to integrate Supabase migration versioning into the JAT IDE, building on the existing Git source control infrastructure. The goal is to provide a seamless experience for managing database migrations alongside Git, using the familiar patterns already established.
+This document proposes how to integrate Supabase migration versioning into the SQUAD IDE, building on the existing Git source control infrastructure. The goal is to provide a seamless experience for managing database migrations alongside Git, using the familiar patterns already established.
 
 ## Current State
 
@@ -429,4 +429,4 @@ Total: ~10-13 tasks (can be parallelized where noted)
 
 - [Supabase CLI Reference](https://supabase.com/docs/reference/cli)
 - [Database Migrations Guide](https://supabase.com/docs/guides/cli/local-development#database-migrations)
-- [JAT IDE Git Integration](./ide/CLAUDE.md) - Existing GitPanel implementation
+- [SQUAD IDE Git Integration](./ide/CLAUDE.md) - Existing GitPanel implementation

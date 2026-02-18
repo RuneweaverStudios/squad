@@ -41,7 +41,7 @@
 		},
 		{
 			title: 'PRD to Tasks',
-			desc: 'Paste a PRD, run /jat:tasktree, get a task tree.',
+			desc: 'Paste a PRD, run /squad:tasktree, get a task tree.',
 			icon: 'tree',
 			color: 'from-emerald-500 to-teal-500',
 			initialX: -300,
@@ -83,17 +83,17 @@
 			color: 'from-[var(--color-primary)] to-cyan-500',
 			tagline: 'All projects. One view.',
 			bullets: ['12 ready tasks', '3 in progress', '2 blocked'],
-			code: `$ jt ready --json
+			code: `$ st ready --json
 [{
-  "id": "jat-7kx2m",
+  "id": "squad-7kx2m",
   "title": "Add OAuth",
   "priority": 1,
   "status": "open"
 }]
 
-$ jt list --project chimaro
-jat-3nf8p [P0] Rate limit
-jat-7kx2m [P1] OAuth flow`
+$ st list --project chimaro
+squad-3nf8p [P0] Rate limit
+squad-7kx2m [P1] OAuth flow`
 		},
 		{
 			title: 'Agent Sessions',
@@ -102,26 +102,26 @@ jat-7kx2m [P1] OAuth flow`
 			bullets: ['4 agents active', '2 awaiting input', '1 completing'],
 			code: `$ am-agents --active
 NAME       STATUS   TASK
-BluePeak   working  jat-3nf8p
+BluePeak   working  squad-3nf8p
 FairMist   idle     -
 
 $ am-whoami
 Agent: BluePeak
 Model: opus-4
-Task: jat-3nf8p`
+Task: squad-3nf8p`
 		},
 		{
 			title: 'Epic Dependencies',
 			color: 'from-emerald-500 to-teal-500',
 			tagline: 'Ship features, not tasks.',
 			bullets: ['Visual dep graph', 'Auto-blocked status', 'Progress tracking'],
-			code: `$ jt dep tree jat-epic
-jat-epic [BLOCKED]
-├── jat-7kx OAuth [READY]
-├── jat-8p Session [OPEN]
-│   └── dep: jat-7kx
-└── jat-9q Tests [OPEN]
-    └── dep: jat-8p
+			code: `$ st dep tree squad-epic
+squad-epic [BLOCKED]
+├── squad-7kx OAuth [READY]
+├── squad-8p Session [OPEN]
+│   └── dep: squad-7kx
+└── squad-9q Tests [OPEN]
+    └── dep: squad-8p
 
 Progress: 0/3`
 		},
@@ -148,12 +148,12 @@ Progress: 0/3`
 			color: 'from-rose-500 to-red-500',
 			tagline: 'AI fills in the details.',
 			bullets: ['Auto-suggest type', 'Smart priority', 'Label inference'],
-			code: `$ jt create "Rate limit" \\
+			code: `$ st create "Rate limit" \\
   --type feature \\
   --priority 0 \\
   --labels api,security
 
-Created: jat-3nf8p
+Created: squad-3nf8p
 
 // AI Suggestions:
 // Type: feature
@@ -201,16 +201,16 @@ Created: jat-3nf8p
 			title: 'PRD → Task Tree',
 			benefit: 'Turn ideas into actionable work in seconds',
 			description: 'Paste a product spec and let AI generate a structured task tree with priorities, dependencies, and assignments.',
-			code: `/jat:tasktree
+			code: `/squad:tasktree
 
 Creating epic: "User Authentication"
-├─ jat-a1: Setup Supabase auth [P0]
-├─ jat-a2: Create login forms [P1]
-│   └─ depends on: jat-a1
-├─ jat-a3: Implement Google OAuth [P1]
-│   └─ depends on: jat-a1
-├─ jat-a4: Build password reset [P2]
-└─ jat-a5: Create profile page [P2]
+├─ squad-a1: Setup Supabase auth [P0]
+├─ squad-a2: Create login forms [P1]
+│   └─ depends on: squad-a1
+├─ squad-a3: Implement Google OAuth [P1]
+│   └─ depends on: squad-a1
+├─ squad-a4: Build password reset [P2]
+└─ squad-a5: Create profile page [P2]
 
 5 tasks created with dependencies`
 		},
@@ -221,12 +221,12 @@ Creating epic: "User Authentication"
 			title: 'Spawn the Swarm',
 			benefit: '40 agents working while you sleep',
 			description: 'One command launches multiple agents across all your projects. They auto-pick ready tasks and start immediately.',
-			code: `jat myproject 4 --auto
+			code: `squad myproject 4 --auto
 
 Spawning 4 agents...
-  BluePeak  → jat-a1 (Setup Supabase)
+  BluePeak  → squad-a1 (Setup Supabase)
   GoldBay   → chimaro-b3 (Fix OAuth)
-  RedMarsh  → jat-c2 (API endpoints)
+  RedMarsh  → squad-c2 (API endpoints)
   FairCove  → other-d1 (Update docs)
 
 4 agents working across 3 projects`
@@ -256,7 +256,7 @@ FairCove: Task complete ✓`
 			title: 'Verified Completion',
 			benefit: 'Work is done right, not just done',
 			description: 'Structured completion verifies tests pass, commits land, and documentation is updated. Then suggests what\'s next.',
-			code: `/jat:complete
+			code: `/squad:complete
 
 Epic "User Authentication" complete!
 
@@ -266,9 +266,9 @@ Files:     34 changed
 Tests:     All passing
 
 Next ready tasks:
-  → jat-b1: Dashboard analytics
-  → jat-b2: Email notifications
-  → jat-b3: Payment integration`
+  → squad-b1: Dashboard analytics
+  → squad-b2: Email notifications
+  → squad-b3: Payment integration`
 		}
 	];
 
@@ -483,7 +483,7 @@ Next ready tasks:
 </script>
 
 <svelte:head>
-	<title>JAT - The World's First Agentic IDE</title>
+	<title>SQUAD - The World's First Agentic IDE</title>
 </svelte:head>
 
 <Nav />
@@ -522,7 +522,7 @@ Next ready tasks:
 				See It In Action
 			</a>
 			<a
-				href="https://twitter.com/intent/tweet?text=Check%20out%20JAT%20%E2%80%94%20the%20world%27s%20first%20Agentic%20IDE.%20Scale%20your%20vibe%20coding%2010x.&url=https%3A%2F%2Fjat.tools&hashtags=JAT,VibeCoding,AgenticIDE"
+				href="https://twitter.com/intent/tweet?text=Check%20out%20SQUAD%20%E2%80%94%20the%20world%27s%20first%20Agentic%20IDE.%20Scale%20your%20vibe%20coding%2010x.&url=https%3A%2F%2Fsquad.tools&hashtags=SQUAD,VibeCoding,AgenticIDE"
 				target="_blank"
 				rel="noopener noreferrer"
 				class="px-6 py-4 rounded-full font-semibold border border-white/20 text-white hover:bg-white/10 transition-all flex items-center gap-2"
@@ -580,7 +580,7 @@ Next ready tasks:
 							<pre class="text-[var(--color-success)]/70 text-[9px] leading-tight font-mono overflow-hidden">{card.code}</pre>
 						</div>
 						<div class="card-back absolute inset-0 rounded-xl bg-gradient-to-br {card.color} p-5 shadow-xl">
-							<div class="text-xs font-mono text-white/60 mb-1">JAT</div>
+							<div class="text-xs font-mono text-white/60 mb-1">SQUAD</div>
 							<div class="text-lg font-bold text-white">{card.title}</div>
 							<div class="mt-3 p-3 rounded bg-black/20 border border-white/10">
 								<div class="text-xs text-white/90 font-medium mb-2">{card.tagline}</div>
@@ -710,7 +710,7 @@ Next ready tasks:
 			style="opacity: {Math.max(0, (chaosProgress - 0.7) / 0.3)}; transform: translateY({(1 - Math.min(1, Math.max(0, (chaosProgress - 0.7) / 0.3))) * 20}px);"
 		>
 			<p class="text-lg text-gray-400">
-				<span class="text-white font-semibold">JAT brings order to the chaos</span> — one IDE to rule them all.
+				<span class="text-white font-semibold">SQUAD brings order to the chaos</span> — one IDE to rule them all.
 			</p>
 		</div>
 	</div>
@@ -741,7 +741,7 @@ Next ready tasks:
 
 		<div class="text-center mb-12">
 			<h2 class="text-3xl md:text-4xl font-bold mb-4">
-				<span class="text-white">JAT is the</span>
+				<span class="text-white">SQUAD is the</span>
 				<span class="text-[var(--color-primary)]">Manual</span>
 			</h2>
 			<p class="text-gray-400 text-lg max-w-2xl mx-auto">
@@ -772,7 +772,7 @@ Next ready tasks:
 					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
 					</svg>
-					WITH JAT /CONFIG
+					WITH SQUAD /CONFIG
 				</h3>
 				<div class="space-y-2 text-sm">
 					{#each [
@@ -846,7 +846,7 @@ Next ready tasks:
 				<span class="text-[var(--color-primary)]">Never Stop Shipping</span>
 			</h2>
 			<p class="text-gray-300 text-lg max-w-2xl mx-auto mb-2">
-				Other tools finish one task and wait. JAT keeps going.
+				Other tools finish one task and wait. SQUAD keeps going.
 			</p>
 			<p class="text-gray-500 max-w-2xl mx-auto">
 				20 agents working in parallel — completed work suggests new work — you supervise, they ship
@@ -931,7 +931,7 @@ Next ready tasks:
 								<div class="w-3 h-3 rounded-full bg-red-500/50"></div>
 								<div class="w-3 h-3 rounded-full bg-yellow-500/50"></div>
 								<div class="w-3 h-3 rounded-full bg-green-500/50"></div>
-								<span class="ml-2 text-xs text-gray-500 font-mono">jat</span>
+								<span class="ml-2 text-xs text-gray-500 font-mono">squad</span>
 							</div>
 							<pre class="p-4 text-sm text-gray-300 font-mono overflow-x-auto leading-relaxed"><code>{tab.code}</code></pre>
 						</div>
@@ -977,7 +977,7 @@ Next ready tasks:
 							<path d="M8 5v14l11-7z"/>
 						</svg>
 					</div>
-					<div class="text-lg font-semibold text-white">JAT IDE</div>
+					<div class="text-lg font-semibold text-white">SQUAD IDE</div>
 					<div class="text-sm text-gray-500 mt-1">Demo video coming soon</div>
 				</div>
 			</div>

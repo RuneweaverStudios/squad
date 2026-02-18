@@ -1,5 +1,5 @@
 /**
- * Performance tracking utilities for the JAT IDE
+ * Performance tracking utilities for the SQUAD IDE
  * Provides timing, metrics collection, and performance monitoring
  */
 

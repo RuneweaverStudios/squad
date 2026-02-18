@@ -2,7 +2,7 @@
  * Agent Configuration Utility
  *
  * Handles reading/writing agent program configurations and routing rules.
- * Storage location: ~/.config/jat/agents.json
+ * Storage location: ~/.config/squad/agents.json
  *
  * This module provides:
  * - CRUD operations for agent programs
@@ -29,7 +29,7 @@ import { createDefaultAgentConfig, isValidAgentId, getAgentModel } from '$lib/ty
 // PATHS
 // =============================================================================
 
-const CONFIG_DIR = join(homedir(), '.config', 'jat');
+const CONFIG_DIR = join(homedir(), '.config', 'squad');
 const AGENTS_CONFIG_FILE = join(CONFIG_DIR, 'agents.json');
 const CREDENTIALS_FILE = join(CONFIG_DIR, 'credentials.json');
 

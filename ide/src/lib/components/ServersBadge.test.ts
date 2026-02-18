@@ -23,9 +23,9 @@ vi.stubGlobal('fetch', mockFetch);
 
 const MOCK_PROJECTS_WITH_PORTS = [
 	{
-		key: 'jat',
-		name: 'jat',
-		path: '/home/jw/code/jat',
+		key: 'squad',
+		name: 'squad',
+		path: '/home/jw/code/squad',
 		port: 5173
 	},
 	{
@@ -42,19 +42,19 @@ const MOCK_PROJECTS_WITH_PORTS = [
 	}
 ];
 
-const MOCK_SPAWN_RESPONSE_JAT = {
+const MOCK_SPAWN_RESPONSE_SQUAD = {
 	session: {
-		sessionName: 'jat-TestAgent',
+		sessionName: 'squad-TestAgent',
 		agentName: 'TestAgent',
 		task: null,
-		project: 'jat',
+		project: 'squad',
 		startedAt: '2025-12-23T10:00:00Z'
 	}
 };
 
 const MOCK_SPAWN_RESPONSE_CHIMARO = {
 	session: {
-		sessionName: 'jat-AnotherAgent',
+		sessionName: 'squad-AnotherAgent',
 		agentName: 'AnotherAgent',
 		task: null,
 		project: 'chimaro',
@@ -64,16 +64,16 @@ const MOCK_SPAWN_RESPONSE_CHIMARO = {
 
 // Session with task ID (should group by task prefix, not session.project)
 const MOCK_SESSION_WITH_TASK = {
-	sessionName: 'jat-BusyAgent',
+	sessionName: 'squad-BusyAgent',
 	agentName: 'BusyAgent',
 	task: { id: 'chimaro-abc', title: 'Fix bug', status: 'in_progress' },
-	project: 'jat', // Even though project says jat, task prefix says chimaro
+	project: 'squad', // Even though project says squad, task prefix says chimaro
 	startedAt: '2025-12-23T10:00:00Z'
 };
 
 // Session without task (should use session.project fallback)
 const MOCK_SESSION_PLANNING = {
-	sessionName: 'jat-PlanningAgent',
+	sessionName: 'squad-PlanningAgent',
 	agentName: 'PlanningAgent',
 	task: null,
 	project: 'jomarchy',
@@ -82,10 +82,10 @@ const MOCK_SESSION_PLANNING = {
 
 // Session with lastCompletedTask (should use task ID prefix)
 const MOCK_SESSION_COMPLETED = {
-	sessionName: 'jat-IdleAgent',
+	sessionName: 'squad-IdleAgent',
 	agentName: 'IdleAgent',
 	task: null,
-	lastCompletedTask: { id: 'jat-xyz', title: 'Done task' },
+	lastCompletedTask: { id: 'squad-xyz', title: 'Done task' },
 	project: 'chimaro', // project field differs from task prefix
 	startedAt: '2025-12-23T10:00:00Z'
 };
@@ -169,10 +169,10 @@ describe('ServersBadge Spawn API Call', () => {
 	it('should call spawn API with correct project key', async () => {
 		mockFetch.mockResolvedValue({
 			ok: true,
-			json: () => Promise.resolve(MOCK_SPAWN_RESPONSE_JAT)
+			json: () => Promise.resolve(MOCK_SPAWN_RESPONSE_SQUAD)
 		});
 
-		await simulateSpawnSession('jat');
+		await simulateSpawnSession('squad');
 
 		expect(mockFetch).toHaveBeenCalledTimes(1);
 		expect(mockFetch).toHaveBeenCalledWith('/api/work/spawn', {
@@ -180,7 +180,7 @@ describe('ServersBadge Spawn API Call', () => {
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				attach: true,
-				project: 'jat'
+				project: 'squad'
 			})
 		});
 	});
@@ -202,7 +202,7 @@ describe('ServersBadge Spawn API Call', () => {
 			ok: true,
 			json: () =>
 				Promise.resolve({
-					session: { sessionName: 'jat-Agent', project: 'unknown-project' }
+					session: { sessionName: 'squad-Agent', project: 'unknown-project' }
 				})
 		});
 
@@ -215,14 +215,14 @@ describe('ServersBadge Spawn API Call', () => {
 	it('should return session with project field set', async () => {
 		mockFetch.mockResolvedValue({
 			ok: true,
-			json: () => Promise.resolve(MOCK_SPAWN_RESPONSE_JAT)
+			json: () => Promise.resolve(MOCK_SPAWN_RESPONSE_SQUAD)
 		});
 
-		const result = await simulateSpawnSession('jat');
+		const result = await simulateSpawnSession('squad');
 
 		expect(result.session).toBeDefined();
-		expect(result.session.project).toBe('jat');
-		expect(result.session.sessionName).toBe('jat-TestAgent');
+		expect(result.session.project).toBe('squad');
+		expect(result.session.sessionName).toBe('squad-TestAgent');
 	});
 });
 
@@ -237,9 +237,9 @@ describe('Session Project Grouping (/work page logic)', () => {
 		const sessions = [MOCK_SESSION_WITH_TASK];
 		const groups = groupSessionsByProject(sessions);
 
-		// Should be grouped under 'chimaro' (from task ID), not 'jat' (from session.project)
+		// Should be grouped under 'chimaro' (from task ID), not 'squad' (from session.project)
 		expect(groups.has('chimaro')).toBe(true);
-		expect(groups.has('jat')).toBe(false);
+		expect(groups.has('squad')).toBe(false);
 		expect(groups.get('chimaro')?.length).toBe(1);
 	});
 
@@ -256,25 +256,25 @@ describe('Session Project Grouping (/work page logic)', () => {
 		const sessions = [MOCK_SESSION_COMPLETED];
 		const groups = groupSessionsByProject(sessions);
 
-		// Should be grouped under 'jat' (from lastCompletedTask ID), not 'chimaro' (from session.project)
-		expect(groups.has('jat')).toBe(true);
+		// Should be grouped under 'squad' (from lastCompletedTask ID), not 'chimaro' (from session.project)
+		expect(groups.has('squad')).toBe(true);
 		expect(groups.has('chimaro')).toBe(false);
-		expect(groups.get('jat')?.length).toBe(1);
+		expect(groups.get('squad')?.length).toBe(1);
 	});
 
 	it('should correctly group multiple sessions by project', () => {
 		const sessions = [
 			MOCK_SESSION_WITH_TASK, // → chimaro (task ID)
 			MOCK_SESSION_PLANNING, // → jomarchy (session.project)
-			MOCK_SESSION_COMPLETED, // → jat (lastCompletedTask ID)
-			{ ...MOCK_SPAWN_RESPONSE_JAT.session }, // → jat (session.project, no task)
+			MOCK_SESSION_COMPLETED, // → squad (lastCompletedTask ID)
+			{ ...MOCK_SPAWN_RESPONSE_SQUAD.session }, // → squad (session.project, no task)
 			{ ...MOCK_SPAWN_RESPONSE_CHIMARO.session } // → chimaro (session.project, no task)
 		];
 		const groups = groupSessionsByProject(sessions);
 
-		expect(groups.size).toBe(3); // jat, chimaro, jomarchy
+		expect(groups.size).toBe(3); // squad, chimaro, jomarchy
 
-		expect(groups.get('jat')?.length).toBe(2); // MOCK_SESSION_COMPLETED + spawn response
+		expect(groups.get('squad')?.length).toBe(2); // MOCK_SESSION_COMPLETED + spawn response
 		expect(groups.get('chimaro')?.length).toBe(2); // MOCK_SESSION_WITH_TASK + spawn response
 		expect(groups.get('jomarchy')?.length).toBe(1); // MOCK_SESSION_PLANNING
 	});
@@ -303,23 +303,23 @@ describe('Session Project Grouping (/work page logic)', () => {
 describe('End-to-End: Spawn Session appears under correct project', () => {
 	beforeEach(resetMocks);
 
-	it('should spawn session for jat project and appear under jat group', async () => {
+	it('should spawn session for squad project and appear under squad group', async () => {
 		// 1. Mock the spawn API response
 		mockFetch.mockResolvedValue({
 			ok: true,
-			json: () => Promise.resolve(MOCK_SPAWN_RESPONSE_JAT)
+			json: () => Promise.resolve(MOCK_SPAWN_RESPONSE_SQUAD)
 		});
 
 		// 2. Simulate spawn
-		const result = await simulateSpawnSession('jat');
+		const result = await simulateSpawnSession('squad');
 
 		// 3. Verify session has correct project
-		expect(result.session.project).toBe('jat');
+		expect(result.session.project).toBe('squad');
 
 		// 4. Verify session groups correctly
 		const groups = groupSessionsByProject([result.session]);
-		expect(groups.has('jat')).toBe(true);
-		expect(groups.get('jat')?.[0].agentName).toBe('TestAgent');
+		expect(groups.has('squad')).toBe(true);
+		expect(groups.get('squad')?.[0].agentName).toBe('TestAgent');
 	});
 
 	it('should spawn session for chimaro project and appear under chimaro group', async () => {
@@ -341,12 +341,12 @@ describe('End-to-End: Spawn Session appears under correct project', () => {
 		// Simulate existing sessions in IDE
 		const existingSessions = [MOCK_SESSION_WITH_TASK, MOCK_SESSION_PLANNING];
 
-		// Spawn new session for jat
+		// Spawn new session for squad
 		mockFetch.mockResolvedValue({
 			ok: true,
-			json: () => Promise.resolve(MOCK_SPAWN_RESPONSE_JAT)
+			json: () => Promise.resolve(MOCK_SPAWN_RESPONSE_SQUAD)
 		});
-		const newSession = await simulateSpawnSession('jat');
+		const newSession = await simulateSpawnSession('squad');
 
 		// Combine existing + new
 		const allSessions = [...existingSessions, newSession.session];
@@ -355,11 +355,11 @@ describe('End-to-End: Spawn Session appears under correct project', () => {
 		// Verify grouping:
 		// - MOCK_SESSION_WITH_TASK → chimaro (task ID)
 		// - MOCK_SESSION_PLANNING → jomarchy (session.project)
-		// - newSession → jat (session.project)
+		// - newSession → squad (session.project)
 		expect(groups.size).toBe(3);
 		expect(groups.get('chimaro')?.length).toBe(1);
 		expect(groups.get('jomarchy')?.length).toBe(1);
-		expect(groups.get('jat')?.length).toBe(1);
+		expect(groups.get('squad')?.length).toBe(1);
 	});
 });
 
@@ -369,7 +369,7 @@ describe('End-to-End: Spawn Session appears under correct project', () => {
 
 describe('getProjectFromTaskId', () => {
 	it('should extract project from standard task ID format', () => {
-		expect(getProjectFromTaskId('jat-abc')).toBe('jat');
+		expect(getProjectFromTaskId('squad-abc')).toBe('squad');
 		expect(getProjectFromTaskId('chimaro-xyz123')).toBe('chimaro');
 		expect(getProjectFromTaskId('jomarchy-1a2b3c')).toBe('jomarchy');
 	});
@@ -383,7 +383,7 @@ describe('getProjectFromTaskId', () => {
 	});
 
 	it('should lowercase project names', () => {
-		expect(getProjectFromTaskId('JAT-ABC')).toBe('jat');
+		expect(getProjectFromTaskId('SQUAD-ABC')).toBe('squad');
 		expect(getProjectFromTaskId('Chimaro-xyz')).toBe('chimaro');
 	});
 

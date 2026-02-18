@@ -3,19 +3,19 @@
  * GET /api/work/[sessionId]/copy - Returns formatted session contents
  *
  * Path params:
- * - sessionId: tmux session name (e.g., "jat-WisePrairie")
+ * - sessionId: tmux session name (e.g., "squad-WisePrairie")
  *
  * Returns a formatted text string containing:
  * - Session name
  * - Agent name (from session name)
- * - Task info (from JAT Tasks, if agent has an assigned task)
+ * - Task info (from SQUAD Tasks, if agent has an assigned task)
  * - Terminal output (stripped of ANSI codes)
  */
 
 import { json } from '@sveltejs/kit';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { getTasks } from '$lib/server/jat-tasks.js';
+import { getTasks } from '$lib/server/squad-tasks.js';
 
 const execAsync = promisify(exec);
 
@@ -54,9 +54,9 @@ export async function GET({ params }) {
 		}
 
 		// Detect session type and extract relevant info
-		// Agent sessions: jat-{AgentName} (e.g., jat-WisePrairie)
-		// Server sessions: {project}-dev or similar (e.g., chimaro-dev, jat-dev)
-		const isAgentSession = sessionId.startsWith('jat-') && !sessionId.endsWith('-dev');
+		// Agent sessions: squad-{AgentName} (e.g., squad-WisePrairie)
+		// Server sessions: {project}-dev or similar (e.g., chimaro-dev, squad-dev)
+		const isAgentSession = sessionId.startsWith('squad-') && !sessionId.endsWith('-dev');
 		const isServerSession = sessionId.endsWith('-dev') || sessionId.includes('-dev-');
 
 		/** @type {string|null} */
@@ -64,8 +64,8 @@ export async function GET({ params }) {
 		let task = null;
 
 		if (isAgentSession) {
-			// Extract agent name from jat-{AgentName}
-			agentName = sessionId.replace(/^jat-/, '');
+			// Extract agent name from squad-{AgentName}
+			agentName = sessionId.replace(/^squad-/, '');
 
 			// Find task assigned to this agent
 			try {

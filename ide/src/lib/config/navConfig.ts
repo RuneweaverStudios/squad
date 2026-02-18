@@ -13,7 +13,7 @@
  *   /automation - Automation rules configuration
  *   /memory   - Memory (agent persistent memory browser and search)
  *   /history  - History (completed task history with streak calendar)
- *   /config   - Config (JAT configuration, includes Projects tab)
+ *   /config   - Config (SQUAD configuration, includes Projects tab)
  *
  * VIEWS (alternative visualizations):
  *   /sessions - Sessions (all tmux sessions: agents, servers, other)

@@ -67,21 +67,21 @@ export function getDimension(providerName, model) {
 
 /**
  * Resolve the API key for a provider.
- * Checks environment variables and jat-secret.
+ * Checks environment variables and squad-secret.
  * @param {string} providerName
  * @returns {string|null}
  */
 export function resolveApiKey(providerName) {
   const provider = getProvider(providerName);
 
-  // Try jat-secret first (IDE-managed keys, more likely to be correct)
+  // Try squad-secret first (IDE-managed keys, more likely to be correct)
   const secretNames = [providerName, ...(provider.secretAliases ?? [])];
   for (const name of secretNames) {
     try {
-      const key = execSync(`jat-secret ${name} 2>/dev/null`, { encoding: 'utf-8' }).trim();
+      const key = execSync(`squad-secret ${name} 2>/dev/null`, { encoding: 'utf-8' }).trim();
       if (key && !key.startsWith('Error') && !key.includes('not found')) return key;
     } catch {
-      // jat-secret not available or no key configured
+      // squad-secret not available or no key configured
     }
   }
 
@@ -109,7 +109,7 @@ export async function embed(texts, providerName, model, apiKey) {
   }
   if (!apiKey) {
     throw new Error(
-      `No API key found for ${provider.name}. Set ${provider.envVar} or configure via jat-secret.`
+      `No API key found for ${provider.name}. Set ${provider.envVar} or configure via squad-secret.`
     );
   }
 

@@ -41,7 +41,7 @@ export type ActionType =
 	| 'send_text'          // Send text to session (like typing)
 	| 'send_keys'          // Send special keys (Enter, Escape, Tab)
 	| 'tmux_command'       // Run arbitrary tmux command
-	| 'signal'             // Emit jat-signal
+	| 'signal'             // Emit squad-signal
 	| 'notify_only'        // Show toast notification only
 	| 'show_question_ui'   // Show custom question UI with options defined in the rule
 	| 'run_command'        // Run a Claude agent slash command
@@ -103,7 +103,7 @@ export interface AutomationAction {
 	 * - signal: The signal type and data (e.g., "working {\"taskId\":\"...\"}")
 	 * - notify_only: The notification message
 	 * - show_question_ui: JSON string of QuestionUIConfig (parsed at runtime)
-	 * - run_command: The slash command to run (e.g., "/jat:complete" or "jat:start")
+	 * - run_command: The slash command to run (e.g., "/squad:complete" or "squad:start")
 	 * - execute_workflow: The workflow ID to execute
 	 */
 	payload: string;

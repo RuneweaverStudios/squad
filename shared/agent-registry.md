@@ -16,8 +16,8 @@ How to use effectively
 1) Register an identity:
    `am-register --name AgentName --program claude-code --model sonnet-4.5`
 2) Declare files when starting a task:
-   `jt update task-id --status in_progress --assignee AgentName --files "src/**/*.ts"`
-3) Files are auto-cleared when the task is closed (`jt close`).
+   `st update task-id --status in_progress --assignee AgentName --files "src/**/*.ts"`
+3) Files are auto-cleared when the task is closed (`st close`).
 
 Common pitfalls
 - "from_agent not registered": always run `am-register` first

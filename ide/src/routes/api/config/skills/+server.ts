@@ -21,7 +21,7 @@ function stripAnsi(str: string): string {
 
 function runSkillsCmd(args: string): { stdout: string; success: boolean; error?: string } {
 	try {
-		const stdout = execSync(`jat-skills ${args} --json`, {
+		const stdout = execSync(`squad-skills ${args} --json`, {
 			encoding: 'utf-8',
 			timeout: 30000,
 			env: { ...process.env, PATH: `${process.env.HOME}/.local/bin:${process.env.PATH}` }
@@ -42,7 +42,7 @@ function parseJson(str: string): any {
 	}
 }
 
-const SKILLS_DIR = join(process.env.HOME || '', '.config/jat/skills');
+const SKILLS_DIR = join(process.env.HOME || '', '.config/squad/skills');
 
 export const GET: RequestHandler = async ({ url }) => {
 	try {

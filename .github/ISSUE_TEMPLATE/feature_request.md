@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest an idea for JAT
+about: Suggest an idea for SQUAD
 title: '[FEATURE] '
 labels: enhancement
 assignees: ''

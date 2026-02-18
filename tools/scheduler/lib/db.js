@@ -1,6 +1,6 @@
 /**
- * Database functions for jat-scheduler.
- * Reads per-project .jat/tasks.db files to find due tasks.
+ * Database functions for squad-scheduler.
+ * Reads per-project .squad/tasks.db files to find due tasks.
  */
 
 import Database from 'better-sqlite3';
@@ -9,19 +9,19 @@ import { join, basename } from 'node:path';
 import { homedir } from 'node:os';
 
 /**
- * Discover all projects with .jat/tasks.db.
+ * Discover all projects with .squad/tasks.db.
  * Checks both ~/code/ directories and projects.json config.
  * @returns {Array<{name: string, path: string, dbPath: string}>}
  */
 export function discoverProjects() {
   const projects = new Map(); // name -> {path, dbPath}
 
-  // 1. Scan ~/code/ for directories with .jat/tasks.db
+  // 1. Scan ~/code/ for directories with .squad/tasks.db
   const codeDir = join(homedir(), 'code');
   if (existsSync(codeDir)) {
     for (const entry of readdirSync(codeDir)) {
       const projPath = join(codeDir, entry);
-      const dbPath = join(projPath, '.jat', 'tasks.db');
+      const dbPath = join(projPath, '.squad', 'tasks.db');
       try {
         if (statSync(projPath).isDirectory() && existsSync(dbPath)) {
           projects.set(entry, { path: projPath, dbPath });
@@ -32,13 +32,13 @@ export function discoverProjects() {
 
   // 2. Also check projects.json for custom paths
   try {
-    const configPath = join(homedir(), '.config/jat/projects.json');
+    const configPath = join(homedir(), '.config/squad/projects.json');
     if (existsSync(configPath)) {
       const config = JSON.parse(readFileSync(configPath, 'utf-8'));
       for (const [key, proj] of Object.entries(config.projects || {})) {
         if (proj.hidden) continue;
         const projPath = (proj.path || '').replace(/^~/, homedir());
-        const dbPath = join(projPath, '.jat', 'tasks.db');
+        const dbPath = join(projPath, '.squad', 'tasks.db');
         if (existsSync(dbPath) && !projects.has(key)) {
           projects.set(key, { path: projPath, dbPath });
         }
@@ -55,7 +55,7 @@ export function discoverProjects() {
 /**
  * Get tasks that are due to run now.
  * Finds tasks where next_run_at <= now AND status = 'open'.
- * @param {string} dbPath - Path to .jat/tasks.db
+ * @param {string} dbPath - Path to .squad/tasks.db
  * @returns {Array<object>}
  */
 export function getDueTasks(dbPath) {
@@ -149,7 +149,7 @@ export function createChildTask(dbPath, parent) {
   try {
     db = new Database(dbPath);
 
-    // Extract project prefix from parent ID (e.g., "jat" from "jat-abc")
+    // Extract project prefix from parent ID (e.g., "squad" from "squad-abc")
     const prefix = parent.id.split('-')[0];
     const childId = `${prefix}-${genId()}`;
     const now = new Date().toISOString();
@@ -165,7 +165,7 @@ export function createChildTask(dbPath, parent) {
       parent.description || '',
       parent.priority,
       parent.issue_type,
-      parent.command || '/jat:start',
+      parent.command || '/squad:start',
       parent.agent_program || null,
       parent.model || null,
       parent.id,

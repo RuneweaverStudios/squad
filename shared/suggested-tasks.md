@@ -25,10 +25,10 @@ Rather than creating tasks immediately, agents signal these discoveries to the I
 │     └─► Notices tech debt, related bugs, improvement opportunities         │
 │                                                                             │
 │  2. Agent includes suggestedTasks in completion signal                      │
-│     └─► jat-signal complete '{"suggestedTasks": [...]}'                    │
+│     └─► squad-signal complete '{"suggestedTasks": [...]}'                    │
 │                                                                             │
 │  3. PostToolUse hook captures signal                                        │
-│     └─► Writes JSON to /tmp/jat-signal-{session}.json                      │
+│     └─► Writes JSON to /tmp/squad-signal-{session}.json                      │
 │                                                                             │
 │  4. IDE SSE server broadcasts completion bundle                       │
 │     └─► session-complete event sent to all connected clients               │
@@ -99,8 +99,8 @@ interface SuggestedTask {
 Include suggested tasks in your completion signal:
 
 ```bash
-jat-signal complete '{
-  "taskId": "jat-abc",
+squad-signal complete '{
+  "taskId": "squad-abc",
   "agentName": "WisePrairie",
   "summary": ["Fixed auth flow", "Added retry logic"],
   "quality": {"tests": "passing", "build": "clean"},
@@ -176,7 +176,7 @@ The IDE renders suggested tasks in an interactive panel with:
 
 **Endpoint:** `POST /api/tasks/bulk`
 
-Creates multiple tasks using the `jt create` command.
+Creates multiple tasks using the `st create` command.
 
 #### Request Format
 
@@ -200,7 +200,7 @@ interface BulkCreateResponse {
 
 interface TaskResult {
   title: string;           // Task title
-  taskId?: string;         // Created task ID (e.g., "jat-abc")
+  taskId?: string;         // Created task ID (e.g., "squad-abc")
   success: boolean;        // Whether creation succeeded
   error?: string;          // Error message if failed
 }
@@ -212,7 +212,7 @@ interface TaskResult {
 curl -X POST http://localhost:3333/api/tasks/bulk \
   -H "Content-Type: application/json" \
   -d '{
-    "project": "jat",
+    "project": "squad",
     "tasks": [
       {
         "type": "feature",
@@ -236,8 +236,8 @@ curl -X POST http://localhost:3333/api/tasks/bulk \
 {
   "success": true,
   "results": [
-    {"title": "Add dark mode toggle", "taskId": "jat-xk9", "success": true},
-    {"title": "Fix login redirect loop", "taskId": "jat-xka", "success": true}
+    {"title": "Add dark mode toggle", "taskId": "squad-xk9", "success": true},
+    {"title": "Fix login redirect loop", "taskId": "squad-xka", "success": true}
   ],
   "created": 2,
   "failed": 0,
@@ -287,11 +287,11 @@ When creating a task manually, click "Auto-suggest" to get AI recommendations:
 ### Files Reference
 
 **Agent Side:**
-- `signal/jat-signal` - Signal command tool
-- `signal/jat-signal-validate` - Signal payload validation
-- `signal/jat-signal-schema.json` - JSON schema for signals
-- `.claude/hooks/post-bash-jat-signal.sh` - PostToolUse hook
-- `commands/jat/complete.md` - Completion workflow documentation
+- `signal/squad-signal` - Signal command tool
+- `signal/squad-signal-validate` - Signal payload validation
+- `signal/squad-signal-schema.json` - JSON schema for signals
+- `.claude/hooks/post-bash-squad-signal.sh` - PostToolUse hook
+- `commands/squad/complete.md` - Completion workflow documentation
 
 **IDE Side:**
 - `ide/src/lib/components/work/SuggestedTasksSection.svelte` - Inline panel UI
@@ -326,7 +326,7 @@ When creating a task manually, click "Auto-suggest" to get AI recommendations:
 
 | Issue | Cause | Fix |
 |-------|-------|-----|
-| Tasks not appearing in IDE | Signal not sent | Check agent sent `jat-signal complete` |
+| Tasks not appearing in IDE | Signal not sent | Check agent sent `squad-signal complete` |
 | SSE not broadcasting | Hook not firing | Verify PostToolUse hook in settings.json |
 | Duplicate task created | Title check failed | Tasks are matched by exact title |
 | Wrong project assigned | Project not specified | Set project in task or request |
@@ -338,8 +338,8 @@ When creating a task manually, click "Auto-suggest" to get AI recommendations:
 # 1. Agent finishes task and discovers follow-up work
 # 2. Agent signals completion with suggested tasks:
 
-jat-signal complete '{
-  "taskId": "jat-xyz",
+squad-signal complete '{
+  "taskId": "squad-xyz",
   "agentName": "CalmMeadow",
   "summary": ["Implemented user authentication", "Added password reset flow"],
   "quality": {"tests": "passing", "build": "clean"},
@@ -366,7 +366,7 @@ jat-signal complete '{
 # 5. Human edits 2FA task priority to P1, adds "security" label
 # 6. Human selects both tasks and clicks "Create Tasks"
 # 7. IDE calls POST /api/tasks/bulk
-# 8. Tasks created: jat-abc (2FA), jat-abd (docs)
+# 8. Tasks created: squad-abc (2FA), squad-abd (docs)
 # 9. Success message shown, tasks appear in task list
 ```
 
@@ -376,26 +376,26 @@ When creating multiple related tasks that should be grouped under an epic:
 
 ```bash
 # 1. Create the epic first
-jt create "Epic: Rich Signals System" --type epic --priority 1
+st create "Epic: Rich Signals System" --type epic --priority 1
 
 # 2. Create child tasks
-jt create "Define signal schema" --type task --priority 1
-jt create "Implement jat-signal command" --type task --priority 1
-jt create "Add PostToolUse hook" --type task --priority 2
+st create "Define signal schema" --type task --priority 1
+st create "Implement squad-signal command" --type task --priority 1
+st create "Add PostToolUse hook" --type task --priority 2
 
 # 3. Link children to epic (USE THE HELPER SCRIPT!)
-# ⚠️ CRITICAL: jt dep add order is easy to get backwards!
-jt-epic-child jat-abc jat-def   # Epic depends on child (correct)
-jt-epic-child jat-abc jat-ghi   # Epic depends on child (correct)
-jt-epic-child jat-abc jat-jkl   # Epic depends on child (correct)
+# ⚠️ CRITICAL: st dep add order is easy to get backwards!
+st-epic-child squad-abc squad-def   # Epic depends on child (correct)
+st-epic-child squad-abc squad-ghi   # Epic depends on child (correct)
+st-epic-child squad-abc squad-jkl   # Epic depends on child (correct)
 
 # ❌ WRONG (creates child blocked by epic):
-# jt dep add jat-def jat-abc   # Child depends on epic - WRONG!
+# st dep add squad-def squad-abc   # Child depends on epic - WRONG!
 ```
 
-**Why `jt-epic-child`?**
-- `jt dep add A B` means "A depends on B" (A is blocked until B completes)
-- Easy to accidentally write `jt dep add child epic` (WRONG direction)
-- `jt-epic-child epic child` always does the right thing
+**Why `st-epic-child`?**
+- `st dep add A B` means "A depends on B" (A is blocked until B completes)
+- Easy to accidentally write `st dep add child epic` (WRONG direction)
+- `st-epic-child epic child` always does the right thing
 
 See `shared/tasks.md` for full epic creation documentation.

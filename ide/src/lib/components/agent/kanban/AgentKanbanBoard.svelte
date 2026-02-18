@@ -47,7 +47,7 @@
 		_sseState?: string;
 		/** Timestamp when WS state was last updated */
 		_sseStateTimestamp?: number;
-		/** Suggested tasks from jat-signal (via WS session-signal event) */
+		/** Suggested tasks from squad-signal (via WS session-signal event) */
 		_signalSuggestedTasks?: Array<{
 			id?: string;
 			type: string;
@@ -61,7 +61,7 @@
 		}>;
 		/** Timestamp when signal suggested tasks were last updated */
 		_signalSuggestedTasksTimestamp?: number;
-		/** Completion bundle from jat-signal complete (via WS session-complete event) */
+		/** Completion bundle from squad-signal complete (via WS session-complete event) */
 		_completionBundle?: {
 			taskId: string;
 			agentName: string;
@@ -165,21 +165,21 @@
 
 		// Find positions using same patterns as WorkCard
 		const needsInputPos = findLastPos([
-			/\[JAT:NEEDS_INPUT\]/,
+			/\[SQUAD:NEEDS_INPUT\]/,
 			/❓\s*NEED CLARIFICATION/,
 			// Claude Code's native question UI patterns
 			/Enter to select.*Tab\/Arrow keys to navigate.*Esc to cancel/,
 			/\[ \].*\n.*\[ \]/, // Multiple checkbox options
 			/Type something\s*\n\s*Next/ // "Type something" option in questions
 		]);
-		const workingPos = findLastPos([/\[JAT:WORKING\s+task=/]);
+		const workingPos = findLastPos([/\[SQUAD:WORKING\s+task=/]);
 		const reviewPos = findLastPos([
-			/\[JAT:NEEDS_REVIEW\]/,
-			/\[JAT:READY\s+actions=/,
+			/\[SQUAD:NEEDS_REVIEW\]/,
+			/\[SQUAD:READY\s+actions=/,
 			/🔍\s*READY FOR REVIEW/
 		]);
-		const completingPos = findLastPos([/jat:complete is running/, /Marking task complete/]);
-		const completedPos = findLastPos([/\[JAT:COMPLETED\]/, /\[JAT:IDLE\]/, /✅\s*TASK COMPLETE/]);
+		const completingPos = findLastPos([/squad:complete is running/, /Marking task complete/]);
+		const completedPos = findLastPos([/\[SQUAD:COMPLETED\]/, /\[SQUAD:IDLE\]/, /✅\s*TASK COMPLETE/]);
 
 		if (session.task) {
 			const positions = [

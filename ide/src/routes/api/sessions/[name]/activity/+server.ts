@@ -3,7 +3,7 @@
  *
  * GET /api/sessions/[name]/activity
  *   Returns the current activity state for a session (from monitor-output.sh)
- *   Activity file: /tmp/jat-activity-{sessionName}.json
+ *   Activity file: /tmp/squad-activity-{sessionName}.json
  *
  * Activity States:
  *   - generating: Agent is actively outputting text (output growing)
@@ -31,7 +31,7 @@ export const GET: RequestHandler = async ({ params }) => {
 	}
 
 	// Activity file is keyed by tmux session name
-	const activityFile = `/tmp/jat-activity-${sessionName}.json`;
+	const activityFile = `/tmp/squad-activity-${sessionName}.json`;
 
 	if (!existsSync(activityFile)) {
 		// No activity file = no monitor running = idle

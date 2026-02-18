@@ -6,7 +6,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, extname } from 'node:path';
 import * as logger from '../../lib/logger.js';
 
-const ATTACH_BASE = join(process.env.HOME, '.local/share/jat/ingest-files');
+const ATTACH_BASE = join(process.env.HOME, '.local/share/squad/ingest-files');
 
 /** @type {import('../base.js').PluginMetadata} */
 export const metadata = {
@@ -26,7 +26,7 @@ export const metadata = {
       label: 'App Password Secret',
       type: 'secret',
       required: true,
-      helpText: 'Name of the secret containing the Gmail App Password (stored in jat-secret)'
+      helpText: 'Name of the secret containing the Gmail App Password (stored in squad-secret)'
     },
     {
       key: 'imapUser',
@@ -41,7 +41,7 @@ export const metadata = {
       label: 'Gmail Label',
       type: 'string',
       required: true,
-      placeholder: 'JAT',
+      placeholder: 'SQUAD',
       helpText: 'Gmail label (folder) to monitor for new emails'
     },
     {
@@ -81,13 +81,13 @@ export default class GmailAdapter extends BaseAdapter {
 
   validate(source) {
     if (!source.secretName) {
-      return { valid: false, error: 'secretName is required (Gmail App Password stored in jat-secret)' };
+      return { valid: false, error: 'secretName is required (Gmail App Password stored in squad-secret)' };
     }
     if (!source.imapUser) {
       return { valid: false, error: 'imapUser is required (Gmail email address)' };
     }
     if (!source.folder) {
-      return { valid: false, error: 'folder is required (Gmail label name, e.g. "JAT" or "Tasks")' };
+      return { valid: false, error: 'folder is required (Gmail label name, e.g. "SQUAD" or "Tasks")' };
     }
     return { valid: true };
   }

@@ -1,18 +1,18 @@
 # Architecture
 
-JAT is built on two distinct layers. The first layer works with any CLI agent without modification. The second layer requires agents to participate in a coordination protocol. You can use either layer independently, but they work best together.
+SQUAD is built on two distinct layers. The first layer works with any CLI agent without modification. The second layer requires agents to participate in a coordination protocol. You can use either layer independently, but they work best together.
 
 ## Two-layer design
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                                                                     │
-│   LAYER 2: Agent Orchestration (JAT-specific)                      │
+│   LAYER 2: Agent Orchestration (SQUAD-specific)                      │
 │   ┌─────────────────────────────────────────────────────────────┐  │
 │   │  Agent Registry (identity)                                    │  │
-│   │  JAT Tasks (task management)                                     │  │
+│   │  SQUAD Tasks (task management)                                     │  │
 │   │  CLAUDE.md (agent instructions)                              │  │
-│   │  Workflow commands (/jat:start, /jat:complete)              │  │
+│   │  Workflow commands (/squad:start, /squad:complete)              │  │
 │   └─────────────────────────────────────────────────────────────┘  │
 │                              ^                                      │
 │                              | built on                             │
@@ -62,7 +62,7 @@ When an agent calls the `AskUserQuestion` tool, here is what happens:
 3. IDE polls the API endpoint, finds the question file
 4. IDE renders clickable buttons in the browser
 5. User clicks a button
-6. IDE sends the answer via `tmux send-keys -t "jat-AgentName" "2" Enter`
+6. IDE sends the answer via `tmux send-keys -t "squad-AgentName" "2" Enter`
 7. Agent receives the input and continues working
 8. IDE deletes the temp file
 
@@ -80,15 +80,15 @@ The agent never knew it was talking to a web UI. It just asked a question and go
 
 ## Layer 2: Explicit coordination
 
-The agent actively participates in the system. It reads `CLAUDE.md` for instructions, uses the Agent Registry for identity, and follows JAT Tasks for task management.
+The agent actively participates in the system. It reads `CLAUDE.md` for instructions, uses the Agent Registry for identity, and follows SQUAD Tasks for task management.
 
 ### Components
 
-**Agent Registry** is a coordination layer built on SQLite (`~/.agent-mail.db`). Agents register identities and look up other active agents. Core tools: `am-register`, `am-whoami`, `am-agents`. Cross-session context is handled by agent memory (`.jat/memory/`).
+**Agent Registry** is a coordination layer built on SQLite (`~/.agent-mail.db`). Agents register identities and look up other active agents. Core tools: `am-register`, `am-whoami`, `am-agents`. Cross-session context is handled by agent memory (`.squad/memory/`).
 
-**JAT Tasks** is a dependency-aware task database. Each project has a `.jat/` directory with a SQLite database. The `jt` CLI handles task creation, status updates, dependency tracking, and priority-based work selection.
+**SQUAD Tasks** is a dependency-aware task database. Each project has a `.squad/` directory with a SQLite database. The `st` CLI handles task creation, status updates, dependency tracking, and priority-based work selection.
 
-**Workflow commands** (`/jat:start`, `/jat:complete`, `/jat:pause`) are JAT-specific slash commands that handle the full lifecycle: registration, memory search, task selection, file declarations, status signals, and completion protocols.
+**Workflow commands** (`/squad:start`, `/squad:complete`, `/squad:pause`) are SQUAD-specific slash commands that handle the full lifecycle: registration, memory search, task selection, file declarations, status signals, and completion protocols.
 
 **Signals** are JSON payloads that agents emit at state transitions (`starting`, `working`, `needs_input`, `review`, `completing`, `complete`). The IDE reads these signals to display accurate session state.
 
@@ -96,12 +96,12 @@ The agent actively participates in the system. It reads `CLAUDE.md` for instruct
 
 ```bash
 # 1. Agent starts, registers, and declares files
-/jat:start myproject-abc
+/squad:start myproject-abc
 
 # 2. Agent works on the task...
 
 # 3. Agent completes
-/jat:complete
+/squad:complete
 # --> commits, closes task, clears file declarations
 ```
 
@@ -118,7 +118,7 @@ The agent actively participates in the system. It reads `CLAUDE.md` for instruct
 | Layer | Files |
 |-------|-------|
 | Layer 1 | `.claude/hooks/`, `.claude/settings.json`, `/tmp/claude-question-*.json`, `ide/src/routes/api/sessions/` |
-| Layer 2 | `CLAUDE.md`, `shared/*.md`, `tools/agents/`, `commands/jat/`, `.jat/` |
+| Layer 2 | `CLAUDE.md`, `shared/*.md`, `tools/agents/`, `commands/squad/`, `.squad/` |
 
 ## Next steps
 

@@ -127,7 +127,7 @@ export const SHELL_PROMPT_PATTERNS = [
 	' on ',             // starship/powerline "dir on branch" format
 	'master [',         // git branch indicators
 	'main [',           // git branch indicators
-	'jat on',           // specific to this user's prompt
+	'squad on',           // specific to this user's prompt
 	'No such file or directory'  // bash error when command not found
 ];
 

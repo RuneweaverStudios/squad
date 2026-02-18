@@ -3,11 +3,11 @@
  *
  * GET /api/tasks/{id}/logs - Returns session logs related to a task
  *
- * Searches .jat/logs/ for log files that contain the task ID.
+ * Searches .squad/logs/ for log files that contain the task ID.
  * Task ID is detected via:
- * - [JAT:WORKING task=X] markers
- * - [JAT:READY ...] markers after task work
- * - jt update/show commands referencing the task
+ * - [SQUAD:WORKING task=X] markers
+ * - [SQUAD:READY ...] markers after task work
+ * - st update/show commands referencing the task
  * - Git commit messages with task ID
  */
 
@@ -26,7 +26,7 @@ export async function GET({ params }) {
 	try {
 		// Get the project root (parent of ide)
 		const projectRoot = resolve(process.cwd(), '..');
-		const logsDir = join(projectRoot, '.jat', 'logs');
+		const logsDir = join(projectRoot, '.squad', 'logs');
 
 		// Check if logs directory exists
 		let logFiles = [];
@@ -77,15 +77,15 @@ export async function GET({ params }) {
 				// Look for various patterns where task ID appears
 				// IMPORTANT: All patterns must include the full task ID to avoid false positives
 				const patterns = [
-					// JAT markers (must include task ID)
-					`[JAT:WORKING task=${id}]`,
-					`[JAT:READY task=${id}]`,
-					`[JAT:NEEDS_REVIEW task=${id}]`,
-					`[JAT:COMPLETED task=${id}]`,
-					// JAT commands
-					`jt show ${id}`,
-					`jt update ${id}`,
-					`jt close ${id}`,
+					// SQUAD markers (must include task ID)
+					`[SQUAD:WORKING task=${id}]`,
+					`[SQUAD:READY task=${id}]`,
+					`[SQUAD:NEEDS_REVIEW task=${id}]`,
+					`[SQUAD:COMPLETED task=${id}]`,
+					// SQUAD commands
+					`st show ${id}`,
+					`st update ${id}`,
+					`st close ${id}`,
 					// Task references in text (with task ID)
 					`task: ${id}`,
 					`Task: ${id}`,
@@ -103,7 +103,7 @@ export async function GET({ params }) {
 				if (containsTask) {
 					// Extract agent name from filename or content
 					// Filename format: session-{session-name}-{timestamp}.log
-					// or: session-jat-{AgentName}-{timestamp}.log
+					// or: session-squad-{AgentName}-{timestamp}.log
 					let agentName = extractAgentFromFilename(logFile);
 					if (!agentName) {
 						agentName = extractAgentFromContent(content);
@@ -158,13 +158,13 @@ export async function GET({ params }) {
 
 /**
  * Extract agent name from log filename
- * Format: session-jat-{AgentName}-{timestamp}.log
+ * Format: session-squad-{AgentName}-{timestamp}.log
  * @param {string} filename
  * @returns {string|null}
  */
 function extractAgentFromFilename(filename) {
-	// Pattern: session-jat-AgentName-20251129-123456.log
-	const match = filename.match(/session-jat-([A-Z][a-zA-Z]+)-\d{8}/);
+	// Pattern: session-squad-AgentName-20251129-123456.log
+	const match = filename.match(/session-squad-([A-Z][a-zA-Z]+)-\d{8}/);
 	if (match) {
 		return match[1];
 	}
@@ -183,7 +183,7 @@ function extractAgentFromContent(content) {
 		/Agent: ([A-Z][a-zA-Z]+)/,
 		/agent_name[=:]?\s*"?([A-Z][a-zA-Z]+)"?/,
 		/am-register.*--name[= ]"?([A-Z][a-zA-Z]+)"?/,
-		/\[JAT:.*\].*([A-Z][a-zA-Z]+)/
+		/\[SQUAD:.*\].*([A-Z][a-zA-Z]+)/
 	];
 
 	for (const pattern of patterns) {

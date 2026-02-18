@@ -319,7 +319,7 @@ export const AUTOMATION_PRESETS: AutomationPreset[] = [
 		id: 'preset-auto-pause-after-reply',
 		name: 'Auto-Pause After Reply',
 		description:
-			'Pause the agent session after it sends a reply via jat-signal, enabling conversational resume when the user responds',
+			'Pause the agent session after it sends a reply via squad-signal, enabling conversational resume when the user responds',
 		category: 'prompt',
 		rule: {
 			name: 'Auto-Pause After Reply',
@@ -328,7 +328,7 @@ export const AUTOMATION_PRESETS: AutomationPreset[] = [
 			enabled: true,
 			patterns: [
 				{
-					pattern: 'jat-signal reply',
+					pattern: 'squad-signal reply',
 					mode: 'contains',
 					caseSensitive: false
 				}
@@ -340,7 +340,7 @@ export const AUTOMATION_PRESETS: AutomationPreset[] = [
 				},
 				{
 					type: 'send_text',
-					payload: '/jat:pause',
+					payload: '/squad:pause',
 					delay: 3000
 				}
 			],
@@ -398,7 +398,7 @@ export const AUTOMATION_PRESETS: AutomationPreset[] = [
 			enabled: true,
 			patterns: [
 				{
-					pattern: '✓ Task.*completed|jat-signal.*completed|Task closed successfully',
+					pattern: '✓ Task.*completed|squad-signal.*completed|Task closed successfully',
 					mode: 'regex',
 					caseSensitive: false
 				}

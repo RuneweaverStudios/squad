@@ -19,20 +19,20 @@ import { tmpdir } from 'os';
 
 const execAsync = promisify(exec);
 
-// Whisper configuration - check jat path first, then fallback to chezwizper
-const JAT_WHISPER_PATH = `${process.env.HOME}/.local/share/jat/whisper`;
+// Whisper configuration - check squad path first, then fallback to chezwizper
+const SQUAD_WHISPER_PATH = `${process.env.HOME}/.local/share/squad/whisper`;
 const CHEZWIZPER_WHISPER_PATH = `${process.env.HOME}/.local/share/chezwizper/whisper`;
 
-// Use jat installation if available, otherwise fall back to chezwizper
-const WHISPER_PATH = existsSync(`${JAT_WHISPER_PATH}/build/bin/whisper-cli`)
-	? JAT_WHISPER_PATH
+// Use squad installation if available, otherwise fall back to chezwizper
+const WHISPER_PATH = existsSync(`${SQUAD_WHISPER_PATH}/build/bin/whisper-cli`)
+	? SQUAD_WHISPER_PATH
 	: CHEZWIZPER_WHISPER_PATH;
 
 const WHISPER_CLI = `${WHISPER_PATH}/build/bin/whisper-cli`;
 const WHISPER_MODEL = `${WHISPER_PATH}/models/ggml-large-v3-turbo-q5_1.bin`;
 
 // Temp directory for audio files
-const TEMP_DIR = join(tmpdir(), 'jat-transcribe');
+const TEMP_DIR = join(tmpdir(), 'squad-transcribe');
 
 /** @type {import('./$types').RequestHandler} */
 export async function POST({ request }) {

@@ -21,7 +21,7 @@
  * ```
  *
  * @see ide/src/lib/components/config/CommandEditor.svelte
- * @see commands/jat/ for example implementations
+ * @see commands/squad/ for example implementations
  */
 
 /**
@@ -212,7 +212,7 @@ tags:
 /**
  * Workflow Template
  *
- * Step-by-step implementation pattern like /jat:start.
+ * Step-by-step implementation pattern like /squad:start.
  * Includes implementation sections with bash code blocks.
  */
 const workflowTemplate: CommandTemplate = {
@@ -484,13 +484,13 @@ fi
 /**
  * Agent Command Template
  *
- * Template for agent coordination commands (like /jat:start, /jat:complete).
- * Includes signal emissions, Agent Mail integration, and JAT Tasks coordination.
+ * Template for agent coordination commands (like /squad:start, /squad:complete).
+ * Includes signal emissions, Agent Mail integration, and SQUAD Tasks coordination.
  */
 const agentTemplate: CommandTemplate = {
 	id: 'agent',
 	name: 'Agent',
-	description: 'Agent coordination with signals, mail, and JAT Tasks',
+	description: 'Agent coordination with signals, mail, and SQUAD Tasks',
 	icon: '🤖',
 	category: 'commands',
 	useCase: 'Agent workflow commands, coordination, task management',
@@ -527,7 +527,7 @@ argument-hint: [task-id]
 2. **Validate State** - Ensure preconditions are met
 3. **Perform Action** - Main operation
 4. **Emit Signal** - Update IDE state
-5. **Coordinate** - Update JAT Tasks, send messages
+5. **Coordinate** - Update SQUAD Tasks, send messages
 
 ---
 
@@ -539,7 +539,7 @@ argument-hint: [task-id]
 # Check if we have an active agent
 AGENT_FILE=".claude/sessions/agent-\${SESSION_ID}.txt"
 if [[ ! -f "$AGENT_FILE" ]]; then
-  echo "Error: No agent registered. Run /jat:start first."
+  echo "Error: No agent registered. Run /squad:start first."
   exit 1
 fi
 
@@ -561,7 +561,7 @@ AGENT_NAME=$(cat "$AGENT_FILE")
 **Update IDE state via signal system.**
 
 \`\`\`bash
-jat-signal working '{"taskId":"task-id","taskTitle":"Task title"}'
+squad-signal working '{"taskId":"task-id","taskTitle":"Task title"}'
 \`\`\`
 
 Available signals:
@@ -579,7 +579,7 @@ Available signals:
 
 \`\`\`bash
 # Update task, declare files, and assign
-jt update task-id --status in_progress --assignee "$AGENT_NAME" --files "src/**/*.ts"
+st update task-id --status in_progress --assignee "$AGENT_NAME" --files "src/**/*.ts"
 \`\`\`
 
 ---
@@ -605,12 +605,12 @@ jt update task-id --status in_progress --assignee "$AGENT_NAME" --files "src/**/
 
 **No agent registered:**
 \`\`\`
-Error: No agent registered. Run /jat:start first.
+Error: No agent registered. Run /squad:start first.
 \`\`\`
 
 **Task not found:**
 \`\`\`
-Error: Task 'task-id' not found in JAT.
+Error: Task 'task-id' not found in SQUAD.
 \`\`\`
 
 ---
@@ -619,9 +619,9 @@ Error: Task 'task-id' not found in JAT.
 
 | Command | Purpose |
 |---------|---------|
-| \`/jat:start\` | Begin working |
-| \`/jat:complete\` | Finish task |
-| \`/jat:status\` | Check current state |
+| \`/squad:start\` | Begin working |
+| \`/squad:complete\` | Finish task |
+| \`/squad:status\` | Check current state |
 `
 };
 
@@ -1356,7 +1356,7 @@ if [[ -z "$TMUX_SESSION" ]]; then
     AGENT_FILE=".claude/sessions/agent-\${SESSION_ID}.txt"
     if [[ -f "$AGENT_FILE" ]]; then
         AGENT_NAME=$(cat "$AGENT_FILE" 2>/dev/null | tr -d '\\n')
-        TMUX_SESSION="jat-\${AGENT_NAME}"
+        TMUX_SESSION="squad-\${AGENT_NAME}"
     fi
 fi
 

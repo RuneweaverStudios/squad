@@ -508,7 +508,7 @@ export async function spawnNextAgent(): Promise<SpawnResult | null> {
  * - Auto-generating unique agent names
  * - Registering agents in Agent Mail database
  * - Detecting project from task ID prefix
- * - Assigning tasks to agents in JAT
+ * - Assigning tasks to agents in SQUAD
  *
  * @param taskId - The task ID to assign to the agent
  * @returns Spawn result
@@ -956,9 +956,9 @@ export function clearSpawnError(): void {
 
 /**
  * Refresh epic children status from the API
- * Call this to sync the store with actual jat database state
+ * Call this to sync the store with actual squad database state
  *
- * Also checks if the epic itself was closed externally (e.g., via /jat:complete)
+ * Also checks if the epic itself was closed externally (e.g., via /squad:complete)
  * and stops the swarm if so.
  */
 export async function refreshEpicState(): Promise<void> {
@@ -971,7 +971,7 @@ export async function refreshEpicState(): Promise<void> {
 		const data = await response.json();
 
 		// Check if the epic itself was closed externally
-		// This happens when an agent runs /jat:complete on the epic task
+		// This happens when an agent runs /squad:complete on the epic task
 		if (data.epicStatus === 'closed') {
 			console.log(`[epicQueueStore] Epic ${state.epicId} was closed externally, stopping swarm`);
 			stopEpic();
@@ -995,7 +995,7 @@ export async function refreshEpicState(): Promise<void> {
 		state.children = state.children.map((child) => {
 			const apiChild = apiChildren.get(child.id);
 			if (apiChild) {
-				// Map JAT task status to our ChildStatus
+				// Map SQUAD task status to our ChildStatus
 				let newStatus: ChildStatus = child.status;
 				if (apiChild.status === 'closed') {
 					newStatus = 'completed';

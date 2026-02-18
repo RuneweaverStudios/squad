@@ -23,7 +23,7 @@ export interface FlywheelStageTokens {
   num: number;
   id: string;           // Machine ID: 'plan', 'tasktree', 'swarm', etc.
   title: string;        // Display title: 'PLAN', 'TASKTREE', etc.
-  desc: string;         // Short description: 'Idea → PRD', '/jat:tasktree', etc.
+  desc: string;         // Short description: 'Idea → PRD', '/squad:tasktree', etc.
 
   // Signal mapping (null for pre/post signal stages)
   signalState: string | null;
@@ -72,7 +72,7 @@ export const FLYWHEEL_STAGES: FlywheelStageTokens[] = [
     num: 2,
     id: 'tasktree',
     title: 'TASKTREE',
-    desc: '/jat:tasktree',
+    desc: '/squad:tasktree',
     signalState: null,  // Pre-signal: task creation
     colors: {
       primary: 'oklch(0.72 0.16 195)',      // Cyan
@@ -162,7 +162,7 @@ export const FLYWHEEL_STAGES: FlywheelStageTokens[] = [
     num: 7,
     id: 'complete',
     title: 'COMPLETE',
-    desc: '/jat:complete',
+    desc: '/squad:complete',
     signalState: 'completing',
     colors: {
       primary: 'oklch(0.70 0.20 145)',      // Green (completion)

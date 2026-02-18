@@ -5,7 +5,7 @@
  *
  * Path format: /api/commands/{namespace}/{name}
  * Examples:
- *   - /api/commands/jat/start → ~/.claude/commands/jat/start.md
+ *   - /api/commands/squad/start → ~/.claude/commands/squad/start.md
  *   - /api/commands/local/prune-resume → .claude/commands/prune-resume.md
  *
  * Security:
@@ -22,7 +22,7 @@ import type { RequestHandler } from './$types';
 import { parseCommandFrontmatter } from '$lib/utils/commandFrontmatter';
 
 // Regex patterns for validation
-// Namespace: alphanumeric, hyphens, underscores (e.g., "jat", "my-project", "local")
+// Namespace: alphanumeric, hyphens, underscores (e.g., "squad", "my-project", "local")
 const NAMESPACE_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
 
 // Command name: alphanumeric, hyphens, underscores (e.g., "start", "complete", "prune-resume")
@@ -79,7 +79,7 @@ function resolveCommandPath(namespace: string, name: string, projectPath: string
 
 /**
  * Parse path segments from URL
- * Expected: namespace/name (e.g., "jat/start" or "local/prune-resume")
+ * Expected: namespace/name (e.g., "squad/start" or "local/prune-resume")
  */
 function parsePathSegments(path: string): { namespace: string; name: string } | null {
 	const segments = path.split('/').filter((s) => s.length > 0);
@@ -110,7 +110,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
 	if (!parsed) {
 		throw error(
 			400,
-			'Invalid path format. Expected: /api/commands/{namespace}/{name} (e.g., /api/commands/jat/start)'
+			'Invalid path format. Expected: /api/commands/{namespace}/{name} (e.g., /api/commands/squad/start)'
 		);
 	}
 
@@ -171,7 +171,7 @@ export const PUT: RequestHandler = async ({ params, url, request }) => {
 	if (!parsed) {
 		throw error(
 			400,
-			'Invalid path format. Expected: /api/commands/{namespace}/{name} (e.g., /api/commands/jat/start)'
+			'Invalid path format. Expected: /api/commands/{namespace}/{name} (e.g., /api/commands/squad/start)'
 		);
 	}
 
@@ -248,7 +248,7 @@ export const DELETE: RequestHandler = async ({ params, url }) => {
 	if (!parsed) {
 		throw error(
 			400,
-			'Invalid path format. Expected: /api/commands/{namespace}/{name} (e.g., /api/commands/jat/start)'
+			'Invalid path format. Expected: /api/commands/{namespace}/{name} (e.g., /api/commands/squad/start)'
 		);
 	}
 

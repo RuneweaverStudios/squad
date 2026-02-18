@@ -184,7 +184,7 @@ export const filePreviewDrawerLine = writable<number | null>(null);
 /**
  * Open the file preview drawer for a specific file
  * @param filePath - Path to the file (relative to project root)
- * @param projectName - Project name (e.g., 'jat', 'chimaro')
+ * @param projectName - Project name (e.g., 'squad', 'chimaro')
  * @param lineNumber - Optional line number to scroll to
  */
 export function openFilePreviewDrawer(filePath: string, projectName: string, lineNumber?: number) {
@@ -226,7 +226,7 @@ export const diffPreviewDrawerCommitHash = writable<string | null>(null);
 /**
  * Open the diff preview drawer for a specific file
  * @param filePath - Path to the file (relative to project root)
- * @param projectName - Project name (e.g., 'jat', 'chimaro')
+ * @param projectName - Project name (e.g., 'squad', 'chimaro')
  * @param isStaged - Whether to show staged diff (true) or unstaged diff (false)
  */
 export function openDiffPreviewDrawer(filePath: string, projectName: string, isStaged: boolean = false) {
@@ -240,7 +240,7 @@ export function openDiffPreviewDrawer(filePath: string, projectName: string, isS
 /**
  * Open the diff preview drawer for a specific file in a commit
  * @param filePath - Path to the file (relative to project root)
- * @param projectName - Project name (e.g., 'jat', 'chimaro')
+ * @param projectName - Project name (e.g., 'squad', 'chimaro')
  * @param commitHash - Full or short commit hash
  */
 export function openCommitDiffDrawer(filePath: string, projectName: string, commitHash: string) {

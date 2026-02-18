@@ -138,7 +138,7 @@
 	// Help modal
 	let showHelpModal = $state(false);
 
-	// Update JAT state
+	// Update SQUAD state
 	let isUpdating = $state(false);
 
 	// Keyboard icon path
@@ -360,11 +360,11 @@
 		isUpdating = true;
 
 		try {
-			const response = await fetch('/api/jat/update', { method: 'POST' });
+			const response = await fetch('/api/squad/update', { method: 'POST' });
 			const data = await response.json();
 
 			if (response.ok && data.success) {
-				successToast(data.message || 'JAT updated successfully!', data.details?.gitPull);
+				successToast(data.message || 'SQUAD updated successfully!', data.details?.gitPull);
 			} else {
 				errorToast(data.error || 'Update failed');
 			}
@@ -922,7 +922,7 @@
 					onclick={handleEpicAutoCloseToggle}
 					class="flex items-center gap-2 w-full px-2 py-1.5 rounded transition-colors {epicAutoClose ? 'bg-success/20' : ''}"
 					title={epicAutoClose
-						? 'Automatically close the epic in JAT when all children complete'
+						? 'Automatically close the epic in SQUAD when all children complete'
 						: 'Keep epic open even when all children complete'}
 				>
 					<span

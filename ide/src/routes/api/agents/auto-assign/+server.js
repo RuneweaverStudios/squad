@@ -29,13 +29,13 @@ export async function POST({ request }) {
 			priorityThreshold = 4
 		} = body;
 
-		// Get ready tasks from JAT
+		// Get ready tasks from SQUAD
 		let readyTasks = [];
 		try {
-			const { stdout } = await execAsync('jt ready --json');
+			const { stdout } = await execAsync('st ready --json');
 			readyTasks = JSON.parse(stdout);
 		} catch {
-			// No ready tasks or jt not available
+			// No ready tasks or st not available
 			readyTasks = [];
 		}
 
@@ -66,7 +66,7 @@ export async function POST({ request }) {
 		// Get agents currently working on tasks
 		let busyAgents = new Set();
 		try {
-			const { stdout } = await execAsync('jt list --json');
+			const { stdout } = await execAsync('st list --json');
 			const allTasks = JSON.parse(stdout);
 			const inProgressTasks = allTasks.filter((/** @type {{ status?: string }} */ t) =>
 				t.status === 'in_progress'
@@ -117,7 +117,7 @@ export async function POST({ request }) {
 			} else {
 				// Actually assign the task
 				try {
-					await execAsync(`jt update "${task.id}" --assignee "${agent}" --status in_progress`);
+					await execAsync(`st update "${task.id}" --assignee "${agent}" --status in_progress`);
 					assignments.push({
 						taskId: task.id,
 						taskTitle: task.title,

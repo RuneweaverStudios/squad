@@ -195,7 +195,7 @@
 			</label>
 			<input
 				class="input input-sm input-bordered w-full font-mono text-sm"
-				placeholder="jat-abc, jat-def"
+				placeholder="squad-abc, squad-def"
 				bind:value={depsInput}
 			/>
 		</div>

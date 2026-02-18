@@ -25,7 +25,7 @@ export const metadata = {
       label: 'Credentials Secret',
       type: 'secret',
       required: true,
-      helpText: 'Name of the secret containing the service account JSON key (stored in jat-secret). Value can be JSON content or a file path.'
+      helpText: 'Name of the secret containing the service account JSON key (stored in squad-secret). Value can be JSON content or a file path.'
     },
     {
       key: 'spaceIds',

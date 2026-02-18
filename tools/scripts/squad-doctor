@@ -1,0 +1,129 @@
+#!/bin/bash
+# squad-doctor - Diagnose squad installation health
+# Run this when squad features aren't working
+
+set -euo pipefail
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+NC='\033[0m' # No Color
+
+pass() { echo -e "${GREEN}✓${NC} $1"; }
+fail() { echo -e "${RED}✗${NC} $1"; ISSUES+=("$1"); }
+warn() { echo -e "${YELLOW}⚠${NC} $1"; }
+
+ISSUES=()
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  squad Doctor Report"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# Find SQUAD installation directory
+SQUAD_DIR=""
+if [[ -n "${SQUAD_INSTALL_DIR:-}" ]] && [[ -d "$SQUAD_INSTALL_DIR" ]]; then
+    SQUAD_DIR="$SQUAD_INSTALL_DIR"
+elif [[ -d "${XDG_DATA_HOME:-$HOME/.local/share}/squad" ]]; then
+    SQUAD_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/squad"
+elif [[ -f "$HOME/.config/squad/projects.json" ]]; then
+    _squad_path=$(jq -r '.projects.squad.path // empty' "$HOME/.config/squad/projects.json" 2>/dev/null | sed "s|^~|$HOME|g")
+    [[ -n "$_squad_path" ]] && [[ -d "$_squad_path" ]] && SQUAD_DIR="$_squad_path"
+fi
+
+# 1. Check squad repo
+if [[ -n "$SQUAD_DIR" ]] && [[ -d "$SQUAD_DIR" ]]; then
+    pass "squad repo exists ($SQUAD_DIR)"
+else
+    fail "squad repo missing - set \$SQUAD_INSTALL_DIR or add squad to ~/.config/squad/projects.json"
+fi
+
+# 2. Check shared docs
+if [[ -n "$SQUAD_DIR" ]]; then
+    SHARED_COUNT=$(ls "$SQUAD_DIR/shared/"*.md 2>/dev/null | wc -l)
+    if [[ $SHARED_COUNT -ge 10 ]]; then
+        pass "$SHARED_COUNT shared docs found"
+    else
+        fail "Only $SHARED_COUNT shared docs (expected 10+)"
+    fi
+else
+    fail "Cannot check shared docs - SQUAD dir not found"
+fi
+
+# 3. Check statusline
+if [[ -f ~/.claude/statusline.sh ]]; then
+    pass "Statusline installed"
+else
+    fail "Statusline missing - run: setup-statusline-and-hooks.sh"
+fi
+
+# 4. Check agent commands
+if [[ -d ~/.claude/commands/squad ]]; then
+    CMD_COUNT=$(ls ~/.claude/commands/squad/*.md 2>/dev/null | wc -l)
+    BROKEN=$(find ~/.claude/commands/squad -type l ! -exec test -e {} \; -print 2>/dev/null | wc -l)
+    if [[ $BROKEN -gt 0 ]]; then
+        warn "$CMD_COUNT commands installed ($BROKEN broken symlinks)"
+        echo "    Broken symlinks:"
+        find ~/.claude/commands/squad -type l ! -exec test -e {} \; -print 2>/dev/null | while read f; do
+            echo "      - $(basename "$f")"
+        done
+        echo "    Fix: rm ~/.claude/commands/squad/*.md && ./install.sh (from SQUAD dir)"
+    else
+        pass "$CMD_COUNT agent commands installed"
+    fi
+else
+    fail "Agent commands not installed - run: ./install.sh (from SQUAD dir)"
+fi
+
+# 5. Check core tools
+echo ""
+echo "Tools:"
+TOOLS_OK=true
+for tool in am-register am-agents am-whoami st squad-signal; do
+    if command -v $tool &>/dev/null; then
+        pass "$tool"
+    else
+        fail "$tool missing"
+        TOOLS_OK=false
+    fi
+done
+
+if [[ "$TOOLS_OK" == "false" ]]; then
+    echo "    Fix: ./install.sh (from SQUAD dir)"
+fi
+
+# 6. Check tasks in current project
+echo ""
+echo "Current Project ($(basename "$PWD")):"
+if [[ -d .squad ]]; then
+    TASK_COUNT=$(st list --json 2>/dev/null | jq length 2>/dev/null || echo "?")
+    pass "Tasks initialized ($TASK_COUNT tasks)"
+else
+    warn "Tasks not initialized - run: st init"
+fi
+
+# 7. Check CLAUDE.md imports
+if [[ -f CLAUDE.md ]]; then
+    # Check for squad shared imports (any path format)
+    IMPORTS=$(grep -cE "^@.*/shared/" CLAUDE.md 2>/dev/null || echo "0")
+    if [[ $IMPORTS -ge 5 ]]; then
+        pass "CLAUDE.md has $IMPORTS squad imports"
+    else
+        warn "CLAUDE.md has only $IMPORTS squad imports (expected 5+)"
+        echo "    Run setup-repos.sh to configure CLAUDE.md imports"
+    fi
+else
+    warn "No CLAUDE.md in current directory"
+fi
+
+# Summary
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+if [[ ${#ISSUES[@]} -eq 0 ]]; then
+    echo -e "  STATUS: ${GREEN}HEALTHY${NC}"
+else
+    echo -e "  STATUS: ${RED}NEEDS REPAIR${NC} (${#ISSUES[@]} issues)"
+fi
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""

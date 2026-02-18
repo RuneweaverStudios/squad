@@ -5,9 +5,9 @@
  * This replaces the previous SSE implementation.
  *
  * Watched sources:
- * - .jat/last-touched - Task mutation sentinel (written by lib/tasks.js on every write)
+ * - .squad/last-touched - Task mutation sentinel (written by lib/tasks.js on every write)
  * - .claude/sessions/agent-*.txt - Agent state changes
- * - /tmp/jat-signal-tmux-*.json - Agent state signals (working, review, complete, etc.)
+ * - /tmp/squad-signal-tmux-*.json - Agent state signals (working, review, complete, etc.)
  * - /tmp/claude-question-tmux-*.json - Agent questions pending user response
  * - tmux session list - Session create/destroy lifecycle events
  * - tmux pane output - Terminal output streaming
@@ -47,7 +47,7 @@ import {
 } from './connectionPool.js';
 // NOTE: Must use relative import (not $lib alias) because this file is transitively
 // imported by vite.config.ts via vitePlugin.ts, and $lib isn't available at config time.
-import { getTasks } from '../jat-tasks.js';
+import { getTasks } from '../squad-tasks.js';
 
 const execAsync = promisify(exec);
 
@@ -55,10 +55,10 @@ const execAsync = promisify(exec);
 // Configuration
 // ============================================================================
 
-// IDE runs from /home/jw/code/jat/ide
-// Sentinel file is at /home/jw/code/jat/.jat/last-touched (parent directory)
+// IDE runs from /home/jw/code/squad/ide
+// Sentinel file is at /home/jw/code/squad/.squad/last-touched (parent directory)
 const PROJECT_ROOT = join(process.cwd(), '..');
-const JAT_DIR = join(PROJECT_ROOT, '.jat');
+const SQUAD_DIR = join(PROJECT_ROOT, '.squad');
 const SENTINEL_FILENAME = 'last-touched';
 
 const SESSIONS_DIR = join(PROJECT_ROOT, '.claude', 'sessions');
@@ -148,7 +148,7 @@ let taskCacheTimestamp = 0;
 const TASK_CACHE_TTL_MS = 5000;
 
 // ============================================================================
-// Task Watcher (watches .jat/last-touched sentinel)
+// Task Watcher (watches .squad/last-touched sentinel)
 // ============================================================================
 
 /**
@@ -244,7 +244,7 @@ function checkTaskChanges(): void {
 }
 
 /**
- * Start watching the .jat/last-touched sentinel file for task mutations
+ * Start watching the .squad/last-touched sentinel file for task mutations
  */
 function startTaskWatcher(): void {
 	if (taskWatcher) {
@@ -252,15 +252,15 @@ function startTaskWatcher(): void {
 		return;
 	}
 
-	console.log(`[WS Watcher] Starting task watcher: ${JAT_DIR}`);
+	console.log(`[WS Watcher] Starting task watcher: ${SQUAD_DIR}`);
 
 	// Initialize previous task snapshots
 	previousTaskSnapshots = getTaskSnapshots();
 	console.log(`[WS Watcher] Initialized with ${previousTaskSnapshots.size} existing tasks`);
 
 	try {
-		// Watch the .jat/ directory for last-touched changes
-		taskWatcher = watch(JAT_DIR, { persistent: false }, (eventType, filename) => {
+		// Watch the .squad/ directory for last-touched changes
+		taskWatcher = watch(SQUAD_DIR, { persistent: false }, (eventType, filename) => {
 			if (filename === SENTINEL_FILENAME || filename === null) {
 				// Debounce rapid changes
 				const existingTimer = debounceTimers.get('tasks');
@@ -365,7 +365,7 @@ function startSessionsWatcher(): void {
 }
 
 // ============================================================================
-// Signal & Question File Watcher (watches /tmp for jat-signal-* and claude-question-*)
+// Signal & Question File Watcher (watches /tmp for squad-signal-* and claude-question-*)
 // ============================================================================
 
 /**
@@ -386,7 +386,7 @@ function simpleHash(str: string): string {
  * Read and parse a signal file, returning null if stale or invalid
  */
 function readSignalFile(sessionName: string): { type: string; state?: string; data?: unknown; timestamp?: string } | null {
-	const signalFile = `/tmp/jat-signal-tmux-${sessionName}.json`;
+	const signalFile = `/tmp/squad-signal-tmux-${sessionName}.json`;
 
 	try {
 		if (!existsSync(signalFile)) {
@@ -417,7 +417,7 @@ function readSignalFile(sessionName: string): { type: string; state?: string; da
  * Returns full bundle data or null if not a complete signal
  */
 function readCompletionBundle(sessionName: string): Record<string, unknown> | null {
-	const signalFile = `/tmp/jat-signal-tmux-${sessionName}.json`;
+	const signalFile = `/tmp/squad-signal-tmux-${sessionName}.json`;
 
 	try {
 		if (!existsSync(signalFile)) {
@@ -581,13 +581,13 @@ function processSignalFileChange(sessionName: string): void {
 function processExistingSignalFiles(): void {
 	try {
 		const files = readdirSync('/tmp').filter(f =>
-			f.startsWith('jat-signal-tmux-') && f.endsWith('.json')
+			f.startsWith('squad-signal-tmux-') && f.endsWith('.json')
 		);
 
 		signalFileStates.clear();
 
 		for (const filename of files) {
-			const sessionName = filename.replace('jat-signal-tmux-', '').replace('.json', '');
+			const sessionName = filename.replace('squad-signal-tmux-', '').replace('.json', '');
 			if (sessionName) {
 				processSignalFileChange(sessionName);
 			}
@@ -668,9 +668,9 @@ function startSignalAndQuestionWatcher(): void {
 		signalWatcher = watch('/tmp', { persistent: false }, (_eventType, filename) => {
 			if (!filename || !filename.endsWith('.json')) return;
 
-			// Handle signal files: jat-signal-tmux-{sessionName}.json
-			if (filename.startsWith('jat-signal-tmux-')) {
-				const sessionName = filename.replace('jat-signal-tmux-', '').replace('.json', '');
+			// Handle signal files: squad-signal-tmux-{sessionName}.json
+			if (filename.startsWith('squad-signal-tmux-')) {
+				const sessionName = filename.replace('squad-signal-tmux-', '').replace('.json', '');
 				if (!sessionName) return;
 
 				const existingTimer = signalDebounceTimers.get(sessionName);
@@ -737,7 +737,7 @@ function stopSignalAndQuestionWatcher(): void {
 // ============================================================================
 
 /**
- * Get list of active jat-* tmux sessions
+ * Get list of active squad-* tmux sessions
  */
 async function getTmuxSessions(): Promise<string[]> {
 	try {
@@ -748,7 +748,7 @@ async function getTmuxSessions(): Promise<string[]> {
 		return stdout
 			.trim()
 			.split('\n')
-			.filter(name => name.startsWith('jat-') && !name.startsWith('jat-pending-'));
+			.filter(name => name.startsWith('squad-') && !name.startsWith('squad-pending-'));
 	} catch {
 		return [];
 	}
@@ -799,7 +799,7 @@ async function pollSessionLifecycle(): Promise<void> {
 		// Detect new sessions
 		for (const sessionName of currentSessionNames) {
 			if (!knownSessions.has(sessionName)) {
-				const agentName = sessionName.replace(/^jat-/, '');
+				const agentName = sessionName.replace(/^squad-/, '');
 				const task = agentTaskMap.get(agentName) || null;
 
 				broadcastSessionCreated(

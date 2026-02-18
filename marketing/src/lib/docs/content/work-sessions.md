@@ -16,7 +16,7 @@ Cards are grouped by project. Each project section can be collapsed or expanded 
 
 ## Session states
 
-Agents move through a predictable lifecycle. The IDE tracks state via JAT signals emitted by the agent and written to `/tmp/jat-signal-*.json` files.
+Agents move through a predictable lifecycle. The IDE tracks state via SQUAD signals emitted by the agent and written to `/tmp/squad-signal-*.json` files.
 
 ```
 STARTING --> WORKING <--> NEEDS INPUT --> REVIEW --> COMPLETING --> COMPLETED
@@ -24,15 +24,15 @@ STARTING --> WORKING <--> NEEDS INPUT --> REVIEW --> COMPLETING --> COMPLETED
 
 | State | Badge color | What's happening |
 |-------|-------------|------------------|
-| `starting` | Blue | Agent booting, running `/jat:start` |
+| `starting` | Blue | Agent booting, running `/squad:start` |
 | `working` | Amber | Agent actively coding |
 | `needs-input` | Purple | Agent asked a question, waiting for response |
 | `ready-for-review` | Cyan | Work done, agent presenting results |
-| `completing` | Teal | Running `/jat:complete` steps (progress bar shown) |
+| `completing` | Teal | Running `/squad:complete` steps (progress bar shown) |
 | `completed` | Green | Task closed, session finished |
 | `idle` | Gray | Agent registered but no active task |
 
-State detection uses SSE (Server-Sent Events) from the signals API. When an agent runs `jat-signal working '{"taskId":"jat-abc"}'`, the PostToolUse hook captures the signal, and the SSE server broadcasts the state change to connected IDE clients.
+State detection uses SSE (Server-Sent Events) from the signals API. When an agent runs `squad-signal working '{"taskId":"squad-abc"}'`, the PostToolUse hook captures the signal, and the SSE server broadcasts the state change to connected IDE clients.
 
 ## Smart Question UI
 
@@ -76,12 +76,12 @@ From the Agents or Tasks page, clicking an active agent name also jumps you to t
 
 The IDE uses an instant signal pattern for immediate UI feedback. Instead of waiting for the next polling cycle (which could be 500ms-2s), certain state changes update the UI instantly.
 
-When the IDE itself triggers an action (like sending `/jat:complete` to a session), it writes the expected signal file immediately rather than waiting for the agent to emit it. This makes state transitions feel instantaneous.
+When the IDE itself triggers an action (like sending `/squad:complete` to a session), it writes the expected signal file immediately rather than waiting for the agent to emit it. This makes state transitions feel instantaneous.
 
 ```
 User clicks "Complete" button
   --> IDE writes completing signal to /tmp/ (instant UI update)
-  --> IDE sends /jat:complete via tmux keys
+  --> IDE sends /squad:complete via tmux keys
   --> Agent processes command and emits real signals
   --> Real signals replace the pre-written ones
 ```

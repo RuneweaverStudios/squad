@@ -524,9 +524,9 @@ describe('getFolderIcon', () => {
 			expect(getFolderIcon('migrations', false)).toBe('🔄');
 		});
 
-		it('should return tasks icon for .jat', () => {
-			expect(getFolderIcon('.jat', true)).toBe('📿');
-			expect(getFolderIcon('.jat', false)).toBe('📿');
+		it('should return tasks icon for .squad', () => {
+			expect(getFolderIcon('.squad', true)).toBe('📿');
+			expect(getFolderIcon('.squad', false)).toBe('📿');
 		});
 
 		it('should return robot for .claude', () => {

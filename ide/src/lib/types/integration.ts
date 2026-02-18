@@ -1,5 +1,5 @@
 /**
- * TypeScript type definitions for the JAT Integration / Ingest Adapter system.
+ * TypeScript type definitions for the SQUAD Integration / Ingest Adapter system.
  *
  * These types formalize the contract defined in tools/ingest/adapters/base.js
  * and provide type safety for the IDE's integration APIs.
@@ -251,7 +251,7 @@ export interface PluginInfo {
 }
 
 /**
- * A configured integration source (stored in ~/.config/jat/integrations.json).
+ * A configured integration source (stored in ~/.config/squad/integrations.json).
  */
 export interface IntegrationSource {
 	id: string;

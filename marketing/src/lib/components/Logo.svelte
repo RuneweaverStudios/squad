@@ -8,6 +8,6 @@
 			text-shadow: 0 0 15px oklch(0.70 0.18 240 / 0.5);
 		"
 	>
-		JAT
+		SQUAD
 	</div>
 </a>

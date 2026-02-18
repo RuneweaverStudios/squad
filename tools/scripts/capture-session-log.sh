@@ -2,10 +2,10 @@
 # capture-session-log.sh - Capture tmux scrollback and append to unified session log
 #
 # Usage: capture-session-log.sh <session-name> <reason>
-#   session-name: tmux session name (e.g., "jat-WisePrairie")
+#   session-name: tmux session name (e.g., "squad-WisePrairie")
 #   reason: compacted | paused | killed | completed
 #
-# Appends current tmux scrollback to .jat/logs/session-{session-name}.log
+# Appends current tmux scrollback to .squad/logs/session-{session-name}.log
 # with a separator indicating the reason for capture.
 
 set -euo pipefail
@@ -18,19 +18,19 @@ if [[ -z "$SESSION_NAME" ]]; then
     exit 1
 fi
 
-# Find project directory (look for .jat directory)
+# Find project directory (look for .squad directory)
 PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
-if [[ ! -d "$PROJECT_DIR/.jat" ]]; then
+if [[ ! -d "$PROJECT_DIR/.squad" ]]; then
     # Try parent directory (if running from ide/)
-    if [[ -d "$PROJECT_DIR/../.jat" ]]; then
+    if [[ -d "$PROJECT_DIR/../.squad" ]]; then
         PROJECT_DIR="$PROJECT_DIR/.."
     else
-        echo "Error: Cannot find .jat directory" >&2
+        echo "Error: Cannot find .squad directory" >&2
         exit 1
     fi
 fi
 
-LOGS_DIR="$PROJECT_DIR/.jat/logs"
+LOGS_DIR="$PROJECT_DIR/.squad/logs"
 LOG_FILE="$LOGS_DIR/session-${SESSION_NAME}.log"
 
 # Ensure logs directory exists

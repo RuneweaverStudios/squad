@@ -48,7 +48,7 @@ fi
 # The IDE writes .claude/sessions/.tmux-agent-{tmuxSessionName} before spawning
 # This MUST be checked first because WINDOWID-based files persist across sessions
 if [[ -z "$AGENT_NAME" ]]; then
-    # Get tmux session name (e.g., "jat-SwiftRiver")
+    # Get tmux session name (e.g., "squad-SwiftRiver")
     TMUX_SESSION=$(tmux display-message -p '#S' 2>/dev/null || echo "")
     if [[ -n "$TMUX_SESSION" ]]; then
         TMUX_AGENT_FILE="$CLAUDE_DIR/sessions/.tmux-agent-${TMUX_SESSION}"
@@ -112,7 +112,7 @@ if [[ -f "$PERSISTENT_STATE_FILE" ]]; then
                 WORKFLOW_STEP="Waiting for user input"
                 ;;
             "review")
-                NEXT_ACTION="Present findings to user. Run /jat:complete when approved"
+                NEXT_ACTION="Present findings to user. Run /squad:complete when approved"
                 WORKFLOW_STEP="Ready for review"
                 ;;
             *)
@@ -122,9 +122,9 @@ if [[ -f "$PERSISTENT_STATE_FILE" ]]; then
         esac
 
         # Output as compact marker for IDE + structured context for agent
-        echo "[JAT:WORKING task=$TASK_ID]"
+        echo "[SQUAD:WORKING task=$TASK_ID]"
         echo ""
-        echo "=== JAT WORKFLOW CONTEXT (restored after compaction) ==="
+        echo "=== SQUAD WORKFLOW CONTEXT (restored after compaction) ==="
         echo "Agent: $AGENT_NAME"
         echo "Task: $TASK_ID - $TASK_TITLE"
         echo "Last Signal: $SIGNAL_STATE"
@@ -137,20 +137,20 @@ if [[ -f "$PERSISTENT_STATE_FILE" ]]; then
 fi
 
 # Fallback: If no state file but agent has in_progress task, still output working marker
-if [[ -z "$TASK_ID" ]] && [[ -n "$AGENT_NAME" ]] && command -v jt &>/dev/null; then
-    TASK_ID=$(jt list --json 2>/dev/null | jq -r --arg a "$AGENT_NAME" '.[] | select(.assignee == $a and .status == "in_progress") | .id' 2>/dev/null | head -1)
+if [[ -z "$TASK_ID" ]] && [[ -n "$AGENT_NAME" ]] && command -v st &>/dev/null; then
+    TASK_ID=$(st list --json 2>/dev/null | jq -r --arg a "$AGENT_NAME" '.[] | select(.assignee == $a and .status == "in_progress") | .id' 2>/dev/null | head -1)
     if [[ -n "$TASK_ID" ]]; then
-        TASK_TITLE=$(jt show "$TASK_ID" --json 2>/dev/null | jq -r '.[0].title // ""' 2>/dev/null)
-        echo "[JAT:WORKING task=$TASK_ID]"
+        TASK_TITLE=$(st show "$TASK_ID" --json 2>/dev/null | jq -r '.[0].title // ""' 2>/dev/null)
+        echo "[SQUAD:WORKING task=$TASK_ID]"
         echo ""
-        echo "=== JAT WORKFLOW CONTEXT (restored from JAT Tasks) ==="
+        echo "=== SQUAD WORKFLOW CONTEXT (restored from SQUAD Tasks) ==="
         echo "Agent: $AGENT_NAME"
         echo "Task: $TASK_ID - $TASK_TITLE"
         echo "Last Signal: unknown (no state file)"
         echo "NEXT ACTION: Emit 'working' signal if continuing work, or 'review' signal if done"
         echo "=================================================="
 
-        echo "[SessionStart] Fallback context from JAT Tasks: task=$TASK_ID" >> "$CLAUDE_DIR/.agent-activity.log"
+        echo "[SessionStart] Fallback context from SQUAD Tasks: task=$TASK_ID" >> "$CLAUDE_DIR/.agent-activity.log"
     fi
 fi
 
@@ -158,6 +158,6 @@ fi
 if [[ "$IN_TMUX" == false ]]; then
     echo ""
     echo "NOT IN TMUX SESSION - IDE cannot track this session."
-    echo "Exit and restart with: jat-projectname (e.g. jat-jat, jat-chimaro)"
-    echo "Or: jat projectname 1 --claude"
+    echo "Exit and restart with: squad-projectname (e.g. squad-squad, squad-chimaro)"
+    echo "Or: squad projectname 1 --claude"
 fi

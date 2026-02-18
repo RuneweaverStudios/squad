@@ -45,7 +45,7 @@ Exit codes:
 
 Note: Deleting an agent does NOT delete:
   - Messages sent by the agent (preserved for audit trail)
-  - Task assignments in JAT Tasks (preserved)
+  - Task assignments in SQUAD Tasks (preserved)
 
 Note: Agents are globally unique across all projects.
   No project specification needed.

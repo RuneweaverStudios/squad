@@ -35,7 +35,7 @@
 		</p>
 
 		<p class="text-lg text-gray-500 max-w-2xl mx-auto mb-10 animate-fade-up delay-300">
-			JAT brings software engineering best practices to agentic development.
+			SQUAD brings software engineering best practices to agentic development.
 			No more chaos. No more context switching. Just structured, scalable AI-assisted coding.
 		</p>
 

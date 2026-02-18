@@ -1,4 +1,4 @@
-# Jomarchy Agent Tools - Architecture
+# SQUAD - Architecture
 
 Technical architecture documentation explaining design decisions, schema design, token savings analysis, and tool composition patterns.
 
@@ -65,7 +65,7 @@ Technical architecture documentation explaining design decisions, schema design,
 
 ### The Bash Solution
 
-**Jomarchy Agent Tools uses bash scripts + SQLite instead:**
+**SQUAD uses bash scripts + SQLite instead:**
 
 | Benefit | Value |
 |---------|-------|
@@ -89,7 +89,7 @@ Tool response:                  200 tokens
 Total per operation:         32,700 tokens
 ```
 
-**Bash Tool (jt example):**
+**Bash Tool (st example):**
 
 ```
 Tool name + description:        100 tokens
@@ -115,7 +115,7 @@ Bash tools are better when:
 - You require **universal compatibility** (works everywhere)
 - You prefer **simple maintenance** (no servers to manage)
 
-**JAT chooses bash for CLI-first AI coding workflows.**
+**SQUAD chooses bash for CLI-first AI coding workflows.**
 
 ---
 
@@ -133,7 +133,7 @@ Bash tools are better when:
              ▼
 ┌─────────────────────────────────────────────┐
 │  Coordination Commands (10 .md files)       │
-│  ~/.claude/commands/jat/                  │
+│  ~/.claude/commands/squad/                  │
 │  /register, /start, /complete, /handoff,    │
 │  /pause, /block, /stop, /status, /verify    │
 └────────┬──────────────────┬─────────────────┘
@@ -144,7 +144,7 @@ Bash tools are better when:
 │ Bash Tools   │   │  State Management        │
 │ (28+ tools)  │   │                          │
 │              │   │  • Agent Registry (SQLite)│
-│ am-*         │◄──┤  • JAT Tasks (per-project)│
+│ am-*         │◄──┤  • SQUAD Tasks (per-project)│
 │ browser-*    │   │  • File Declarations     │
 │ db-*         │   │                          │
 └──────────────┘   └──────────────────────────┘
@@ -155,21 +155,21 @@ Bash tools are better when:
 **Workflow Example: `/start` command**
 
 1. **User invokes:** `/start`
-2. **Claude reads:** `~/.claude/commands/jat/start.md`
+2. **Claude reads:** `~/.claude/commands/squad/start.md`
 3. **Expands to steps:**
    - Parse parameters and mode (quick/normal)
    - Detect task type (bulk vs normal)
    - Contextualize from conversation OR auto-select
    - Check conflicts (git status, dependencies)
-   - Declare files via `jt update --files`
-   - Query dependencies via `jt show`
+   - Declare files via `st update --files`
+   - Query dependencies via `st show`
    - BEGIN WORK
 4. **Bash tools execute:**
-   - `jt update jat-123 --files "src/**"` → SQLite UPDATE
-   - `jt show jat-123 --json` → Reads .jat/tasks.db
+   - `st update squad-123 --files "src/**"` → SQLite UPDATE
+   - `st show squad-123 --json` → Reads .squad/tasks.db
 5. **State persists:**
    - Agent Registry: `~/.agent-mail.db`
-   - JAT Tasks: `.jat/tasks.db` (SQLite, per-project)
+   - SQUAD Tasks: `.squad/tasks.db` (SQLite, per-project)
    - File declarations: stored on the task record
 
 **Zero HTTP calls. Zero servers. Pure bash + SQLite.**
@@ -229,7 +229,7 @@ CREATE TABLE messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id INTEGER NOT NULL,
     sender_id INTEGER NOT NULL,
-    thread_id TEXT,                      -- Use JAT task ID (e.g., "jat-123")
+    thread_id TEXT,                      -- Use SQUAD task ID (e.g., "squad-123")
     subject TEXT NOT NULL,
     body_md TEXT NOT NULL,               -- Markdown content
     importance TEXT NOT NULL DEFAULT 'normal', -- normal | high | urgent
@@ -242,7 +242,7 @@ CREATE TABLE messages (
 
 **Purpose:** Async communication between agents.
 
-**Why thread_id?** Links messages to JAT tasks for traceability.
+**Why thread_id?** Links messages to SQUAD tasks for traceability.
 
 **Why Markdown?** Structured content (code blocks, lists, links) in messages.
 
@@ -271,10 +271,10 @@ CREATE INDEX idx_messages_project ON messages(project_id);
 CREATE INDEX idx_messages_created ON messages(created_ts);
 ```
 
-> **Note:** File declarations are stored on the task record itself (via `jt update --files`),
+> **Note:** File declarations are stored on the task record itself (via `st update --files`),
 > not in a separate table. They are automatically cleared when the task is closed.
 
-### JAT Tasks Schema (`.jat/tasks.db`)
+### SQUAD Tasks Schema (`.squad/tasks.db`)
 
 **Format:** SQLite database (per-project)
 
@@ -306,7 +306,7 @@ CREATE INDEX idx_messages_created ON messages(created_ts);
 
 - Clean separation (each repo has own tasks)
 - No global state leakage
-- IDE aggregation (JAT IDE reads all `~/code/*/.jat/`)
+- IDE aggregation (SQUAD IDE reads all `~/code/*/.squad/`)
 
 ---
 
@@ -316,12 +316,12 @@ CREATE INDEX idx_messages_created ON messages(created_ts);
 
 ```bash
 # Get ready tasks as JSON, filter by priority, extract IDs
-jt ready --json | \
+st ready --json | \
   jq '.[] | select(.priority <= 1)' | \
   jq -r '.id'
 ```
 
-**Tools used:** `jt` → `jq`
+**Tools used:** `st` → `jq`
 
 **Pattern:** Transform → Filter → Extract
 
@@ -329,11 +329,11 @@ jt ready --json | \
 
 ```bash
 # Close all tasks matching a label
-jt list --json | jq -r '.[] | select(.labels | contains(["cleanup"])) | .id' | \
-  xargs -I {} jt close {} --reason "Batch cleanup"
+st list --json | jq -r '.[] | select(.labels | contains(["cleanup"])) | .id' | \
+  xargs -I {} st close {} --reason "Batch cleanup"
 ```
 
-**Tools used:** `jt` → `jq` → `xargs` → `jt`
+**Tools used:** `st` → `jq` → `xargs` → `st`
 
 **Pattern:** Query → Extract → Iterate
 
@@ -341,15 +341,15 @@ jt list --json | jq -r '.[] | select(.labels | contains(["cleanup"])) | .id' | \
 
 ```bash
 # Check if task has file declarations before starting
-task_files=$(jt show jat-abc --json | jq -r '.[0].reserved_files // ""')
+task_files=$(st show squad-abc --json | jq -r '.[0].reserved_files // ""')
 if [[ -n "$task_files" ]]; then
   echo "Task already has file declarations: $task_files"
 else
-  jt update jat-abc --files "src/auth/**"
+  st update squad-abc --files "src/auth/**"
 fi
 ```
 
-**Tools used:** `jt` → `jq` → conditional
+**Tools used:** `st` → `jq` → conditional
 
 **Pattern:** Query → Check → Act
 
@@ -359,7 +359,7 @@ fi
 # Gather metrics in parallel
 {
   am-agents --json > /tmp/agents.json &
-  jt ready --json > /tmp/tasks.json &
+  st ready --json > /tmp/tasks.json &
   wait
 }
 
@@ -374,8 +374,8 @@ jq '.[] | .name' /tmp/agents.json
 ### Pattern 5: Incremental Processing (while read)
 
 ```bash
-# Process each task from JAT Tasks queue
-jt ready --json | jq -c '.[]' | while read task; do
+# Process each task from SQUAD Tasks queue
+st ready --json | jq -c '.[]' | while read task; do
   task_id=$(echo "$task" | jq -r '.id')
   priority=$(echo "$task" | jq -r '.priority')
   echo "Processing $task_id (P$priority)"
@@ -383,7 +383,7 @@ jt ready --json | jq -c '.[]' | while read task; do
 done
 ```
 
-**Tools used:** `jt` → `jq` → `while read`
+**Tools used:** `st` → `jq` → `while read`
 
 **Pattern:** Stream → Parse → Iterate
 
@@ -393,7 +393,7 @@ done
 set -euo pipefail
 
 # Safely chain tools (fails if any step fails)
-jt ready --json | \
+st ready --json | \
   jq '.[] | select(.priority <= 1)' | \
   tee /tmp/urgent.json | \
   jq -r '.id'
@@ -420,7 +420,7 @@ jt ready --json | \
    - Request overhead:                  500 tokens
    - Response JSON:                     800 tokens
 
-3. Get tasks (hypothetical mcp.jat_tasks.get_ready):
+3. Get tasks (hypothetical mcp.squad_tasks.get_ready):
    - Request overhead:                  500 tokens
    - Response JSON:                   1,200 tokens
 
@@ -436,14 +436,14 @@ jt ready --json | \
 Total:                                36,500 tokens
 ```
 
-#### Bash Approach (JAT)
+#### Bash Approach (SQUAD)
 
 ```
-1. Get tasks (jt ready --json):
+1. Get tasks (st ready --json):
    - Tool name:                          20 tokens
    - Response JSON:                   1,200 tokens
 
-2. Start task (jt update --status in_progress --files "src/**"):
+2. Start task (st update --status in_progress --files "src/**"):
    - Tool name + args:                   50 tokens
    - Response text:                     100 tokens
 
@@ -469,7 +469,7 @@ Total:                                 1,370 tokens
 - MCP approach: 365k tokens = exceeds window (requires summarization)
 - Bash approach: 23.9k tokens = fits easily with room for code
 
-**JAT enables swarm coordination that fits in context windows.**
+**SQUAD enables swarm coordination that fits in context windows.**
 
 ---
 
@@ -520,7 +520,7 @@ Total per invocation:    2,080-5,180ms
 
 **Mitigation:** WAL mode enabled (`PRAGMA journal_mode=WAL`) for better concurrency.
 
-### JAT Tasks SQLite Performance
+### SQUAD Tasks SQLite Performance
 
 **Read performance:**
 
@@ -556,7 +556,7 @@ Total per invocation:    2,080-5,180ms
 
 #### 1. File Declarations (Advisory)
 
-**Not enforced.** Agents declare which files they plan to edit via `jt update --files`. Other agents check these declarations voluntarily.
+**Not enforced.** Agents declare which files they plan to edit via `st update --files`. Other agents check these declarations voluntarily.
 
 **Attack:** Malicious agent ignores declarations → writes anyway
 
@@ -578,7 +578,7 @@ sqlite3 ~/.agent-mail.db \
   "SELECT * FROM messages WHERE thread_id = '$thread_id'"
 ```
 
-**All JAT tools use parameterized queries** via `am-lib.sh:query_db()`.
+**All SQUAD tools use parameterized queries** via `am-lib.sh:query_db()`.
 
 #### 3. Path Validation
 
@@ -586,8 +586,8 @@ sqlite3 ~/.agent-mail.db \
 
 ```bash
 # Valid patterns
-jt update task-id --files "src/**/*.ts"   # Glob pattern
-jt update task-id --files "src/auth/"     # Directory
+st update task-id --files "src/**/*.ts"   # Glob pattern
+st update task-id --files "src/auth/"     # Directory
 ```
 
 **Validation logic:** Patterns must be relative to project root.
@@ -616,9 +616,9 @@ jt update task-id --files "src/auth/"     # Directory
 2. **Don't expose SQLite database** over network
 3. **Audit agent behavior** (check git history for rogue commits)
 4. **Use file declarations** (prevent accidental conflicts, not attacks)
-5. **Review JAT tasks** (verify task descriptions before accepting)
+5. **Review SQUAD tasks** (verify task descriptions before accepting)
 
-**JAT prioritizes simplicity over paranoia.** Designed for cooperative agents on trusted machines.
+**SQUAD prioritizes simplicity over paranoia.** Designed for cooperative agents on trusted machines.
 
 ---
 
@@ -641,12 +641,12 @@ jt update task-id --files "src/auth/"     # Directory
 **How many projects can one agent work across?**
 
 - Agent Mail: One `~/.agent-mail.db` for all projects
-- JAT Tasks: One `.jat/` per project
+- SQUAD Tasks: One `.squad/` per project
 - **Limit:** Unlimited (tested with 50+ projects)
 
 **IDE aggregation:**
 
-- JAT IDE scans `~/code/*/.jat/`
+- SQUAD IDE scans `~/code/*/.squad/`
 - Linear scan: ~10ms per project
 - 50 projects: 500ms total
 
@@ -693,7 +693,7 @@ jt update task-id --files "src/auth/"     # Directory
    - Live task progress tracking
 
 5. **MCP Compatibility Layer**
-   - Expose JAT tools via MCP protocol
+   - Expose SQUAD tools via MCP protocol
    - Best of both worlds (bash tools + MCP integration)
 
 ### Design Trade-offs
@@ -702,18 +702,18 @@ jt update task-id --files "src/auth/"     # Directory
 |----------|---------|------|
 | Bash over HTTP | Instant startup, composability | No remote access |
 | SQLite over PostgreSQL | Zero config, single-file | Write concurrency limit |
-| SQLite per-project (JAT Tasks) | Fast queries, ACID transactions | Not directly git-diffable |
+| SQLite per-project (SQUAD Tasks) | Fast queries, ACID transactions | Not directly git-diffable |
 | Advisory locks | Simple, no enforcement overhead | Requires cooperative agents |
 | Local-only | Fast, no network latency | Can't coordinate across machines |
 
-**JAT optimizes for:**
+**SQUAD optimizes for:**
 
 - Local-first development
 - Minimal overhead
 - Maximum composability
 - Universal compatibility
 
-**JAT sacrifices:**
+**SQUAD sacrifices:**
 
 - Remote coordination (without syncing)
 - Write-heavy workloads (>100/sec)
@@ -723,7 +723,7 @@ jt update task-id --files "src/auth/"     # Directory
 
 ## Conclusion
 
-**Jomarchy Agent Tools proves that bash + SQLite can power sophisticated multi-agent coordination with 80x token reduction vs MCP servers.**
+**SQUAD proves that bash + SQLite can power sophisticated multi-agent coordination with 80x token reduction vs MCP servers.**
 
 **Key architectural insights:**
 
@@ -733,21 +733,21 @@ jt update task-id --files "src/auth/"     # Directory
 4. **Advisory locks suffice** for cooperative agents
 5. **Local-first architecture** prioritizes speed and simplicity
 
-**When to use JAT:**
+**When to use SQUAD:**
 
 - AI-assisted development workflows
 - CLI-first coding environments
 - Token-constrained models
 - Local development (laptop, workstation)
 
-**When NOT to use JAT:**
+**When NOT to use SQUAD:**
 
 - Remote agent coordination (across networks)
 - High-security environments (need enforced isolation)
 - Write-heavy workloads (>100 writes/sec)
 - Multi-user shared systems
 
-**JAT's niche: Local-first AI coding with minimal overhead.**
+**SQUAD's niche: Local-first AI coding with minimal overhead.**
 
 For questions or discussions, see [CONTRIBUTING.md](CONTRIBUTING.md) or open an issue.
 

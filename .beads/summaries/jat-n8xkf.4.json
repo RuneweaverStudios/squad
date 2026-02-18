@@ -1,10 +1,10 @@
 {
-  "taskId": "jat-n8xkf.4",
-  "title": "Migrate shell scripts and hooks from bd to jt",
+  "taskId": "squad-n8xkf.4",
+  "title": "Migrate shell scripts and hooks from bd to st",
   "summary": [
-    "Migrated shell scripts from 'bd' to 'jt' command prefix across multiple scripts",
-    "Updated 4 shell callsites to use new 'jt' commands instead of 'bd'",
-    "Renamed and updated helper scripts with new .jat/ path references",
+    "Migrated shell scripts from 'bd' to 'st' command prefix across multiple scripts",
+    "Updated 4 shell callsites to use new 'st' commands instead of 'bd'",
+    "Renamed and updated helper scripts with new .squad/ path references",
     "Simplified backup and rollback scripts for task database management"
   ],
   "outcome": "completed",
@@ -23,13 +23,13 @@
     {
       "type": "chore",
       "title": "Create comprehensive script migration documentation",
-      "description": "Document the migration process from 'bd' to 'jt' commands. Create a detailed guide explaining the changes made, new command structures, and potential impact on existing workflows. Include a mapping of old 'bd' commands to new 'jt' commands for reference.",
+      "description": "Document the migration process from 'bd' to 'st' commands. Create a detailed guide explaining the changes made, new command structures, and potential impact on existing workflows. Include a mapping of old 'bd' commands to new 'st' commands for reference.",
       "priority": 2,
       "reason": "Ensure clear understanding of command migration for team members"
     },
     {
       "type": "task",
-      "title": "Audit remaining scripts for potential bd/jt command references",
+      "title": "Audit remaining scripts for potential bd/st command references",
       "description": "Perform a comprehensive search across the entire codebase to identify any remaining 'bd' command references that might have been missed during this migration. Create a script or process to systematically replace these references and ensure complete migration.",
       "priority": 3,
       "reason": "Ensure complete migration and prevent potential future inconsistencies"
@@ -42,8 +42,8 @@
       "tools/scripts/setup-repos.sh"
     ],
     "patterns": [
-      "Migrate command prefixes from 'bd' to 'jt'",
-      "Update path references from .beads/ to .jat/"
+      "Migrate command prefixes from 'bd' to 'st'",
+      "Update path references from .beads/ to .squad/"
     ],
     "gotchas": [
       "Careful replacement of command references to avoid breaking existing scripts",

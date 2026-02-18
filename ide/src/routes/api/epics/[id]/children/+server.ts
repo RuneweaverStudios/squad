@@ -5,11 +5,11 @@
  * Returns all children of an epic with blocking information.
  * This powers the EpicSwarmModal task list.
  *
- * Performance: Uses the jat-tasks.js SQLite library directly instead of spawning
- * jt CLI commands. This reduces response time from ~15s to <100ms.
+ * Performance: Uses the squad-tasks.js SQLite library directly instead of spawning
+ * st CLI commands. This reduces response time from ~15s to <100ms.
  */
 import { json } from '@sveltejs/kit';
-import { getTasks, getTaskById } from '$lib/server/jat-tasks.js';
+import { getTasks, getTaskById } from '$lib/server/squad-tasks.js';
 import type { RequestHandler } from './$types';
 
 /** Child task with blocking info */
@@ -54,10 +54,10 @@ export const GET: RequestHandler = async ({ params }) => {
 		// Get all tasks first (needed for both epic lookup and child detection)
 		const allTasks = getTasks();
 
-		// Get the epic details using jat-tasks.js library (much faster than jt CLI)
+		// Get the epic details using squad-tasks.js library (much faster than st CLI)
 		const epic = getTaskById(epicId);
 
-		// Method 1: Find children by hierarchical ID pattern (e.g., jat-cptest.1, jat-cptest.2)
+		// Method 1: Find children by hierarchical ID pattern (e.g., squad-cptest.1, squad-cptest.2)
 		const childPattern = new RegExp(`^${epicId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.\\d+$`);
 		const hierarchicalChildren = allTasks.filter((t: { id: string }) => childPattern.test(t.id));
 

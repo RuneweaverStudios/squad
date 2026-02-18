@@ -15,20 +15,20 @@ function extractTaskId(preview) {
 // Test cases
 const testCases = [
   // Valid formats (should extract task ID)
-  { input: '[jat-abc] Completed: Update agents page', expected: 'jat-abc', category: 'Standard bracket format' },
-  { input: '[jat-0ol] Starting work on activities API', expected: 'jat-0ol', category: 'Numeric in hash' },
+  { input: '[squad-abc] Completed: Update agents page', expected: 'squad-abc', category: 'Standard bracket format' },
+  { input: '[squad-0ol] Starting work on activities API', expected: 'squad-0ol', category: 'Numeric in hash' },
   { input: '[chimaro-xyz] Bug fix in auth flow', expected: 'chimaro-xyz', category: 'Different project' },
   { input: '[jomarchy-123] Implement feature X', expected: 'jomarchy-123', category: 'All numeric hash' },
-  { input: 'Starting jat-abc without brackets', expected: 'jat-abc', category: 'No brackets' },
-  { input: 'Completed task jat-def successfully', expected: 'jat-def', category: 'Mid-text' },
-  { input: '[JAT-ABC] Uppercase test', expected: 'JAT-ABC', category: 'Uppercase (case-insensitive)' },
+  { input: 'Starting squad-abc without brackets', expected: 'squad-abc', category: 'No brackets' },
+  { input: 'Completed task squad-def successfully', expected: 'squad-def', category: 'Mid-text' },
+  { input: '[SQUAD-ABC] Uppercase test', expected: 'SQUAD-ABC', category: 'Uppercase (case-insensitive)' },
 
   // Invalid formats (should return null)
   { input: 'Generic message without task ID', expected: null, category: 'No task ID' },
   { input: 'Task completed successfully', expected: null, category: 'No task ID pattern' },
   { input: '[invalid] Wrong format', expected: null, category: 'Invalid format' },
-  { input: '[jat] Missing hash', expected: null, category: 'Missing hash' },
-  { input: '[jat-] Empty hash', expected: null, category: 'Empty hash' },
+  { input: '[squad] Missing hash', expected: null, category: 'Missing hash' },
+  { input: '[squad-] Empty hash', expected: null, category: 'Empty hash' },
   { input: '[-abc] Missing project', expected: null, category: 'Missing project' },
   { input: '', expected: null, category: 'Empty string' },
   { input: null, expected: null, category: 'Null input' },

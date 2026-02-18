@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Install JAT git hooks to a repository
+# Install SQUAD git hooks to a repository
 #
 # Usage: install-hooks.sh [repo-path]
 #        If no path given, installs to current directory
@@ -23,7 +23,7 @@ fi
 
 TARGET_HOOKS="$TARGET_REPO/.git/hooks"
 
-echo "Installing JAT hooks to: $TARGET_REPO"
+echo "Installing SQUAD hooks to: $TARGET_REPO"
 
 # Install pre-commit hook
 if [ -f "$TARGET_HOOKS/pre-commit" ]; then
@@ -41,10 +41,10 @@ chmod +x "$TARGET_HOOKS/pre-commit"
 echo "  ✓ Installed pre-commit hook"
 
 echo ""
-echo "✅ JAT hooks installed!"
+echo "✅ SQUAD hooks installed!"
 echo ""
 echo "The pre-commit hook will:"
-echo "  • Block commits if no agent is registered (run /jat:start first)"
+echo "  • Block commits if no agent is registered (run /squad:start first)"
 echo "  • Auto-sync task changes before commit"
 echo ""
 echo "To bypass: git commit --no-verify"

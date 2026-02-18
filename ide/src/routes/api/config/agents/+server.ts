@@ -7,7 +7,7 @@
  * - GET: List all agent programs with status
  * - POST: Add a new agent program
  *
- * Storage: ~/.config/jat/agents.json
+ * Storage: ~/.config/squad/agents.json
  */
 
 import { json } from '@sveltejs/kit';

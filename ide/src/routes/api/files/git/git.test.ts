@@ -28,8 +28,8 @@ function resetMocks() {
 // Test Fixtures
 // ============================================================================
 
-const MOCK_PROJECT_NAME = 'jat';
-const MOCK_PROJECT_PATH = '/home/user/code/jat';
+const MOCK_PROJECT_NAME = 'squad';
+const MOCK_PROJECT_PATH = '/home/user/code/squad';
 
 // Mock git status response
 const MOCK_STATUS = {

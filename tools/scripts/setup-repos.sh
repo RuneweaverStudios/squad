@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Per-Repository Setup
-# - Initialize tasks (jt init) in each project
-# - Add jat shared documentation imports to project CLAUDE.md
+# - Initialize tasks (st init) in each project
+# - Add squad shared documentation imports to project CLAUDE.md
 
 # Note: Don't use 'set -e' - arithmetic (( )) can return 1 when incrementing from 0
 # This would cause premature exit on: ((REPOS_FOUND++))
@@ -16,70 +16,70 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-# Determine JAT installation directory
+# Determine SQUAD installation directory
 # Accept as first argument from install.sh, or auto-detect
 if [ -n "$1" ]; then
-    JAT_DIR="$1"
-elif [ -n "${JAT_INSTALL_DIR:-}" ] && [ -d "$JAT_INSTALL_DIR" ]; then
-    JAT_DIR="$JAT_INSTALL_DIR"
-elif [ -d "${XDG_DATA_HOME:-$HOME/.local/share}/jat" ]; then
-    JAT_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/jat"
-elif [ -f "$HOME/.config/jat/projects.json" ]; then
-    _jat_path=$(jq -r '.projects.jat.path // empty' "$HOME/.config/jat/projects.json" 2>/dev/null | sed "s|^~|$HOME|g")
-    if [ -n "$_jat_path" ] && [ -d "$_jat_path" ]; then
-        JAT_DIR="$_jat_path"
+    SQUAD_DIR="$1"
+elif [ -n "${SQUAD_INSTALL_DIR:-}" ] && [ -d "$SQUAD_INSTALL_DIR" ]; then
+    SQUAD_DIR="$SQUAD_INSTALL_DIR"
+elif [ -d "${XDG_DATA_HOME:-$HOME/.local/share}/squad" ]; then
+    SQUAD_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/squad"
+elif [ -f "$HOME/.config/squad/projects.json" ]; then
+    _squad_path=$(jq -r '.projects.squad.path // empty' "$HOME/.config/squad/projects.json" 2>/dev/null | sed "s|^~|$HOME|g")
+    if [ -n "$_squad_path" ] && [ -d "$_squad_path" ]; then
+        SQUAD_DIR="$_squad_path"
     fi
 fi
 
-if [ -z "${JAT_DIR:-}" ]; then
-    echo -e "${RED}ERROR: JAT installation not found${NC}"
-    echo "Set \$JAT_INSTALL_DIR or add jat to ~/.config/jat/projects.json"
+if [ -z "${SQUAD_DIR:-}" ]; then
+    echo -e "${RED}ERROR: SQUAD installation not found${NC}"
+    echo "Set \$SQUAD_INSTALL_DIR or add squad to ~/.config/squad/projects.json"
     exit 1
 fi
 
-# The imports to add to each project's CLAUDE.md (use detected JAT_DIR)
-JAT_IMPORTS="@$JAT_DIR/shared/overview.md
-@$JAT_DIR/shared/agent-registry.md
-@$JAT_DIR/shared/bash-patterns.md
-@$JAT_DIR/shared/tasks.md
-@$JAT_DIR/shared/tools.md
-@$JAT_DIR/shared/workflow-commands.md
-@$JAT_DIR/shared/statusline.md"
+# The imports to add to each project's CLAUDE.md (use detected SQUAD_DIR)
+SQUAD_IMPORTS="@$SQUAD_DIR/shared/overview.md
+@$SQUAD_DIR/shared/agent-registry.md
+@$SQUAD_DIR/shared/bash-patterns.md
+@$SQUAD_DIR/shared/tasks.md
+@$SQUAD_DIR/shared/tools.md
+@$SQUAD_DIR/shared/workflow-commands.md
+@$SQUAD_DIR/shared/statusline.md"
 
-# Marker to detect if imports are already present (check for any JAT import)
-JAT_MARKER="@.*/shared/overview.md"
+# Marker to detect if imports are already present (check for any SQUAD import)
+SQUAD_MARKER="@.*/shared/overview.md"
 
-# Standard gitignore patterns for JAT projects
+# Standard gitignore patterns for SQUAD projects
 # These should be ignored (per-developer/session-specific):
 #   - .claude/agent-*.txt (session files)
 #   - .mcp.json (may contain API keys)
 # These should be committed:
 #   - .claude/settings.json (team config)
-#   - .jat/tasks.db (task data - source of truth, ignored via .jat/.gitignore)
-JAT_GITIGNORE_PATTERNS='# Claude Code session-specific files (per-developer, do not commit)
+#   - .squad/tasks.db (task data - source of truth, ignored via .squad/.gitignore)
+SQUAD_GITIGNORE_PATTERNS='# Claude Code session-specific files (per-developer, do not commit)
 .claude/agent-*.txt
 .claude/agent-*-activity.jsonl
 
 # MCP server configuration (may contain sensitive API keys)
 .mcp.json'
 
-# Marker to detect if JAT gitignore patterns already present
-JAT_GITIGNORE_MARKER=".claude/agent-*.txt"
+# Marker to detect if SQUAD gitignore patterns already present
+SQUAD_GITIGNORE_MARKER=".claude/agent-*.txt"
 
-echo -e "${BLUE}Setting up repositories for jat (Jomarchy Agent Tools)...${NC}"
+echo -e "${BLUE}Setting up repositories for squad...${NC}"
 echo ""
 
-# Check if jt command is available
-if ! command -v jt &> /dev/null; then
-    echo -e "${RED}ERROR: 'jt' command not found${NC}"
-    echo "Please install JAT tools first (run install.sh)"
+# Check if st command is available
+if ! command -v st &> /dev/null; then
+    echo -e "${RED}ERROR: 'st' command not found${NC}"
+    echo "Please install SQUAD tools first (run install.sh)"
     exit 1
 fi
 
 # Ask if user wants to auto-setup existing projects
-echo -e "${YELLOW}JAT can automatically initialize all projects in ~/code/ with:${NC}"
-echo "  • JAT task management (.jat/ directory)"
-echo "  • JAT documentation imports (CLAUDE.md)"
+echo -e "${YELLOW}SQUAD can automatically initialize all projects in ~/code/ with:${NC}"
+echo "  • SQUAD task management (.squad/ directory)"
+echo "  • SQUAD documentation imports (CLAUDE.md)"
 echo "  • Git hooks for agent coordination"
 echo "  • .gitignore patterns"
 echo ""
@@ -92,7 +92,7 @@ if [[ ! "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
     echo ""
     echo "You can initialize projects individually later with:"
     echo "  cd ~/code/<project>"
-    echo "  jt init"
+    echo "  st init"
     echo ""
     echo "Or run this script again to auto-setup all projects:"
     echo "  bash $SCRIPT_DIR/setup-repos.sh"
@@ -130,10 +130,10 @@ for repo_dir in "$CODE_DIR"/*; do
 
     REPO_NAME=$(basename "$repo_dir")
 
-    # Skip jat itself (it has its own CLAUDE.md structure)
-    if [ "$REPO_NAME" = "jat" ] || [ "$REPO_NAME" = "jomarchy-agent-tools" ]; then
+    # Skip squad itself (it has its own CLAUDE.md structure)
+    if [ "$REPO_NAME" = "squad" ] || [ "$REPO_NAME" = "jomarchy-agent-tools" ]; then
         echo -e "${BLUE}→ ${REPO_NAME}${NC}"
-        echo -e "  ${YELLOW}⊘ Skipping jat repo (has its own structure)${NC}"
+        echo -e "  ${YELLOW}⊘ Skipping squad repo (has its own structure)${NC}"
         echo ""
         continue
     fi
@@ -151,15 +151,15 @@ for repo_dir in "$CODE_DIR"/*; do
     ((REPOS_FOUND++))
 
     # Initialize tasks if needed
-    if [ ! -d "$repo_dir/.jat" ]; then
+    if [ ! -d "$repo_dir/.squad" ]; then
         echo "  → Initializing tasks..."
         cd "$repo_dir"
 
-        jt init --quiet > /dev/null 2>&1 || {
+        st init --quiet > /dev/null 2>&1 || {
             echo -e "  ${YELLOW}⚠ Task init failed (may already be partially initialized)${NC}"
         }
 
-        if [ -d "$repo_dir/.jat" ]; then
+        if [ -d "$repo_dir/.squad" ]; then
             echo -e "  ${GREEN}✓ Tasks initialized${NC}"
             ((TASKS_INITIALIZED++))
         fi
@@ -167,26 +167,26 @@ for repo_dir in "$CODE_DIR"/*; do
         echo -e "  ${GREEN}✓${NC} Tasks already initialized"
     fi
 
-    # Update .gitignore with JAT patterns
+    # Update .gitignore with SQUAD patterns
     GITIGNORE_FILE="$repo_dir/.gitignore"
 
     if [ -f "$GITIGNORE_FILE" ]; then
-        # Check if JAT patterns already present
-        if grep -q "$JAT_GITIGNORE_MARKER" "$GITIGNORE_FILE"; then
-            echo -e "  ${GREEN}✓${NC} .gitignore already has JAT patterns"
+        # Check if SQUAD patterns already present
+        if grep -q "$SQUAD_GITIGNORE_MARKER" "$GITIGNORE_FILE"; then
+            echo -e "  ${GREEN}✓${NC} .gitignore already has SQUAD patterns"
         else
-            # Append JAT patterns to existing .gitignore
-            echo "  → Adding JAT patterns to .gitignore..."
+            # Append SQUAD patterns to existing .gitignore
+            echo "  → Adding SQUAD patterns to .gitignore..."
             echo "" >> "$GITIGNORE_FILE"
-            echo "$JAT_GITIGNORE_PATTERNS" >> "$GITIGNORE_FILE"
-            echo -e "  ${GREEN}✓ Added JAT patterns to .gitignore${NC}"
+            echo "$SQUAD_GITIGNORE_PATTERNS" >> "$GITIGNORE_FILE"
+            echo -e "  ${GREEN}✓ Added SQUAD patterns to .gitignore${NC}"
             ((GITIGNORE_UPDATED++))
         fi
     else
-        # Create new .gitignore with JAT patterns
-        echo "  → Creating .gitignore with JAT patterns..."
-        echo "$JAT_GITIGNORE_PATTERNS" > "$GITIGNORE_FILE"
-        echo -e "  ${GREEN}✓ Created .gitignore with JAT patterns${NC}"
+        # Create new .gitignore with SQUAD patterns
+        echo "  → Creating .gitignore with SQUAD patterns..."
+        echo "$SQUAD_GITIGNORE_PATTERNS" > "$GITIGNORE_FILE"
+        echo -e "  ${GREEN}✓ Created .gitignore with SQUAD patterns${NC}"
         ((GITIGNORE_UPDATED++))
     fi
 
@@ -214,11 +214,11 @@ for repo_dir in "$CODE_DIR"/*; do
 
     if [ ! -f "$CLAUDE_MD" ]; then
         # Create new CLAUDE.md with imports
-        echo "  → Creating CLAUDE.md with jat imports..."
+        echo "  → Creating CLAUDE.md with squad imports..."
         cat > "$CLAUDE_MD" << EOF
 # $REPO_NAME
 
-$JAT_IMPORTS
+$SQUAD_IMPORTS
 
 ## Project Overview
 
@@ -228,21 +228,21 @@ $JAT_IMPORTS
 
 \`\`\`bash
 # Start working (registers agent + picks task)
-/jat:start
+/squad:start
 
 # See available tasks
-jt ready
+st ready
 \`\`\`
 EOF
-        echo -e "  ${GREEN}✓ Created CLAUDE.md with jat imports${NC}"
+        echo -e "  ${GREEN}✓ Created CLAUDE.md with squad imports${NC}"
         ((IMPORTS_ADDED++))
     else
         # Check if imports are already present (use -E for regex)
-        if grep -qE "$JAT_MARKER" "$CLAUDE_MD"; then
-            echo -e "  ${GREEN}✓${NC} CLAUDE.md already has jat imports"
+        if grep -qE "$SQUAD_MARKER" "$CLAUDE_MD"; then
+            echo -e "  ${GREEN}✓${NC} CLAUDE.md already has squad imports"
         else
             # Add imports at the top (after title if present)
-            echo "  → Adding jat imports to CLAUDE.md..."
+            echo "  → Adding squad imports to CLAUDE.md..."
 
             # Read first line to check for title
             FIRST_LINE=$(head -1 "$CLAUDE_MD")
@@ -252,7 +252,7 @@ EOF
                 {
                     head -1 "$CLAUDE_MD"
                     echo ""
-                    echo "$JAT_IMPORTS"
+                    echo "$SQUAD_IMPORTS"
                     echo ""
                     tail -n +2 "$CLAUDE_MD"
                 } > "$CLAUDE_MD.tmp"
@@ -260,14 +260,14 @@ EOF
             else
                 # No title, insert imports at top
                 {
-                    echo "$JAT_IMPORTS"
+                    echo "$SQUAD_IMPORTS"
                     echo ""
                     cat "$CLAUDE_MD"
                 } > "$CLAUDE_MD.tmp"
                 mv "$CLAUDE_MD.tmp" "$CLAUDE_MD"
             fi
 
-            echo -e "  ${GREEN}✓ Added jat imports to CLAUDE.md${NC}"
+            echo -e "  ${GREEN}✓ Added squad imports to CLAUDE.md${NC}"
             ((IMPORTS_ADDED++))
         fi
     fi
@@ -283,7 +283,7 @@ echo "  Total repos found: $REPOS_FOUND"
 echo "  Tasks initialized: $TASKS_INITIALIZED"
 echo "  .gitignore updated: $GITIGNORE_UPDATED"
 echo "  Git hooks installed: $HOOKS_INSTALLED"
-echo "  jat imports added: $IMPORTS_ADDED"
+echo "  squad imports added: $IMPORTS_ADDED"
 echo "  Skipped (not git repos): $SKIPPED"
 echo ""
 
@@ -291,19 +291,19 @@ if [ $REPOS_FOUND -eq 0 ]; then
     echo -e "${YELLOW}  ⚠ No repositories found in ~/code/${NC}"
     echo "  Clone some projects to ~/code/ to get started"
 else
-    echo "  All repositories now have jat multi-agent tooling!"
+    echo "  All repositories now have squad multi-agent tooling!"
     echo ""
     echo "  Each project's CLAUDE.md imports:"
-    echo "    @$JAT_DIR/shared/overview.md      # System overview"
-    echo "    @$JAT_DIR/shared/agent-registry.md    # Agent Mail docs"
-    echo "    @$JAT_DIR/shared/bash-patterns.md # Bash patterns"
-    echo "    @$JAT_DIR/shared/tasks.md         # JAT task planning"
-    echo "    @$JAT_DIR/shared/tools.md         # 33 bash tools"
-    echo "    @$JAT_DIR/shared/workflow-commands.md # /jat:* commands"
-    echo "    @$JAT_DIR/shared/statusline.md    # Statusline docs"
+    echo "    @$SQUAD_DIR/shared/overview.md      # System overview"
+    echo "    @$SQUAD_DIR/shared/agent-registry.md    # Agent Mail docs"
+    echo "    @$SQUAD_DIR/shared/bash-patterns.md # Bash patterns"
+    echo "    @$SQUAD_DIR/shared/tasks.md         # SQUAD task planning"
+    echo "    @$SQUAD_DIR/shared/tools.md         # 33 bash tools"
+    echo "    @$SQUAD_DIR/shared/workflow-commands.md # /squad:* commands"
+    echo "    @$SQUAD_DIR/shared/statusline.md    # Statusline docs"
     echo ""
     echo "  Test in any project:"
     echo "    cd ~/code/<project>"
-    echo "    /jat:start                # Register + start work"
+    echo "    /squad:start                # Register + start work"
     echo ""
 fi

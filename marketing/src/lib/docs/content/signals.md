@@ -1,18 +1,18 @@
 # Signals
 
-Signals are the communication protocol between agents and the IDE. An agent emits a signal by running the `jat-signal` CLI tool, which writes a JSON file to `/tmp/`. The IDE reads these files via SSE and updates the UI in real time.
+Signals are the communication protocol between agents and the IDE. An agent emits a signal by running the `squad-signal` CLI tool, which writes a JSON file to `/tmp/`. The IDE reads these files via SSE and updates the UI in real time.
 
 ## Signal types
 
-JAT defines seven signal states. Each represents a phase in the agent's work lifecycle.
+SQUAD defines seven signal states. Each represents a phase in the agent's work lifecycle.
 
 | Signal | State | When emitted | Required fields |
 |--------|-------|--------------|-----------------|
 | `starting` | Agent booting | After registration, before task work | `agentName`, `sessionId`, `project`, `model`, `gitBranch`, `gitStatus` |
 | `working` | Active coding | After reading task, before first edit | `taskId`, `taskTitle`, `approach` |
 | `needs_input` | Blocked on question | Before calling AskUserQuestion | `taskId`, `question`, `questionType` |
-| `review` | Work complete | After coding, before /jat:complete | `taskId`, `taskTitle`, `summary` |
-| `completing` | Closing out task | During /jat:complete steps | `taskId`, `currentStep`, `progress` |
+| `review` | Work complete | After coding, before /squad:complete | `taskId`, `taskTitle`, `summary` |
+| `completing` | Closing out task | During /squad:complete steps | `taskId`, `currentStep`, `progress` |
 | `complete` | Task finished | After all completion steps pass | `taskId`, `completionMode`, `summary`, `quality` |
 | `compacting` | Context shrinking | During context compaction | `reason`, `contextSizeBefore`, `estimatedAfter` |
 
@@ -25,10 +25,10 @@ Each signal type has its own JSON schema. Here are the most commonly used payloa
 **Starting signal:**
 
 ```bash
-jat-signal starting '{
+squad-signal starting '{
   "agentName": "FairBay",
   "sessionId": "a019c84c-7b54-45cc-9eee-dd6a70dea1a3",
-  "project": "jat",
+  "project": "squad",
   "model": "claude-opus-4-5-20251101",
   "gitBranch": "master",
   "gitStatus": "clean",
@@ -40,8 +40,8 @@ jat-signal starting '{
 **Working signal:**
 
 ```bash
-jat-signal working '{
-  "taskId": "jat-abc",
+squad-signal working '{
+  "taskId": "squad-abc",
   "taskTitle": "Add caching layer",
   "approach": "Use Redis for session cache, add TTL config",
   "expectedFiles": ["src/lib/cache/*", "src/routes/api/*"],
@@ -52,8 +52,8 @@ jat-signal working '{
 **Needs input signal:**
 
 ```bash
-jat-signal needs_input '{
-  "taskId": "jat-abc",
+squad-signal needs_input '{
+  "taskId": "squad-abc",
   "question": "Should expired cache entries return stale data or null?",
   "questionType": "choice",
   "options": [
@@ -66,8 +66,8 @@ jat-signal needs_input '{
 **Complete signal (full bundle):**
 
 ```bash
-jat-signal complete '{
-  "taskId": "jat-abc",
+squad-signal complete '{
+  "taskId": "squad-abc",
   "agentName": "FairBay",
   "completionMode": "review_required",
   "summary": ["Added Redis cache layer", "Configured TTL per route"],
@@ -82,27 +82,27 @@ jat-signal complete '{
 }'
 ```
 
-## jat-signal CLI tool
+## squad-signal CLI tool
 
-The `jat-signal` bash tool validates payloads against the JSON schema and writes the signal file.
+The `squad-signal` bash tool validates payloads against the JSON schema and writes the signal file.
 
 ```bash
-jat-signal <signal_type> '<json_payload>'
+squad-signal <signal_type> '<json_payload>'
 ```
 
 Signal types must be one of: `starting`, `working`, `needs_input`, `review`, `completing`, `complete`, `compacting`.
 
 The tool also accepts a `question` type for structured question signals that integrate with the Smart Question UI.
 
-Validation runs via `jat-signal-validate` which checks the payload against `jat-signal-schema.json`. Invalid payloads are rejected with a descriptive error.
+Validation runs via `squad-signal-validate` which checks the payload against `squad-signal-schema.json`. Invalid payloads are rejected with a descriptive error.
 
 ## Signal file locations
 
 Signals write to temp files in `/tmp/` using two naming patterns:
 
 ```
-/tmp/jat-signal-{sessionId}.json        # By Claude session ID
-/tmp/jat-signal-tmux-{tmuxSession}.json  # By tmux session name
+/tmp/squad-signal-{sessionId}.json        # By Claude session ID
+/tmp/squad-signal-tmux-{tmuxSession}.json  # By tmux session name
 ```
 
 Both files contain the same data. The dual-write enables flexible lookup since some contexts have the session ID and others have the tmux session name.
@@ -115,8 +115,8 @@ The IDE reads signals through Server-Sent Events (SSE). The SSE endpoint polls s
 
 ```
 Agent emits signal
-  --> PostToolUse hook captures jat-signal call
-  --> Hook writes JSON to /tmp/jat-signal-*.json
+  --> PostToolUse hook captures squad-signal call
+  --> Hook writes JSON to /tmp/squad-signal-*.json
   --> SSE server detects new/changed file
   --> SSE broadcasts session-signal event
   --> Browser receives event, updates SessionCard state
@@ -134,7 +134,7 @@ For example, when you click "Complete" on a session:
 
 1. IDE writes `completing` signal to `/tmp/` with `progress: 0`
 2. UI updates instantly to show "COMPLETING" badge
-3. IDE sends `/jat:complete` via tmux keys
+3. IDE sends `/squad:complete` via tmux keys
 4. Agent processes the command and emits its own signals
 5. Agent's real signals overwrite the pre-written file with richer data
 
@@ -146,13 +146,13 @@ The `completing` signal is unique in that it tracks progress through multiple st
 
 | Step | Progress | Signal emitted by |
 |------|----------|-------------------|
-| Verifying | 0% | `jat-step verifying` |
-| Committing | 25% | `jat-step committing` |
-| Closing | 50% | `jat-step closing` |
-| Releasing | 75% | `jat-step releasing` |
-| Complete | 100% | `jat-step complete` |
+| Verifying | 0% | `squad-step verifying` |
+| Committing | 25% | `squad-step committing` |
+| Closing | 50% | `squad-step closing` |
+| Releasing | 75% | `squad-step releasing` |
+| Complete | 100% | `squad-step complete` |
 
-Each `jat-step` call emits the signal automatically. The agent doesn't need to call `jat-signal` manually during the completion flow.
+Each `squad-step` call emits the signal automatically. The agent doesn't need to call `squad-signal` manually during the completion flow.
 
 ## See also
 

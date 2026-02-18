@@ -1,6 +1,6 @@
 # Agent programs
 
-JAT supports multiple AI coding assistants through a configurable agent program system. You can route specific tasks to different tools based on type, priority, labels, or project.
+SQUAD supports multiple AI coding assistants through a configurable agent program system. You can route specific tasks to different tools based on type, priority, labels, or project.
 
 ## Supported agents
 
@@ -15,7 +15,7 @@ JAT supports multiple AI coding assistants through a configurable agent program 
 
 ## The agents.json file
 
-Agent configuration lives at `~/.config/jat/agents.json`. Heres a trimmed example:
+Agent configuration lives at `~/.config/squad/agents.json`. Heres a trimmed example:
 
 ```json
 {
@@ -107,12 +107,12 @@ Routing rules map task attributes to specific agents and models. Rules are evalu
 | `label` | equals, contains, startsWith, regex | `security`, `frontend` |
 | `type` | equals, regex | `bug`, `feature`, `chore` |
 | `priority` | equals, lt, lte, gt, gte | `0`, `1` |
-| `project` | equals, startsWith, regex | `jat`, `chimaro` |
-| `epic` | equals | `jat-abc` |
+| `project` | equals, startsWith, regex | `squad`, `chimaro` |
+| `epic` | equals | `squad-abc` |
 
 ## Adding a new agent type
 
-1. Add the program to `~/.config/jat/agents.json` under `programs`
+1. Add the program to `~/.config/squad/agents.json` under `programs`
 2. If it uses API keys, add the key in Settings > API Keys (match `apiKeyProvider` to the key name)
 3. Optionally create routing rules to send specific tasks to it
 
@@ -120,7 +120,7 @@ Routing rules map task attributes to specific agents and models. Rules are evalu
 
 When the IDE spawns an agent for a task:
 
-1. Load agent config from `~/.config/jat/agents.json`
+1. Load agent config from `~/.config/squad/agents.json`
 2. Evaluate routing rules against the task (first match wins)
 3. Select agent and model from the matched rule (or use fallback)
 4. Validate the agent is enabled and auth is available

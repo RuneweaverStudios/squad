@@ -21,7 +21,7 @@ export const metadata = {
       label: 'Bot Token Secret',
       type: 'secret',
       required: true,
-      helpText: 'Name of the secret containing the Discord bot token (stored in jat-secret)'
+      helpText: 'Name of the secret containing the Discord bot token (stored in squad-secret)'
     },
     {
       key: 'guildId',
@@ -330,7 +330,7 @@ async function discordFetch(path, token) {
   const resp = await fetch(`${API_BASE}${path}`, {
     headers: {
       'Authorization': `Bot ${token}`,
-      'User-Agent': 'JAT-Ingest/1.0'
+      'User-Agent': 'SQUAD-Ingest/1.0'
     },
     signal: AbortSignal.timeout(15000)
   });

@@ -133,7 +133,7 @@
 
 	// Helpers
 	function categorizeSession(name: string): { type: TmuxSession['type']; project?: string } {
-		if (name.startsWith('jat-')) {
+		if (name.startsWith('squad-')) {
 			const agentName = name.slice(4);
 			if (agentName.startsWith('pending-')) {
 				return { type: 'agent', project: undefined };
@@ -145,14 +145,14 @@
 			const project = name.slice(7);
 			return { type: 'server', project };
 		}
-		if (name === 'jat-ide' || name.startsWith('jat-ide')) {
+		if (name === 'squad-ide' || name.startsWith('squad-ide')) {
 			return { type: 'ide' };
 		}
 		return { type: 'other' };
 	}
 
 	function getAgentName(sessionName: string): string {
-		if (sessionName.startsWith('jat-')) {
+		if (sessionName.startsWith('squad-')) {
 			return sessionName.slice(4);
 		}
 		return sessionName;
@@ -614,7 +614,7 @@
 </script>
 
 <svelte:head>
-	<title>Tasks (Tabbed) | JAT IDE</title>
+	<title>Tasks (Tabbed) | SQUAD IDE</title>
 	<meta
 		name="description"
 		content="Task management with project tabs for AI coding agents."
@@ -1169,7 +1169,7 @@
 		border-radius: 0.75rem;
 		border: 1px solid oklch(0.25 0.02 250);
 		border-top: 3px solid var(--project-color);
-		/* NOTE: overflow:hidden removed - it clips TaskIdBadge dropdowns that need to escape container (see jat-1xa13) */
+		/* NOTE: overflow:hidden removed - it clips TaskIdBadge dropdowns that need to escape container (see squad-1xa13) */
 	}
 
 	/* Subsections */

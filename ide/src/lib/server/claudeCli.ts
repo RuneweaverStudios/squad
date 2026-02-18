@@ -11,7 +11,7 @@
  *   const response = await claudeCliCall("Your prompt here", { model: 'haiku' });
  *   const parsed = JSON.parse(response.result);
  *
- * Task: jat-gygxz - API key alternative using claude CLI
+ * Task: squad-gygxz - API key alternative using claude CLI
  */
 
 import { exec } from 'child_process';

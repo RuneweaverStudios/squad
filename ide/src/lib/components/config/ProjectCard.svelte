@@ -168,10 +168,10 @@
 
 	<!-- Badges row -->
 	<div class="badges-row">
-		<!-- Status badges (hasJat, hasClaudeMd) -->
+		<!-- Status badges (hasSquad, hasClaudeMd) -->
 		{#if project.stats}
-			<span class="badge jat-badge" class:has-jat={project.stats.hasJat} title={project.stats.hasJat ? 'JAT initialized' : 'No .jat/ directory'}>
-				{#if project.stats.hasJat}
+			<span class="badge squad-badge" class:has-squad={project.stats.hasSquad} title={project.stats.hasSquad ? 'SQUAD initialized' : 'No .squad/ directory'}>
+				{#if project.stats.hasSquad}
 					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="badge-icon">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
 					</svg>
@@ -180,7 +180,7 @@
 						<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
 					</svg>
 				{/if}
-				JAT
+				SQUAD
 			</span>
 			<span class="badge claude-md-badge" class:has-claude-md={project.stats.hasClaudeMd} title={project.stats.hasClaudeMd ? 'Has CLAUDE.md or AGENTS.md' : 'No CLAUDE.md found'}>
 				{#if project.stats.hasClaudeMd}
@@ -409,13 +409,13 @@
 		background: oklch(0.25 0.06 55);
 	}
 
-	/* Status badges (JAT, CLAUDE.md) */
-	.jat-badge {
+	/* Status badges (SQUAD, CLAUDE.md) */
+	.squad-badge {
 		color: oklch(0.70 0.10 50);
 		background: oklch(0.25 0.06 50);
 	}
 
-	.jat-badge.has-jat {
+	.squad-badge.has-squad {
 		color: oklch(0.80 0.12 145);
 		background: oklch(0.25 0.06 145);
 	}

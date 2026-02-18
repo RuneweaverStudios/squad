@@ -1,7 +1,7 @@
 /**
  * Workflow Utilities (Server-Only)
  *
- * Manages workflow files stored in ~/.config/jat/workflows/.
+ * Manages workflow files stored in ~/.config/squad/workflows/.
  * Provides CRUD operations, validation, and run history management.
  *
  * This file uses Node.js fs/path/os modules and must only be imported
@@ -51,7 +51,7 @@ export type {
 // =============================================================================
 
 /** Directory where workflows are stored */
-export const WORKFLOWS_DIR = join(homedir(), '.config', 'jat', 'workflows');
+export const WORKFLOWS_DIR = join(homedir(), '.config', 'squad', 'workflows');
 
 /** Directory where run history is stored */
 export const RUNS_DIR = join(WORKFLOWS_DIR, 'runs');

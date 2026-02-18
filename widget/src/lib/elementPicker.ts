@@ -9,7 +9,7 @@ let onSelect: ((data: ElementData) => void) | null = null;
 
 function createOverlay(): HTMLElement {
   const el = document.createElement('div');
-  el.id = 'jat-feedback-picker-overlay';
+  el.id = 'squad-feedback-picker-overlay';
   el.style.cssText = `
     position: fixed;
     top: 0;
@@ -29,7 +29,7 @@ function createOverlay(): HTMLElement {
 
 function showTooltip() {
   const el = document.createElement('div');
-  el.id = 'jat-feedback-picker-tooltip';
+  el.id = 'squad-feedback-picker-tooltip';
   el.innerHTML = 'Click an element to select it &bull; Press <strong>ESC</strong> to cancel';
   el.style.cssText = `
     position: fixed;
@@ -53,7 +53,7 @@ function showTooltip() {
 function handleHover(event: MouseEvent) {
   if (!isActive || !overlay) return;
   const target = event.target as HTMLElement;
-  if (target === overlay || target.id === 'jat-feedback-picker-tooltip') return;
+  if (target === overlay || target.id === 'squad-feedback-picker-tooltip') return;
 
   const rect = target.getBoundingClientRect();
   overlay.style.top = `${rect.top}px`;

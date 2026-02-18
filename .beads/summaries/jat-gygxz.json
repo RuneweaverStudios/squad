@@ -1,5 +1,5 @@
 {
-  "taskId": "jat-gygxz",
+  "taskId": "squad-gygxz",
   "title": "do we need api key maybe we could do the api llm calls through claude head less kind of way like 'claude -p \"what is the capital of france?\"'",
   "summary": [
     "Investigated alternative API key approaches for Anthropic API calls",

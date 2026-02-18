@@ -3,10 +3,10 @@
  *
  * GET /api/sessions/[name]/signal
  *   Returns the current signal for a session (from PostToolUse hook)
- *   Signal file: /tmp/jat-signal-tmux-{sessionName}.json
+ *   Signal file: /tmp/squad-signal-tmux-{sessionName}.json
  *
  * POST /api/sessions/[name]/signal
- *   Emits a signal for the session using jat-signal command
+ *   Emits a signal for the session using squad-signal command
  *   Body: { type: string, data: string | object }
  *
  * DELETE /api/sessions/[name]/signal
@@ -36,12 +36,12 @@ export async function GET({ params }) {
 		return json({ error: 'Missing session name' }, { status: 400 });
 	}
 
-	// Try tmux session name first (e.g., "jat-FairBay")
-	let signalFile = `/tmp/jat-signal-tmux-${sessionName}.json`;
+	// Try tmux session name first (e.g., "squad-FairBay")
+	let signalFile = `/tmp/squad-signal-tmux-${sessionName}.json`;
 
 	// If not found, try session ID format
 	if (!existsSync(signalFile)) {
-		signalFile = `/tmp/jat-signal-${sessionName}.json`;
+		signalFile = `/tmp/squad-signal-${sessionName}.json`;
 	}
 
 	if (!existsSync(signalFile)) {
@@ -83,8 +83,8 @@ export async function DELETE({ params }) {
 
 	// Try to delete both possible file locations
 	const files = [
-		`/tmp/jat-signal-tmux-${sessionName}.json`,
-		`/tmp/jat-signal-${sessionName}.json`
+		`/tmp/squad-signal-tmux-${sessionName}.json`,
+		`/tmp/squad-signal-${sessionName}.json`
 	];
 
 	let deleted = false;
@@ -117,7 +117,7 @@ export async function DELETE({ params }) {
  * Body: { type: string, data: string | object, direct?: boolean }
  *
  * When direct=true (default), writes directly to signal files for instant UI feedback.
- * When direct=false, uses jat-signal command (legacy behavior).
+ * When direct=false, uses squad-signal command (legacy behavior).
  */
 /** @type {import('./$types').RequestHandler} */
 export async function POST({ params, request }) {
@@ -138,8 +138,8 @@ export async function POST({ params, request }) {
 			}, { status: 400 });
 		}
 
-		// Normalize session name (ensure jat- prefix for tmux session)
-		const tmuxSession = sessionName.startsWith('jat-') ? sessionName : `jat-${sessionName}`;
+		// Normalize session name (ensure squad- prefix for tmux session)
+		const tmuxSession = sessionName.startsWith('squad-') ? sessionName : `squad-${sessionName}`;
 
 		// Direct write mode - for instant UI feedback
 		if (direct) {
@@ -154,11 +154,11 @@ export async function POST({ params, request }) {
 			};
 
 			// 1. Write current signal state to signal file
-			const signalFile = `/tmp/jat-signal-tmux-${tmuxSession}.json`;
+			const signalFile = `/tmp/squad-signal-tmux-${tmuxSession}.json`;
 			writeFileSync(signalFile, JSON.stringify(signal, null, 2));
 
 			// 2. Append to timeline JSONL
-			const timelineFile = `/tmp/jat-timeline-${tmuxSession}.jsonl`;
+			const timelineFile = `/tmp/squad-timeline-${tmuxSession}.jsonl`;
 			const timelineEvent = {
 				type: 'signal',
 				session_id: signalData.sessionId || '',
@@ -182,18 +182,18 @@ export async function POST({ params, request }) {
 			});
 		}
 
-		// Legacy mode - use jat-signal command
+		// Legacy mode - use squad-signal command
 		const payload = typeof data === 'object' ? JSON.stringify(data) : (data || '{}');
 
 		try {
-			// Execute jat-signal command
-			// The command outputs [JAT-SIGNAL:type] payload which is captured by PostToolUse hooks
-			const result = await execFileAsync('jat-signal', [type, payload], {
+			// Execute squad-signal command
+			// The command outputs [SQUAD-SIGNAL:type] payload which is captured by PostToolUse hooks
+			const result = await execFileAsync('squad-signal', [type, payload], {
 				timeout: 10000,
 				env: {
 					...process.env,
 					// Set session context for the signal
-					JAT_SESSION: sessionName
+					SQUAD_SESSION: sessionName
 				}
 			});
 
@@ -208,11 +208,11 @@ export async function POST({ params, request }) {
 		} catch (execError) {
 			const execErr = /** @type {{ stderr?: string, message?: string, code?: string }} */ (execError);
 
-			// Check if jat-signal command not found
+			// Check if squad-signal command not found
 			if (execErr.code === 'ENOENT') {
 				return json({
-					error: 'jat-signal not found',
-					message: 'jat-signal command not found in PATH. Ensure jat tools are installed.',
+					error: 'squad-signal not found',
+					message: 'squad-signal command not found in PATH. Ensure squad tools are installed.',
 					sessionName
 				}, { status: 500 });
 			}

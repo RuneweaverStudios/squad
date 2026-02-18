@@ -1,5 +1,5 @@
 /**
- * HTTP/2 Server for JAT IDE
+ * HTTP/2 Server for SQUAD IDE
  *
  * Enables HTTP/2 multiplexing to eliminate the browser's 6-connection-per-domain limit.
  * SSE and regular HTTP requests share a single TCP connection with unlimited streams.
@@ -171,7 +171,7 @@ async function startServer() {
 	server.listen(PORT, HOST, () => {
 		console.log('');
 		console.log('╔═══════════════════════════════════════════════════════════════╗');
-		console.log('║                    JAT IDE - HTTP/2 Server                    ║');
+		console.log('║                    SQUAD IDE - HTTP/2 Server                    ║');
 		console.log('╠═══════════════════════════════════════════════════════════════╣');
 		console.log(`║  URL: https://${HOST}:${PORT}                              ║`);
 		console.log('║                                                               ║');

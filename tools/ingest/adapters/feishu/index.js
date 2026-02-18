@@ -24,14 +24,14 @@ export const metadata = {
       label: 'App ID Secret',
       type: 'secret',
       required: true,
-      helpText: 'Name of the secret containing the Feishu/Lark App ID (stored in jat-secret)'
+      helpText: 'Name of the secret containing the Feishu/Lark App ID (stored in squad-secret)'
     },
     {
       key: 'appSecretSecret',
       label: 'App Secret Secret',
       type: 'secret',
       required: true,
-      helpText: 'Name of the secret containing the Feishu/Lark App Secret (stored in jat-secret)'
+      helpText: 'Name of the secret containing the Feishu/Lark App Secret (stored in squad-secret)'
     },
     {
       key: 'chatIds',

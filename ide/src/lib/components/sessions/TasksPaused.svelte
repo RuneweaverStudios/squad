@@ -140,7 +140,7 @@
 						<td class="td-action text-right" onclick={(e) => e.stopPropagation()}>
 							<StatusActionBadge
 								sessionState={session.resumable ? 'paused' : 'orphaned'}
-								sessionName={`jat-${session.agentName}`}
+								sessionName={`squad-${session.agentName}`}
 								disabled={actionLoading === session.agentName}
 								onAction={(actionId) => handleAction(actionId, session)}
 								alignRight={true}

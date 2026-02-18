@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { getAgents } from '$lib/server/agent-mail.js';
-import { getTasks } from '$lib/server/jat-tasks.js';
+import { getTasks } from '$lib/server/squad-tasks.js';
 
 /**
  * Unified Agent Orchestration API

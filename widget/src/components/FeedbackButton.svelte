@@ -3,7 +3,7 @@
 </script>
 
 <button
-  class="jat-fb-btn"
+  class="squad-fb-btn"
   class:open
   onclick={onclick}
   aria-label={open ? 'Close feedback' : 'Send feedback'}
@@ -22,12 +22,12 @@
 </button>
 
 <style>
-  .jat-fb-btn {
+  .squad-fb-btn {
     width: 52px;
     height: 52px;
     border-radius: 50%;
     border: none;
-    background: var(--jat-btn-color, #3b82f6);
+    background: var(--squad-btn-color, #3b82f6);
     color: white;
     cursor: pointer;
     display: flex;
@@ -36,14 +36,14 @@
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
     transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
   }
-  .jat-fb-btn:hover {
+  .squad-fb-btn:hover {
     transform: scale(1.08);
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
   }
-  .jat-fb-btn:active {
+  .squad-fb-btn:active {
     transform: scale(0.95);
   }
-  .jat-fb-btn.open {
+  .squad-fb-btn.open {
     background: #6b7280;
   }
 </style>

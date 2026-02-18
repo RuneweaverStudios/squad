@@ -9,7 +9,7 @@
 	 */
 
 	const links = [
-		{ label: 'GitHub', href: 'https://github.com/jomarchy/jat' },
+		{ label: 'GitHub', href: 'https://github.com/jomarchy/squad' },
 		{ label: 'Documentation', href: '#chapters' },
 		{ label: 'IDE', href: '#interface' }
 	];
@@ -55,7 +55,7 @@
 		<!-- Credits -->
 		<div class="footer-credits">
 			<p class="credits-text">
-				Built with <span class="credits-highlight">Claude Code</span> + <span class="credits-highlight">JAT</span>
+				Built with <span class="credits-highlight">Claude Code</span> + <span class="credits-highlight">SQUAD</span>
 			</p>
 			<p class="credits-quote">
 				"Clearly some powerful alien tool was handed around..."

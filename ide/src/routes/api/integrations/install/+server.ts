@@ -2,7 +2,7 @@
  * Plugin Installation API
  *
  * POST /api/integrations/install
- * Clones a git repository into ~/.config/jat/ingest-plugins/{name}/
+ * Clones a git repository into ~/.config/squad/ingest-plugins/{name}/
  * and validates the plugin format.
  *
  * Body: { repoUrl: string }
@@ -16,20 +16,20 @@ import { join, basename } from 'node:path';
 import { homedir } from 'node:os';
 import { execSync } from 'node:child_process';
 
-const USER_PLUGINS_DIR = join(homedir(), '.config', 'jat', 'ingest-plugins');
+const USER_PLUGINS_DIR = join(homedir(), '.config', 'squad', 'ingest-plugins');
 
 /**
  * Extract a plugin name from a git repo URL.
- * e.g., https://github.com/user/jat-ingest-cloudflare → cloudflare
- *       https://github.com/user/jat-ingest-cloudflare.git → cloudflare
+ * e.g., https://github.com/user/squad-ingest-cloudflare → cloudflare
+ *       https://github.com/user/squad-ingest-cloudflare.git → cloudflare
  */
 function extractPluginName(repoUrl: string): string {
 	let name = basename(repoUrl);
 	// Remove .git suffix
 	if (name.endsWith('.git')) name = name.slice(0, -4);
 	// Remove common prefixes
-	if (name.startsWith('jat-ingest-')) name = name.slice('jat-ingest-'.length);
-	if (name.startsWith('jat-')) name = name.slice('jat-'.length);
+	if (name.startsWith('squad-ingest-')) name = name.slice('squad-ingest-'.length);
+	if (name.startsWith('squad-')) name = name.slice('squad-'.length);
 	return name || 'plugin';
 }
 

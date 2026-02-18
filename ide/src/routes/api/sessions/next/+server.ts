@@ -12,12 +12,12 @@
 import { json } from '@sveltejs/kit';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { getReadyTasks } from '$lib/server/jat-tasks.js';
+import { getReadyTasks } from '$lib/server/squad-tasks.js';
 import {
 	DEFAULT_MODEL,
 	AGENT_MAIL_URL
 } from '$lib/config/spawnConfig.js';
-import { getJatDefaults } from '$lib/server/projectPaths.js';
+import { getSquadDefaults } from '$lib/server/projectPaths.js';
 import { CLAUDE_READY_PATTERNS, SHELL_PROMPT_PATTERNS } from '$lib/server/shellPatterns.js';
 import type { RequestHandler } from './$types';
 
@@ -77,15 +77,15 @@ export const POST: RequestHandler = async ({ request }) => {
 
 			// Clean up signal files
 			try {
-				await execAsync(`rm -f /tmp/jat-signal-tmux-${completedSessionName}.json 2>/dev/null || true`);
+				await execAsync(`rm -f /tmp/squad-signal-tmux-${completedSessionName}.json 2>/dev/null || true`);
 			} catch {
 				// Ignore cleanup errors
 			}
 		}
 
 		// 3. Apply configurable delay before spawning (allows user to see completion)
-		const jatDefaults = await getJatDefaults();
-		const autoProceedDelay = jatDefaults.auto_proceed_delay || 2;
+		const squadDefaults = await getSquadDefaults();
+		const autoProceedDelay = squadDefaults.auto_proceed_delay || 2;
 		if (autoProceedDelay > 0) {
 			console.log(`[next] Waiting ${autoProceedDelay}s before spawning next task...`);
 			await new Promise(resolve => setTimeout(resolve, autoProceedDelay * 1000));
@@ -93,7 +93,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		// 4. Spawn new session for next task
 		const projectPath = nextTask.project_path || project || process.cwd().replace('/ide', '');
-		const sessionName = `jat-pending-${Date.now()}`;
+		const sessionName = `squad-pending-${Date.now()}`;
 
 		// Build the claude command
 		let claudeCmd = `cd "${projectPath}"`;
@@ -101,11 +101,11 @@ export const POST: RequestHandler = async ({ request }) => {
 		claudeCmd += ` claude --model ${DEFAULT_MODEL}`;
 		// Only pass --dangerously-skip-permissions if user has explicitly enabled it
 		// User must accept the YOLO warning manually first, then set skip_permissions: true in config
-		if (jatDefaults.skip_permissions) {
+		if (squadDefaults.skip_permissions) {
 			claudeCmd += ' --dangerously-skip-permissions';
 		}
 
-		const initialPrompt = `/jat:start ${nextTask.id}`;
+		const initialPrompt = `/squad:start ${nextTask.id}`;
 
 		// Create tmux session
 		const command = `tmux new-session -d -s "${sessionName}" -x ${TMUX_INITIAL_WIDTH} -y ${TMUX_INITIAL_HEIGHT} -c "${projectPath}" && sleep 0.3 && tmux send-keys -t "${sessionName}" "${claudeCmd}" Enter`;
@@ -125,7 +125,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		}
 
 		// 5. Wait for Claude to start and send initial prompt
-		const maxWaitSeconds = jatDefaults.claude_startup_timeout || 20;
+		const maxWaitSeconds = squadDefaults.claude_startup_timeout || 20;
 		const checkIntervalMs = 500;
 		let claudeReady = false;
 

@@ -5,7 +5,7 @@
  * Query params:
  *   ?path=/custom/path - Scan a specific directory (default: ~/code)
  *
- * Returns: { directories: [{ path, name, isGitRepo, hasJat }], basePath: string }
+ * Returns: { directories: [{ path, name, isGitRepo, hasSquad }], basePath: string }
  *
  * Security: Only allows paths under user's home directory.
  * Used by CreateProjectDrawer path picker.
@@ -53,12 +53,12 @@ function isGitRepo(dirPath) {
 }
 
 /**
- * Check if a directory has JAT initialized
+ * Check if a directory has SQUAD initialized
  * @param {string} dirPath
  * @returns {boolean}
  */
-function hasJat(dirPath) {
-	return existsSync(join(dirPath, '.jat'));
+function hasSquad(dirPath) {
+	return existsSync(join(dirPath, '.squad'));
 }
 
 export async function GET({ url }) {
@@ -101,7 +101,7 @@ export async function GET({ url }) {
 					path: fullPath,
 					name: entry.name,
 					isGitRepo: isGitRepo(fullPath),
-					hasJat: hasJat(fullPath)
+					hasSquad: hasSquad(fullPath)
 				};
 			})
 			// Sort alphabetically by name

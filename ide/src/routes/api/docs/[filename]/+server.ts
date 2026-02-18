@@ -15,7 +15,7 @@ import type { RequestHandler } from './$types';
  * Get the shared docs directory path
  */
 function getSharedDocsPath(): string {
-	return join(homedir(), 'code', 'jat', 'shared');
+	return join(homedir(), 'code', 'squad', 'shared');
 }
 
 /**

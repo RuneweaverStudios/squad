@@ -37,15 +37,15 @@
 	const BUILTIN_TYPES = ['rss', 'slack', 'telegram', 'gmail', 'custom'];
 	const isPluginType = $derived(sourceType != null && !BUILTIN_TYPES.includes(sourceType));
 
-	// Chat/messaging source types default to /jat:chat instead of /jat:start
+	// Chat/messaging source types default to /squad:chat instead of /squad:start
 	const CHAT_SOURCE_TYPES = new Set([
 		'telegram', 'slack', 'discord', 'matrix', 'mattermost',
 		'line', 'signal', 'whatsapp', 'bluebubbles', 'googlechat'
 	]);
 	function getDefaultCommand(): string {
-		if (sourceType && CHAT_SOURCE_TYPES.has(sourceType)) return '/jat:chat';
-		if (pluginMetadata?.capabilities?.send) return '/jat:chat';
-		return '/jat:start';
+		if (sourceType && CHAT_SOURCE_TYPES.has(sourceType)) return '/squad:chat';
+		if (pluginMetadata?.capabilities?.send) return '/squad:chat';
+		return '/squad:start';
 	}
 
 	// Wizard state
@@ -107,7 +107,7 @@
 
 	// Automation fields
 	let autoAction = $state<'none' | 'immediate' | 'schedule' | 'delay'>('none');
-	let autoCommand = $state('/jat:start');
+	let autoCommand = $state('/squad:start');
 	let cmdDropdownOpen = $state(false);
 	let cmdSearchQuery = $state('');
 	let cmdSearchInput: HTMLInputElement | undefined;
@@ -313,10 +313,10 @@
 			if (!groups.has(ns)) groups.set(ns, []);
 			groups.get(ns)!.push({ invocation: cmd.invocation, name: cmd.name });
 		}
-		// Sort: jat first, then local, then alphabetical
+		// Sort: squad first, then local, then alphabetical
 		const sorted = Array.from(groups.entries()).sort(([a], [b]) => {
-			if (a === 'jat') return -1;
-			if (b === 'jat') return 1;
+			if (a === 'squad') return -1;
+			if (b === 'squad') return 1;
 			if (a === 'local') return -1;
 			if (b === 'local') return 1;
 			return a.localeCompare(b);
@@ -494,7 +494,7 @@
 					name,
 					value: token,
 					envVar,
-					description: `${type} bot token for jat-ingest`
+					description: `${type} bot token for squad-ingest`
 				})
 			});
 			const data = await res.json();
@@ -594,7 +594,7 @@
 					name: secretName,
 					value: token,
 					envVar,
-					description: `${pluginMetadata?.name || sourceType} API token for jat-ingest`
+					description: `${pluginMetadata?.name || sourceType} API token for squad-ingest`
 				})
 			});
 			const data = await res.json();
@@ -1373,7 +1373,7 @@
 								<input
 									type="text"
 									class="input input-bordered w-full font-mono text-sm"
-									placeholder="JAT"
+									placeholder="SQUAD"
 									bind:value={gmailFolder}
 								/>
 								<p class="font-mono text-[10px] mt-1.5" style="color: oklch(0.45 0.02 250);">
@@ -1684,7 +1684,7 @@
 			/>
 		{/if}
 		<p class="font-mono text-[10px] mt-1.5" style="color: oklch(0.45 0.02 250);">
-			Name used in <code>jat-secret</code> to retrieve the {type === 'gmail' ? 'App Password' : 'token'}
+			Name used in <code>squad-secret</code> to retrieve the {type === 'gmail' ? 'App Password' : 'token'}
 		</p>
 	</div>
 
@@ -1864,7 +1864,7 @@
 					<li>Go to <a href="https://myaccount.google.com/security" target="_blank" rel="noopener" class="underline" style="color: oklch(0.70 0.12 25);">myaccount.google.com/security</a></li>
 					<li>Enable <strong style="color: oklch(0.75 0.02 250);">2-Step Verification</strong> if not already on</li>
 					<li>Go to <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener" class="underline" style="color: oklch(0.70 0.12 25);">App Passwords</a></li>
-					<li>Enter a name (e.g. <code style="color: oklch(0.65 0.02 250);">JAT Ingest</code>) and click <strong style="color: oklch(0.75 0.02 250);">Create</strong></li>
+					<li>Enter a name (e.g. <code style="color: oklch(0.65 0.02 250);">SQUAD Ingest</code>) and click <strong style="color: oklch(0.75 0.02 250);">Create</strong></li>
 					<li>Copy the 16-character password (spaces are optional)</li>
 				</ol>
 				<div
@@ -1872,7 +1872,7 @@
 					style="background: oklch(0.18 0.02 250); border: 1px solid oklch(0.25 0.02 250);"
 				>
 					<p class="font-mono text-[10px]" style="color: oklch(0.55 0.02 250);">
-						Also create a Gmail label (e.g. <code style="color: oklch(0.65 0.02 250);">JAT</code>) and a filter rule to route relevant emails there. Only emails in that label become tasks.
+						Also create a Gmail label (e.g. <code style="color: oklch(0.65 0.02 250);">SQUAD</code>) and a filter rule to route relevant emails there. Only emails in that label become tasks.
 					</p>
 				</div>
 			</div>
@@ -2333,7 +2333,7 @@
 				}}
 			/>
 			<p class="font-mono text-[10px] mt-1" style="color: oklch(0.45 0.02 250);">
-				Name used in <code>jat-secret</code> to retrieve the token
+				Name used in <code>squad-secret</code> to retrieve the token
 			</p>
 
 			<!-- Secret status -->

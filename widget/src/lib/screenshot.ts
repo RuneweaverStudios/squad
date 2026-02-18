@@ -11,7 +11,7 @@ export async function captureViewport(): Promise<string> {
     logging: false,
     ignoreElements: (el) => {
       // Ignore our own widget elements
-      return el.tagName === 'JAT-FEEDBACK' || el.id?.startsWith('jat-feedback-');
+      return el.tagName === 'SQUAD-FEEDBACK' || el.id?.startsWith('squad-feedback-');
     },
   });
 
@@ -25,7 +25,7 @@ export async function captureElement(el: Element): Promise<string> {
     allowTaint: true,
     logging: false,
     ignoreElements: (ignore) => {
-      return ignore.tagName === 'JAT-FEEDBACK' || ignore.id?.startsWith('jat-feedback-');
+      return ignore.tagName === 'SQUAD-FEEDBACK' || ignore.id?.startsWith('squad-feedback-');
     },
   });
 

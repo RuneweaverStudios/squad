@@ -1,8 +1,8 @@
 {
-  "name": "jat-scheduler",
+  "name": "squad-scheduler",
   "version": "0.1.0",
   "type": "module",
-  "description": "JAT task scheduler daemon - polls task databases and spawns agents on schedule",
+  "description": "SQUAD task scheduler daemon - polls task databases and spawns agents on schedule",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",

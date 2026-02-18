@@ -62,7 +62,7 @@
 		<!-- Arrow -->
 		<div class="flex justify-center mb-16">
 			<div class="flex flex-col items-center gap-2">
-				<span class="text-sm text-gray-500 font-medium">JAT changes this</span>
+				<span class="text-sm text-gray-500 font-medium">SQUAD changes this</span>
 				<svg class="w-8 h-8 text-[var(--color-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
 				</svg>

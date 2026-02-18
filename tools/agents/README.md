@@ -74,14 +74,14 @@ All tools support `--help` for detailed usage.
 
 ## File Declarations
 
-File reservations have been replaced by `--files` on `jt` (the task CLI):
+File reservations have been replaced by `--files` on `st` (the task CLI):
 
 ```bash
 # Declare files when starting a task
-jt update task-123 --status in_progress --assignee Alice --files "src/auth/**"
+st update task-123 --status in_progress --assignee Alice --files "src/auth/**"
 
 # Files are automatically cleared when the task is closed
-jt close task-123 --reason "Done"
+st close task-123 --reason "Done"
 ```
 
 ## Schema
@@ -126,7 +126,7 @@ lsof ~/.agent-mail.db  # Check for stuck connections
 
 Inspired by:
 - [mcp_agent_mail](https://github.com/Dicklesworthstone/mcp_agent_mail) - Original Python/MCP implementation
-- [Beads](https://github.com/steveyegge/beads) - Dependency-aware task management (original inspiration for JAT Tasks)
+- [Beads](https://github.com/steveyegge/beads) - Dependency-aware task management (original inspiration for SQUAD Tasks)
 - [What if you don't need MCP?](https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/) - Token efficiency philosophy
 
 ## License

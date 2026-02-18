@@ -2,7 +2,7 @@
 	/**
 	 * SignalDebugWidget
 	 *
-	 * Debug panel that shows raw signal files from /tmp/jat-signal-*.json
+	 * Debug panel that shows raw signal files from /tmp/squad-signal-*.json
 	 * Useful for troubleshooting agent state detection and signal flow.
 	 *
 	 * Features:
@@ -302,7 +302,7 @@
 				<p class="font-mono text-sm" style="color: oklch(0.55 0.02 250);">No signal files found</p>
 				<p class="font-mono text-xs mt-2" style="color: oklch(0.45 0.02 250);">
 					Signals appear when agents run <code class="px-1 py-0.5 rounded bg-base-300"
-						>jat-signal</code
+						>squad-signal</code
 					> commands
 				</p>
 			</div>

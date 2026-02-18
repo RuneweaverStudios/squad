@@ -643,12 +643,12 @@
 
 	// localStorage key for persisting open files per project
 	function getStorageKey(project: string): string {
-		return `jat-files-open-${project}`;
+		return `squad-files-open-${project}`;
 	}
 
 	// localStorage key for persisting starred files per project
 	function getStarredStorageKey(project: string): string {
-		return `jat-files-starred-${project}`;
+		return `squad-files-starred-${project}`;
 	}
 
 	// Files to auto-star by default when a project has no starred files yet
@@ -659,7 +659,7 @@
 
 	// Check which default files exist in the project root and auto-star them
 	async function initDefaultStarredFiles(project: string) {
-		const initKey = `jat-files-starred-init-${project}`;
+		const initKey = `squad-files-starred-init-${project}`;
 		if (localStorage.getItem(initKey)) return; // Already initialized
 
 		try {
@@ -1017,9 +1017,9 @@
 </script>
 
 <svelte:head>
-	<title>Files | JAT IDE</title>
+	<title>Files | SQUAD IDE</title>
 	<meta name="description" content="Project file browser with syntax-highlighted editor. Browse, edit, and manage project files." />
-	<meta property="og:title" content="Files | JAT IDE" />
+	<meta property="og:title" content="Files | SQUAD IDE" />
 	<meta property="og:description" content="Project file browser with syntax-highlighted editor. Browse, edit, and manage project files." />
 	<meta property="og:image" content="/favicons/files.svg" />
 	<link rel="icon" href="/favicons/files.svg" />

@@ -3,7 +3,7 @@
  * GET /api/work/[sessionId]/output - Capture current terminal output
  *
  * Path params:
- * - sessionId: tmux session name (e.g., "jat-WisePrairie")
+ * - sessionId: tmux session name (e.g., "squad-WisePrairie")
  *
  * Query params:
  * - lines: Number of lines to capture (default: 200)
@@ -26,12 +26,12 @@ const execAsync = promisify(exec);
 /**
  * Read the unified session log file for a session
  * This log accumulates history across compactions, pauses, and completions.
- * @param {string} sessionId - tmux session name (e.g., "jat-WisePrairie")
+ * @param {string} sessionId - tmux session name (e.g., "squad-WisePrairie")
  * @returns {Promise<{content: string, filename: string, modifiedAt: string} | null>}
  */
 async function readSessionLog(sessionId) {
 	const projectPath = process.cwd().replace('/ide', '');
-	const logsDir = path.join(projectPath, '.jat', 'logs');
+	const logsDir = path.join(projectPath, '.squad', 'logs');
 	const logFile = path.join(logsDir, `session-${sessionId}.log`);
 
 	if (!existsSync(logFile)) {

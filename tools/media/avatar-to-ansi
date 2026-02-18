@@ -13,7 +13,7 @@
 # Example output: ██ (two colored block characters)
 #
 
-AVATARS_DIR="${AVATARS_DIR:-/home/jw/code/jat/avatars}"
+AVATARS_DIR="${AVATARS_DIR:-/home/jw/code/squad/avatars}"
 
 # Convert hex color to RGB values
 hex_to_rgb() {

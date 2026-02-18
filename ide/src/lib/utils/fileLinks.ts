@@ -1,14 +1,14 @@
 /**
  * File Link Utilities
  *
- * Generates JAT IDE file editor links for opening files in the built-in editor.
+ * Generates SQUAD IDE file editor links for opening files in the built-in editor.
  * Supports line number deep links and project context.
  * Also provides localhost URL utilities for route files.
  *
  * @see ide/CLAUDE.md for usage documentation
  */
 
-// Project configuration loaded from ~/.config/jat/projects.json
+// Project configuration loaded from ~/.config/squad/projects.json
 // This will be populated by getProjectConfig()
 let projectsCache: Record<string, ProjectConfig> | null = null;
 
@@ -47,27 +47,27 @@ export interface DiffLinkOptions {
 }
 
 /**
- * Generate a JAT IDE file editor URL to open a file
+ * Generate a SQUAD IDE file editor URL to open a file
  *
- * Opens the file in the JAT IDE's built-in file editor (/files route).
+ * Opens the file in the SQUAD IDE's built-in file editor (/files route).
  * Supports line number deep links via query parameters.
  *
  * @example
  * ```typescript
  * // Open file
- * generateJatFileUrl('src/lib/auth.ts')
+ * generateSquadFileUrl('src/lib/auth.ts')
  * // → /files?path=src/lib/auth.ts
  *
  * // Open at specific line
- * generateJatFileUrl('src/lib/auth.ts', { line: 42 })
+ * generateSquadFileUrl('src/lib/auth.ts', { line: 42 })
  * // → /files?path=src/lib/auth.ts&line=42
  *
  * // Open at specific line and column
- * generateJatFileUrl('src/lib/auth.ts', { line: 42, column: 10 })
+ * generateSquadFileUrl('src/lib/auth.ts', { line: 42, column: 10 })
  * // → /files?path=src/lib/auth.ts&line=42&column=10
  * ```
  */
-export function generateJatFileUrl(filePath: string, options: FileLinkOptions = {}): string {
+export function generateSquadFileUrl(filePath: string, options: FileLinkOptions = {}): string {
 	const { projectRoot, line, column } = options;
 
 	// Normalize path - remove project root prefix if present
@@ -98,22 +98,22 @@ export function generateJatFileUrl(filePath: string, options: FileLinkOptions = 
 }
 
 /**
- * @deprecated Use generateJatFileUrl instead. This function is kept for backward compatibility.
+ * @deprecated Use generateSquadFileUrl instead. This function is kept for backward compatibility.
  */
 export function generateVSCodeUrl(filePath: string, options: FileLinkOptions = {}): string {
-	return generateJatFileUrl(filePath, options);
+	return generateSquadFileUrl(filePath, options);
 }
 
 /**
- * Generate a JAT IDE file editor URL with diff view
+ * Generate a SQUAD IDE file editor URL with diff view
  *
- * Opens the file in the JAT IDE's built-in file editor with diff mode.
+ * Opens the file in the SQUAD IDE's built-in file editor with diff mode.
  * Note: Diff view may show the file with a diff indicator, actual diff
  * visualization depends on the /files page implementation.
  *
  * @example
  * ```typescript
- * // Show file (diff view in JAT)
+ * // Show file (diff view in SQUAD)
  * generateDiffUrl('src/lib/auth.ts')
  * // → /files?path=src/lib/auth.ts&diff=true
  *
@@ -175,7 +175,7 @@ export function generateGitDiffCommand(filePath: string, ref?: string): string {
 }
 
 /**
- * Open a file in the JAT IDE file editor
+ * Open a file in the SQUAD IDE file editor
  *
  * Navigates to the /files route with the file path.
  * Opens in a new browser tab to preserve the current context.
@@ -184,23 +184,23 @@ export function generateGitDiffCommand(filePath: string, ref?: string): string {
  * @param options - Optional line/column to scroll to
  */
 export function openInVSCode(filePath: string, options: FileLinkOptions = {}): void {
-	const url = generateJatFileUrl(filePath, options);
+	const url = generateSquadFileUrl(filePath, options);
 
 	// Open in new tab to preserve current context
 	window.open(url, '_blank');
 }
 
 /**
- * Open a file in the JAT IDE file editor
+ * Open a file in the SQUAD IDE file editor
  *
- * Alias for openInVSCode - named for clarity when using JAT links.
+ * Alias for openInVSCode - named for clarity when using SQUAD links.
  */
-export function openInJatEditor(filePath: string, options: FileLinkOptions = {}): void {
+export function openInSquadEditor(filePath: string, options: FileLinkOptions = {}): void {
 	openInVSCode(filePath, options);
 }
 
 /**
- * Open a diff view in the JAT IDE file editor
+ * Open a diff view in the SQUAD IDE file editor
  *
  * Navigates to the /files route with diff mode enabled.
  * Opens in a new browser tab to preserve the current context.
@@ -211,27 +211,27 @@ export function openDiffInVSCode(filePath: string, options: DiffLinkOptions = {}
 }
 
 /**
- * Open a diff view in the JAT IDE file editor
+ * Open a diff view in the SQUAD IDE file editor
  *
- * Alias for openDiffInVSCode - named for clarity when using JAT links.
+ * Alias for openDiffInVSCode - named for clarity when using SQUAD links.
  */
-export function openDiffInJatEditor(filePath: string, options: DiffLinkOptions = {}): void {
+export function openDiffInSquadEditor(filePath: string, options: DiffLinkOptions = {}): void {
 	openDiffInVSCode(filePath, options);
 }
 
 /**
- * Check if we're in a browser context where JAT file editor links work
+ * Check if we're in a browser context where SQUAD file editor links work
  */
 export function canOpenInVSCode(): boolean {
 	return typeof window !== 'undefined' && typeof window.location !== 'undefined';
 }
 
 /**
- * Check if we're in a browser context where JAT file editor links work
+ * Check if we're in a browser context where SQUAD file editor links work
  *
  * Alias for canOpenInVSCode - named for clarity.
  */
-export function canOpenInJatEditor(): boolean {
+export function canOpenInSquadEditor(): boolean {
 	return canOpenInVSCode();
 }
 
@@ -290,7 +290,7 @@ export function isGlobPattern(path: string): boolean {
  * by the actual project root at runtime.
  */
 function getDefaultProjectRoot(): string {
-	// This will be the jat project root when accessed from IDE
+	// This will be the squad project root when accessed from IDE
 	// The parent of /ide is the project root
 	if (typeof window !== 'undefined' && window.location) {
 		// We're in browser context - the API should provide the actual root
@@ -305,7 +305,7 @@ function getDefaultProjectRoot(): string {
  * File link result containing both URL and fallback command
  */
 export interface FileLinkResult {
-	/** JAT file editor URL for direct opening */
+	/** SQUAD file editor URL for direct opening */
 	editorUrl: string;
 	/** Shell command for terminal users */
 	shellCommand?: string;
@@ -327,7 +327,7 @@ export interface FileLinkResult {
 export function getFileLink(filePath: string, options: FileLinkOptions = {}): FileLinkResult {
 	const { line, column } = options;
 
-	const editorUrl = generateJatFileUrl(filePath, options);
+	const editorUrl = generateSquadFileUrl(filePath, options);
 
 	// Build shell command for terminal users (still points to external editor)
 	let shellCommand = `code ${filePath}`;
@@ -404,7 +404,7 @@ export function getProjectsCache(): Record<string, ProjectConfig> | null {
 /**
  * Get the port for a project from the cache
  *
- * @param projectName - Project name (e.g., 'jat', 'chimaro')
+ * @param projectName - Project name (e.g., 'squad', 'chimaro')
  * @returns Port number or null if not found
  */
 export function getProjectPort(projectName: string): number | null {
@@ -422,7 +422,7 @@ export function getProjectPort(projectName: string): number | null {
  *
  * @example
  * ```typescript
- * generateLocalhostUrl('/dashboard', 'jat')
+ * generateLocalhostUrl('/dashboard', 'squad')
  * // → 'http://localhost:3333/dashboard'
  *
  * generateLocalhostUrl('/login', 'chimaro')
@@ -501,9 +501,9 @@ export function detectRouteFromPath(filePath: string): string | null {
  * Interface for all links related to a file
  */
 export interface FileLinks {
-	/** JAT file editor link to open the file */
+	/** SQUAD file editor link to open the file */
 	editorUrl: string;
-	/** JAT file editor link to show diff */
+	/** SQUAD file editor link to show diff */
 	diffUrl: string;
 	/** Localhost URL if this is a route file */
 	localhostUrl: string | null;
@@ -521,7 +521,7 @@ export interface FileLinks {
  *
  * @example
  * ```typescript
- * getAllFileLinks('src/routes/dash/+page.svelte', 'jat')
+ * getAllFileLinks('src/routes/dash/+page.svelte', 'squad')
  * // → {
  * //     editorUrl: '/files?path=src/routes/dash/+page.svelte',
  * //     diffUrl: '/files?path=src/routes/dash/+page.svelte&diff=true',
@@ -535,7 +535,7 @@ export function getAllFileLinks(
 	projectName: string,
 	options: FileLinkOptions & { localhostRoute?: string } = {}
 ): FileLinks {
-	const editorUrl = generateJatFileUrl(filePath, options);
+	const editorUrl = generateSquadFileUrl(filePath, options);
 	const diffUrl = generateDiffUrl(filePath, {});
 
 	// Use explicit localhost route if provided, otherwise try to detect
@@ -553,7 +553,7 @@ export function getAllFileLinks(
 /**
  * Open all links for a file
  *
- * Opens the file in JAT editor and optionally localhost, each in a new tab.
+ * Opens the file in SQUAD editor and optionally localhost, each in a new tab.
  *
  * @param filePath - File path relative to project root
  * @param projectName - Project name for localhost URL
@@ -576,7 +576,7 @@ export function openAllFileLinks(
 		window.open(links.localhostUrl, '_blank');
 	}
 
-	// Open JAT file editor in new tab
+	// Open SQUAD file editor in new tab
 	if (options.openEditor) {
 		window.open(links.editorUrl, '_blank');
 	} else if (options.openDiff) {
@@ -585,20 +585,20 @@ export function openAllFileLinks(
 }
 
 // =============================================================================
-// JAT FILES PAGE URL UTILITIES
+// SQUAD FILES PAGE URL UTILITIES
 // =============================================================================
 
 /**
- * Generate a URL to open a file in the JAT Files page (/files)
+ * Generate a URL to open a file in the SQUAD Files page (/files)
  *
  * @param filePath - File path relative to project root
- * @param projectName - Project name (e.g., 'jat', 'chimaro')
+ * @param projectName - Project name (e.g., 'squad', 'chimaro')
  * @returns URL to the files page with project and file parameters
  *
  * @example
  * ```typescript
- * generateFilesPageUrl('src/lib/auth.ts', 'jat')
- * // → '/files?project=jat&file=src/lib/auth.ts'
+ * generateFilesPageUrl('src/lib/auth.ts', 'squad')
+ * // → '/files?project=squad&file=src/lib/auth.ts'
  * ```
  */
 export function generateFilesPageUrl(filePath: string, projectName: string): string {
@@ -609,18 +609,18 @@ export function generateFilesPageUrl(filePath: string, projectName: string): str
 }
 
 /**
- * Open a file in the JAT Files page (/files) in a new tab
+ * Open a file in the SQUAD Files page (/files) in a new tab
  *
- * This is the preferred way to open files within the JAT IDE,
+ * This is the preferred way to open files within the SQUAD IDE,
  * as it keeps the user in the integrated file editor while preserving context.
  *
  * @param filePath - File path relative to project root
- * @param projectName - Project name (e.g., 'jat', 'chimaro')
+ * @param projectName - Project name (e.g., 'squad', 'chimaro')
  *
  * @example
  * ```typescript
- * openInFilesPage('src/lib/auth.ts', 'jat');
- * // Opens /files?project=jat&file=src/lib/auth.ts in new tab
+ * openInFilesPage('src/lib/auth.ts', 'squad');
+ * // Opens /files?project=squad&file=src/lib/auth.ts in new tab
  * ```
  */
 export function openInFilesPage(filePath: string, projectName: string): void {
@@ -636,15 +636,15 @@ export function openInFilesPage(filePath: string, projectName: string): void {
  * Useful for viewing files from signal cards, task details, etc.
  *
  * @param filePath - File path relative to project root
- * @param projectName - Project name (e.g., 'jat', 'chimaro')
+ * @param projectName - Project name (e.g., 'squad', 'chimaro')
  * @param lineNumber - Optional line number to scroll to
  *
  * @example
  * ```typescript
- * openInFilePreviewDrawer('src/lib/auth.ts', 'jat');
+ * openInFilePreviewDrawer('src/lib/auth.ts', 'squad');
  * // Opens drawer with auth.ts content
  *
- * openInFilePreviewDrawer('src/lib/auth.ts', 'jat', 42);
+ * openInFilePreviewDrawer('src/lib/auth.ts', 'squad', 42);
  * // Opens drawer with auth.ts, scrolled to line 42
  * ```
  */

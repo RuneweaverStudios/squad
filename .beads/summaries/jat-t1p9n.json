@@ -1,6 +1,6 @@
 {
-  "taskId": "jat-t1p9n",
-  "title": "update jat/readme.md",
+  "taskId": "squad-t1p9n",
+  "title": "update squad/readme.md",
   "summary": [
     "Updated README.md to reflect current project structure and views",
     "Removed references to outdated /work and /kanban paths",
@@ -10,7 +10,7 @@
   "duration": "3 minutes",
   "agent": "AzureOcean",
   "keyChanges": [
-    "jat/readme.md"
+    "squad/readme.md"
   ],
   "quality": {
     "tests": "none",
@@ -34,7 +34,7 @@
   ],
   "crossAgentIntel": {
     "files": [
-      "jat/readme.md"
+      "squad/readme.md"
     ],
     "patterns": [
       "Update documentation to match current project structure"

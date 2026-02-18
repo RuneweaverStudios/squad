@@ -28,7 +28,7 @@ function getFixHint(name: string, plat: string): string {
 		sqlite3: isMac ? 'brew install sqlite' : 'sudo apt install -y sqlite3',
 		jq: isMac ? 'brew install jq' : 'sudo apt install -y jq',
 		git: isMac ? 'brew install git' : 'sudo apt install -y git',
-		jt: 'curl -sSL https://raw.githubusercontent.com/joewinke/jat/master/tools/scripts/bootstrap.sh | bash',
+		st: 'curl -sSL https://raw.githubusercontent.com/joewinke/squad/master/tools/scripts/bootstrap.sh | bash',
 		node: isMac ? 'brew install node' : 'sudo apt install -y nodejs npm'
 	};
 	return hints[name] || `Install ${name}`;
@@ -42,7 +42,7 @@ export async function GET() {
 		{ name: 'sqlite3', cmd: 'sqlite3 --version', required: true },
 		{ name: 'jq', cmd: 'jq --version', required: true },
 		{ name: 'git', cmd: 'git --version', required: true },
-		{ name: 'jt', cmd: 'jt --version', required: true },
+		{ name: 'st', cmd: 'st --version', required: true },
 		{ name: 'node', cmd: 'node --version', required: false }
 	];
 

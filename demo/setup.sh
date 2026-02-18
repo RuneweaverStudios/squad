@@ -1,5 +1,5 @@
 #!/bin/bash
-# JAT Demo Setup Script
+# SQUAD Demo Setup Script
 # Creates isolated demo environment with sample projects and tasks
 
 set -e
@@ -14,9 +14,9 @@ BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
 
-DEMO_DIR="/tmp/jat-demo"
-JAT_DIR="$HOME/code/jat"
-DEMO_TEMPLATES="$JAT_DIR/demo"
+DEMO_DIR="/tmp/squad-demo"
+SQUAD_DIR="$HOME/code/squad"
+DEMO_TEMPLATES="$SQUAD_DIR/demo"
 
 #------------------------------------------------------------------------------
 # Utility Functions
@@ -67,7 +67,7 @@ EOF
     cat > "$project_dir/README.md" << 'EOF'
 # ACME SaaS Platform
 
-A demo SaaS application for JAT demonstration.
+A demo SaaS application for SQUAD demonstration.
 
 ## Features (To Build)
 - User authentication (OAuth + email/password)
@@ -112,7 +112,7 @@ EOF
     cat > "$project_dir/CLAUDE.md" << 'EOF'
 # ACME SaaS Platform
 
-This is a demo SaaS application for showcasing JAT capabilities.
+This is a demo SaaS application for showcasing SQUAD capabilities.
 
 ## Tech Stack
 - Frontend: React + TypeScript
@@ -136,8 +136,8 @@ EOF
     # Commit initial state
     (cd "$project_dir" && git add -A && git commit -q -m "Initial demo project setup")
 
-    # Initialize JAT Tasks
-    (cd "$project_dir" && jt init -q 2>/dev/null || true)
+    # Initialize SQUAD Tasks
+    (cd "$project_dir" && st init -q 2>/dev/null || true)
 
     log_done "acme-saas created"
 }
@@ -227,7 +227,7 @@ EOF
     cat > "$project_dir/CLAUDE.md" << 'EOF'
 # Pixel Art Editor
 
-A creative pixel art application for showcasing JAT capabilities.
+A creative pixel art application for showcasing SQUAD capabilities.
 
 ## Tech Stack
 - Frontend: TypeScript + Canvas API
@@ -249,8 +249,8 @@ EOF
     # Commit initial state
     (cd "$project_dir" && git add -A && git commit -q -m "Initial demo project setup")
 
-    # Initialize JAT Tasks
-    (cd "$project_dir" && jt init -q 2>/dev/null || true)
+    # Initialize SQUAD Tasks
+    (cd "$project_dir" && st init -q 2>/dev/null || true)
 
     log_done "pixel-art created"
 }
@@ -265,78 +265,78 @@ create_acme_tasks() {
 
     (cd "$project_dir"
         # Epic: User Authentication System
-        jt create "Epic: User authentication system" \
+        st create "Epic: User authentication system" \
             --type epic \
             --priority 0 \
             --labels auth,security,core \
             --description "Complete authentication system with OAuth and email/password login. This epic covers all auth-related work." \
             2>/dev/null || true
 
-        local epic_id=$(jt list --json 2>/dev/null | jq -r '.[] | select(.title | contains("Epic: User")) | .id' | head -1)
+        local epic_id=$(st list --json 2>/dev/null | jq -r '.[] | select(.title | contains("Epic: User")) | .id' | head -1)
 
         # Epic subtasks
-        jt create "Set up OAuth providers (Google, GitHub)" \
+        st create "Set up OAuth providers (Google, GitHub)" \
             --type task \
             --priority 0 \
             --labels auth,oauth \
             --description "Configure OAuth 2.0 providers for social login. Support Google and GitHub initially." \
             2>/dev/null || true
-        local oauth_id=$(jt list --json 2>/dev/null | jq -r '.[] | select(.title | contains("OAuth providers")) | .id' | head -1)
+        local oauth_id=$(st list --json 2>/dev/null | jq -r '.[] | select(.title | contains("OAuth providers")) | .id' | head -1)
 
-        jt create "Build login/signup UI components" \
+        st create "Build login/signup UI components" \
             --type task \
             --priority 1 \
             --labels auth,ui,frontend \
             --description "Create responsive login and signup forms with validation, error states, and loading indicators." \
             2>/dev/null || true
-        local login_ui_id=$(jt list --json 2>/dev/null | jq -r '.[] | select(.title | contains("login/signup UI")) | .id' | head -1)
+        local login_ui_id=$(st list --json 2>/dev/null | jq -r '.[] | select(.title | contains("login/signup UI")) | .id' | head -1)
 
-        jt create "Implement session management" \
+        st create "Implement session management" \
             --type task \
             --priority 1 \
             --labels auth,backend,security \
             --description "Handle JWT tokens, refresh logic, and secure session storage. Include logout and session invalidation." \
             2>/dev/null || true
-        local session_id=$(jt list --json 2>/dev/null | jq -r '.[] | select(.title | contains("session management")) | .id' | head -1)
+        local session_id=$(st list --json 2>/dev/null | jq -r '.[] | select(.title | contains("session management")) | .id' | head -1)
 
         # Set up epic dependencies (epic depends on subtasks)
         if [[ -n "$epic_id" && -n "$oauth_id" ]]; then
-            jt dep add "$epic_id" "$oauth_id" 2>/dev/null || true
+            st dep add "$epic_id" "$oauth_id" 2>/dev/null || true
         fi
         if [[ -n "$epic_id" && -n "$login_ui_id" ]]; then
-            jt dep add "$epic_id" "$login_ui_id" 2>/dev/null || true
+            st dep add "$epic_id" "$login_ui_id" 2>/dev/null || true
         fi
         if [[ -n "$epic_id" && -n "$session_id" ]]; then
-            jt dep add "$epic_id" "$session_id" 2>/dev/null || true
+            st dep add "$epic_id" "$session_id" 2>/dev/null || true
         fi
         # Session depends on OAuth (OAuth must be done first)
         if [[ -n "$session_id" && -n "$oauth_id" ]]; then
-            jt dep add "$session_id" "$oauth_id" 2>/dev/null || true
+            st dep add "$session_id" "$oauth_id" 2>/dev/null || true
         fi
 
         # Other standalone tasks
-        jt create "Add Stripe billing integration" \
+        st create "Add Stripe billing integration" \
             --type feature \
             --priority 1 \
             --labels billing,stripe,backend \
             --description "Integrate Stripe for subscription billing. Support monthly/yearly plans, usage-based pricing, and invoice management." \
             2>/dev/null || true
 
-        jt create "Build analytics dashboard widgets" \
+        st create "Build analytics dashboard widgets" \
             --type feature \
             --priority 2 \
             --labels analytics,dashboard,frontend \
             --description "Create dashboard widgets showing key metrics: active users, MRR, churn rate, feature usage." \
             2>/dev/null || true
 
-        jt create "Fix mobile responsive layout issues" \
+        st create "Fix mobile responsive layout issues" \
             --type bug \
             --priority 1 \
             --labels ui,mobile,bug \
             --description "Navigation menu breaks on screens under 768px. Settings page has overflow issues on mobile." \
             2>/dev/null || true
 
-        jt create "Write API documentation" \
+        st create "Write API documentation" \
             --type chore \
             --priority 3 \
             --labels docs,api \
@@ -352,35 +352,35 @@ create_pixel_art_tasks() {
     log_info "Creating pixel-art tasks..."
 
     (cd "$project_dir"
-        jt create "Implement brush tool with size control" \
+        st create "Implement brush tool with size control" \
             --type feature \
             --priority 1 \
             --labels tools,canvas \
             --description "Create a brush tool that supports variable sizes (1-32px), opacity control, and smooth drawing." \
             2>/dev/null || true
 
-        jt create "Add layer support" \
+        st create "Add layer support" \
             --type feature \
             --priority 2 \
             --labels layers,canvas,core \
             --description "Implement layer system with add/remove/reorder layers, opacity per layer, and merge functionality." \
             2>/dev/null || true
 
-        jt create "Export to PNG and GIF" \
+        st create "Export to PNG and GIF" \
             --type feature \
             --priority 1 \
             --labels export,core \
             --description "Allow exporting artwork to PNG (single frame) and animated GIF (from layers as frames)." \
             2>/dev/null || true
 
-        jt create "Build color palette picker" \
+        st create "Build color palette picker" \
             --type feature \
             --priority 2 \
             --labels ui,tools \
             --description "Create color picker with HSL sliders, saved palettes, and eyedropper tool for picking colors from canvas." \
             2>/dev/null || true
 
-        jt create "Add keyboard shortcuts" \
+        st create "Add keyboard shortcuts" \
             --type chore \
             --priority 3 \
             --labels ux,accessibility \
@@ -398,7 +398,7 @@ create_pixel_art_tasks() {
 setup_demo() {
     echo ""
     echo -e "${BOLD}╔═══════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BOLD}║              ${CYAN}🎬 JAT Demo Environment Setup${NC}${BOLD}                   ║${NC}"
+    echo -e "${BOLD}║              ${CYAN}🎬 SQUAD Demo Environment Setup${NC}${BOLD}                   ║${NC}"
     echo -e "${BOLD}╚═══════════════════════════════════════════════════════════════╝${NC}"
     echo ""
     echo -e "  ${DIM}Demo directory:${NC} $DEMO_DIR"
@@ -419,22 +419,22 @@ setup_demo() {
     log_step "Step 3/3: Configuring demo environment"
 
     # Backup current config if exists
-    local backup_file="$HOME/.config/jat/projects.json.pre-demo"
-    if [[ -f "$HOME/.config/jat/projects.json" ]] && [[ ! -f "$backup_file" ]]; then
-        cp "$HOME/.config/jat/projects.json" "$backup_file"
+    local backup_file="$HOME/.config/squad/projects.json.pre-demo"
+    if [[ -f "$HOME/.config/squad/projects.json" ]] && [[ ! -f "$backup_file" ]]; then
+        cp "$HOME/.config/squad/projects.json" "$backup_file"
         log_info "Backed up current config to projects.json.pre-demo"
     fi
 
     # Merge demo projects into config (don't replace, merge)
     local tmp_file=$(mktemp)
-    if [[ -f "$HOME/.config/jat/projects.json" ]]; then
+    if [[ -f "$HOME/.config/squad/projects.json" ]]; then
         # Merge demo projects with existing config
         jq -s '.[0] * {projects: (.[0].projects + .[1].projects)}' \
-            "$HOME/.config/jat/projects.json" \
+            "$HOME/.config/squad/projects.json" \
             "$DEMO_TEMPLATES/projects.json" > "$tmp_file"
-        mv "$tmp_file" "$HOME/.config/jat/projects.json"
+        mv "$tmp_file" "$HOME/.config/squad/projects.json"
     else
-        cp "$DEMO_TEMPLATES/projects.json" "$HOME/.config/jat/projects.json"
+        cp "$DEMO_TEMPLATES/projects.json" "$HOME/.config/squad/projects.json"
     fi
     log_done "Demo projects added to config"
 
@@ -448,11 +448,11 @@ setup_demo() {
     echo -e "  ${CYAN}pixel-art${NC}  - Pixel art editor (5 tasks)"
     echo ""
     echo "Next steps:"
-    echo -e "  ${DIM}1.${NC} Launch IDE:  ${BOLD}jat demo${NC}"
-    echo -e "  ${DIM}2.${NC} Start an agent:    ${BOLD}jat acme-saas${NC}"
-    echo -e "  ${DIM}3.${NC} Epic swarm:        ${BOLD}jat acme-saas 3 --auto${NC}"
+    echo -e "  ${DIM}1.${NC} Launch IDE:  ${BOLD}squad demo${NC}"
+    echo -e "  ${DIM}2.${NC} Start an agent:    ${BOLD}squad acme-saas${NC}"
+    echo -e "  ${DIM}3.${NC} Epic swarm:        ${BOLD}squad acme-saas 3 --auto${NC}"
     echo ""
-    echo -e "${DIM}Reset anytime with: jat demo reset${NC}"
+    echo -e "${DIM}Reset anytime with: squad demo reset${NC}"
     echo ""
 }
 
@@ -462,7 +462,7 @@ reset_demo() {
     echo ""
 
     # Kill any running demo sessions
-    for session in $(tmux list-sessions -F '#S' 2>/dev/null | grep -E '^jat-(acme|pixel)'); do
+    for session in $(tmux list-sessions -F '#S' 2>/dev/null | grep -E '^squad-(acme|pixel)'); do
         tmux kill-session -t "$session" 2>/dev/null || true
         log_info "Killed session: $session"
     done
@@ -474,25 +474,25 @@ reset_demo() {
     fi
 
     # Remove demo projects from config
-    if [[ -f "$HOME/.config/jat/projects.json" ]]; then
+    if [[ -f "$HOME/.config/squad/projects.json" ]]; then
         local tmp_file=$(mktemp)
         jq 'del(.projects["acme-saas"]) | del(.projects["pixel-art"])' \
-            "$HOME/.config/jat/projects.json" > "$tmp_file"
-        mv "$tmp_file" "$HOME/.config/jat/projects.json"
+            "$HOME/.config/squad/projects.json" > "$tmp_file"
+        mv "$tmp_file" "$HOME/.config/squad/projects.json"
         log_done "Removed demo projects from config"
     fi
 
     # Clear demo-related signal files
-    rm -f /tmp/jat-signal-*-acme-*.json 2>/dev/null
-    rm -f /tmp/jat-signal-*-pixel-*.json 2>/dev/null
-    rm -f /tmp/jat-timeline-jat-acme*.jsonl 2>/dev/null
-    rm -f /tmp/jat-timeline-jat-pixel*.jsonl 2>/dev/null
+    rm -f /tmp/squad-signal-*-acme-*.json 2>/dev/null
+    rm -f /tmp/squad-signal-*-pixel-*.json 2>/dev/null
+    rm -f /tmp/squad-timeline-squad-acme*.jsonl 2>/dev/null
+    rm -f /tmp/squad-timeline-squad-pixel*.jsonl 2>/dev/null
     log_done "Cleared demo signal files"
 
     echo ""
     echo -e "${GREEN}✓ Demo environment reset${NC}"
     echo ""
-    echo "Run 'jat demo init' to set up again"
+    echo "Run 'squad demo init' to set up again"
     echo ""
 }
 

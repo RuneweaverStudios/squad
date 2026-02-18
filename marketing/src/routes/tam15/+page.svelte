@@ -466,7 +466,7 @@
 		<section class="install-section">
 			<div class="scroll-container">
 				<div class="scroll-ornament top">᛭᛭᛭</div>
-				<code>git clone https://github.com/jomarchy/jat.git</code>
+				<code>git clone https://github.com/jomarchy/squad.git</code>
 				<div class="scroll-ornament bottom">᛭᛭᛭</div>
 			</div>
 		</section>

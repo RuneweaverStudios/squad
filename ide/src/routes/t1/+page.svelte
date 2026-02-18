@@ -120,7 +120,7 @@
 </script>
 
 <svelte:head>
-	<title>T1 Kanban | JAT IDE</title>
+	<title>T1 Kanban | SQUAD IDE</title>
 </svelte:head>
 
 <div class="kanban-page">

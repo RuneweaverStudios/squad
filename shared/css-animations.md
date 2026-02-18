@@ -1,6 +1,6 @@
 ## CSS Animation Approach and Design Guidelines
 
-This document describes the CSS animation strategy used in the JAT IDE, particularly for the `/tasks` page task list animations.
+This document describes the CSS animation strategy used in the SQUAD IDE, particularly for the `/tasks` page task list animations.
 
 ### Animation Library: Animista
 
@@ -166,7 +166,7 @@ All animations respect `prefers-reduced-motion`:
 
 ### Animation CSS Variables
 
-The IDE defines semantic animation color variables in the `[data-theme='jat']` block:
+The IDE defines semantic animation color variables in the `[data-theme='squad']` block:
 
 ```css
 /* Primary blue - entrance animations, radar, links */
@@ -219,8 +219,8 @@ The IDE defines semantic animation color variables in the `[data-theme='jat']` b
 
 The current animation approach evolved through several iterations:
 
-1. **Initial implementation (jat-9kghu):** Added scale-in/scale-out animations to `/tasks` page
-2. **Refinement (jat-64s5a):** Changed to slide-in-fwd-center/slide-out-bck-center for 3D depth effect
+1. **Initial implementation (squad-9kghu):** Added scale-in/scale-out animations to `/tasks` page
+2. **Refinement (squad-64s5a):** Changed to slide-in-fwd-center/slide-out-bck-center for 3D depth effect
 3. **Session cards:** Separate Y-axis animations to match vertical card layout
 
 ### Animista Integration

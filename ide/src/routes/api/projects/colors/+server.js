@@ -1,5 +1,5 @@
 /**
- * API endpoint to fetch project colors from ~/.config/jat/projects.json
+ * API endpoint to fetch project colors from ~/.config/squad/projects.json
  * Returns a map of project name -> hex color
  */
 
@@ -10,7 +10,7 @@ import { join } from 'path';
 
 export async function GET() {
 	try {
-		const configPath = join(homedir(), '.config/jat/projects.json');
+		const configPath = join(homedir(), '.config/squad/projects.json');
 
 		if (!existsSync(configPath)) {
 			return json({ colors: {} });

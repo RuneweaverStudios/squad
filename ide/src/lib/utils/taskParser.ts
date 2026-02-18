@@ -2,7 +2,7 @@
  * Task Parser — Core parsing engine for multi-mode task creation
  *
  * Supports: shorthand single-line, YAML, JSON, markdown lists, plain text
- * Used by: CreatePaste tab, /api/tasks/parse endpoint, jat-bulk CLI
+ * Used by: CreatePaste tab, /api/tasks/parse endpoint, squad-bulk CLI
  */
 import yaml from 'js-yaml';
 
@@ -101,10 +101,10 @@ export function detectFormat(text: string): DetectedFormat {
  *   /p0 through /p4                      → priority
  *   #security, #api                      → labels (multiple)
  *   @AgentName                           → assignee
- *   +jat-abc                             → dependency
+ *   +squad-abc                             → dependency
  *   Everything else                      → title
  *
- * Example: "Fix auth timeout /bug /p0 #security #api @BrightCanyon +jat-abc"
+ * Example: "Fix auth timeout /bug /p0 #security #api @BrightCanyon +squad-abc"
  */
 export function parseShorthand(line: string): ParsedTask {
 	let remaining = line.trim();

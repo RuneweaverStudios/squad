@@ -28,9 +28,9 @@ export interface Toast {
 		label: string;
 		onClick: () => void;
 	};
-	/** Project name for color pill display (e.g., "jat", "chimaro") */
+	/** Project name for color pill display (e.g., "squad", "chimaro") */
 	projectId?: string;
-	/** Task ID for badge display (e.g., "jat-abc") */
+	/** Task ID for badge display (e.g., "squad-abc") */
 	taskId?: string;
 	/** Task title for tooltip/context */
 	taskTitle?: string;

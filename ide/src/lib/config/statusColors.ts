@@ -617,7 +617,7 @@ export const SESSION_STATE_VISUALS: Record<string, SessionStateVisual> = {
 		label: '⏳ COMPLETING',
 		shortLabel: '⏳ Completing',
 		iconType: 'gear',
-		description: 'Running /jat:complete to finalize the task',
+		description: 'Running /squad:complete to finalize the task',
 		// StatusActionBadge colors
 		bgColor: 'oklch(0.50 0.12 175 / 0.3)',
 		textColor: 'oklch(0.85 0.12 175)',
@@ -755,7 +755,7 @@ export interface SessionStateAction {
 	icon: string;         // SVG path
 	variant: 'default' | 'success' | 'warning' | 'error' | 'info';
 	description?: string;
-	/** For custom command actions: the slash command to execute (e.g., "/jat:tasktree") */
+	/** For custom command actions: the slash command to execute (e.g., "/squad:tasktree") */
 	command?: string;
 }
 
@@ -1403,18 +1403,18 @@ export interface GroupHeaderInfo {
  * // → { icon: '🐛', label: 'BUG', accent: 'oklch(...)', bgTint: '...' }
  *
  * // Parent mode - uses folder icon
- * getGroupHeaderInfo('parent', 'jat-abc')
- * // → { icon: '📁', label: 'JAT-ABC', accent: 'oklch(...)', bgTint: '...' }
+ * getGroupHeaderInfo('parent', 'squad-abc')
+ * // → { icon: '📁', label: 'SQUAD-ABC', accent: 'oklch(...)', bgTint: '...' }
  *
  * // Label mode - uses tag icon
  * getGroupHeaderInfo('label', 'dashboard')
  * // → { icon: '🏷️', label: 'DASHBOARD', accent: 'oklch(...)', bgTint: '...' }
  *
  * // Project mode - uses composite key (project::epic)
- * getGroupHeaderInfo('project', 'jat::jat-abc')
- * // → { icon: '📁', label: 'JAT-ABC', accent: 'oklch(...)', bgTint: '...' }
- * getGroupHeaderInfo('project', 'jat::')
- * // → { icon: '📦', label: 'JAT', accent: 'oklch(...)', bgTint: '...' } // Project header
+ * getGroupHeaderInfo('project', 'squad::squad-abc')
+ * // → { icon: '📁', label: 'SQUAD-ABC', accent: 'oklch(...)', bgTint: '...' }
+ * getGroupHeaderInfo('project', 'squad::')
+ * // → { icon: '📦', label: 'SQUAD', accent: 'oklch(...)', bgTint: '...' } // Project header
  */
 export function getGroupHeaderInfo(mode: GroupingMode, groupKey: string | null): GroupHeaderInfo {
 	switch (mode) {

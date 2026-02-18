@@ -44,7 +44,7 @@
 		cost: number;
 	}
 
-	// Suggested task interface (from jat-signal)
+	// Suggested task interface (from squad-signal)
 	interface SuggestedTask {
 		id?: string;
 		type: string;
@@ -88,7 +88,7 @@
 		gotchas?: string[];
 	}
 
-	// Full completion bundle from jat-signal complete
+	// Full completion bundle from squad-signal complete
 	interface CompletionBundle {
 		taskId: string;
 		agentName: string;
@@ -116,15 +116,15 @@
 		_sseState?: string;
 		/** Timestamp when WS state was last updated */
 		_sseStateTimestamp?: number;
-		/** Suggested tasks from jat-signal (via WS session-signal event) */
+		/** Suggested tasks from squad-signal (via WS session-signal event) */
 		_signalSuggestedTasks?: SuggestedTask[];
 		/** Timestamp when signal suggested tasks were last updated */
 		_signalSuggestedTasksTimestamp?: number;
-		/** Human action from jat-signal (via WS session-signal event) */
+		/** Human action from squad-signal (via WS session-signal event) */
 		_signalAction?: SignalAction;
 		/** Timestamp when signal action was last updated */
 		_signalActionTimestamp?: number;
-		/** Completion bundle from jat-signal complete (via WS session-complete event) */
+		/** Completion bundle from squad-signal complete (via WS session-complete event) */
 		_completionBundle?: CompletionBundle;
 		/** Timestamp when completion bundle was received */
 		_completionBundleTimestamp?: number;
@@ -243,15 +243,15 @@
 
 		// Find positions using same patterns as SessionCard
 		const needsInputPos = findLastPos([
-			/\[JAT:NEEDS_INPUT\]/,
+			/\[SQUAD:NEEDS_INPUT\]/,
 			/❓\s*NEED CLARIFICATION/,
 			// Claude Code's native question UI patterns
 			/Enter to select.*Tab\/Arrow keys to navigate.*Esc to cancel/,
 			/\[ \].*\n.*\[ \]/,  // Multiple checkbox options
 			/Type something\s*\n\s*Next/,  // "Type something" option in questions
 		]);
-		const workingPos = findLastPos([/\[JAT:WORKING\s+task=/]);
-		const reviewPos = findLastPos([/\[JAT:NEEDS_REVIEW\]/, /\[JAT:READY\s+actions=/, /🔍\s*READY FOR REVIEW/]);
+		const workingPos = findLastPos([/\[SQUAD:WORKING\s+task=/]);
+		const reviewPos = findLastPos([/\[SQUAD:NEEDS_REVIEW\]/, /\[SQUAD:READY\s+actions=/, /🔍\s*READY FOR REVIEW/]);
 
 		if (session.task) {
 			const positions = [
@@ -270,7 +270,7 @@
 		}
 
 		// No active task - check completed vs idle
-		const hasCompletionMarker = /\[JAT:IDLE\]/.test(recentOutput) || /✅\s*TASK COMPLETE/.test(recentOutput);
+		const hasCompletionMarker = /\[SQUAD:IDLE\]/.test(recentOutput) || /✅\s*TASK COMPLETE/.test(recentOutput);
 		if (session.lastCompletedTask || hasCompletionMarker) {
 			return 4; // completed
 		}

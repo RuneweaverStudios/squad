@@ -38,30 +38,30 @@
 	// Task cycles
 	const taskCycles = [
 		{
-			task: { id: 'jat-7kx', name: 'OAuth setup' },
+			task: { id: 'squad-7kx', name: 'OAuth setup' },
 			agents: ['BluePeak', 'FairMist', 'GreenRidge'],
 			workingFiles: 'src/auth/oauth.ts\nsrc/lib/google.ts\n+ 47 lines',
 			question: 'Auth provider?\n1. Supabase\n2. Auth0\n3. Custom',
 			diff: '+3 files changed\n+142 insertions\n-12 deletions',
-			nextTask: 'jat-7ky: Sessions',
+			nextTask: 'squad-7ky: Sessions',
 			suggested: { name: 'Add MFA', reason: 'Security enhancement' }
 		},
 		{
-			task: { id: 'jat-8ab', name: 'Add MFA' },
+			task: { id: 'squad-8ab', name: 'Add MFA' },
 			agents: ['BluePeak', 'FairMist', 'GreenRidge'],
 			workingFiles: 'src/auth/mfa.ts\nsrc/lib/totp.ts\n+ 89 lines',
 			question: 'MFA method?\n1. TOTP App\n2. SMS\n3. Email',
 			diff: '+5 files changed\n+203 insertions\n-8 deletions',
-			nextTask: 'jat-8ac: MFA UI',
+			nextTask: 'squad-8ac: MFA UI',
 			suggested: { name: 'Rate Limiting', reason: 'Prevent brute force' }
 		},
 		{
-			task: { id: 'jat-9cd', name: 'Rate Limiting' },
+			task: { id: 'squad-9cd', name: 'Rate Limiting' },
 			agents: ['BluePeak', 'FairMist', 'GreenRidge'],
 			workingFiles: 'src/middleware/rateLimit.ts\nsrc/lib/redis.ts\n+ 62 lines',
 			question: 'Rate limit strategy?\n1. Token bucket\n2. Sliding window\n3. Fixed window',
 			diff: '+4 files changed\n+156 insertions\n-3 deletions',
-			nextTask: 'jat-9ce: Rate limit UI',
+			nextTask: 'squad-9ce: Rate limit UI',
 			suggested: { name: 'OAuth Refresh', reason: 'Token expiry handling' }
 		}
 	];
@@ -70,7 +70,7 @@
 
 	let taskStates = $derived([
 		{ title: 'Add user authentication', content: '"Users should be able to log in with Google or email..."', icon: '💭' },
-		{ title: 'Auth System Epic', content: '├─ jat-7kx: OAuth setup\n├─ jat-7ky: Sessions\n└─ jat-7kz: Login UI', icon: '🌳' },
+		{ title: 'Auth System Epic', content: '├─ squad-7kx: OAuth setup\n├─ squad-7ky: Sessions\n└─ squad-7kz: Login UI', icon: '🌳' },
 		{ title: `${currentCycle.task.id}: ${currentCycle.task.name}`, content: currentCycle.agents.map(a => `🤖 ${a}`).join('\n'), icon: '🚀' },
 		{ title: `${currentCycle.task.id}: ${currentCycle.task.name}`, content: currentCycle.workingFiles, icon: '⚡' },
 		{ title: `${currentCycle.task.id}: ${currentCycle.task.name}`, content: currentCycle.question, icon: '❓' },

@@ -1,5 +1,5 @@
 /**
- * Push Notifications System for JAT IDE
+ * Push Notifications System for SQUAD IDE
  *
  * Provides multiple notification channels to alert users when agents need attention:
  * 1. Browser Notifications API - System-level notifications (works even when tab is in background)
@@ -326,7 +326,7 @@ export function updateTitleBadge(count: number): void {
 	}
 
 	// Extract base title (remove any existing badge)
-	const baseTitle = originalTitle || 'JAT IDE';
+	const baseTitle = originalTitle || 'SQUAD IDE';
 
 	document.title = `(${count}) ${baseTitle}`;
 }

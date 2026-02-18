@@ -59,7 +59,7 @@ else
 fi
 
 # Get tasks to check in-progress status (ensure valid JSON)
-TASKS_RAW=$(jt list --json 2>/dev/null || echo "")
+TASKS_RAW=$(st list --json 2>/dev/null || echo "")
 if [[ -z "$TASKS_RAW" ]] || ! echo "$TASKS_RAW" | jq empty 2>/dev/null; then
     TASKS_JSON="[]"
 else

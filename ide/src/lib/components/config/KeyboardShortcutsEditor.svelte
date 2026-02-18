@@ -100,10 +100,10 @@
 			groups.set(cmd.namespace, [...existing, cmd]);
 		}
 
-		// Sort namespaces: jat first, then local, then alphabetically
+		// Sort namespaces: squad first, then local, then alphabetically
 		const sortedEntries = Array.from(groups.entries()).sort(([a], [b]) => {
-			if (a === 'jat') return -1;
-			if (b === 'jat') return 1;
+			if (a === 'squad') return -1;
+			if (b === 'squad') return 1;
 			if (a === 'local') return -1;
 			if (b === 'local') return 1;
 			return a.localeCompare(b);

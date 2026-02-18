@@ -38,8 +38,8 @@ function getOnlineAgents(): Set<string> {
 		}).trim();
 
 		for (const line of result.split('\n')) {
-			if (line.startsWith('jat-')) {
-				online.add(line.replace('jat-', ''));
+			if (line.startsWith('squad-')) {
+				online.add(line.replace('squad-', ''));
 			}
 		}
 	} catch {
@@ -106,13 +106,13 @@ function buildTaskSessionsMap(taskIds: Set<string>, projectPath: string): Map<st
 	}
 
 	const tmpDir = '/tmp';
-	const timelinePattern = /^jat-timeline-jat-(.+)\.jsonl$/;
+	const timelinePattern = /^squad-timeline-squad-(.+)\.jsonl$/;
 
 	// First, cache all signal files for session ID lookup
 	try {
-		const signalFiles = readdirSync(tmpDir).filter(f => f.startsWith('jat-signal-tmux-jat-'));
+		const signalFiles = readdirSync(tmpDir).filter(f => f.startsWith('squad-signal-tmux-squad-'));
 		for (const file of signalFiles) {
-			const agentMatch = file.match(/^jat-signal-tmux-jat-(.+)\.json$/);
+			const agentMatch = file.match(/^squad-signal-tmux-squad-(.+)\.json$/);
 			if (agentMatch) {
 				try {
 					const content = readFileSync(join(tmpDir, file), 'utf-8');

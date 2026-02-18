@@ -4,7 +4,7 @@
 # Deletes Claude Code session files older than 7 days
 #
 # Add to crontab:
-#   0 4 * * * /home/jw/code/jat/tools/scripts/cleanup-jsonl-cron.sh >> /tmp/jsonl-cleanup.log 2>&1
+#   0 4 * * * /home/jw/code/squad/tools/scripts/cleanup-jsonl-cron.sh >> /tmp/jsonl-cleanup.log 2>&1
 #
 
 PROJECTS_DIR="$HOME/.claude/projects"

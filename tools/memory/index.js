@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 /**
- * jat-memory - Memory indexer and search CLI.
+ * squad-memory - Memory indexer and search CLI.
  *
- * Reads .jat/memory/*.md files, chunks them, generates embeddings,
+ * Reads .squad/memory/*.md files, chunks them, generates embeddings,
  * and stores in SQLite with vector search + FTS5 support.
  *
  * Usage:
- *   jat-memory index [--force] [--project path] [--skip-embeddings] [--verbose]
- *   jat-memory search 'query' [--project path] [--limit N] [--min-score 0.5]
- *   jat-memory status [--project path] [--json]
- *   jat-memory providers
- *   jat-memory --help
+ *   squad-memory index [--force] [--project path] [--skip-embeddings] [--verbose]
+ *   squad-memory search 'query' [--project path] [--limit N] [--min-score 0.5]
+ *   squad-memory status [--project path] [--json]
+ *   squad-memory providers
+ *   squad-memory --help
  */
 
 import { existsSync } from 'node:fs';
@@ -39,28 +39,28 @@ function resolveProjectPath() {
 
   // Default: current directory
   const cwd = process.cwd();
-  if (existsSync(`${cwd}/.jat`)) return cwd;
+  if (existsSync(`${cwd}/.squad`)) return cwd;
 
   // Try parent directories
   let dir = cwd;
   while (dir !== '/') {
     dir = resolve(dir, '..');
-    if (existsSync(`${dir}/.jat`)) return dir;
+    if (existsSync(`${dir}/.squad`)) return dir;
   }
 
-  console.error('Error: No .jat/ directory found. Run "jt init" in your project first.');
+  console.error('Error: No .squad/ directory found. Run "st init" in your project first.');
   process.exit(1);
 }
 
 function printHelp() {
-  console.log(`jat-memory - Agent memory indexer and search
+  console.log(`squad-memory - Agent memory indexer and search
 
 Usage:
-  jat-memory index [options]         Index memory files (chunk, embed, store)
-  jat-memory search 'query' [opts]   Hybrid search over memory index
-  jat-memory status [options]        Show index statistics
-  jat-memory providers               List available embedding providers
-  jat-memory --help                  Show this help
+  squad-memory index [options]         Index memory files (chunk, embed, store)
+  squad-memory search 'query' [opts]   Hybrid search over memory index
+  squad-memory status [options]        Show index statistics
+  squad-memory providers               List available embedding providers
+  squad-memory --help                  Show this help
 
 Index Options:
   --project <path>      Project path (default: current directory)
@@ -82,8 +82,8 @@ Status Options:
   --project <path>      Project path (default: current directory)
   --json                Output as JSON
 
-Memory files are read from: .jat/memory/*.md
-Index is stored in: .jat/memory.db`);
+Memory files are read from: .squad/memory/*.md
+Index is stored in: .squad/memory.db`);
 }
 
 // --- Commands ---
@@ -143,12 +143,12 @@ function cmdStatus() {
   const projectPath = resolveProjectPath();
   const jsonOutput = hasFlag('json');
 
-  const dbPath = `${projectPath}/.jat/memory.db`;
+  const dbPath = `${projectPath}/.squad/memory.db`;
   if (!existsSync(dbPath)) {
     if (jsonOutput) {
-      console.log(JSON.stringify({ error: 'No memory index found. Run: jat-memory index' }));
+      console.log(JSON.stringify({ error: 'No memory index found. Run: squad-memory index' }));
     } else {
-      console.log('No memory index found. Run: jat-memory index');
+      console.log('No memory index found. Run: squad-memory index');
     }
     return;
   }
@@ -194,13 +194,13 @@ async function cmdSearch() {
 
   if (!query) {
     console.error('Error: Search query required.');
-    console.error('Usage: jat-memory search "your query here" [--limit 5] [--min-score 0]');
+    console.error('Usage: squad-memory search "your query here" [--limit 5] [--min-score 0]');
     process.exit(1);
   }
 
-  const dbPath = `${projectPath}/.jat/memory.db`;
+  const dbPath = `${projectPath}/.squad/memory.db`;
   if (!existsSync(dbPath)) {
-    console.error('No memory index found. Run: jat-memory index');
+    console.error('No memory index found. Run: squad-memory index');
     process.exit(1);
   }
 
@@ -265,6 +265,6 @@ switch (command) {
     break;
   default:
     console.error(`Unknown command: ${command}`);
-    console.error('Run "jat-memory --help" for usage');
+    console.error('Run "squad-memory --help" for usage');
     process.exit(1);
 }

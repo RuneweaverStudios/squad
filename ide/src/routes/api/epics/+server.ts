@@ -4,13 +4,13 @@
  * GET /api/epics - List all epics (open and closed)
  * POST /api/epics - Create a new epic
  * Query params:
- *   - project: filter by project prefix (e.g., 'jat', 'chimaro')
+ *   - project: filter by project prefix (e.g., 'squad', 'chimaro')
  *   - status: 'open', 'closed', or 'all' (default: 'all')
  */
 
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { getTasks, createTask, addDependency } from '$lib/server/jat-tasks.js';
+import { getTasks, createTask, addDependency } from '$lib/server/squad-tasks.js';
 import { invalidateCache } from '$lib/server/cache.js';
 import { _resetTaskCache } from '../agents/+server.js';
 import { getProjectPath } from '$lib/server/projectPaths.js';

@@ -1,6 +1,6 @@
 /**
  * Markdown chunker for memory files.
- * Splits .jat/memory/*.md files into ~500 token chunks,
+ * Splits .squad/memory/*.md files into ~500 token chunks,
  * respecting heading boundaries with configurable overlap.
  */
 

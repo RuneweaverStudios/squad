@@ -5,11 +5,11 @@
  * Users can customize which commands appear in the StatusActionBadge dropdown
  * for each session state.
  *
- * Config file location: ~/.config/jat/state-actions.json
+ * Config file location: ~/.config/squad/state-actions.json
  *
  * The system supports:
  * - Built-in actions (complete, cleanup, attach, etc.)
- * - Custom slash commands (e.g., /jat:complete, /jat:pause)
+ * - Custom slash commands (e.g., /squad:complete, /squad:pause)
  * - Per-state customization
  * - Priority ordering
  */
@@ -25,7 +25,7 @@ import { SESSION_STATE_ACTIONS, type SessionStateAction, type SessionState } fro
  */
 export interface CustomCommandAction extends SessionStateAction {
 	type: 'command';
-	command: string; // The slash command to run (e.g., "/jat:complete")
+	command: string; // The slash command to run (e.g., "/squad:complete")
 }
 
 /**
@@ -86,7 +86,7 @@ export const BUILTIN_ACTIONS_CATALOG: AvailableBuiltinAction[] = [
 	{
 		id: 'complete',
 		label: 'Complete Task',
-		description: 'Run /jat:complete to finish task',
+		description: 'Run /squad:complete to finish task',
 		icon: 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
 		variant: 'success',
 		defaultStates: ['ready-for-review']
@@ -102,7 +102,7 @@ export const BUILTIN_ACTIONS_CATALOG: AvailableBuiltinAction[] = [
 	{
 		id: 'start',
 		label: 'Pick Task',
-		description: 'Run /jat:start to pick a task (not used in one-task-one-session model)',
+		description: 'Run /squad:start to pick a task (not used in one-task-one-session model)',
 		icon: 'M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z',
 		variant: 'success',
 		defaultStates: []  // Empty: one task = one session = one agent philosophy

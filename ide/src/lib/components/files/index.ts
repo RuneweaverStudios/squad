@@ -7,4 +7,4 @@ export { default as DiffViewer } from './DiffViewer.svelte';
 // Types
 export type { OpenFile, FileNode } from './types';
 
-// TODO: FileTree and FileTreeNode will be added in task jat-mzxmw
+// TODO: FileTree and FileTreeNode will be added in task squad-mzxmw

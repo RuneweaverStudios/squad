@@ -16,11 +16,11 @@ import { homedir } from 'os';
 
 /**
  * Get persistent storage directory for task images
- * Uses ~/.local/share/jat/task-images/ for persistence across reboots
+ * Uses ~/.local/share/squad/task-images/ for persistence across reboots
  * @returns {string} - Path to persistent upload directory
  */
 function getPersistentUploadDir() {
-	return join(homedir(), '.local', 'share', 'jat', 'task-images');
+	return join(homedir(), '.local', 'share', 'squad', 'task-images');
 }
 
 /**
@@ -88,7 +88,7 @@ export async function POST({ request }) {
 		}
 
 		// Create persistent directory for uploaded files
-		// Uses ~/.local/share/jat/task-images/ to survive reboots
+		// Uses ~/.local/share/squad/task-images/ to survive reboots
 		const uploadDir = getPersistentUploadDir();
 		if (!existsSync(uploadDir)) {
 			await mkdir(uploadDir, { recursive: true });

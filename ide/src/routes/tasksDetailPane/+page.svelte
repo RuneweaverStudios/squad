@@ -7,7 +7,7 @@
 
 	// Sample task data (same as A and C for comparison)
 	const sampleTask = {
-		id: 'jat-abc123',
+		id: 'squad-abc123',
 		status: 'in_progress',
 		issue_type: 'feature',
 		title: 'Add notes field to task detail panel',
@@ -17,7 +17,7 @@
 Requirements:
 - Focus-to-edit, blur-to-save behavior
 - Match existing theme/style
-- Store in SQLite via JAT
+- Store in SQLite via SQUAD
 - Display below description section`,
 		notes: 'Checked the API - notes field already exists in schema. Need to add UI component.'
 	};
@@ -27,10 +27,10 @@ Requirements:
 		assignee: 'DeepStar',
 		notes: 'Checked the API - notes field already exists in schema. Need to add UI component.',
 		depends_on: [
-			{ id: 'jat-xyz789', title: 'Database schema update', status: 'closed', priority: 0 }
+			{ id: 'squad-xyz789', title: 'Database schema update', status: 'closed', priority: 0 }
 		],
 		blocked_by: [
-			{ id: 'jat-def456', title: 'UI polish pass', status: 'open', priority: 2 }
+			{ id: 'squad-def456', title: 'UI polish pass', status: 'open', priority: 2 }
 		],
 		created_at: '2025-01-14T10:00:00Z',
 		updated_at: '2025-01-15T14:30:00Z',
@@ -40,12 +40,12 @@ Requirements:
 		],
 		timeline: [
 			{ type: 'signal' as const, timestamp: '2025-01-15T14:30:00Z', data: { state: 'working', agentName: 'DeepStar', taskTitle: 'Add notes field' } },
-			{ type: 'jat_event' as const, event: 'status_changed', timestamp: '2025-01-15T14:00:00Z', description: 'Status changed to in_progress', metadata: { status: 'in_progress' } },
+			{ type: 'squad_event' as const, event: 'status_changed', timestamp: '2025-01-15T14:00:00Z', description: 'Status changed to in_progress', metadata: { status: 'in_progress' } },
 			{ type: 'agent_mail' as const, event: 'message', timestamp: '2025-01-15T12:00:00Z', description: 'Starting work on notes field implementation', metadata: { from_agent: 'DeepStar' } },
-			{ type: 'jat_event' as const, event: 'assigned', timestamp: '2025-01-14T10:30:00Z', description: 'Assigned to DeepStar', metadata: { assignee: 'DeepStar' } },
-			{ type: 'jat_event' as const, event: 'created', timestamp: '2025-01-14T10:00:00Z', description: 'Task created', metadata: {} }
+			{ type: 'squad_event' as const, event: 'assigned', timestamp: '2025-01-14T10:30:00Z', description: 'Assigned to DeepStar', metadata: { assignee: 'DeepStar' } },
+			{ type: 'squad_event' as const, event: 'created', timestamp: '2025-01-14T10:00:00Z', description: 'Task created', metadata: {} }
 		],
-		timelineCounts: { total: 5, jat_events: 3, agent_mail: 1, signals: 1 }
+		timelineCounts: { total: 5, squad_events: 3, agent_mail: 1, signals: 1 }
 	};
 
 	function handleViewTask(taskId: string) {
@@ -59,7 +59,7 @@ Requirements:
 </script>
 
 <svelte:head>
-	<title>Current: Base Detail Pane | JAT IDE</title>
+	<title>Current: Base Detail Pane | SQUAD IDE</title>
 </svelte:head>
 
 <div class="demo-page">

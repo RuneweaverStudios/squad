@@ -6,13 +6,13 @@ import { json } from '@sveltejs/kit';
 import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
 
-// Find .jat directory by walking up from cwd
-function findJatDir() {
+// Find .squad directory by walking up from cwd
+function findSquadDir() {
 	let dir = process.cwd();
 	while (dir !== '/') {
-		const jatPath = resolve(dir, '.jat');
-		if (existsSync(jatPath)) {
-			return jatPath;
+		const squadPath = resolve(dir, '.squad');
+		if (existsSync(squadPath)) {
+			return squadPath;
 		}
 		dir = resolve(dir, '..');
 	}
@@ -163,12 +163,12 @@ export async function POST({ request }) {
 		}
 
 		// Load current rules
-		const jatDir = findJatDir();
+		const squadDir = findSquadDir();
 		/** @type {ReviewRules} */
 		let rules = DEFAULT_RULES;
 
-		if (jatDir) {
-			const rulesPath = resolve(jatDir, 'review-rules.json');
+		if (squadDir) {
+			const rulesPath = resolve(squadDir, 'review-rules.json');
 			if (existsSync(rulesPath)) {
 				const content = readFileSync(rulesPath, 'utf-8');
 				rules = /** @type {ReviewRules} */ (JSON.parse(content));

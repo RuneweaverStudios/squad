@@ -35,7 +35,7 @@ const ROUTE_CHANNELS: Record<string, Channel[]> = {
  * Get the channels needed for a given route path.
  * Returns BASE_CHANNELS + any route-specific channels.
  *
- * @param pathname - The current route pathname (e.g., '/work', '/tasks/jat-abc')
+ * @param pathname - The current route pathname (e.g., '/work', '/tasks/squad-abc')
  * @returns Array of channels to subscribe to
  */
 export function getChannelsForRoute(pathname: string): Channel[] {

@@ -1,13 +1,13 @@
 # Introduction
 
-JAT (Jomarchy Agent Tools) is an **agentic IDE** — a system that lets you run, monitor, and coordinate multiple AI coding agents working in parallel across your codebases.
+SQUAD (Jomarchy Agent Tools) is an **agentic IDE** — a system that lets you run, monitor, and coordinate multiple AI coding agents working in parallel across your codebases.
 
-## What JAT Does
+## What SQUAD Does
 
-JAT sits on top of your existing AI coding tools (Claude Code, Codex CLI, Gemini CLI, etc.) and provides:
+SQUAD sits on top of your existing AI coding tools (Claude Code, Codex CLI, Gemini CLI, etc.) and provides:
 
 - **A visual IDE** for monitoring agent sessions in real-time
-- **Task management** with dependency tracking (JAT Tasks)
+- **Task management** with dependency tracking (SQUAD Tasks)
 - **Agent coordination** via identity registry and file reservations
 - **Browser automation** for testing and verification
 - **Multi-project support** with unified views
@@ -23,16 +23,16 @@ Modern AI coding assistants are powerful, but using them at scale creates chaos:
 
 ## The Solution
 
-JAT provides a two-layer architecture:
+SQUAD provides a two-layer architecture:
 
 **Layer 1: Transparent Enhancement** — Works with any CLI agent. Hooks capture tool calls, temp files share state, tmux manages sessions. The agent doesn't know the IDE exists.
 
-**Layer 2: Explicit Coordination** — Agents participate in the system via workflow commands, the Agent Registry, and JAT task management.
+**Layer 2: Explicit Coordination** — Agents participate in the system via workflow commands, the Agent Registry, and SQUAD task management.
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  Layer 2: Agent Orchestration (JAT-specific)        │
-│  • Agent Registry • JAT Tasks • Workflow Commands   │
+│  Layer 2: Agent Orchestration (SQUAD-specific)        │
+│  • Agent Registry • SQUAD Tasks • Workflow Commands   │
 ├─────────────────────────────────────────────────────┤
 │  Layer 1: Transparent Enhancement (agent-agnostic)  │
 │  • PostToolUse Hooks • tmux • Temp Files • SSE      │
@@ -43,8 +43,8 @@ JAT provides a two-layer architecture:
 
 1. **One agent = one session = one task** — Each session handles exactly one task
 2. **File reservations prevent conflicts** — Agents lock files before editing
-3. **Memory coordinates work** — Past session context surfaces via `.jat/memory/`
-4. **JAT Tasks is the task queue** — Pick from ready work, update status, close when done
+3. **Memory coordinates work** — Past session context surfaces via `.squad/memory/`
+4. **SQUAD Tasks is the task queue** — Pick from ready work, update status, close when done
 
 ## Supported Agents
 
@@ -66,6 +66,6 @@ JAT provides a two-layer architecture:
 
 ## Next Steps
 
-- [Installation](/docs/installation/) — Get JAT installed
+- [Installation](/docs/installation/) — Get SQUAD installed
 - [Quick Start](/docs/quick-start/) — Build something in 5 minutes
 - [Architecture](/docs/architecture/) — Understand the design

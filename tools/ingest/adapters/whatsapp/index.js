@@ -4,8 +4,8 @@ import { join } from 'node:path';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import * as logger from '../../lib/logger.js';
 
-const ATTACH_BASE = join(process.env.HOME, '.local/share/jat/ingest-files');
-const DEFAULT_AUTH_DIR = join(process.env.HOME, '.config/jat/whatsapp-auth');
+const ATTACH_BASE = join(process.env.HOME, '.local/share/squad/ingest-files');
+const DEFAULT_AUTH_DIR = join(process.env.HOME, '.config/squad/whatsapp-auth');
 
 /** @type {import('../base.js').PluginMetadata} */
 export const metadata = {

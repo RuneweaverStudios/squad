@@ -157,7 +157,7 @@
 	let triggerRef: HTMLButtonElement | null = $state(null);
 	let dropdownContentRef: HTMLDivElement | null = $state(null);
 
-	// Portal-based dropdown to escape stacking context (jat-1xa13)
+	// Portal-based dropdown to escape stacking context (squad-1xa13)
 	let dropdownPosition = $state({ top: 0, left: 0 });
 
 	function updateDropdownPosition() {
@@ -572,7 +572,7 @@
 		createEpicError = null;
 
 		try {
-			// Extract project from current task ID (e.g., "jat-abc" -> "jat")
+			// Extract project from current task ID (e.g., "squad-abc" -> "squad")
 			const project = task.id.split("-")[0];
 
 			const response = await fetch("/api/epics", {
@@ -926,7 +926,7 @@
 		{/if}
 	</button>
 
-	<!-- Dropdown Menu - uses portal to escape stacking context (jat-1xa13) -->
+	<!-- Dropdown Menu - uses portal to escape stacking context (squad-1xa13) -->
 	{#if isOpen}
 		<div
 			use:portalAction

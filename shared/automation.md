@@ -112,7 +112,7 @@ Rules can have multiple patterns. ALL patterns must match (AND logic) for the ru
 | `send_text` | Send text + Enter to session | `y` (sends "y\n") |
 | `send_keys` | Send raw tmux keys | `C-c` (Ctrl+C) |
 | `tmux_command` | Run tmux command | `send-keys -t {session} q` |
-| `signal` | Emit JAT signal | `working {"taskId":"{$1}"}` |
+| `signal` | Emit SQUAD signal | `working {"taskId":"{$1}"}` |
 | `notify_only` | Log without action | `Detected stall` |
 
 **Action Delay:**
@@ -126,18 +126,18 @@ All action payloads support template variable substitution. Variables are replac
 
 | Variable | Description | Example Value |
 |----------|-------------|---------------|
-| `{session}` | Tmux session name | `jat-FairBay` |
+| `{session}` | Tmux session name | `squad-FairBay` |
 | `{agent}` | Agent name (extracted from session) | `FairBay` |
 | `{timestamp}` | ISO timestamp when rule triggered | `2025-12-17T15:30:00.000Z` |
-| `{match}` | Full text matched by pattern | `Working on task jat-abc` |
-| `{$0}` | Same as `{match}` (full match) | `Working on task jat-abc` |
-| `{$1}`, `{$2}`, ... | Regex capture groups | `jat-abc` (if captured) |
+| `{match}` | Full text matched by pattern | `Working on task squad-abc` |
+| `{$0}` | Same as `{match}` (full match) | `Working on task squad-abc` |
+| `{$1}`, `{$2}`, ... | Regex capture groups | `squad-abc` (if captured) |
 
 **Example: Dynamic Signal with Captured Task ID**
 
 Pattern (regex):
 ```
-Working on task (jat-[a-z0-9]+)
+Working on task (squad-[a-z0-9]+)
 ```
 
 Signal action:
@@ -145,9 +145,9 @@ Signal action:
 working {"taskId":"{$1}","agentName":"{agent}"}
 ```
 
-If the output contains "Working on task jat-xyz" and the session is "jat-FairBay", the signal emitted will be:
+If the output contains "Working on task squad-xyz" and the session is "squad-FairBay", the signal emitted will be:
 ```
-working {"taskId":"jat-xyz","agentName":"FairBay"}
+working {"taskId":"squad-xyz","agentName":"FairBay"}
 ```
 
 **Capture Group Tips:**
@@ -180,7 +180,7 @@ Pre-configured rules in `automationConfig.ts`:
 | Auto-Retry on Failure | prompt | `Retry\?\|Try again\?` | Send `y` |
 | Auto-Proceed Confirmation | prompt | `Do you want to proceed?...1. Yes` | Send Enter |
 | Waiting for Input Detection | stall | `waiting for.*input\|⎿` | Notify |
-| Task Completion Notification | notification | `Task completed\|jat:complete` | Notify |
+| Task Completion Notification | notification | `Task completed\|squad:complete` | Notify |
 | Error Detection Notification | notification | `Error:\|Exception:\|FATAL` | Notify |
 
 ### Store API
@@ -272,7 +272,7 @@ import { processSessionOutput } from '$lib/utils/automationEngine';
 
 // Check output against all rules, execute matching actions
 const results = await processSessionOutput(
-  sessionName,    // e.g., 'jat-FairBay'
+  sessionName,    // e.g., 'squad-FairBay'
   outputText,     // Terminal output to check
   sessionState    // Current state: 'working' | 'idle' | etc.
 );
@@ -410,7 +410,7 @@ Rules can be limited to trigger only in specific session states:
 | `working` | Agent actively coding |
 | `needs-input` | Waiting for user response |
 | `ready-for-review` | Agent asking to complete |
-| `completing` | Running /jat:complete |
+| `completing` | Running /squad:complete |
 | `completed` | Task finished |
 | `idle` | No active task |
 
@@ -428,7 +428,7 @@ Rules can be limited to trigger only in specific session states:
 The automation engine is called from the session polling loop in the IDE. When new output is detected, `processSessionOutput()` is invoked.
 
 **Signals:**
-Actions can emit JAT signals via the `signal` action type, which writes to `/tmp/jat-signal-*.json` for IDE state updates.
+Actions can emit SQUAD signals via the `signal` action type, which writes to `/tmp/squad-signal-*.json` for IDE state updates.
 
 **Activity Logging:**
 All rule triggers are logged to the activity store with:

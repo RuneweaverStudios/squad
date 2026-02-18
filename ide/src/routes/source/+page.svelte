@@ -319,9 +319,9 @@
 </script>
 
 <svelte:head>
-	<title>Source Control | JAT IDE</title>
+	<title>Source Control | SQUAD IDE</title>
 	<meta name="description" content="Git source control view with staged/unstaged changes and side-by-side diff viewer." />
-	<meta property="og:title" content="Source Control | JAT IDE" />
+	<meta property="og:title" content="Source Control | SQUAD IDE" />
 	<meta property="og:description" content="Git source control view with staged/unstaged changes and side-by-side diff viewer." />
 	<meta property="og:image" content="/favicons/source.svg" />
 	<link rel="icon" href="/favicons/source.svg" />

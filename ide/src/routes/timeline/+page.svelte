@@ -94,9 +94,9 @@
 </script>
 
 <svelte:head>
-	<title>Timeline | JAT IDE</title>
+	<title>Timeline | SQUAD IDE</title>
 	<meta name="description" content="Timeline view of task activity and agent work history." />
-	<meta property="og:title" content="Timeline | JAT IDE" />
+	<meta property="og:title" content="Timeline | SQUAD IDE" />
 	<meta property="og:description" content="Timeline view of task activity and agent work history." />
 	<meta property="og:image" content="/favicons/timeline.svg" />
 	<link rel="icon" href="/favicons/timeline.svg" />

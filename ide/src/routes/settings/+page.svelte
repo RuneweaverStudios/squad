@@ -4,10 +4,10 @@
 </script>
 
 <svelte:head>
-	<title>Settings | JAT IDE</title>
-	<meta name="description" content="Configure JAT IDE settings. Manage review rules and access debug tools." />
-	<meta property="og:title" content="Settings | JAT IDE" />
-	<meta property="og:description" content="Configure JAT IDE settings. Manage review rules and access debug tools." />
+	<title>Settings | SQUAD IDE</title>
+	<meta name="description" content="Configure SQUAD IDE settings. Manage review rules and access debug tools." />
+	<meta property="og:title" content="Settings | SQUAD IDE" />
+	<meta property="og:description" content="Configure SQUAD IDE settings. Manage review rules and access debug tools." />
 	<meta property="og:image" content="/favicons/config.svg" />
 	<link rel="icon" href="/favicons/config.svg" />
 </svelte:head>

@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
-/* Custom 'jat' theme - industrial dark theme matching hardcoded colors */
-[data-theme='jat'] {
+/* Custom 'squad' theme - industrial dark theme matching hardcoded colors */
+[data-theme='squad'] {
 	color-scheme: dark;
 
 	/* Base colors - dark blue-gray industrial palette */
@@ -101,7 +101,7 @@
 
 @plugin "daisyui" {
 	themes:
-		jat --default,
+		squad --default,
 		light,
 		dark,
 		cupcake,
@@ -145,7 +145,7 @@
 	color: var(--anim-primary-bright);
 }
 
-/* Industrial select - monospace font, minimal styling matching JAT theme */
+/* Industrial select - monospace font, minimal styling matching SQUAD theme */
 .industrial-select {
 	font-family: ui-monospace, monospace;
 	font-size: 0.75rem;
@@ -1144,7 +1144,7 @@
 
 /* ==========================================================================
    MONACO EDITOR CONTEXT MENU
-   Override Monaco's default context menu to match JAT FileTree style.
+   Override Monaco's default context menu to match SQUAD FileTree style.
    These must be global because Monaco renders the menu outside component scope.
    ========================================================================== */
 

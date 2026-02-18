@@ -899,7 +899,7 @@
 
 					<div class="bg-base-200 rounded-lg p-3 mb-4 text-sm">
 						<p class="text-base-content/70">
-							<strong>Note:</strong> This only removes the project from the JAT configuration file. The actual project directory and files will not be deleted.
+							<strong>Note:</strong> This only removes the project from the SQUAD configuration file. The actual project directory and files will not be deleted.
 						</p>
 					</div>
 

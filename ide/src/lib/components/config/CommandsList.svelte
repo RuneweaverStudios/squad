@@ -3,7 +3,7 @@
 	 * CommandsList Component
 	 *
 	 * Displays all slash commands grouped by namespace in collapsible sections with:
-	 * - Namespace-based grouping (jat, local, etc.)
+	 * - Namespace-based grouping (squad, local, etc.)
 	 * - Collapsible sections per namespace
 	 * - Search/filter by name, invocation, or namespace
 	 * - Import/Export functionality
@@ -250,7 +250,7 @@
 	let searchInput: HTMLInputElement;
 
 	// Track expanded/collapsed state per namespace
-	let expandedNamespaces = $state<Set<string>>(new Set(['jat', 'local']));
+	let expandedNamespaces = $state<Set<string>>(new Set(['squad', 'local']));
 
 	// Score-based fuzzy search (adapted from StatusActionBadge)
 	function scoreCommand(query: string, cmd: SlashCommand): number {
@@ -332,9 +332,9 @@
 			namespaces.add(group.namespace);
 		}
 		return Array.from(namespaces).sort((a, b) => {
-			// Sort jat first, then local, then alphabetically
-			if (a === 'jat') return -1;
-			if (b === 'jat') return 1;
+			// Sort squad first, then local, then alphabetically
+			if (a === 'squad') return -1;
+			if (b === 'squad') return 1;
 			if (a === 'local') return -1;
 			if (b === 'local') return 1;
 			return a.localeCompare(b);
@@ -406,7 +406,7 @@
 	// Get namespace icon based on type
 	function getNamespaceIcon(namespace: string): string {
 		switch (namespace) {
-			case 'jat':
+			case 'squad':
 				return 'M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12'; // menu/list icon
 			case 'local':
 				return 'M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z'; // key icon
@@ -420,7 +420,7 @@
 	// Get namespace color
 	function getNamespaceColor(namespace: string): string {
 		switch (namespace) {
-			case 'jat':
+			case 'squad':
 				return 'oklch(0.65 0.15 200)'; // blue
 			case 'local':
 				return 'oklch(0.65 0.15 145)'; // green

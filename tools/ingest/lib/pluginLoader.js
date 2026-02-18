@@ -3,7 +3,7 @@
  *
  * Scans two directories for plugins:
  *   1. Built-in: tools/ingest/adapters/{name}/index.js
- *   2. User:     ~/.config/jat/ingest-plugins/{name}/index.js
+ *   2. User:     ~/.config/squad/ingest-plugins/{name}/index.js
  *
  * User plugins override built-in if they share the same type.
  * Broken plugins log warnings but never crash the loader.
@@ -21,7 +21,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUILTIN_DIR = join(__dirname, '..', 'adapters');
 
 /** User plugins directory */
-const USER_DIR = join(process.env.HOME, '.config', 'jat', 'ingest-plugins');
+const USER_DIR = join(process.env.HOME, '.config', 'squad', 'ingest-plugins');
 
 /**
  * @typedef {Object} LoadedPlugin
@@ -130,7 +130,7 @@ function listPluginDirs(dir) {
  *
  * Scans:
  *   1. Built-in: tools/ingest/adapters/{name}/index.js
- *   2. User:     ~/.config/jat/ingest-plugins/{name}/index.js
+ *   2. User:     ~/.config/squad/ingest-plugins/{name}/index.js
  *
  * User plugins override built-in if they share the same type.
  *

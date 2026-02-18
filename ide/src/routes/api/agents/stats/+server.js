@@ -4,7 +4,7 @@ import { execSync } from 'child_process';
 /**
  * API endpoint for fetching agent statistics
  *
- * Returns agent status breakdown from Agent Mail + JAT Tasks
+ * Returns agent status breakdown from Agent Mail + SQUAD Tasks
  *
  * Response format:
  * {
@@ -17,17 +17,17 @@ import { execSync } from 'child_process';
  */
 export async function GET({ url }) {
 	try {
-		// Get all tasks from JAT
-		const tasksJson = execSync('jt list --json', {
+		// Get all tasks from SQUAD
+		const tasksJson = execSync('st list --json', {
 			encoding: 'utf-8',
-			cwd: process.env.HOME + '/code/jat'
+			cwd: process.env.HOME + '/code/squad'
 		});
 		const tasks = JSON.parse(tasksJson);
 
 		// Get all agents from Agent Mail
 		const agentsOutput = execSync('am-agents', {
 			encoding: 'utf-8',
-			cwd: process.env.HOME + '/code/jat'
+			cwd: process.env.HOME + '/code/squad'
 		});
 
 		// Parse agent list (format: "AgentName <program> last_active_minutes_ago")

@@ -104,7 +104,7 @@
 	let allTasks = $state<Task[]>([]);
 	let agents = $state<Agent[]>([]);
 	let isInitialLoad = $state(true);
-	let configProjects = $state<string[]>([]); // Projects from JAT config
+	let configProjects = $state<string[]>([]); // Projects from SQUAD config
 	let projectColorsMap = $state<Record<string, string>>({});
 
 	// Drawer state
@@ -336,7 +336,7 @@
 		return map;
 	});
 
-	// Derive all projects (from JAT config, sessions, AND tasks)
+	// Derive all projects (from SQUAD config, sessions, AND tasks)
 	// Config projects are shown even if empty (for onboarding new projects)
 	const allProjects = $derived.by(() => {
 		const projects = new Set<string>();
@@ -383,10 +383,10 @@
 
 	// Group sessions by project
 	// Project is determined from (in priority order):
-	// 1. task ID prefix (e.g., jat-12p -> jat)
+	// 1. task ID prefix (e.g., squad-12p -> squad)
 	// 2. lastCompletedTask ID prefix
 	// 3. session.project field (set by spawn API for planning sessions)
-	// Do NOT fall back to tmux session name - all sessions are named jat-{AgentName}
+	// Do NOT fall back to tmux session name - all sessions are named squad-{AgentName}
 	// regardless of which project they're working on
 	const sessionsByProject = $derived.by(() => {
 		const groups = new Map<string, typeof workSessionsState.sessions>();
@@ -401,7 +401,7 @@
 				project = session.project;
 			}
 			// Note: We intentionally don't fall back to sessionName because
-			// tmux sessions are named jat-{AgentName} not {project}-{AgentName}
+			// tmux sessions are named squad-{AgentName} not {project}-{AgentName}
 			if (project) {
 				const existing = groups.get(project) || [];
 				existing.push(session);
@@ -1339,7 +1339,7 @@
 		}
 	}
 
-	// Fetch JAT config projects (for showing all configured projects)
+	// Fetch SQUAD config projects (for showing all configured projects)
 	async function fetchConfigProjects() {
 		try {
 			const response = await fetch('/api/projects?visible=true');
@@ -1351,7 +1351,7 @@
 		}
 	}
 
-	// Fetch JAT defaults (for layout heights)
+	// Fetch SQUAD defaults (for layout heights)
 	async function fetchConfigDefaults() {
 		try {
 			const response = await fetch('/api/config/defaults');
@@ -1370,7 +1370,7 @@
 		openTaskDrawer(project);
 	}
 
-	// Hide project from IDE (doesn't delete .jat/)
+	// Hide project from IDE (doesn't delete .squad/)
 	async function hideProject(project: string) {
 		isHiding = true;
 		try {
@@ -1464,9 +1464,9 @@
 </script>
 
 <svelte:head>
-	<title>Dashboard | JAT IDE</title>
+	<title>Dashboard | SQUAD IDE</title>
 	<meta name="description" content="Multi-project agent sessions view. Monitor and interact with AI coding agents working across your projects." />
-	<meta property="og:title" content="Dashboard | JAT IDE" />
+	<meta property="og:title" content="Dashboard | SQUAD IDE" />
 	<meta property="og:description" content="Multi-project agent sessions view. Monitor and interact with AI coding agents working across your projects." />
 	<meta property="og:image" content="/favicons/dashboard.svg" />
 	<link rel="icon" href="/favicons/dashboard.svg" />
@@ -1976,10 +1976,10 @@
 					Are you sure you want to hide <span class="font-semibold text-primary">{projectToHide}</span> from the IDE?
 				</p>
 				<p class="text-sm text-base-content/70 bg-base-200 rounded p-3">
-					This only hides the project from the IDE. The project's <code class="text-primary">.jat/</code> directory and all task data will remain untouched.
+					This only hides the project from the IDE. The project's <code class="text-primary">.squad/</code> directory and all task data will remain untouched.
 				</p>
 				<p class="text-xs text-base-content/50 mt-3">
-					To restore hidden projects, edit <code>~/.config/jat/ide-projects.json</code>
+					To restore hidden projects, edit <code>~/.config/squad/ide-projects.json</code>
 				</p>
 				<div class="modal-action">
 					<button

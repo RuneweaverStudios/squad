@@ -44,7 +44,7 @@ When a rule triggers, its actions execute in order.
 | `send_text` | Sends text + Enter to session | `y` |
 | `send_keys` | Sends raw tmux key sequence | `C-c` (Ctrl+C) |
 | `tmux_command` | Runs arbitrary tmux command | `send-keys -t {session} q` |
-| `signal` | Emits a JAT signal | `working {"taskId":"{$1}"}` |
+| `signal` | Emits a SQUAD signal | `working {"taskId":"{$1}"}` |
 | `notify_only` | Logs the match without acting | `Detected stall pattern` |
 
 Actions support an optional `delayMs` field. Set `delayMs: 5000` to wait 5 seconds before executing. Useful for debouncing flaky error recovery.
@@ -55,21 +55,21 @@ Action payloads support variable substitution at runtime.
 
 | Variable | Resolves to | Example |
 |----------|-------------|---------|
-| `{session}` | Tmux session name | `jat-FairBay` |
+| `{session}` | Tmux session name | `squad-FairBay` |
 | `{agent}` | Agent name | `FairBay` |
 | `{timestamp}` | ISO timestamp | `2025-12-17T15:30:00.000Z` |
-| `{match}` | Full matched text | `Working on task jat-abc` |
-| `{$0}` | Same as `{match}` | `Working on task jat-abc` |
-| `{$1}`, `{$2}` | Regex capture groups | `jat-abc` |
+| `{match}` | Full matched text | `Working on task squad-abc` |
+| `{$0}` | Same as `{match}` | `Working on task squad-abc` |
+| `{$1}`, `{$2}` | Regex capture groups | `squad-abc` |
 
 Capture groups come from regex patterns. Use parentheses to capture, then reference with `{$1}` in the action value.
 
 ```
-Pattern (regex): Working on task (jat-[a-z0-9]+)
+Pattern (regex): Working on task (squad-[a-z0-9]+)
 Action (signal): working {"taskId":"{$1}","agentName":"{agent}"}
 ```
 
-If the output contains "Working on task jat-xyz" and the session is `jat-FairBay`, the signal payload becomes `working {"taskId":"jat-xyz","agentName":"FairBay"}`.
+If the output contains "Working on task squad-xyz" and the session is `squad-FairBay`, the signal payload becomes `working {"taskId":"squad-xyz","agentName":"FairBay"}`.
 
 ## Rate limiting and cooldowns
 
@@ -85,7 +85,7 @@ Global limits apply across all rules:
 
 ## Preset library
 
-JAT ships with pre-built rules you can install from the Presets panel.
+SQUAD ships with pre-built rules you can install from the Presets panel.
 
 | Preset | Category | Trigger | Action |
 |--------|----------|---------|--------|
@@ -96,7 +96,7 @@ JAT ships with pre-built rules you can install from the Presets panel.
 | Auto-Continue Prompts | prompt | `Continue\?\|Press Enter` | Send Enter |
 | Auto-Retry on Failure | prompt | `Retry\?\|Try again\?` | Send `y` |
 | Waiting for Input Detection | stall | `waiting for.*input` | Notify only |
-| Task Completion Notification | notification | `Task completed\|jat:complete` | Notify |
+| Task Completion Notification | notification | `Task completed\|squad:complete` | Notify |
 | Error Detection | notification | `Error:\|Exception:\|FATAL` | Notify |
 
 Install presets with one click from the Presets picker. Installed presets can be customized after installation.

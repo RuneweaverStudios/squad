@@ -311,7 +311,7 @@
 							No memory files in {browseProject}
 						</p>
 						<p class="font-mono text-xs" style="color: oklch(0.40 0.02 250);">
-							Memory files are created when tasks complete via /jat:complete
+							Memory files are created when tasks complete via /squad:complete
 						</p>
 					</div>
 				{:else}
@@ -386,7 +386,7 @@
 							No projects with memory directories found
 						</p>
 						<p class="font-mono text-xs" style="color: oklch(0.40 0.02 250);">
-							Memory files are stored in .jat/memory/ within each project
+							Memory files are stored in .squad/memory/ within each project
 						</p>
 					</div>
 				{:else}
@@ -464,9 +464,9 @@
 					<!-- Info -->
 					<div class="p-4 rounded-lg" style="background: oklch(0.16 0.01 250); border: 1px solid oklch(0.22 0.02 250);">
 						<div class="font-mono text-xs space-y-1" style="color: oklch(0.50 0.02 250);">
-							<p>Memory files: <code style="color: oklch(0.65 0.10 280);">.jat/memory/*.md</code></p>
-							<p>Index database: <code style="color: oklch(0.65 0.10 280);">.jat/memory.db</code></p>
-							<p>CLI: <code style="color: oklch(0.65 0.10 280);">jat-memory index | search | status | providers</code></p>
+							<p>Memory files: <code style="color: oklch(0.65 0.10 280);">.squad/memory/*.md</code></p>
+							<p>Index database: <code style="color: oklch(0.65 0.10 280);">.squad/memory.db</code></p>
+							<p>CLI: <code style="color: oklch(0.65 0.10 280);">squad-memory index | search | status | providers</code></p>
 						</div>
 					</div>
 				{/if}

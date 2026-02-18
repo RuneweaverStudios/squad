@@ -14,7 +14,7 @@
 	onMount(async () => {
 		// Check if widget JS file is served
 		try {
-			const res = await fetch('/widget/jat-feedback.js', { method: 'HEAD' });
+			const res = await fetch('/widget/squad-feedback.js', { method: 'HEAD' });
 			widgetFileExists = res.ok;
 		} catch {
 			widgetFileExists = false;
@@ -30,14 +30,14 @@
 		}
 	});
 
-	const quickStartSnippet = `<script src="http://localhost:3333/widget/jat-feedback.js"><\/script>
-<jat-feedback endpoint="http://localhost:3333"></jat-feedback>`;
+	const quickStartSnippet = `<script src="http://localhost:3333/widget/squad-feedback.js"><\/script>
+<squad-feedback endpoint="http://localhost:3333"></squad-feedback>`;
 
-	const tunnelSnippet = `<script src="https://YOUR-TUNNEL.trycloudflare.com/widget/jat-feedback.js"><\/script>
-<jat-feedback endpoint="https://YOUR-TUNNEL.trycloudflare.com"></jat-feedback>`;
+	const tunnelSnippet = `<script src="https://YOUR-TUNNEL.trycloudflare.com/widget/squad-feedback.js"><\/script>
+<squad-feedback endpoint="https://YOUR-TUNNEL.trycloudflare.com"></squad-feedback>`;
 
 	const reactSnippet = `// In your index.html or layout component:
-// <script src="http://localhost:3333/widget/jat-feedback.js"><\/script>
+// <script src="http://localhost:3333/widget/squad-feedback.js"><\/script>
 
 // Then in any React component:
 export default function App() {
@@ -45,20 +45,20 @@ export default function App() {
     <div>
       <h1>My App</h1>
       {/* Widget renders as a floating button */}
-      <jat-feedback endpoint="http://localhost:3333"></jat-feedback>
+      <squad-feedback endpoint="http://localhost:3333"></squad-feedback>
     </div>
   );
 }`;
 
 	const svelteSnippet = `<!-- In app.html: -->
-<!-- <script src="http://localhost:3333/widget/jat-feedback.js"><\/script> -->
+<!-- <script src="http://localhost:3333/widget/squad-feedback.js"><\/script> -->
 
 <!-- In any .svelte file: -->
 <svelte:head>
-  <script src="http://localhost:3333/widget/jat-feedback.js"><\/script>
+  <script src="http://localhost:3333/widget/squad-feedback.js"><\/script>
 </svelte:head>
 
-<jat-feedback endpoint="http://localhost:3333"></jat-feedback>`;
+<squad-feedback endpoint="http://localhost:3333"></squad-feedback>`;
 
 	const nextSnippet = `// In pages/_app.tsx or layout.tsx:
 import Script from 'next/script';
@@ -67,8 +67,8 @@ export default function Layout({ children }) {
   return (
     <>
       {children}
-      <Script src="http://localhost:3333/widget/jat-feedback.js" strategy="lazyOnload" />
-      <jat-feedback endpoint="http://localhost:3333"></jat-feedback>
+      <Script src="http://localhost:3333/widget/squad-feedback.js" strategy="lazyOnload" />
+      <squad-feedback endpoint="http://localhost:3333"></squad-feedback>
     </>
   );
 }`;
@@ -76,7 +76,7 @@ export default function Layout({ children }) {
 	const buildSnippet = `cd widget && npm install && npm run build
 
 # Copy to IDE static directory
-cp dist/jat-feedback.js ../ide/static/widget/
+cp dist/squad-feedback.js ../ide/static/widget/
 
 # Or use the IDE shortcut:
 cd ide && npm run build:widget`;
@@ -110,12 +110,12 @@ cd ide && npm run build:widget`;
 						Feedback Widget
 					</h1>
 					<p class="font-mono text-xs" style="color: oklch(0.50 0.04 250);">
-						&lt;jat-feedback&gt; &mdash; v1.0.0
+						&lt;squad-feedback&gt; &mdash; v1.0.0
 					</p>
 				</div>
 			</div>
 			<p class="font-mono text-sm leading-relaxed max-w-2xl" style="color: oklch(0.65 0.03 250);">
-				A drop-in web component that lets your end users submit bug reports directly into JAT.
+				A drop-in web component that lets your end users submit bug reports directly into SQUAD.
 				No browser extension needed &mdash; just a script tag. Reports appear as tasks with screenshots,
 				console logs, and element data attached.
 			</p>
@@ -154,7 +154,7 @@ cd ide && npm run build:widget`;
 				{#each [
 					{ step: '1', title: 'Add the script tag', desc: 'One script tag loads the widget. One custom element places it. Zero dependencies on your end.' },
 					{ step: '2', title: 'User submits a report', desc: 'Floating button opens a form. Users describe the bug, capture a screenshot, and hit submit.' },
-					{ step: '3', title: 'Report becomes a task', desc: 'The report POSTs to your JAT IDE. A task is created with screenshots saved to .jat/screenshots/.' },
+					{ step: '3', title: 'Report becomes a task', desc: 'The report POSTs to your SQUAD IDE. A task is created with screenshots saved to .squad/screenshots/.' },
 				] as item}
 					<div
 						class="rounded-lg px-4 py-3"
@@ -218,7 +218,7 @@ cd ide && npm run build:widget`;
 					class="mt-3 px-3 py-2 rounded-lg font-mono text-[10px] leading-relaxed"
 					style="background: oklch(0.18 0.04 45); border: 1px solid oklch(0.28 0.08 45); color: oklch(0.70 0.12 45);"
 				>
-					The widget JS file is not found at <code style="color: oklch(0.80 0.10 45);">/widget/jat-feedback.js</code>. Run <code style="color: oklch(0.80 0.10 45);">npm run build:widget</code> from the <code>ide/</code> directory to build and copy it.
+					The widget JS file is not found at <code style="color: oklch(0.80 0.10 45);">/widget/squad-feedback.js</code>. Run <code style="color: oklch(0.80 0.10 45);">npm run build:widget</code> from the <code>ide/</code> directory to build and copy it.
 				</div>
 			{/if}
 		</section>
@@ -228,10 +228,10 @@ cd ide && npm run build:widget`;
 			<h2 class="font-mono text-xs font-bold uppercase tracking-widest mb-4" style="color: oklch(0.50 0.04 250);">What It Captures</h2>
 			<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
 				{#each [
-					{ icon: '📸', title: 'Screenshots', desc: 'Captures the visible viewport using html2canvas. Screenshots are saved as base64 data URLs and stored in .jat/screenshots/ as PNG or JPEG files.', detail: 'Max 5 per report. Compressed to JPEG for efficiency.' },
+					{ icon: '📸', title: 'Screenshots', desc: 'Captures the visible viewport using html2canvas. Screenshots are saved as base64 data URLs and stored in .squad/screenshots/ as PNG or JPEG files.', detail: 'Max 5 per report. Compressed to JPEG for efficiency.' },
 					{ icon: '🐛', title: 'Console Logs', desc: 'Hooks into console.log, console.error, console.warn, and console.info. Captures the last 50 entries with timestamps, file names, and line numbers.', detail: 'Sensitive data (API keys, JWTs, passwords) is automatically redacted.' },
 					{ icon: '🎯', title: 'Element Picker', desc: 'Click any element on the page to capture its tag, classes, ID, bounding rect, XPath, and CSS selector. Useful for pointing at exactly what\'s broken.', detail: 'Highlights elements on hover. Press ESC to cancel.' },
-					{ icon: '📡', title: 'Offline Queue', desc: 'If the JAT endpoint is unreachable, reports are queued in localStorage and retried every 30 seconds. Up to 50 reports can be queued.', detail: 'Queue persists across page reloads. Auto-submits when connection returns.' },
+					{ icon: '📡', title: 'Offline Queue', desc: 'If the SQUAD endpoint is unreachable, reports are queued in localStorage and retried every 30 seconds. Up to 50 reports can be queued.', detail: 'Queue persists across page reloads. Auto-submits when connection returns.' },
 				] as feat}
 					<div
 						class="rounded-lg px-4 py-3"
@@ -252,7 +252,7 @@ cd ide && npm run build:widget`;
 		<section class="mb-10">
 			<h2 class="font-mono text-xs font-bold uppercase tracking-widest mb-4" style="color: oklch(0.50 0.04 250);">Configuration</h2>
 			<p class="font-mono text-[11px] mb-4 leading-relaxed" style="color: oklch(0.55 0.03 250);">
-				All configuration is done via HTML attributes on the <code style="color: oklch(0.70 0.10 270);">&lt;jat-feedback&gt;</code> element.
+				All configuration is done via HTML attributes on the <code style="color: oklch(0.70 0.10 270);">&lt;squad-feedback&gt;</code> element.
 			</p>
 
 			<div
@@ -269,7 +269,7 @@ cd ide && npm run build:widget`;
 					</thead>
 					<tbody>
 						{#each [
-							{ attr: 'endpoint', default: '(required)', desc: 'URL of your JAT IDE. Reports are POSTed to /api/feedback/report on this host.' },
+							{ attr: 'endpoint', default: '(required)', desc: 'URL of your SQUAD IDE. Reports are POSTed to /api/feedback/report on this host.' },
 							{ attr: 'position', default: 'bottom-right', desc: 'Where the floating button appears. Options: bottom-right, bottom-left, top-right, top-left.' },
 							{ attr: 'theme', default: 'dark', desc: 'Color theme for the widget panel. Options: dark, light.' },
 							{ attr: 'buttoncolor', default: '#3b82f6', desc: 'Background color of the floating button. Accepts any CSS color value.' },
@@ -296,12 +296,12 @@ cd ide && npm run build:widget`;
 				<pre
 					class="font-mono text-[10px] leading-relaxed px-4 py-3 rounded-lg overflow-x-auto"
 					style="background: oklch(0.12 0.01 250); color: oklch(0.68 0.06 200); border: 1px solid oklch(0.22 0.02 250); margin: 0;"
-				>{`<jat-feedback
+				>{`<squad-feedback
   endpoint="http://localhost:3333"
   position="bottom-left"
   theme="dark"
   buttoncolor="#10b981"
-></jat-feedback>`}</pre>
+></squad-feedback>`}</pre>
 			</div>
 		</section>
 
@@ -347,7 +347,7 @@ cd ide && npm run build:widget`;
 				{#each [
 					{ method: 'GET', path: '/api/feedback/report', desc: 'Health check. Returns { status: "ok" }.' },
 					{ method: 'OPTIONS', path: '/api/feedback/report', desc: 'CORS preflight. Returns 204 with Access-Control headers.' },
-					{ method: 'POST', path: '/api/feedback/report', desc: 'Submit report. Returns { ok: true, id: "jat-xxx" }.' },
+					{ method: 'POST', path: '/api/feedback/report', desc: 'Submit report. Returns { ok: true, id: "squad-xxx" }.' },
 				] as ep}
 					<div
 						class="rounded-lg px-3 py-2"
@@ -389,7 +389,7 @@ cd ide && npm run build:widget`;
 							{ report: 'type: "enhancement"', task: 'type: feature', mapping: 'Mapped to feature' },
 							{ report: 'type: "other"', task: 'type: task', mapping: 'Mapped to task' },
 							{ report: 'priority: "critical"', task: 'priority: P0', mapping: 'critical=0, high=1, medium=2, low=3' },
-							{ report: 'screenshots', task: '.jat/screenshots/', mapping: 'Base64 decoded and saved as files' },
+							{ report: 'screenshots', task: '.squad/screenshots/', mapping: 'Base64 decoded and saved as files' },
 						] as row, i}
 							<tr style="background: {i % 2 === 0 ? 'oklch(0.14 0.01 250)' : 'oklch(0.16 0.02 250)'}; border-top: 1px solid oklch(0.22 0.02 250);">
 								<td class="px-4 py-2"><code class="font-mono text-[9px]" style="color: oklch(0.70 0.10 200);">{row.report}</code></td>
@@ -409,7 +409,7 @@ cd ide && npm run build:widget`;
 		<section class="mb-10">
 			<h2 class="font-mono text-xs font-bold uppercase tracking-widest mb-4" style="color: oklch(0.50 0.04 250);">Production Setup</h2>
 			<p class="font-mono text-[11px] mb-4 leading-relaxed" style="color: oklch(0.55 0.03 250);">
-				JAT runs locally. To receive reports from production apps, expose your IDE via a
+				SQUAD runs locally. To receive reports from production apps, expose your IDE via a
 				<a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/" target="_blank" rel="noopener" class="underline" style="color: oklch(0.70 0.10 200);">Cloudflare Tunnel</a>.
 				Free quick tunnels require no account.
 			</p>
@@ -466,7 +466,7 @@ cd ide && npm run build:widget`;
 			>
 				<strong>Note:</strong> Free quick tunnels rotate URLs each time you restart cloudflared.
 				For a persistent URL, create a named tunnel:
-				<code style="color: oklch(0.75 0.10 45);">cloudflared tunnel create my-jat</code>
+				<code style="color: oklch(0.75 0.10 45);">cloudflared tunnel create my-squad</code>
 				then configure DNS via the Cloudflare dashboard.
 			</div>
 		</section>
@@ -479,7 +479,7 @@ cd ide && npm run build:widget`;
 					{ title: 'Sensitive Data Redaction', desc: 'Console logs are automatically scanned for API keys, JWT tokens, passwords, credit card numbers, and other sensitive patterns. Matches are replaced with [REDACTED] before sending.' },
 					{ title: 'Shadow DOM Isolation', desc: 'The widget renders inside Shadow DOM. Its styles cannot leak into or be affected by your app\'s CSS.' },
 					{ title: 'CORS', desc: 'The report API returns Access-Control-Allow-Origin: * so the widget can POST from any domain. The endpoint only accepts structured JSON payloads.' },
-					{ title: 'No External Requests', desc: 'The widget only communicates with your JAT IDE endpoint. No telemetry, no third-party services, no analytics.' },
+					{ title: 'No External Requests', desc: 'The widget only communicates with your SQUAD IDE endpoint. No telemetry, no third-party services, no analytics.' },
 				] as item}
 					<div
 						class="flex gap-3 px-4 py-2.5 rounded-lg"
@@ -529,12 +529,12 @@ cd ide && npm run build:widget`;
 				style="border: 1px solid oklch(0.24 0.03 250);"
 			>
 				{#each [
-					{ issue: 'Widget button doesn\'t appear', cause: 'Script not loaded or endpoint missing', fix: 'Check browser console for 404 on jat-feedback.js. Verify the script src URL is correct.' },
-					{ issue: 'Reports not submitting', cause: 'Endpoint unreachable or CORS error', fix: 'Open browser DevTools Network tab. Check the POST to /api/feedback/report. Make sure JAT IDE is running.' },
-					{ issue: '"No endpoint configured" message', cause: 'Missing endpoint attribute', fix: 'Add the endpoint attribute: <jat-feedback endpoint="http://localhost:3333">' },
+					{ issue: 'Widget button doesn\'t appear', cause: 'Script not loaded or endpoint missing', fix: 'Check browser console for 404 on squad-feedback.js. Verify the script src URL is correct.' },
+					{ issue: 'Reports not submitting', cause: 'Endpoint unreachable or CORS error', fix: 'Open browser DevTools Network tab. Check the POST to /api/feedback/report. Make sure SQUAD IDE is running.' },
+					{ issue: '"No endpoint configured" message', cause: 'Missing endpoint attribute', fix: 'Add the endpoint attribute: <squad-feedback endpoint="http://localhost:3333">' },
 					{ issue: 'Screenshots are blank', cause: 'html2canvas limitation with cross-origin images', fix: 'Cross-origin images (from CDNs) may not render. Local images work fine.' },
 					{ issue: 'Widget styles look wrong', cause: 'CSS conflict (unlikely with Shadow DOM)', fix: 'The widget uses Shadow DOM for isolation. If issues persist, check for global * selectors overriding shadow styles.' },
-					{ issue: 'Reports queue but never send', cause: 'Endpoint permanently unreachable', fix: 'The offline queue retries every 30s. Check that your JAT IDE URL is correct and the server is running.' },
+					{ issue: 'Reports queue but never send', cause: 'Endpoint permanently unreachable', fix: 'The offline queue retries every 30s. Check that your SQUAD IDE URL is correct and the server is running.' },
 				] as row, i}
 					<div
 						class="px-4 py-3"

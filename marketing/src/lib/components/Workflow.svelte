@@ -17,19 +17,19 @@ Users should be able to:
 		{
 			number: '02',
 			title: 'Generate Task Tree',
-			description: 'Run /jat:tasktree to convert your spec into a structured epic with tasks, priorities, and dependencies.',
-			code: `/jat:tasktree
+			description: 'Run /squad:tasktree to convert your spec into a structured epic with tasks, priorities, and dependencies.',
+			code: `/squad:tasktree
 
 Creating epic: "User Authentication"
-├─ jat-a1: Setup Supabase auth config [P0]
-├─ jat-a2: Create login/signup forms [P1]
-│   └─ depends on: jat-a1
-├─ jat-a3: Implement Google OAuth [P1]
-│   └─ depends on: jat-a1
-├─ jat-a4: Build password reset flow [P2]
-│   └─ depends on: jat-a2
-└─ jat-a5: Create profile page [P2]
-    └─ depends on: jat-a2, jat-a3
+├─ squad-a1: Setup Supabase auth config [P0]
+├─ squad-a2: Create login/signup forms [P1]
+│   └─ depends on: squad-a1
+├─ squad-a3: Implement Google OAuth [P1]
+│   └─ depends on: squad-a1
+├─ squad-a4: Build password reset flow [P2]
+│   └─ depends on: squad-a2
+└─ squad-a5: Create profile page [P2]
+    └─ depends on: squad-a2, squad-a3
 
 5 tasks created with dependencies`,
 			highlight: '5 Tasks',
@@ -39,12 +39,12 @@ Creating epic: "User Authentication"
 			number: '03',
 			title: 'Launch the Swarm',
 			description: 'Spawn multiple agents across your projects. They pick ready tasks (no blocked work) and start automatically.',
-			code: `jat myproject 4 --auto
+			code: `squad myproject 4 --auto
 
 Spawning 4 agents...
-  BluePeak  → jat-a1 (Setup Supabase)
+  BluePeak  → squad-a1 (Setup Supabase)
   GoldBay   → chimaro-b3 (Fix OAuth bug)
-  RedMarsh  → jat-c2 (API endpoints)
+  RedMarsh  → squad-c2 (API endpoints)
   FairCove  → other-d1 (Update docs)
 
 4 agents working across 3 projects`,
@@ -80,8 +80,8 @@ Files:     34 changed
 Tests:     All passing
 
 Next ready tasks:
-  → jat-b1: Dashboard analytics
-  → jat-b2: Email notifications
+  → squad-b1: Dashboard analytics
+  → squad-b2: Email notifications
   → chimaro-c1: Payment flow`,
 			highlight: 'Done',
 			label: 'Ship'
@@ -145,7 +145,7 @@ Next ready tasks:
 								<div class="w-3 h-3 rounded-full bg-red-500/80"></div>
 								<div class="w-3 h-3 rounded-full bg-yellow-500/80"></div>
 								<div class="w-3 h-3 rounded-full bg-green-500/80"></div>
-								<span class="ml-2 text-xs text-gray-500 font-mono">jat</span>
+								<span class="ml-2 text-xs text-gray-500 font-mono">squad</span>
 							</div>
 
 							<!-- Code content -->

@@ -5,7 +5,7 @@
 	 * Shows a small star/sparkle badge with tooltip explaining why
 	 * Uses success-ish colors that stand out but aren't overwhelming
 	 *
-	 * Task: jat-puza.4 - Smart recommendations badges in TaskTable
+	 * Task: squad-puza.4 - Smart recommendations badges in TaskTable
 	 */
 
 	interface Props {

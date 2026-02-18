@@ -3,7 +3,7 @@
  * Provides consistent, visually distinct colors for projects
  *
  * Colors are fetched from the API (/api/projects/colors) which reads from
- * ~/.config/jat/projects.json. Fetched colors are cached and refresh periodically.
+ * ~/.config/squad/projects.json. Fetched colors are cached and refresh periodically.
  * Unknown projects fall back to hash-based color assignment.
  */
 
@@ -99,7 +99,7 @@ function getHashColor(projectPrefix: string): string {
 export function getProjectColor(taskId: string): string {
 	if (!taskId) return '#6b7280'; // gray for unknown
 
-	// Extract project prefix (e.g., "jat-abc" → "jat")
+	// Extract project prefix (e.g., "squad-abc" → "squad")
 	const projectPrefix = taskId.split('-')[0].toLowerCase();
 
 	// Check cached dynamic colors first

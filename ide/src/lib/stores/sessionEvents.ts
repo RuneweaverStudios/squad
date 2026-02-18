@@ -68,7 +68,7 @@ export type SessionEventType =
 	| 'session-destroyed'
 	| 'session-auto-proceed';
 
-// Suggested task interface (from jat-signal)
+// Suggested task interface (from squad-signal)
 export interface SuggestedTask {
 	id?: string;
 	type: string;
@@ -81,7 +81,7 @@ export interface SuggestedTask {
 	depends_on?: string[];
 }
 
-// Human action interface (from jat-signal complete payload's humanActions field)
+// Human action interface (from squad-signal complete payload's humanActions field)
 export interface HumanAction {
 	title: string;
 	description?: string;
@@ -106,7 +106,7 @@ export interface CrossAgentIntel {
 	gotchas?: string[];
 }
 
-// Full completion bundle from jat-signal complete
+// Full completion bundle from squad-signal complete
 export interface CompletionBundle {
 	taskId: string;
 	agentName: string;
@@ -119,7 +119,7 @@ export interface CompletionBundle {
 	completionMode?: 'review_required' | 'auto_proceed';
 }
 
-// Rich signal payload from jat-signal commands (working, review, needs_input, completing)
+// Rich signal payload from squad-signal commands (working, review, needs_input, completing)
 // Contains the full structured data for rendering signal cards
 export interface RichSignalPayload {
 	type: string; // 'working' | 'review' | 'needs_input' | 'completing' | etc.
@@ -198,13 +198,13 @@ export interface SessionEvent {
 		title?: string;
 		status?: string;
 	} | null;
-	// Signal event fields (from jat-signal)
+	// Signal event fields (from squad-signal)
 	signalType?: string;
 	suggestedTasks?: SuggestedTask[];
 	action?: HumanAction;
-	// Rich signal payload (from jat-signal state commands: working, review, needs_input, completing)
+	// Rich signal payload (from squad-signal state commands: working, review, needs_input, completing)
 	signalPayload?: RichSignalPayload;
-	// Completion bundle fields (from jat-signal complete)
+	// Completion bundle fields (from squad-signal complete)
 	completionBundle?: CompletionBundle;
 	// Delta update fields (bandwidth optimization)
 	isDelta?: boolean;          // true = output contains only new lines to append
@@ -291,7 +291,7 @@ function scheduleAutoKill(sessionName: string, delaySeconds: number): void {
 		console.log(`[AutoKill] Executing kill for ${sessionName}`);
 
 		try {
-			const response = await fetch(`/api/sessions/${encodeURIComponent(sessionName.replace(/^jat-/, ''))}`, {
+			const response = await fetch(`/api/sessions/${encodeURIComponent(sessionName.replace(/^squad-/, ''))}`, {
 				method: 'DELETE'
 			});
 
@@ -326,7 +326,7 @@ export function cancelAutoKill(sessionName: string): void {
 		console.log(`[AutoKill] Cancelled scheduled kill for ${sessionName}`);
 
 		// Extract agent name and task context from session
-		const agentName = sessionName.startsWith('jat-') ? sessionName.slice(4) : sessionName;
+		const agentName = sessionName.startsWith('squad-') ? sessionName.slice(4) : sessionName;
 		const session = workSessionsState.sessions.find(s => s.sessionName === sessionName);
 		const taskId = session?.task?.id;
 		const projectId = taskId ? taskId.split('-')[0] : undefined;
@@ -391,7 +391,7 @@ async function scanAndPauseIdleSessions(): Promise<void> {
 		const sessionName = session.sessionName;
 		if (!sessionName) continue;
 
-		const agentName = sessionName.startsWith('jat-') ? sessionName.slice(4) : sessionName;
+		const agentName = sessionName.startsWith('squad-') ? sessionName.slice(4) : sessionName;
 		const taskId = session.task?.id || 'unknown';
 		const taskTitle = session.task?.title || '';
 
@@ -486,7 +486,7 @@ function handleSessionOutput(data: SessionEvent): void {
 	if (sessionIndex === -1) {
 		const newSession: WorkSession = {
 			sessionName,
-			agentName: agentName || sessionName.replace(/^jat-/, ''),
+			agentName: agentName || sessionName.replace(/^squad-/, ''),
 			task: null,
 			lastCompletedTask: null,
 			output: '',
@@ -632,7 +632,7 @@ function handleSessionState(data: SessionEvent): void {
 
 	// Toast notifications for key state transitions (only when state actually changed)
 	if (previousState !== state) {
-		const agentName = sessionName.startsWith('jat-') ? sessionName.slice(4) : sessionName;
+		const agentName = sessionName.startsWith('squad-') ? sessionName.slice(4) : sessionName;
 		const taskId = currentSession.task?.id;
 		const projectId = taskId ? taskId.split('-').slice(0, -1).join('-') || undefined : undefined;
 		const taskTitle = currentSession.task?.title;
@@ -716,7 +716,7 @@ function handleSessionSignal(_data: SessionEvent): void {
 
 /**
  * Handle session-complete event: update session with full completion bundle
- * This event contains the structured completion data from jat-signal complete
+ * This event contains the structured completion data from squad-signal complete
  *
  * PERFORMANCE: Uses in-place mutation for fine-grained reactivity.
  */
@@ -759,7 +759,7 @@ function handleSessionComplete(data: SessionEvent): void {
 	// Toast notification for task completion (if enabled, and only on first completion event)
 	if (getToastComplete() && !alreadyCompleted) {
 		const completedSession = workSessionsState.sessions[sessionIndex];
-		const completedAgentName = sessionName.startsWith('jat-') ? sessionName.slice(4) : sessionName;
+		const completedAgentName = sessionName.startsWith('squad-') ? sessionName.slice(4) : sessionName;
 		const completedTaskId = completedSession.task?.id;
 		const completedProjectId = completedTaskId ? completedTaskId.split('-').slice(0, -1).join('-') || undefined : undefined;
 		const summaryText = completionBundle.summary?.length
@@ -816,7 +816,7 @@ function handleSessionComplete(data: SessionEvent): void {
 	} else if (autoKillDelay === 0) {
 		// Immediate kill (delay of 0)
 		console.log(`[AutoKill] Immediate kill for ${sessionName} (delay=0)`);
-		fetch(`/api/sessions/${encodeURIComponent(sessionName.replace(/^jat-/, ''))}`, {
+		fetch(`/api/sessions/${encodeURIComponent(sessionName.replace(/^squad-/, ''))}`, {
 			method: 'DELETE'
 		}).catch(error => {
 			console.error(`[AutoKill] Error killing ${sessionName}:`, error);
@@ -839,7 +839,7 @@ function handleSessionCreated(data: SessionEvent): void {
 	// Create new session entry
 	const newSession: WorkSession = {
 		sessionName,
-		agentName: agentName || sessionName.replace(/^jat-/, ''),
+		agentName: agentName || sessionName.replace(/^squad-/, ''),
 		task: task || null,
 		lastCompletedTask: null,
 		output: '',
@@ -896,7 +896,7 @@ function handleSessionDestroyed(data: SessionEvent): void {
  * IMPORTANT: Auto-proceed only works within an active Epic Swarm.
  * Without an epic, agents complete normally without auto-spawning.
  *
- * Triggered by: jat-signal complete '{"completionMode":"auto_proceed","nextTaskId":"...","nextTaskTitle":"...",...}'
+ * Triggered by: squad-signal complete '{"completionMode":"auto_proceed","nextTaskId":"...","nextTaskTitle":"...",...}'
  */
 async function handleAutoProceed(data: SessionEvent): Promise<void> {
 	const { sessionName, signalPayload } = data;
@@ -1245,7 +1245,7 @@ export function initSessionEvents() {
 	if (typeof window === 'undefined') return; // SSR guard
 
 	if (!channel) {
-		channel = new BroadcastChannel('jat-session-events');
+		channel = new BroadcastChannel('squad-session-events');
 
 		// Listen for events from other tabs/pages
 		channel.onmessage = (event: MessageEvent<SessionEvent>) => {
@@ -1265,7 +1265,7 @@ export function broadcastSessionEvent(
 	const event: SessionEvent = {
 		type,
 		sessionName,
-		agentName: agentName || sessionName.replace('jat-', ''),
+		agentName: agentName || sessionName.replace('squad-', ''),
 		timestamp: Date.now()
 	};
 

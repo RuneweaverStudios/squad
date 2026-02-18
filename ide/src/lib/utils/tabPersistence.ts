@@ -5,7 +5,7 @@
  * including tab order for drag-drop reordering.
  *
  * Storage format:
- * - Key: `jat-files-open-{project}`
+ * - Key: `squad-files-open-{project}`
  * - Value: { openFiles: [{ path }], activeFilePath: string | null }
  */
 
@@ -22,15 +22,15 @@ export interface PersistedTabState {
 /**
  * Generate a localStorage key for a project's open files.
  *
- * @param project - The project name (e.g., "jat", "chimaro")
+ * @param project - The project name (e.g., "squad", "chimaro")
  * @returns The localStorage key string
  *
  * @example
- * getStorageKey("jat") // "jat-files-open-jat"
- * getStorageKey("my-project") // "jat-files-open-my-project"
+ * getStorageKey("squad") // "squad-files-open-squad"
+ * getStorageKey("my-project") // "squad-files-open-my-project"
  */
 export function getStorageKey(project: string): string {
-	return `jat-files-open-${project}`;
+	return `squad-files-open-${project}`;
 }
 
 /**
@@ -58,7 +58,7 @@ export function isStorageAvailable(): boolean {
  * @param activeFilePath - Currently active file path (or null)
  *
  * @example
- * saveTabsToStorage("jat", ["/src/a.ts", "/src/b.ts"], "/src/a.ts");
+ * saveTabsToStorage("squad", ["/src/a.ts", "/src/b.ts"], "/src/a.ts");
  */
 export function saveTabsToStorage(
 	project: string,
@@ -90,7 +90,7 @@ export function saveTabsToStorage(
  * @returns The persisted tab state, or null if not found/invalid
  *
  * @example
- * const state = loadTabsFromStorage("jat");
+ * const state = loadTabsFromStorage("squad");
  * if (state) {
  *   for (const tab of state.openFiles) {
  *     await openFile(tab.path);
@@ -154,7 +154,7 @@ export function clearTabsFromStorage(project: string): void {
 export function getProjectsWithSavedTabs(): string[] {
 	if (!isStorageAvailable()) return [];
 
-	const prefix = 'jat-files-open-';
+	const prefix = 'squad-files-open-';
 	const projects: string[] = [];
 
 	for (let i = 0; i < window.localStorage.length; i++) {

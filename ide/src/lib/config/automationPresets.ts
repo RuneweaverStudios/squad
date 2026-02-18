@@ -539,7 +539,7 @@ const notificationPresets: AutomationPreset[] = [
 			enabled: true,
 			patterns: [
 				{
-					pattern: 'jat-signal.*completed|Task.*completed|✓ Task closed|jt close.*completed',
+					pattern: 'squad-signal.*completed|Task.*completed|✓ Task closed|st close.*completed',
 					mode: 'regex',
 					caseSensitive: false
 				}

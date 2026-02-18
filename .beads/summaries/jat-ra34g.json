@@ -1,5 +1,5 @@
 {
-  "taskId": "jat-ra34g",
+  "taskId": "squad-ra34g",
   "title": "usr trying to install on mac hving isues",
   "summary": [
     "Investigated macOS installation issues with application startup",
@@ -21,14 +21,14 @@
   "suggestedTasks": [
     {
       "type": "bug",
-      "title": "Create Comprehensive macOS Installation Guide for JAT",
+      "title": "Create Comprehensive macOS Installation Guide for SQUAD",
       "description": "Develop a detailed, step-by-step installation guide specifically for macOS users. The guide should cover shell configuration (bash/zsh), PATH setup, potential environment variables, and common troubleshooting steps. Focus on providing clear instructions for different macOS versions and terminal configurations.",
       "priority": 1,
       "reason": "User experienced installation difficulties indicating lack of clear macOS-specific documentation"
     },
     {
       "type": "task",
-      "title": "Implement Cross-Platform Startup Diagnostics for JAT",
+      "title": "Implement Cross-Platform Startup Diagnostics for SQUAD",
       "description": "Add robust startup diagnostic logging mechanism that provides clear, actionable error messages for different operating systems. Create a self-diagnostic mode that checks environment configuration, required dependencies, and provides specific guidance for resolution.",
       "priority": 2,
       "reason": "Current installation process lacks clear diagnostics for troubleshooting"

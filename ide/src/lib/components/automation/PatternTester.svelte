@@ -16,7 +16,7 @@
 	 * - Custom rule input for quick testing
 	 */
 
-	// Types for automation rules (matches planned jat-48b4 types)
+	// Types for automation rules (matches planned squad-48b4 types)
 	interface AutomationAction {
 		type: 'send_text' | 'send_keys' | 'tmux_command' | 'signal' | 'notify_only';
 		value: string;

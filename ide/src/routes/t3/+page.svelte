@@ -135,7 +135,7 @@
 </script>
 
 <svelte:head>
-	<title>T3 Timeline | JAT IDE</title>
+	<title>T3 Timeline | SQUAD IDE</title>
 </svelte:head>
 
 <div class="timeline-page">

@@ -4,7 +4,7 @@
 
 Firefox (and all browsers) limit HTTP/1.1 to **6 connections per origin, shared across ALL tabs**.
 
-Each JAT IDE tab currently opens:
+Each SQUAD IDE tab currently opens:
 
 | Connection | Type | HTTP Slot |
 |---|---|---|
@@ -53,7 +53,7 @@ The WS infrastructure is mature — most of the server-side work is done:
 | File | What It Does |
 |---|---|
 | `connectionPool.ts` | WS server, channel subscriptions, `broadcast()`, heartbeats, retry queue |
-| `watchers.ts` | Watches `.jat/last-touched` (task changes), `.claude/sessions/` (agent state), polls tmux output |
+| `watchers.ts` | Watches `.squad/last-touched` (task changes), `.claude/sessions/` (agent state), polls tmux output |
 | `messageQueue.ts` | Failed message retry with exponential backoff, priority queues, dead letter handling |
 | `vitePlugin.ts` | Attaches WS server to Vite dev server |
 
@@ -119,7 +119,7 @@ export function broadcastSessionOutput(sessionName: string, delta: string, lineC
 3. Move watchers from the SSE endpoint into `watchers.ts`:
 
 The SSE endpoint (`/api/sessions/events/+server.ts`) currently watches:
-- `/tmp/jat-signal-*` files for agent state signals
+- `/tmp/squad-signal-*` files for agent state signals
 - `/tmp/claude-question-*` files for pending questions
 - tmux session list for create/destroy events
 - tmux pane output for content updates

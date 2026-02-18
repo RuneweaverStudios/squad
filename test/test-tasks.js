@@ -1,20 +1,20 @@
 #!/usr/bin/env node
 /**
- * Test script for JAT Tasks SQLite Query Layer
+ * Test script for SQUAD Tasks SQLite Query Layer
  *
- * Validates that lib/tasks.js can query all JAT task databases from Node
+ * Validates that lib/tasks.js can query all SQUAD task databases from Node
  */
 
 import { getProjects, getTasks, getTaskById, getReadyTasks } from '../lib/tasks.js';
 
-console.log('🧪 Testing JAT Tasks SQLite Query Layer\n');
+console.log('🧪 Testing SQUAD Tasks SQLite Query Layer\n');
 console.log('═'.repeat(80));
 
 // Test 1: getProjects()
 console.log('\n📂 TEST 1: getProjects()');
 console.log('─'.repeat(80));
 const projects = getProjects();
-console.log(`✓ Found ${projects.length} project(s) with JAT databases:`);
+console.log(`✓ Found ${projects.length} project(s) with SQUAD databases:`);
 projects.forEach(p => {
   console.log(`  • ${p.name}`);
   console.log(`    Path: ${p.path}`);
@@ -22,7 +22,7 @@ projects.forEach(p => {
 });
 
 if (projects.length === 0) {
-  console.log('⚠️  No projects found. Make sure ~/code/*/.jat/tasks.db exists');
+  console.log('⚠️  No projects found. Make sure ~/code/*/.squad/tasks.db exists');
   process.exit(1);
 }
 
@@ -118,11 +118,11 @@ console.log('\n' + '═'.repeat(80));
 console.log('✅ ALL TESTS PASSED');
 console.log('═'.repeat(80));
 console.log('\nAcceptance Criteria Verification:');
-console.log('✓ Can query all JAT task databases from Node');
+console.log('✓ Can query all SQUAD task databases from Node');
 console.log(`✓ Successfully queried ${projects.length} project(s)`);
 console.log(`✓ Retrieved ${allTasks.length} task(s) across all projects`);
 console.log(`✓ getProjects() works: ${projects.length} projects found`);
 console.log(`✓ getTasks() works: ${allTasks.length} tasks retrieved`);
 console.log(`✓ getTaskById() works: Successfully retrieved task details`);
 console.log(`✓ getReadyTasks() works: ${readyTasks.length} ready tasks found`);
-console.log('\n🎉 JAT Tasks SQLite Query Layer is fully functional!\n');
+console.log('\n🎉 SQUAD Tasks SQLite Query Layer is fully functional!\n');

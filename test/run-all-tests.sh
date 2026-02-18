@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Run all tests for jat (Jomarchy Agent Tools)
+# Run all tests for squad (Jomarchy Agent Tools)
 #
 # Orchestrates all test scripts:
 #   - Node.js tests (test-tasks.js, test-agent-mail.js)
@@ -31,7 +31,7 @@ FAILED=0
 TOTAL=0
 
 echo "════════════════════════════════════════════════════════════"
-echo "Running All Tests for JAT (Jomarchy Agent Tools)"
+echo "Running All Tests for SQUAD (Jomarchy Agent Tools)"
 echo "════════════════════════════════════════════════════════════"
 echo ""
 
@@ -103,7 +103,7 @@ echo "════════════════════════�
 echo ""
 
 # Run Node.js tests
-run_test "JAT Tasks SQLite Query Layer" "node test/test-tasks.js"
+run_test "SQUAD Tasks SQLite Query Layer" "node test/test-tasks.js"
 run_test "Agent Mail SQLite Query Layer" "node test/test-agent-mail.js"
 
 # Run Agent Mail workflow test

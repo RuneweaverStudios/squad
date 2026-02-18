@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
-# rollback-tasks.sh - Restore .jat/tasks.db from backup
+# rollback-tasks.sh - Restore .squad/tasks.db from backup
 #
 # Usage:
 #   rollback-tasks.sh --backup PATH [--verify] [--force]
 #
 # Example:
-#   rollback-tasks.sh --backup ~/code/chimaro/.jat/backups/backup_20231124_123456
+#   rollback-tasks.sh --backup ~/code/chimaro/.squad/backups/backup_20231124_123456
 
 set -euo pipefail
 
@@ -46,8 +46,8 @@ BACKUP DIRECTORY:
     Must contain: tasks.db.backup, tasks.db.sha256 (for --verify)
 
 EXAMPLES:
-    $SCRIPT_NAME --backup ~/code/project/.jat/backups/backup_20231124_123456
-    $SCRIPT_NAME --backup ~/code/project/.jat/backups/backup_20231124_123456 --verify --force
+    $SCRIPT_NAME --backup ~/code/project/.squad/backups/backup_20231124_123456
+    $SCRIPT_NAME --backup ~/code/project/.squad/backups/backup_20231124_123456 --verify --force
 EOF
 }
 
@@ -107,10 +107,10 @@ fi
 tasks_db=""
 if [[ -f "${BACKUP_DIR}/metadata.txt" ]]; then
     project_path=$(grep "^Project:" "${BACKUP_DIR}/metadata.txt" | cut -d' ' -f2-)
-    [[ -n "$project_path" ]] && tasks_db="${project_path}/.jat/tasks.db"
+    [[ -n "$project_path" ]] && tasks_db="${project_path}/.squad/tasks.db"
 fi
 if [[ -z "$tasks_db" ]]; then
-    # Infer from backup dir: project/.jat/backups/backup_xxx/
+    # Infer from backup dir: project/.squad/backups/backup_xxx/
     parent_dir=$(dirname "$(dirname "$BACKUP_DIR")")
     tasks_db="${parent_dir}/tasks.db"
 fi
@@ -147,5 +147,5 @@ fi
 echo ""
 log_success "Rollback complete from: $BACKUP_DIR"
 echo ""
-log_info "Verify with: jt list --json | head -5"
+log_info "Verify with: st list --json | head -5"
 echo ""

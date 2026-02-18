@@ -1,12 +1,12 @@
 /**
- * Tools API - List JAT tools with categories
+ * Tools API - List SQUAD tools with categories
  *
  * GET /api/tools
- * Returns categorized list of JAT tools from the installation directory.
+ * Returns categorized list of SQUAD tools from the installation directory.
  *
  * Response:
  * {
- *   jatPath: string,           // JAT installation directory
+ *   squadPath: string,           // SQUAD installation directory
  *   categories: [{
  *     id: string,              // Category ID (mail, browser, etc.)
  *     name: string,            // Display name
@@ -14,7 +14,7 @@
  *     icon: string,            // SVG path for icon
  *     tools: [{
  *       name: string,          // Tool filename
- *       path: string,          // Relative path from JAT root
+ *       path: string,          // Relative path from SQUAD root
  *       absolutePath: string,  // Full filesystem path
  *       type: 'bash' | 'js',   // Script type
  *       size: number,          // File size in bytes
@@ -55,7 +55,7 @@ const TOOL_CATEGORIES = [
 		description: 'Task management and review rule tools',
 		directory: 'tools/core',
 		icon: 'M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z',
-		filter: (name: string) => name.startsWith('jt-') || name.startsWith('backup-jat') || name.startsWith('rollback-jat')
+		filter: (name: string) => name.startsWith('st-') || name.startsWith('backup-squad') || name.startsWith('rollback-squad')
 	},
 	{
 		id: 'signal',
@@ -63,7 +63,7 @@ const TOOL_CATEGORIES = [
 		description: 'Session state signaling for IDE integration',
 		directory: 'tools/signal',
 		icon: 'M9.348 14.651a3.75 3.75 0 010-5.303m5.304 0a3.75 3.75 0 010 5.303m-7.425 2.122a6.75 6.75 0 010-9.546m9.546 0a6.75 6.75 0 010 9.546M5.106 18.894c-3.808-3.808-3.808-9.98 0-13.789m13.788 0c3.808 3.808 3.808 9.981 0 13.79M12 12h.008v.007H12V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z',
-		filter: (name: string) => name.startsWith('jat-signal')
+		filter: (name: string) => name.startsWith('squad-signal')
 	},
 	{
 		id: 'media',
@@ -83,30 +83,30 @@ const TOOL_CATEGORIES = [
 	},
 	{
 		id: 'commands',
-		name: 'JAT Commands',
+		name: 'SQUAD Commands',
 		description: 'Workflow commands for agent lifecycle',
-		directory: 'commands/jat',
+		directory: 'commands/squad',
 		icon: 'M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z',
 		filter: (name: string) => name.endsWith('.md') && !name.startsWith('README')
 	}
 ];
 
 /**
- * Find JAT installation directory
+ * Find SQUAD installation directory
  */
-function findJatPath(): string | null {
+function findSquadPath(): string | null {
 	// Check common locations
 	const candidates = [
-		join(homedir(), 'code', 'jat'),
-		join(homedir(), 'projects', 'jat'),
-		join(homedir(), '.local', 'share', 'jat'),
+		join(homedir(), 'code', 'squad'),
+		join(homedir(), 'projects', 'squad'),
+		join(homedir(), '.local', 'share', 'squad'),
 		// Also check where IDE is running from (parent of ide/)
 		join(process.cwd(), '..'),
 		process.cwd().replace('/ide', '')
 	];
 
 	for (const candidate of candidates) {
-		// Verify it's actually JAT by checking for key directories
+		// Verify it's actually SQUAD by checking for key directories
 		if (
 			existsSync(candidate) &&
 			existsSync(join(candidate, 'tools', 'mail')) &&
@@ -134,7 +134,7 @@ function getFileType(name: string): 'bash' | 'js' | 'markdown' | 'unknown' {
  * List tools in a category directory
  */
 async function listCategoryTools(
-	jatPath: string,
+	squadPath: string,
 	category: (typeof TOOL_CATEGORIES)[0]
 ): Promise<
 	{
@@ -146,7 +146,7 @@ async function listCategoryTools(
 		modified: string;
 	}[]
 > {
-	const dirPath = join(jatPath, category.directory);
+	const dirPath = join(squadPath, category.directory);
 
 	if (!existsSync(dirPath)) {
 		return [];
@@ -198,13 +198,13 @@ async function listCategoryTools(
 }
 
 export const GET: RequestHandler = async () => {
-	const jatPath = findJatPath();
+	const squadPath = findSquadPath();
 
-	if (!jatPath) {
+	if (!squadPath) {
 		return json(
 			{
-				error: 'JAT installation not found',
-				hint: 'Ensure JAT is installed in ~/code/jat or the IDE is run from the JAT directory'
+				error: 'SQUAD installation not found',
+				hint: 'Ensure SQUAD is installed in ~/code/squad or the IDE is run from the SQUAD directory'
 			},
 			{ status: 404 }
 		);
@@ -214,7 +214,7 @@ export const GET: RequestHandler = async () => {
 		const categories = [];
 
 		for (const category of TOOL_CATEGORIES) {
-			const tools = await listCategoryTools(jatPath, category);
+			const tools = await listCategoryTools(squadPath, category);
 
 			categories.push({
 				id: category.id,
@@ -226,7 +226,7 @@ export const GET: RequestHandler = async () => {
 		}
 
 		return json({
-			jatPath,
+			squadPath,
 			categories
 		});
 	} catch (err) {

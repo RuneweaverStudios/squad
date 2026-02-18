@@ -1,6 +1,6 @@
 # Browser automation
 
-JAT includes 12 browser automation tools built on the Chrome DevTools Protocol (CDP). They're Node.js scripts that control Chrome/Chromium for testing, scraping, and verification tasks.
+SQUAD includes 12 browser automation tools built on the Chrome DevTools Protocol (CDP). They're Node.js scripts that control Chrome/Chromium for testing, scraping, and verification tasks.
 
 ## Getting started
 
@@ -10,7 +10,7 @@ Start Chrome with remote debugging enabled, then connect:
 # Start Chrome with debugging port
 google-chrome --remote-debugging-port=9222
 
-# Connect JAT tools to the running browser
+# Connect SQUAD tools to the running browser
 browser-start.js
 ```
 
@@ -94,7 +94,7 @@ All wait conditions use CDP polling with configurable timeouts.
 
 ## Using with agents
 
-Agents can use browser tools during task verification. A typical pattern in `/jat:verify`:
+Agents can use browser tools during task verification. A typical pattern in `/squad:verify`:
 
 ```bash
 browser-start.js

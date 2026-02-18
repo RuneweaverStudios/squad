@@ -1,6 +1,6 @@
 # Media and image generation
 
-JAT includes image generation tools powered by the Google Gemini API. They handle text-to-image generation, image editing, multi-image composition, and agent avatar creation.
+SQUAD includes image generation tools powered by the Google Gemini API. They handle text-to-image generation, image editing, multi-image composition, and agent avatar creation.
 
 ## Prerequisites
 

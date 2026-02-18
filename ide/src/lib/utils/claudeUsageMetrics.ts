@@ -10,7 +10,7 @@
  * - Caching layer to prevent API hammering
  * - Graceful error handling with fallbacks
  *
- * Task: jat-sk1 - Implement Claude API usage data fetching
+ * Task: squad-sk1 - Implement Claude API usage data fetching
  * Author: FaintRidge
  * Date: 2025-11-21
  */

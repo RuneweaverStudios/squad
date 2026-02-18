@@ -1,0 +1,55 @@
+#!/bin/bash
+# squad-ingest-server: Start ingest daemon as a managed server (server-ingest tmux session)
+#
+# The IDE auto-discovers server-* tmux sessions on the /servers page,
+# giving us live output, stop/restart controls, and status detection for free.
+
+set -euo pipefail
+
+SESSION="server-ingest"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+DAEMON="$SCRIPT_DIR/squad-ingest"
+
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    echo "squad-ingest-server - Start ingest daemon as managed server"
+    echo ""
+    echo "USAGE:"
+    echo "    squad-ingest-server           Start server-ingest tmux session"
+    echo "    squad-ingest-server --stop    Stop the server"
+    echo "    squad-ingest-server --status  Check if running"
+    echo "    squad-ingest-server --help    Show this help"
+    exit 0
+fi
+
+if [[ "${1:-}" == "--stop" ]]; then
+    if tmux has-session -t "$SESSION" 2>/dev/null; then
+        tmux send-keys -t "$SESSION" C-c
+        sleep 1
+        tmux kill-session -t "$SESSION" 2>/dev/null || true
+        echo "Stopped $SESSION"
+    else
+        echo "$SESSION not running"
+    fi
+    exit 0
+fi
+
+if [[ "${1:-}" == "--status" ]]; then
+    if tmux has-session -t "$SESSION" 2>/dev/null; then
+        echo "running"
+    else
+        echo "stopped"
+    fi
+    exit 0
+fi
+
+# Start the daemon in a tmux session
+if tmux has-session -t "$SESSION" 2>/dev/null; then
+    echo "$SESSION already running"
+    echo "Use: squad-ingest-server --stop  to stop it first"
+    exit 0
+fi
+
+tmux new-session -d -s "$SESSION" "node $DAEMON; echo '[squad-ingest] exited'; sleep 5"
+echo "Started $SESSION"
+echo "View in IDE: /servers page"
+echo "Stop: squad-ingest-server --stop"

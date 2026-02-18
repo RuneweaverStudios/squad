@@ -16,7 +16,7 @@
 		{ id: 'hero', title: 'THE ALIEN MANUAL', subtitle: 'Galaxy Edition' },
 		{ id: 'transmission', quote: 'Clearly some powerful alien tool was handed around except it comes with no manual...', author: '@karpathy' },
 		{ id: 'features', items: ['Task Architecture', 'Agent Coordination', 'Swarm Intelligence', 'Workflow Automation'] },
-		{ id: 'install', command: 'git clone https://github.com/jomarchy/jat.git && cd jat && ./install.sh' }
+		{ id: 'install', command: 'git clone https://github.com/jomarchy/squad.git && cd squad && ./install.sh' }
 	];
 
 	function startAmbientSound() {

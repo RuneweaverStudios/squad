@@ -4,8 +4,8 @@
  *
  * Returns list of agent sessions with their session IDs for resuming.
  * Data sourced from:
- * 1. Timeline files in /tmp/jat-timeline-*.jsonl (cleared on reboot)
- * 2. Signal files in /tmp/jat-signal-*.json (cleared on reboot)
+ * 1. Timeline files in /tmp/squad-timeline-*.jsonl (cleared on reboot)
+ * 2. Signal files in /tmp/squad-signal-*.json (cleared on reboot)
  * 3. Persistent session files in .claude/sessions/agent-*.txt
  */
 
@@ -35,7 +35,7 @@ function getProjectPath(): string {
 function isAgentOnline(agentName: string): boolean {
 	try {
 		const { execSync } = require('child_process');
-		const result = execSync(`tmux has-session -t "jat-${agentName}" 2>/dev/null && echo "yes" || echo "no"`, {
+		const result = execSync(`tmux has-session -t "squad-${agentName}" 2>/dev/null && echo "yes" || echo "no"`, {
 			encoding: 'utf-8'
 		}).trim();
 		return result === 'yes';
@@ -49,7 +49,7 @@ function isAgentOnline(agentName: string): boolean {
  */
 function findSessionIdForAgent(agentName: string, projectPath: string): string | null {
 	// Try signal file first
-	const signalFile = `/tmp/jat-signal-tmux-jat-${agentName}.json`;
+	const signalFile = `/tmp/squad-signal-tmux-squad-${agentName}.json`;
 	if (existsSync(signalFile)) {
 		try {
 			const data = JSON.parse(readFileSync(signalFile, 'utf-8'));
@@ -102,7 +102,7 @@ function findSessionsForTask(taskId: string, projectPath: string): TaskSession[]
 	const sessions: Map<string, TaskSession> = new Map();
 
 	// Scan all timeline files
-	const timelinePattern = /^jat-timeline-jat-(.+)\.jsonl$/;
+	const timelinePattern = /^squad-timeline-squad-(.+)\.jsonl$/;
 	const tmpDir = '/tmp';
 
 	try {
@@ -167,7 +167,7 @@ function findSessionsForTask(taskId: string, projectPath: string): TaskSession[]
 
 	// Also check signal files directly for working/starting signals
 	try {
-		const signalFiles = readdirSync(tmpDir).filter(f => f.startsWith('jat-signal-tmux-'));
+		const signalFiles = readdirSync(tmpDir).filter(f => f.startsWith('squad-signal-tmux-'));
 
 		for (const file of signalFiles) {
 			const filePath = join(tmpDir, file);

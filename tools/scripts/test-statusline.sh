@@ -41,7 +41,7 @@ fi
 
 # Test database paths
 TEST_DB="/tmp/test-agent-mail-${RANDOM}.db"
-TEST_PROJECT_DIR="/tmp/test-jat-${RANDOM}"
+TEST_PROJECT_DIR="/tmp/test-squad-${RANDOM}"
 
 # Cleanup function
 cleanup() {
@@ -83,7 +83,7 @@ EOF
     cd "$TEST_PROJECT_DIR"
 
     # Initialize tasks database
-    jt init --quiet >/dev/null 2>&1 || true
+    st init --quiet >/dev/null 2>&1 || true
 
     cd - >/dev/null
 }
@@ -97,7 +97,7 @@ VALUES (1, '$agent_name', 'claude-code', 'sonnet-4.5', 'Test agent', datetime('n
 EOF
 }
 
-# Helper: Create task in JAT database
+# Helper: Create task in SQUAD database
 create_task() {
     local task_id="$1"
     local title="$2"
@@ -106,7 +106,7 @@ create_task() {
     local priority="${5:-1}"
 
     # Database is always tasks.db
-    local db_file="$TEST_PROJECT_DIR/.jat/tasks.db"
+    local db_file="$TEST_PROJECT_DIR/.squad/tasks.db"
 
     if [[ ! -f "$db_file" ]]; then
         echo "Error: Tasks database not found at $db_file" >&2
@@ -155,13 +155,13 @@ EOF
         # Create test command wrappers
         mkdir -p /tmp/test-bin
 
-        # jt wrapper
-        cat > /tmp/test-bin/jt <<JTEOF
+        # st wrapper
+        cat > /tmp/test-bin/st <<JTEOF
 #!/bin/bash
 cd "$TEST_PROJECT_DIR"
-$(which jt) "\$@"
+$(which st) "\$@"
 JTEOF
-        chmod +x /tmp/test-bin/jt
+        chmod +x /tmp/test-bin/st
 
         # am-agents wrapper
         cat > /tmp/test-bin/am-agents <<AMEOF
@@ -248,12 +248,12 @@ echo "Test 1: Agent with in_progress task (no reservations)"
 echo "------------------------------------------------------"
 
 register_test_agent "TestAgent1"
-create_task "jat-abc" "Test Task 1" "in_progress" "TestAgent1" 1
+create_task "squad-abc" "Test Task 1" "in_progress" "TestAgent1" 1
 
 output=$(run_statusline_test "TestAgent1")
 
-assert_contains "$output" "jat-abc" "Shows task ID from JAT"
-assert_contains "$output" "Test Task 1" "Shows task title from JAT"
+assert_contains "$output" "squad-abc" "Shows task ID from SQUAD"
+assert_contains "$output" "Test Task 1" "Shows task title from SQUAD"
 
 echo ""
 
@@ -268,22 +268,22 @@ register_test_agent "TestAgent2"
 output=$(run_statusline_test "TestAgent2")
 
 assert_contains "$output" "idle" "Shows idle status when no work"
-assert_not_contains "$output" "jat-" "Does not show any task ID"
+assert_not_contains "$output" "squad-" "Does not show any task ID"
 
 echo ""
 
 # ----------------------------------------------------------------------------
-# TEST 3: Edge case - Closed task in JAT
+# TEST 3: Edge case - Closed task in SQUAD
 # ----------------------------------------------------------------------------
 echo "Test 3: Edge case - Closed task should not appear"
 echo "------------------------------------------------------"
 
 register_test_agent "TestAgent3"
-create_task "jat-cls" "Closed Task" "closed" "TestAgent3" 1
+create_task "squad-cls" "Closed Task" "closed" "TestAgent3" 1
 
 output=$(run_statusline_test "TestAgent3")
 
-assert_not_contains "$output" "jat-cls" "Does not show closed tasks"
+assert_not_contains "$output" "squad-cls" "Does not show closed tasks"
 assert_contains "$output" "idle" "Shows idle when only closed tasks exist"
 
 echo ""
@@ -295,12 +295,12 @@ echo "Test 4: Priority badge display"
 echo "------------------------------------------------------"
 
 register_test_agent "TestAgent4"
-create_task "jat-p0t" "P0 Task" "in_progress" "TestAgent4" 0
+create_task "squad-p0t" "P0 Task" "in_progress" "TestAgent4" 0
 
 output=$(run_statusline_test "TestAgent4")
 
 assert_contains "$output" "P0" "Shows P0 priority badge"
-assert_contains "$output" "jat-p0t" "Shows task ID"
+assert_contains "$output" "squad-p0t" "Shows task ID"
 
 echo ""
 

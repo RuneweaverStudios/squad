@@ -3,7 +3,7 @@
  * Returns dependency graph data for a task: what blocks it and what it unblocks
  */
 import { json } from '@sveltejs/kit';
-import { getTaskById } from '$lib/server/jat-tasks.js';
+import { getTaskById } from '$lib/server/squad-tasks.js';
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ params }) {

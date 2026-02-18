@@ -559,7 +559,7 @@
 		<section class="install-section">
 			<div class="void-terminal">
 				<div class="terminal-sigil">◆</div>
-				<code>git clone https://github.com/jomarchy/jat.git</code>
+				<code>git clone https://github.com/jomarchy/squad.git</code>
 				<div class="terminal-sigil">◆</div>
 			</div>
 		</section>

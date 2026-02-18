@@ -29,15 +29,15 @@ const execFileAsync = promisify(execFile);
  * This ensures IDE-initiated inputs are tracked even if Claude Code's
  * UserPromptSubmit hook fails.
  *
- * @param {string} sessionName - tmux session name (e.g., 'jat-AgentName')
+ * @param {string} sessionName - tmux session name (e.g., 'squad-AgentName')
  * @param {string} input - The text that was sent
  * @param {string} inputType - Type of input ('text', 'command', 'key')
  */
 function writeTimelineEvent(sessionName, input, inputType) {
 	try {
-		// Ensure session name has jat- prefix for timeline filename
-		const tmuxSession = sessionName.startsWith('jat-') ? sessionName : `jat-${sessionName}`;
-		const timelineFile = `/tmp/jat-timeline-${tmuxSession}.jsonl`;
+		// Ensure session name has squad- prefix for timeline filename
+		const tmuxSession = sessionName.startsWith('squad-') ? sessionName : `squad-${sessionName}`;
+		const timelineFile = `/tmp/squad-timeline-${tmuxSession}.jsonl`;
 
 		// Determine if this is a slash command
 		const isCommand = input.startsWith('/');

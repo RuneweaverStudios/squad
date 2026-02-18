@@ -90,7 +90,7 @@
 </script>
 
 <svelte:head>
-	<title>T2 Priority Matrix | JAT IDE</title>
+	<title>T2 Priority Matrix | SQUAD IDE</title>
 </svelte:head>
 
 <div class="matrix-page">

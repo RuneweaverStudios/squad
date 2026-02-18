@@ -2,7 +2,7 @@
 	/**
 	 * ToolsEditor Component
 	 *
-	 * Monaco editor for viewing and editing JAT tool files.
+	 * Monaco editor for viewing and editing SQUAD tool files.
 	 * Shows file path, type badge, and save button.
 	 *
 	 * @see ide/src/routes/config/+page.svelte for usage
@@ -11,7 +11,7 @@
 	import MonacoWrapper from './MonacoWrapper.svelte';
 
 	interface Props {
-		/** Relative path to the tool file (from JAT root) */
+		/** Relative path to the tool file (from SQUAD root) */
 		toolPath?: string | null;
 		/** Display name for the tool */
 		displayName?: string;

@@ -9,7 +9,7 @@
  *
  * Returns: { summary, recommendedAction, keyFiles, relatedTasks }
  *
- * Task: jat-tvos9.3 - Build unified /api/search endpoint
+ * Task: squad-tvos9.3 - Build unified /api/search endpoint
  */
 
 import { json } from '@sveltejs/kit';

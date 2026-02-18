@@ -3,7 +3,7 @@ import { join, basename, extname } from 'node:path';
 import { createHash } from 'node:crypto';
 import * as logger from './logger.js';
 
-const BASE_DIR = join(process.env.HOME, '.local/share/jat/ingest-files');
+const BASE_DIR = join(process.env.HOME, '.local/share/squad/ingest-files');
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 2000;
 

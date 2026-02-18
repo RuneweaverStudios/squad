@@ -6,10 +6,10 @@
 
 ## Problem
 
-First-time JAT users who install the system but don't have an existing project are stuck. The IDE shows an empty state with no clear path forward. These users need guided onboarding to:
+First-time SQUAD users who install the system but don't have an existing project are stuck. The IDE shows an empty state with no clear path forward. These users need guided onboarding to:
 - Create their first project
 - Write a Product Requirements Document (PRD)
-- Initialize JAT task management
+- Initialize SQUAD task management
 - Generate initial tasks
 - Start working with their first agent
 
@@ -25,11 +25,11 @@ Create a guided onboarding experience where a special "Project Setup Agent" walk
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  1. IDE Detects Empty State                              │
-│     └─► No projects in ~/.config/jat/projects.json             │
+│     └─► No projects in ~/.config/squad/projects.json             │
 │                                                                 │
 │  2. Show Onboarding CTA                                         │
 │     ┌──────────────────────────────────────────┐               │
-│     │  Welcome to JAT!                         │               │
+│     │  Welcome to SQUAD!                         │               │
 │     │                                          │               │
 │     │  You don't have any projects yet.        │               │
 │     │                                          │               │
@@ -53,8 +53,8 @@ Create a guided onboarding experience where a special "Project Setup Agent" walk
 │  5. Agent Creates Project Structure                             │
 │     ├─► Creates ~/code/<project-name>/                         │
 │     ├─► Writes CLAUDE.md with PRD                              │
-│     ├─► Runs `jt init`                                         │
-│     └─► Adds project to JAT config                             │
+│     ├─► Runs `st init`                                         │
+│     └─► Adds project to SQUAD config                             │
 │                                                                 │
 │  6. Agent Creates Initial Tasks                                 │
 │     └─► Breaks down PRD into actionable tasks                  │
@@ -75,18 +75,18 @@ Create a guided onboarding experience where a special "Project Setup Agent" walk
 
 ### Phase 1: IDE Empty State & UI
 
-- **jat-TBD1**: Detect empty state on IDE load
-  - Check if `~/.config/jat/projects.json` has any projects
+- **squad-TBD1**: Detect empty state on IDE load
+  - Check if `~/.config/squad/projects.json` has any projects
   - Display onboarding CTA if empty
   - Type: task, Priority: P1
 
-- **jat-TBD2**: Create OnboardingEmptyState component
-  - Hero message: "Welcome to JAT!"
+- **squad-TBD2**: Create OnboardingEmptyState component
+  - Hero message: "Welcome to SQUAD!"
   - Two buttons: "Get Started" and "Import Existing"
   - Modern, friendly design
   - Type: task, Priority: P1
 
-- **jat-TBD3**: Implement "Get Started" button handler
+- **squad-TBD3**: Implement "Get Started" button handler
   - Calls `/api/onboarding/start` endpoint
   - Spawns tmux session with onboarding agent
   - Opens SessionCard in IDE
@@ -94,19 +94,19 @@ Create a guided onboarding experience where a special "Project Setup Agent" walk
 
 ### Phase 2: Onboarding Agent & Session Management
 
-- **jat-TBD4**: Create onboarding agent system prompt
+- **squad-TBD4**: Create onboarding agent system prompt
   - Conversational, friendly tone
   - Guides through: idea → PRD → project structure → tasks
   - Includes examples and templates
   - Type: task, Priority: P0
 
-- **jat-TBD5**: Create `/api/onboarding/start` endpoint
-  - Spawns tmux session: `tmux-jat-onboarding-{timestamp}`
+- **squad-TBD5**: Create `/api/onboarding/start` endpoint
+  - Spawns tmux session: `tmux-squad-onboarding-{timestamp}`
   - Launches Claude Code with onboarding prompt
   - Returns session ID to IDE
   - Type: task, Priority: P1
 
-- **jat-TBD6**: Create onboarding slash command `/jat:onboard`
+- **squad-TBD6**: Create onboarding slash command `/squad:onboard`
   - Can be manually triggered by users
   - Reusable for multiple projects
   - Accepts optional project name parameter
@@ -114,13 +114,13 @@ Create a guided onboarding experience where a special "Project Setup Agent" walk
 
 ### Phase 3: Project Creation Workflow
 
-- **jat-TBD7**: Agent project directory creation helper
+- **squad-TBD7**: Agent project directory creation helper
   - Creates `~/code/<project-name>/`
   - Validates directory doesn't exist
   - Handles naming conflicts gracefully
   - Type: task, Priority: P1
 
-- **jat-TBD8**: Agent PRD template and guidance
+- **squad-TBD8**: Agent PRD template and guidance
   - Provides structured PRD template
   - Asks clarifying questions about:
     - Project purpose
@@ -130,34 +130,34 @@ Create a guided onboarding experience where a special "Project Setup Agent" walk
   - Writes to `CLAUDE.md`
   - Type: task, Priority: P1
 
-- **jat-TBD9**: Agent JAT Tasks initialization
-  - Runs `jt init` in project directory
-  - Explains what JAT Tasks does
-  - Shows how to use basic jt commands
+- **squad-TBD9**: Agent SQUAD Tasks initialization
+  - Runs `st init` in project directory
+  - Explains what SQUAD Tasks does
+  - Shows how to use basic st commands
   - Type: task, Priority: P1
 
-- **jat-TBD10**: Agent JAT config integration
-  - Adds project to `~/.config/jat/projects.json`
+- **squad-TBD10**: Agent SQUAD config integration
+  - Adds project to `~/.config/squad/projects.json`
   - Sets up project-specific settings
   - Registers project in IDE
   - Type: task, Priority: P1
 
 ### Phase 4: Task Generation & Kickoff
 
-- **jat-TBD11**: Agent task breakdown from PRD
+- **squad-TBD11**: Agent task breakdown from PRD
   - Reads PRD from CLAUDE.md
   - Creates logical task breakdown
-  - Uses `jt create` for each task
+  - Uses `st create` for each task
   - Sets appropriate priorities and dependencies
   - Type: task, Priority: P1
 
-- **jat-TBD12**: Agent offers to start first task
+- **squad-TBD12**: Agent offers to start first task
   - Lists created tasks
   - Asks if user wants to start working
-  - If yes, runs `/jat:start` on first ready task
+  - If yes, runs `/squad:start` on first ready task
   - Type: task, Priority: P2
 
-- **jat-TBD13**: IDE auto-refreshes after onboarding
+- **squad-TBD13**: IDE auto-refreshes after onboarding
   - Polls for project creation completion
   - Automatically shows new project when ready
   - Displays success message
@@ -165,33 +165,33 @@ Create a guided onboarding experience where a special "Project Setup Agent" walk
 
 ### Phase 5: Import Existing Project Flow
 
-- **jat-TBD14**: Create "Import Existing" modal
+- **squad-TBD14**: Create "Import Existing" modal
   - File browser to select project directory
   - Checks if directory has git repo
   - Validates it's a real project
   - Type: task, Priority: P2
 
-- **jat-TBD15**: Import existing project backend
-  - Runs `jt init` if no .jat exists
+- **squad-TBD15**: Import existing project backend
+  - Runs `st init` if no .squad exists
   - Creates basic CLAUDE.md if missing
-  - Adds to JAT config
+  - Adds to SQUAD config
   - Type: task, Priority: P2
 
 ### Phase 6: Polish & Documentation
 
-- **jat-TBD16**: Add onboarding help text and tooltips
+- **squad-TBD16**: Add onboarding help text and tooltips
   - Explain what each step does
   - Link to documentation
   - FAQ for common questions
   - Type: task, Priority: P3
 
-- **jat-TBD17**: Write onboarding documentation
+- **squad-TBD17**: Write onboarding documentation
   - Add section to main docs
   - Record demo video
   - Create troubleshooting guide
   - Type: task, Priority: P3
 
-- **jat-TBD18**: Add analytics/telemetry for onboarding
+- **squad-TBD18**: Add analytics/telemetry for onboarding
   - Track completion rate
   - Identify drop-off points
   - Measure time to first task
@@ -206,12 +206,12 @@ Create a guided onboarding experience where a special "Project Setup Agent" walk
 ## Technical Notes
 
 **Onboarding Agent Lifecycle:**
-1. Spawned via special tmux session: `tmux-jat-onboarding-{timestamp}`
+1. Spawned via special tmux session: `tmux-squad-onboarding-{timestamp}`
 2. Uses dedicated onboarding system prompt (not regular agent prompt)
 3. Has access to:
    - File operations (mkdir, write)
-   - jt commands (init, create)
-   - JAT config modification
+   - st commands (init, create)
+   - SQUAD config modification
 4. Self-terminates after successful project creation
 
 **Session Management:**
@@ -226,8 +226,8 @@ Create a guided onboarding experience where a special "Project Setup Agent" walk
 
 ## Dependencies
 
-- Existing JAT config system (`~/.config/jat/projects.json`)
-- JAT Tasks CLI (`jt init`, `jt create`)
+- Existing SQUAD config system (`~/.config/squad/projects.json`)
+- SQUAD Tasks CLI (`st init`, `st create`)
 - IDE SessionCard component
 - tmux session management
 
@@ -240,5 +240,5 @@ Create a guided onboarding experience where a special "Project Setup Agent" walk
 
 ## Related Epics
 
-- jat-xyz: IDE empty states and error handling
-- jat-abc: Improved project configuration management
+- squad-xyz: IDE empty states and error handling
+- squad-abc: Improved project configuration management

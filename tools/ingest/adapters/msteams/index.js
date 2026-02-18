@@ -33,7 +33,7 @@ export const metadata = {
       label: 'Client Secret',
       type: 'secret',
       required: true,
-      helpText: 'Name of the secret containing the Azure AD client secret (stored in jat-secret)'
+      helpText: 'Name of the secret containing the Azure AD client secret (stored in squad-secret)'
     },
     {
       key: 'tenantId',

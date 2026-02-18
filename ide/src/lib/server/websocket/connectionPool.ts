@@ -365,7 +365,7 @@ export interface BroadcastOptions {
  *
  * @example
  * // Normal broadcast (queues failed messages for retry)
- * broadcast('tasks', { type: 'task-updated', taskId: 'jat-abc', data: {...} });
+ * broadcast('tasks', { type: 'task-updated', taskId: 'squad-abc', data: {...} });
  *
  * // High priority broadcast (more retries, faster retry)
  * broadcast('agents', { type: 'agent-state-change', ... }, { priority: 'high' });

@@ -669,7 +669,7 @@
 			addToast({ message: `Epic Complete: ${title}`, type: 'success', details: `All children of ${epicId} are now closed`, projectId: getProjectFromTaskId(epicId) || undefined, taskId: epicId, route: `/tasks?taskDetailDrawer=${epicId}` });
 		}
 
-		// If auto-close is enabled, close the epics in JAT
+		// If auto-close is enabled, close the epics in SQUAD
 		if (getEpicAutoClose()) {
 			for (const epicId of epicIds) {
 				try {
@@ -700,7 +700,7 @@
 	// Returns true for any assigned agent when activity state is unknown (better UX than no shimmer)
 	function isAgentGenerating(agentName: string | undefined | null): boolean {
 		if (!agentName) return false;
-		const sessionName = `jat-${agentName}`;
+		const sessionName = `squad-${agentName}`;
 		const session = workSessionsState.sessions.find(s => s.sessionName === sessionName);
 
 		// If we have explicit activity state, use it
@@ -729,7 +729,7 @@
 		}
 
 		// Fallback: check the global workSessionsState store
-		const sessionName = `jat-${agentName}`;
+		const sessionName = `squad-${agentName}`;
 		const session = workSessionsState.sessions.find(s => s.sessionName === sessionName);
 		return session?._sseState || 'working';
 	}
@@ -949,7 +949,7 @@
 	});
 
 	// Calculate critical paths for all incomplete epics
-	// Task: jat-puza.5 - Critical path highlighting in TaskTable
+	// Task: squad-puza.5 - Critical path highlighting in TaskTable
 	// NOTE: Uses `tasks` (not allTasks) for O(n) performance in projects page context.
 	// For full cross-project analysis, use the main /tasks page instead.
 	const criticalPaths = $derived.by(() => {
@@ -1054,7 +1054,7 @@
 
 			switch (sortColumn) {
 				case 'id':
-					// Use hierarchical-aware comparison for IDs (handles jat-abc.1, jat-abc.10 correctly)
+					// Use hierarchical-aware comparison for IDs (handles squad-abc.1, squad-abc.10 correctly)
 					const idComparison = compareTaskIds(a.id || '', b.id || '');
 					const idResult = sortDirection === 'asc' ? idComparison : -idComparison;
 					if (idResult !== 0) return idResult;
@@ -1123,7 +1123,7 @@
 			case 'type':
 				return task.issue_type || null;
 			case 'parent':
-				// Get parent epic ID - checks both hierarchical IDs (jat-abc.1) AND dependency-based relationships
+				// Get parent epic ID - checks both hierarchical IDs (squad-abc.1) AND dependency-based relationships
 				// Tasks without a parent (epics or standalone) use their own ID as the group
 				const parentId = getParentEpicId(task.id, epicChildMap);
 				return parentId || task.id; // Use own ID if no parent (standalone/epic)
@@ -1132,7 +1132,7 @@
 				return task.labels && task.labels.length > 0 ? task.labels[0] : null;
 			case 'project':
 				// Composite key: "project::epic" for nested grouping
-				// Example: "jat::jat-abc" for subtask, "jat::jat-abc" for epic itself, "jat::" for standalone
+				// Example: "squad::squad-abc" for subtask, "squad::squad-abc" for epic itself, "squad::" for standalone
 				const project = getProjectFromTaskId(task.id);
 				// Get parent epic - checks both hierarchical IDs AND dependency-based relationships
 				const epic = getParentEpicId(task.id, epicChildMap) || task.id;
@@ -2245,7 +2245,7 @@
 	}
 
 	/**
-	 * Update task notes with all file paths so agents see them via jt show
+	 * Update task notes with all file paths so agents see them via st show
 	 */
 	async function updateTaskNotesWithFiles(taskId: string) {
 		try {

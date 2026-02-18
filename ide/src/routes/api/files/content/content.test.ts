@@ -517,7 +517,7 @@ describe('GET /api/files/content API', () => {
 			})
 		});
 
-		const response = await fetch('/api/files/content?project=jat&path=src/app.ts');
+		const response = await fetch('/api/files/content?project=squad&path=src/app.ts');
 		const data = await response.json();
 
 		expect(data).toHaveProperty('content');
@@ -545,7 +545,7 @@ describe('GET /api/files/content API', () => {
 			json: () => Promise.resolve({ error: 'File path is required' })
 		});
 
-		const response = await fetch('/api/files/content?project=jat');
+		const response = await fetch('/api/files/content?project=squad');
 		expect(response.ok).toBe(false);
 		expect(response.status).toBe(400);
 	});
@@ -557,7 +557,7 @@ describe('GET /api/files/content API', () => {
 			json: () => Promise.resolve({ error: 'File not found' })
 		});
 
-		const response = await fetch('/api/files/content?project=jat&path=nonexistent.ts');
+		const response = await fetch('/api/files/content?project=squad&path=nonexistent.ts');
 		expect(response.ok).toBe(false);
 		expect(response.status).toBe(404);
 	});
@@ -569,7 +569,7 @@ describe('GET /api/files/content API', () => {
 			json: () => Promise.resolve({ error: 'Path traversal detected' })
 		});
 
-		const response = await fetch('/api/files/content?project=jat&path=../../../etc/passwd');
+		const response = await fetch('/api/files/content?project=squad&path=../../../etc/passwd');
 		expect(response.ok).toBe(false);
 		expect(response.status).toBe(403);
 	});
@@ -581,7 +581,7 @@ describe('GET /api/files/content API', () => {
 			json: () => Promise.resolve({ error: 'File too large: 2.00MB exceeds 1MB limit' })
 		});
 
-		const response = await fetch('/api/files/content?project=jat&path=huge-file.bin');
+		const response = await fetch('/api/files/content?project=squad&path=huge-file.bin');
 		expect(response.ok).toBe(false);
 		expect(response.status).toBe(413);
 	});
@@ -593,7 +593,7 @@ describe('GET /api/files/content API', () => {
 			json: () => Promise.resolve({ error: 'Binary file - cannot display as text' })
 		});
 
-		const response = await fetch('/api/files/content?project=jat&path=image.png');
+		const response = await fetch('/api/files/content?project=squad&path=image.png');
 		expect(response.ok).toBe(false);
 		expect(response.status).toBe(415);
 	});
@@ -615,7 +615,7 @@ describe('PUT /api/files/content API', () => {
 			})
 		});
 
-		const response = await fetch('/api/files/content?project=jat&path=src/new-file.ts', {
+		const response = await fetch('/api/files/content?project=squad&path=src/new-file.ts', {
 			method: 'PUT',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ content: 'export const foo = 1;' })
@@ -633,7 +633,7 @@ describe('PUT /api/files/content API', () => {
 			json: () => Promise.resolve({ error: 'Cannot write to sensitive file' })
 		});
 
-		const response = await fetch('/api/files/content?project=jat&path=.env', {
+		const response = await fetch('/api/files/content?project=squad&path=.env', {
 			method: 'PUT',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ content: 'SECRET=value' })
@@ -650,7 +650,7 @@ describe('PUT /api/files/content API', () => {
 			json: () => Promise.resolve({ error: 'Content must be a string' })
 		});
 
-		const response = await fetch('/api/files/content?project=jat&path=file.txt', {
+		const response = await fetch('/api/files/content?project=squad&path=file.txt', {
 			method: 'PUT',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ content: 123 })
@@ -677,7 +677,7 @@ describe('DELETE /api/files/content API', () => {
 			})
 		});
 
-		const response = await fetch('/api/files/content?project=jat&path=src/old-file.ts', {
+		const response = await fetch('/api/files/content?project=squad&path=src/old-file.ts', {
 			method: 'DELETE'
 		});
 
@@ -694,7 +694,7 @@ describe('DELETE /api/files/content API', () => {
 			json: () => Promise.resolve({ error: 'Cannot delete sensitive file' })
 		});
 
-		const response = await fetch('/api/files/content?project=jat&path=.env', {
+		const response = await fetch('/api/files/content?project=squad&path=.env', {
 			method: 'DELETE'
 		});
 
@@ -709,7 +709,7 @@ describe('DELETE /api/files/content API', () => {
 			json: () => Promise.resolve({ error: 'File not found' })
 		});
 
-		const response = await fetch('/api/files/content?project=jat&path=nonexistent.ts', {
+		const response = await fetch('/api/files/content?project=squad&path=nonexistent.ts', {
 			method: 'DELETE'
 		});
 
@@ -735,7 +735,7 @@ describe('PATCH /api/files/content API (Rename)', () => {
 			})
 		});
 
-		const response = await fetch('/api/files/content?project=jat&path=src/old-name.ts', {
+		const response = await fetch('/api/files/content?project=squad&path=src/old-name.ts', {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ newName: 'new-name.ts' })
@@ -754,7 +754,7 @@ describe('PATCH /api/files/content API (Rename)', () => {
 			json: () => Promise.resolve({ error: 'newName is required and must be a string' })
 		});
 
-		const response = await fetch('/api/files/content?project=jat&path=src/file.ts', {
+		const response = await fetch('/api/files/content?project=squad&path=src/file.ts', {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({})
@@ -771,7 +771,7 @@ describe('PATCH /api/files/content API (Rename)', () => {
 			json: () => Promise.resolve({ error: 'Invalid file name' })
 		});
 
-		const response = await fetch('/api/files/content?project=jat&path=src/file.ts', {
+		const response = await fetch('/api/files/content?project=squad&path=src/file.ts', {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ newName: '../escape.ts' })
@@ -788,7 +788,7 @@ describe('PATCH /api/files/content API (Rename)', () => {
 			json: () => Promise.resolve({ error: 'Cannot rename sensitive file' })
 		});
 
-		const response = await fetch('/api/files/content?project=jat&path=.env', {
+		const response = await fetch('/api/files/content?project=squad&path=.env', {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ newName: 'renamed.env' })
@@ -805,7 +805,7 @@ describe('PATCH /api/files/content API (Rename)', () => {
 			json: () => Promise.resolve({ error: 'A file with that name already exists' })
 		});
 
-		const response = await fetch('/api/files/content?project=jat&path=src/file.ts', {
+		const response = await fetch('/api/files/content?project=squad&path=src/file.ts', {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ newName: 'existing.ts' })
@@ -833,7 +833,7 @@ describe('POST /api/files/content API (Create)', () => {
 			})
 		});
 
-		const response = await fetch('/api/files/content?project=jat&path=src&name=new-file.ts&type=file', {
+		const response = await fetch('/api/files/content?project=squad&path=src&name=new-file.ts&type=file', {
 			method: 'POST'
 		});
 
@@ -853,7 +853,7 @@ describe('POST /api/files/content API (Create)', () => {
 			})
 		});
 
-		const response = await fetch('/api/files/content?project=jat&path=src&name=new-folder&type=folder', {
+		const response = await fetch('/api/files/content?project=squad&path=src&name=new-folder&type=folder', {
 			method: 'POST'
 		});
 
@@ -870,7 +870,7 @@ describe('POST /api/files/content API (Create)', () => {
 			json: () => Promise.resolve({ error: 'Name is required' })
 		});
 
-		const response = await fetch('/api/files/content?project=jat&path=src&type=file', {
+		const response = await fetch('/api/files/content?project=squad&path=src&type=file', {
 			method: 'POST'
 		});
 
@@ -885,7 +885,7 @@ describe('POST /api/files/content API (Create)', () => {
 			json: () => Promise.resolve({ error: 'Type must be "file" or "folder"' })
 		});
 
-		const response = await fetch('/api/files/content?project=jat&path=src&name=test&type=invalid', {
+		const response = await fetch('/api/files/content?project=squad&path=src&name=test&type=invalid', {
 			method: 'POST'
 		});
 
@@ -900,7 +900,7 @@ describe('POST /api/files/content API (Create)', () => {
 			json: () => Promise.resolve({ error: 'Invalid name' })
 		});
 
-		const response = await fetch('/api/files/content?project=jat&path=src&name=path/file.ts&type=file', {
+		const response = await fetch('/api/files/content?project=squad&path=src&name=path/file.ts&type=file', {
 			method: 'POST'
 		});
 
@@ -915,7 +915,7 @@ describe('POST /api/files/content API (Create)', () => {
 			json: () => Promise.resolve({ error: 'Cannot create sensitive file' })
 		});
 
-		const response = await fetch('/api/files/content?project=jat&path=&name=.env&type=file', {
+		const response = await fetch('/api/files/content?project=squad&path=&name=.env&type=file', {
 			method: 'POST'
 		});
 
@@ -930,7 +930,7 @@ describe('POST /api/files/content API (Create)', () => {
 			json: () => Promise.resolve({ error: 'A file with that name already exists' })
 		});
 
-		const response = await fetch('/api/files/content?project=jat&path=src&name=existing.ts&type=file', {
+		const response = await fetch('/api/files/content?project=squad&path=src&name=existing.ts&type=file', {
 			method: 'POST'
 		});
 

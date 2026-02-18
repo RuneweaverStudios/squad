@@ -1,17 +1,17 @@
 # Multi-Agent Swarm
 
-JAT's swarm mode launches multiple agents that independently pick and work on tasks from your backlog. A single command spawns 4+ agents, each grabbing the highest-priority ready task from JAT Tasks.
+SQUAD's swarm mode launches multiple agents that independently pick and work on tasks from your backlog. A single command spawns 4+ agents, each grabbing the highest-priority ready task from SQUAD Tasks.
 
 ## Launching a swarm
 
-The `jat` CLI accepts a project name and agent count:
+The `squad` CLI accepts a project name and agent count:
 
 ```bash
 # Launch 4 agents on the chimaro project
-jat chimaro 4 --auto
+squad chimaro 4 --auto
 
 # Claude-only mode (no npm dev server, browser, or IDE)
-jat chimaro 4 --claude --auto
+squad chimaro 4 --claude --auto
 ```
 
 Without `--claude`, the full launch sequence runs:
@@ -20,7 +20,7 @@ Without `--claude`, the full launch sequence runs:
 2. Launch the browser with remote debugging
 3. Start the IDE
 4. Spawn 4 Claude Code sessions in tmux (staggered)
-5. Each session runs `/jat:start auto` which picks the top ready task
+5. Each session runs `/squad:start auto` which picks the top ready task
 
 With `--claude`, only steps 4 and 5 run. This is faster and uses fewer system resources when you dont need the browser or dev server.
 
@@ -36,7 +36,7 @@ Agents spawn with a configurable delay between each launch. The default is 15 se
 }
 ```
 
-Staggering prevents race conditions. Without it, multiple agents might query `jt ready` at the same instant and grab the same task. The 15-second gap gives each agent time to register, reserve files, and update the task status before the next one starts.
+Staggering prevents race conditions. Without it, multiple agents might query `st ready` at the same instant and grab the same task. The 15-second gap gives each agent time to register, reserve files, and update the task status before the next one starts.
 
 If you have a large backlog with no shared files, you can reduce the stagger to 5 seconds. For repos with lots of overlapping code paths, 20-30 seconds is safer.
 
@@ -45,14 +45,14 @@ If you have a large backlog with no shared files, you can reduce the stagger to 
 The Epic Swarm feature (Alt+E) spawns agents specifically for the subtasks of an epic.
 
 ```
-Epic: "Improve IDE Performance" (jat-abc)
+Epic: "Improve IDE Performance" (squad-abc)
   |
-  +-- jat-def: "Add caching layer"      --> Agent 1
-  +-- jat-ghi: "Optimize queries"       --> Agent 2
-  +-- jat-jkl: "Add performance tests"  --> Agent 3
+  +-- squad-def: "Add caching layer"      --> Agent 1
+  +-- squad-ghi: "Optimize queries"       --> Agent 2
+  +-- squad-jkl: "Add performance tests"  --> Agent 3
 ```
 
-The IDE reads the epic's child tasks, filters to those with `open` status, and spawns one agent per ready child. Dependencies between children are respected. If `jat-jkl` depends on `jat-ghi`, only `jat-def` and `jat-ghi` spawn initially. When `jat-ghi` completes, `jat-jkl` becomes ready and the IDE auto-spawns an agent for it.
+The IDE reads the epic's child tasks, filters to those with `open` status, and spawns one agent per ready child. Dependencies between children are respected. If `squad-jkl` depends on `squad-ghi`, only `squad-def` and `squad-ghi` spawn initially. When `squad-ghi` completes, `squad-jkl` becomes ready and the IDE auto-spawns an agent for it.
 
 Epic Swarm uses a special `auto_proceed` completion mode. When an agent finishes a child task, the completion bundle tells the IDE to immediately spawn the next available child. No human review needed between subtasks.
 
@@ -79,7 +79,7 @@ The `claude_startup_timeout` setting controls how long the IDE waits for each ag
 
 ## Review rules for auto-proceed
 
-Review rules control whether a completed task needs human review or auto-proceeds to the next task. Configure these in `.jat/review-rules.json` or through Settings in the IDE.
+Review rules control whether a completed task needs human review or auto-proceeds to the next task. Configure these in `.squad/review-rules.json` or through Settings in the IDE.
 
 | Rule condition | Action | Example use case |
 |----------------|--------|------------------|
@@ -97,7 +97,7 @@ The detection order is:
 
 1. Task notes override
 2. Session epic context (`.claude/sessions/context-{sessionId}.json`)
-3. Project review rules (`.jat/review-rules.json`)
+3. Project review rules (`.squad/review-rules.json`)
 4. Default: review required
 
 ## Coordination via Agent Registry
@@ -107,7 +107,7 @@ When multiple agents work in the same repository, the Agent Registry and task sy
 **File declarations** on tasks tell other agents which files you plan to edit:
 
 ```bash
-jt update jat-def --status in_progress --assignee FairBay --files "src/lib/cache/**"
+st update squad-def --status in_progress --assignee FairBay --files "src/lib/cache/**"
 ```
 
 Before starting work, agents check existing file declarations to avoid overlapping edits.
@@ -119,11 +119,11 @@ am-agents    # List all registered agents
 am-whoami    # Check current agent identity
 ```
 
-**Memory** transfers context between sessions. When an agent completes a task, it writes a memory entry to `.jat/memory/` with lessons, gotchas, and patterns. The next agent working on related code picks this up automatically during `/jat:start`.
+**Memory** transfers context between sessions. When an agent completes a task, it writes a memory entry to `.squad/memory/` with lessons, gotchas, and patterns. The next agent working on related code picks this up automatically during `/squad:start`.
 
 ## Agent routing
 
-The IDE routes tasks to specific agent programs and models based on configurable rules in `~/.config/jat/agents.json`.
+The IDE routes tasks to specific agent programs and models based on configurable rules in `~/.config/squad/agents.json`.
 
 | Rule | Condition | Routes to |
 |------|-----------|-----------|

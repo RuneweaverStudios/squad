@@ -7,7 +7,7 @@
  * - Session context (placeholder - requires API integration)
  * - Agent metrics (placeholder - requires am-agents integration)
  *
- * Task: jat-sk1 - Claude API usage data fetching
+ * Task: squad-sk1 - Claude API usage data fetching
  */
 
 import { json } from '@sveltejs/kit';

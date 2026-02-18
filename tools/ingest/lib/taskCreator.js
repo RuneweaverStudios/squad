@@ -5,14 +5,14 @@ import { fileURLToPath } from 'node:url';
 import { findThreadByParentItemId, updateThreadCursor, deactivateThread } from './dedup.js';
 import * as logger from './logger.js';
 
-// Resolve jat root from this file's location (tools/ingest/lib/ → jat/)
+// Resolve squad root from this file's location (tools/ingest/lib/ → squad/)
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const JAT_ROOT = join(__dirname, '..', '..', '..');
-const TASK_IMAGES_PATH = join(JAT_ROOT, '.jat', 'task-images.json');
+const SQUAD_ROOT = join(__dirname, '..', '..', '..');
+const TASK_IMAGES_PATH = join(SQUAD_ROOT, '.squad', 'task-images.json');
 
-const IDE_BASE_URL = process.env.JAT_IDE_URL || 'http://127.0.0.1:3333';
+const IDE_BASE_URL = process.env.SQUAD_IDE_URL || 'http://127.0.0.1:3333';
 
-// Messaging/chat source types where /jat:chat is the appropriate default command
+// Messaging/chat source types where /squad:chat is the appropriate default command
 const CHAT_SOURCE_TYPES = new Set([
   'telegram', 'slack', 'discord', 'matrix', 'mattermost',
   'line', 'signal', 'whatsapp', 'bluebubbles', 'googlechat'
@@ -23,13 +23,13 @@ function isChatSource(source) {
 }
 
 /**
- * Create a task via jt create CLI.
+ * Create a task via st create CLI.
  * Returns the created task ID or null on failure.
  */
 export function createTask(source, item, downloadedAttachments = []) {
   const defaults = source.taskDefaults || {};
   // Auto-set type to 'chat' for conversational integrations
-  const isChat = source.automation?.command === '/jat:chat' || isChatSource(source);
+  const isChat = source.automation?.command === '/squad:chat' || isChatSource(source);
   const type = isChat ? 'chat' : (defaults.type || 'task');
   const priority = String(defaults.priority ?? 2);
   const labels = defaults.labels || [];
@@ -53,12 +53,12 @@ export function createTask(source, item, downloadedAttachments = []) {
   }
 
   try {
-    const output = execFileSync('jt', args, {
+    const output = execFileSync('st', args, {
       encoding: 'utf-8',
       timeout: 15000,
       cwd: getProjectPath(source.project)
     }).trim();
-    // jt create outputs "Created jat-xxxxx: Title" - extract the task ID
+    // st create outputs "Created squad-xxxxx: Title" - extract the task ID
     const match = output.match(/^Created\s+(\S+):/);
     const taskId = match ? match[1] : output;
 
@@ -67,7 +67,7 @@ export function createTask(source, item, downloadedAttachments = []) {
       const realDesc = description.replace('TASK_ID', taskId);
       if (realDesc !== description) {
         try {
-          execFileSync('jt', ['update', taskId, '--description', realDesc], {
+          execFileSync('st', ['update', taskId, '--description', realDesc], {
             encoding: 'utf-8', timeout: 15000, cwd: getProjectPath(source.project)
           });
         } catch { /* description update is secondary */ }
@@ -77,7 +77,7 @@ export function createTask(source, item, downloadedAttachments = []) {
     logger.info(`created task ${taskId}: ${item.title.slice(0, 60)}`, source.id);
     return taskId;
   } catch (err) {
-    logger.error(`jt create failed: ${err.message}`, source.id);
+    logger.error(`st create failed: ${err.message}`, source.id);
     return null;
   }
 }
@@ -93,7 +93,7 @@ function buildDescription(item, attachments) {
     const o = item.origin;
     const channel = o.channelId ? ` channel ${o.channelId}` : '';
     parts.push(`Origin: ${o.adapterType}${channel}`);
-    parts.push(`Reply: \`jat-signal reply '{"taskId":"TASK_ID","message":"...","replyType":"ack"}'\``);
+    parts.push(`Reply: \`squad-signal reply '{"taskId":"TASK_ID","message":"...","replyType":"ack"}'\``);
   }
 
   if (item.description) {
@@ -138,7 +138,7 @@ export function appendToTask(taskId, replies, project) {
   // Read current task description once
   let currentDesc = '';
   try {
-    const showOutput = execFileSync('jt', ['show', taskId, '--json'], {
+    const showOutput = execFileSync('st', ['show', taskId, '--json'], {
       encoding: 'utf-8',
       timeout: 15000,
       cwd
@@ -147,7 +147,7 @@ export function appendToTask(taskId, replies, project) {
     const task = Array.isArray(parsed) ? parsed[0] : parsed;
     currentDesc = task?.description || '';
   } catch (err) {
-    logger.error(`jt show failed for ${taskId}: ${err.message}`);
+    logger.error(`st show failed for ${taskId}: ${err.message}`);
     return false;
   }
 
@@ -168,7 +168,7 @@ export function appendToTask(taskId, replies, project) {
 
   // Single write with all replies
   try {
-    execFileSync('jt', ['update', taskId, '--description', newDesc], {
+    execFileSync('st', ['update', taskId, '--description', newDesc], {
       encoding: 'utf-8',
       timeout: 15000,
       cwd
@@ -176,7 +176,7 @@ export function appendToTask(taskId, replies, project) {
     logger.info(`appended ${replies.length} reply(s) to ${taskId}`, project);
     return true;
   } catch (err) {
-    logger.error(`jt update failed for ${taskId}: ${err.message}`);
+    logger.error(`st update failed for ${taskId}: ${err.message}`);
     return false;
   }
 }
@@ -196,22 +196,22 @@ export async function resumeSession(taskId, replyText, project) {
   // 1. Look up task assignee
   let assignee;
   try {
-    const showOutput = execFileSync('jt', ['show', taskId, '--json'], {
+    const showOutput = execFileSync('st', ['show', taskId, '--json'], {
       encoding: 'utf-8', timeout: 15000, cwd
     });
     const parsed = JSON.parse(showOutput);
     const task = Array.isArray(parsed) ? parsed[0] : parsed;
     assignee = task?.assignee;
   } catch (err) {
-    return { resumed: false, reason: `jt show failed: ${err.message}` };
+    return { resumed: false, reason: `st show failed: ${err.message}` };
   }
 
   if (!assignee) {
     return { resumed: false, reason: 'no-assignee' };
   }
 
-  const sessionName = `jat-${assignee}`;
-  const injectionText = `The user replied on the originating channel (e.g. Telegram). You MUST send your response back using jat-signal reply (not just text output). Their message: ${replyText}`;
+  const sessionName = `squad-${assignee}`;
+  const injectionText = `The user replied on the originating channel (e.g. Telegram). You MUST send your response back using squad-signal reply (not just text output). Their message: ${replyText}`;
 
   // 2. Check if tmux session still exists (agent still running)
   let sessionActive = false;
@@ -321,7 +321,7 @@ export async function resumeSession(taskId, replyText, project) {
  * Uses -l flag for literal key interpretation and sends Enter separately.
  * This matches the IDE input API behavior (ide/src/routes/api/sessions/[name]/input/+server.js).
  *
- * @param {string} sessionName - tmux session name (e.g., 'jat-AgentName')
+ * @param {string} sessionName - tmux session name (e.g., 'squad-AgentName')
  * @param {string} text - Text to inject
  */
 function injectTextViaTmux(sessionName, text) {
@@ -359,14 +359,14 @@ export async function handleThreadReply(source, item, downloaded = []) {
   // Check if the task is closed — if so, reopen it before proceeding
   let taskClosed = false;
   try {
-    const showOutput = execFileSync('jt', ['show', taskId, '--json'], {
+    const showOutput = execFileSync('st', ['show', taskId, '--json'], {
       encoding: 'utf-8', timeout: 15000, cwd
     });
     const parsed = JSON.parse(showOutput);
     const task = Array.isArray(parsed) ? parsed[0] : parsed;
     if (task?.status === 'closed') {
       taskClosed = true;
-      execFileSync('jt', ['update', taskId, '--status', 'open'], {
+      execFileSync('st', ['update', taskId, '--status', 'open'], {
         encoding: 'utf-8', timeout: 15000, cwd
       });
       logger.info(`Reopened closed task ${taskId} for follow-up reply`, source.id);
@@ -432,7 +432,7 @@ export async function handleReaction(source, item) {
 
   // Close the task
   try {
-    execFileSync('jt', ['close', taskId, '--reason', `Closed via ${item.reaction} reaction by ${item.author || 'user'}`], {
+    execFileSync('st', ['close', taskId, '--reason', `Closed via ${item.reaction} reaction by ${item.author || 'user'}`], {
       encoding: 'utf-8', timeout: 15000, cwd
     });
     logger.info(`Closed task ${taskId} via ${item.reaction} reaction`, source.id);
@@ -444,7 +444,7 @@ export async function handleReaction(source, item) {
   // Kill the agent session if it's still running (paused sessions have a tmux session)
   let assignee;
   try {
-    const showOutput = execFileSync('jt', ['show', taskId, '--json'], {
+    const showOutput = execFileSync('st', ['show', taskId, '--json'], {
       encoding: 'utf-8', timeout: 15000, cwd
     });
     const parsed = JSON.parse(showOutput);
@@ -453,7 +453,7 @@ export async function handleReaction(source, item) {
   } catch { /* ignore */ }
 
   if (assignee) {
-    const sessionName = `jat-${assignee}`;
+    const sessionName = `squad-${assignee}`;
     try {
       execFileSync('tmux', ['kill-session', '-t', sessionName], { timeout: 5000 });
       logger.info(`Killed session ${sessionName} after reaction close`, source.id);
@@ -467,7 +467,7 @@ export async function handleReaction(source, item) {
 
   // Send confirmation back to the channel
   try {
-    const router = join(dirname(fileURLToPath(import.meta.url)), '..', 'jat-reply-router');
+    const router = join(dirname(fileURLToPath(import.meta.url)), '..', 'squad-reply-router');
     execFileSync(router, ['--task-id', taskId, '--message', `Task closed. ${item.reaction}`, '--type', 'completion'], {
       encoding: 'utf-8', timeout: 15000
     });
@@ -479,13 +479,13 @@ export async function handleReaction(source, item) {
 }
 
 /**
- * Register downloaded files as task attachments in .jat/task-images.json
+ * Register downloaded files as task attachments in .squad/task-images.json
  * so they appear in the IDE's ATTACHMENTS section.
  */
 export function registerTaskAttachments(taskId, downloadedFiles, project) {
   if (!downloadedFiles?.length) return;
 
-  // Write to jat's .jat/task-images.json (where the IDE reads from)
+  // Write to squad's .squad/task-images.json (where the IDE reads from)
   const storePath = TASK_IMAGES_PATH;
 
   // Load existing
@@ -520,11 +520,11 @@ export function registerTaskAttachments(taskId, downloadedFiles, project) {
     return;
   }
 
-  // Sync to task notes so agents see them via jt show
+  // Sync to task notes so agents see them via st show
   const imageList = existing.map((img, i) => `  ${i + 1}. ${img.path}`).join('\n');
   const notes = `Author: ${project}\n📷 Attached files:\n${imageList}\n(Use Read tool to view)`;
   try {
-    execFileSync('jt', ['update', taskId, '--notes', notes], {
+    execFileSync('st', ['update', taskId, '--notes', notes], {
       encoding: 'utf-8',
       timeout: 15000,
       cwd: getProjectPath(project)
@@ -546,12 +546,12 @@ export function applyAutomation(taskId, source) {
   if (!auto || auto.action === 'none') return;
 
   const cwd = getProjectPath(source.project);
-  const command = auto.command || (isChatSource(source) ? '/jat:chat' : '/jat:start');
+  const command = auto.command || (isChatSource(source) ? '/squad:chat' : '/squad:start');
 
   if (auto.action === 'immediate') {
     // Set command on task, then fire-and-forget spawn API call
     try {
-      execFileSync('jt', ['update', taskId, '--command', command], {
+      execFileSync('st', ['update', taskId, '--command', command], {
         encoding: 'utf-8', timeout: 15000, cwd
       });
     } catch (err) {
@@ -576,7 +576,7 @@ export function applyAutomation(taskId, source) {
 
   try {
     const args = ['update', taskId, '--command', command, '--next-run-at', nextRunAt];
-    execFileSync('jt', args, { encoding: 'utf-8', timeout: 15000, cwd });
+    execFileSync('st', args, { encoding: 'utf-8', timeout: 15000, cwd });
     logger.info(`scheduled ${taskId} for ${nextRunAt} (${auto.action})`, source.id);
   } catch (err) {
     logger.error(`Failed to set schedule on ${taskId}: ${err.message}`, source.id);
@@ -643,7 +643,7 @@ export function getProjectPath(projectName) {
 
   for (const p of candidates) {
     try {
-      execFileSync('test', ['-d', `${p}/.jat`], { timeout: 1000 });
+      execFileSync('test', ['-d', `${p}/.squad`], { timeout: 1000 });
       return p;
     } catch { /* skip */ }
   }

@@ -3,7 +3,7 @@
  *
  * Type definitions for the visual workflow builder system.
  * Workflows are n8n-style automation pipelines with nodes, edges,
- * and execution state. Stored as JSON files in ~/.config/jat/workflows/.
+ * and execution state. Stored as JSON files in ~/.config/squad/workflows/.
  *
  * @see ide/src/lib/utils/workflows.server.ts for CRUD operations
  * @see ide/src/routes/api/workflows/ for API endpoints
@@ -67,7 +67,7 @@ export interface TriggerCronConfig {
 	timezone?: string;
 }
 
-/** Event trigger: fires on a JAT event */
+/** Event trigger: fires on a SQUAD event */
 export interface TriggerEventConfig {
 	/** Event type to listen for */
 	eventType:
@@ -355,7 +355,7 @@ export interface WorkflowRun {
 // =============================================================================
 
 /**
- * Shape of a workflow JSON file on disk (~/.config/jat/workflows/{id}.json)
+ * Shape of a workflow JSON file on disk (~/.config/squad/workflows/{id}.json)
  */
 export interface WorkflowFile {
 	id: string;
@@ -370,7 +370,7 @@ export interface WorkflowFile {
 
 /**
  * Shape of a workflow run JSON file on disk
- * (~/.config/jat/workflows/runs/{workflowId}/{runId}.json)
+ * (~/.config/squad/workflows/runs/{workflowId}/{runId}.json)
  */
 export interface WorkflowRunFile {
 	id: string;

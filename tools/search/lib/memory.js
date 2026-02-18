@@ -1,5 +1,5 @@
 /**
- * Memory search module - wraps jat-memory hybrid search.
+ * Memory search module - wraps squad-memory hybrid search.
  */
 
 import { existsSync } from 'node:fs';
@@ -22,7 +22,7 @@ export async function searchMemory(query, options = {}) {
 
   const projectPath = resolveProjectPath(project);
   if (!projectPath) {
-    log('No .jat/ directory found - skipping memory search');
+    log('No .squad/ directory found - skipping memory search');
     return [];
   }
 
@@ -54,18 +54,18 @@ export async function searchMemory(query, options = {}) {
 }
 
 /**
- * Resolve project path, looking for .jat/ directory.
+ * Resolve project path, looking for .squad/ directory.
  */
 function resolveProjectPath(explicit) {
   if (explicit) {
     const p = resolve(explicit);
-    return existsSync(`${p}/.jat`) ? p : null;
+    return existsSync(`${p}/.squad`) ? p : null;
   }
 
   // Walk up from cwd
   let dir = process.cwd();
   while (dir !== '/') {
-    if (existsSync(`${dir}/.jat`)) return dir;
+    if (existsSync(`${dir}/.squad`)) return dir;
     dir = resolve(dir, '..');
   }
   return null;

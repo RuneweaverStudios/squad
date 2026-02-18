@@ -48,7 +48,7 @@
 		inactiveColor: string | null;
 		description: string | null;
 		hidden: boolean;
-		source: 'jat-config' | 'filesystem' | 'server-session';
+		source: 'squad-config' | 'filesystem' | 'server-session';
 		tasks?: { open: number; total: number };
 		agents?: { active: number; total: number };
 		status?: string | null;
@@ -224,7 +224,7 @@
 		'oklch(0.85 0.18 85)'   // Bright yellow
 	];
 
-	// Convert #rrggbb to rgb(rrggbb) for JAT config (used when saving colors)
+	// Convert #rrggbb to rgb(rrggbb) for SQUAD config (used when saving colors)
 	function hexToRgb(hex: string): string {
 		const cleaned = hex.replace('#', '').toLowerCase();
 		return `rgb(${cleaned})`;
@@ -765,7 +765,7 @@
 
 	// Server sessions that have no matching project config entry
 	// These are servers like 'server-ingest' or 'server-finance' that are running
-	// but weren't configured in ~/.config/jat/projects.json
+	// but weren't configured in ~/.config/squad/projects.json
 	const serverOnlyEntries = $derived.by((): Project[] => {
 		const projectNames = new Set(projects.map(p => p.name.toLowerCase()));
 		return serverSessionsState.sessions
@@ -849,9 +849,9 @@
 </script>
 
 <svelte:head>
-	<title>Servers | JAT IDE</title>
+	<title>Servers | SQUAD IDE</title>
 	<meta name="description" content="Manage project development servers. Start, stop, and monitor server sessions across projects." />
-	<meta property="og:title" content="Servers | JAT IDE" />
+	<meta property="og:title" content="Servers | SQUAD IDE" />
 	<meta property="og:description" content="Manage project development servers. Start, stop, and monitor server sessions across projects." />
 	<meta property="og:image" content="/favicons/servers.svg" />
 	<link rel="icon" href="/favicons/servers.svg" />
@@ -922,7 +922,7 @@
 						No projects found
 					</p>
 					<p class="text-base-content/50 font-mono text-xs mt-2 mb-4">
-						Add a project to get started with JAT
+						Add a project to get started with SQUAD
 					</p>
 					<button
 						class="btn btn-sm gap-1 text-success border border-success/30 bg-success/10"

@@ -15,8 +15,8 @@ import { join } from 'path';
 
 const execAsync = promisify(exec);
 
-// Path to JAT config
-const CONFIG_FILE = join(homedir(), '.config', 'jat', 'projects.json');
+// Path to SQUAD config
+const CONFIG_FILE = join(homedir(), '.config', 'squad', 'projects.json');
 
 /**
  * Read project config

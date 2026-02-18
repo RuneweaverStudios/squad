@@ -2,7 +2,7 @@
 	/**
 	 * SkillsEditor Component
 	 *
-	 * Browse and manage Claude Code skills from the JAT skill catalog.
+	 * Browse and manage Claude Code skills from the SQUAD skill catalog.
 	 * - Installed Skills: enable/disable toggles, uninstall, update
 	 * - Browse Catalog: search/filter, install with one click
 	 * - Skill Detail: drawer showing full skill info
@@ -81,9 +81,9 @@
 	// Derived - track both id and name for matching against catalog entries
 	const installedIds = $derived(new Set(installed.flatMap((s) => [s.id, s.name, s.id?.toLowerCase(), s.name?.toLowerCase()].filter(Boolean))));
 
-	/** Derive effective source: JAT skills get their own category */
+	/** Derive effective source: SQUAD skills get their own category */
 	function effectiveSource(skill: CatalogSkill): string {
-		if (skill.author === 'jat' || skill.tags.includes('jat')) return 'jat';
+		if (skill.author === 'squad' || skill.tags.includes('squad')) return 'squad';
 		return skill.source;
 	}
 
@@ -110,10 +110,10 @@
 
 	const catalogSources = $derived(() => {
 		const sources = new Set(catalog.map((s) => effectiveSource(s)));
-		// Put 'jat' first after 'all', then sort the rest
+		// Put 'squad' first after 'all', then sort the rest
 		const sorted = Array.from(sources).sort((a, b) => {
-			if (a === 'jat') return -1;
-			if (b === 'jat') return 1;
+			if (a === 'squad') return -1;
+			if (b === 'squad') return 1;
 			if (a === 'curated') return -1;
 			if (b === 'curated') return 1;
 			return a.localeCompare(b);
@@ -182,7 +182,7 @@
 		}
 	}
 
-	// Toggle enable/disable - uses skill id (jat-skills expects id, not name)
+	// Toggle enable/disable - uses skill id (squad-skills expects id, not name)
 	async function toggleSkill(skillId: string, enable: boolean) {
 		togglingSkills.add(skillId);
 		togglingSkills = new Set(togglingSkills);
@@ -381,8 +381,8 @@
 
 	function sourceLabel(source: string): string {
 		switch (source) {
-			case 'jat':
-				return 'JAT';
+			case 'squad':
+				return 'SQUAD';
 			case 'curated':
 				return 'Official';
 			case 'github-openclaw':
@@ -400,8 +400,8 @@
 
 	function sourceColorClass(source: string): string {
 		switch (source) {
-			case 'jat':
-				return 'source-jat';
+			case 'squad':
+				return 'source-squad';
 			case 'curated':
 				return 'source-official';
 			case 'github-openclaw':
@@ -1021,7 +1021,7 @@
 	}
 
 	/* Filter chip active states per source */
-	.filter-chip.source-jat.active {
+	.filter-chip.source-squad.active {
 		color: oklch(0.90 0.14 85);
 		background: oklch(0.24 0.08 85);
 		border-color: oklch(0.45 0.12 85);
@@ -1283,7 +1283,7 @@
 	}
 
 	/* Source color variants - distinct hues per source */
-	.source-jat {
+	.source-squad {
 		background: oklch(0.26 0.10 85);
 		color: oklch(0.80 0.15 85);
 	}

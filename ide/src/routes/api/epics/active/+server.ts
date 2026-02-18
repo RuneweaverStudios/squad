@@ -1,7 +1,7 @@
 /**
  * Active Epic API - Track which epic swarm is currently running
  *
- * This file is read by agents in /jat:complete to prevent them from
+ * This file is read by agents in /squad:complete to prevent them from
  * auto-proceeding to tasks that belong to an active epic swarm.
  *
  * POST /api/epics/active - Set the active epic
@@ -14,7 +14,7 @@ import { writeFile, unlink, readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import type { RequestHandler } from './$types';
 
-const ACTIVE_EPIC_FILE = '/tmp/jat-epic-active.json';
+const ACTIVE_EPIC_FILE = '/tmp/squad-epic-active.json';
 
 interface ActiveEpicData {
 	epicId: string;

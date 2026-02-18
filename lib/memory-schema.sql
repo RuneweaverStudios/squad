@@ -1,10 +1,10 @@
--- JAT Agent Memory: Search Index Schema
--- Stored in: .jat/memory.db (per project, alongside tasks.db)
--- Rebuilt from .jat/memory/*.md files (Markdown is source of truth)
+-- SQUAD Agent Memory: Search Index Schema
+-- Stored in: .squad/memory.db (per project, alongside tasks.db)
+-- Rebuilt from .squad/memory/*.md files (Markdown is source of truth)
 --
 -- This database provides fast search over memory entries. The Markdown
--- files in .jat/memory/ are the canonical source; this index can be
--- rebuilt at any time with: jat-memory index --force
+-- files in .squad/memory/ are the canonical source; this index can be
+-- rebuilt at any time with: squad-memory index --force
 
 -- ─────────────────────────────────────────────────────────────────────
 -- Chunks: text segments from memory files, with optional embeddings
@@ -12,7 +12,7 @@
 
 CREATE TABLE IF NOT EXISTS chunks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    path TEXT NOT NULL,              -- relative to .jat/memory/ (e.g. "2026-02-10-jat-abc-auth-timeout.md")
+    path TEXT NOT NULL,              -- relative to .squad/memory/ (e.g. "2026-02-10-squad-abc-auth-timeout.md")
     task_id TEXT NOT NULL,           -- from frontmatter: task field
     section TEXT NOT NULL,           -- heading name: "summary", "approach", "decisions", "key_files", "lessons", "cross_agent_intel"
     start_line INTEGER NOT NULL,     -- 1-indexed line in source .md file
@@ -91,7 +91,7 @@ END;
 -- ─────────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS file_meta (
-    path TEXT PRIMARY KEY,           -- relative to .jat/memory/
+    path TEXT PRIMARY KEY,           -- relative to .squad/memory/
     task_id TEXT NOT NULL,
     project TEXT NOT NULL,
     agent TEXT,

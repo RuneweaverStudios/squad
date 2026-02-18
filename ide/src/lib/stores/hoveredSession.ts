@@ -21,7 +21,7 @@ export const highlightedSessionName = writable<string | null>(null);
 /**
  * Jump to a session by setting it as hovered, scrolling to it, highlighting it,
  * and optionally maximizing the session panel height.
- * @param sessionName - The session name to jump to (e.g., "jat-AgentName" for work, "server-project" for servers)
+ * @param sessionName - The session name to jump to (e.g., "squad-AgentName" for work, "server-project" for servers)
  * @param agentName - The agent name if this is a work session (used for data-agent-name selector)
  * @param options - Optional settings
  * @param options.maximize - If true, signal to maximize the session panel (default: true)
@@ -63,7 +63,7 @@ export function jumpToSession(sessionName: string, agentName?: string, options?:
 		const selectors = [
 			agentName ? `[data-agent-name="${agentName}"]` : null,
 			`[data-session-name="${sessionName}"]`,
-			`[data-agent-name="${sessionName.replace(/^jat-/, '')}"]`  // Fallback: extract agent from session name
+			`[data-agent-name="${sessionName.replace(/^squad-/, '')}"]`  // Fallback: extract agent from session name
 		].filter(Boolean);
 
 		for (const selector of selectors) {

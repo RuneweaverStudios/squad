@@ -4,9 +4,9 @@
  * GET /api/config/llm - Get current LLM configuration and provider status
  * PUT /api/config/llm - Update LLM configuration
  *
- * Configuration stored in: ~/.config/jat/projects.json under "llm" key
+ * Configuration stored in: ~/.config/squad/projects.json under "llm" key
  *
- * Task: jat-ce8x8 - Implement Claude CLI Fallback Configuration System
+ * Task: squad-ce8x8 - Implement Claude CLI Fallback Configuration System
  */
 
 import { json } from '@sveltejs/kit';
@@ -17,7 +17,7 @@ import type { RequestHandler } from './$types';
 import { getLlmConfig, getLlmProviderStatus } from '$lib/server/llmService';
 import { LLM_PROVIDER_DEFAULTS, type LlmProviderMode } from '$lib/config/constants';
 
-const CONFIG_PATH = join(homedir(), '.config', 'jat', 'projects.json');
+const CONFIG_PATH = join(homedir(), '.config', 'squad', 'projects.json');
 
 /**
  * GET - Retrieve current LLM configuration and provider status

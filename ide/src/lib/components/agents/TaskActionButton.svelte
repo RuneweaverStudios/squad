@@ -131,7 +131,7 @@
 
 	// Get session name for attach
 	const sessionName = $derived(
-		taskAgent ? `jat-${taskAgent.name}` : null
+		taskAgent ? `squad-${taskAgent.name}` : null
 	);
 
 	// Check if this is a human task (shouldn't auto-spawn agents)

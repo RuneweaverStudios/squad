@@ -19,8 +19,8 @@
  * - subject_max_length: Maximum first line length
  * - custom_instructions: Additional instructions for the AI
  *
- * Task: jat-2d600 - Add a 'generate commit message' button in /files
- * Task: jat-i97j2 - Implement Commit Message Generation Configuration Options
+ * Task: squad-2d600 - Add a 'generate commit message' button in /files
+ * Task: squad-i97j2 - Implement Commit Message Generation Configuration Options
  */
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
@@ -37,7 +37,7 @@ import {
 } from '$lib/config/constants';
 import { claudeCliCall } from '$lib/server/claudeCli';
 
-const CONFIG_PATH = join(homedir(), '.config', 'jat', 'projects.json');
+const CONFIG_PATH = join(homedir(), '.config', 'squad', 'projects.json');
 
 interface CommitMessageConfig {
 	model: CommitMessageModel;

@@ -2,7 +2,7 @@
  * Scheduler Status API
  * GET /api/scheduler/status
  *
- * Returns the current state of the jat-scheduler service:
+ * Returns the current state of the squad-scheduler service:
  * - running: whether the scheduler tmux session exists
  * - uptime: seconds since session started (if running)
  * - scheduledCount: number of tasks with schedule_cron or next_run_at
@@ -15,12 +15,12 @@ import { promisify } from 'util';
 import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { getScheduledTasks } from '$lib/server/jat-tasks.js';
+import { getScheduledTasks } from '$lib/server/squad-tasks.js';
 
 const execAsync = promisify(exec);
 
 const SCHEDULER_SESSION = 'server-scheduler';
-const WORKFLOWS_DIR = join(homedir(), '.config', 'jat', 'workflows');
+const WORKFLOWS_DIR = join(homedir(), '.config', 'squad', 'workflows');
 const WORKFLOW_STATE_FILE = join(WORKFLOWS_DIR, '.scheduler-state.json');
 
 /**

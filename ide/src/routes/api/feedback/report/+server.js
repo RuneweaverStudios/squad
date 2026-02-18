@@ -1,8 +1,8 @@
 /**
  * Feedback Widget Report API
  *
- * Receives bug reports from the <jat-feedback> widget and creates tasks.
- * Screenshots are saved to .jat/screenshots/ and referenced in the task description.
+ * Receives bug reports from the <squad-feedback> widget and creates tasks.
+ * Screenshots are saved to .squad/screenshots/ and referenced in the task description.
  * Includes CORS headers for cross-origin widget usage.
  *
  * POST - Submit a bug report (creates a task)
@@ -10,7 +10,7 @@
  * OPTIONS - CORS preflight
  */
 import { json } from '@sveltejs/kit';
-import { createTask } from '$lib/server/jat-tasks.js';
+import { createTask } from '$lib/server/squad-tasks.js';
 import { invalidateCache } from '$lib/server/cache.js';
 import { _resetTaskCache } from '../../../api/agents/+server.js';
 import { emitEvent } from '$lib/utils/eventBus.server.js';
@@ -24,7 +24,7 @@ const CORS_HEADERS = {
 	'Access-Control-Max-Age': '86400'
 };
 
-/** Map widget priority strings to JAT numeric priorities */
+/** Map widget priority strings to SQUAD numeric priorities */
 const PRIORITY_MAP = {
 	critical: 0,
 	high: 1,
@@ -32,7 +32,7 @@ const PRIORITY_MAP = {
 	low: 3
 };
 
-/** Map widget type strings to JAT task types */
+/** Map widget type strings to SQUAD task types */
 const TYPE_MAP = {
 	bug: 'bug',
 	enhancement: 'feature',
@@ -53,7 +53,7 @@ export async function GET() {
 	return json(
 		{
 			status: 'ok',
-			service: 'jat-feedback-report',
+			service: 'squad-feedback-report',
 			timestamp: new Date().toISOString()
 		},
 		{ headers: CORS_HEADERS }
@@ -98,7 +98,7 @@ export async function POST({ request }) {
 		const screenshotPaths = [];
 		if (body.screenshots && Array.isArray(body.screenshots) && body.screenshots.length > 0) {
 			const projectPath = process.cwd().replace(/\/ide$/, '');
-			const screenshotsDir = resolve(projectPath, '.jat', 'screenshots');
+			const screenshotsDir = resolve(projectPath, '.squad', 'screenshots');
 
 			if (!existsSync(screenshotsDir)) {
 				mkdirSync(screenshotsDir, { recursive: true });
@@ -119,7 +119,7 @@ export async function POST({ request }) {
 					const filepath = resolve(screenshotsDir, filename);
 
 					writeFileSync(filepath, Buffer.from(base64, 'base64'));
-					screenshotPaths.push(`.jat/screenshots/${filename}`);
+					screenshotPaths.push(`.squad/screenshots/${filename}`);
 				} catch (err) {
 					console.warn(`[feedback-report] Screenshot save failed (${i}):`, err instanceof Error ? err.message : String(err));
 				}

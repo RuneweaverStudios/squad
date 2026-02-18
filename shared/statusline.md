@@ -3,7 +3,7 @@
 **The statusline automatically displays your agent identity and status for each Claude Code session.**
 
 **Location:** `~/.claude/statusline.sh` (global, works across all projects)
-**Source:** `~/code/jat/.claude/statusline.sh` (canonical, edit here)
+**Source:** `~/code/squad/.claude/statusline.sh` (canonical, edit here)
 
 ### How It Works
 
@@ -17,7 +17,7 @@ Session 3: StrongShore | [P0] task-xyz - Critical bug fix [🔒1]
 
 ### Registration
 
-When you run `/jat:start`, it automatically:
+When you run `/squad:start`, it automatically:
 1. Registers your agent in the Agent Registry
 2. Writes agent name to `.claude/sessions/agent-{session_id}.txt`
 3. Statusline reads from that file and displays your identity
@@ -36,9 +36,9 @@ When you run `/jat:start`, it automatically:
 
 **Examples:**
 ```
-FreeMarsh | [P1] jat-m95 - Update /start... [🔒2 📬1 ⏱45m]
+FreeMarsh | [P1] squad-m95 - Update /start... [🔒2 📬1 ⏱45m]
 FreeMarsh | idle [📬3]
-jat | no agent registered
+squad | no agent registered
 ```
 
 ### Multi-Agent Sessions
@@ -47,15 +47,15 @@ jat | no agent registered
 
 ```bash
 # Terminal 1
-/jat:start  # Choose FreeMarsh
+/squad:start  # Choose FreeMarsh
 # Statusline shows: FreeMarsh | ...
 
 # Terminal 2
-/jat:start  # Choose PaleStar
+/squad:start  # Choose PaleStar
 # Statusline shows: PaleStar | ...
 
 # Terminal 3
-/jat:start  # Choose StrongShore
+/squad:start  # Choose StrongShore
 # Statusline shows: StrongShore | ...
 ```
 
@@ -64,7 +64,7 @@ All three sessions work independently with their own agent identities.
 ### Files
 
 **Global (shared across all projects):**
-- `~/.claude/statusline.sh` - The statusline script (installed by jat)
+- `~/.claude/statusline.sh` - The statusline script (installed by squad)
 
 **Per-session (created automatically):**
 - `.claude/sessions/agent-{session_id}.txt` - Your agent name for this session
@@ -80,15 +80,15 @@ All three sessions work independently with their own agent identities.
 ┌─ STATUS CALCULATION DECISION TREE ─────────────────────────────────────┐
 │                                                                        │
 │  1. Check if agent is registered                                      │
-│     └─ NO → Show "jat | no agent registered"                          │
+│     └─ NO → Show "squad | no agent registered"                          │
 │     └─ YES → Continue to step 2                                       │
 │                                                                        │
-│  2. Check JAT Tasks for in_progress tasks assigned to agent           │
-│     └─ FOUND → Use task from JAT Tasks (Priority 1 source)            │
+│  2. Check SQUAD Tasks for in_progress tasks assigned to agent           │
+│     └─ FOUND → Use task from SQUAD Tasks (Priority 1 source)            │
 │     └─ NOT FOUND → Continue to step 3                                 │
 │                                                                        │
 │  3. Check file reservations for task ID in reason field               │
-│     └─ FOUND → Extract task ID, lookup in JAT Tasks (Priority 2)      │
+│     └─ FOUND → Extract task ID, lookup in SQUAD Tasks (Priority 2)      │
 │     └─ NOT FOUND → Continue to step 4                                 │
 │                                                                        │
 │  4. No active task found                                              │
@@ -99,7 +99,7 @@ All three sessions work independently with their own agent identities.
 
 **Priority Order:**
 1. **Agent Registration** - `.claude/sessions/agent-{session_id}.txt` exists?
-2. **Task in_progress** - `jt list --json | filter(assignee == agent && status == "in_progress")`
+2. **Task in_progress** - `st list --json | filter(assignee == agent && status == "in_progress")`
 3. **Idle State** - Agent registered but no work
 
 **Git Display Colors:**
@@ -111,7 +111,7 @@ All three sessions work independently with their own agent identities.
 | Branch name | Green | `\033[0;32m` |
 | Dirty indicator (*) | Red | `\033[0;31m` |
 
-Example: `jat@master*` → blue `jat`, dim `@`, green `master`, red `*`
+Example: `squad@master*` → blue `squad`, dim `@`, green `master`, red `*`
 
 **Indicator Colors:**
 
@@ -126,8 +126,8 @@ Example: `jat@master*` → blue `jat`, dim `@`, green `master`, red `*`
 
 | Issue | Cause | Fix |
 |-------|-------|-----|
-| Shows "idle" but I'm working | Task not marked `in_progress` | Run `jt update task-id --status in_progress` |
-| Shows "no agent registered" | Session file missing | Run `/jat:start` to register |
+| Shows "idle" but I'm working | Task not marked `in_progress` | Run `st update task-id --status in_progress` |
+| Shows "no agent registered" | Session file missing | Run `/squad:start` to register |
 
 ### Why PPID-Based Session Tracking?
 

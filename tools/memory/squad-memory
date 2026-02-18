@@ -1,0 +1,18 @@
+#!/bin/bash
+# squad-memory - Agent memory indexer CLI
+# Reads .squad/memory/*.md, chunks, embeds, stores in SQLite for search.
+#
+# Usage:
+#   squad-memory index [--force] [--project path] [--skip-embeddings] [--verbose]
+#   squad-memory status [--project path] [--json]
+#   squad-memory providers
+#   squad-memory --help
+
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+  DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+exec bash "$SCRIPT_DIR/run.sh" "$@"

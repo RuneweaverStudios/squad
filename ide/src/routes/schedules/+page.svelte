@@ -112,7 +112,7 @@
 		editingTask = task;
 		editCron = task.schedule_cron || '';
 		editNextRun = task.next_run_at ? formatDateForInput(task.next_run_at) : '';
-		editCommand = task.command || '/jat:start';
+		editCommand = task.command || '/squad:start';
 		editAgentProgram = task.agent_program || '';
 		editModel = task.model || '';
 	}
@@ -132,7 +132,7 @@
 			const body: Record<string, any> = {
 				schedule_cron: editCron || null,
 				next_run_at: editNextRun ? new Date(editNextRun).toISOString() : null,
-				command: editCommand || '/jat:start',
+				command: editCommand || '/squad:start',
 				agent_program: editAgentProgram || null,
 				model: editModel || null
 			};
@@ -294,7 +294,7 @@
 						type="text"
 						class="form-input"
 						bind:value={editCommand}
-						placeholder="/jat:start"
+						placeholder="/squad:start"
 					/>
 				</div>
 

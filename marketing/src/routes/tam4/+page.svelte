@@ -39,9 +39,9 @@
 		{ type: 'divider', text: '════════════════════════════════════════════════════════════════' },
 		{ type: 'label', text: '[INSTALLATION]' },
 		{ type: 'blank', text: '' },
-		{ type: 'command', text: '$ git clone https://github.com/jomarchy/jat.git ~/code/jat' },
-		{ type: 'command', text: '$ cd ~/code/jat && ./install.sh' },
-		{ type: 'command', text: '$ jat' },
+		{ type: 'command', text: '$ git clone https://github.com/jomarchy/squad.git ~/code/squad' },
+		{ type: 'command', text: '$ cd ~/code/squad && ./install.sh' },
+		{ type: 'command', text: '$ squad' },
 		{ type: 'blank', text: '' },
 		{ type: 'success', text: '> READY FOR INPUT_' }
 	];

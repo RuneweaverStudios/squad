@@ -118,8 +118,8 @@ function getAllCommandsWithContent(
 	// Sort by namespace then name
 	allCommands.sort((a, b) => {
 		if (a.namespace !== b.namespace) {
-			if (a.namespace === 'jat') return -1;
-			if (b.namespace === 'jat') return 1;
+			if (a.namespace === 'squad') return -1;
+			if (b.namespace === 'squad') return 1;
 			if (a.namespace === 'local') return -1;
 			if (b.namespace === 'local') return 1;
 			return a.namespace.localeCompare(b.namespace);

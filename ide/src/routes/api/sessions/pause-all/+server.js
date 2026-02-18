@@ -8,7 +8,7 @@ import { listSessionsAsync, sendKey } from '$lib/server/sessions.js';
 
 /**
  * POST /api/sessions/pause-all
- * Send Ctrl+C (interrupt) to all active JAT sessions
+ * Send Ctrl+C (interrupt) to all active SQUAD sessions
  * Body:
  * - filter: Optional array of agent names to target (default: all sessions)
  * - exclude: Optional array of agent names to exclude

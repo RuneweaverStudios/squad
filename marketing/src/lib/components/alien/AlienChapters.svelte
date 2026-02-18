@@ -1,10 +1,10 @@
 <script lang="ts">
 	/**
-	 * AlienChapters - Manual chapters showcasing JAT features
+	 * AlienChapters - Manual chapters showcasing SQUAD features
 	 *
 	 * Features:
 	 * - Manual-style chapter layout
-	 * - Each chapter covers a core JAT capability
+	 * - Each chapter covers a core SQUAD capability
 	 * - Interactive reveal animations
 	 */
 	import { onMount } from 'svelte';
@@ -17,7 +17,7 @@
 			number: 'I',
 			glyph: '⌬',
 			title: 'Task Architecture',
-			subtitle: 'JAT Tasks: Dependency-Aware Work',
+			subtitle: 'SQUAD Tasks: Dependency-Aware Work',
 			description: 'Structure your work into epics, features, and tasks with automatic dependency tracking. When Agent A finishes a blocker, Agent B is automatically ready.',
 			features: [
 				'Priority-based task queues',
@@ -25,12 +25,12 @@
 				'Status propagation',
 				'Multi-project aggregation'
 			],
-			code: `$ jt ready --json
+			code: `$ st ready --json
 [{
-  "id": "jat-7kx2m",
+  "id": "squad-7kx2m",
   "title": "Add OAuth",
   "priority": 1,
-  "deps": ["jat-3nf8p"],
+  "deps": ["squad-3nf8p"],
   "status": "ready"
 }]`,
 			color: 'oklch(70% 0.25 280)'
@@ -47,12 +47,12 @@
 				'Cross-session memory',
 				'Conflict prevention'
 			],
-			code: `$ jt update jat-7kx2m \\
+			code: `$ st update squad-7kx2m \\
   --status in_progress \\
   --assignee BluePeak \\
   --files "src/**/*.ts"
 
-Updated: jat-7kx2m
+Updated: squad-7kx2m
 Status: in_progress
 Files: src/**/*.ts`,
 			color: 'oklch(65% 0.20 180)'
@@ -69,13 +69,13 @@ Files: src/**/*.ts`,
 				'Real-time monitoring',
 				'Smart question UI'
 			],
-			code: `$ jat myproject 4 --auto
+			code: `$ squad myproject 4 --auto
 
 Spawning 4 agents...
-  BluePeak  → jat-a1 [P0]
-  GoldBay   → jat-b3 [P1]
-  RedMarsh  → jat-c2 [P1]
-  FairCove  → jat-d1 [P2]
+  BluePeak  → squad-a1 [P0]
+  GoldBay   → squad-b3 [P1]
+  RedMarsh  → squad-c2 [P1]
+  FairCove  → squad-d1 [P2]
 
 IDE: http://localhost:5174`,
 			color: 'oklch(75% 0.18 145)'
@@ -135,14 +135,14 @@ IDE: http://localhost:5174`,
 				'Suggested next tasks',
 				'Continuous deployment'
 			],
-			code: `/jat:complete
+			code: `/squad:complete
 
 Task "User Auth" complete!
 
 Suggested next:
-  → jat-b1: Dashboard [P1]
-  → jat-b2: Email notify [P2]
-  → jat-b3: Payments [P1]
+  → squad-b1: Dashboard [P1]
+  → squad-b2: Email notify [P2]
+  → squad-b3: Payments [P1]
 
 Spawning new agent...`,
 			color: 'oklch(65% 0.25 320)'

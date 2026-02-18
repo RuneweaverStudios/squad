@@ -3,8 +3,8 @@
  *
  * GET /api/tasks/{id}/signals - Returns signal timeline for a task
  *
- * Reads from .jat/signals/{taskId}.jsonl which is populated by
- * the PostToolUse hook (post-bash-jat-signal.sh) whenever an agent
+ * Reads from .squad/signals/{taskId}.jsonl which is populated by
+ * the PostToolUse hook (post-bash-squad-signal.sh) whenever an agent
  * emits a signal with that task ID.
  *
  * The signal timeline provides a structured history of:
@@ -47,7 +47,7 @@ export const GET: RequestHandler = async ({ params }) => {
 		// Get the project root from the task ID prefix (e.g., "steelbridge-xyz" -> "/home/user/code/steelbridge")
 		// Falls back to parent of IDE if task ID doesn't have a recognizable project prefix
 		const projectRoot = getProjectPath(id) || resolve(process.cwd(), '..');
-		const signalsDir = join(projectRoot, '.jat', 'signals');
+		const signalsDir = join(projectRoot, '.squad', 'signals');
 		const signalFile = join(signalsDir, `${id}.jsonl`);
 
 		// Check if signal file exists

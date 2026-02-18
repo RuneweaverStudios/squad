@@ -1,6 +1,6 @@
 /**
  * Memory indexer orchestrator.
- * Scans .jat/memory/*.md files, detects changes, chunks, embeds, and stores.
+ * Scans .squad/memory/*.md files, detects changes, chunks, embeds, and stores.
  */
 
 import { readdirSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
@@ -26,10 +26,10 @@ function hashContent(content) {
 /**
  * Discover memory files in a project.
  * @param {string} projectPath
- * @returns {string[]} Array of filenames (relative to .jat/memory/)
+ * @returns {string[]} Array of filenames (relative to .squad/memory/)
  */
 function discoverFiles(projectPath) {
-  const memoryDir = join(projectPath, '.jat', 'memory');
+  const memoryDir = join(projectPath, '.squad', 'memory');
   if (!existsSync(memoryDir)) return [];
 
   return readdirSync(memoryDir)
@@ -45,7 +45,7 @@ function discoverFiles(projectPath) {
  * @returns {{ toIndex: string[], toRemove: string[], unchanged: string[] }}
  */
 function diffFiles(projectPath, db, force) {
-  const memoryDir = join(projectPath, '.jat', 'memory');
+  const memoryDir = join(projectPath, '.squad', 'memory');
   const diskFiles = discoverFiles(projectPath);
   const indexedHashes = getAllFileHashes(db);
 
@@ -93,7 +93,7 @@ function resolveEmbeddingConfig(db) {
   let provider = getConfig(db, 'embedding_provider');
   let model = getConfig(db, 'embedding_model');
 
-  // Auto-detect provider: try resolving API keys (env vars + jat-secret)
+  // Auto-detect provider: try resolving API keys (env vars + squad-secret)
   if (!provider) {
     for (const candidate of ['openai', 'gemini', 'voyage']) {
       if (resolveApiKey(candidate)) {
@@ -111,7 +111,7 @@ function resolveEmbeddingConfig(db) {
 
   const dimension = getDimension(provider, model);
 
-  // Resolve API key from env vars and jat-secret
+  // Resolve API key from env vars and squad-secret
   const apiKey = resolveApiKey(provider);
 
   return { provider, model, dimension, apiKey };
@@ -141,16 +141,16 @@ export async function indexProject(options) {
   const log = verbose ? (...args) => console.error('[indexer]', ...args) : () => {};
   const errors = [];
 
-  // Ensure .jat/memory/ directory exists
-  const memoryDir = join(projectPath, '.jat', 'memory');
+  // Ensure .squad/memory/ directory exists
+  const memoryDir = join(projectPath, '.squad', 'memory');
   if (!existsSync(memoryDir)) {
     mkdirSync(memoryDir, { recursive: true });
-    log('Created .jat/memory/ directory');
+    log('Created .squad/memory/ directory');
   }
 
   // Open database
   const db = openDb(projectPath);
-  log('Opened database:', join(projectPath, '.jat', 'memory.db'));
+  log('Opened database:', join(projectPath, '.squad', 'memory.db'));
 
   // Resolve embedding config
   let embeddingConfig = null;

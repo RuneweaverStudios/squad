@@ -4,13 +4,13 @@ Helper scripts for agent orchestration workflows.
 
 ## get-agent-task.sh
 
-**Purpose:** Get current task ID for an agent by checking both JAT Tasks and Agent Mail.
+**Purpose:** Get current task ID for an agent by checking both SQUAD Tasks and Agent Mail.
 
 **Problem Solved:** Provides consistent agent status calculation between statusline and IDE.
 
 ### Algorithm
 
-The script checks the JAT Tasks database for `in_progress` tasks assigned to the agent.
+The script checks the SQUAD Tasks database for `in_progress` tasks assigned to the agent.
 
 This matches the IDE logic in `ide/src/lib/stores/agents.svelte.ts`:
 
@@ -53,7 +53,7 @@ fi
 ```bash
 # Agent with in_progress task
 $ ./scripts/get-agent-task.sh GreatLake
-jat-a1z
+squad-a1z
 
 # Agent with no work
 $ ./scripts/get-agent-task.sh PaleStar
@@ -73,7 +73,7 @@ Already implements this logic correctly (serves as reference implementation).
 
 ### Dependencies
 
-- `jt` command (JAT Tasks CLI)
+- `st` command (SQUAD Tasks CLI)
 - `jq` (for JSON parsing)
 
 All dependencies are optional - script gracefully handles missing commands.
@@ -94,7 +94,7 @@ All dependencies are optional - script gracefully handles missing commands.
 ### Test Coverage
 
 1. ✅ Agent with in_progress task
-   - Verifies JAT Tasks in_progress tasks appear in statusline
+   - Verifies SQUAD Tasks in_progress tasks appear in statusline
    - Checks task ID and title display
 
 2. ✅ Agent with no task (idle state)
@@ -130,8 +130,8 @@ Exits with proper status codes for automated testing.
 ### Implementation Details
 
 **Test Environment:**
-- Creates isolated temporary databases for Agent Mail and JAT Tasks
-- Initializes real JAT Tasks database with `jt init`
+- Creates isolated temporary databases for Agent Mail and SQUAD Tasks
+- Initializes real SQUAD Tasks database with `st init`
 - Injects test data via direct SQLite inserts
 
 **Test Execution:**
@@ -147,7 +147,7 @@ Exits with proper status codes for automated testing.
 
 - `sqlite3` - Database operations
 - `jq` - JSON processing
-- `jt` - JAT Tasks CLI (must be installed)
+- `st` - SQUAD Tasks CLI (must be installed)
 
 ### Database Schema
 
@@ -174,14 +174,14 @@ CREATE TABLE agents (
 ### Known Limitations
 
 - Tests only status calculation logic (not full statusline features)
-- Requires actual `jt` command to be installed
+- Requires actual `st` command to be installed
 - Date handling assumes GNU date (may need adjustment for macOS)
 
 ### Troubleshooting
 
-**Tests fail with "Error: JAT Tasks database not found"**
-- Check that `jt init` succeeds
-- Verify `.jat/tasks.db` is created in test directory
+**Tests fail with "Error: SQUAD Tasks database not found"**
+- Check that `st init` succeeds
+- Verify `.squad/tasks.db` is created in test directory
 
 **Tests fail with "no such table: projects"**
 - Schema mismatch - update test database creation

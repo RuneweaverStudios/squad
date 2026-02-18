@@ -17,8 +17,8 @@
 	}
 
 	const COMMAND_EXAMPLES: { label: string; cmd: string }[] = [
-		{ label: 'Ready tasks', cmd: 'jt ready --json' },
-		{ label: 'Task details', cmd: 'jt show {{input}} --json' },
+		{ label: 'Ready tasks', cmd: 'st ready --json' },
+		{ label: 'Task details', cmd: 'st show {{input}} --json' },
 		{ label: 'Git status', cmd: 'git status --porcelain' },
 		{ label: 'Git log', cmd: 'git log --oneline -10' },
 		{ label: 'Active agents', cmd: 'am-agents --json' },

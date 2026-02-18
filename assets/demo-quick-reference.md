@@ -1,10 +1,10 @@
-# JAT Demo Recording - Quick Reference
+# SQUAD Demo Recording - Quick Reference
 
 ## 🎬 Before Recording
 
 ```bash
 # Run reset script
-bash ~/code/jat/assets/demo-reset.sh
+bash ~/code/squad/assets/demo-reset.sh
 ```
 
 ## 📋 Recording Sequence (45 seconds)
@@ -21,7 +21,7 @@ bash ~/code/jat/assets/demo-reset.sh
 
 ### Frame 3 (10-20s): Generate Tasks [SPEED UP]
 - Agent creates PRD
-- Runs `/jat:tasktree`
+- Runs `/squad:tasktree`
 - Creates subtasks
 
 ### Frame 4 (20-25s): Tasks Appear

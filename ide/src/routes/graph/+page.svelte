@@ -92,9 +92,9 @@
 </script>
 
 <svelte:head>
-	<title>Graph | JAT IDE</title>
+	<title>Graph | SQUAD IDE</title>
 	<meta name="description" content="Task dependency graph visualization. Explore relationships between tasks and epics." />
-	<meta property="og:title" content="Graph | JAT IDE" />
+	<meta property="og:title" content="Graph | SQUAD IDE" />
 	<meta property="og:description" content="Task dependency graph visualization. Explore relationships between tasks and epics." />
 	<meta property="og:image" content="/favicons/graph.svg" />
 	<link rel="icon" href="/favicons/graph.svg" />

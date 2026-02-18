@@ -12,8 +12,8 @@
 
 	import type { ReviewSignal, FileModification, KeyDecision, CommitInfo, ReviewFocusItem } from '$lib/types/richSignals';
 	import {
-		openInJatEditor,
-		openDiffInJatEditor,
+		openInSquadEditor,
+		openDiffInSquadEditor,
 		getFileLink,
 		getDiffLink,
 		getAllFileLinks,
@@ -29,7 +29,7 @@
 	interface Props {
 		/** The rich review signal data */
 		signal: ReviewSignal;
-		/** Project name for localhost URL generation (e.g., 'jat', 'chimaro') */
+		/** Project name for localhost URL generation (e.g., 'squad', 'chimaro') */
 		projectName?: string;
 		/** Baseline commit SHA for diff comparison (from working signal) */
 		baselineCommit?: string | null;
@@ -57,7 +57,7 @@
 
 	let {
 		signal,
-		projectName = 'jat',
+		projectName = 'squad',
 		baselineCommit = null,
 		onTaskClick,
 		onFileClick,
@@ -147,13 +147,13 @@
 		}
 	}
 
-	// Handle diff click - opens diff in JAT file editor by default
+	// Handle diff click - opens diff in SQUAD file editor by default
 	function handleDiffClick(file: FileModification) {
 		if (onDiffClick) {
 			onDiffClick(file.path, file.changeType);
 		} else {
-			// Default: open diff in JAT file editor
-			openDiffInJatEditor(file.path);
+			// Default: open diff in SQUAD file editor
+			openDiffInSquadEditor(file.path);
 		}
 	}
 
@@ -507,7 +507,7 @@
 									</button>
 								{/if}
 
-								<!-- Diff link (always shown - opens in JAT file editor) -->
+								<!-- Diff link (always shown - opens in SQUAD file editor) -->
 								<button
 									type="button"
 									onclick={() => handleDiffClick(file)}

@@ -29,7 +29,7 @@
 		onStartSuggested?: () => Promise<void>;
 		/** Callback when a task is selected from the dropdown */
 		onAssignTask?: (taskId: string) => Promise<void>;
-		/** Callback when "/jat:start" is clicked without a specific task */
+		/** Callback when "/squad:start" is clicked without a specific task */
 		onStartIdle?: () => Promise<void>;
 		/** Whether an action is being submitted */
 		submitting?: boolean;
@@ -389,7 +389,7 @@
 								<path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
 							</svg>
 						{/if}
-						Start (/jat:start)
+						Start (/squad:start)
 					</button>
 				</div>
 			{/if}

@@ -5,7 +5,7 @@
 # Usage: log-agent-activity --type TYPE [options]
 #
 # Types:
-#   command   - Agent command execution (e.g., /jat:start)
+#   command   - Agent command execution (e.g., /squad:start)
 #   prompt    - User prompt/request
 #   tool      - Tool call (Read, Write, Bash, etc.)
 #   status    - General status update

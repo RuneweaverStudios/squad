@@ -236,7 +236,7 @@ export async function loadProjects(): Promise<void> {
 	state.projectsError = null;
 
 	try {
-		// Fetch with stats=true to get hasJat, hasClaudeMd, etc.
+		// Fetch with stats=true to get hasSquad, hasClaudeMd, etc.
 		const response = await fetch(`${PROJECTS_API}?stats=true`);
 		if (!response.ok) {
 			throw new Error(`Failed to load projects: ${response.statusText}`);
@@ -257,7 +257,7 @@ export async function loadProjects(): Promise<void> {
 			database_url: p.databaseUrl,
 			hidden: p.hidden,
 			stats: p.stats ? {
-				hasJat: p.stats.hasJat,
+				hasSquad: p.stats.hasSquad,
 				hasClaudeMd: p.stats.hasClaudeMd,
 				agentCount: p.stats.agentCount,
 				taskCount: p.stats.taskCount,
@@ -462,9 +462,9 @@ export function getCommandGroups(): CommandGroup[] {
 	// Convert to array and sort namespaces
 	const result: CommandGroup[] = [];
 	const sortedNamespaces = Array.from(groups.keys()).sort((a, b) => {
-		// 'jat' first, then 'local', then alphabetically
-		if (a === 'jat') return -1;
-		if (b === 'jat') return 1;
+		// 'squad' first, then 'local', then alphabetically
+		if (a === 'squad') return -1;
+		if (b === 'squad') return 1;
 		if (a === 'local') return -1;
 		if (b === 'local') return 1;
 		return a.localeCompare(b);

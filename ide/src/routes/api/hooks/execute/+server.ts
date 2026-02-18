@@ -79,7 +79,7 @@ async function executeHook(
 			env: {
 				...process.env,
 				// Mark this as a preview/dry-run execution
-				JAT_HOOK_PREVIEW: 'true',
+				SQUAD_HOOK_PREVIEW: 'true',
 				// Provide a mock session ID for hooks that need it
 				CLAUDE_SESSION_ID: 'preview-session-' + Date.now()
 			},
@@ -138,7 +138,7 @@ async function executeHook(
  *
  * Request body:
  * {
- *   command: string,     // Path to hook script (e.g., "./.claude/hooks/post-bash-jat-signal.sh")
+ *   command: string,     // Path to hook script (e.g., "./.claude/hooks/post-bash-squad-signal.sh")
  *   input: object,       // JSON object to pass as stdin
  *   timeout?: number     // Optional timeout in ms (default: 10000)
  * }

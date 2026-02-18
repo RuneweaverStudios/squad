@@ -10,10 +10,10 @@ import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { createTask, getScheduledTasks, updateTask, closeTask } from '$lib/server/jat-tasks.js';
+import { createTask, getScheduledTasks, updateTask, closeTask } from '$lib/server/squad-tasks.js';
 import { getProjectPath } from '$lib/server/projectPaths.js';
 
-const CONFIG_DIR = join(homedir(), '.config', 'jat');
+const CONFIG_DIR = join(homedir(), '.config', 'squad');
 const TEMPLATES_FILE = join(CONFIG_DIR, 'quick-commands.json');
 
 /**
@@ -44,7 +44,7 @@ function findScheduledTask(templateId) {
 	return scheduled.find((t) => {
 		if (t.status === 'closed') return false;
 		if (t.command === quickCommand) return true;
-		// spawn-agent tasks use /jat:start but have a template-id marker in description
+		// spawn-agent tasks use /squad:start but have a template-id marker in description
 		if (t.description?.includes(`template-id:${templateId}`)) return true;
 		return false;
 	}) || null;
@@ -160,7 +160,7 @@ export async function POST({ params, request }) {
 
 		// Build the command string based on run mode
 		const isSpawnAgent = runMode === 'spawn-agent';
-		const command = isSpawnAgent ? '/jat:start' : `/quick-command:${params.id}`;
+		const command = isSpawnAgent ? '/squad:start' : `/quick-command:${params.id}`;
 
 		// Store variable defaults in the description as JSON block
 		const variableBlock =

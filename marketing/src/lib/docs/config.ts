@@ -13,8 +13,8 @@ export const docSections: DocSection[] = [
 	{
 		title: 'Getting Started',
 		pages: [
-			{ slug: 'introduction', title: 'Introduction', description: 'What is JAT and why it exists' },
-			{ slug: 'installation', title: 'Installation', description: 'Install JAT and prerequisites' },
+			{ slug: 'introduction', title: 'Introduction', description: 'What is SQUAD and why it exists' },
+			{ slug: 'installation', title: 'Installation', description: 'Install SQUAD and prerequisites' },
 			{ slug: 'quick-start', title: 'Quick Start', description: 'Get up and running in minutes' }
 		]
 	},
@@ -46,7 +46,7 @@ export const docSections: DocSection[] = [
 	{
 		title: 'The IDE',
 		pages: [
-			{ slug: 'ide-overview', title: 'IDE Overview', description: 'The JAT IDE' },
+			{ slug: 'ide-overview', title: 'IDE Overview', description: 'The SQUAD IDE' },
 			{ slug: 'work-sessions', title: 'Work Sessions', description: 'Managing agent sessions' },
 			{
 				slug: 'task-views',
@@ -71,7 +71,7 @@ export const docSections: DocSection[] = [
 			{
 				slug: 'workflow-commands',
 				title: 'Workflow Commands',
-				description: '/jat:start, /jat:complete, /jat:pause'
+				description: '/squad:start, /squad:complete, /squad:pause'
 			},
 			{
 				slug: 'signals',
@@ -141,7 +141,7 @@ export const docSections: DocSection[] = [
 			{
 				slug: 'cli-reference',
 				title: 'CLI Reference',
-				description: 'All JAT CLI commands'
+				description: 'All SQUAD CLI commands'
 			},
 			{
 				slug: 'api-reference',

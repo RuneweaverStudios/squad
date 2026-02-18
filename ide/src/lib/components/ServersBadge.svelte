@@ -147,12 +147,12 @@
 
 			const data = await response.json();
 			// Filter to projects that have a port OR serverPath configured
-			// Note: API returns { name: "jat", displayName: "JAT", serverPath: "...", ... }
+			// Note: API returns { name: "squad", displayName: "SQUAD", serverPath: "...", ... }
 			// where 'name' is the project key used for matching with serverSessions
 			projectsWithPorts = (data.projects || [])
 				.filter((p: any) => p.port || p.serverPath)
 				.map((p: any) => ({
-					key: p.name, // 'name' is the actual key (e.g., "jat", "chimaro")
+					key: p.name, // 'name' is the actual key (e.g., "squad", "chimaro")
 					displayName: p.displayName || p.name.toUpperCase(),
 					port: p.port || 5173, // Default to Vite's default port
 					path: p.path,

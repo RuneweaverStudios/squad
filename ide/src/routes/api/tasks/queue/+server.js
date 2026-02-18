@@ -35,10 +35,10 @@ export async function GET({ url }) {
 		const validSorts = ['hybrid', 'priority', 'oldest'];
 		const sort = validSorts.includes(sortParam) ? sortParam : 'hybrid';
 
-		// Build jt ready command
-		let command = `jt ready --json --limit ${limit} --sort ${sort}`;
+		// Build st ready command
+		let command = `st ready --json --limit ${limit} --sort ${sort}`;
 
-		// Execute jt ready to get queue
+		// Execute st ready to get queue
 		const { stdout } = await execAsync(command);
 		/** @type {Task[]} */
 		const tasks = JSON.parse(stdout);

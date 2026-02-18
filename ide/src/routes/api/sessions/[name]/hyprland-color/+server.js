@@ -3,13 +3,13 @@
  * POST /api/sessions/[name]/hyprland-color
  *
  * Applies Hyprland window border colors based on project configuration.
- * The session name (e.g., "jat-AgentName") is used to find the terminal window.
+ * The session name (e.g., "squad-AgentName") is used to find the terminal window.
  *
  * Query params:
- *   ?project=jat  - Project name to use for colors (optional, derived from task if not provided)
+ *   ?project=squad  - Project name to use for colors (optional, derived from task if not provided)
  *
  * Body (optional):
- *   { taskId?: string }  - Task ID to derive project from (e.g., "jat-abc" -> "jat")
+ *   { taskId?: string }  - Task ID to derive project from (e.g., "squad-abc" -> "squad")
  */
 
 import { json } from '@sveltejs/kit';
@@ -22,7 +22,7 @@ import { join } from 'path';
 const execAsync = promisify(exec);
 const readFileAsync = promisify(readFile);
 
-const CONFIG_FILE = join(homedir(), '.config', 'jat', 'projects.json');
+const CONFIG_FILE = join(homedir(), '.config', 'squad', 'projects.json');
 
 /**
  * Check if Hyprland is available
@@ -88,7 +88,7 @@ async function applyBorderColorToWindow(address, activeColor, inactiveColor) {
 
 /**
  * Apply border colors to windows matching a project prefix
- * @param {string} projectName - The project name (e.g., "jat")
+ * @param {string} projectName - The project name (e.g., "squad")
  * @param {string} activeColor - Active border color (rgb format)
  * @param {string} inactiveColor - Inactive border color (rgb format)
  * @param {string} [sessionName] - Optional: specific session name to match
@@ -200,7 +200,7 @@ export async function POST({ params, url, request }) {
 		try {
 			const body = await request.json().catch(() => ({}));
 			if (body.taskId) {
-				// Extract project from task ID (e.g., "jat-abc" -> "jat")
+				// Extract project from task ID (e.g., "squad-abc" -> "squad")
 				projectName = body.taskId.split('-')[0];
 			}
 		} catch {

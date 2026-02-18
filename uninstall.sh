@@ -12,8 +12,8 @@ NC='\033[0m'
 # Check if running from within an install directory that will be removed
 CURRENT_DIR="$(pwd)"
 INSTALL_DIRS=(
-    "$HOME/.local/share/jat"
-    "$HOME/code/jat"
+    "$HOME/.local/share/squad"
+    "$HOME/code/squad"
     "$HOME/code/jomarchy-agent-tools"
 )
 
@@ -39,14 +39,14 @@ echo -e "${BLUE}Squad Complete Uninstall${NC}"
 echo ""
 echo -e "${YELLOW}This will remove:${NC}"
 echo "  • Squad/IDE installation directory"
-echo "  • ~/.local/bin symlinks (jt, am-*, jat, browser-*, etc.)"
-echo "  • ~/.config/jat config files"
-echo "  • ~/.claude/commands/jat"
-echo "  • Running tmux sessions (server-jat, jat-*)"
+echo "  • ~/.local/bin symlinks (st, am-*, squad, browser-*, etc.)"
+echo "  • ~/.config/squad config files"
+echo "  • ~/.claude/commands/squad"
+echo "  • Running tmux sessions (server-squad, squad-*)"
 echo "  • Bash launcher functions from ~/.bashrc"
 echo ""
-echo -e "${RED}WARNING: This does NOT remove .jat/ from your projects${NC}"
-echo -e "${YELLOW}(Remove those manually if desired: rm -rf ~/code/*/.jat)${NC}"
+echo -e "${RED}WARNING: This does NOT remove .squad/ from your projects${NC}"
+echo -e "${YELLOW}(Remove those manually if desired: rm -rf ~/code/*/.squad)${NC}"
 echo ""
 read -p "Continue? [y/N] " -r
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -58,14 +58,14 @@ echo ""
 
 # 1. Stop running tmux sessions
 echo -e "${BLUE}[1/7] Stopping tmux sessions...${NC}"
-tmux kill-session -t server-jat 2>/dev/null && echo "  ✓ Killed server-jat" || echo "  • server-jat not running"
-for session in $(tmux list-sessions -F "#{session_name}" 2>/dev/null | grep "^jat-" || true); do
+tmux kill-session -t server-squad 2>/dev/null && echo "  ✓ Killed server-squad" || echo "  • server-squad not running"
+for session in $(tmux list-sessions -F "#{session_name}" 2>/dev/null | grep "^squad-" || true); do
     tmux kill-session -t "$session" && echo "  ✓ Killed $session"
 done
 
 # 2. Remove symlinks from ~/.local/bin
 echo -e "${BLUE}[2/7] Removing symlinks from ~/.local/bin...${NC}"
-for tool in jt jt-* am-* browser-* db-* signal-* omarchy-* jat jat-*; do
+for tool in st st-* am-* browser-* db-* signal-* omarchy-* squad squad-*; do
     if [ -L ~/.local/bin/"$tool" ]; then
         rm ~/.local/bin/"$tool" && echo "  ✓ Removed $tool"
     fi
@@ -73,24 +73,24 @@ done
 
 # 3. Remove config files
 echo -e "${BLUE}[3/7] Removing config files...${NC}"
-if [ -d ~/.config/jat ]; then
-    rm -rf ~/.config/jat && echo "  ✓ Removed ~/.config/jat"
+if [ -d ~/.config/squad ]; then
+    rm -rf ~/.config/squad && echo "  ✓ Removed ~/.config/squad"
 else
-    echo "  • ~/.config/jat not found"
+    echo "  • ~/.config/squad not found"
 fi
 
 # 4. Remove Claude commands
-echo -e "${BLUE}[4/7] Removing ~/.claude/commands/jat...${NC}"
-if [ -d ~/.claude/commands/jat ]; then
-    rm -rf ~/.claude/commands/jat && echo "  ✓ Removed ~/.claude/commands/jat"
+echo -e "${BLUE}[4/7] Removing ~/.claude/commands/squad...${NC}"
+if [ -d ~/.claude/commands/squad ]; then
+    rm -rf ~/.claude/commands/squad && echo "  ✓ Removed ~/.claude/commands/squad"
 else
-    echo "  • ~/.claude/commands/jat not found"
+    echo "  • ~/.claude/commands/squad not found"
 fi
 
 # 5. Remove bash launcher functions
 echo -e "${BLUE}[5/7] Removing launcher functions from ~/.bashrc...${NC}"
-if grep -q "# JAT Project Launchers\|# Squad tools" ~/.bashrc 2>/dev/null; then
-    sed -i.bak '/# JAT Project Launchers - START/,/# JAT Project Launchers - END/d' ~/.bashrc 2>/dev/null || true
+if grep -q "# SQUAD Project Launchers\|# Squad tools" ~/.bashrc 2>/dev/null; then
+    sed -i.bak '/# SQUAD Project Launchers - START/,/# SQUAD Project Launchers - END/d' ~/.bashrc 2>/dev/null || true
     sed -i.bak '/# Squad tools/,/^$/d' ~/.bashrc 2>/dev/null || true
     echo "  ✓ Removed launcher functions from ~/.bashrc"
 else
@@ -100,7 +100,7 @@ fi
 # 6. Find and remove installation directories
 echo -e "${BLUE}[6/7] Removing installation...${NC}"
 REMOVED=0
-for dir in ~/.local/share/jat ~/code/jat ~/code/jomarchy-agent-tools; do
+for dir in ~/.local/share/squad ~/code/squad ~/code/jomarchy-agent-tools; do
     if [ -d "$dir" ]; then
         # Check if user is currently in this directory
         CURRENT_DIR=$(pwd)
@@ -132,8 +132,8 @@ echo -e "${BLUE}[7/7] Cleanup summary${NC}"
 echo ""
 echo -e "${GREEN}✓ Squad uninstalled${NC}"
 echo ""
-echo -e "${YELLOW}To remove .jat from projects (optional):${NC}"
-echo "  cd ~/code && for dir in */; do rm -rf \"\${dir}.jat\"; done"
+echo -e "${YELLOW}To remove .squad from projects (optional):${NC}"
+echo "  cd ~/code && for dir in */; do rm -rf \"\${dir}.squad\"; done"
 echo ""
 echo -e "${YELLOW}To remove git hooks from projects (optional):${NC}"
 echo "  cd ~/code && for dir in */; do rm -f \"\${dir}.git/hooks/pre-commit\"; done"

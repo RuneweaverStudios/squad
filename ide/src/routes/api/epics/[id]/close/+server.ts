@@ -37,7 +37,7 @@ export const POST: RequestHandler = async ({ params }) => {
 
 	try {
 		// Get the epic details first
-		const { stdout: epicStdout } = await execAsync(`jt show "${epicId}" --json`);
+		const { stdout: epicStdout } = await execAsync(`st show "${epicId}" --json`);
 		const epicData = JSON.parse(epicStdout);
 
 		if (!epicData || epicData.length === 0) {
@@ -95,7 +95,7 @@ export const POST: RequestHandler = async ({ params }) => {
 		}
 
 		// All children are complete, close the epic
-		await execAsync(`jt update "${epicId}" --status closed`);
+		await execAsync(`st update "${epicId}" --status closed`);
 
 		return json({
 			success: true,
@@ -108,7 +108,7 @@ export const POST: RequestHandler = async ({ params }) => {
 		const error = err as Error & { stderr?: string };
 		console.error('Error closing epic:', error);
 
-		// Check if it's a "not found" error from jt
+		// Check if it's a "not found" error from st
 		if (error.stderr?.includes('not found') || error.stderr?.includes('no issue found')) {
 			return json({ success: false, epicId, message: `Epic '${epicId}' not found` }, { status: 404 });
 		}

@@ -1,8 +1,8 @@
-# JAT — The World's First Agentic IDE
+# SQUAD — The World's First Agentic IDE
 
 **Everything you need to vibe code. In one place. Finally.**
 
-JAT is the complete, self-contained environment for agentic development. Task management, agent orchestration, code editor, git integration, terminal access—all unified in a single IDE. No plugins to install, no services to configure, no pieces to assemble. Just describe what you want and supervise the swarm.
+SQUAD is the complete, self-contained environment for agentic development. Task management, agent orchestration, code editor, git integration, terminal access—all unified in a single IDE. No plugins to install, no services to configure, no pieces to assemble. Just describe what you want and supervise the swarm.
 
 ![IDE](https://img.shields.io/badge/IDE-SvelteKit-orange)
 ![Agents](https://img.shields.io/badge/Agents-20+-green)
@@ -16,7 +16,7 @@ Copilot IDE:         You write code, AI suggests completions
 Agentic IDE:         Agents write code, you supervise and approve
 ```
 
-JAT is purpose-built for the third paradigm. It's not about typing faster—it's about managing 20 agents working simultaneously while you review, guide, and approve.
+SQUAD is purpose-built for the third paradigm. It's not about typing faster—it's about managing 20 agents working simultaneously while you review, guide, and approve.
 
 ## Complete IDE Feature Set
 
@@ -120,11 +120,11 @@ Search everything from anywhere:
 │    src/routes/tasks/+page.svelte                                   │
 │                                                                    │
 │  TASKS                                                             │
-│    jat-abc  Add user authentication                   P1 · task   │
-│    jat-xyz  Fix login timeout                         P0 · bug    │
+│    squad-abc  Add user authentication                   P1 · task   │
+│    squad-xyz  Fix login timeout                         P0 · bug    │
 │                                                                    │
 │  AGENTS                                                            │
-│    WildMeadow  working on jat-abc                                  │
+│    WildMeadow  working on squad-abc                                  │
 │    BoldRiver   idle                                                │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -135,10 +135,10 @@ Access any agent's terminal session or run commands:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│  Terminal: jat-WildMeadow                              [×] [□] [−] │
+│  Terminal: squad-WildMeadow                              [×] [□] [−] │
 ├─────────────────────────────────────────────────────────────────────┤
 │  $ npm run build                                                   │
-│  > jat-ide@0.0.1 build                                             │
+│  > squad-ide@0.0.1 build                                             │
 │  > vite build                                                      │
 │                                                                    │
 │  vite v7.2.2 building for production...                           │
@@ -172,7 +172,7 @@ Access any agent's terminal session or run commands:
 │                                                                      │
 │   1. PLAN WITH AI        Describe your feature, get PRD              │
 │         ↓                 (or bring your own PRD)                    │
-│   2. /JAT:TASKTREE           Convert PRD → structured tasks              │
+│   2. /SQUAD:TASKTREE           Convert PRD → structured tasks              │
 │         ↓                                                            │
 │   3. EPIC SWARM          IDE spawns agents on subtasks         │
 │         ↓                                                            │
@@ -191,7 +191,7 @@ Access any agent's terminal session or run commands:
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-## What Makes JAT Different
+## What Makes SQUAD Different
 
 | Feature | Description |
 |---------|-------------|
@@ -201,7 +201,7 @@ Access any agent's terminal session or run commands:
 | **Epic Swarm** | Spawn parallel agents on subtasks |
 | **Auto-proceed rules** | Configure auto-completion by type/priority matrix |
 | **Error recovery** | Automatic retry patterns for failures |
-| **PRD → Tasks** | `/jat:tasktree` converts requirements to structured tasks |
+| **PRD → Tasks** | `/squad:tasktree` converts requirements to structured tasks |
 | **Full IDE** | Monaco editor, git panel, file explorer—all built in |
 
 The magic is in agent orchestration. Everything else is just table stakes.
@@ -241,10 +241,10 @@ The magic is in agent orchestration. Everything else is just table stakes.
 
 ```bash
 # Install (one command)
-curl -sSL https://raw.githubusercontent.com/joewinke/jat/master/tools/scripts/bootstrap.sh | bash
+curl -sSL https://raw.githubusercontent.com/joewinke/squad/master/tools/scripts/bootstrap.sh | bash
 
 # Restart shell and launch
-source ~/.bashrc && jat
+source ~/.bashrc && squad
 ```
 
 Open http://localhost:3333 → Add a project → Create a task → Spawn an agent → Supervise
@@ -252,7 +252,7 @@ Open http://localhost:3333 → Add a project → Create a task → Spawn an agen
 ## Architecture
 
 ```
-~/code/jat/
+~/code/squad/
 ├── ide/          # SvelteKit app (the IDE)
 │   ├── src/
 │   │   ├── routes/     # /work, /files, /kanban, /servers, /config
@@ -267,7 +267,7 @@ Open http://localhost:3333 → Add a project → Create a task → Spawn an agen
 │   ├── mail/           # Agent coordination (am-*)
 │   ├── browser/        # Browser automation
 │   └── signal/         # State synchronization
-├── commands/           # /jat:start, /jat:complete, /jat:tasktree
+├── commands/           # /squad:start, /squad:complete, /squad:tasktree
 └── shared/             # Agent-facing documentation
 ```
 
@@ -280,7 +280,7 @@ Open http://localhost:3333 → Add a project → Create a task → Spawn an agen
 
 ## Configuration
 
-All settings in `~/.config/jat/`:
+All settings in `~/.config/squad/`:
 
 | File | Purpose |
 |------|---------|
@@ -308,30 +308,30 @@ IDE settings at `/config`:
 
 **Q: Is this only for Claude Code?**
 
-JAT is optimized for Claude Code but works with any terminal-based AI assistant that supports the signal protocol. The key is tmux session management.
+SQUAD is optimized for Claude Code but works with any terminal-based AI assistant that supports the signal protocol. The key is tmux session management.
 
 **Q: How many agents can I run?**
 
-Tested with 20+ concurrent agents. Limited by your machine and API rate limits, not JAT. Default max is 12, configurable in settings.
+Tested with 20+ concurrent agents. Limited by your machine and API rate limits, not SQUAD. Default max is 12, configurable in settings.
 
 **Q: Can I use this with existing projects?**
 
-Yes. Run `jt init` in any git repo to add task tracking. JAT auto-discovers projects in `~/code/`.
+Yes. Run `st init` in any git repo to add task tracking. SQUAD auto-discovers projects in `~/code/`.
 
 **Q: Is there a hosted version?**
 
 The IDE and tools run locally. Your code stays on your machine; agents use the LLM providers you configure (cloud or local). You can use a local LLM for the orchestrator to reduce token cost and keep routing on-device—see Token efficiency (local orchestrator) in the docs.
 
-**Q: Can I use my existing editor alongside JAT?**
+**Q: Can I use my existing editor alongside SQUAD?**
 
-Yes. JAT handles agent orchestration and code review. Use your favorite editor for deep debugging when needed.
+Yes. SQUAD handles agent orchestration and code review. Use your favorite editor for deep debugging when needed.
 
 ## Credits
 
 - **[@joewinke](https://github.com/joewinke)** — Creator
 - **Mario Zechner** — [What if you don't need MCP?](https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/) (inspiration)
 - **Agent Mail** — Inspired by [Dicklesworthstone/mcp_agent_mail](https://github.com/Dicklesworthstone/mcp_agent_mail)
-- **JAT Tasks** — Task management (inspired by [steveyegge/beads](https://github.com/steveyegge/beads))
+- **SQUAD Tasks** — Task management (inspired by [steveyegge/beads](https://github.com/steveyegge/beads))
 - **Monaco** — Code editor engine
 - **SvelteKit** — IDE framework
 - **DaisyUI** — UI components
@@ -343,4 +343,4 @@ MIT
 
 ---
 
-**JAT: The IDE where agents write code and you approve it.**
+**SQUAD: The IDE where agents write code and you approve it.**

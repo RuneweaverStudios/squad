@@ -2,17 +2,17 @@
  * Bulk Task Creation API
  * POST /api/tasks/bulk
  *
- * Accepts an array of task objects from JAT:SUGGESTED_TASKS format
+ * Accepts an array of task objects from SQUAD:SUGGESTED_TASKS format
  * and creates them via lib/tasks.js direct calls.
  */
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { createTask as libCreateTask, getTaskById, addDependency } from '$lib/server/jat-tasks.js';
+import { createTask as libCreateTask, getTaskById, addDependency } from '$lib/server/squad-tasks.js';
 import { invalidateCache } from '$lib/server/cache.js';
 import { _resetTaskCache } from '../../../api/agents/+server.js';
 import { getProjectPath } from '$lib/server/projectPaths.js';
 
-/** Suggested task from JAT:SUGGESTED_TASKS marker */
+/** Suggested task from SQUAD:SUGGESTED_TASKS marker */
 interface SuggestedTask {
 	/** Optional ID if this references an existing task */
 	id?: string;
@@ -278,7 +278,7 @@ async function createTask(
 				return {
 					title: task.title,
 					success: false,
-					error: `Project directory not found: ${projectInfo.path}. Add the project to ~/.config/jat/projects.json with the correct path.`
+					error: `Project directory not found: ${projectInfo.path}. Add the project to ~/.config/squad/projects.json with the correct path.`
 				};
 			}
 
@@ -359,10 +359,10 @@ async function createTask(
 
 		let errorMessage = error.message || 'Unknown error';
 
-		// Check for "no .jat/ database" error - project not initialized
-		if (errorMessage.includes('No .jat/ database') || errorMessage.includes('Run initProject()')) {
+		// Check for "no .squad/ database" error - project not initialized
+		if (errorMessage.includes('No .squad/ database') || errorMessage.includes('Run initProject()')) {
 			const projectName = defaultProject || task.project || 'this project';
-			errorMessage = `Project "${projectName}" has not been initialized for task tracking. Run "jt init" in the project directory, or use the "Add Project" button on the Projects page.`;
+			errorMessage = `Project "${projectName}" has not been initialized for task tracking. Run "st init" in the project directory, or use the "Add Project" button on the Projects page.`;
 		}
 
 		return {

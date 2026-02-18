@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Migrate JAT from ~/code/jat to ~/.local/share/jat (XDG standard)
+# Migrate SQUAD from ~/code/squad to ~/.local/share/squad (XDG standard)
 # Safe to run multiple times - skips already-migrated installations
 #
 # Usage: migrate-to-xdg.sh [-y]
@@ -27,13 +27,13 @@ NC='\033[0m'
 
 echo ""
 echo -e "${BOLD}╔═══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BOLD}║           JAT Migration to XDG Location                       ║${NC}"
+echo -e "${BOLD}║           SQUAD Migration to XDG Location                       ║${NC}"
 echo -e "${BOLD}╚═══════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
-OLD_DIR="$HOME/code/jat"
-NEW_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/jat"
-CONFIG_DIR="$HOME/.config/jat"
+OLD_DIR="$HOME/code/squad"
+NEW_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/squad"
+CONFIG_DIR="$HOME/.config/squad"
 BIN_DIR="$HOME/.local/bin"
 
 # Check current state
@@ -41,8 +41,8 @@ echo -e "${BLUE}Checking current installation...${NC}"
 echo ""
 
 if [ ! -d "$OLD_DIR" ] && [ ! -d "$NEW_DIR" ]; then
-    echo -e "${YELLOW}No JAT installation found.${NC}"
-    echo "Run the installer: curl -fsSL https://raw.githubusercontent.com/joewinke/jat/master/tools/scripts/bootstrap.sh | bash"
+    echo -e "${YELLOW}No SQUAD installation found.${NC}"
+    echo "Run the installer: curl -fsSL https://raw.githubusercontent.com/joewinke/squad/master/tools/scripts/bootstrap.sh | bash"
     exit 0
 fi
 
@@ -79,7 +79,7 @@ if [ -d "$OLD_DIR" ] && [ ! -d "$NEW_DIR" ]; then
     echo -e "${BLUE}Migrating to:${NC}   $NEW_DIR"
     echo ""
     echo "This script will:"
-    echo "  1. Move JAT to XDG location"
+    echo "  1. Move SQUAD to XDG location"
     echo "  2. Update symlinks in ~/.local/bin/"
     echo "  3. Update config files"
     echo "  4. Remove old location"
@@ -108,7 +108,7 @@ if [ -d "$OLD_DIR" ] && [ ! -d "$NEW_DIR" ]; then
     # Move the repo
     echo "Moving $OLD_DIR → $NEW_DIR"
     mv "$OLD_DIR" "$NEW_DIR"
-    echo -e "${GREEN}✓ Moved JAT to XDG location${NC}"
+    echo -e "${GREEN}✓ Moved SQUAD to XDG location${NC}"
 elif [ -d "$OLD_DIR" ] && [ -d "$NEW_DIR" ]; then
     # Both exist - just remove old
     echo "New location already exists, will remove old location later"
@@ -120,13 +120,13 @@ echo -e "${BOLD}Step 2/5: Updating symlinks in ~/.local/bin/${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-# Remove old symlinks pointing to ~/code/jat
+# Remove old symlinks pointing to ~/code/squad
 REMOVED=0
 if [ -d "$BIN_DIR" ]; then
     for link in "$BIN_DIR"/*; do
         if [ -L "$link" ]; then
             target=$(readlink "$link")
-            if [[ "$target" == *"/code/jat/"* ]] || [[ "$target" == *"/code/jomarchy-agent-tools/"* ]]; then
+            if [[ "$target" == *"/code/squad/"* ]] || [[ "$target" == *"/code/jomarchy-agent-tools/"* ]]; then
                 rm "$link"
                 ((REMOVED++)) || true
             fi
@@ -148,11 +148,11 @@ echo -e "${BOLD}Step 3/5: Updating config files${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-# Update ~/.config/jat/projects.json
+# Update ~/.config/squad/projects.json
 if [ -f "$CONFIG_DIR/projects.json" ]; then
-    if grep -q "/code/jat" "$CONFIG_DIR/projects.json"; then
-        sed -i.bak 's|~/code/jat|~/.local/share/jat|g' "$CONFIG_DIR/projects.json"
-        sed -i 's|/code/jat|/.local/share/jat|g' "$CONFIG_DIR/projects.json"
+    if grep -q "/code/squad" "$CONFIG_DIR/projects.json"; then
+        sed -i.bak 's|~/code/squad|~/.local/share/squad|g' "$CONFIG_DIR/projects.json"
+        sed -i 's|/code/squad|/.local/share/squad|g' "$CONFIG_DIR/projects.json"
         rm -f "$CONFIG_DIR/projects.json.bak"
         echo -e "${GREEN}✓ Updated projects.json${NC}"
     else
@@ -165,9 +165,9 @@ fi
 # Update ~/.claude/settings.json hook paths
 CLAUDE_SETTINGS="$HOME/.claude/settings.json"
 if [ -f "$CLAUDE_SETTINGS" ]; then
-    if grep -q "/code/jat" "$CLAUDE_SETTINGS"; then
-        sed -i.bak 's|~/code/jat|~/.local/share/jat|g' "$CLAUDE_SETTINGS"
-        sed -i 's|/code/jat|/.local/share/jat|g' "$CLAUDE_SETTINGS"
+    if grep -q "/code/squad" "$CLAUDE_SETTINGS"; then
+        sed -i.bak 's|~/code/squad|~/.local/share/squad|g' "$CLAUDE_SETTINGS"
+        sed -i 's|/code/squad|/.local/share/squad|g' "$CLAUDE_SETTINGS"
         rm -f "$CLAUDE_SETTINGS.bak"
         echo -e "${GREEN}✓ Updated ~/.claude/settings.json${NC}"
     else
@@ -193,19 +193,19 @@ else
     SHELL_CONFIG="$HOME/.bashrc"
 fi
 
-# Remove JAT launcher block from shell config
-MARKER_START="# >>> JAT Claude Launchers >>>"
-MARKER_END="# <<< JAT Claude Launchers <<<"
+# Remove SQUAD launcher block from shell config
+MARKER_START="# >>> SQUAD Claude Launchers >>>"
+MARKER_END="# <<< SQUAD Claude Launchers <<<"
 
 if [ -f "$SHELL_CONFIG" ] && grep -q "$MARKER_START" "$SHELL_CONFIG"; then
     # Create backup
-    cp "$SHELL_CONFIG" "$SHELL_CONFIG.bak-jat-migrate"
+    cp "$SHELL_CONFIG" "$SHELL_CONFIG.bak-squad-migrate"
 
     # Remove the block between markers (inclusive)
     sed -i "/$MARKER_START/,/$MARKER_END/d" "$SHELL_CONFIG"
 
     echo -e "${GREEN}✓ Removed old launcher functions from $SHELL_CONFIG${NC}"
-    echo "  (Backup: $SHELL_CONFIG.bak-jat-migrate)"
+    echo "  (Backup: $SHELL_CONFIG.bak-squad-migrate)"
 else
     echo "  No launcher functions to remove"
 fi
@@ -220,7 +220,7 @@ echo ""
 if [ -d "$OLD_DIR" ]; then
     echo "Removing old directory: $OLD_DIR"
     rm -rf "$OLD_DIR"
-    echo -e "${GREEN}✓ Removed ~/code/jat${NC}"
+    echo -e "${GREEN}✓ Removed ~/code/squad${NC}"
 else
     echo "  Old directory already removed"
 fi
@@ -239,10 +239,10 @@ echo -e "${GREEN}║              ${BOLD}✓ Migration Complete!${NC}${GREEN}   
 echo -e "${GREEN}║                                                               ║${NC}"
 echo -e "${GREEN}╚═══════════════════════════════════════════════════════════════╝${NC}"
 echo ""
-echo "JAT is now installed at: $NEW_DIR"
+echo "SQUAD is now installed at: $NEW_DIR"
 echo ""
 echo "Next steps:"
 echo "  1. Restart your terminal (or run: source $SHELL_CONFIG)"
-echo "  2. Verify: jt --version"
+echo "  2. Verify: st --version"
 echo "  3. Start IDE: cd $NEW_DIR/ide && npm run dev"
 echo ""

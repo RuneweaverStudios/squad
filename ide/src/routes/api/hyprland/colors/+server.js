@@ -2,7 +2,7 @@
  * Hyprland Colors API
  * POST /api/hyprland/colors - Apply border colors to all project windows
  *
- * This endpoint is equivalent to the CLI's `jat colors` command.
+ * This endpoint is equivalent to the CLI's `squad colors` command.
  * It finds all Hyprland windows with project name prefixes and applies
  * the configured border colors.
  */
@@ -17,7 +17,7 @@ import { join } from 'path';
 
 const execAsync = promisify(exec);
 
-const CONFIG_FILE = join(homedir(), '.config', 'jat', 'projects.json');
+const CONFIG_FILE = join(homedir(), '.config', 'squad', 'projects.json');
 
 /**
  * Check if Hyprland is available

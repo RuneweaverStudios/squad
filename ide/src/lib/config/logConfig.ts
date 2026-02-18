@@ -1,5 +1,5 @@
 /**
- * Log Configuration for JAT IDE
+ * Log Configuration for SQUAD IDE
  *
  * Defines log levels, event mappings, and environment-specific settings
  * for the structured logging system using pino.

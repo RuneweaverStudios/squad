@@ -42,7 +42,7 @@ interface ProjectPaths {
  * Get project paths from config (both project root and server_path)
  */
 function getProjectPaths(projectName: string): ProjectPaths {
-	const configPath = join(process.env.HOME || '~', '.config', 'jat', 'projects.json');
+	const configPath = join(process.env.HOME || '~', '.config', 'squad', 'projects.json');
 
 	if (!existsSync(configPath)) {
 		// Fall back to ~/code/{project}
@@ -128,7 +128,7 @@ function getLocalMigrationFiles(projectPath: string): Map<string, { name: string
  * Get database password from credentials or .env files
  *
  * Fallback chain:
- * 1. ~/.config/jat/credentials.json (supabase_db_password)
+ * 1. ~/.config/squad/credentials.json (supabase_db_password)
  * 2. Project .env files (SUPABASE_DB_PASSWORD, DATABASE_PASSWORD, POSTGRES_PASSWORD)
  */
 function getDatabasePassword(projectName: string, projectPath: string, serverPath?: string): string | null {

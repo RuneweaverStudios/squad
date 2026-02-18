@@ -149,11 +149,11 @@ function registerAgentInDb(agentName, projectPath, model) {
 }
 
 /**
- * Load JAT config defaults
+ * Load SQUAD config defaults
  * @returns {{ model: string, skip_permissions: boolean, agent_stagger: number, claude_startup_timeout: number }}
  */
-function loadJatDefaults() {
-	const configPath = join(homedir(), '.config/jat/projects.json');
+function loadSquadDefaults() {
+	const configPath = join(homedir(), '.config/squad/projects.json');
 	const defaults = {
 		model: 'opus',
 		skip_permissions: false,
@@ -171,7 +171,7 @@ function loadJatDefaults() {
 				if (typeof config.defaults.claude_startup_timeout === 'number') defaults.claude_startup_timeout = config.defaults.claude_startup_timeout;
 			}
 		} catch (err) {
-			console.error('Failed to load JAT config:', err);
+			console.error('Failed to load SQUAD config:', err);
 		}
 	}
 
@@ -184,22 +184,22 @@ function loadJatDefaults() {
  * Body:
  * - count: Number of agents to spawn (required, 1-10)
  * - project: Project path (default: current project)
- * - model: Model to use (default: from JAT config, fallback opus-4.5)
- * - stagger: Delay between spawns in ms (default: from JAT config agent_stagger * 1000)
- * - autoStart: Whether to run /jat:start auto (default: true)
+ * - model: Model to use (default: from SQUAD config, fallback opus-4.5)
+ * - stagger: Delay between spawns in ms (default: from SQUAD config agent_stagger * 1000)
+ * - autoStart: Whether to run /squad:start auto (default: true)
  */
 /** @type {import('./$types').RequestHandler} */
 export async function POST({ request }) {
 	try {
-		const jatDefaults = loadJatDefaults();
+		const squadDefaults = loadSquadDefaults();
 		const body = await request.json();
 		const {
 			count = 1,
 			project,
-			model = jatDefaults.model,
-			stagger = jatDefaults.agent_stagger * 1000,
+			model = squadDefaults.model,
+			stagger = squadDefaults.agent_stagger * 1000,
 			autoStart = true,
-			skipPermissions = jatDefaults.skip_permissions
+			skipPermissions = squadDefaults.skip_permissions
 		} = body;
 
 		// Validate count
@@ -224,7 +224,7 @@ export async function POST({ request }) {
 		}
 
 		// Spawn sessions with staggered timing
-		// Now using jat-{AgentName} naming since we pre-register agents
+		// Now using squad-{AgentName} naming since we pre-register agents
 		const results = [];
 
 		// Default tmux dimensions for proper terminal output width
@@ -233,12 +233,12 @@ export async function POST({ request }) {
 		const TMUX_INITIAL_WIDTH = 80;
 		const TMUX_INITIAL_HEIGHT = 40;
 
-		// JAT bootstrap prompt - minimal identity, commands load full docs on-demand
-		const jatBootstrap = `You are a JAT agent. Run /jat:start to begin work.`;
+		// SQUAD bootstrap prompt - minimal identity, commands load full docs on-demand
+		const squadBootstrap = `You are a SQUAD agent. Run /squad:start to begin work.`;
 
 		for (let i = 0; i < agentCount; i++) {
 			const agentName = agentNames[i];
-			const sessionName = `jat-${agentName}`;
+			const sessionName = `squad-${agentName}`;
 
 			try {
 				// Step 1: Register agent in Agent Mail SQLite database
@@ -270,7 +270,7 @@ export async function POST({ request }) {
 				let claudeCmd = `cd "${projectPath}" && claude`;
 				if (model) claudeCmd += ` --model ${model}`;
 				if (skipPermissions) claudeCmd += ' --dangerously-skip-permissions';
-				claudeCmd += ` --append-system-prompt '${jatBootstrap}'`;
+				claudeCmd += ` --append-system-prompt '${squadBootstrap}'`;
 
 				// Step 4: Create tmux session with explicit dimensions
 				const command = `tmux new-session -d -s "${sessionName}" -x ${TMUX_INITIAL_WIDTH} -y ${TMUX_INITIAL_HEIGHT} -c "${projectPath}" && sleep 0.3 && tmux send-keys -t "${sessionName}" "${claudeCmd}" Enter`;
@@ -278,7 +278,7 @@ export async function POST({ request }) {
 
 				// Step 5: Wait for Claude to start and send initial prompt
 				if (autoStart) {
-					const maxWaitSeconds = jatDefaults.claude_startup_timeout;
+					const maxWaitSeconds = squadDefaults.claude_startup_timeout;
 					const checkIntervalMs = 500;
 					let claudeReady = false;
 					let shellPromptDetected = false;
@@ -312,8 +312,8 @@ export async function POST({ request }) {
 					}
 
 					if (claudeReady) {
-						// Send /jat:start with agent name so it resumes existing registration
-						const initialPrompt = `/jat:start ${agentName} auto`;
+						// Send /squad:start with agent name so it resumes existing registration
+						const initialPrompt = `/squad:start ${agentName} auto`;
 						const escapedPrompt = initialPrompt.replace(/"/g, '\\"').replace(/\$/g, '\\$');
 						await execAsync(`tmux send-keys -t "${sessionName}" -- "${escapedPrompt}"`);
 						await new Promise(resolve => setTimeout(resolve, 100));

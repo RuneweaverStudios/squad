@@ -1,12 +1,12 @@
 #!/bin/bash
-# Install JAT skills for Pi coding agent
-# Creates symlinks from JAT skills/ to ~/.pi/agent/skills/
+# Install SQUAD skills for Pi coding agent
+# Creates symlinks from SQUAD skills/ to ~/.pi/agent/skills/
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-JAT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-SKILLS_SRC="$JAT_DIR/skills"
+SQUAD_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+SKILLS_SRC="$SQUAD_DIR/skills"
 SKILLS_DST="$HOME/.pi/agent/skills"
 
 # Colors
@@ -15,7 +15,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-echo -e "${BLUE}Installing JAT skills for Pi coding agent...${NC}"
+echo -e "${BLUE}Installing SQUAD skills for Pi coding agent...${NC}"
 echo
 
 # Check Pi is installed
@@ -69,11 +69,11 @@ echo -e "${GREEN}Installed $SKILL_COUNT skill(s) to $SKILLS_DST${NC}"
 
 # Copy AGENTS.md to Pi's global location if it doesn't exist or is outdated
 PI_AGENTS_MD="$HOME/.pi/agent/AGENTS.md"
-JAT_AGENTS_MD="$JAT_DIR/AGENTS.md"
+SQUAD_AGENTS_MD="$SQUAD_DIR/AGENTS.md"
 
-if [[ -f "$JAT_AGENTS_MD" ]]; then
-    if [[ ! -f "$PI_AGENTS_MD" ]] || ! diff -q "$JAT_AGENTS_MD" "$PI_AGENTS_MD" &>/dev/null; then
-        cp "$JAT_AGENTS_MD" "$PI_AGENTS_MD"
+if [[ -f "$SQUAD_AGENTS_MD" ]]; then
+    if [[ ! -f "$PI_AGENTS_MD" ]] || ! diff -q "$SQUAD_AGENTS_MD" "$PI_AGENTS_MD" &>/dev/null; then
+        cp "$SQUAD_AGENTS_MD" "$PI_AGENTS_MD"
         echo -e "${GREEN}  ✓ AGENTS.md${NC} -> $PI_AGENTS_MD"
     else
         echo -e "  AGENTS.md already up to date"
@@ -82,10 +82,10 @@ fi
 
 echo
 echo -e "${BLUE}Skills available in Pi:${NC}"
-echo "  /skill:jat-start     - Begin working on a task"
-echo "  /skill:jat-complete   - Complete current task"
-echo "  /skill:jat-verify     - Browser verification"
+echo "  /skill:squad-start     - Begin working on a task"
+echo "  /skill:squad-complete   - Complete current task"
+echo "  /skill:squad-verify     - Browser verification"
 echo
 echo -e "${BLUE}Quick test:${NC}"
 echo "  pi                    # Start Pi"
-echo "  /skill:jat-start      # Begin JAT workflow"
+echo "  /skill:squad-start      # Begin SQUAD workflow"

@@ -36,13 +36,13 @@
 
 	const taskStates = [
 		{ title: 'Add user authentication', status: 'idle', statusLabel: 'Idea', content: '"Users should be able to log in with Google or email..."', visual: 'thought-bubble' },
-		{ title: 'Auth System Epic', status: 'open', statusLabel: 'Tasks Created', content: '├─ jat-7kx: OAuth setup\n├─ jat-7ky: Sessions\n└─ jat-7kz: Login UI', visual: 'tree' },
-		{ title: 'jat-7kx: OAuth setup', status: 'starting', statusLabel: 'Spawning', content: 'BluePeak → jat-7kx\nFairMist → jat-7ky\nGreenRidge → jat-7kz', visual: 'agents' },
-		{ title: 'jat-7kx: OAuth setup', status: 'working', statusLabel: 'Working', content: 'src/auth/oauth.ts\nsrc/lib/google.ts\n+ 47 lines', visual: 'code' },
-		{ title: 'jat-7kx: OAuth setup', status: 'needs_input', statusLabel: 'Needs Input', content: 'Auth provider?\n❯ 1. Supabase\n  2. Auth0\n  3. Custom', visual: 'question' },
-		{ title: 'jat-7kx: OAuth setup', status: 'review', statusLabel: 'Review', content: '+3 files changed\n+142 insertions\n-12 deletions', visual: 'diff' },
-		{ title: 'jat-7kx: OAuth setup', status: 'completing', statusLabel: 'Completing', content: '✓ Committing changes\n✓ Closing task\n✓ Announcing to team', visual: 'check' },
-		{ title: 'jat-7kx: OAuth setup', status: 'completed', statusLabel: 'auto_proceed', content: '✓ Task closed\n✓ Spawning next task\n→ jat-7ky: Sessions', visual: 'check' },
+		{ title: 'Auth System Epic', status: 'open', statusLabel: 'Tasks Created', content: '├─ squad-7kx: OAuth setup\n├─ squad-7ky: Sessions\n└─ squad-7kz: Login UI', visual: 'tree' },
+		{ title: 'squad-7kx: OAuth setup', status: 'starting', statusLabel: 'Spawning', content: 'BluePeak → squad-7kx\nFairMist → squad-7ky\nGreenRidge → squad-7kz', visual: 'agents' },
+		{ title: 'squad-7kx: OAuth setup', status: 'working', statusLabel: 'Working', content: 'src/auth/oauth.ts\nsrc/lib/google.ts\n+ 47 lines', visual: 'code' },
+		{ title: 'squad-7kx: OAuth setup', status: 'needs_input', statusLabel: 'Needs Input', content: 'Auth provider?\n❯ 1. Supabase\n  2. Auth0\n  3. Custom', visual: 'question' },
+		{ title: 'squad-7kx: OAuth setup', status: 'review', statusLabel: 'Review', content: '+3 files changed\n+142 insertions\n-12 deletions', visual: 'diff' },
+		{ title: 'squad-7kx: OAuth setup', status: 'completing', statusLabel: 'Completing', content: '✓ Committing changes\n✓ Closing task\n✓ Announcing to team', visual: 'check' },
+		{ title: 'squad-7kx: OAuth setup', status: 'completed', statusLabel: 'auto_proceed', content: '✓ Task closed\n✓ Spawning next task\n→ squad-7ky: Sessions', visual: 'check' },
 		{ title: 'Suggested: Add MFA', status: 'suggested', statusLabel: 'suggestedTask', content: 'From completionBundle:\n→ type: feature\n→ priority: P1', visual: 'sparkle' }
 	];
 
@@ -60,12 +60,12 @@
 
 	const storySnippets = [
 		{ headline: "It starts with an idea.", text: "You describe what you want: \"Add user authentication.\" The AI helps you turn it into a structured PRD." },
-		{ headline: "The PRD becomes tasks.", text: "Run /jat:tasktree and watch your requirements transform into a dependency tree of actionable work." },
+		{ headline: "The PRD becomes tasks.", text: "Run /squad:tasktree and watch your requirements transform into a dependency tree of actionable work." },
 		{ headline: "Agents swarm the work.", text: "Multiple AI agents claim tasks and start coding in parallel. No bottlenecks. No waiting." },
 		{ headline: "Parallel execution.", text: "Each agent works independently on their assigned task. Code flows from multiple sources simultaneously." },
 		{ headline: "Questions surface to you.", text: "When an agent needs a decision — \"OAuth or JWT?\" — it appears as a clickable button, not buried in terminal spam." },
 		{ headline: "Review with clarity.", text: "See the diffs, understand the changes. Every modification tracked and presented for your approval." },
-		{ headline: "One command to ship.", text: "Run /jat:complete and watch the magic: commits, closes the task, announces to the team. Done." },
+		{ headline: "One command to ship.", text: "Run /squad:complete and watch the magic: commits, closes the task, announces to the team. Done." },
 		{ headline: "Auto-proceed kicks in.", text: "Low-priority tasks complete without your input. The system knows when to ask and when to just ship." },
 		{ headline: "And then, the magic.", text: "Completed work suggests new work. \"Add MFA support?\" The flywheel keeps spinning. Perpetual motion." }
 	];

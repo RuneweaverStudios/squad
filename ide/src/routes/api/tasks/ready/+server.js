@@ -7,7 +7,7 @@
  */
 
 import { json } from '@sveltejs/kit';
-import { getReadyTasks } from '$lib/server/jat-tasks.js';
+import { getReadyTasks } from '$lib/server/squad-tasks.js';
 import { apiCache, cacheKey, CACHE_TTL } from '$lib/server/cache.js';
 
 /** @type {import('./$types').RequestHandler} */
@@ -19,7 +19,7 @@ export async function GET() {
 			return json(cached);
 		}
 
-		// Get ready tasks from all projects using the jat-tasks.js library
+		// Get ready tasks from all projects using the squad-tasks.js library
 		const tasks = getReadyTasks();
 
 		const responseData = {

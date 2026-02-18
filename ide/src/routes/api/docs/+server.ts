@@ -1,8 +1,8 @@
 /**
- * API endpoint to list and search shared JAT documentation files
+ * API endpoint to list and search shared SQUAD documentation files
  *
  * GET /api/docs
- * Lists all .md files in ~/code/jat/shared/
+ * Lists all .md files in ~/code/squad/shared/
  *
  * Query params:
  *   ?search=term - Filter docs by content/title matching search term
@@ -94,8 +94,8 @@ function matchesSearch(doc: DocFile, content: string, searchTerm: string): boole
  * Get the shared docs directory path
  */
 function getSharedDocsPath(): string {
-	// Use the jat project path
-	return join(homedir(), 'code', 'jat', 'shared');
+	// Use the squad project path
+	return join(homedir(), 'code', 'squad', 'shared');
 }
 
 /**

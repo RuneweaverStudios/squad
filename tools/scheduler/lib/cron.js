@@ -1,5 +1,5 @@
 /**
- * Cron expression utilities for jat-scheduler.
+ * Cron expression utilities for squad-scheduler.
  * Uses cron-parser to compute next run times.
  */
 

@@ -131,7 +131,7 @@
 	// Available namespaces
 	const namespaces = [
 		{ value: 'local', label: 'Local (project)' },
-		{ value: 'jat', label: 'JAT' },
+		{ value: 'squad', label: 'SQUAD' },
 		{ value: 'git', label: 'Git' }
 	];
 

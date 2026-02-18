@@ -21,7 +21,7 @@ export interface Task {
  *
  * @example
  * getProjectFromTaskId("chimaro-abc") // "chimaro"
- * getProjectFromTaskId("jat-bov") // "jat"
+ * getProjectFromTaskId("squad-bov") // "squad"
  * getProjectFromTaskId("invalid") // null
  */
 export function getProjectFromTaskId(taskId: string): string | null {
@@ -29,8 +29,8 @@ export function getProjectFromTaskId(taskId: string): string | null {
     return null;
   }
 
-  // Task IDs should be in format: "project-hash" (e.g., "chimaro-abc", "jat-bov")
-  // or "project-hash.N" for child tasks (e.g., "jat-7uzx.1", "jat-abc.2")
+  // Task IDs should be in format: "project-hash" (e.g., "chimaro-abc", "squad-bov")
+  // or "project-hash.N" for child tasks (e.g., "squad-7uzx.1", "squad-abc.2")
   // Project prefix must be followed by a hyphen and at least one character
   const match = taskId.match(/^([a-zA-Z0-9_-]+?)-([a-zA-Z0-9.]+)$/);
 
@@ -51,17 +51,17 @@ export function getProjectFromTaskId(taskId: string): string | null {
 /**
  * Extract parent ID from a hierarchical task ID
  *
- * Hierarchical IDs use dot notation: parent.childNumber (e.g., "jat-abc.1", "jat-abc.2")
+ * Hierarchical IDs use dot notation: parent.childNumber (e.g., "squad-abc.1", "squad-abc.2")
  * This function extracts the parent portion before the last dot.
  *
- * @param taskId - Task ID (e.g., "jat-abc.1", "jat-abc", "jat-qub2.7")
+ * @param taskId - Task ID (e.g., "squad-abc.1", "squad-abc", "squad-qub2.7")
  * @returns Parent ID or null if not hierarchical
  *
  * @example
- * extractParentId("jat-abc.1") // "jat-abc"
- * extractParentId("jat-qub2.7") // "jat-qub2"
- * extractParentId("jat-abc.10") // "jat-abc"
- * extractParentId("jat-abc") // null (not hierarchical)
+ * extractParentId("squad-abc.1") // "squad-abc"
+ * extractParentId("squad-qub2.7") // "squad-qub2"
+ * extractParentId("squad-abc.10") // "squad-abc"
+ * extractParentId("squad-abc") // null (not hierarchical)
  * extractParentId("invalid") // null
  */
 export function extractParentId(taskId: string): string | null {
@@ -69,7 +69,7 @@ export function extractParentId(taskId: string): string | null {
     return null;
   }
 
-  // Hierarchical IDs have format: parentId.childNumber (e.g., "jat-abc.1", "jat-qub2.7")
+  // Hierarchical IDs have format: parentId.childNumber (e.g., "squad-abc.1", "squad-qub2.7")
   // The dot must be followed by one or more digits
   const match = taskId.match(/^(.+)\.(\d+)$/);
 
@@ -94,8 +94,8 @@ export function extractParentId(taskId: string): string | null {
  * @returns true if the ID has hierarchical format (parent.child)
  *
  * @example
- * isHierarchicalId("jat-abc.1") // true
- * isHierarchicalId("jat-abc") // false
+ * isHierarchicalId("squad-abc.1") // true
+ * isHierarchicalId("squad-abc") // false
  */
 export function isHierarchicalId(taskId: string): boolean {
   return extractParentId(taskId) !== null;
@@ -104,20 +104,20 @@ export function isHierarchicalId(taskId: string): boolean {
 /**
  * Extract child number from a hierarchical task ID
  *
- * @param taskId - Task ID (e.g., "jat-abc.1", "jat-abc.10")
+ * @param taskId - Task ID (e.g., "squad-abc.1", "squad-abc.10")
  * @returns Child number or null if not hierarchical
  *
  * @example
- * extractChildNumber("jat-abc.1") // 1
- * extractChildNumber("jat-abc.10") // 10
- * extractChildNumber("jat-abc") // null
+ * extractChildNumber("squad-abc.1") // 1
+ * extractChildNumber("squad-abc.10") // 10
+ * extractChildNumber("squad-abc") // null
  */
 export function extractChildNumber(taskId: string): number | null {
   if (!taskId || typeof taskId !== 'string') {
     return null;
   }
 
-  // Hierarchical IDs have format: parentId.childNumber (e.g., "jat-abc.1", "jat-qub2.7")
+  // Hierarchical IDs have format: parentId.childNumber (e.g., "squad-abc.1", "squad-qub2.7")
   const match = taskId.match(/^.+\.(\d+)$/);
 
   if (!match) {
@@ -130,7 +130,7 @@ export function extractChildNumber(taskId: string): number | null {
 /**
  * Compare two task IDs for sorting, handling hierarchical IDs numerically
  *
- * For hierarchical IDs (jat-abc.1, jat-abc.2), sorts by:
+ * For hierarchical IDs (squad-abc.1, squad-abc.2), sorts by:
  * 1. Parent ID (alphabetically)
  * 2. Child number (numerically)
  *
@@ -141,10 +141,10 @@ export function extractChildNumber(taskId: string): number | null {
  * @returns Negative if idA < idB, positive if idA > idB, 0 if equal
  *
  * @example
- * compareTaskIds("jat-abc.1", "jat-abc.2") // -1 (1 < 2)
- * compareTaskIds("jat-abc.2", "jat-abc.10") // -1 (2 < 10, numeric)
- * compareTaskIds("jat-abc.10", "jat-abc.2") // 1 (10 > 2)
- * compareTaskIds("jat-abc", "jat-def") // alphabetical
+ * compareTaskIds("squad-abc.1", "squad-abc.2") // -1 (1 < 2)
+ * compareTaskIds("squad-abc.2", "squad-abc.10") // -1 (2 < 10, numeric)
+ * compareTaskIds("squad-abc.10", "squad-abc.2") // 1 (10 > 2)
+ * compareTaskIds("squad-abc", "squad-def") // alphabetical
  */
 export function compareTaskIds(idA: string, idB: string): number {
   const parentA = extractParentId(idA);
@@ -168,7 +168,7 @@ export function compareTaskIds(idA: string, idB: string): number {
   }
 
   // One is a child of the other's ID
-  // e.g., comparing "jat-abc" (parent) with "jat-abc.1" (child)
+  // e.g., comparing "squad-abc" (parent) with "squad-abc.1" (child)
   // Parent should come first
   if (parentA === idB) return 1; // idA is child of idB, so idB comes first
   if (parentB === idA) return -1; // idB is child of idA, so idA comes first
@@ -188,11 +188,11 @@ export function compareTaskIds(idA: string, idB: string): number {
  *   { id: "chimaro-abc", title: "Task 1" },
  *   { id: "jomarchy-xyz", title: "Task 2" },
  *   { id: "chimaro-def", title: "Task 3" },
- *   { id: "jat-ghi", title: "Task 4" }
+ *   { id: "squad-ghi", title: "Task 4" }
  * ];
  *
  * getProjectsFromTasks(tasks)
- * // ["chimaro", "jat", "jomarchy"]
+ * // ["chimaro", "squad", "jomarchy"]
  */
 export function getProjectsFromTasks(tasks: Task[]): string[] {
   if (!Array.isArray(tasks)) {
@@ -232,14 +232,14 @@ export function getProjectsFromTasks(tasks: Task[]): string[] {
  * const tasks = [
  *   { id: "chimaro-abc", status: "open" },
  *   { id: "chimaro-def", status: "closed" },
- *   { id: "jat-ghi", status: "open" }
+ *   { id: "squad-ghi", status: "open" }
  * ];
  *
  * getTaskCountByProject(tasks, 'open')
- * // Map { "chimaro" => 1, "jat" => 1 }
+ * // Map { "chimaro" => 1, "squad" => 1 }
  *
  * getTaskCountByProject(tasks, 'all')
- * // Map { "chimaro" => 2, "jat" => 1 }
+ * // Map { "chimaro" => 2, "squad" => 1 }
  */
 export function getTaskCountByProject(tasks: Task[], statusFilter: string = 'open'): Map<string, number> {
   const counts = new Map<string, number>();
@@ -270,12 +270,12 @@ export function getTaskCountByProject(tasks: Task[], statusFilter: string = 'ope
 /**
  * Get filesystem path for a project based on task ID
  *
- * @param taskId - Task ID with project prefix (e.g., "chimaro-abc", "jat-xyz")
+ * @param taskId - Task ID with project prefix (e.g., "chimaro-abc", "squad-xyz")
  * @returns Absolute path to project directory, or null if project cannot be determined
  *
  * @example
  * getProjectPath("chimaro-abc") // "/home/user/code/chimaro"
- * getProjectPath("jat-xyz") // "/home/user/code/jat"
+ * getProjectPath("squad-xyz") // "/home/user/code/squad"
  * getProjectPath("invalid") // null
  */
 export function getProjectPath(taskId: string): string | null {
@@ -301,7 +301,7 @@ export function getProjectPath(taskId: string): string | null {
  * @example
  * const tasks = [
  *   { id: "chimaro-abc", title: "Task 1" },
- *   { id: "jat-def", title: "Task 2" }
+ *   { id: "squad-def", title: "Task 2" }
  * ];
  *
  * filterTasksByProject(tasks, "chimaro")
@@ -339,7 +339,7 @@ export function filterTasksByProject(tasks: Task[], projectName: string): Task[]
  * @example
  * const tasks = [
  *   { id: "chimaro-abc", title: "Task 1" },
- *   { id: "jat-def", title: "Task 2" },
+ *   { id: "squad-def", title: "Task 2" },
  *   { id: "jomarchy-ghi", title: "Task 3" }
  * ];
  *
@@ -352,8 +352,8 @@ export function filterTasksByProject(tasks: Task[], projectName: string): Task[]
  * // [{ id: "chimaro-abc", title: "Task 1" }]
  *
  * // Multiple projects (union)
- * filterTasksByProjects(tasks, new Set(["chimaro", "jat"]))
- * // [{ id: "chimaro-abc", ... }, { id: "jat-def", ... }]
+ * filterTasksByProjects(tasks, new Set(["chimaro", "squad"]))
+ * // [{ id: "chimaro-abc", ... }, { id: "squad-def", ... }]
  */
 export function filterTasksByProjects(tasks: Task[], projectNames: Set<string>): Task[] {
   if (!Array.isArray(tasks)) {
@@ -426,7 +426,7 @@ export function buildEpicChildMap(tasks: TaskWithDeps[]): Map<string, string> {
  * Get the parent epic ID for a task.
  *
  * Checks both:
- * 1. Hierarchical IDs (jat-abc.1 -> jat-abc)
+ * 1. Hierarchical IDs (squad-abc.1 -> squad-abc)
  * 2. Dependency-based relationships (via epicChildMap)
  *
  * @param taskId - The task ID to check

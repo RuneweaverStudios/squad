@@ -2,7 +2,7 @@
   "projects": {
     "acme-saas": {
       "name": "ACME-SAAS",
-      "path": "/tmp/jat-demo/acme-saas",
+      "path": "/tmp/squad-demo/acme-saas",
       "port": 3001,
       "description": "SaaS startup application - auth, billing, dashboard",
       "active_color": "rgb(59, 130, 246)",
@@ -10,7 +10,7 @@
     },
     "pixel-art": {
       "name": "PIXEL-ART",
-      "path": "/tmp/jat-demo/pixel-art",
+      "path": "/tmp/squad-demo/pixel-art",
       "port": 3002,
       "description": "Creative pixel art editor side project",
       "active_color": "rgb(168, 85, 247)",

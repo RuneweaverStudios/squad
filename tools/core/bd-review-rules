@@ -5,7 +5,7 @@
 # Review rules determine whether a task requires human review before
 # auto-closing or can auto-proceed based on type and priority.
 #
-# Rules stored in: .jat/review-rules.json
+# Rules stored in: .squad/review-rules.json
 #
 # Usage:
 #   bd-review-rules                           # Show all current rules
@@ -103,12 +103,12 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Find .jat directory (walk up tree)
-find_jat_dir() {
+# Find .squad directory (walk up tree)
+find_squad_dir() {
     local dir="$PWD"
     while [[ "$dir" != "/" ]]; do
-        if [[ -d "$dir/.jat" ]]; then
-            echo "$dir/.jat"
+        if [[ -d "$dir/.squad" ]]; then
+            echo "$dir/.squad"
             return 0
         fi
         dir=$(dirname "$dir")
@@ -119,13 +119,13 @@ find_jat_dir() {
 
 # Get the rules file path
 get_rules_file() {
-    local jat_dir
-    jat_dir=$(find_jat_dir)
-    if [[ -z "$jat_dir" ]]; then
-        echo -e "${RED}Error: No .jat directory found${NC}" >&2
+    local squad_dir
+    squad_dir=$(find_squad_dir)
+    if [[ -z "$squad_dir" ]]; then
+        echo -e "${RED}Error: No .squad directory found${NC}" >&2
         exit 1
     fi
-    echo "$jat_dir/review-rules.json"
+    echo "$squad_dir/review-rules.json"
 }
 
 # Generate default rules JSON
@@ -157,7 +157,7 @@ ensure_rules_file() {
     echo "$rules_file"
 }
 
-# Function to get a config value with default (reads from .jat/review-rules.json)
+# Function to get a config value with default (reads from .squad/review-rules.json)
 get_config() {
     local key="$1"
     local default="$2"
@@ -183,7 +183,7 @@ get_config() {
     fi
 }
 
-# Function to set a config value (writes to .jat/review-rules.json)
+# Function to set a config value (writes to .squad/review-rules.json)
 set_config() {
     local key="$1"
     local value="$2"

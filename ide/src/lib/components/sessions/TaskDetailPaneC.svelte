@@ -34,7 +34,7 @@
 	}
 
 	interface TimelineEvent {
-		type: 'jat_event' | 'agent_mail' | 'signal';
+		type: 'squad_event' | 'agent_mail' | 'signal';
 		event?: string;
 		timestamp: string;
 		description?: string;
@@ -52,7 +52,7 @@
 		updated_at?: string;
 		attachments: TaskAttachment[];
 		timeline: TimelineEvent[];
-		timelineCounts: { total: number; jat_events: number; agent_mail: number; signals?: number };
+		timelineCounts: { total: number; squad_events: number; agent_mail: number; signals?: number };
 	}
 
 	// Props
@@ -302,7 +302,7 @@
 						{#if activityOpen}
 							<div class="card-content activity-content">
 								{#each details.timeline.slice(0, 10) as event}
-									<div class="activity-item" class:task-event={event.type === 'jat_event'} class:message-event={event.type === 'agent_mail'} class:signal-event={event.type === 'signal'}>
+									<div class="activity-item" class:task-event={event.type === 'squad_event'} class:message-event={event.type === 'agent_mail'} class:signal-event={event.type === 'signal'}>
 										<span class="activity-bullet"></span>
 										<span class="activity-time">{new Date(event.timestamp).toLocaleString()}</span>
 										<span class="activity-text">

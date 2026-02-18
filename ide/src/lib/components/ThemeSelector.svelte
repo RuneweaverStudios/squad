@@ -15,7 +15,7 @@
 
 	// All DaisyUI themes with labels
 	const themes = [
-		{ name: 'jat', label: 'JAT' },
+		{ name: 'squad', label: 'SQUAD' },
 		{ name: 'light', label: 'Light' },
 		{ name: 'dark', label: 'Dark' },
 		{ name: 'cupcake', label: 'Cupcake' },
@@ -50,24 +50,24 @@
 		{ name: 'sunset', label: 'Sunset' }
 	];
 
-	let currentTheme = $state('jat');
+	let currentTheme = $state('squad');
 	let isAnimating = $state(false);
 
 	// Get display label for current theme
 	const currentThemeLabel = $derived(
-		themes.find((t) => t.name === currentTheme)?.label || 'JAT'
+		themes.find((t) => t.name === currentTheme)?.label || 'SQUAD'
 	);
 
 	onMount(() => {
-		// Get current theme or default to jat
+		// Get current theme or default to squad
 		const savedTheme = localStorage.getItem('theme');
 		if (savedTheme && themes.some((t) => t.name === savedTheme)) {
 			currentTheme = savedTheme;
 			document.documentElement.setAttribute('data-theme', savedTheme);
 		} else {
-			currentTheme = 'jat';
-			document.documentElement.setAttribute('data-theme', 'jat');
-			localStorage.setItem('theme', 'jat');
+			currentTheme = 'squad';
+			document.documentElement.setAttribute('data-theme', 'squad');
+			localStorage.setItem('theme', 'squad');
 		}
 	});
 

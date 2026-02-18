@@ -1,4 +1,4 @@
-const PREFIX = '[jat-ingest]';
+const PREFIX = '[squad-ingest]';
 
 function timestamp() {
   return new Date().toISOString().replace('T', ' ').replace(/\.\d+Z/, '');

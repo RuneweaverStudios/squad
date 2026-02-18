@@ -12,9 +12,9 @@ export default defineConfig({
   build: {
     lib: {
       entry: 'src/main.ts',
-      name: 'JatFeedback',
+      name: 'SquadFeedback',
       formats: ['iife'],
-      fileName: () => 'jat-feedback.js'
+      fileName: () => 'squad-feedback.js'
     },
     outDir: 'dist',
     minify: 'esbuild',

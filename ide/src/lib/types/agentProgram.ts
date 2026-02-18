@@ -5,7 +5,7 @@
  * Supports multiple AI coding assistants (Claude Code, Codex, Gemini Code, etc.)
  * with configurable routing rules based on task attributes.
  *
- * Storage: ~/.config/jat/agents.json
+ * Storage: ~/.config/squad/agents.json
  *
  * @see shared/agent-programs.md for architecture documentation
  * @see ide/CLAUDE.md "Agent Programs" section for UI documentation
@@ -27,7 +27,7 @@ export type AgentAuthType = 'subscription' | 'api_key' | 'none';
 /**
  * API key provider reference for agents using 'api_key' auth.
  *
- * References keys stored in ~/.config/jat/credentials.json
+ * References keys stored in ~/.config/squad/credentials.json
  */
 export type ApiKeyProvider = 'anthropic' | 'openai' | 'google' | string;
 
@@ -116,7 +116,7 @@ export interface AgentProgram {
 
 	/**
 	 * API key provider for 'api_key' auth type.
-	 * References credentials stored in ~/.config/jat/credentials.json
+	 * References credentials stored in ~/.config/squad/credentials.json
 	 */
 	apiKeyProvider?: ApiKeyProvider;
 
@@ -289,7 +289,7 @@ export interface AgentRoutingRule {
 // =============================================================================
 
 /**
- * Root structure of ~/.config/jat/agents.json
+ * Root structure of ~/.config/squad/agents.json
  *
  * @example
  * ```json

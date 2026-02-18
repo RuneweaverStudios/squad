@@ -114,7 +114,7 @@
 		<!-- Logo (Industrial) -->
 		<div class="py-4 flex justify-center relative">
 			<a
-				href="https://github.com/joewinke/jat"
+				href="https://github.com/joewinke/squad"
 				target="_blank"
 				rel="noopener noreferrer"
 				class="group transition-all duration-200 hover:scale-105"
@@ -128,7 +128,7 @@
 						text-shadow: 0 0 15px oklch(0.70 0.18 240 / 0.5);
 					"
 				>
-					JAT
+					SQUAD
 				</div>
 			</a>
 			<!-- Decorative line under logo -->
@@ -595,16 +595,16 @@
 						<div>
 							<h4 class="text-lg font-semibold mb-3">Core Workflow (4 commands)</h4>
 
-							<!-- /jat:start -->
+							<!-- /squad:start -->
 							<div class="mb-4">
-								<h5 class="text-md font-semibold mb-2">/jat:start - Get to Work</h5>
+								<h5 class="text-md font-semibold mb-2">/squad:start - Get to Work</h5>
 								<div class="mockup-code text-xs mb-2">
-									<pre><code>/jat:start                    # Auto-create new agent (fast!)</code></pre>
-									<pre><code>/jat:start resume             # Choose from logged-out agents</code></pre>
-									<pre><code>/jat:start GreatWind          # Resume specific agent by name</code></pre>
-									<pre><code>/jat:start quick              # Start highest priority task immediately</code></pre>
-									<pre><code>/jat:start task-abc           # Start specific task (with checks)</code></pre>
-									<pre><code>/jat:start task-abc quick     # Start specific task (skip checks)</code></pre>
+									<pre><code>/squad:start                    # Auto-create new agent (fast!)</code></pre>
+									<pre><code>/squad:start resume             # Choose from logged-out agents</code></pre>
+									<pre><code>/squad:start GreatWind          # Resume specific agent by name</code></pre>
+									<pre><code>/squad:start quick              # Start highest priority task immediately</code></pre>
+									<pre><code>/squad:start task-abc           # Start specific task (with checks)</code></pre>
+									<pre><code>/squad:start task-abc quick     # Start specific task (skip checks)</code></pre>
 								</div>
 								<p class="text-sm text-base-content/70">
 									Smart registration (auto-create or resume) → Session persistence → Task selection
@@ -612,13 +612,13 @@
 								</p>
 							</div>
 
-							<!-- /jat:complete -->
+							<!-- /squad:complete -->
 							<div class="mb-4">
 								<h5 class="text-md font-semibold mb-2">
-									/jat:complete - Finish Task Properly
+									/squad:complete - Finish Task Properly
 								</h5>
 								<div class="mockup-code text-xs mb-2">
-									<pre><code>/jat:complete                 # Full verify + commit + close task</code></pre>
+									<pre><code>/squad:complete                 # Full verify + commit + close task</code></pre>
 								</div>
 								<p class="text-sm text-base-content/70">
 									Completes the current task with full verification. Session ends after completion.
@@ -626,13 +626,13 @@
 								</p>
 							</div>
 
-							<!-- /jat:pause -->
+							<!-- /squad:pause -->
 							<div class="mb-4">
 								<h5 class="text-md font-semibold mb-2">
-									/jat:pause - Quick Pivot (Context Switch)
+									/squad:pause - Quick Pivot (Context Switch)
 								</h5>
 								<div class="mockup-code text-xs mb-2">
-									<pre><code>/jat:pause                    # Quick exit + show menu</code></pre>
+									<pre><code>/squad:pause                    # Quick exit + show menu</code></pre>
 								</div>
 								<p class="text-sm text-base-content/70">
 									Quick commit/stash → Acknowledge Mail → Release locks → Show available tasks menu.
@@ -645,11 +645,11 @@
 						<div>
 							<h4 class="text-lg font-semibold mb-3">Support Commands (3 commands)</h4>
 
-							<!-- /jat:status -->
+							<!-- /squad:status -->
 							<div class="mb-4">
-								<h5 class="text-md font-semibold mb-2">/jat:status - Check Current Work</h5>
+								<h5 class="text-md font-semibold mb-2">/squad:status - Check Current Work</h5>
 								<div class="mockup-code text-xs mb-2">
-									<pre><code>/jat:status                   # Shows current task, locks, messages</code></pre>
+									<pre><code>/squad:status                   # Shows current task, locks, messages</code></pre>
 								</div>
 								<p class="text-sm text-base-content/70">
 									Shows current task progress, unread Agent Mail messages,
@@ -657,30 +657,30 @@
 								</p>
 							</div>
 
-							<!-- /jat:verify -->
+							<!-- /squad:verify -->
 							<div class="mb-4">
-								<h5 class="text-md font-semibold mb-2">/jat:verify - Quality Checks</h5>
+								<h5 class="text-md font-semibold mb-2">/squad:verify - Quality Checks</h5>
 								<div class="mockup-code text-xs mb-2">
-									<pre><code>/jat:verify                   # Verify current task</code></pre>
-									<pre><code>/jat:verify task-abc          # Verify specific task</code></pre>
+									<pre><code>/squad:verify                   # Verify current task</code></pre>
+									<pre><code>/squad:verify task-abc          # Verify specific task</code></pre>
 								</div>
 								<p class="text-sm text-base-content/70">
 									Runs tests, lint, security checks, and browser tests (if applicable). Must pass
-									before /jat:complete.
+									before /squad:complete.
 								</p>
 							</div>
 
-							<!-- /jat:plan -->
+							<!-- /squad:plan -->
 							<div class="mb-4">
 								<h5 class="text-md font-semibold mb-2">
-									/jat:plan - Convert Planning to Tasks
+									/squad:plan - Convert Planning to Tasks
 								</h5>
 								<div class="mockup-code text-xs mb-2">
-									<pre><code>/jat:plan                     # Analyze conversation/PRD, create tasks</code></pre>
+									<pre><code>/squad:plan                     # Analyze conversation/PRD, create tasks</code></pre>
 								</div>
 								<p class="text-sm text-base-content/70">
 									Analyzes conversation history OR written PRD, breaks work into atomic tasks,
-									creates JAT tasks with proper dependency chains.
+									creates SQUAD tasks with proper dependency chains.
 								</p>
 							</div>
 						</div>
@@ -691,7 +691,7 @@
 							<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
 								<div class="alert alert-success">
 									<span class="text-sm"
-										><strong>Speed:</strong> Use `/jat:start quick` to skip conflict checks and start
+										><strong>Speed:</strong> Use `/squad:start quick` to skip conflict checks and start
 										immediately</span
 									>
 								</div>
@@ -703,7 +703,7 @@
 								</div>
 								<div class="alert alert-warning">
 									<span class="text-sm"
-										><strong>Quality:</strong> Always run `/jat:verify` before `/jat:complete` for
+										><strong>Quality:</strong> Always run `/squad:verify` before `/squad:complete` for
 										critical work</span
 									>
 								</div>
@@ -981,19 +981,19 @@
 							<h4 class="text-lg font-semibold mb-3">Quick Start</h4>
 							<div class="mockup-code text-xs">
 								<pre><code># 1. Install (run in your terminal/bash)</code></pre>
-								<pre><code>curl -fsSL https://raw.githubusercontent.com/joewinke/jat/master/install.sh | bash</code></pre>
+								<pre><code>curl -fsSL https://raw.githubusercontent.com/joewinke/squad/master/install.sh | bash</code></pre>
 								<pre><code></code></pre>
-								<pre><code># 2. Initialize JAT in your project</code></pre>
-								<pre><code>jt init</code></pre>
+								<pre><code># 2. Initialize SQUAD in your project</code></pre>
+								<pre><code>st init</code></pre>
 								<pre><code></code></pre>
 								<pre><code># 3. Start working (registers agent + picks task)</code></pre>
-								<pre><code>/jat:start</code></pre>
+								<pre><code>/squad:start</code></pre>
 							</div>
 						</div>
 
 						<!-- What Is This -->
 						<div>
-							<h4 class="text-lg font-semibold mb-3">What Is JAT?</h4>
+							<h4 class="text-lg font-semibold mb-3">What Is SQUAD?</h4>
 							<p class="text-sm text-base-content/70 mb-3">
 								Jomarchy Agent Tools is a <strong>self-contained AI development environment</strong> that
 								gives your AI coding assistants (Claude Code, Cline, Codex, etc.) the ability to:
@@ -1010,7 +1010,7 @@
 									<strong>Transcend</strong> project folders and context window bounds with persistent state
 								</li>
 								<li>
-									<strong>Plan</strong> work with dependency-aware task management (JAT Tasks)
+									<strong>Plan</strong> work with dependency-aware task management (SQUAD Tasks)
 								</li>
 								<li>
 									<strong>Execute</strong> with 28 composable bash tools (no HTTP servers, no running daemons)
@@ -1034,7 +1034,7 @@
 								<pre><code>             │</code></pre>
 								<pre><code>  ┌──────────┼──────────┐</code></pre>
 								<pre><code>  ▼          ▼          ▼</code></pre>
-								<pre><code>Agent   JAT Tasks  28 Tools</code></pre>
+								<pre><code>Agent   SQUAD Tasks  28 Tools</code></pre>
 								<pre><code> Mail      CLI     (bash)</code></pre>
 							</div>
 						</div>
@@ -1050,7 +1050,7 @@
 								</div>
 								<div class="alert alert-success">
 									<span class="text-sm"
-										><strong>JAT Tasks:</strong> Dependency-aware task planning with CLI</span
+										><strong>SQUAD Tasks:</strong> Dependency-aware task planning with CLI</span
 									>
 								</div>
 								<div class="alert alert-warning">
@@ -1072,17 +1072,17 @@
 
 							<h5 class="text-md font-semibold mb-2">Standard Workflow (One Agent = One Task)</h5>
 							<div class="mockup-code text-xs mb-3">
-								<pre><code>/jat:start task-abc           # Create agent, start task</code></pre>
+								<pre><code>/squad:start task-abc           # Create agent, start task</code></pre>
 								<pre><code># ... work on task ...</code></pre>
-								<pre><code>/jat:complete                 # Complete task, session ends</code></pre>
+								<pre><code>/squad:complete                 # Complete task, session ends</code></pre>
 								<pre><code># Close terminal, spawn new agent for next task</code></pre>
 							</div>
 
 							<h5 class="text-md font-semibold mb-2">Quick Start (Skip Checks)</h5>
 							<div class="mockup-code text-xs mb-3">
-								<pre><code>/jat:start task-abc quick     # Skip conflict checks</code></pre>
+								<pre><code>/squad:start task-abc quick     # Skip conflict checks</code></pre>
 								<pre><code># ... work on task ...</code></pre>
-								<pre><code>/jat:complete                 # Complete task</code></pre>
+								<pre><code>/squad:complete                 # Complete task</code></pre>
 							</div>
 						</div>
 
@@ -1091,7 +1091,7 @@
 							<h4 class="text-lg font-semibold mb-3">Learn More</h4>
 							<div class="flex flex-col gap-2">
 								<a
-									href="https://github.com/joewinke/jat"
+									href="https://github.com/joewinke/squad"
 									target="_blank"
 									class="btn btn-sm btn-primary"
 								>

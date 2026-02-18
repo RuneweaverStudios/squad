@@ -34,7 +34,7 @@
 	}
 
 	interface TimelineEvent {
-		type: 'jat_event' | 'agent_mail' | 'signal';
+		type: 'squad_event' | 'agent_mail' | 'signal';
 		event?: string;
 		timestamp: string;
 		description?: string;
@@ -52,7 +52,7 @@
 		updated_at?: string;
 		attachments: TaskAttachment[];
 		timeline: TimelineEvent[];
-		timelineCounts: { total: number; jat_events: number; agent_mail: number; signals?: number };
+		timelineCounts: { total: number; squad_events: number; agent_mail: number; signals?: number };
 	}
 
 	// Props
@@ -434,7 +434,7 @@
 									ondragstart={(e) => {
 										if (task.description) {
 											e.dataTransfer?.setData('text/plain', task.description);
-											e.dataTransfer?.setData('application/x-jat-text', JSON.stringify({
+											e.dataTransfer?.setData('application/x-squad-text', JSON.stringify({
 												type: 'description',
 												taskId: task.id,
 												content: task.description
@@ -502,7 +502,7 @@
 									ondragstart={(e) => {
 										if (details?.notes) {
 											e.dataTransfer?.setData('text/plain', details.notes);
-											e.dataTransfer?.setData('application/x-jat-text', JSON.stringify({
+											e.dataTransfer?.setData('application/x-squad-text', JSON.stringify({
 												type: 'notes',
 												taskId: task.id,
 												content: details.notes
@@ -576,7 +576,7 @@
 														e.stopPropagation();
 														console.log('[TaskDetailPaneA] DragStart on thumbnail', attachment.path);
 														e.dataTransfer?.setData('text/plain', attachment.path);
-														e.dataTransfer?.setData('application/x-jat-image', JSON.stringify({
+														e.dataTransfer?.setData('application/x-squad-image', JSON.stringify({
 															path: attachment.path,
 															filename: attachment.filename,
 															url: attachment.url
@@ -715,10 +715,10 @@
 					{#if details?.timeline && details.timeline.length > 0}
 						<div class="task-panel-timeline">
 							{#each details.timeline as event}
-								<div class="timeline-event" class:task-event={event.type === 'jat_event'} class:message-event={event.type === 'agent_mail'} class:signal-event={event.type === 'signal'}>
+								<div class="timeline-event" class:task-event={event.type === 'squad_event'} class:message-event={event.type === 'agent_mail'} class:signal-event={event.type === 'signal'}>
 									<div class="timeline-event-header">
 										<span class="timeline-event-type">
-											{#if event.type === 'jat_event'}
+											{#if event.type === 'squad_event'}
 												{event.event}
 											{:else if event.type === 'signal'}
 												{event.data?.state || 'signal'}

@@ -54,7 +54,7 @@
 			],
 			examples: [
 				{ label: 'Specific agent', expr: 'data.agentName === "SwiftCanyon"' },
-				{ label: 'By project', expr: 'data.project === "jat"' }
+				{ label: 'By project', expr: 'data.project === "squad"' }
 			]
 		},
 		signal_received: {

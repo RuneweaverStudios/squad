@@ -13,8 +13,8 @@
  *
  * Uses Claude Haiku for fast, cost-effective suggestions.
  *
- * Task: jat-3qgk - Auto prioritize and type a task
- * Fix: jat-6z5ix - Only send selected project context (not all projects)
+ * Task: squad-3qgk - Auto prioritize and type a task
+ * Fix: squad-6z5ix - Only send selected project context (not all projects)
  */
 
 import { json } from '@sveltejs/kit';
@@ -23,7 +23,7 @@ import { getApiKeyWithFallback } from '$lib/utils/credentials';
 import { claudeCliCall } from '$lib/server/claudeCli';
 
 // Get API key with fallback chain:
-// 1. ~/.config/jat/credentials.json (preferred)
+// 1. ~/.config/squad/credentials.json (preferred)
 // 2. Environment variables (legacy)
 // 3. null (will use claude CLI as fallback)
 function getApiKey() {

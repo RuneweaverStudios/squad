@@ -38,11 +38,11 @@
 			const data = await response.json();
 			sessions = data.sessions || [];
 
-			// Auto-select most recent jat- session
+			// Auto-select most recent squad- session
 			if (!selectedSession && sessions.length > 0) {
-				const jatSessions = sessions.filter((s: any) => s.name.startsWith('jat-'));
-				if (jatSessions.length > 0) {
-					selectedSession = jatSessions[jatSessions.length - 1].name;
+				const squadSessions = sessions.filter((s: any) => s.name.startsWith('squad-'));
+				if (squadSessions.length > 0) {
+					selectedSession = squadSessions[squadSessions.length - 1].name;
 				} else {
 					selectedSession = sessions[sessions.length - 1].name;
 				}
@@ -145,7 +145,7 @@
 </script>
 
 <svelte:head>
-	<title>Minimap Prototypes - JAT IDE</title>
+	<title>Minimap Prototypes - SQUAD IDE</title>
 </svelte:head>
 
 <div class="page-container">

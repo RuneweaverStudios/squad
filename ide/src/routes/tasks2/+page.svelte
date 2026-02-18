@@ -132,7 +132,7 @@
 
 	// Helpers
 	function categorizeSession(name: string): { type: TmuxSession['type']; project?: string } {
-		if (name.startsWith('jat-')) {
+		if (name.startsWith('squad-')) {
 			const agentName = name.slice(4);
 			if (agentName.startsWith('pending-')) {
 				return { type: 'agent', project: undefined };
@@ -144,14 +144,14 @@
 			const project = name.slice(7);
 			return { type: 'server', project };
 		}
-		if (name === 'jat-ide' || name.startsWith('jat-ide')) {
+		if (name === 'squad-ide' || name.startsWith('squad-ide')) {
 			return { type: 'ide' };
 		}
 		return { type: 'other' };
 	}
 
 	function getAgentName(sessionName: string): string {
-		if (sessionName.startsWith('jat-')) {
+		if (sessionName.startsWith('squad-')) {
 			return sessionName.slice(4);
 		}
 		return sessionName;
@@ -605,7 +605,7 @@
 </script>
 
 <svelte:head>
-	<title>Tasks (Grouped) | JAT IDE</title>
+	<title>Tasks (Grouped) | SQUAD IDE</title>
 	<meta
 		name="description"
 		content="Task management with project and epic grouping for AI coding agents."

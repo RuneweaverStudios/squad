@@ -14,11 +14,11 @@ import { homedir } from 'os';
 
 /**
  * Get persistent storage directory for task images
- * Uses ~/.local/share/jat/task-images/ for persistence across reboots
+ * Uses ~/.local/share/squad/task-images/ for persistence across reboots
  * @returns {string} - Path to persistent upload directory
  */
 function getPersistentUploadDir() {
-	return join(homedir(), '.local', 'share', 'jat', 'task-images');
+	return join(homedir(), '.local', 'share', 'squad', 'task-images');
 }
 
 /**
@@ -117,7 +117,7 @@ export async function GET({ params, url }) {
 			: rawPath;
 
 		// Determine actual file path - check persistent storage
-		// Location: ~/.local/share/jat/task-images/
+		// Location: ~/.local/share/squad/task-images/
 		let filePath;
 		if (requestedPath.startsWith('/tmp') || requestedPath.startsWith(homedir())) {
 			// Full path provided
@@ -136,7 +136,7 @@ export async function GET({ params, url }) {
 		// Only allow persistent storage - no legacy temp directories
 		const allowedDirs = [
 			getPersistentUploadDir(),
-			join(homedir(), '.local', 'share', 'jat', 'ingest-files')
+			join(homedir(), '.local', 'share', 'squad', 'ingest-files')
 		];
 
 		const isAllowed = allowedDirs.some((dir) => filePath.startsWith(dir));

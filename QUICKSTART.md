@@ -1,10 +1,10 @@
-# JAT Quick Start Guide
+# SQUAD Quick Start Guide
 
 > **Get from zero to orchestrating AI agents in 5 minutes**
 
 ## The 10X Boost in 5 Steps
 
-Andrej Karpathy said it best: you could be 10X more powerful with AI agents if you could just string together what's available. JAT is that string.
+Andrej Karpathy said it best: you could be 10X more powerful with AI agents if you could just string together what's available. SQUAD is that string.
 
 ---
 
@@ -29,19 +29,19 @@ brew install tmux sqlite jq node
 
 ---
 
-## Step 2: Install JAT (1 min)
+## Step 2: Install SQUAD (1 min)
 
 ```bash
 # One-line installer (works on Linux and macOS)
-curl -fsSL https://raw.githubusercontent.com/joewinke/jat/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/joewinke/squad/master/install.sh | bash
 ```
 
 **This symlinks all tools to `~/.local/bin/`:**
-- `jt-*` - JAT Tasks CLI
+- `st-*` - SQUAD Tasks CLI
 - `am-*` - Agent Registry (4 commands)
 - `browser-*` - Browser automation (11 commands)
 - `db-*` - Database tools (4 commands)
-- `jat-*` - JAT signals and launchers
+- `squad-*` - SQUAD signals and launchers
 
 **Reload your shell:**
 ```bash
@@ -51,7 +51,7 @@ source ~/.bashrc  # or ~/.zshrc on macOS
 **Verify:**
 ```bash
 am-whoami    # Should show "Not registered" (expected)
-jt --version # Should show version number
+st --version # Should show version number
 ```
 
 ---
@@ -60,7 +60,7 @@ jt --version # Should show version number
 
 ```bash
 cd ~/code/myproject
-jt init
+st init
 ```
 
 **Answer the prompts** (or press Enter for defaults):
@@ -68,14 +68,14 @@ jt init
 - Default priority: `2` (Medium)
 - Task prefix: `mp` (e.g., mp-001, mp-002)
 
-**This creates `.jat/` directory** - git-backed task tracking.
+**This creates `.squad/` directory** - git-backed task tracking.
 
 ---
 
 ## Step 4: Start the IDE (30 sec)
 
 ```bash
-jat
+squad
 ```
 
 **This:**
@@ -108,16 +108,16 @@ jat
 
 ```bash
 # Single agent
-jat-myproject
+squad-myproject
 
 # Multiple agents in auto-attack mode
-jat myproject 4 --auto
+squad myproject 4 --auto
 ```
 
 **What happens:**
-1. Tmux session created: `jat-{AgentName}`
+1. Tmux session created: `squad-{AgentName}`
 2. Claude Code starts in session
-3. Agent runs `/jat:start` (picks highest priority task)
+3. Agent runs `/squad:start` (picks highest priority task)
 4. IDE shows live terminal output
 5. Session state updates in real-time
 
@@ -231,20 +231,20 @@ Go to **Config → Automation → Presets**:
 **Fix:**
 ```bash
 # Don't run:
-claude "/jat:start"  # ❌ No tmux, IDE can't track
+claude "/squad:start"  # ❌ No tmux, IDE can't track
 
 # Do run:
-jat-myproject        # ✅ Launcher creates tmux session
+squad-myproject        # ✅ Launcher creates tmux session
 ```
 
 ### "IDE says 'No projects found'"
 
-**Cause:** Haven't run `jt init` in your project
+**Cause:** Haven't run `st init` in your project
 
 **Fix:**
 ```bash
 cd ~/code/myproject
-jt init
+st init
 # Refresh IDE
 ```
 
@@ -254,7 +254,7 @@ jt init
 
 **Fix:**
 ```bash
-bash ~/code/jat/tools/scripts/install-whisper.sh
+bash ~/code/squad/tools/scripts/install-whisper.sh
 ```
 
 ### "Browser automation tools not found"
@@ -263,7 +263,7 @@ bash ~/code/jat/tools/scripts/install-whisper.sh
 
 **Fix:**
 ```bash
-cd ~/code/jat/tools/browser
+cd ~/code/squad/tools/browser
 npm install
 ```
 
@@ -328,23 +328,23 @@ npm install
 
 ### IDE
 ```bash
-jat                             # Launch IDE
+squad                             # Launch IDE
 ```
 
 ### Project Management
 ```bash
-jat init                        # Auto-discover ~/code/* projects
-jat add <path>                  # Add project manually
-jat list                        # Show all projects
+squad init                        # Auto-discover ~/code/* projects
+squad add <path>                  # Add project manually
+squad list                        # Show all projects
 ```
 
 ### Task Management
 ```bash
-jt ready                        # Tasks ready to work
-jt create "Title" --priority 1  # Create task (P1 = High)
-jt show <id>                    # View task details
-jt close <id>                   # Close completed task
-jt dep add <task> <blocker>     # Add dependency
+st ready                        # Tasks ready to work
+st create "Title" --priority 1  # Create task (P1 = High)
+st show <id>                    # View task details
+st close <id>                   # Close completed task
+st dep add <task> <blocker>     # Add dependency
 ```
 
 ### Agent Coordination
@@ -355,11 +355,11 @@ am-agents                       # List all registered agents
 
 ### Slash Commands (in Claude sessions)
 ```
-/jat:start          Pick task, reserve files, begin work
-/jat:complete       Verify, commit, close task, end session
-/jat:tasktree           Convert PRD to structured tasks
-/jat:verify         Run tests, lint, security checks
-/jat:doctor         Diagnose and repair JAT setup
+/squad:start          Pick task, reserve files, begin work
+/squad:complete       Verify, commit, close task, end session
+/squad:tasktree           Convert PRD to structured tasks
+/squad:verify         Run tests, lint, security checks
+/squad:doctor         Diagnose and repair SQUAD setup
 ```
 
 ---
@@ -375,7 +375,7 @@ am-agents                       # List all registered agents
 - [shared/tools.md](shared/tools.md) - All 40+ tools
 
 ### Having Issues?
-- Check [GitHub Issues](https://github.com/joewinke/jat/issues)
+- Check [GitHub Issues](https://github.com/joewinke/squad/issues)
 - Read troubleshooting in [CLAUDE.md](CLAUDE.md)
 - Join community discussions
 
@@ -394,4 +394,4 @@ Karpathy said programmers could be **10X more powerful** if they could just stri
 
 **You're ready to claim the 10X boost. Happy orchestrating! 🚀**
 
-[Full Docs](GETTING_STARTED.md) | [README](README.md) | [Issues](https://github.com/joewinke/jat/issues)
+[Full Docs](GETTING_STARTED.md) | [README](README.md) | [Issues](https://github.com/joewinke/squad/issues)

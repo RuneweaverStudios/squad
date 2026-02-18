@@ -1,21 +1,21 @@
-# JAT Installation Guide
+# SQUAD Installation Guide
 
 ## Quick Install (Recommended)
 
 **Copy and paste this single line:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/joewinke/jat/master/install.sh | bash && source ~/.zshrc
+curl -fsSL https://raw.githubusercontent.com/joewinke/squad/master/install.sh | bash && source ~/.zshrc
 ```
 
 For bash users (Linux):
 ```bash
-curl -fsSL https://raw.githubusercontent.com/joewinke/jat/master/install.sh | bash && source ~/.bashrc
+curl -fsSL https://raw.githubusercontent.com/joewinke/squad/master/install.sh | bash && source ~/.bashrc
 ```
 
 Then start the IDE:
 ```bash
-jat
+squad
 ```
 
 Open your browser to: http://localhost:3333
@@ -27,13 +27,13 @@ Open your browser to: http://localhost:3333
    - macOS: Uses Homebrew
    - Linux: Guides you through package manager installation
 3. **Chooses installation location**:
-   - Default: `~/.local/share/jat` (XDG-compliant)
-   - Alternative: `~/code/jat`
+   - Default: `~/.local/share/squad` (XDG-compliant)
+   - Alternative: `~/code/squad`
    - Custom: You can specify your own path
 4. **Clones the repository**
 5. **Installs IDE dependencies** (npm packages)
-6. **Adds JAT to your PATH**
-7. **Creates the `jat` command**
+6. **Adds SQUAD to your PATH**
+7. **Creates the `squad` command**
 
 ## Shell Detection
 
@@ -49,9 +49,9 @@ The installer automatically detects your shell and updates the correct config fi
 
 The installer checks for existing installations in this order:
 
-1. `$JAT_INSTALL_DIR` (if set as environment variable)
-2. `${XDG_DATA_HOME:-$HOME/.local/share}/jat` (XDG standard)
-3. `$HOME/code/jat` (traditional developer location)
+1. `$SQUAD_INSTALL_DIR` (if set as environment variable)
+2. `${XDG_DATA_HOME:-$HOME/.local/share}/squad` (XDG standard)
+3. `$HOME/code/squad` (traditional developer location)
 4. `$HOME/code/jomarchy-agent-tools` (legacy name)
 
 If none exist, you'll be prompted to choose.
@@ -72,8 +72,8 @@ sudo apt install tmux sqlite3 jq nodejs npm
 sudo pacman -S tmux sqlite jq nodejs npm
 
 # 2. Clone the repository
-git clone https://github.com/joewinke/jat ~/.local/share/jat
-cd ~/.local/share/jat
+git clone https://github.com/joewinke/squad ~/.local/share/squad
+cd ~/.local/share/squad
 
 # 3. Install IDE dependencies
 cd ide
@@ -85,12 +85,12 @@ cd ..
 
 # 5. Reload shell and test
 source ~/.zshrc   # or ~/.bashrc on Linux
-jat
+squad
 ```
 
 ## Troubleshooting
 
-### "command not found: jat"
+### "command not found: squad"
 
 **Cause**: Shell config not reloaded or PATH not set
 
@@ -102,8 +102,8 @@ source ~/.zshrc
 # Linux (bash):
 source ~/.bashrc
 
-# Verify PATH includes JAT:
-echo $PATH | grep jat
+# Verify PATH includes SQUAD:
+echo $PATH | grep squad
 ```
 
 ### "zsh: command not found: #"
@@ -115,21 +115,21 @@ echo $PATH | grep jat
 **DON'T DO THIS:**
 ```bash
 # Install and launch IDE
-curl -fsSL https://raw.githubusercontent.com/joewinke/jat/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/joewinke/squad/master/install.sh | bash
 ```
 
 **DO THIS:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/joewinke/jat/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/joewinke/squad/master/install.sh | bash
 ```
 
-### "source ~/.bashrc && jat" fails on macOS
+### "source ~/.bashrc && squad" fails on macOS
 
 **Cause**: macOS uses `zsh` by default, not `bash`
 
 **Solution**: Use `~/.zshrc` instead:
 ```bash
-source ~/.zshrc && jat
+source ~/.zshrc && squad
 ```
 
 ### Homebrew not found on macOS
@@ -141,7 +141,7 @@ source ~/.zshrc && jat
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ```
 
-Then run the JAT installer again.
+Then run the SQUAD installer again.
 
 ### Dependencies still missing after installation
 
@@ -165,7 +165,7 @@ Then run the JAT installer again.
 
 **Solution**:
 ```bash
-cd ~/.local/share/jat/ide  # or wherever you installed JAT
+cd ~/.local/share/squad/ide  # or wherever you installed SQUAD
 npm install
 npm run dev
 ```
@@ -176,31 +176,31 @@ npm run dev
 
 **Solution**: Create it manually and re-run:
 ```bash
-mkdir -p ~/.local/share/jat
-curl -fsSL https://raw.githubusercontent.com/joewinke/jat/master/install.sh | bash
+mkdir -p ~/.local/share/squad
+curl -fsSL https://raw.githubusercontent.com/joewinke/squad/master/install.sh | bash
 ```
 
 ### Want to change installation directory?
 
-Set the `JAT_INSTALL_DIR` environment variable:
+Set the `SQUAD_INSTALL_DIR` environment variable:
 
 ```bash
-export JAT_INSTALL_DIR=~/my/custom/path
-curl -fsSL https://raw.githubusercontent.com/joewinke/jat/master/install.sh | bash
+export SQUAD_INSTALL_DIR=~/my/custom/path
+curl -fsSL https://raw.githubusercontent.com/joewinke/squad/master/install.sh | bash
 ```
 
 ## Uninstalling
 
-To completely remove JAT:
+To completely remove SQUAD:
 
 ```bash
 # 1. Remove installation directory
-rm -rf ~/.local/share/jat  # or your custom install location
+rm -rf ~/.local/share/squad  # or your custom install location
 
 # 2. Remove from PATH (edit your shell config)
 # Remove these lines from ~/.zshrc or ~/.bashrc:
-# # JAT - Jomarchy Agent Tools
-# export PATH="$PATH:/path/to/jat/tools"
+# # SQUAD - Jomarchy Agent Tools
+# export PATH="$PATH:/path/to/squad/tools"
 
 # 3. Reload shell
 source ~/.zshrc  # or ~/.bashrc
@@ -208,10 +208,10 @@ source ~/.zshrc  # or ~/.bashrc
 
 ## Updating
 
-To update JAT to the latest version:
+To update SQUAD to the latest version:
 
 ```bash
-cd ~/.local/share/jat  # or your install location
+cd ~/.local/share/squad  # or your install location
 git pull origin master
 cd ide
 npm install  # update IDE dependencies
@@ -244,19 +244,19 @@ npm install  # update IDE dependencies
 ## Getting Help
 
 - **Documentation**: [README.md](README.md)
-- **Issues**: https://github.com/joewinke/jat/issues
-- **Discussions**: https://github.com/joewinke/jat/discussions
+- **Issues**: https://github.com/joewinke/squad/issues
+- **Discussions**: https://github.com/joewinke/squad/discussions
 
 ## Next Steps
 
 After installation:
 
-1. **Start the IDE**: `jat`
+1. **Start the IDE**: `squad`
 2. **Open browser**: http://localhost:3333
 3. **Initialize a project**:
    ```bash
    cd ~/code/myproject
-   jt init
+   st init
    ```
 4. **Read the docs**: Check out [CLAUDE.md](CLAUDE.md) for full documentation
 

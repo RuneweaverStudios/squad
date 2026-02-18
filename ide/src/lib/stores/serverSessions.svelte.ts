@@ -26,9 +26,9 @@ import type { ServerState } from '$lib/config/statusColors';
 export interface ServerSession {
 	/** Mode identifier - always 'server' for server sessions */
 	mode: 'server';
-	/** Tmux session name (e.g., 'chimaro-dev', 'jat-dev') */
+	/** Tmux session name (e.g., 'chimaro-dev', 'squad-dev') */
 	sessionName: string;
-	/** Project name (e.g., 'chimaro', 'jat') */
+	/** Project name (e.g., 'chimaro', 'squad') */
 	projectName: string;
 	/** Display name shown in UI (e.g., 'Chimaro Dev Server') */
 	displayName: string;

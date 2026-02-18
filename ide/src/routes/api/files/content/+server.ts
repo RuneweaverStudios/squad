@@ -40,8 +40,8 @@ const SENSITIVE_PATTERNS = [
 	'.pfx'
 ];
 
-// Path to JAT config for project lookup
-const CONFIG_FILE = join(homedir(), '.config', 'jat', 'projects.json');
+// Path to SQUAD config for project lookup
+const CONFIG_FILE = join(homedir(), '.config', 'squad', 'projects.json');
 
 /**
  * Language detection based on file extension for Monaco editor
@@ -202,9 +202,9 @@ function detectLanguage(filePath: string): string {
 }
 
 /**
- * Read JAT projects config
+ * Read SQUAD projects config
  */
-async function readJatConfig(): Promise<{ projects?: Record<string, { path?: string }> } | null> {
+async function readSquadConfig(): Promise<{ projects?: Record<string, { path?: string }> } | null> {
 	try {
 		if (!existsSync(CONFIG_FILE)) {
 			return null;
@@ -220,9 +220,9 @@ async function readJatConfig(): Promise<{ projects?: Record<string, { path?: str
  * Get project path from name
  */
 async function getProjectPath(projectName: string): Promise<string | null> {
-	const config = await readJatConfig();
+	const config = await readSquadConfig();
 
-	// Check JAT config first
+	// Check SQUAD config first
 	if (config?.projects?.[projectName]?.path) {
 		return config.projects[projectName].path.replace(/^~/, homedir());
 	}

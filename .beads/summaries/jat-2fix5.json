@@ -1,5 +1,5 @@
 {
-  "taskId": "jat-2fix5",
+  "taskId": "squad-2fix5",
   "title": "on /tasks when user scrolls in active tasks area problem",
   "summary": [
     "Investigated scrolling behavior in active tasks area",

@@ -18,16 +18,16 @@
  * - Response includes: meta.dateRange with parsed from/to dates
  * - Each agent includes: activityInRange (count), lastActiveInRange (timestamp)
  *
- * Each agent in full mode includes an 'activities' array with recent JAT task history:
+ * Each agent in full mode includes an 'activities' array with recent SQUAD task history:
  * - ts: timestamp (ISO 8601)
- * - preview: task status update (e.g., "[jat-abc] Completed: Task title")
+ * - preview: task status update (e.g., "[squad-abc] Completed: Task title")
  * - content: task description
  * - type: 'urgent' | 'action_required' | 'message' (based on task status)
  */
 
 import { json } from '@sveltejs/kit';
 import { getAgents, getTaskActivities, getAgentCounts } from '$lib/server/agent-mail.js';
-import { getTasks } from '$lib/server/jat-tasks.js';
+import { getTasks } from '$lib/server/squad-tasks.js';
 import { getAllAgentUsageAsync, getHourlyUsageAsync, getAgentHourlyUsageAsync, getAgentContextPercent } from '$lib/utils/tokenUsage.js';
 import { apiCache, cacheKey, CACHE_TTL, invalidateCache, singleFlight } from '$lib/server/cache.js';
 import { exec } from 'child_process';
@@ -73,7 +73,7 @@ function getCachedTasks(projectName = null, forceFresh = false) {
 			cachedTasksProject = projectName;
 			taskCacheTimestamp = now;
 		} catch (err) {
-			console.error('Failed to fetch tasks from JAT:', err);
+			console.error('Failed to fetch tasks from SQUAD:', err);
 			// Return stale cache on error
 		}
 	}
@@ -318,9 +318,9 @@ async function computeAgentsData({ projectFilter, agentFilter, includeUsage, inc
 		);
 		stdout.trim().split('\n').forEach(line => {
 			const [sessionName, createdUnix] = line.split(':');
-			// Extract agent name from session name (jat-AgentName -> AgentName)
-			if (sessionName.startsWith('jat-')) {
-				const agentName = sessionName.replace('jat-', '');
+			// Extract agent name from session name (squad-AgentName -> AgentName)
+			if (sessionName.startsWith('squad-')) {
+				const agentName = sessionName.replace('squad-', '');
 				// Store creation timestamp (unix seconds)
 				agentSessionCreatedAt.set(agentName, parseInt(createdUnix, 10) * 1000);
 			}
@@ -389,7 +389,7 @@ async function computeAgentsData({ projectFilter, agentFilter, includeUsage, inc
 		const openTasks = agentTasks.filter(t => t.status === 'open').length;
 		const inProgressTasks = agentTasks.filter(t => t.status === 'in_progress').length;
 
-		// Get recent activities from JAT task history (last 10 task updates)
+		// Get recent activities from SQUAD task history (last 10 task updates)
 		/** @type {Activity[]} */
 		let activities = [];
 		if (includeActivities) {
@@ -530,7 +530,7 @@ async function computeAgentsData({ projectFilter, agentFilter, includeUsage, inc
 	/** @type {{ poll_interval_ms: number, data_sources: string[], cache_ttl_ms: number, dateRange?: { from: string | null, to: string | null } }} */
 	const meta = {
 		poll_interval_ms: 3000, // Recommended poll interval for frontend
-		data_sources: ['agent-mail', 'jat'],
+		data_sources: ['agent-mail', 'squad'],
 		cache_ttl_ms: 2000 // Data freshness guarantee
 	};
 
@@ -593,13 +593,13 @@ export async function POST({ request, locals }) {
 		if (!/^[a-z]+-[a-z0-9]{3}$/.test(taskId)) {
 			return json({
 				error: 'Invalid task ID format',
-				message: 'Task ID must be in format: project-xxx (e.g., jat-abc)'
+				message: 'Task ID must be in format: project-xxx (e.g., squad-abc)'
 			}, { status: 400 });
 		}
 
 		// Verify task exists before assigning
 		try {
-			const { stdout } = await execAsync(`jt show "${taskId}" --json`);
+			const { stdout } = await execAsync(`st show "${taskId}" --json`);
 			const taskData = JSON.parse(stdout);
 			if (!taskData || taskData.length === 0) {
 				return json({
@@ -614,10 +614,10 @@ export async function POST({ request, locals }) {
 			}, { status: 404 });
 		}
 
-		// Assign task to agent using jt CLI
+		// Assign task to agent using st CLI
 		try {
 			await execAsync(
-				`jt update "${taskId}" --assignee "${agentName}"`
+				`st update "${taskId}" --assignee "${agentName}"`
 			);
 
 			// Invalidate caches since task assignment changed
@@ -625,7 +625,7 @@ export async function POST({ request, locals }) {
 			invalidateCache.tasks();
 
 			// Get updated task data
-			const { stdout: updatedTaskJson } = await execAsync(`jt show "${taskId}" --json`);
+			const { stdout: updatedTaskJson } = await execAsync(`st show "${taskId}" --json`);
 			const updatedTask = JSON.parse(updatedTaskJson);
 
 			locals.logger?.info({
@@ -646,7 +646,7 @@ export async function POST({ request, locals }) {
 				error: err,
 				taskId,
 				agentName
-			}, 'Failed to assign task via jt CLI');
+			}, 'Failed to assign task via st CLI');
 
 			perf.end({ error: err instanceof Error ? err.message : 'Unknown error' });
 

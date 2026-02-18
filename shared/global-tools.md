@@ -68,11 +68,11 @@ browser-eval.js "const x = 5; const y = 10; return x + y"
 
 | Tool | Purpose | Usage |
 |------|---------|-------|
-| `jat-secret` | Retrieve secrets from vault | `jat-secret <name>` |
+| `squad-secret` | Retrieve secrets from vault | `squad-secret <name>` |
 
 ```bash
-jat-secret stripe           # Get secret value
-jat-secret --list            # List all secrets
-jat-secret --env stripe      # Get env var name
-eval $(jat-secret --export)  # Load all as env vars
+squad-secret stripe           # Get secret value
+squad-secret --list            # List all secrets
+squad-secret --env stripe      # Get env var name
+eval $(squad-secret --export)  # Load all as env vars
 ```

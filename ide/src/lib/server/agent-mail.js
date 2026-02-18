@@ -45,7 +45,7 @@ export function getInboxForThread(agentName, threadId = undefined, options = {})
 
 /**
  * Get recent activities for an agent (last 10 messages)
- * @deprecated Use getTaskActivities() instead - shows agent's task history from JAT, not shared inbox
+ * @deprecated Use getTaskActivities() instead - shows agent's task history from SQUAD, not shared inbox
  * @param {string} agentName - Agent name
  * @returns {Activity[]} - Array of activity objects {ts, preview, content, type}
  */
@@ -71,10 +71,10 @@ export function getAgentActivities(agentName) {
  */
 
 /**
- * Get recent JAT task activities for an agent (last 10 task updates)
+ * Get recent SQUAD task activities for an agent (last 10 task updates)
  * Shows tasks the agent worked on, with their status transitions
  * @param {string} agentName - Agent name
- * @param {Task[]} allTasks - All tasks from JAT (from getTasks())
+ * @param {Task[]} allTasks - All tasks from SQUAD (from getTasks())
  * @returns {Activity[]} - Array of activity objects {ts, preview, content, type}
  */
 export function getTaskActivities(agentName, allTasks) {
@@ -142,13 +142,13 @@ export function searchMessages(query) {
 
 /**
  * Get active agents from running tmux sessions
- * Uses actual jat-* tmux sessions instead of stale session files
+ * Uses actual squad-* tmux sessions instead of stale session files
  * @param {string} projectPath - Project root path (unused, kept for API compat)
  * @returns {{ activeAgents: string[], activeCount: number }} - Active agent info
  */
 export function getActiveAgents(projectPath) {
 	try {
-		// Get actual running jat-* tmux sessions
+		// Get actual running squad-* tmux sessions
 		const sessions = listSessions();
 		const activeAgents = sessions.map(s => s.agentName);
 

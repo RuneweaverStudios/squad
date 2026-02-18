@@ -2,7 +2,7 @@
 	/**
 	 * THE ALIEN MANUAL
 	 *
-	 * An immersive, alien-themed interpretation of JAT - playing into
+	 * An immersive, alien-themed interpretation of SQUAD - playing into
 	 * Karpathy's quote about the "alien tool with no manual".
 	 *
 	 * This IS the manual.
@@ -28,8 +28,8 @@
 </script>
 
 <svelte:head>
-	<title>THE ALIEN MANUAL | JAT - Decode the Technology</title>
-	<meta name="description" content="The alien tool came with no manual. So we wrote one. JAT is the command interface for orchestrating AI coding agents at scale." />
+	<title>THE ALIEN MANUAL | SQUAD - Decode the Technology</title>
+	<meta name="description" content="The alien tool came with no manual. So we wrote one. SQUAD is the command interface for orchestrating AI coding agents at scale." />
 </svelte:head>
 
 <div class="alien-manual" class:mounted>

@@ -84,7 +84,7 @@
 				style="background: oklch(0.16 0.01 250); border-color: oklch(0.25 0.02 250); color: oklch(0.90 0.02 250)"
 				value={config.taskId || ''}
 				oninput={(e) => update({ taskId: e.currentTarget.value })}
-				placeholder="jat-abc"
+				placeholder="squad-abc"
 			/>
 		</div>
 	{/if}

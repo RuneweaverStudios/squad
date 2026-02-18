@@ -232,7 +232,7 @@
 					>
 						<SessionCard
 							mode="compact"
-							sessionName={`jat-${agent.name}`}
+							sessionName={`squad-${agent.name}`}
 							agentName={agent.name}
 							task={agentTask ? {
 								id: agentTask.id,

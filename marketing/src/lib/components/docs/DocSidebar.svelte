@@ -35,7 +35,7 @@
 <nav class="doc-sidebar" aria-label="Documentation">
 	<div class="sidebar-header">
 		<a href="/" class="sidebar-logo">
-			<span class="logo-jat">JAT</span>
+			<span class="logo-squad">SQUAD</span>
 			<span class="logo-docs">Docs</span>
 		</a>
 	</div>
@@ -116,7 +116,7 @@
 		text-decoration: none;
 	}
 
-	.logo-jat {
+	.logo-squad {
 		font-size: 1.25rem;
 		font-weight: 800;
 		letter-spacing: -0.02em;

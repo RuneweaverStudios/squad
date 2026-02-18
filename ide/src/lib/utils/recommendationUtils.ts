@@ -6,7 +6,7 @@
  * 2. Has Waiting Agents - Tasks are prioritized if idle agents are available
  * 3. Critical Path - Tasks in epics with active workers are more urgent
  *
- * Task: jat-puza.4 - Smart recommendations badges in TaskTable
+ * Task: squad-puza.4 - Smart recommendations badges in TaskTable
  */
 
 export interface Task {
@@ -37,7 +37,7 @@ export interface RecommendationScore {
 
 /**
  * Get parent epic ID from a task ID
- * e.g., "jat-puza.4" -> "jat-puza"
+ * e.g., "squad-puza.4" -> "squad-puza"
  */
 function getParentEpicId(taskId: string): string | null {
 	const dotIndex = taskId.lastIndexOf('.');

@@ -1,8 +1,8 @@
-# JAT IDE API Documentation
+# SQUAD IDE API Documentation
 
 ## Overview
 
-The JAT IDE provides a REST API for accessing task, agent, and coordination data. All endpoints return JSON and support CORS for local development.
+The SQUAD IDE provides a REST API for accessing task, agent, and coordination data. All endpoints return JSON and support CORS for local development.
 
 ## Base URL
 
@@ -28,14 +28,14 @@ Get all tasks from all projects with optional filtering.
 {
   "tasks": [
     {
-      "id": "jat-42o",
+      "id": "squad-42o",
       "title": "Demo: Backend API setup",
       "status": "closed",
       "priority": 0,
       "labels": ["backend", "api"],
       "depends_on": [],
       "blocked_by": [],
-      "project": "jat",
+      "project": "squad",
       "created_at": "2025-11-20T05:01:00Z",
       "updated_at": "2025-11-20T05:01:00Z"
     }
@@ -48,13 +48,13 @@ Get all tasks from all projects with optional filtering.
 Get detailed information for a specific task.
 
 **Path Parameters:**
-- `id`: Task ID (e.g., `jat-42o`)
+- `id`: Task ID (e.g., `squad-42o`)
 
 **Response:**
 ```json
 {
   "task": {
-    "id": "jat-42o",
+    "id": "squad-42o",
     "title": "Demo: Backend API setup",
     "description": "Set up Express server and database",
     "status": "closed",
@@ -63,15 +63,15 @@ Get detailed information for a specific task.
     "depends_on": [],
     "blocked_by": [
       {
-        "id": "jat-4p0",
+        "id": "squad-4p0",
         "title": "Demo: Frontend integration",
         "status": "open",
         "priority": 1
       }
     ],
     "comments": [],
-    "project": "jat",
-    "project_path": "/home/jw/code/jat",
+    "project": "squad",
+    "project_path": "/home/jw/code/squad",
     "created_at": "2025-11-20T05:01:00Z",
     "updated_at": "2025-11-20T05:01:00Z",
     "assignee": null
@@ -119,12 +119,12 @@ Get active file reservations (locks) across all projects.
       "id": 1,
       "path_pattern": "src/**/*.ts",
       "exclusive": 1,
-      "reason": "jat-ijo: Agent data layer",
+      "reason": "squad-ijo: Agent data layer",
       "created_ts": "2025-11-20T05:30:00Z",
       "expires_ts": "2025-11-20T06:30:00Z",
       "released_ts": null,
       "agent_name": "PaleStar",
-      "project_path": "/home/jw/code/jat"
+      "project_path": "/home/jw/code/squad"
     }
   ]
 }
@@ -180,7 +180,7 @@ Get unified view of all agent coordination data. This endpoint combines agents, 
   "timestamp": "2025-11-20T05:45:00Z",
   "meta": {
     "poll_interval_ms": 3000,
-    "data_sources": ["agent-mail", "jat-tasks"],
+    "data_sources": ["agent-mail", "squad-tasks"],
     "cache_ttl_ms": 2000
   }
 }
@@ -200,7 +200,7 @@ The API aggregates data from two main sources:
    - File reservations
    - Message threads
 
-2. **JAT Tasks** (`.jat/tasks.db` per project):
+2. **SQUAD Tasks** (`.squad/tasks.db` per project):
    - Tasks and issues
    - Task dependencies
    - Task status and metadata

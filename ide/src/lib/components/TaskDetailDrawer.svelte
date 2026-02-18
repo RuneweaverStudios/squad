@@ -94,7 +94,7 @@
 
 	// Task history state
 	interface TimelineEvent {
-		type: 'jat_event' | 'agent_mail';
+		type: 'squad_event' | 'agent_mail';
 		event: string;
 		timestamp: string;
 		description: string;
@@ -107,7 +107,7 @@
 		timeline: TimelineEvent[];
 		count: {
 			total: number;
-			jat_events: number;
+			squad_events: number;
 			agent_mail: number;
 		};
 		timestamp: string;
@@ -210,7 +210,7 @@
 
 	// Derived: Session name for attach
 	const sessionName = $derived(
-		taskAgent ? `jat-${taskAgent.name}` : null
+		taskAgent ? `squad-${taskAgent.name}` : null
 	);
 
 	// Derived: Dependency analysis for blocking check
@@ -525,8 +525,8 @@
 			groups.get(ns)!.push({ invocation: cmd.invocation, name: cmd.name });
 		}
 		const sorted = Array.from(groups.entries()).sort(([a], [b]) => {
-			if (a === 'jat') return -1;
-			if (b === 'jat') return 1;
+			if (a === 'squad') return -1;
+			if (b === 'squad') return 1;
 			if (a === 'local') return -1;
 			if (b === 'local') return 1;
 			return a.localeCompare(b);
@@ -574,7 +574,7 @@
 	const filteredTimeline = $derived((): TimelineEvent[] => {
 		if (!taskHistory?.timeline) return [];
 		if (timelineFilter === 'all') return taskHistory.timeline;
-		if (timelineFilter === 'tasks') return taskHistory.timeline.filter(e => e.type === 'jat_event');
+		if (timelineFilter === 'tasks') return taskHistory.timeline.filter(e => e.type === 'squad_event');
 		return taskHistory.timeline.filter(e => e.type === 'agent_mail');
 	});
 
@@ -1104,7 +1104,7 @@
 	async function fetchAvailableTasks(taskIdParam: string, signal?: AbortSignal) {
 		if (!taskIdParam) return;
 
-		// Extract project from task ID (e.g., "jat-abc" -> "jat")
+		// Extract project from task ID (e.g., "squad-abc" -> "squad")
 		const project = taskIdParam.split('-')[0];
 		if (!project) return;
 
@@ -2499,7 +2499,7 @@
 												class="w-full px-2.5 py-1 rounded-lg font-mono text-sm text-left flex items-center justify-between transition-colors cmd-dropdown-trigger min-h-6"
 												onclick={() => { cmdDropdownOpen = !cmdDropdownOpen; }}
 											>
-												<span class="truncate" style="color: oklch(0.85 0.02 250);">{task.command || '/jat:start'}</span>
+												<span class="truncate" style="color: oklch(0.85 0.02 250);">{task.command || '/squad:start'}</span>
 												<svg class="w-3 h-3 flex-shrink-0 transition-transform {cmdDropdownOpen ? 'rotate-180' : ''}" style="color: oklch(0.50 0.02 250);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 													<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
 												</svg>
@@ -3488,7 +3488,7 @@
 										class="tab {timelineFilter === 'tasks' ? 'tab-active' : ''}"
 										onclick={() => timelineFilter = 'tasks'}
 									>
-										Tasks ({taskHistory?.count?.jat_events || 0})
+										Tasks ({taskHistory?.count?.squad_events || 0})
 									</button>
 									<button
 										class="tab {timelineFilter === 'messages' ? 'tab-active' : ''}"
@@ -3530,10 +3530,10 @@
 										<li style="grid-template-columns: 30% min-content 1fr;">
 											<!-- Top connector (skip for first item) -->
 											{#if i > 0}
-												<hr class="{event.type === 'jat_event' ? 'bg-info' : 'bg-warning'}" />
+												<hr class="{event.type === 'squad_event' ? 'bg-info' : 'bg-warning'}" />
 											{/if}
 
-											{#if event.type === 'jat_event'}
+											{#if event.type === 'squad_event'}
 												<!-- Task events on LEFT side (timeline-start) -->
 												<div class="timeline-start timeline-box text-xs mb-4 border-info/30 bg-info/5">
 													<!-- Event description -->
@@ -3653,7 +3653,7 @@
 
 											<!-- Bottom connector (skip for last item) -->
 											{#if i < filteredTimeline().length - 1}
-												<hr class="{filteredTimeline()[i + 1]?.type === 'jat_event' ? 'bg-info' : 'bg-warning'}" />
+												<hr class="{filteredTimeline()[i + 1]?.type === 'squad_event' ? 'bg-info' : 'bg-warning'}" />
 											{/if}
 										</li>
 									{/each}

@@ -44,7 +44,7 @@ let _projectsConfigMtime = 0;
  * @returns {{ projects?: Record<string, { path?: string, server_path?: string, port?: number }> } | null}
  */
 function loadProjectsConfig() {
-	const configPath = `${process.env.HOME}/.config/jat/projects.json`;
+	const configPath = `${process.env.HOME}/.config/squad/projects.json`;
 	try {
 		const { mtimeMs } = statSync(configPath);
 		if (_projectsConfig && mtimeMs === _projectsConfigMtime) {

@@ -75,8 +75,8 @@ function isFileOrSymlinkToFile(path: string): boolean {
  * Discover commands from a directory
  *
  * @param dir - Directory path to search
- * @param namespace - Namespace for these commands (e.g., "jat", "local")
- * @param prefix - Invocation prefix (e.g., "jat" for "/jat:start")
+ * @param namespace - Namespace for these commands (e.g., "squad", "local")
+ * @param prefix - Invocation prefix (e.g., "squad" for "/squad:start")
  * @param includeFrontmatter - Whether to read and parse frontmatter (default: true)
  */
 function discoverCommands(
@@ -150,7 +150,7 @@ function discoverAllCommands(projectPath?: string, includeFrontmatter: boolean =
 			const entries = readdirSync(globalCommandsDir, { withFileTypes: true });
 			for (const entry of entries) {
 				if (entry.isDirectory()) {
-					// Namespaced commands: ~/.claude/commands/jat/*.md
+					// Namespaced commands: ~/.claude/commands/squad/*.md
 					const nsPath = join(globalCommandsDir, entry.name);
 					const nsCommands = discoverCommands(nsPath, entry.name, entry.name, includeFrontmatter);
 					allCommands.push(...nsCommands);
@@ -195,9 +195,9 @@ function discoverAllCommands(projectPath?: string, includeFrontmatter: boolean =
 	// Sort by namespace then name
 	allCommands.sort((a, b) => {
 		if (a.namespace !== b.namespace) {
-			// Put 'jat' first, then 'local', then others
-			if (a.namespace === 'jat') return -1;
-			if (b.namespace === 'jat') return 1;
+			// Put 'squad' first, then 'local', then others
+			if (a.namespace === 'squad') return -1;
+			if (b.namespace === 'squad') return 1;
 			if (a.namespace === 'local') return -1;
 			if (b.namespace === 'local') return 1;
 			return a.namespace.localeCompare(b.namespace);
@@ -260,7 +260,7 @@ export const GET: RequestHandler = async ({ url }) => {
  * Body: { namespace: string, name: string, content: string }
  *
  * Examples:
- *   - { namespace: "jat", name: "new-cmd", content: "# New Command\n..." }
+ *   - { namespace: "squad", name: "new-cmd", content: "# New Command\n..." }
  *   - { namespace: "local", name: "my-cmd", content: "..." }
  */
 export const POST: RequestHandler = async ({ url, request }) => {
@@ -274,7 +274,7 @@ export const POST: RequestHandler = async ({ url, request }) => {
 
 	// Validate required fields
 	if (!body.namespace || typeof body.namespace !== 'string') {
-		throw error(400, 'Request body must contain "namespace" field (e.g., "jat" or "local")');
+		throw error(400, 'Request body must contain "namespace" field (e.g., "squad" or "local")');
 	}
 
 	if (!body.name || typeof body.name !== 'string') {

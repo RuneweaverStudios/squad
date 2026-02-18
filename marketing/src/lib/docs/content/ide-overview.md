@@ -1,13 +1,13 @@
 # IDE Overview
 
-The JAT IDE is a SvelteKit 5 application that gives you a real-time control panel for every agent session running across your projects. Built with Tailwind CSS v4 and DaisyUI, it runs locally on `http://127.0.0.1:5174`.
+The SQUAD IDE is a SvelteKit 5 application that gives you a real-time control panel for every agent session running across your projects. Built with Tailwind CSS v4 and DaisyUI, it runs locally on `http://127.0.0.1:5174`.
 
 ## Starting the IDE
 
-The fastest way to launch is the `jat` command with no arguments.
+The fastest way to launch is the `squad` command with no arguments.
 
 ```bash
-jat
+squad
 ```
 
 This single command checks dependencies, starts the dev server, opens your browser, and checks for updates (throttled to once per 24 hours). If updates are available you get a prompt before anything installs.
@@ -15,12 +15,12 @@ This single command checks dependencies, starts the dev server, opens your brows
 For manual control:
 
 ```bash
-cd ~/code/jat/ide
+cd ~/code/squad/ide
 npm install
 npm run dev
 ```
 
-The IDE discovers projects automatically by scanning `~/code/` for directories with a `.jat/` folder. No configuration file needed for basic use.
+The IDE discovers projects automatically by scanning `~/code/` for directories with a `.squad/` folder. No configuration file needed for basic use.
 
 ## Main pages
 
@@ -34,7 +34,7 @@ The IDE discovers projects automatically by scanning `~/code/` for directories w
 | Source | `/source` | Git timeline showing commits per project |
 | Settings | `/settings` | API keys, agent programs, review rules, shortcuts |
 
-Every page supports multi-project filtering through URL parameters. Bookmark `/tasks?project=jat` and it always opens filtered to JAT tasks.
+Every page supports multi-project filtering through URL parameters. Bookmark `/tasks?project=squad` and it always opens filtered to SQUAD tasks.
 
 ## Tech stack
 
@@ -83,18 +83,18 @@ Sounds can be muted globally or per-event type in Settings. The implementation l
 
 ## Auto-update mechanism
 
-When you launch with `jat` (no arguments), the CLI checks for updates against the git remote.
+When you launch with `squad` (no arguments), the CLI checks for updates against the git remote.
 
 ```bash
-jat update            # Pull latest changes
-jat update --check    # Check without installing
-jat update --disable  # Turn off auto-check
-jat update --status   # Show install path and version
+squad update            # Pull latest changes
+squad update --check    # Check without installing
+squad update --disable  # Turn off auto-check
+squad update --status   # Show install path and version
 ```
 
 Updates run `git pull origin master` behind the scenes. Local changes get stashed and restored. Symlinks in `~/.local/bin/` refresh automatically after each update.
 
-To disable the launch-time check permanently, add to `~/.config/jat/projects.json`:
+To disable the launch-time check permanently, add to `~/.config/squad/projects.json`:
 
 ```json
 {

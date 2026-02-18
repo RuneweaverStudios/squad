@@ -9,7 +9,7 @@
  * 2. Extract research results
  * 3. Generate summaries and documentation
  *
- * Task: jat-a7372 - add send terminal to llm button to sessioncard.svelte
+ * Task: squad-a7372 - add send terminal to llm button to sessioncard.svelte
  */
 
 import { json } from '@sveltejs/kit';

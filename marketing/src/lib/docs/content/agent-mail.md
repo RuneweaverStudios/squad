@@ -6,7 +6,7 @@ The Agent Registry is the coordination layer that gives agents persistent identi
 
 When multiple agents work on the same codebase simultaneously, they need unique identities to coordinate. The Agent Registry provides explicit agent registration, identity lookup, and discovery.
 
-File declarations (which files an agent plans to edit) are managed through the task system via `jt update --files`, keeping coordination data alongside the task itself.
+File declarations (which files an agent plans to edit) are managed through the task system via `st update --files`, keeping coordination data alongside the task itself.
 
 The whole system runs as bash scripts. No servers, no sockets, no APIs. Just SQLite queries wrapped in CLI tools that any agent can call.
 
@@ -18,7 +18,7 @@ Before an agent can start work, it needs an identity:
 am-register --name CalmMeadow --program claude-code --model sonnet-4.5
 ```
 
-This creates a row in the `agents` table. IDE-spawned agents get registered automatically by the spawn API, so `/jat:start` can skip this step.
+This creates a row in the `agents` table. IDE-spawned agents get registered automatically by the spawn API, so `/squad:start` can skip this step.
 
 Check the current identity:
 
@@ -29,19 +29,19 @@ am-agents                # Lists all registered agents
 
 ## File declarations
 
-File declarations tell other agents which files you plan to edit. They are managed on the task itself via the `--files` flag on `jt update`:
+File declarations tell other agents which files you plan to edit. They are managed on the task itself via the `--files` flag on `st update`:
 
 ```bash
-jt update myproject-abc --status in_progress --assignee CalmMeadow --files "src/lib/auth/**/*.ts"
+st update myproject-abc --status in_progress --assignee CalmMeadow --files "src/lib/auth/**/*.ts"
 ```
 
-When a task is closed with `jt close`, its file declarations are automatically cleared.
+When a task is closed with `st close`, its file declarations are automatically cleared.
 
 ## Cross-session context via memory
 
-Instead of messaging between agents, JAT uses a persistent memory system. When an agent completes a task, it writes a memory entry to `.jat/memory/` containing lessons, patterns, gotchas, and decisions from that session.
+Instead of messaging between agents, SQUAD uses a persistent memory system. When an agent completes a task, it writes a memory entry to `.squad/memory/` containing lessons, patterns, gotchas, and decisions from that session.
 
-The next agent working on related code picks up this context automatically during `/jat:start`, which searches memory for relevant entries based on the task title and description.
+The next agent working on related code picks up this context automatically during `/squad:start`, which searches memory for relevant entries based on the task title and description.
 
 This approach is more reliable than real-time messaging because:
 - Memory persists across sessions (messages require both agents to be active)
@@ -52,15 +52,15 @@ This approach is more reliable than real-time messaging because:
 
 ```bash
 # 1. Pick a task
-jt ready --json
+st ready --json
 
 # 2. Claim the task and declare files
-jt update myproject-abc --status in_progress --assignee CalmMeadow --files "src/**/*.ts"
+st update myproject-abc --status in_progress --assignee CalmMeadow --files "src/**/*.ts"
 
 # 3. Do the work...
 
 # 4. Close the task (auto-clears file declarations)
-jt close myproject-abc --reason "Completed"
+st close myproject-abc --reason "Completed"
 ```
 
 ## Common pitfalls
@@ -72,8 +72,8 @@ jt close myproject-abc --reason "Completed"
 A few rules that save headaches:
 
 - Keep file declaration patterns as narrow as possible
-- Declare files when starting a task via `--files` on `jt update`
-- The `jt close` command clears file declarations automatically
+- Declare files when starting a task via `--files` on `st update`
+- The `st close` command clears file declarations automatically
 
 ## Tool reference
 
@@ -88,6 +88,6 @@ Every tool supports `--help` for full usage details.
 
 ## Next steps
 
-- [Task Management](/docs/task-management/) - JAT task system that the registry coordinates around
+- [Task Management](/docs/task-management/) - SQUAD task system that the registry coordinates around
 - [Architecture](/docs/architecture/) - How the Agent Registry fits into the two-layer design
 - [Multi-Agent Swarm](/docs/multi-agent/) - Running parallel agents with coordination

@@ -1,18 +1,18 @@
 ## Agent Persistent Memory
 
-Agents build project memory automatically. When a task completes, key context is saved to `.jat/memory/`. When the next agent starts a related task, relevant memories are loaded automatically.
+Agents build project memory automatically. When a task completes, key context is saved to `.squad/memory/`. When the next agent starts a related task, relevant memories are loaded automatically.
 
 ### Storage Design
 
 ```
-.jat/
+.squad/
 ├── tasks.db              # Task database (existing)
 ├── memory.db             # Search index (SQLite, gitignored, rebuilt from .md files)
 ├── memory.db-wal         # WAL journal (gitignored)
 ├── memory/               # Memory entries (Markdown, committed to git)
-│   ├── 2026-02-08-jat-abc-fix-oauth-timeout.md
-│   ├── 2026-02-09-jat-def-add-login-page.md
-│   └── 2026-02-10-jat-ghi-refactor-auth-module.md
+│   ├── 2026-02-08-squad-abc-fix-oauth-timeout.md
+│   ├── 2026-02-09-squad-def-add-login-page.md
+│   └── 2026-02-10-squad-ghi-refactor-auth-module.md
 └── .gitignore            # Ignores *.db, *.db-wal, *.db-shm
 ```
 
@@ -27,7 +27,7 @@ Agents build project memory automatically. When a task completes, key context is
 | Component | Source | Example |
 |-----------|--------|---------|
 | `YYYY-MM-DD` | Task completion date | `2026-02-10` |
-| `taskId` | Task ID from JAT | `jat-abc` |
+| `taskId` | Task ID from SQUAD | `squad-abc` |
 | `slug` | Slugified task title (lowercase, hyphens, max 50 chars) | `fix-oauth-timeout` |
 
 **Slugification rules:**
@@ -39,8 +39,8 @@ Agents build project memory automatically. When a task completes, key context is
 
 **Examples:**
 ```
-2026-02-10-jat-abc-fix-oauth-timeout.md
-2026-02-10-jat-def-add-user-authentication-page.md
+2026-02-10-squad-abc-fix-oauth-timeout.md
+2026-02-10-squad-def-add-user-authentication-page.md
 2026-02-10-chimaro-x4k-refactor-payment-processing.md
 ```
 
@@ -50,7 +50,7 @@ Each memory file has YAML frontmatter followed by structured sections.
 
 ```markdown
 ---
-task: jat-abc
+task: squad-abc
 agent: FairBay
 project: chimaro
 completed: 2026-02-10T15:30:00Z
@@ -125,14 +125,14 @@ development when the provider was faster.
 | `completed` | ISO datetime | Yes | Task completion timestamp |
 | `files` | string[] | Yes | Files modified during the task |
 | `tags` | string[] | Yes | Semantic tags (derived from content + labels) |
-| `labels` | string[] | No | Task labels from JAT |
+| `labels` | string[] | No | Task labels from SQUAD |
 | `priority` | integer | No | Task priority (0-4) |
 | `type` | string | No | Task type (bug, feature, task, chore) |
 | `risk` | string | No | Risk level (low, medium, high) |
 
 **Tags vs Labels:**
 - **Tags** are semantic descriptors of what the memory is about (auth, timeout, oauth, database, css)
-- **Labels** are the original task labels from JAT (security, backend, frontend, urgent)
+- **Labels** are the original task labels from SQUAD (security, backend, frontend, urgent)
 - Both are indexed for search. Tags are generated from content; labels are copied from the task.
 
 ### Sections
@@ -148,7 +148,7 @@ Each section maps to a `section` value in the search index chunks table.
 | `## Lessons` | Recommended | Non-obvious learnings | `lessons` |
 | `## Cross-Agent Intel` | Optional | Patterns and gotchas for other agents | `cross_agent_intel` |
 
-**Section generation source mapping** (during `/jat:complete`):
+**Section generation source mapping** (during `/squad:complete`):
 
 | Section | Generated From |
 |---------|---------------|
@@ -161,7 +161,7 @@ Each section maps to a `section` value in the search index chunks table.
 
 ### Search Index Schema
 
-The search index lives in `.jat/memory.db` and provides two search modes:
+The search index lives in `.squad/memory.db` and provides two search modes:
 
 1. **BM25 full-text search** via FTS5 - keyword matching with relevance ranking
 2. **Vector similarity search** via sqlite-vec - semantic similarity using embeddings
@@ -209,8 +209,8 @@ Query ("oauth timeout")
 **Search result format:**
 ```json
 {
-  "path": "2026-02-08-jat-abc-fix-oauth-timeout.md",
-  "taskId": "jat-abc",
+  "path": "2026-02-08-squad-abc-fix-oauth-timeout.md",
+  "taskId": "squad-abc",
   "section": "approach",
   "snippet": "Investigated the auth timeout by tracing...",
   "score": 0.87,
@@ -222,7 +222,7 @@ Query ("oauth timeout")
 
 ### Embedding Providers
 
-Configured in `.jat/memory.db` config table or `~/.config/jat/projects.json`.
+Configured in `.squad/memory.db` config table or `~/.config/squad/projects.json`.
 
 | Provider | Model | Dimensions | Cost |
 |----------|-------|------------|------|
@@ -235,7 +235,7 @@ Configured in `.jat/memory.db` config table or `~/.config/jat/projects.json`.
 
 ### .gitignore Updates
 
-Add to `.jat/.gitignore`:
+Add to `.squad/.gitignore`:
 ```gitignore
 # Existing
 tasks.db
@@ -252,21 +252,21 @@ The `memory/` directory is NOT gitignored - memory files are committed to the re
 
 ### Integration Points
 
-**Write (during `/jat:complete` Step 4.5):**
+**Write (during `/squad:complete` Step 4.5):**
 1. Gather context: task details, approach, git diff, key decisions
 2. Agent generates memory .md file directly (no LLM call needed)
-3. Write to `.jat/memory/{date}-{taskId}-{slug}.md`
-4. Run `jat-memory index` to incrementally update search index
+3. Write to `.squad/memory/{date}-{taskId}-{slug}.md`
+4. Run `squad-memory index` to incrementally update search index
 
-**Read (during `/jat:start` Step 4):**
+**Read (during `/squad:start` Step 4):**
 1. Extract key terms from task title + description
-2. Run `jat-memory search` with those terms
+2. Run `squad-memory search` with those terms
 3. Display relevant snippets to the agent
 4. Agent incorporates context into approach planning
 
 **CLI tools:**
 ```bash
-jat-memory index [--force] [--project path]   # Build/rebuild search index
-jat-memory search 'query' [--limit 5]         # Search memory entries
-jat-memory stats [--project path]             # Show memory statistics
+squad-memory index [--force] [--project path]   # Build/rebuild search index
+squad-memory search 'query' [--limit 5]         # Search memory entries
+squad-memory stats [--project path]             # Show memory statistics
 ```

@@ -65,7 +65,7 @@ export interface ActionResult {
  * Template context for variable substitution in action payloads
  */
 export interface TemplateContext {
-	/** The tmux session name (e.g., "jat-FairBay") */
+	/** The tmux session name (e.g., "squad-FairBay") */
 	session: string;
 	/** The agent name extracted from session (e.g., "FairBay") */
 	agent: string;
@@ -240,7 +240,7 @@ function recordAction(): void {
  * Process template variables in a string
  *
  * Available variables:
- * - {session} - The tmux session name (e.g., "jat-FairBay")
+ * - {session} - The tmux session name (e.g., "squad-FairBay")
  * - {agent} - The agent name extracted from session (e.g., "FairBay")
  * - {timestamp} - ISO timestamp when the rule triggered
  * - {match} or {$0} - Full matched text from pattern
@@ -275,8 +275,8 @@ function createTemplateContext(
 	sessionName: string,
 	match: PatternMatch | null
 ): TemplateContext {
-	// Extract agent name from session name (e.g., "jat-FairBay" -> "FairBay")
-	const agentName = sessionName.startsWith('jat-')
+	// Extract agent name from session name (e.g., "squad-FairBay" -> "FairBay")
+	const agentName = sessionName.startsWith('squad-')
 		? sessionName.substring(4)
 		: sessionName;
 
@@ -492,7 +492,7 @@ async function executeTmuxCommand(sessionName: string, command: string): Promise
 }
 
 /**
- * Emit a jat-signal via API
+ * Emit a squad-signal via API
  */
 async function emitSignal(sessionName: string, signalSpec: string): Promise<void> {
 	// Parse signal spec: "type payload"
@@ -608,7 +608,7 @@ async function showQuestionUI(
  *
  * Sends the command to the session's terminal, which will be picked up by
  * Claude Code and executed. Commands can be specified with or without the
- * leading slash (e.g., "/jat:complete" or "jat:complete").
+ * leading slash (e.g., "/squad:complete" or "squad:complete").
  */
 async function runSlashCommand(
 	sessionName: string,

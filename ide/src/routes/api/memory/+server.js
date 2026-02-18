@@ -18,7 +18,7 @@ import { homedir } from 'os';
 const execAsync = promisify(exec);
 
 /**
- * Discover all projects with .jat/memory/ directories
+ * Discover all projects with .squad/memory/ directories
  * @returns {Promise<Array<{name: string, path: string, hasIndex: boolean, hasMemoryDir: boolean}>>}
  */
 async function discoverMemoryProjects() {
@@ -31,11 +31,11 @@ async function discoverMemoryProjects() {
 	for (const entry of entries) {
 		if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
 		const projectPath = join(codeDir, entry.name);
-		const jatDir = join(projectPath, '.jat');
-		if (!existsSync(jatDir)) continue;
+		const squadDir = join(projectPath, '.squad');
+		if (!existsSync(squadDir)) continue;
 
-		const memoryDir = join(jatDir, 'memory');
-		const memoryDb = join(jatDir, 'memory.db');
+		const memoryDir = join(squadDir, 'memory');
+		const memoryDb = join(squadDir, 'memory.db');
 
 		projects.push({
 			name: entry.name,
@@ -49,14 +49,14 @@ async function discoverMemoryProjects() {
 }
 
 /**
- * Get memory status for a single project using jat-memory CLI
+ * Get memory status for a single project using squad-memory CLI
  * @param {string} projectPath
  * @returns {Promise<Record<string, any>|null>}
  */
 async function getProjectStatus(projectPath) {
 	try {
 		const { stdout } = await execAsync(
-			`jat-memory status --project "${projectPath}" --json`,
+			`squad-memory status --project "${projectPath}" --json`,
 			{ timeout: 10000 }
 		);
 		return JSON.parse(stdout.trim());
@@ -66,12 +66,12 @@ async function getProjectStatus(projectPath) {
 }
 
 /**
- * Browse memory files in a project's .jat/memory/ directory
+ * Browse memory files in a project's .squad/memory/ directory
  * @param {string} projectPath
  * @returns {Promise<Array<object>>}
  */
 async function browseMemoryFiles(projectPath) {
-	const memoryDir = join(projectPath, '.jat', 'memory');
+	const memoryDir = join(projectPath, '.squad', 'memory');
 	if (!existsSync(memoryDir)) return [];
 
 	const files = await readdir(memoryDir);
@@ -153,7 +153,7 @@ export async function GET({ url }) {
 				if (!project.hasMemoryDir && !project.hasIndex) continue;
 
 				const status = project.hasIndex ? await getProjectStatus(project.path) : null;
-				const memoryDir = join(project.path, '.jat', 'memory');
+				const memoryDir = join(project.path, '.squad', 'memory');
 				let fileCount = 0;
 				if (existsSync(memoryDir)) {
 					const files = await readdir(memoryDir);
@@ -192,7 +192,7 @@ export async function GET({ url }) {
 				try {
 					const safeQuery = query.replace(/'/g, "'\\''");
 					const { stdout } = await execAsync(
-						`jat-memory search '${safeQuery}' --project "${proj.path}" --limit ${limit} --json`,
+						`squad-memory search '${safeQuery}' --project "${proj.path}" --limit ${limit} --json`,
 						{ timeout: 15000 }
 					);
 					const results = JSON.parse(stdout.trim());
@@ -227,7 +227,7 @@ export async function GET({ url }) {
 			}
 
 			const projectPath = join(homedir(), 'code', projectName);
-			if (!existsSync(join(projectPath, '.jat'))) {
+			if (!existsSync(join(projectPath, '.squad'))) {
 				return json({ error: `Project not found: ${projectName}` }, { status: 404 });
 			}
 
@@ -247,7 +247,7 @@ export async function GET({ url }) {
 				return json({ error: 'Invalid filename' }, { status: 400 });
 			}
 
-			const filePath = join(homedir(), 'code', projectName, '.jat', 'memory', filename);
+			const filePath = join(homedir(), 'code', projectName, '.squad', 'memory', filename);
 			if (!existsSync(filePath)) {
 				return json({ error: 'File not found' }, { status: 404 });
 			}
@@ -287,7 +287,7 @@ export async function POST({ request }) {
 			try {
 				const flags = force ? '--force --skip-embeddings --json' : '--skip-embeddings --json';
 				const { stdout } = await execAsync(
-					`jat-memory index --project "${proj.path}" ${flags}`,
+					`squad-memory index --project "${proj.path}" ${flags}`,
 					{ timeout: 60000 }
 				);
 				const result = JSON.parse(stdout.trim());

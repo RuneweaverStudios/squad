@@ -98,7 +98,7 @@ export interface TimeSeriesResult {
  * Per-project token data for a time bucket
  */
 export interface ProjectTokenData {
-	/** Project key (e.g., 'jat', 'chimaro') */
+	/** Project key (e.g., 'squad', 'chimaro') */
 	project: string;
 	/** Total tokens for this project in this bucket */
 	tokens: number;
@@ -511,7 +511,7 @@ export interface AgentMultiProjectTimeSeriesOptions {
  *   bucketSize: '30min'
  * });
  * // data.data[0].projects = [
- * //   { project: 'jat', tokens: 50000, cost: 0.15, color: '#5588ff' },
+ * //   { project: 'squad', tokens: 50000, cost: 0.15, color: '#5588ff' },
  * //   { project: 'chimaro', tokens: 30000, cost: 0.09, color: '#00d4aa' }
  * // ]
  * // Only includes sessions where this agent worked
@@ -739,9 +739,9 @@ export async function getAgentMultiProjectTimeSeries(
 }
 
 /**
- * Get time-series data aggregated across ALL projects from jat config
+ * Get time-series data aggregated across ALL projects from squad config
  *
- * Scans all project paths from ~/.config/jat/projects.json and aggregates
+ * Scans all project paths from ~/.config/squad/projects.json and aggregates
  * token usage into time buckets with per-project breakdown and colors.
  *
  * @param options - Aggregation options
@@ -750,7 +750,7 @@ export async function getAgentMultiProjectTimeSeries(
  * @example
  * const data = await getMultiProjectTimeSeries({ range: '24h', bucketSize: '30min' });
  * // data.data[0].projects = [
- * //   { project: 'jat', tokens: 50000, cost: 0.15, color: '#5588ff' },
+ * //   { project: 'squad', tokens: 50000, cost: 0.15, color: '#5588ff' },
  * //   { project: 'chimaro', tokens: 30000, cost: 0.09, color: '#00d4aa' }
  * // ]
  */

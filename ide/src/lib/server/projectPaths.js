@@ -1,7 +1,7 @@
 /**
  * Project Path Resolution
  *
- * Looks up project paths from JAT config and jat-discovered projects.
+ * Looks up project paths from SQUAD config and squad-discovered projects.
  * Used by task creation endpoints to find the correct directory.
  */
 import { readFile, readdir } from 'fs/promises';
@@ -9,20 +9,20 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
-const JAT_CONFIG_PATH = join(homedir(), '.config', 'jat', 'projects.json');
+const SQUAD_CONFIG_PATH = join(homedir(), '.config', 'squad', 'projects.json');
 
 /**
- * @typedef {Object} JatProjectConfig
+ * @typedef {Object} SquadProjectConfig
  * @property {string} [path] - Custom path to project
  * @property {string} [name] - Display name
  * @property {number} [port] - Dev server port
  */
 
 /**
- * @typedef {Object} JatDefaults
+ * @typedef {Object} SquadDefaults
  * @property {string} [terminal] - Default terminal emulator
  * @property {string} [editor] - Default code editor
- * @property {string} [tools_path] - Path to jat tools
+ * @property {string} [tools_path] - Path to squad tools
  * @property {string} [claude_flags] - Claude command flags
  * @property {string} [model] - Default Claude model
  * @property {number} [agent_stagger] - Stagger delay between agent spawns (seconds)
@@ -32,21 +32,21 @@ const JAT_CONFIG_PATH = join(homedir(), '.config', 'jat', 'projects.json');
  */
 
 /**
- * @typedef {Object} JatConfig
- * @property {Record<string, JatProjectConfig>} [projects] - Project configurations
- * @property {JatDefaults} [defaults] - Default settings
+ * @typedef {Object} SquadConfig
+ * @property {Record<string, SquadProjectConfig>} [projects] - Project configurations
+ * @property {SquadDefaults} [defaults] - Default settings
  */
 
 /**
- * Read JAT config file
- * @returns {Promise<JatConfig|null>}
+ * Read SQUAD config file
+ * @returns {Promise<SquadConfig|null>}
  */
-async function readJatConfig() {
+async function readSquadConfig() {
 	try {
-		if (!existsSync(JAT_CONFIG_PATH)) {
+		if (!existsSync(SQUAD_CONFIG_PATH)) {
 			return null;
 		}
-		const content = await readFile(JAT_CONFIG_PATH, 'utf-8');
+		const content = await readFile(SQUAD_CONFIG_PATH, 'utf-8');
 		return JSON.parse(content);
 	} catch {
 		return null;
@@ -54,10 +54,10 @@ async function readJatConfig() {
 }
 
 /**
- * Scan ~/code for projects with .jat/ directories
+ * Scan ~/code for projects with .squad/ directories
  * @returns {Promise<Array<{name: string, path: string}>>}
  */
-async function scanJatProjects() {
+async function scanSquadProjects() {
 	const codeDir = join(homedir(), 'code');
 	if (!existsSync(codeDir)) {
 		return [];
@@ -65,7 +65,7 @@ async function scanJatProjects() {
 
 	try {
 		const entries = await readdir(codeDir, { withFileTypes: true });
-		const jatProjects = [];
+		const squadProjects = [];
 
 		for (const entry of entries) {
 			if (!entry.isDirectory() || entry.name.startsWith('.')) {
@@ -73,17 +73,17 @@ async function scanJatProjects() {
 			}
 
 			const projectPath = join(codeDir, entry.name);
-			const jatDir = join(projectPath, '.jat');
+			const squadDir = join(projectPath, '.squad');
 
-			if (existsSync(jatDir)) {
-				jatProjects.push({
+			if (existsSync(squadDir)) {
+				squadProjects.push({
 					name: entry.name,
 					path: projectPath
 				});
 			}
 		}
 
-		return jatProjects;
+		return squadProjects;
 	} catch {
 		return [];
 	}
@@ -93,12 +93,12 @@ async function scanJatProjects() {
  * Get the filesystem path for a project by name
  *
  * Looks up in order:
- * 1. JAT config (supports custom paths)
- * 2. JAT-discovered projects (~/code/{name}/.jat/)
+ * 1. SQUAD config (supports custom paths)
+ * 2. SQUAD-discovered projects (~/code/{name}/.squad/)
  * 3. Default fallback (~/code/{name})
  *
- * @param {string} projectName - Project name (e.g., "chimaro", "jat")
- * @returns {Promise<{path: string, source: 'jat-config' | 'jat-discovered' | 'default', exists: boolean}>}
+ * @param {string} projectName - Project name (e.g., "chimaro", "squad")
+ * @returns {Promise<{path: string, source: 'squad-config' | 'squad-discovered' | 'default', exists: boolean}>}
  */
 /**
  * Normalize a project name for comparison
@@ -114,15 +114,15 @@ function normalizeProjectName(name) {
 export async function getProjectPath(projectName) {
 	const normalizedName = normalizeProjectName(projectName);
 
-	// 1. Check JAT config first (supports custom paths like /code/projects/foo)
-	const jatConfig = await readJatConfig();
-	if (jatConfig?.projects) {
-		for (const [key, config] of Object.entries(jatConfig.projects)) {
+	// 1. Check SQUAD config first (supports custom paths like /code/projects/foo)
+	const squadConfig = await readSquadConfig();
+	if (squadConfig?.projects) {
+		for (const [key, config] of Object.entries(squadConfig.projects)) {
 			if (normalizeProjectName(key) === normalizedName) {
 				const path = config.path?.replace(/^~/, homedir()) || join(homedir(), 'code', key);
 				return {
 					path,
-					source: 'jat-config',
+					source: 'squad-config',
 					exists: existsSync(path)
 				};
 			}
@@ -139,15 +139,15 @@ export async function getProjectPath(projectName) {
 }
 
 /**
- * Get JAT config defaults
+ * Get SQUAD config defaults
  *
- * Returns defaults from ~/.config/jat/projects.json with fallback values.
+ * Returns defaults from ~/.config/squad/projects.json with fallback values.
  * Used for configurable settings like Claude startup timeout.
  *
- * @returns {Promise<JatDefaults>}
+ * @returns {Promise<SquadDefaults>}
  */
-export async function getJatDefaults() {
-	const jatConfig = await readJatConfig();
+export async function getSquadDefaults() {
+	const squadConfig = await readSquadConfig();
 
 	// Default values
 	// NOTE: skip_permissions defaults to false for safety - user must explicitly enable
@@ -165,8 +165,8 @@ export async function getJatDefaults() {
 	};
 
 	// Override with config values if present
-	if (jatConfig?.defaults) {
-		const configDefaults = jatConfig.defaults;
+	if (squadConfig?.defaults) {
+		const configDefaults = squadConfig.defaults;
 		if (configDefaults.terminal) defaults.terminal = configDefaults.terminal;
 		if (configDefaults.editor) defaults.editor = configDefaults.editor;
 		if (configDefaults.tools_path) defaults.tools_path = configDefaults.tools_path;

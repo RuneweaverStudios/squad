@@ -14,7 +14,7 @@ RED='\033[0;31m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-WHISPER_DIR="$HOME/.local/share/jat/whisper"
+WHISPER_DIR="$HOME/.local/share/squad/whisper"
 MODEL_NAME="ggml-large-v3-turbo-q5_1.bin"
 MODEL_URL="https://huggingface.co/ggerganov/whisper.cpp/resolve/main/${MODEL_NAME}"
 
@@ -105,7 +105,7 @@ echo -e "${GREEN}  ✓ All dependencies found${NC}"
 echo ""
 echo -e "${BLUE}Setting up whisper.cpp...${NC}"
 
-mkdir -p "$HOME/.local/share/jat"
+mkdir -p "$HOME/.local/share/squad"
 
 if [ -d "$WHISPER_DIR" ]; then
     echo "  Whisper directory exists, updating..."
@@ -195,7 +195,7 @@ echo ""
 echo -e "${BLUE}Creating configuration...${NC}"
 
 # Update IDE transcribe API to use whisper path
-# The API checks ~/.local/share/jat/whisper first (jt CLI standard), then falls back to chezwizper
+# The API checks ~/.local/share/squad/whisper first (st CLI standard), then falls back to chezwizper
 echo -e "${GREEN}  ✓ Whisper configured at: $WHISPER_DIR${NC}"
 
 echo ""

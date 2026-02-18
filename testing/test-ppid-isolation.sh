@@ -1,5 +1,5 @@
 #!/bin/bash
-# Test script for PPID session isolation (jat-7kq)
+# Test script for PPID session isolation (squad-7kq)
 #
 # This script tests that PPID-based session tracking works correctly
 # for multi-agent statusline support.

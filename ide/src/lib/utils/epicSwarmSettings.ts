@@ -31,7 +31,7 @@ const STORAGE_KEY = 'epic-swarm-settings';
 const PROJECT_STORAGE_KEY_PREFIX = 'epic-swarm-settings-project-';
 
 /**
- * Extract project name from epic ID (e.g., 'jat-abc' -> 'jat')
+ * Extract project name from epic ID (e.g., 'squad-abc' -> 'squad')
  */
 function getProjectFromEpicId(epicId: string): string | null {
 	if (!epicId) return null;

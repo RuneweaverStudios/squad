@@ -1,4 +1,4 @@
-# Structured Logging System Plan for JAT IDE
+# Structured Logging System Plan for SQUAD IDE
 
 ## Overview
 

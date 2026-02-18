@@ -10,7 +10,7 @@
 import { json } from '@sveltejs/kit';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
-import { getJatDefaults } from '$lib/server/projectPaths.js';
+import { getSquadDefaults } from '$lib/server/projectPaths.js';
 
 const execAsync = promisify(exec);
 
@@ -32,8 +32,8 @@ export async function POST() {
 			}, { status: 400 });
 		}
 
-		const jatDefaults = await getJatDefaults();
-		const sessionName = `jat-yolo-${Date.now()}`;
+		const squadDefaults = await getSquadDefaults();
+		const sessionName = `squad-yolo-${Date.now()}`;
 		const projectPath = process.cwd().replace('/ide', '');
 
 		// Default tmux dimensions
@@ -62,8 +62,8 @@ export async function POST() {
 		}
 
 		// Find available terminal and open attached to the session
-		let terminal = jatDefaults.terminal || 'auto';
-		const windowTitle = `JAT: Accept YOLO Warning`;
+		let terminal = squadDefaults.terminal || 'auto';
+		const windowTitle = `SQUAD: Accept YOLO Warning`;
 		const attachCmd = `tmux attach-session -t "${sessionName}"`;
 
 		// Resolve 'auto' to platform default

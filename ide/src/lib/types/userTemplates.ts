@@ -24,7 +24,7 @@ export interface UserTemplate extends CommandTemplate {
 }
 
 /**
- * Template file format stored in ~/.config/jat/templates/
+ * Template file format stored in ~/.config/squad/templates/
  */
 export interface TemplateFile {
 	/** Template ID (filename without extension) */

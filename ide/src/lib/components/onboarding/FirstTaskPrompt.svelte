@@ -36,6 +36,6 @@
 	</button>
 
 	<p class="text-[11px] font-mono text-center" style="color: oklch(0.45 0.02 250);">
-		Or from terminal: <code class="px-1 py-0.5 rounded" style="background: oklch(0.22 0.01 250);">jt create "My first task" --type task</code>
+		Or from terminal: <code class="px-1 py-0.5 rounded" style="background: oklch(0.22 0.01 250);">st create "My first task" --type task</code>
 	</p>
 </div>

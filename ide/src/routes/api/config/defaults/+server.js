@@ -1,7 +1,7 @@
 /**
- * JAT Defaults API
- * GET /api/config/defaults - Read JAT defaults from ~/.config/jat/projects.json
- * PUT /api/config/defaults - Update JAT defaults
+ * SQUAD Defaults API
+ * GET /api/config/defaults - Read SQUAD defaults from ~/.config/squad/projects.json
+ * PUT /api/config/defaults - Update SQUAD defaults
  */
 
 import { json } from '@sveltejs/kit';
@@ -9,10 +9,10 @@ import { readFile, writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
-import { JAT_DEFAULTS } from '$lib/config/constants';
+import { SQUAD_DEFAULTS } from '$lib/config/constants';
 import { singleFlight, apiCache } from '$lib/server/cache.js';
 
-const CONFIG_PATH = join(homedir(), '.config', 'jat', 'projects.json');
+const CONFIG_PATH = join(homedir(), '.config', 'squad', 'projects.json');
 
 /**
  * Read the full config file
@@ -58,7 +58,7 @@ export async function GET() {
 			const defaults = config.defaults || {};
 
 			// Merge with default values (user values override defaults)
-			const merged = { ...JAT_DEFAULTS, ...defaults };
+			const merged = { ...SQUAD_DEFAULTS, ...defaults };
 
 			return {
 				success: true,
@@ -181,7 +181,7 @@ export async function DELETE() {
 		// Read existing config to preserve projects
 		const config = await readConfig();
 
-		// Remove the defaults section entirely - GET will merge with JAT_DEFAULTS
+		// Remove the defaults section entirely - GET will merge with SQUAD_DEFAULTS
 		delete config.defaults;
 
 		// Write back (preserves projects and other sections)
@@ -192,7 +192,7 @@ export async function DELETE() {
 
 		return json({
 			success: true,
-			defaults: JAT_DEFAULTS,
+			defaults: SQUAD_DEFAULTS,
 			message: 'Defaults reset to factory values'
 		});
 	} catch (error) {

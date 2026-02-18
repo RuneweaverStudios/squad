@@ -1,5 +1,5 @@
 #!/bin/bash
-# Sync JAT development changes to XDG installation
+# Sync SQUAD development changes to XDG installation
 # Usage: ./sync-to-xdg.sh
 
 set -e
@@ -11,10 +11,10 @@ CYAN='\033[0;36m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-SOURCE_DIR="$HOME/code/jat"
-TARGET_DIR="$HOME/.local/share/jat"
+SOURCE_DIR="$HOME/code/squad"
+TARGET_DIR="$HOME/.local/share/squad"
 
-echo -e "${CYAN}🔄 JAT Development → XDG Sync${NC}"
+echo -e "${CYAN}🔄 SQUAD Development → XDG Sync${NC}"
 echo ""
 echo -e "Source: ${SOURCE_DIR}"
 echo -e "Target: ${TARGET_DIR}"
@@ -29,7 +29,7 @@ fi
 # Check if target exists
 if [ ! -d "$TARGET_DIR" ]; then
     echo -e "${RED}❌ Target directory not found: $TARGET_DIR${NC}"
-    echo -e "${YELLOW}Run JAT installer first to create XDG installation${NC}"
+    echo -e "${YELLOW}Run SQUAD installer first to create XDG installation${NC}"
     exit 1
 fi
 
@@ -100,8 +100,8 @@ echo ""
 echo -e "${GREEN}✅ Sync complete!${NC}"
 echo ""
 echo -e "Changes synced to XDG installation:"
-echo -e "  • IDE changes → ${CYAN}jat${NC} will now use updated code"
+echo -e "  • IDE changes → ${CYAN}squad${NC} will now use updated code"
 echo -e "  • Tool changes → ${CYAN}am-*, db-*, etc.${NC} will use updated scripts"
 echo -e "  • Config changes → Templates and shared docs updated"
 echo ""
-echo -e "Your dev environment (${CYAN}jat-dev${NC}) remains unchanged."
+echo -e "Your dev environment (${CYAN}squad-dev${NC}) remains unchanged."

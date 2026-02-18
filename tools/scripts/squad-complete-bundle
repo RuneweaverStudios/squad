@@ -1,0 +1,450 @@
+#!/bin/bash
+#
+# squad-complete-bundle - Generate CompletionBundle JSON via LLM
+#
+# Usage:
+#   squad-complete-bundle --task <task-id> --agent <agent-name> [options]
+#
+# Options:
+#   --task <id>       Task ID (required)
+#   --agent <name>    Agent name (required)
+#   --mode <mode>     Completion mode: review_required or auto_proceed (default: auto-detect)
+#   --next-task <id>  Next task ID (for auto_proceed mode, auto-detected if not specified)
+#   --emit            Automatically emit squad-signal complete (default: just output JSON)
+#   --help            Show this help
+#
+# Mode Auto-Detection:
+#   When --mode is not specified, completion mode is auto-detected from:
+#   1. Task notes: [REVIEW_OVERRIDE:always_review|auto_proceed|force_review]
+#   2. Session epic context: .claude/sessions/context-{session_id}.json
+#   3. Project review rules: .squad/review-rules.json
+#   4. Default: review_required (safe fallback)
+#
+# Environment:
+#   ANTHROPIC_API_KEY  API key for Anthropic (required)
+#
+# Output:
+#   Outputs valid JSON suitable for: squad-signal complete "$JSON"
+#
+# Example:
+#   squad-complete-bundle --task squad-abc --agent FreeOcean
+#   squad-complete-bundle --task squad-abc --agent FreeOcean --mode auto_proceed --next-task squad-def
+
+set -euo pipefail
+
+# Colors for user-facing messages (stderr only, stdout is for JSON)
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+DIM='\033[2m'
+NC='\033[0m'
+
+# Log to stderr (so stdout remains clean for JSON output)
+log() { echo -e "$@" >&2; }
+log_dim() { echo -e "${DIM}$@${NC}" >&2; }
+log_error() { echo -e "${RED}Error: $@${NC}" >&2; }
+log_success() { echo -e "${GREEN}$@${NC}" >&2; }
+log_warn() { echo -e "${YELLOW}$@${NC}" >&2; }
+
+show_usage() {
+    cat >&2 <<'EOF'
+squad-complete-bundle - Generate CompletionBundle JSON via LLM
+
+Usage:
+  squad-complete-bundle --task <task-id> --agent <agent-name> [options]
+
+Options:
+  --task <id>       Task ID (required)
+  --agent <name>    Agent name (required)
+  --mode <mode>     Completion mode: review_required or auto_proceed (auto-detected if not specified)
+  --auto-mode       Force auto-detection even if --mode is specified
+  --next-task <id>  Next task ID (for auto_proceed mode, auto-detected if not specified)
+  --emit            Automatically emit squad-signal complete (recommended)
+  --help            Show this help
+
+Mode Auto-Detection:
+  When --mode is not specified, completion mode is auto-detected from:
+  1. Task notes: [REVIEW_OVERRIDE:always_review|auto_proceed|force_review]
+  2. Session epic context: .claude/sessions/context-{session_id}.json
+  3. Project review rules: .squad/review-rules.json
+  4. Default: review_required (safe fallback)
+
+Environment:
+  ANTHROPIC_API_KEY  API key for Anthropic (required)
+
+Output:
+  Outputs valid JSON suitable for: squad-signal complete "$JSON"
+
+Example:
+  squad-complete-bundle --task squad-abc --agent FreeOcean --emit
+  squad-complete-bundle --task squad-abc --agent FreeOcean --mode auto_proceed --next-task squad-def --emit
+EOF
+    exit 0
+}
+
+# Parse arguments
+TASK_ID=""
+AGENT_NAME=""
+COMPLETION_MODE=""  # Empty = auto-detect
+NEXT_TASK_ID=""
+EMIT_SIGNAL=false
+AUTO_MODE=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --task)
+            TASK_ID="$2"
+            shift 2
+            ;;
+        --agent)
+            AGENT_NAME="$2"
+            shift 2
+            ;;
+        --mode)
+            COMPLETION_MODE="$2"
+            shift 2
+            ;;
+        --next-task)
+            NEXT_TASK_ID="$2"
+            shift 2
+            ;;
+        --emit)
+            EMIT_SIGNAL=true
+            shift
+            ;;
+        --auto-mode)
+            AUTO_MODE=true
+            shift
+            ;;
+        --help|-h)
+            show_usage
+            ;;
+        *)
+            log_error "Unknown option: $1"
+            show_usage
+            ;;
+    esac
+done
+
+# Validate required arguments
+if [[ -z "$TASK_ID" ]]; then
+    log_error "Task ID is required (--task <id>)"
+    exit 1
+fi
+
+if [[ -z "$AGENT_NAME" ]]; then
+    log_error "Agent name is required (--agent <name>)"
+    exit 1
+fi
+
+# Check for API key
+if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
+    log_error "ANTHROPIC_API_KEY environment variable is required"
+    exit 1
+fi
+
+log_dim "Gathering context for completion bundle..."
+
+# ============================================================================
+# CONTEXT GATHERING
+# ============================================================================
+
+# 1. Get task details from SQUAD
+log_dim "  • Fetching task details..."
+TASK_JSON=$(st show "$TASK_ID" --json 2>/dev/null || echo "[]")
+
+if [[ "$TASK_JSON" == "[]" ]] || [[ -z "$TASK_JSON" ]]; then
+    log_error "Task not found: $TASK_ID"
+    exit 1
+fi
+
+TASK_TITLE=$(echo "$TASK_JSON" | jq -r '.[0].title // "Unknown"')
+TASK_TYPE=$(echo "$TASK_JSON" | jq -r '.[0].issue_type // "task"')
+TASK_PRIORITY=$(echo "$TASK_JSON" | jq -r '.[0].priority // 2')
+TASK_DESC=$(echo "$TASK_JSON" | jq -r '.[0].description // ""')
+TASK_NOTES=$(echo "$TASK_JSON" | jq -r '.[0].notes // ""')
+
+# ============================================================================
+# COMPLETION MODE AUTO-DETECTION
+# ============================================================================
+
+if [[ -z "$COMPLETION_MODE" ]] || [[ "$AUTO_MODE" == true ]]; then
+    log_dim "  • Auto-detecting completion mode..."
+    DETECTED_MODE=""
+
+    # 1. Check task notes for REVIEW_OVERRIDE
+    if [[ -n "$TASK_NOTES" ]]; then
+        if echo "$TASK_NOTES" | grep -qi '\[REVIEW_OVERRIDE:auto_proceed\]'; then
+            DETECTED_MODE="auto_proceed"
+            log_dim "    → Task notes: auto_proceed"
+        elif echo "$TASK_NOTES" | grep -qi '\[REVIEW_OVERRIDE:always_review\]\|\[REVIEW_OVERRIDE:force_review\]'; then
+            DETECTED_MODE="review_required"
+            log_dim "    → Task notes: review_required"
+        fi
+    fi
+
+    # 2. Check session epic context (if not already detected)
+    if [[ -z "$DETECTED_MODE" ]]; then
+        # Try to find session ID from PPID
+        SESSION_ID=""
+        if [[ -f "/tmp/claude-session-${PPID}.txt" ]]; then
+            SESSION_ID=$(cat "/tmp/claude-session-${PPID}.txt" | tr -d '\n')
+        fi
+
+        if [[ -n "$SESSION_ID" ]]; then
+            CONTEXT_FILE=".claude/sessions/context-${SESSION_ID}.json"
+            if [[ -f "$CONTEXT_FILE" ]]; then
+                REVIEW_THRESHOLD=$(jq -r '.reviewThreshold // empty' "$CONTEXT_FILE" 2>/dev/null)
+                if [[ "$REVIEW_THRESHOLD" == "never" ]]; then
+                    DETECTED_MODE="auto_proceed"
+                    log_dim "    → Session context: auto_proceed (reviewThreshold=never)"
+                elif [[ "$REVIEW_THRESHOLD" == "always" ]]; then
+                    DETECTED_MODE="review_required"
+                    log_dim "    → Session context: review_required (reviewThreshold=always)"
+                fi
+            fi
+        fi
+    fi
+
+    # 3. Check project review rules (if not already detected)
+    if [[ -z "$DETECTED_MODE" ]] && [[ -f ".squad/review-rules.json" ]]; then
+        DEFAULT_MODE=$(jq -r '.defaultMode // empty' ".squad/review-rules.json" 2>/dev/null)
+        if [[ "$DEFAULT_MODE" == "auto_proceed" ]]; then
+            DETECTED_MODE="auto_proceed"
+            log_dim "    → Project rules: auto_proceed"
+        elif [[ "$DEFAULT_MODE" == "review_required" ]]; then
+            DETECTED_MODE="review_required"
+            log_dim "    → Project rules: review_required"
+        fi
+    fi
+
+    # 4. Default fallback
+    if [[ -z "$DETECTED_MODE" ]]; then
+        DETECTED_MODE="review_required"
+        log_dim "    → Default: review_required"
+    fi
+
+    COMPLETION_MODE="$DETECTED_MODE"
+fi
+
+# 2. Get git status and diff
+log_dim "  • Collecting git status..."
+GIT_STATUS=$(git status --porcelain 2>/dev/null | head -50 || echo "")
+GIT_DIFF_STAT=$(git diff --stat HEAD 2>/dev/null | tail -20 || echo "")
+GIT_DIFF_STAGED=$(git diff --staged --stat 2>/dev/null | tail -20 || echo "")
+
+# Get list of modified files
+MODIFIED_FILES=$(git diff --name-only HEAD 2>/dev/null || echo "")
+STAGED_FILES=$(git diff --staged --name-only 2>/dev/null || echo "")
+ALL_CHANGED_FILES=$(echo -e "$MODIFIED_FILES\n$STAGED_FILES" | sort -u | grep -v '^$' || echo "")
+FILE_COUNT=$(echo "$ALL_CHANGED_FILES" | grep -c '.' || echo "0")
+
+# 3. Get recent commits (if any new commits were made)
+log_dim "  • Checking recent commits..."
+RECENT_COMMITS=$(git log --oneline -5 2>/dev/null || echo "")
+
+# 4. Count lines changed
+LINES_ADDED=$(git diff HEAD --numstat 2>/dev/null | awk '{sum+=$1} END {print sum+0}' || echo "0")
+LINES_REMOVED=$(git diff HEAD --numstat 2>/dev/null | awk '{sum+=$2} END {print sum+0}' || echo "0")
+
+# 5. Check test status (if test command exists)
+log_dim "  • Checking for test/build status..."
+TESTS_STATUS="none"
+BUILD_STATUS="clean"
+
+# Try to detect test status from common patterns
+if [[ -f "package.json" ]]; then
+    # Check if tests exist
+    if grep -q '"test"' package.json 2>/dev/null; then
+        TESTS_STATUS="skipped"  # Tests exist but we're not running them
+    fi
+fi
+
+# 6. Get project name from current directory
+PROJECT_NAME=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
+
+# 7. Format files list for prompt (limit to first 20)
+FILES_FOR_PROMPT=""
+if [[ -n "$ALL_CHANGED_FILES" ]]; then
+    FILES_FOR_PROMPT=$(echo "$ALL_CHANGED_FILES" | head -20)
+fi
+
+log_dim "  • Task: $TASK_TITLE"
+log_dim "  • Files changed: $FILE_COUNT"
+log_dim "  • Lines: +$LINES_ADDED / -$LINES_REMOVED"
+
+# ============================================================================
+# BUILD LLM PROMPT
+# ============================================================================
+
+log_dim "Calling LLM to generate completion bundle..."
+
+# Build the prompt with all context
+PROMPT=$(cat <<PROMPT_EOF
+You are generating a CompletionBundle JSON for a completed task. Based on the context below, generate ONLY valid JSON (no markdown, no explanation).
+
+## Task Information
+- Task ID: $TASK_ID
+- Title: $TASK_TITLE
+- Type: $TASK_TYPE
+- Priority: P$TASK_PRIORITY
+- Description: $TASK_DESC
+
+## Git Changes
+Files changed ($FILE_COUNT files):
+$FILES_FOR_PROMPT
+
+Diff summary:
+$GIT_DIFF_STAT
+
+Lines: +$LINES_ADDED / -$LINES_REMOVED
+
+Recent commits:
+$RECENT_COMMITS
+
+## Required Output Schema
+
+Generate a JSON object with these fields:
+
+{
+  "taskId": "$TASK_ID",
+  "agentName": "$AGENT_NAME",
+  "completionMode": "$COMPLETION_MODE",
+  $(if [[ -n "$NEXT_TASK_ID" ]]; then echo "\"nextTaskId\": \"$NEXT_TASK_ID\","; fi)
+
+  "summary": [
+    // 2-5 bullet points describing what was accomplished
+    // Be specific about what was done, not vague
+  ],
+
+  "quality": {
+    "tests": "passing" | "failing" | "none" | "skipped",
+    "build": "clean" | "warnings" | "errors",
+    "preExisting": "optional note about pre-existing issues"
+  },
+
+  "suggestedTasks": [
+    // REQUIRED: 1-3 follow-up tasks discovered during work
+    // Look for: tech debt, tests to add, docs to update, related improvements
+    {
+      "type": "feature" | "bug" | "task" | "chore",
+      "title": "Descriptive task title (5-12 words, actionable verb, specific target)",
+      "description": "DETAILED standalone description (2-4 sentences). Include:\n- WHAT specific work needs to be done\n- WHERE in the codebase (files, components, modules)\n- WHY this matters (context from the completed task)\n- HOW to approach it (brief strategy if non-obvious)\nThe description must be understandable WITHOUT reading the parent task.",
+      "priority": 2,  // 0-4, where 0 is critical
+      "reason": "Specific discovery context from the completed work"
+    }
+  ],
+
+  "humanActions": [
+    // Only if manual steps are needed (deploy, config, etc)
+    {
+      "title": "Short action title",
+      "description": "Detailed steps to take"
+    }
+  ],
+
+  "crossAgentIntel": {
+    "files": ["key files modified"],
+    "patterns": ["conventions used that other agents should follow"],
+    "gotchas": ["non-obvious issues or surprises"]
+  },
+
+  // AI-generated insights
+  "suggestedLabels": ["REQUIRED: labels based on actual work done, e.g. auth, api, ui, config, signals"],
+  "riskLevel": "low" | "medium" | "high",  // REQUIRED: low=routine, medium=core logic, high=breaking/security
+  "suggestedRename": "new title if task evolved/pivoted significantly (optional - omit if title is accurate)",
+  "breakingChanges": ["list of breaking changes, or omit if none"],
+  "documentationNeeds": ["docs that need updating, or omit if none"]
+}
+
+## Guidelines
+1. Summary should be specific accomplishments, not vague ("Added X feature" not "Made changes")
+2. ALWAYS include at least one suggested task - there's always follow-up work or tech debt
+3. Only include humanActions if manual steps are truly required (deploy, config, etc)
+4. crossAgentIntel should help other agents working in the same codebase
+5. Include suggestedRename ONLY if the original title no longer reflects the work done (otherwise omit)
+6. suggestedLabels is REQUIRED - always include 1-4 labels reflecting what was touched (auth, ui, api, db, tests, config, signals, etc)
+7. riskLevel is REQUIRED - always include: low=routine changes, medium=core logic changes, high=breaking/security/data changes
+8. breakingChanges: list specific breaking changes, omit field entirely if none
+9. documentationNeeds: list specific docs needing updates, omit if none
+10. CRITICAL for suggestedTasks: Each task MUST be a STANDALONE work item. A new agent picking up this task will NOT have context from the parent task. Include specific file paths, component names, function names, and enough context that someone unfamiliar can start immediately. Vague tasks like "improve X" or "fix the issue" are useless - be SPECIFIC.
+
+Output ONLY the JSON object. No markdown code blocks, no explanation text.
+PROMPT_EOF
+)
+
+# ============================================================================
+# CALL ANTHROPIC API
+# ============================================================================
+
+# Make the API call using curl
+API_RESPONSE=$(curl -s "https://api.anthropic.com/v1/messages" \
+    -H "Content-Type: application/json" \
+    -H "x-api-key: $ANTHROPIC_API_KEY" \
+    -H "anthropic-version: 2023-06-01" \
+    -d "$(jq -n \
+        --arg prompt "$PROMPT" \
+        '{
+            model: "claude-3-5-haiku-latest",
+            max_tokens: 2048,
+            messages: [
+                {
+                    role: "user",
+                    content: $prompt
+                }
+            ]
+        }'
+    )" 2>/dev/null)
+
+# Check for API errors
+if echo "$API_RESPONSE" | jq -e '.error' >/dev/null 2>&1; then
+    ERROR_MSG=$(echo "$API_RESPONSE" | jq -r '.error.message // "Unknown error"')
+    log_error "API error: $ERROR_MSG"
+    exit 1
+fi
+
+# Extract the content from the response
+BUNDLE_JSON=$(echo "$API_RESPONSE" | jq -r '.content[0].text // empty')
+
+if [[ -z "$BUNDLE_JSON" ]]; then
+    log_error "Empty response from API"
+    log_dim "Full response: $API_RESPONSE"
+    exit 1
+fi
+
+# Clean up the JSON (remove any markdown code blocks if present)
+BUNDLE_JSON=$(echo "$BUNDLE_JSON" | sed 's/^```json//g; s/^```//g; s/```$//g' | tr -d '\n' | jq -c '.')
+
+# Validate it's valid JSON
+if ! echo "$BUNDLE_JSON" | jq -e '.' >/dev/null 2>&1; then
+    log_error "Invalid JSON from LLM response"
+    log_dim "Raw response: $BUNDLE_JSON"
+    exit 1
+fi
+
+# Ensure required fields are present
+BUNDLE_JSON=$(echo "$BUNDLE_JSON" | jq \
+    --arg taskId "$TASK_ID" \
+    --arg agentName "$AGENT_NAME" \
+    --arg mode "$COMPLETION_MODE" \
+    '. + {taskId: $taskId, agentName: $agentName, completionMode: $mode}')
+
+# Add nextTaskId if provided
+if [[ -n "$NEXT_TASK_ID" ]]; then
+    NEXT_TASK_TITLE=$(st show "$NEXT_TASK_ID" --json 2>/dev/null | jq -r '.[0].title // "Unknown"' || echo "Unknown")
+    BUNDLE_JSON=$(echo "$BUNDLE_JSON" | jq \
+        --arg nextId "$NEXT_TASK_ID" \
+        --arg nextTitle "$NEXT_TASK_TITLE" \
+        '. + {nextTaskId: $nextId, nextTaskTitle: $nextTitle}')
+fi
+
+log_success "Generated completion bundle successfully"
+
+# Either emit the signal or output the JSON
+if [[ "$EMIT_SIGNAL" == true ]]; then
+    log_dim "Emitting squad-signal complete..."
+    squad-signal complete "$BUNDLE_JSON"
+else
+    # Output the final JSON to stdout
+    echo "$BUNDLE_JSON"
+fi

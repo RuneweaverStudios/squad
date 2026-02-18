@@ -3,7 +3,7 @@
  *
  * POST /api/ingest/[sourceId]/poll
  *
- * Triggers a single poll for a specific source by running jat-ingest --source <id> --once.
+ * Triggers a single poll for a specific source by running squad-ingest --source <id> --once.
  */
 
 import { json } from '@sveltejs/kit';
@@ -20,9 +20,9 @@ export async function POST({ params }) {
 		return json({ error: 'Missing sourceId' }, { status: 400 });
 	}
 
-	const ingestBin = join(homedir(), '.local/bin/jat-ingest');
+	const ingestBin = join(homedir(), '.local/bin/squad-ingest');
 	if (!existsSync(ingestBin)) {
-		return json({ error: 'jat-ingest not installed' }, { status: 500 });
+		return json({ error: 'squad-ingest not installed' }, { status: 500 });
 	}
 
 	try {

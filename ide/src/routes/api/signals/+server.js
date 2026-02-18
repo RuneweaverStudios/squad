@@ -2,7 +2,7 @@
  * Signals API - List All Active Agent Signals
  *
  * GET /api/signals
- *   Returns all current signals from /tmp/jat-signal-*.json files
+ *   Returns all current signals from /tmp/squad-signal-*.json files
  *   Useful for IDE overview of agent states
  *
  * DELETE /api/signals
@@ -18,7 +18,7 @@ import { readdirSync, readFileSync, unlinkSync, existsSync } from 'fs';
 import { join } from 'path';
 
 const SIGNAL_DIR = '/tmp';
-const SIGNAL_PREFIX = 'jat-signal-';
+const SIGNAL_PREFIX = 'squad-signal-';
 
 /**
  * Get all signal files from /tmp

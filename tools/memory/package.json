@@ -1,8 +1,8 @@
 {
-  "name": "jat-memory",
+  "name": "squad-memory",
   "version": "0.1.0",
   "type": "module",
-  "description": "JAT memory indexer - chunk, embed, and store agent memory for search",
+  "description": "SQUAD memory indexer - chunk, embed, and store agent memory for search",
   "main": "index.js",
   "scripts": {
     "start": "node index.js index",

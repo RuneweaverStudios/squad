@@ -33,7 +33,7 @@ export const metadata = {
       label: 'Access Token Secret',
       type: 'secret',
       required: true,
-      helpText: 'Name of the secret containing a personal access token or bot token (stored in jat-secret)'
+      helpText: 'Name of the secret containing a personal access token or bot token (stored in squad-secret)'
     },
     {
       key: 'channelIds',

@@ -86,7 +86,7 @@ const PRICING = {
  * Discover all project directories that have .claude/agent-*.txt files.
  * Scans ~/code/* for directories containing .claude/ subdirectories.
  *
- * Output: Array of project paths (e.g., ['/home/user/code/jat', '/home/user/code/chimaro'])
+ * Output: Array of project paths (e.g., ['/home/user/code/squad', '/home/user/code/chimaro'])
  */
 async function discoverProjectPaths(): Promise<string[]> {
 	const homeDir = os.homedir();

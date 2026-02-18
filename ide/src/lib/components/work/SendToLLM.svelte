@@ -13,7 +13,7 @@
 	 * - Submit sends content + instructions to /api/llm/process
 	 * - Result routed based on user selection
 	 *
-	 * Task: jat-a7372 - add send terminal to llm button to sessioncard.svelte
+	 * Task: squad-a7372 - add send terminal to llm button to sessioncard.svelte
 	 */
 
 	import { fade, fly } from 'svelte/transition';

@@ -30,11 +30,11 @@ mcp_agent_mail/
 # Plan mode temporary files
 .plan/
 
-# JAT task data (user-specific, don't commit to open source repo)
-# When users add their OWN projects via "Add Project", jt init creates
-# .jat/ with a .gitignore that ignores SQLite files.
-# This entry only affects the JAT repo itself.
-.jat/
+# SQUAD task data (user-specific, don't commit to open source repo)
+# When users add their OWN projects via "Add Project", st init creates
+# .squad/ with a .gitignore that ignores SQLite files.
+# This entry only affects the SQUAD repo itself.
+.squad/
 
 # Generated avatars (per-machine, don't commit)
 avatars/

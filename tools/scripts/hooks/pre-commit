@@ -1,12 +1,12 @@
 #!/bin/sh
 #
-# JAT pre-commit hook
+# SQUAD pre-commit hook
 #
 # 1. Ensures agent is registered (prevents "Claude" orphan commits)
-# 2. Legacy: Flushes jt (JAT Tasks) changes to JSONL before commit (obsolete - JAT uses SQLite)
+# 2. Legacy: Flushes st (SQUAD Tasks) changes to JSONL before commit (obsolete - SQUAD uses SQLite)
 #
 # Install: cp this file to .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
-# Or run: jat hooks [path]
+# Or run: squad hooks [path]
 #
 
 # ============================================================
@@ -33,7 +33,7 @@ check_agent_registered() {
     if [ ! -f "$AGENT_FILE" ]; then
         echo "❌ No agent registered for this session!" >&2
         echo "" >&2
-        echo "Run /jat:start to register before committing." >&2
+        echo "Run /squad:start to register before committing." >&2
         echo "This ensures your work is properly tracked." >&2
         echo "" >&2
         echo "To skip this check: git commit --no-verify" >&2
@@ -44,7 +44,7 @@ check_agent_registered() {
     if [ -z "$AGENT_NAME" ] || [ "$AGENT_NAME" = "Claude" ]; then
         echo "❌ Invalid agent registration ('$AGENT_NAME')!" >&2
         echo "" >&2
-        echo "Run /jat:start to register properly." >&2
+        echo "Run /squad:start to register properly." >&2
         return 1
     fi
 

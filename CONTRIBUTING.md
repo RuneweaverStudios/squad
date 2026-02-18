@@ -30,14 +30,14 @@ Thank you for your interest in contributing! This document provides guidelines f
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/joewinke/jat.git
-cd jat
+git clone https://github.com/joewinke/squad.git
+cd squad
 
 # 2. Run the installer locally
 ./install.sh
 
-# 3. Initialize JAT Tasks in the repo
-jt init
+# 3. Initialize SQUAD Tasks in the repo
+st init
 
 # 4. Register as an agent (for testing)
 am-register --program dev --model test
@@ -265,7 +265,7 @@ await browser.disconnect();
 
 ### ANSI Text Box Width Constraints
 
-Command templates in `commands/jat/*.md` use Unicode box-drawing characters to display formatted output. These boxes MUST fit within the tmux default width to prevent wrapping.
+Command templates in `commands/squad/*.md` use Unicode box-drawing characters to display formatted output. These boxes MUST fit within the tmux default width to prevent wrapping.
 
 **Rules:**
 
@@ -303,7 +303,7 @@ display_width("╔════════════════════�
 ```
 # GOOD (76 characters display width):
 ╔══════════════════════════════════════════════════════════════════════════╗
-║  ✅ TASK COMPLETED: jat-abc                                              ║
+║  ✅ TASK COMPLETED: squad-abc                                              ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 
 # BAD (would wrap in 80-column terminal):
@@ -312,7 +312,7 @@ display_width("╔════════════════════�
 ╚════════════════════════════════════════════════════════════════════════════════════╝
 ```
 
-**Note:** tmux sessions created by `jat` CLI and bash launchers now use `-x 120 -y 40` for extra width, but templates should still target 76 characters for compatibility with other terminal environments.
+**Note:** tmux sessions created by `squad` CLI and bash launchers now use `-x 120 -y 40` for extra width, but templates should still target 76 characters for compatibility with other terminal environments.
 
 ---
 
@@ -469,21 +469,21 @@ Brief description of what this PR does.
 ## Project Structure
 
 ```
-jat/
+squad/
 ├── tools/                     # All executable tools
 │   ├── browser/              # Browser automation (browser-*.js)
-│   ├── core/                 # Core utilities (db-*, jt-*, etc.)
+│   ├── core/                 # Core utilities (db-*, st-*, etc.)
 │   ├── mail/                 # Agent Registry (am-*)
 │   ├── media/                # Image generation (gemini-*, avatar-*)
-│   ├── signal/               # JAT signal tools
+│   ├── signal/               # SQUAD signal tools
 │   └── scripts/              # Installation & utilities
 │
-├── commands/jat/             # Workflow commands (/jat:start, etc.)
-│   ├── start.md              # /jat:start command
-│   ├── complete.md           # /jat:complete command
+├── commands/squad/             # Workflow commands (/squad:start, etc.)
+│   ├── start.md              # /squad:start command
+│   ├── complete.md           # /squad:complete command
 │   └── ...                   # Other commands
 │
-├── ide/                 # JAT IDE (SvelteKit)
+├── ide/                 # SQUAD IDE (SvelteKit)
 │   ├── src/                  # Source files
 │   └── CLAUDE.md             # IDE-specific docs
 │
@@ -515,14 +515,14 @@ jat/
 /register
 
 # 2. Create task
-jt create "Add new tool: db-backup" \
+st create "Add new tool: db-backup" \
   --type feature \
   --labels tools,database \
   --priority 1 \
   --description "Create PostgreSQL backup tool with compression and rotation"
 
 # 3. Declare files on task
-jt update jat-123 --files "tools/db-backup"
+st update squad-123 --files "tools/db-backup"
 
 # 4. Develop tool
 vim tools/db-backup
@@ -540,7 +540,7 @@ git add tools/db-backup README.md
 git commit -m "feat: add db-backup tool for PostgreSQL dumps"
 
 # 8. Complete
-jt close jat-123 --reason "Completed: db-backup tool implemented"
+st close squad-123 --reason "Completed: db-backup tool implemented"
 
 # 9. Push and create PR
 git push origin feature/db-backup

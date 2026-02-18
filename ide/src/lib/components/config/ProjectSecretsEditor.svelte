@@ -3,7 +3,7 @@
 	 * Project Secrets Editor
 	 *
 	 * Manages per-project secrets like database URLs, Supabase keys, etc.
-	 * Secrets are stored securely in ~/.config/jat/credentials.json
+	 * Secrets are stored securely in ~/.config/squad/credentials.json
 	 */
 
 	import { onMount } from 'svelte';
@@ -167,7 +167,7 @@
 			</svg>
 			Project Secrets
 		</h4>
-		<span class="secrets-hint">Stored securely in ~/.config/jat/credentials.json</span>
+		<span class="secrets-hint">Stored securely in ~/.config/squad/credentials.json</span>
 	</div>
 
 	{#if loading}

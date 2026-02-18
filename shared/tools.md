@@ -13,7 +13,7 @@ tools/
 ├── scheduler/    # Task scheduling daemon (cron + one-shot spawning)
 ├── search/       # Unified search (tasks, memory, files)
 ├── scripts/      # Installation and setup (33 scripts)
-└── signal/       # JAT signal emission (3 tools)
+└── signal/       # SQUAD signal emission (3 tools)
 ```
 
 ---
@@ -27,7 +27,7 @@ tools/
 | `am-whoami` | Current identity | `--agent X` |
 | `am-delete-agent` | Remove agent | `AGENT_NAME [--force]` |
 
-> **Note:** File declarations are managed via `jt update --files "glob/**"` on the task itself.
+> **Note:** File declarations are managed via `st update --files "glob/**"` on the task itself.
 > Files are auto-cleared when the task is closed.
 
 ---
@@ -38,53 +38,53 @@ Database, monitoring, credentials, and task review tools.
 
 | Tool | Purpose |
 |------|---------|
-| `jat-secret` | Retrieve secrets from credentials store |
+| `squad-secret` | Retrieve secrets from credentials store |
 | `db-query` | Run SQL, returns JSON |
 | `db-sessions` | List database connections |
 | `db-schema` | Show table structure |
 | `db-connection-test` | Test database connectivity |
 | `edge-logs` | Stream Supabase edge function logs |
 | `lint-staged` | Lint staged git files |
-| `jt-check-review` | Check if task needs human review |
-| `jt-review-rules` | Display review rules for project |
-| `jt-review-rules-loader` | Load/parse review rules from config |
-| `jt-set-review-override` | Set review override for a task |
-| `backup-jat.sh` | Backup task database |
-| `rollback-jat.sh` | Rollback task database to backup |
-| `jat-skills` | Skill catalog, installer, and local management |
+| `st-check-review` | Check if task needs human review |
+| `st-review-rules` | Display review rules for project |
+| `st-review-rules-loader` | Load/parse review rules from config |
+| `st-set-review-override` | Set review override for a task |
+| `backup-squad.sh` | Backup task database |
+| `rollback-squad.sh` | Rollback task database to backup |
+| `squad-skills` | Skill catalog, installer, and local management |
 
-**jat-secret usage:**
+**squad-secret usage:**
 ```bash
-jat-secret <name>       # Get secret value
-jat-secret --list       # List all secrets
-jat-secret --export     # Output export statements
-jat-secret --env <name> # Get env var name for a key
+squad-secret <name>       # Get secret value
+squad-secret --list       # List all secrets
+squad-secret --export     # Output export statements
+squad-secret --env <name> # Get env var name for a key
 ```
 
-**jat-skills usage:**
+**squad-skills usage:**
 ```bash
 # Catalog (browse remote skills)
-jat-skills search <query>   # Search skills by keyword
-jat-skills list-available    # List all catalog skills
-jat-skills info <skill-id>   # Show skill details
-jat-skills refresh           # Force refresh cache
-jat-skills sources           # Show source status
+squad-skills search <query>   # Search skills by keyword
+squad-skills list-available    # List all catalog skills
+squad-skills info <skill-id>   # Show skill details
+squad-skills refresh           # Force refresh cache
+squad-skills sources           # Show source status
 
 # Install & manage (local skills)
-jat-skills install <name-or-url>  # Install from catalog or URL
-jat-skills list                   # List installed skills
-jat-skills enable <name>          # Enable an installed skill
-jat-skills disable <name>         # Disable an installed skill
-jat-skills uninstall <name>       # Remove an installed skill
-jat-skills update <name>          # Re-fetch from source
-jat-skills sync                   # Manually sync agent links
+squad-skills install <name-or-url>  # Install from catalog or URL
+squad-skills list                   # List installed skills
+squad-skills enable <name>          # Enable an installed skill
+squad-skills disable <name>         # Disable an installed skill
+squad-skills uninstall <name>       # Remove an installed skill
+squad-skills update <name>          # Re-fetch from source
+squad-skills sync                   # Manually sync agent links
 
-jat-skills --json            # JSON output (combine with any command)
+squad-skills --json            # JSON output (combine with any command)
 ```
 
 **Agent link syncing:**
 
-When you install, enable, disable, uninstall, or update a skill, `jat-skills` automatically syncs agent links so all supported agent programs can discover the skill:
+When you install, enable, disable, uninstall, or update a skill, `squad-skills` automatically syncs agent links so all supported agent programs can discover the skill:
 
 | Agent | Discovery Method | Link Location |
 |-------|-----------------|---------------|
@@ -94,7 +94,7 @@ When you install, enable, disable, uninstall, or update a skill, `jat-skills` au
 
 - Orphan symlinks (from uninstalled/disabled skills) are cleaned up automatically
 - Existing user commands/skills are never overwritten (conflict safety)
-- Run `jat-skills sync` to manually repair links if needed
+- Run `squad-skills sync` to manually repair links if needed
 
 ---
 
@@ -142,38 +142,38 @@ AI image generation via Google Gemini API.
 
 ### Signal Tools (tools/signal/)
 
-JAT signal emission for IDE state updates.
+SQUAD signal emission for IDE state updates.
 
 | Tool | Purpose |
 |------|---------|
-| `jat-signal` | Emit status signals to IDE |
-| `jat-signal-validate` | Validate signal JSON against schema |
-| `jat-signal-schema.json` | JSON schema for signal payloads |
+| `squad-signal` | Emit status signals to IDE |
+| `squad-signal-validate` | Validate signal JSON against schema |
+| `squad-signal-schema.json` | JSON schema for signal payloads |
 
 **Signal types:** `starting`, `working`, `needs_input`, `review`, `completing`, `complete`
 
 **Example:**
 ```bash
-jat-signal working '{"taskId":"jat-abc","taskTitle":"Add feature","approach":"..."}'
+squad-signal working '{"taskId":"squad-abc","taskTitle":"Add feature","approach":"..."}'
 ```
 
 ---
 
 ### Search Tools (tools/search/)
 
-Unified search across tasks, memory, and files. Use `jat-search` as your primary context retrieval tool before starting work.
+Unified search across tasks, memory, and files. Use `squad-search` as your primary context retrieval tool before starting work.
 
 | Tool | Purpose |
 |------|---------|
-| `jat-search` | Meta search or per-source subcommands |
+| `squad-search` | Meta search or per-source subcommands |
 
 **Subcommands:**
 ```bash
-jat-search "query"                     # Meta search (all sources in parallel)
-jat-search tasks "query" [--json]      # Deep task search (FTS5)
-jat-search memory "query"              # Memory search (FTS5 + vector hybrid)
-jat-search files "query"               # File search (ripgrep + filename)
-jat-search "query" --summarize         # Meta search with LLM synthesis
+squad-search "query"                     # Meta search (all sources in parallel)
+squad-search tasks "query" [--json]      # Deep task search (FTS5)
+squad-search memory "query"              # Memory search (FTS5 + vector hybrid)
+squad-search files "query"               # File search (ripgrep + filename)
+squad-search "query" --summarize         # Meta search with LLM synthesis
 ```
 
 **Options:** `--project PATH`, `--limit N`, `--json`, `--summarize`, `--verbose`
@@ -181,24 +181,24 @@ jat-search "query" --summarize         # Meta search with LLM synthesis
 **Context retrieval funnel pattern:**
 ```bash
 # 1. Broad meta search to find relevant context
-jat-search "auth middleware" --json
+squad-search "auth middleware" --json
 # Returns grouped results from tasks, memory, and files
 
 # 2. Drill into memory for lessons learned
-jat-search memory "auth race condition"
+squad-search memory "auth race condition"
 # Shows past session context with gotchas and patterns
 
 # 3. Drill into tasks for history
-jat-search tasks "OAuth timeout" --json
+squad-search tasks "OAuth timeout" --json
 # Shows related/duplicate tasks with status and priority
 
 # 4. Drill into files for code references
-jat-search files "refreshToken"
+squad-search files "refreshToken"
 # Shows file paths and matching lines via ripgrep
 ```
 
 **How agents should use search:**
-- Run `jat-search` at task start to gather context before writing code
+- Run `squad-search` at task start to gather context before writing code
 - Check memory for lessons from past sessions working on similar areas
 - Check tasks for duplicates or related in-progress work
 - Use `--summarize` for LLM-synthesized context when results are noisy
@@ -216,19 +216,19 @@ Installation, setup, and utility scripts.
 | `setup-repos.sh` | Initialize project repositories |
 | `setup-bash-functions.sh` | Generate shell launcher functions |
 | `setup-statusline-and-hooks.sh` | Install Claude Code hooks |
-| `setup-tmux.sh` | Configure tmux for JAT |
+| `setup-tmux.sh` | Configure tmux for SQUAD |
 | `setup-global-claude-md.sh` | Setup global CLAUDE.md |
 | `install-agent-mail.sh` | Initialize Agent Registry database |
 | `install-hooks.sh` | Install Claude Code hooks |
 | `install-whisper.sh` | Install whisper.cpp for voice input |
 
-**JAT Workflow:**
+**SQUAD Workflow:**
 | Script | Purpose |
 |--------|---------|
-| `jat-step` | Execute completion step with signal emission |
-| `jat-complete-bundle` | Generate structured completion bundle via LLM |
-| `jat-doctor` | Diagnose JAT installation issues |
-| `jt-epic-child` | Set epic→child dependency correctly |
+| `squad-step` | Execute completion step with signal emission |
+| `squad-complete-bundle` | Generate structured completion bundle via LLM |
+| `squad-doctor` | Diagnose SQUAD installation issues |
+| `st-epic-child` | Set epic→child dependency correctly |
 
 **Agent Management:**
 | Script | Purpose |
@@ -254,19 +254,19 @@ Installation, setup, and utility scripts.
 | `fix-hook-stdin.sh` | Fix hook stdin issues |
 | `update-signal-hooks.sh` | Update signal hook scripts |
 | `import-bashrc-config.sh` | Import bashrc configuration |
-| `migrate-jomarchy-agent-tools-to-jat.sh` | Migration helper |
+| `migrate-jomarchy-agent-tools-to-squad.sh` | Migration helper |
 | `migrate-task-images.sh` | Migrate task image paths |
 
-**jat-step usage:**
+**squad-step usage:**
 ```bash
-jat-step <step> --task <id> --title <title> --agent <name> [--type <type>]
+squad-step <step> --task <id> --title <title> --agent <name> [--type <type>]
 ```
 
 | Step | Action | Signal |
 |------|--------|--------|
 | `verifying` | Emit only (agent does verification) | completing (0%) |
 | `committing` | git add + commit | completing (25%) |
-| `closing` | jt close | completing (50%) |
+| `closing` | st close | completing (50%) |
 | `releasing` | Capture session log | completing (75%) |
 | `complete` | Generate bundle + emit complete signal | complete (100%) |
 
@@ -278,9 +278,9 @@ jat-step <step> --task <id> --title <title> --agent <name> [--type <type>]
 
 **Declare files → Work → Close (auto-clears):**
 ```bash
-jt update task-123 --status in_progress --assignee $AGENT_NAME --files "src/**/*.ts"
+st update task-123 --status in_progress --assignee $AGENT_NAME --files "src/**/*.ts"
 # ... work ...
-jt close task-123 --reason "Completed"  # files auto-cleared
+st close task-123 --reason "Completed"  # files auto-cleared
 ```
 
 ### More Info

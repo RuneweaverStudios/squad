@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Simple agent lister (fast, no categorization)
-# Just lists all agents - for use in /jat:start
+# Just lists all agents - for use in /squad:start
 
 set -e
 

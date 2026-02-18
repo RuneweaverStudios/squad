@@ -1,6 +1,6 @@
 ## Agent Programs: Agent-Agnostic Orchestration
 
-JAT supports multiple AI coding assistants through a configurable agent program system. This allows routing tasks to different AI tools based on task attributes, cost considerations, or capability requirements.
+SQUAD supports multiple AI coding assistants through a configurable agent program system. This allows routing tasks to different AI tools based on task attributes, cost considerations, or capability requirements.
 
 ### Overview
 
@@ -32,7 +32,7 @@ JAT supports multiple AI coding assistants through a configurable agent program 
 
 ### Configuration File
 
-**Location:** `~/.config/jat/agents.json`
+**Location:** `~/.config/squad/agents.json`
 
 ```json
 {
@@ -147,8 +147,8 @@ Routing rules map task attributes to agent/model selection. Rules are evaluated 
 | `label` | Match task labels | `security`, `frontend`, `backend` |
 | `type` | Match task type | `bug`, `feature`, `task`, `chore`, `epic` |
 | `priority` | Match priority level | `0`, `1`, `2`, `3` |
-| `project` | Match project name | `jat`, `chimaro` |
-| `epic` | Match parent epic | `jat-abc` |
+| `project` | Match project name | `squad`, `chimaro` |
+| `epic` | Match parent epic | `squad-abc` |
 
 **Operators:**
 
@@ -207,7 +207,7 @@ Routing rules map task attributes to agent/model selection. Rules are evaluated 
 
 When spawning an agent for a task:
 
-1. **Load Config** - Read `~/.config/jat/agents.json`
+1. **Load Config** - Read `~/.config/squad/agents.json`
 2. **Evaluate Rules** - Check each routing rule in order
 3. **Select Agent** - Use matched rule or fallback
 4. **Validate** - Check agent is enabled and auth is available
@@ -219,8 +219,8 @@ When spawning an agent for a task:
 
 | Agent | Discovery | How |
 |-------|-----------|-----|
-| Claude Code | Native commands | Symlinks in `~/.claude/commands/{name}.md` (auto-synced by `jat-skills`) |
-| Pi | Native skills | Directory symlinks in `~/.pi/agent/skills/{id}/` (auto-synced by `jat-skills`) |
+| Claude Code | Native commands | Symlinks in `~/.claude/commands/{name}.md` (auto-synced by `squad-skills`) |
+| Pi | Native skills | Directory symlinks in `~/.pi/agent/skills/{id}/` (auto-synced by `squad-skills`) |
 | Codex, Gemini, OpenCode, Aider | Prompt injection | Skill names and descriptions injected into bootstrap prompt at spawn time |
 
 Native agents (Claude Code, Pi) discover skills through their own file-based mechanisms. Non-native agents receive a compact summary block listing available skills so they can read the full `SKILL.md` when needed.
@@ -229,7 +229,7 @@ Native agents (Claude Code, Pi) discover skills through their own file-based mec
 ```json
 POST /api/work/spawn
 {
-  "taskId": "jat-abc",
+  "taskId": "squad-abc",
   "agentId": "claude-code",    // Optional: override routing
   "model": "opus"               // Optional: override model
 }
@@ -240,7 +240,7 @@ POST /api/work/spawn
 {
   "success": true,
   "session": {
-    "sessionName": "jat-BrightCanyon",
+    "sessionName": "squad-BrightCanyon",
     "agentName": "BrightCanyon",
     "agentProgram": "claude-code",
     "model": "opus",
@@ -287,7 +287,7 @@ POST /api/work/spawn
 The first access to `/api/config/agents` triggers migration:
 
 1. **Read Legacy Config:**
-   - `~/.config/jat/projects.json` → `defaults.model`, `defaults.claude_flags`
+   - `~/.config/squad/projects.json` → `defaults.model`, `defaults.claude_flags`
 
 2. **Create Claude Code Entry:**
    ```json
@@ -389,5 +389,5 @@ See `ide/src/lib/types/agentProgram.ts` for complete type definitions.
 - `ide/src/lib/components/config/AgentRoutingRulesEditor.svelte` - Rules UI
 
 **Config:**
-- `~/.config/jat/agents.json` - Agent configuration
-- `~/.config/jat/credentials.json` - API keys (referenced by `apiKeyProvider`)
+- `~/.config/squad/agents.json` - Agent configuration
+- `~/.config/squad/credentials.json` - API keys (referenced by `apiKeyProvider`)

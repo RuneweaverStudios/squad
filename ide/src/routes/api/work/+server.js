@@ -3,7 +3,7 @@
  * GET /api/work - Return all active work sessions with task info, output, and token usage
  *
  * Each WorkSession includes:
- * - sessionName: tmux session name (e.g., "jat-WisePrairie")
+ * - sessionName: tmux session name (e.g., "squad-WisePrairie")
  * - agentName: Agent name extracted from session (e.g., "WisePrairie")
  * - task: Current in_progress task for this agent (or null)
  * - lastCompletedTask: Most recently closed task by this agent (for completion state display)
@@ -22,7 +22,7 @@ import { json } from '@sveltejs/kit';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { readFileSync, existsSync, statSync } from 'fs';
-import { getTasks } from '$lib/server/jat-tasks.js';
+import { getTasks } from '$lib/server/squad-tasks.js';
 import { getAgentUsageAsync, getAgentHourlyUsageAsync, getAgentContextPercent } from '$lib/utils/tokenUsage.js';
 import { apiCache, cacheKey, CACHE_TTL, singleFlight } from '$lib/server/cache.js';
 import { SIGNAL_TTL } from '$lib/config/constants.js';
@@ -30,7 +30,7 @@ import { SIGNAL_TTL } from '$lib/config/constants.js';
 const execAsync = promisify(exec);
 
 /**
- * Map jat-signal states to SessionCard states
+ * Map squad-signal states to SessionCard states
  * Signal uses short names, SessionCard expects hyphenated names
  */
 /** @type {Record<string, string>} */
@@ -49,13 +49,13 @@ const SIGNAL_STATE_MAP = {
 };
 
 /**
- * Read signal state from /tmp/jat-signal-tmux-{sessionName}.json
+ * Read signal state from /tmp/squad-signal-tmux-{sessionName}.json
  * Handles both state signals (type: "state") and completion bundles (type: "complete")
  * @param {string} sessionName - tmux session name
  * @returns {string|null} Session state or null if no valid signal
  */
 function readSignalState(sessionName) {
-	const signalFile = `/tmp/jat-signal-tmux-${sessionName}.json`;
+	const signalFile = `/tmp/squad-signal-tmux-${sessionName}.json`;
 
 	try {
 		if (!existsSync(signalFile)) {
@@ -133,7 +133,7 @@ function getCachedTasks() {
 
 /**
  * @typedef {Object} WorkSession
- * @property {string} sessionName - tmux session name (e.g., "jat-WisePrairie")
+ * @property {string} sessionName - tmux session name (e.g., "squad-WisePrairie")
  * @property {string} agentName - Agent name (e.g., "WisePrairie")
  * @property {Object|null} task - Current in_progress task
  * @property {Object|null} lastCompletedTask - Most recently closed task by this agent
@@ -204,7 +204,7 @@ function extractContextPercentFromOutput(output) {
 
 	// Look for status line visual indicator using filled/unfilled squares
 	// Pattern: ▪▪▪▪▪▪▫▫▫▫ (filled squares = context remaining, unfilled = context used)
-	// This appears in the custom JAT statusline
+	// This appears in the custom SQUAD statusline
 	// We want the LAST (most recent) match since context decreases over time
 	const visualMatches = cleanOutput.match(/[▪▫]{5,15}/g);
 	if (visualMatches && visualMatches.length > 0) {
@@ -249,7 +249,7 @@ function detectSessionState(output, task, lastCompletedTask, sessionName) {
 	if (sessionName) {
 		const signalState = readSignalState(sessionName);
 		if (signalState) {
-			// Fix state sync: during /jat:complete, the "closing" step marks the
+			// Fix state sync: during /squad:complete, the "closing" step marks the
 			// task as closed in the DB before the "complete" signal is emitted.
 			// If signal says "completing" but task is already closed (no active task),
 			// the completion is effectively done — show "completed" instead.
@@ -280,8 +280,8 @@ function detectSessionStateFromOutput(output, task, lastCompletedTask, sessionNa
 	const recentOutput = output ? stripAnsi(output.slice(-3000)) : '';
 
 	// Find LAST position of each marker type (most recent wins)
-	const completedPos = recentOutput.lastIndexOf('[JAT:COMPLETED]');
-	const idlePos = recentOutput.lastIndexOf('[JAT:IDLE]');
+	const completedPos = recentOutput.lastIndexOf('[SQUAD:COMPLETED]');
+	const idlePos = recentOutput.lastIndexOf('[SQUAD:IDLE]');
 	// Claude Code question UI patterns (more specific than just ⎿ which appears in all tool results)
 	const questionUIPatterns = [
 		'Enter to select',           // Question selection UI
@@ -289,14 +289,14 @@ function detectSessionStateFromOutput(output, task, lastCompletedTask, sessionNa
 		'Type something',            // Free-form input option
 		'[ ]',                       // Checkbox option
 	];
-	let needsInputPos = recentOutput.lastIndexOf('[JAT:NEEDS_INPUT]');
+	let needsInputPos = recentOutput.lastIndexOf('[SQUAD:NEEDS_INPUT]');
 	for (const pattern of questionUIPatterns) {
 		const pos = recentOutput.lastIndexOf(pattern);
 		if (pos > needsInputPos) needsInputPos = pos;
 	}
 	const reviewPos = Math.max(
-		recentOutput.lastIndexOf('[JAT:NEEDS_REVIEW]'),
-		recentOutput.lastIndexOf('[JAT:READY]'),
+		recentOutput.lastIndexOf('[SQUAD:NEEDS_REVIEW]'),
+		recentOutput.lastIndexOf('[SQUAD:READY]'),
 		recentOutput.lastIndexOf('ready to mark complete'),
 		recentOutput.lastIndexOf('Ready to mark complete'),
 		recentOutput.lastIndexOf('shall I mark'),
@@ -305,11 +305,11 @@ function detectSessionStateFromOutput(output, task, lastCompletedTask, sessionNa
 		recentOutput.lastIndexOf('Ready for Review')
 	);
 	const completingPos = Math.max(
-		recentOutput.lastIndexOf('jat:complete is running'),
+		recentOutput.lastIndexOf('squad:complete is running'),
 		recentOutput.lastIndexOf('Marking task complete')
 	);
-	const workingPos = recentOutput.lastIndexOf('[JAT:WORKING');
-	const compactingPos = recentOutput.lastIndexOf('[JAT:COMPACTING]');
+	const workingPos = recentOutput.lastIndexOf('[SQUAD:WORKING');
+	const compactingPos = recentOutput.lastIndexOf('[SQUAD:COMPACTING]');
 
 	// If there's an active task, use marker-based detection
 	if (task) {
@@ -339,7 +339,7 @@ function detectSessionStateFromOutput(output, task, lastCompletedTask, sessionNa
 	// This matches SessionCard.svelte logic for consistency
 	if (lastCompletedTask) {
 		// Check for completion evidence in output
-		// [JAT:IDLE] appears AFTER task completion, so it indicates recently completed
+		// [SQUAD:IDLE] appears AFTER task completion, so it indicates recently completed
 		const hasCompletionMarker = completedPos >= 0 || idlePos >= 0 ||
 			/✅\s*TASK COMPLETE/.test(recentOutput);
 		const hasReviewMarker = reviewPos >= 0;
@@ -429,7 +429,7 @@ export async function GET({ url }) {
  * @param {boolean} includeUsage
  */
 async function computeWorkData(lines, includeUsage) {
-	// Step 1: List jat-* tmux sessions
+	// Step 1: List squad-* tmux sessions
 		const sessionsCommand = `tmux list-sessions -F "#{session_name}:#{session_created}:#{session_attached}" 2>/dev/null || echo ""`;
 
 		let sessionsOutput = '';
@@ -457,7 +457,7 @@ async function computeWorkData(lines, includeUsage) {
 			};
 		}
 
-		// Parse sessions and filter for jat-* prefix (excluding jat-pending-* which are still being set up)
+		// Parse sessions and filter for squad-* prefix (excluding squad-pending-* which are still being set up)
 		const rawSessions = sessionsOutput
 			.split('\n')
 			.filter(line => line.length > 0)
@@ -469,9 +469,9 @@ async function computeWorkData(lines, includeUsage) {
 					attached: attached === '1'
 				};
 			})
-			.filter(session => session.name.startsWith('jat-'))
-			// Filter out pending sessions (still being set up, not yet renamed to jat-{AgentName})
-			.filter(session => !session.name.startsWith('jat-pending-'));
+			.filter(session => session.name.startsWith('squad-'))
+			// Filter out pending sessions (still being set up, not yet renamed to squad-{AgentName})
+			.filter(session => !session.name.startsWith('squad-pending-'));
 
 		if (rawSessions.length === 0) {
 			return {
@@ -486,7 +486,7 @@ async function computeWorkData(lines, includeUsage) {
 		// Step 1b: Skip terminal resize - now handled at session creation time
 		// (Previously ran tmux resize-window for every session on every request, causing ~200ms overhead)
 
-		// Step 2: Get all tasks from JAT (for lookup) - uses cache to avoid expensive JSONL parsing
+		// Step 2: Get all tasks from SQUAD (for lookup) - uses cache to avoid expensive JSONL parsing
 		const allTasks = getCachedTasks();
 
 		// Create a map of agent -> in_progress task
@@ -551,7 +551,7 @@ async function computeWorkData(lines, includeUsage) {
 		const activeSessionNames = new Set();
 
 		for (const session of rawSessions) {
-			const agentName = session.name.replace(/^jat-/, '');
+			const agentName = session.name.replace(/^squad-/, '');
 			const signalState = readSignalState(session.name);
 			if (signalState) {
 				preSignalStates.set(session.name, signalState);
@@ -596,7 +596,7 @@ async function computeWorkData(lines, includeUsage) {
 
 			if (sessionsToCap.length > 0) {
 				// Build a single shell command that captures active sessions with delimiters.
-				const DELIM = '___JAT_SESSION_DELIM___';
+				const DELIM = '___SQUAD_SESSION_DELIM___';
 				const captureScript = sessionsToCap.map(name =>
 					`echo '${DELIM}${name}${DELIM}'; tmux capture-pane -p -e -t '${name}' -S -${lines} 2>/dev/null || true`
 				).join('; ');
@@ -637,10 +637,10 @@ async function computeWorkData(lines, includeUsage) {
 		/** @type {WorkSession[]} */
 		const workSessions = await Promise.all(
 			rawSessions.map(async (session) => {
-				// Extract agent name from session name (jat-AgentName -> AgentName)
-				// The tmux session name is the authoritative source since /jat:start
+				// Extract agent name from session name (squad-AgentName -> AgentName)
+				// The tmux session name is the authoritative source since /squad:start
 				// renames the tmux session when registering the agent
-				const agentName = session.name.replace(/^jat-/, '');
+				const agentName = session.name.replace(/^squad-/, '');
 
 				// Get task for this agent
 				/** @type {Task|null} */

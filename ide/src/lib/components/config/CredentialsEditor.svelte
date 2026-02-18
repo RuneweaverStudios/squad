@@ -3,13 +3,13 @@
 	 * CredentialsEditor Component (Secret Vault)
 	 *
 	 * A general-purpose secret vault for managing API keys and credentials.
-	 * Keys are stored securely in ~/.config/jat/credentials.json and displayed masked.
+	 * Keys are stored securely in ~/.config/squad/credentials.json and displayed masked.
 	 *
 	 * Sections:
 	 * - Provider Keys: Built-in AI provider API keys (Anthropic, Google, OpenAI)
 	 *   with "Used by" indicators showing which IDE features depend on each key
 	 * - Custom Secrets: User-defined keys for external services
-	 *   accessible via `jat-secret <name>` or environment variables
+	 *   accessible via `squad-secret <name>` or environment variables
 	 *
 	 * Features:
 	 * - Add/edit/delete API keys
@@ -373,7 +373,7 @@
 		<h2>Secret Vault</h2>
 		<p class="section-description">
 			Securely store API keys and credentials. All secrets are encrypted at rest in
-			<code>~/.config/jat/credentials.json</code>
+			<code>~/.config/squad/credentials.json</code>
 		</p>
 	</div>
 
@@ -514,7 +514,7 @@
 			<div class="section-subheader">
 				<h3>Custom Secrets</h3>
 				<p class="section-subdescription">
-					Store additional API keys and credentials. Access via <code>jat-secret &lt;name&gt;</code> or environment variables.
+					Store additional API keys and credentials. Access via <code>squad-secret &lt;name&gt;</code> or environment variables.
 				</p>
 			</div>
 
@@ -717,7 +717,7 @@
 							}
 						}}
 					/>
-					<p class="form-hint">Used with <code>jat-secret {customKeyForm.name || 'name'}</code></p>
+					<p class="form-hint">Used with <code>squad-secret {customKeyForm.name || 'name'}</code></p>
 				</div>
 
 				<div class="form-group">

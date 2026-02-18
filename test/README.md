@@ -1,17 +1,17 @@
 # Tests
 
-Test suite for jat.
+Test suite for squad.
 
-## JAT Tasks + Agent Mail Integration Tests
+## SQUAD Tasks + Agent Mail Integration Tests
 
-Run integration tests to verify cross-referencing between JAT tasks and Agent Mail coordination:
+Run integration tests to verify cross-referencing between SQUAD tasks and Agent Mail coordination:
 
 ```bash
 node test/test-integration.js
 ```
 
 Tests verify:
-- ✅ Cross-referencing between JAT Tasks and Agent Mail
+- ✅ Cross-referencing between SQUAD Tasks and Agent Mail
 - ✅ File reservation tracking
 - ✅ Agent assignment queries
 - ✅ Active work tracking
@@ -58,6 +58,6 @@ node test/test-integration.js
 # macOS compatibility
 bash test/test-macos-compat.sh
 
-# JAT workflow test
+# SQUAD workflow test
 bash mail/test-workflow.sh
 ```

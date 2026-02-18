@@ -2,7 +2,7 @@
  * Batch Session Activity API - Get activity states for all sessions in one request
  *
  * GET /api/sessions/activity
- *   Returns activity states for all requested jat-* tmux sessions.
+ *   Returns activity states for all requested squad-* tmux sessions.
  *   Builds file paths directly from session names (avoids scanning /tmp).
  *
  * Query params:
@@ -54,7 +54,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
 		// Build file paths directly from session names — no /tmp directory scan
 		for (const sessionName of sessionNames) {
-			const filePath = `/tmp/jat-activity-${sessionName}.json`;
+			const filePath = `/tmp/squad-activity-${sessionName}.json`;
 
 			try {
 				const stats = statSync(filePath);

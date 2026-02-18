@@ -1,8 +1,8 @@
-# JAT IDE - Development Guide
+# SQUAD IDE - Development Guide
 
 ## Project Overview
 
-Multi-project task management IDE powered by JAT Tasks + Agent Mail. Built with SvelteKit 5, Tailwind CSS v4, and DaisyUI.
+Multi-project task management IDE powered by SQUAD Tasks + Agent Mail. Built with SvelteKit 5, Tailwind CSS v4, and DaisyUI.
 
 ## Tech Stack
 
@@ -497,7 +497,7 @@ let {
   }
 </script>
 
-<button onclick={() => openTaskDetails('jat-abc')}>
+<button onclick={() => openTaskDetails('squad-abc')}>
   View Task Details
 </button>
 
@@ -740,20 +740,20 @@ const requestBody = {
 - `src/routes/api/tasks/[id]/+server.js` - GET/PUT task endpoint
 
 **Task Reference:**
-- jat-25i: Create TaskDetailDrawer base component (completed)
-- jat-lli: Implement auto-save edit mode (planned)
-- jat-dtq: Add quick actions to view mode (planned)
+- squad-25i: Create TaskDetailDrawer base component (completed)
+- squad-lli: Implement auto-save edit mode (planned)
+- squad-dtq: Add quick actions to view mode (planned)
 
 ## Multi-Project Filtering
 
 ### Overview
 
-The IDE supports multi-project task management with intelligent project detection and filtering. Projects are automatically detected from task ID prefixes (e.g., `chimaro-abc`, `jat-xyz`, `jomarchy-123`).
+The IDE supports multi-project task management with intelligent project detection and filtering. Projects are automatically detected from task ID prefixes (e.g., `chimaro-abc`, `squad-xyz`, `jomarchy-123`).
 
 ### How It Works
 
 **Project Detection:**
-- Task IDs follow format: `{project}-{hash}` (e.g., `jat-xkp`, `chimaro-42a`)
+- Task IDs follow format: `{project}-{hash}` (e.g., `squad-xkp`, `chimaro-42a`)
 - Project name is extracted from the prefix before the first hyphen
 - Projects are auto-discovered from all loaded tasks
 - No manual project configuration needed
@@ -763,12 +763,12 @@ The IDE supports multi-project task management with intelligent project detectio
 ```typescript
 // Extract project from task ID
 getProjectFromTaskId("chimaro-abc")  // → "chimaro"
-getProjectFromTaskId("jat-xyz")      // → "jat"
+getProjectFromTaskId("squad-xyz")      // → "squad"
 getProjectFromTaskId("jomarchy-123") // → "jomarchy"
 
 // Get all unique projects from tasks
 getProjectsFromTasks(tasks)
-// → ["All Projects", "chimaro", "jat", "jomarchy"]
+// → ["All Projects", "chimaro", "squad", "jomarchy"]
 
 // Filter tasks by project
 filterTasksByProject(tasks, "chimaro")
@@ -781,7 +781,7 @@ filterTasksByProject(tasks, "chimaro")
 - Dropdown selector in top navigation bar
 - Shows all detected projects
 - Displays task count per project
-- Example: "jat (8) | chimaro (12) | All Projects (20)"
+- Example: "squad (8) | chimaro (12) | All Projects (20)"
 
 **2. TaskQueue Sidebar**
 - Project filter integrated with task queue
@@ -795,7 +795,7 @@ filterTasksByProject(tasks, "chimaro")
 - Example URLs:
   - `/agents` - All projects
   - `/agents?project=chimaro` - Only chimaro tasks
-  - `/agents?project=jat` - Only jat tasks
+  - `/agents?project=squad` - Only squad tasks
 
 ### Features
 
@@ -832,9 +832,9 @@ Result: Shows only chimaro-* tasks
 
 **2. Switch Projects:**
 ```
-1. Select "jat" from dropdown
-2. URL updates to: /agents?project=jat
-3. Tasks refresh to show only jat-* tasks
+1. Select "squad" from dropdown
+2. URL updates to: /agents?project=squad
+3. Tasks refresh to show only squad-* tasks
 4. Share URL with team for same view
 ```
 
@@ -857,8 +857,8 @@ Use case: Dedicated bookmark per project
 Project filter works seamlessly with existing filters:
 
 ```
-/agents?project=jat&priority=P0&status=open
-→ Shows P0 open tasks from jat project only
+/agents?project=squad&priority=P0&status=open
+→ Shows P0 open tasks from squad project only
 
 /agents?project=chimaro&search=authentication
 → Shows chimaro tasks matching "authentication"
@@ -872,9 +872,9 @@ The project filter handles various task ID formats:
 
 | Format | Project Extracted | Example |
 |--------|-------------------|---------|
-| `project-hash` | `project` | `jat-abc` → "jat" |
+| `project-hash` | `project` | `squad-abc` → "squad" |
 | `multi-word-hash` | `multi-word` | `my-app-xyz` → "my-app" |
-| `CAPS-hash` | `caps` | `JAT-123` → "jat" (lowercased) |
+| `CAPS-hash` | `caps` | `SQUAD-123` → "squad" (lowercased) |
 | `under_score-hash` | `under_score` | `my_proj-abc` → "my_proj" |
 
 **Invalid formats (no project extracted):**
@@ -937,7 +937,7 @@ function handleProjectChange(project: string) {
 // Unit tests in projectUtils.test.ts
 test('extracts project from task ID', () => {
   expect(getProjectFromTaskId('chimaro-abc')).toBe('chimaro');
-  expect(getProjectFromTaskId('jat-xyz')).toBe('jat');
+  expect(getProjectFromTaskId('squad-xyz')).toBe('squad');
   expect(getProjectFromTaskId('invalid')).toBeNull();
 });
 ```
@@ -977,10 +977,10 @@ test('extracts project from task ID', () => {
 **Rationale:**
 - Agents are globally unique (one agent name across all projects)
 - Cross-project coordination is common (deployments, infrastructure, team broadcasts)
-**Note:** Agent messaging (am-send, am-inbox) was removed in the reservation-to-jt migration.
+**Note:** Agent messaging (am-send, am-inbox) was removed in the reservation-to-st migration.
 The inbox API endpoint has been deleted. Agent coordination now happens via task assignments and memory.
 
-**Task:** jat-xkr - Resolved 2025-11-21 by SharpIsle (messaging later removed in jat-8vpc9)
+**Task:** squad-xkr - Resolved 2025-11-21 by SharpIsle (messaging later removed in squad-8vpc9)
 
 ## Claude API Usage Metrics
 
@@ -1021,9 +1021,9 @@ npm run dev
 - Future enhancements
 
 **Task References:**
-- jat-sk1: Claude API usage data fetching (completed)
-- jat-1ux: Replace SystemCapacityBar with ClaudeUsageBar (completed)
-- jat-ozq: Document Claude API usage metrics (completed)
+- squad-sk1: Claude API usage data fetching (completed)
+- squad-1ux: Replace SystemCapacityBar with ClaudeUsageBar (completed)
+- squad-ozq: Document Claude API usage metrics (completed)
 
 ## Per-Agent Token Tracking
 
@@ -1054,7 +1054,7 @@ Claude Code Sessions → JSONL Files → tokenUsage.ts → API Endpoints → UI 
 **2. Session-Agent Mapping:**
 - Location: `.claude/agent-{session_id}.txt`
 - Contains: Agent name for that session
-- Created by: Agent workflow commands (`/jat:start`, etc.)
+- Created by: Agent workflow commands (`/squad:start`, etc.)
 
 **3. Token Aggregation:**
 - `tokenUsage.ts` parses JSONL files
@@ -1202,7 +1202,7 @@ Collapsible panel showing:
 **Example:**
 ```bash
 # Session file
-~/.claude/projects/-home-jw-code-jat/abc123-def456.jsonl
+~/.claude/projects/-home-jw-code-squad/abc123-def456.jsonl
 
 # Agent mapping
 .claude/agent-abc123-def456.txt → "WisePrairie"
@@ -1283,10 +1283,10 @@ curl 'http://localhost:3333/api/agents/WisePrairie/usage?range=week'
    ```bash
    # Find project slug
    pwd | sed 's/\//\-/g'
-   # Example: /home/jw/code/jat → -home-jw-code-jat
+   # Example: /home/jw/code/squad → -home-jw-code-squad
 
    # Check for JSONL files
-   ls ~/.claude/projects/-home-jw-code-jat/*.jsonl
+   ls ~/.claude/projects/-home-jw-code-squad/*.jsonl
    ```
 
 2. **Check agent mapping files:**
@@ -1386,11 +1386,11 @@ Check thresholds in `tokenUsageConfig.ts` and adjust to your budget.
 - `ide/CLAUDE.md` - This section
 
 **Task References:**
-- jat-naq: Create tokenUsage.ts utility module (completed)
-- jat-v0w: Create usage API endpoint (completed)
-- jat-1n0: Enhance API orchestration (completed)
-- jat-oig: Display token usage on AgentCard (completed)
-- jat-1q7: Document per-agent token tracking (this section)
+- squad-naq: Create tokenUsage.ts utility module (completed)
+- squad-v0w: Create usage API endpoint (completed)
+- squad-1n0: Enhance API orchestration (completed)
+- squad-oig: Display token usage on AgentCard (completed)
+- squad-1q7: Document per-agent token tracking (this section)
 
 ## Two-Phase Loading Pattern
 
@@ -1585,7 +1585,7 @@ While Phase 2 data loads, show DaisyUI skeleton loaders:
 - Consider debouncing rapid updates
 
 **Task References:**
-- jat-aydj: Fix long loading time on /dash (completed)
+- squad-aydj: Fix long loading time on /dash (completed)
 
 ### Skeleton Component Library
 
@@ -1664,7 +1664,7 @@ The **SessionCard** component (`src/lib/components/work/SessionCard.svelte`) tra
 │     │            │              │             │            │           │    │
 │     │            │              │             │            │           │    │
 │     ▼            ▼              ▼             ▼            ▼           ▼    │
-│  Agent       Agent is       Agent asks    Agent asks   /jat:complete  Task  │
+│  Agent       Agent is       Agent asks    Agent asks   /squad:complete  Task  │
 │  booting     working on     a question    if ready     is running    done   │
 │              task           (tool use)    to complete                       │
 │                                                                             │
@@ -1679,36 +1679,36 @@ The **SessionCard** component (`src/lib/components/work/SessionCard.svelte`) tra
 | `working` | ⚡ WORKING | Amber | Agent actively working | SSE `sseState='working'` OR task.status === 'in_progress' |
 | `needs-input` | ❓ NEEDS INPUT | Purple | Waiting for user response | SSE `sseState='needs_input'` OR `⎿` prompt in output |
 | `ready-for-review` | 👁 REVIEW | Cyan | Agent asking to complete | SSE `sseState='review'` |
-| `completing` | ⏳ COMPLETING | Teal | Running /jat:complete | "jat:complete is running" in output |
+| `completing` | ⏳ COMPLETING | Teal | Running /squad:complete | "squad:complete is running" in output |
 | `completed` | ✓ COMPLETED | Green | Task finished | SSE `sseState='completed'` |
 | `idle` | 💤 IDLE | Gray | No active task | SSE `sseState='idle'` OR agent registered but no task |
 
 ### State Detection via Signals API
 
-Session state is detected via SSE (Server-Sent Events) from the signals API. Agents emit state changes using `jat-signal` with JSON payloads:
+Session state is detected via SSE (Server-Sent Events) from the signals API. Agents emit state changes using `squad-signal` with JSON payloads:
 
 ```bash
 # Agent signals working state (requires JSON)
-jat-signal working '{"taskId":"jat-abc","taskTitle":"Add auth"}'
+squad-signal working '{"taskId":"squad-abc","taskTitle":"Add auth"}'
 
 # Agent signals needs input (requires JSON)
-jat-signal needs_input '{"taskId":"jat-abc","question":"Which lib?","questionType":"choice"}'
+squad-signal needs_input '{"taskId":"squad-abc","question":"Which lib?","questionType":"choice"}'
 
 # Agent signals ready for review (requires JSON)
-jat-signal review '{"taskId":"jat-abc","summary":["Added login"]}'
+squad-signal review '{"taskId":"squad-abc","summary":["Added login"]}'
 
 # Agent signals completion (requires JSON - full bundle)
-jat-signal complete '{"taskId":"jat-abc","agentName":"Agent","completionMode":"review_required","summary":["Added login"],"quality":{"tests":"passing","build":"clean"},"suggestedTasks":[]}'
+squad-signal complete '{"taskId":"squad-abc","agentName":"Agent","completionMode":"review_required","summary":["Added login"],"quality":{"tests":"passing","build":"clean"},"suggestedTasks":[]}'
 ```
 
-The PostToolUse hook captures these signals and writes them to `/tmp/jat-signal-{session}.json`. The SSE server reads these files and broadcasts state changes to connected IDE clients via `session-signal` events.
+The PostToolUse hook captures these signals and writes them to `/tmp/squad-signal-{session}.json`. The SSE server reads these files and broadcasts state changes to connected IDE clients via `session-signal` events.
 
 **See:** `shared/signals.md` for the complete signal system documentation.
 
 ### State Transitions
 
 **STARTING → WORKING:**
-- Agent runs `jat-signal working '{"taskId":"...","taskTitle":"..."}'`
+- Agent runs `squad-signal working '{"taskId":"...","taskTitle":"..."}'`
 - Or inferred from `task.status === 'in_progress'` in task database
 
 **WORKING → NEEDS INPUT:**
@@ -1723,8 +1723,8 @@ The PostToolUse hook captures these signals and writes them to `/tmp/jat-signal-
 - Agent asks about completion: "ready to mark complete?", "shall I mark", etc.
 
 **REVIEW → COMPLETING:**
-- User runs `/jat:complete` command
-- Pattern: "jat:complete is running"
+- User runs `/squad:complete` command
+- Pattern: "squad:complete is running"
 
 **COMPLETING → COMPLETED → IDLE:**
 - Task marked closed
@@ -1850,7 +1850,7 @@ The **SessionCard** component (`src/lib/components/work/SessionCard.svelte`) is 
 ```svelte
 <SessionCard
   mode="compact"
-  sessionName={`jat-${agent.name}`}
+  sessionName={`squad-${agent.name}`}
   agentName={agent.name}
   task={agentTask}
   tokens={agent.usage?.today?.total_tokens || 0}
@@ -1869,7 +1869,7 @@ SessionCard receives agent activity state via SSE from the signals API:
 | `working` | `sseState='working'` | Actively coding |
 | `needs-input` | `sseState='needs_input'` OR question UI patterns | Waiting for user |
 | `ready-for-review` | `sseState='review'` | Asking to complete |
-| `completing` | `jat:complete is running` in output | Running completion |
+| `completing` | `squad:complete is running` in output | Running completion |
 | `completed` | `sseState='completed'` | Task finished |
 | `idle` | `sseState='idle'` OR no task assigned | No active work |
 
@@ -2113,7 +2113,7 @@ Returns current question data if available:
 
 ### Task Reference
 
-- jat-nsrz: Smart Question UI - Parse and display Claude Code question options (completed)
+- squad-nsrz: Smart Question UI - Parse and display Claude Code question options (completed)
 
 ## Instant Signal Pattern (Triage Effect)
 
@@ -2139,7 +2139,7 @@ Session actions provide immediate UI feedback by writing signal files directly B
 │                                                                             │
 │  2. INSTANTLY write signal to temp file                                     │
 │     └─► POST /api/sessions/{name}/signal                                    │
-│     └─► Writes to /tmp/jat-signal-tmux-{session}.json                       │
+│     └─► Writes to /tmp/squad-signal-tmux-{session}.json                       │
 │     └─► UI polls this file → shows new state IMMEDIATELY                    │
 │                                                                             │
 │  3. THEN call actual API endpoint                                           │
@@ -2155,7 +2155,7 @@ Session actions provide immediate UI feedback by writing signal files directly B
 
 | Term | Description | Emitter |
 |------|-------------|---------|
-| **Agent-emitted signal** | Agent runs `jat-signal` command during workflow | Agent process |
+| **Agent-emitted signal** | Agent runs `squad-signal` command during workflow | Agent process |
 | **IDE-initiated signal** | IDE writes signal file directly via API or spawn | IDE server |
 | **Optimistic UI state** | Local Svelte state override for instant feedback | Component |
 
@@ -2165,9 +2165,9 @@ Session actions provide immediate UI feedback by writing signal files directly B
 |--------|-----------------|----------------|------------|
 | `spawn` | (new) → starting | `starting` | Creates tmux + Claude |
 | `pause` | working → paused | `paused` | `/api/sessions/[name]/pause` |
-| `completing` | working → completing | `completing` | `/jat:complete` command |
+| `completing` | working → completing | `completing` | `/squad:complete` command |
 | `resume` | paused → working | `working` | `/api/sessions/[name]/resume` |
-| `start` | idle → starting | `starting` | `/jat:start` command |
+| `start` | idle → starting | `starting` | `/squad:start` command |
 | `start-next` | completed → auto-proceeding | `auto-proceeding` | `/api/tasks/next` |
 
 ### Implementation Details
@@ -2182,10 +2182,10 @@ if (direct) {
     const signal = { type, ...signalData, timestamp };
 
     // Write current signal state
-    writeFileSync(`/tmp/jat-signal-tmux-${tmuxSession}.json`, JSON.stringify(signal, null, 2));
+    writeFileSync(`/tmp/squad-signal-tmux-${tmuxSession}.json`, JSON.stringify(signal, null, 2));
 
     // Append to timeline history
-    appendFileSync(`/tmp/jat-timeline-${tmuxSession}.jsonl`, JSON.stringify(timelineEvent) + '\n');
+    appendFileSync(`/tmp/squad-timeline-${tmuxSession}.jsonl`, JSON.stringify(timelineEvent) + '\n');
 }
 ```
 
@@ -2268,8 +2268,8 @@ $effect(() => {
 - `src/lib/components/sessions/TasksActive.svelte` - Optimistic state pattern for StatusActionBadge
 
 **Signal Files:**
-- `/tmp/jat-signal-tmux-{session}.json` - Current signal state (read by SSE)
-- `/tmp/jat-timeline-{session}.jsonl` - Signal history (append-only)
+- `/tmp/squad-signal-tmux-{session}.json` - Current signal state (read by SSE)
+- `/tmp/squad-timeline-{session}.jsonl` - Signal history (append-only)
 
 ### When to Use This Pattern
 
@@ -2285,8 +2285,8 @@ $effect(() => {
 
 ### Task Reference
 
-- jat-5z78g: Instant signal pattern for session state transitions (completed)
-- jat-n1937: Add optimistic local state to TasksActive for instant StatusActionBadge updates (completed)
+- squad-5z78g: Instant signal pattern for session state transitions (completed)
+- squad-n1937: Add optimistic local state to TasksActive for instant StatusActionBadge updates (completed)
 
 ## Sound Effects System
 
@@ -2387,7 +2387,7 @@ playMyNewSound();
 
 ### Task Reference
 
-- jat-fr9v: Research and implement sound effects system (completed)
+- squad-fr9v: Research and implement sound effects system (completed)
 
 ## UI Patterns: Table Row Gradients (hasRowGradient)
 
@@ -2485,7 +2485,7 @@ class="... {isWorkingCompleted ? 'task-working-completed' : isCompleted ? 'task-
 
 ### Task Reference
 
-- jat-2mzr: Retain completed tasks visible in TaskTable (completed)
+- squad-2mzr: Retain completed tasks visible in TaskTable (completed)
 
 ## UI Patterns: Jump to Session (Click-to-Center)
 
@@ -2588,17 +2588,17 @@ This tells `scrollIntoView({ block: 'start' })` to leave extra space at the top.
 
 ### Task Reference
 
-- jat-35hd: Document Jump to Session behavior and fix scroll offset (completed)
+- squad-35hd: Document Jump to Session behavior and fix scroll offset (completed)
 
 ## User Templates
 
 ### Overview
 
-The IDE supports custom user templates stored in `~/.config/jat/templates/`. These complement the built-in templates and allow users to save their own command patterns for reuse.
+The IDE supports custom user templates stored in `~/.config/squad/templates/`. These complement the built-in templates and allow users to save their own command patterns for reuse.
 
 ### Architecture
 
-**Storage Location:** `~/.config/jat/templates/{id}.json`
+**Storage Location:** `~/.config/squad/templates/{id}.json`
 
 **File Format:**
 ```json
@@ -2731,7 +2731,7 @@ const userTemplates = allTemplates.filter(t => t.isUserTemplate);
 
 ### Task Reference
 
-- jat-4e31: Add custom user templates (completed)
+- squad-4e31: Add custom user templates (completed)
 
 ## Credentials & API Keys Settings
 
@@ -2778,7 +2778,7 @@ Users can add their own API keys for custom services:
 
 ### Security
 
-- Keys stored in `~/.config/jat/credentials.json` with 0600 permissions
+- Keys stored in `~/.config/squad/credentials.json` with 0600 permissions
 - Full keys never sent to browser (only masked versions)
 - Verification available for built-in providers
 
@@ -2805,16 +2805,16 @@ setProjectSecret(projectKey: string, secretKey: string, value: string): void
 getProjectSecretWithFallback(projectKey: string, secretKey: string): string | undefined
 ```
 
-### Bash Tool: jat-secret
+### Bash Tool: squad-secret
 
 Access credentials from shell scripts and hooks:
 
 ```bash
-jat-secret stripe              # Get value
-jat-secret --env stripe        # Get env var name (STRIPE_API_KEY)
-jat-secret --list              # List all keys
-jat-secret --export            # Output export statements
-eval $(jat-secret --export)    # Load all as env vars
+squad-secret stripe              # Get value
+squad-secret --env stripe        # Get env var name (STRIPE_API_KEY)
+squad-secret --list              # List all keys
+squad-secret --export            # Output export statements
+eval $(squad-secret --export)    # Load all as env vars
 ```
 
 ### Files
@@ -2831,7 +2831,7 @@ eval $(jat-secret --export)    # Load all as env vars
 - `src/lib/utils/credentials.ts` - CRUD operations, masking, validation
 
 **Storage:**
-- `~/.config/jat/credentials.json` - Secure credential storage
+- `~/.config/squad/credentials.json` - Secure credential storage
 
 ## Autopilot Settings
 
@@ -2848,7 +2848,7 @@ The **SwarmSettingsEditor** component (`src/lib/components/config/SwarmSettingsE
 | `auto_proceed` | Signal value: spawn next task (Epic Swarm) |
 | `review_required` | Signal value: don't auto-spawn |
 | **spawn** | Create a new session for the next task |
-| **auto-complete** | IDE auto-triggers `/jat:complete` based on review rules |
+| **auto-complete** | IDE auto-triggers `/squad:complete` based on review rules |
 | **auto-kill** | Session self-destructs (tracked by IDE, not in signal) |
 
 ### Features
@@ -2877,7 +2877,7 @@ The SwarmSettingsEditor manages two categories of settings:
 | `agent_stagger` | 15 | 1-120 | Seconds between spawning each agent |
 | `claude_startup_timeout` | 20 | 5-120 | Seconds to wait for Claude TUI to start |
 
-**Storage:** Settings are persisted to `~/.config/jat/projects.json` under the `defaults` key.
+**Storage:** Settings are persisted to `~/.config/squad/projects.json` under the `defaults` key.
 
 ### Review Rules Matrix
 
@@ -2899,7 +2899,7 @@ epic        review    review    review    review    auto
 - Higher-priority tasks (P0, P1) typically require human review
 - Per-type notes can be added for team guidance
 
-**Storage:** Review rules are stored in `~/.config/jat/review-rules.json`.
+**Storage:** Review rules are stored in `~/.config/squad/review-rules.json`.
 
 ### API Endpoints
 
@@ -2945,7 +2945,7 @@ epic        review    review    review    review    auto
 Default values are defined in `src/lib/config/constants.ts`:
 
 ```typescript
-export const JAT_DEFAULTS = {
+export const SQUAD_DEFAULTS = {
     terminal: 'alacritty',
     editor: 'code',
     tools_path: '~/.local/bin',
@@ -2995,19 +2995,19 @@ await fetch('/api/config/defaults', {
 - `src/lib/components/ReviewRulesEditor.svelte` - Review rules matrix (embedded)
 
 **Configuration:**
-- `src/lib/config/constants.ts` - JAT_DEFAULTS with default values
+- `src/lib/config/constants.ts` - SQUAD_DEFAULTS with default values
 
 **API:**
 - `src/routes/api/config/defaults/+server.ts` - Spawn settings endpoint
 - `src/routes/api/review-rules/+server.ts` - Review rules endpoint
 
 **Storage:**
-- `~/.config/jat/projects.json` - Spawn settings (under `defaults` key)
-- `~/.config/jat/review-rules.json` - Review rules matrix
+- `~/.config/squad/projects.json` - Spawn settings (under `defaults` key)
+- `~/.config/squad/review-rules.json` - Review rules matrix
 
 ### Task Reference
 
-- jat-zzlgv: Document SwarmSettingsEditor in CLAUDE.md (this section)
+- squad-zzlgv: Document SwarmSettingsEditor in CLAUDE.md (this section)
 
 ## Keyboard Shortcuts
 
@@ -3093,8 +3093,8 @@ Users can assign custom keyboard shortcuts to any slash command. These are store
 // Get/set command shortcuts
 import { getShortcut, setShortcut } from '$lib/stores/keyboardShortcuts.svelte';
 
-setShortcut('/jat:complete', 'Alt+C');
-const shortcut = getShortcut('/jat:complete'); // 'Alt+C'
+setShortcut('/squad:complete', 'Alt+C');
+const shortcut = getShortcut('/squad:complete'); // 'Alt+C'
 
 // Get/set global shortcuts
 import { getGlobalShortcut, setGlobalShortcut } from '$lib/stores/keyboardShortcuts.svelte';
@@ -3109,7 +3109,7 @@ resetGlobalShortcut('new-task'); // Back to 'Alt+N'
 
 ### Task Reference
 
-- jat-tt20r: Add keyboard shortcut documentation to CLAUDE.md
+- squad-tt20r: Add keyboard shortcut documentation to CLAUDE.md
 
 ## Task Context Menus (/tasks page)
 
@@ -3141,7 +3141,7 @@ Right-click the **header row** or the **expanded terminal/session area** of any 
 | **Duplicate** | Create a copy of the task |
 | **Interrupt** | Send Ctrl+C to the agent session |
 | **Pause** | Pause the agent session |
-| **Complete** | Optimistic state update + signal emission, triggers `/jat:complete` |
+| **Complete** | Optimistic state update + signal emission, triggers `/squad:complete` |
 | **Close & Kill** | Close task via API, then kill tmux session (danger action) |
 
 ### Performance: CSS Visibility Toggle
@@ -3186,13 +3186,13 @@ function closeContextMenu() {
 
 ### Task Reference
 
-- jat-qqltp: Right-click context menus for standalone tasks on /tasks page (completed)
+- squad-qqltp: Right-click context menus for standalone tasks on /tasks page (completed)
 
 ## Monaco Editor Context Menu Actions
 
 ### Overview
 
-All Monaco editors in the IDE support custom right-click context menu actions for LLM interaction and task creation. The context menu is styled to match the JAT FileTree aesthetic (dark theme, rounded corners, oklch colors).
+All Monaco editors in the IDE support custom right-click context menu actions for LLM interaction and task creation. The context menu is styled to match the SQUAD FileTree aesthetic (dark theme, rounded corners, oklch colors).
 
 ### Custom Actions
 
@@ -3224,7 +3224,7 @@ All Monaco editors in the IDE support custom right-click context menu actions fo
 
 ### Styled Context Menu
 
-The Monaco context menu is globally styled in `app.css` (section: "MONACO EDITOR CONTEXT MENU") to match the JAT FileTree style:
+The Monaco context menu is globally styled in `app.css` (section: "MONACO EDITOR CONTEXT MENU") to match the SQUAD FileTree style:
 
 - Dark background (`oklch(0.18 0.02 250)`)
 - Rounded corners with subtle border
@@ -3247,7 +3247,7 @@ The Monaco context menu is globally styled in `app.css` (section: "MONACO EDITOR
 
 ### Task Reference
 
-- jat-a7372: Add Send to LLM and Create Task context menu actions to all Monaco editors
+- squad-a7372: Add Send to LLM and Create Task context menu actions to all Monaco editors
 
 ## Project File Explorer (/files)
 
@@ -3626,7 +3626,7 @@ The file explorer persists open tabs and their order to localStorage, allowing u
 
 **How It Works:**
 
-1. **Storage Key:** `jat-files-open-${projectName}` (one key per project)
+1. **Storage Key:** `squad-files-open-${projectName}` (one key per project)
 2. **Data Format:**
    ```json
    {
@@ -3649,7 +3649,7 @@ The file explorer persists open tabs and their order to localStorage, allowing u
 
 | Function | Purpose |
 |----------|---------|
-| `getStorageKey(project)` | Returns key: `jat-files-open-${project}` |
+| `getStorageKey(project)` | Returns key: `squad-files-open-${project}` |
 | `saveOpenFilesToStorage()` | Serializes current state to localStorage |
 | `loadOpenFilesFromStorage()` | Restores state on mount (runs once per project) |
 
@@ -3714,16 +3714,16 @@ Icons are determined by file extension in FileTree:
 
 ### Epic Task Reference
 
-- jat-f79r7: Epic - Project File Explorer (/files route)
-  - jat-kms1v: Create /files/+page.svelte main layout (completed)
-  - jat-gz6pb: Create FileTree component with lazy loading (completed)
-  - jat-2gfhm: Add file type icons to FileTree (completed)
-  - jat-tzi7a: Add keyboard shortcuts for file operations (completed)
-  - jat-6z80w: File tabs can be drag and dropped to reorder (completed)
-  - jat-5qtio: Add file/folder create, rename, delete operations (completed)
-  - jat-myayu: Add persistent tab order storage (completed)
-  - jat-q5835: Add documentation for tab order feature (completed)
-  - jat-hxpie: Create Documentation for FileEditor Component (completed)
+- squad-f79r7: Epic - Project File Explorer (/files route)
+  - squad-kms1v: Create /files/+page.svelte main layout (completed)
+  - squad-gz6pb: Create FileTree component with lazy loading (completed)
+  - squad-2gfhm: Add file type icons to FileTree (completed)
+  - squad-tzi7a: Add keyboard shortcuts for file operations (completed)
+  - squad-6z80w: File tabs can be drag and dropped to reorder (completed)
+  - squad-5qtio: Add file/folder create, rename, delete operations (completed)
+  - squad-myayu: Add persistent tab order storage (completed)
+  - squad-q5835: Add documentation for tab order feature (completed)
+  - squad-hxpie: Create Documentation for FileEditor Component (completed)
 
 ## File Operations Error Handling
 
@@ -3999,7 +3999,7 @@ Errors are displayed in modal dialogs with appropriate styling:
 
 ### Task Reference
 
-- jat-r1luo: Document Error Handling Patterns
+- squad-r1luo: Document Error Handling Patterns
 
 ## Development Commands
 
@@ -4161,7 +4161,7 @@ Tailwind's `bg-gradient-*` cannot:
 3. Would break theme-awareness (CSS variable usage)
 
 **If adding new animations:**
-- Use the existing `--anim-*` CSS variables (defined in `[data-theme='jat']`)
+- Use the existing `--anim-*` CSS variables (defined in `[data-theme='squad']`)
 - Follow the `color-mix(in oklch, var(--anim-*) XX%, transparent)` pattern
 - Place in app.css with the other animation keyframes
 
@@ -4180,7 +4180,7 @@ Tailwind's `bg-gradient-*` cannot:
 
 ### Task Reference
 
-- jat-k6zps: Audit app.css animations and document non-replaceable patterns
+- squad-k6zps: Audit app.css animations and document non-replaceable patterns
 
 ## Animation Utility Classes
 
@@ -4350,7 +4350,7 @@ These specialized classes are defined earlier in `app.css` for specific UI patte
 
 ### Task Reference
 
-- jat-3845b: Standardize animation utility classes
+- squad-3845b: Standardize animation utility classes
 
 ## Agent Registration via IDE Spawn API
 
@@ -4381,13 +4381,13 @@ The IDE's `/api/work/spawn` endpoint handles agent registration automatically wh
 │     └─► INSERT INTO agents (project_id, name, program, model, ...)         │
 │                                                                             │
 │  4. Write agent identity file (pre-session)                                 │
-│     └─► .claude/sessions/.tmux-agent-jat-{AgentName}                       │
+│     └─► .claude/sessions/.tmux-agent-squad-{AgentName}                       │
 │                                                                             │
 │  5. Create tmux session + start Claude Code                                 │
-│     └─► tmux new-session -d -s "jat-{AgentName}"                           │
+│     └─► tmux new-session -d -s "squad-{AgentName}"                           │
 │     └─► claude --model {model} --append-system-prompt ...                  │
 │                                                                             │
-│  6. Send /jat:start {AgentName} [taskId]                                   │
+│  6. Send /squad:start {AgentName} [taskId]                                   │
 │     └─► Agent resumes existing identity (no duplicate registration)        │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -4448,9 +4448,9 @@ INSERT INTO projects (slug, human_key) VALUES (?, ?)
 
 ### Session Identity Files
 
-Before starting Claude Code, the spawn API writes identity files that help hooks and the `/jat:start` command identify the agent:
+Before starting Claude Code, the spawn API writes identity files that help hooks and the `/squad:start` command identify the agent:
 
-**File written:** `.claude/sessions/.tmux-agent-jat-{AgentName}`
+**File written:** `.claude/sessions/.tmux-agent-squad-{AgentName}`
 
 **Contents:** Just the agent name (e.g., `GentleCoast`)
 
@@ -4458,7 +4458,7 @@ Before starting Claude Code, the spawn API writes identity files that help hooks
 
 **Why pre-write?**
 - Claude Code's session ID isn't known until it starts
-- The tmux session name IS known (`jat-{AgentName}`)
+- The tmux session name IS known (`squad-{AgentName}`)
 - Hooks can look up agent name using tmux session name
 
 ### Comparison: Legacy vs New Approach
@@ -4467,15 +4467,15 @@ Before starting Claude Code, the spawn API writes identity files that help hooks
 |--------|---------------------|-----------------|
 | **Name generation** | Bash script with word lists | JavaScript with same word lists |
 | **Database access** | Via am-register bash tool | Direct SQLite via better-sqlite3 |
-| **When registered** | By agent after /jat:start | By IDE before Claude starts |
+| **When registered** | By agent after /squad:start | By IDE before Claude starts |
 | **Identity file** | Written by agent | Written by IDE (pre-session) |
-| **Task assignment** | Agent runs `jt update` | IDE runs `jt update` |
+| **Task assignment** | Agent runs `st update` | IDE runs `st update` |
 | **Collision check** | am-register handles | JavaScript handles |
 
 **Benefits of new approach:**
 - **Faster startup** - No bash tool overhead
 - **Atomic registration** - Agent exists before Claude starts
-- **Consistent identity** - Name passed to /jat:start matches database
+- **Consistent identity** - Name passed to /squad:start matches database
 - **Better error handling** - JavaScript can return detailed errors
 
 ### API Reference
@@ -4498,14 +4498,14 @@ Before starting Claude Code, the spawn API writes identity files that help hooks
 {
   "success": true,
   "session": {
-    "sessionName": "jat-GentleCoast",
+    "sessionName": "squad-GentleCoast",
     "agentName": "GentleCoast",
-    "task": { "id": "jat-abc", "title": "...", ... },
-    "project": "jat",
+    "task": { "id": "squad-abc", "title": "...", ... },
+    "project": "squad",
     "created": "2025-12-19T12:00:00.000Z",
     "attached": false
   },
-  "message": "Spawned agent GentleCoast for task jat-abc"
+  "message": "Spawned agent GentleCoast for task squad-abc"
 }
 ```
 
@@ -4513,14 +4513,14 @@ Before starting Claude Code, the spawn API writes identity files that help hooks
 
 | Status | Code | Cause |
 |--------|------|-------|
-| 400 | Bad Request | Project path not found, no .jat directory |
+| 400 | Bad Request | Project path not found, no .squad directory |
 | 409 | Conflict | Session already exists (duplicate tmux session name) |
 | 500 | Server Error | Failed to register agent, failed to create session |
 | 202 | Accepted | YOLO warning dialog requires user acceptance |
 
 ### For Agent Developers
 
-**When implementing /jat:start:**
+**When implementing /squad:start:**
 
 1. **Check if agent exists** - The IDE has already registered the agent
 2. **Resume, don't create** - Use the agent name passed as argument
@@ -4531,12 +4531,12 @@ Before starting Claude Code, the spawn API writes identity files that help hooks
    ```
 4. **Rename tmux session** - Ensure IDE can track:
    ```bash
-   tmux rename-session "jat-{AgentName}"
+   tmux rename-session "squad-{AgentName}"
    ```
 
 **The spawn API passes agent name explicitly:**
 ```
-/jat:start GentleCoast jat-abc
+/squad:start GentleCoast squad-abc
 ```
 This ensures the agent uses the pre-registered name instead of generating a new one.
 
@@ -4552,8 +4552,8 @@ This ensures the agent uses the pre-registered name instead of generating a new 
 
 ### Task Reference
 
-- jat-sud88: Add agent registration to IDE spawn API (completed)
-- jat-jbhnu: Document New Agent Registration Process (this section)
+- squad-sud88: Add agent registration to IDE spawn API (completed)
+- squad-jbhnu: Document New Agent Registration Process (this section)
 
 ## References
 

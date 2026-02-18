@@ -3,7 +3,7 @@
 # monitor-output.sh - Real-time output activity monitor
 #
 # Monitors tmux pane output to detect when agent is actively generating text.
-# Writes ephemeral state to /tmp/jat-activity-{session}.json for IDE polling.
+# Writes ephemeral state to /tmp/squad-activity-{session}.json for IDE polling.
 #
 # Usage: monitor-output.sh <tmux-session-name>
 # Started by: user-prompt-signal.sh (on user message)
@@ -21,8 +21,8 @@ if [[ -z "$TMUX_SESSION" ]]; then
     exit 1
 fi
 
-ACTIVITY_FILE="/tmp/jat-activity-${TMUX_SESSION}.json"
-PID_FILE="/tmp/jat-monitor-${TMUX_SESSION}.pid"
+ACTIVITY_FILE="/tmp/squad-activity-${TMUX_SESSION}.json"
+PID_FILE="/tmp/squad-monitor-${TMUX_SESSION}.pid"
 
 # Write our PID so we can be killed by other hooks
 echo $$ > "$PID_FILE"

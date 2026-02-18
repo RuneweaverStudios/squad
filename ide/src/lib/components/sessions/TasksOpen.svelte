@@ -30,7 +30,7 @@
 		priority: number;
 	}
 
-	const STORAGE_KEY = 'jat-open-tasks-project-filter';
+	const STORAGE_KEY = 'squad-open-tasks-project-filter';
 
 	interface Dependency {
 		id: string;

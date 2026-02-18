@@ -3,7 +3,7 @@
  * POST /api/work/[sessionId]/capture-log - Capture and append to unified session log
  *
  * Path params:
- * - sessionId: tmux session name (e.g., "jat-WisePrairie")
+ * - sessionId: tmux session name (e.g., "squad-WisePrairie")
  *
  * Body (optional):
  * - taskId: Task ID for context (used in log metadata)
@@ -11,7 +11,7 @@
  *
  * Behavior:
  * 1. Capture full tmux pane content
- * 2. Append to unified session log: .jat/logs/session-{sessionId}.log
+ * 2. Append to unified session log: .squad/logs/session-{sessionId}.log
  * 3. Return log file path
  *
  * The unified log accumulates all session history across compactions,
@@ -24,7 +24,7 @@ import { promisify } from 'util';
 import { writeFile, appendFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
-import { getTasks } from '$lib/server/jat-tasks.js';
+import { getTasks } from '$lib/server/squad-tasks.js';
 
 const execAsync = promisify(exec);
 
@@ -50,11 +50,11 @@ export async function POST({ params, request }) {
 		}
 
 		const projectPath = process.cwd().replace('/ide', '');
-		const logsDir = path.join(projectPath, '.jat', 'logs');
+		const logsDir = path.join(projectPath, '.squad', 'logs');
 		const reason = body.reason || 'completed';
 
-		// Extract agent name from session name (jat-AgentName -> AgentName)
-		const agentName = sessionId.replace(/^jat-/, '');
+		// Extract agent name from session name (squad-AgentName -> AgentName)
+		const agentName = sessionId.replace(/^squad-/, '');
 
 		// Unified log file path
 		const filename = `session-${sessionId}.log`;

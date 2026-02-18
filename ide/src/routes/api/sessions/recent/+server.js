@@ -2,7 +2,7 @@
  * Recent Closed Sessions API
  * GET /api/sessions/recent - Returns recently closed sessions from signal files
  *
- * Reads /tmp/jat-signal-tmux-jat-*.json files, filters out currently active
+ * Reads /tmp/squad-signal-tmux-squad-*.json files, filters out currently active
  * tmux sessions, and returns the closed ones sorted by mtime descending.
  */
 
@@ -14,13 +14,13 @@ import { singleFlight, cacheKey } from '$lib/server/cache.js';
 
 const execAsync = promisify(exec);
 
-const SIGNAL_PREFIX = 'jat-signal-tmux-jat-';
+const SIGNAL_PREFIX = 'squad-signal-tmux-squad-';
 const SIGNAL_SUFFIX = '.json';
 
 /**
  * Parse a signal file and extract normalized session info
  * @param {string} filePath - Full path to signal file
- * @param {string} sessionName - tmux session name (e.g., "jat-AgentName")
+ * @param {string} sessionName - tmux session name (e.g., "squad-AgentName")
  * @returns {object|null} Parsed session info or null if unparseable
  */
 function parseSignalFile(filePath, sessionName) {
@@ -32,7 +32,7 @@ function parseSignalFile(filePath, sessionName) {
 		// Normalize fields - data lives in different places depending on signal type
 		const agentName = signal.agentName
 			|| signal.data?.agentName
-			|| sessionName.replace(/^jat-/, '');
+			|| sessionName.replace(/^squad-/, '');
 
 		const taskId = signal.taskId || signal.task_id
 			|| signal.data?.taskId
@@ -107,9 +107,9 @@ export async function GET() {
 			const recentSessions = [];
 
 			for (const filename of signalFiles) {
-				// Extract session name from filename: jat-signal-tmux-jat-AgentName.json → jat-AgentName
+				// Extract session name from filename: squad-signal-tmux-squad-AgentName.json → squad-AgentName
 				const sessionName = filename
-					.slice('jat-signal-tmux-'.length, -SIGNAL_SUFFIX.length);
+					.slice('squad-signal-tmux-'.length, -SIGNAL_SUFFIX.length);
 
 				// Skip if this session is currently active
 				if (activeSessions.has(sessionName)) continue;

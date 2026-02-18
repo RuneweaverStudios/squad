@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import * as logger from './logger.js';
 
-const CONFIG_DIR = join(process.env.HOME, '.config/jat');
+const CONFIG_DIR = join(process.env.HOME, '.config/squad');
 const CONFIG_PATH = join(CONFIG_DIR, 'integrations.json');
 const LEGACY_PATH = join(CONFIG_DIR, 'feeds.json');
 
@@ -29,7 +29,7 @@ export function loadConfig() {
   } catch (err) {
     if (err.code === 'ENOENT') {
       logger.error(`Config not found: ${path}`);
-      logger.info('Create it with: jat-ingest-test --init');
+      logger.info('Create it with: squad-ingest-test --init');
       return { version: 1, sources: [] };
     }
     throw err;
@@ -107,7 +107,7 @@ function validate(config) {
 
 export function getSecret(secretName) {
   try {
-    const value = execFileSync('jat-secret', [secretName], {
+    const value = execFileSync('squad-secret', [secretName], {
       encoding: 'utf-8',
       timeout: 5000
     }).trim();

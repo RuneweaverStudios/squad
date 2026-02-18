@@ -1,6 +1,6 @@
 /**
  * Database operations for memory index.
- * Creates and manages .jat/memory.db with chunks, FTS5, and sqlite-vec tables.
+ * Creates and manages .squad/memory.db with chunks, FTS5, and sqlite-vec tables.
  */
 
 import Database from 'better-sqlite3';
@@ -14,11 +14,11 @@ const SCHEMA_PATH = join(__dirname, '..', '..', '..', 'lib', 'memory-schema.sql'
 
 /**
  * Open (or create) the memory database for a project.
- * @param {string} projectPath - Path to project root (contains .jat/)
+ * @param {string} projectPath - Path to project root (contains .squad/)
  * @returns {Database.Database}
  */
 export function openDb(projectPath) {
-  const dbPath = join(projectPath, '.jat', 'memory.db');
+  const dbPath = join(projectPath, '.squad', 'memory.db');
   const db = new Database(dbPath);
 
   // Load sqlite-vec extension
@@ -91,7 +91,7 @@ export function setConfig(db, key, value) {
 /**
  * Get file metadata for change detection.
  * @param {Database.Database} db
- * @param {string} path - Relative path within .jat/memory/
+ * @param {string} path - Relative path within .squad/memory/
  * @returns {{ path: string, file_hash: string, indexed_at: string } | null}
  */
 export function getFileMeta(db, path) {

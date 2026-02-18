@@ -6,8 +6,8 @@
  * 2. Global fallback: Otherwise pick highest-priority ready task from backlog
  *
  * Used by:
- * - StatusActionBadge "Start Next" action (jat-puza.8)
- * - TopBar "Start Next" button (jat-puza.1)
+ * - StatusActionBadge "Start Next" action (squad-puza.8)
+ * - TopBar "Start Next" button (squad-puza.1)
  *
  * Returns: { taskId, source: 'epic' | 'backlog', epicId?: string } | null
  */
@@ -39,7 +39,7 @@ export interface Epic {
 
 /**
  * Get the parent epic ID from a task ID
- * Task IDs with dots (e.g., jat-puza.8) have parent epic (e.g., jat-puza)
+ * Task IDs with dots (e.g., squad-puza.8) have parent epic (e.g., squad-puza)
  */
 export function getParentEpicId(taskId: string): string | null {
 	const dotIndex = taskId.lastIndexOf('.');
@@ -73,7 +73,7 @@ function isTaskReady(task: Task): boolean {
 
 /**
  * Find the next ready sibling task within the same epic
- * Siblings are tasks with the same parent epic ID (e.g., jat-puza.1, jat-puza.2, etc.)
+ * Siblings are tasks with the same parent epic ID (e.g., squad-puza.1, squad-puza.2, etc.)
  */
 async function findNextEpicSibling(
 	completedTaskId: string,

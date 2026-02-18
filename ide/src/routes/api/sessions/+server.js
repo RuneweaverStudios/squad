@@ -1,6 +1,6 @@
 /**
  * Sessions API - List and Spawn Sessions
- * GET /api/sessions - List all tmux sessions (optionally filtered by jat- prefix)
+ * GET /api/sessions - List all tmux sessions (optionally filtered by squad- prefix)
  * POST /api/sessions - Spawn a new Claude Code session
  */
 
@@ -12,7 +12,7 @@ import {
 	DEFAULT_MODEL,
 	AGENT_MAIL_URL
 } from '$lib/config/spawnConfig.js';
-import { getJatDefaults } from '$lib/server/projectPaths.js';
+import { getSquadDefaults } from '$lib/server/projectPaths.js';
 import { CLAUDE_READY_PATTERNS, SHELL_PROMPT_PATTERNS } from '$lib/server/shellPatterns.js';
 import { stripAnsi } from '$lib/utils/ansiToHtml.js';
 import { singleFlight, cacheKey } from '$lib/server/cache.js';
@@ -25,7 +25,7 @@ const execAsync = promisify(exec);
  * @returns {{ resumed: boolean, originalSessionId?: string, resumedAt?: string } | null}
  */
 function getResumeInfo(sessionName) {
-	const resumeFile = `/tmp/jat-resumed-${sessionName}.json`;
+	const resumeFile = `/tmp/squad-resumed-${sessionName}.json`;
 	try {
 		if (!existsSync(resumeFile)) {
 			return null;
@@ -48,7 +48,7 @@ function getResumeInfo(sessionName) {
  * @returns {string|null} Project name or null if not found
  */
 function getProjectFromSignal(sessionName) {
-	const signalFile = `/tmp/jat-signal-tmux-${sessionName}.json`;
+	const signalFile = `/tmp/squad-signal-tmux-${sessionName}.json`;
 	try {
 		if (!existsSync(signalFile)) {
 			return null;
@@ -99,13 +99,13 @@ async function getProjectFromTmuxCwd(sessionName) {
  * GET /api/sessions
  * List all tmux sessions
  * Query params:
- * - filter: 'jat' to only show jat-* sessions (default), 'all' for all sessions
+ * - filter: 'squad' to only show squad-* sessions (default), 'all' for all sessions
  */
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ url }) {
-	let filter = 'jat';
+	let filter = 'squad';
 	try {
-		filter = url.searchParams.get('filter') || 'jat';
+		filter = url.searchParams.get('filter') || 'squad';
 		const key = cacheKey('sessions', { filter });
 
 		// singleFlight: cache + deduplication. Sessions endpoint runs tmux
@@ -132,7 +132,7 @@ export async function GET({ url }) {
 					})
 					.filter(session => {
 						if (filter === 'all') return true;
-						return session.name.startsWith('jat-');
+						return session.name.startsWith('squad-');
 					});
 
 				// Get project and resume info for each session
@@ -141,7 +141,7 @@ export async function GET({ url }) {
 						// Try signal file first (fast, sync)
 						let project = getProjectFromSignal(session.name);
 						// Fall back to tmux working directory (slower, async)
-						if (!project && session.name.startsWith('jat-')) {
+						if (!project && session.name.startsWith('squad-')) {
 							project = await getProjectFromTmuxCwd(session.name);
 						}
 						// Check if this is a resumed session
@@ -214,15 +214,15 @@ export async function GET({ url }) {
  * - project: Project path (default: current project from cwd)
  * - model: Model to use (sonnet-4.5, opus-4.5, haiku)
  * - task: Optional task ID to auto-start
- * - prompt: Optional initial prompt (e.g., '/jat:start auto')
+ * - prompt: Optional initial prompt (e.g., '/squad:start auto')
  */
 /** @type {import('./$types').RequestHandler} */
 export async function POST({ request }) {
 	try {
 		const body = await request.json();
 
-		// Get JAT config defaults for skip_permissions setting
-		const jatDefaults = await getJatDefaults();
+		// Get SQUAD config defaults for skip_permissions setting
+		const squadDefaults = await getSquadDefaults();
 
 		const {
 			agentName,
@@ -230,7 +230,7 @@ export async function POST({ request }) {
 			model = DEFAULT_MODEL,
 			task,
 			prompt,
-			skipPermissions = jatDefaults.skip_permissions
+			skipPermissions = squadDefaults.skip_permissions
 		} = body;
 
 		// Determine project path
@@ -238,8 +238,8 @@ export async function POST({ request }) {
 
 		// Generate session name
 		// If agentName provided, use it directly (caller is responsible for registration)
-		// Otherwise, use jat-pending-* naming so /jat:start can register and rename
-		const sessionName = agentName ? `jat-${agentName}` : `jat-pending-${Date.now()}`;
+		// Otherwise, use squad-pending-* naming so /squad:start can register and rename
+		const sessionName = agentName ? `squad-${agentName}` : `squad-pending-${Date.now()}`;
 
 		// Default tmux dimensions for proper terminal output width
 		// 80 columns is the standard terminal width that Claude Code expects
@@ -264,11 +264,11 @@ export async function POST({ request }) {
 		// Build initial prompt - task takes priority, then prompt, then default auto
 		let initialPrompt;
 		if (task) {
-			initialPrompt = `/jat:start ${task}`;
+			initialPrompt = `/squad:start ${task}`;
 		} else if (prompt) {
 			initialPrompt = prompt;
 		} else {
-			initialPrompt = '/jat:start auto';
+			initialPrompt = '/squad:start auto';
 		}
 
 		// Create tmux session with Claude Code with explicit dimensions
@@ -283,8 +283,8 @@ export async function POST({ request }) {
 			// Wait for Claude to fully start, then send the initial prompt
 			// Verify Claude Code TUI is running before sending prompt
 			if (initialPrompt) {
-				const jatDefaults = await getJatDefaults();
-				const maxWaitSeconds = jatDefaults.claude_startup_timeout || 20;
+				const squadDefaults = await getSquadDefaults();
+				const maxWaitSeconds = squadDefaults.claude_startup_timeout || 20;
 				const checkIntervalMs = 500;
 				let claudeReady = false;
 				let shellPromptDetected = false;
@@ -317,7 +317,7 @@ export async function POST({ request }) {
 					}
 				}
 
-				// CRITICAL: Don't send /jat:start if Claude isn't ready - it will go to bash!
+				// CRITICAL: Don't send /squad:start if Claude isn't ready - it will go to bash!
 				if (!claudeReady) {
 					if (shellPromptDetected) {
 						console.error(`[sessions] ABORTING: Claude Code did not start (shell prompt detected)`);
@@ -325,7 +325,7 @@ export async function POST({ request }) {
 							error: 'Claude Code failed to start',
 							message: 'Claude Code did not start within the timeout period. The session was created but Claude is not running. Try attaching to the terminal manually.',
 							sessionName,
-							agentName: agentName || sessionName.replace('jat-', ''),
+							agentName: agentName || sessionName.replace('squad-', ''),
 							recoveryHint: `Try: tmux attach-session -t ${sessionName}`
 						}, { status: 500 });
 					}
@@ -357,10 +357,10 @@ export async function POST({ request }) {
 						// Check if the command was received
 						// We look for signs the command is executing OR has been received
 						// DO NOT use Ctrl-C retry - it interrupts in-flight bash commands
-						// causing "Interrupted by user" errors (jat-t45zv)
+						// causing "Interrupted by user" errors (squad-t45zv)
 						//
 						// Use -S -40 -E -4 to capture agent output area only, skipping:
-						// - Last 1-2 lines: statusline ("bypass permissions", JAT status)
+						// - Last 1-2 lines: statusline ("bypass permissions", SQUAD status)
 						// - Last 2-3 lines: input prompt area
 						const { stdout: paneOutput } = await execAsync(
 							`tmux capture-pane -t "${sessionName}" -p -S -40 -E -4 2>/dev/null`
@@ -368,7 +368,7 @@ export async function POST({ request }) {
 
 						// Signs the command is executing or was received:
 						// 1. "is running" - Claude Code shows this for slash commands
-						// 2. "STARTING" - JAT signal state
+						// 2. "STARTING" - SQUAD signal state
 						// 3. "Bash(" - Tool execution has started
 						// 4. "● " - Tool execution indicator
 						const commandReceived =
@@ -418,7 +418,7 @@ export async function POST({ request }) {
 			return json({
 				success: true,
 				sessionName,
-				agentName: agentName || sessionName.replace('jat-', ''),
+				agentName: agentName || sessionName.replace('squad-', ''),
 				project: projectPath,
 				model,
 				task: task || null,

@@ -15,12 +15,12 @@ import { json } from '@sveltejs/kit';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { existsSync } from 'fs';
-import { getTasks } from '$lib/server/jat-tasks.js';
+import { getTasks } from '$lib/server/squad-tasks.js';
 import {
 	DEFAULT_MODEL,
 	AGENT_MAIL_URL
 } from '$lib/config/spawnConfig.js';
-import { getJatDefaults } from '$lib/server/projectPaths.js';
+import { getSquadDefaults } from '$lib/server/projectPaths.js';
 import { CLAUDE_READY_PATTERNS, SHELL_PROMPT_PATTERNS, isYoloWarningDialog } from '$lib/server/shellPatterns.js';
 import { stripAnsi } from '$lib/utils/ansiToHtml.js';
 
@@ -38,8 +38,8 @@ export async function POST({ params }) {
 			}, { status: 400 });
 		}
 
-		// Extract agent name from session name (jat-AgentName -> AgentName)
-		const agentName = sessionId.replace(/^jat-/, '');
+		// Extract agent name from session name (squad-AgentName -> AgentName)
+		const agentName = sessionId.replace(/^squad-/, '');
 
 		// Step 1: Find in_progress task assigned to this agent
 		let currentTask = null;
@@ -70,8 +70,8 @@ export async function POST({ params }) {
 			}, { status: 400 });
 		}
 
-		// Get JAT config defaults (used for skip_permissions, timeout, etc.)
-		const jatDefaults = await getJatDefaults();
+		// Get SQUAD config defaults (used for skip_permissions, timeout, etc.)
+		const squadDefaults = await getSquadDefaults();
 
 		// Step 2: Kill the existing tmux session
 		try {
@@ -97,7 +97,7 @@ export async function POST({ params }) {
 
 		// Only pass --dangerously-skip-permissions if user has explicitly enabled it
 		// User must accept the YOLO warning manually first, then set skip_permissions: true in config
-		if (jatDefaults.skip_permissions) {
+		if (squadDefaults.skip_permissions) {
 			claudeCmd += ' --dangerously-skip-permissions';
 		}
 
@@ -119,14 +119,14 @@ export async function POST({ params }) {
 			}, { status: 500 });
 		}
 
-		// Step 4: Wait for Claude to initialize, then send /jat:start {agentName} [taskId]
+		// Step 4: Wait for Claude to initialize, then send /squad:start {agentName} [taskId]
 		const initialPrompt = currentTask
-			? `/jat:start ${agentName} ${currentTask.id}`
-			: `/jat:start ${agentName}`;
+			? `/squad:start ${agentName} ${currentTask.id}`
+			: `/squad:start ${agentName}`;
 
 		// Wait for Claude to initialize with verification
 		// Check that Claude Code TUI is running (not just bash prompt)
-		const maxWaitSeconds = jatDefaults.claude_startup_timeout || 20;
+		const maxWaitSeconds = squadDefaults.claude_startup_timeout || 20;
 		const checkIntervalMs = 500;
 		let claudeReady = false;
 		let shellPromptDetected = false;
@@ -174,7 +174,7 @@ export async function POST({ params }) {
 			}
 		}
 
-		// CRITICAL: Don't send /jat:start if Claude isn't ready - it will go to bash!
+		// CRITICAL: Don't send /squad:start if Claude isn't ready - it will go to bash!
 		if (!claudeReady) {
 			if (shellPromptDetected) {
 				console.error(`[restart] ABORTING: Claude Code did not start (shell prompt detected)`);
@@ -214,10 +214,10 @@ export async function POST({ params }) {
 				// Check if the command was received
 				// We look for signs the command is executing OR has been received
 				// DO NOT use Ctrl-C retry - it interrupts in-flight bash commands
-				// causing "Interrupted by user" errors (jat-t45zv)
+				// causing "Interrupted by user" errors (squad-t45zv)
 				//
 				// Use -S -40 -E -4 to capture agent output area only, skipping:
-				// - Last 1-2 lines: statusline ("bypass permissions", JAT status)
+				// - Last 1-2 lines: statusline ("bypass permissions", SQUAD status)
 				// - Last 2-3 lines: input prompt area
 				const { stdout: paneOutput } = await execAsync(
 					`tmux capture-pane -t "${sessionId}" -p -S -40 -E -4 2>/dev/null`
@@ -225,7 +225,7 @@ export async function POST({ params }) {
 
 				// Signs the command is executing or was received:
 				// 1. "is running" - Claude Code shows this for slash commands
-				// 2. "STARTING" - JAT signal state
+				// 2. "STARTING" - SQUAD signal state
 				// 3. "Bash(" - Tool execution has started
 				// 4. "● " - Tool execution indicator
 				const commandReceived =

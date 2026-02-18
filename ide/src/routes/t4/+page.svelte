@@ -143,7 +143,7 @@
 </script>
 
 <svelte:head>
-	<title>T4 Tree | JAT IDE</title>
+	<title>T4 Tree | SQUAD IDE</title>
 </svelte:head>
 
 <div class="tree-page">

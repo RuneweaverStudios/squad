@@ -44,9 +44,9 @@ export const GET: RequestHandler = async ({ params, url }) => {
 	const offset = parseInt(url.searchParams.get('offset') || '0');
 	const since = url.searchParams.get('since');
 
-	// Timeline file is named by tmux session (with jat- prefix if not present)
-	const tmuxSession = sessionName.startsWith('jat-') ? sessionName : `jat-${sessionName}`;
-	const timelineFile = `/tmp/jat-timeline-${tmuxSession}.jsonl`;
+	// Timeline file is named by tmux session (with squad- prefix if not present)
+	const tmuxSession = sessionName.startsWith('squad-') ? sessionName : `squad-${sessionName}`;
+	const timelineFile = `/tmp/squad-timeline-${tmuxSession}.jsonl`;
 
 	if (!existsSync(timelineFile)) {
 		return json({
@@ -125,8 +125,8 @@ export const DELETE: RequestHandler = async ({ params }) => {
 		return json({ error: 'Session name required' }, { status: 400 });
 	}
 
-	const tmuxSession = sessionName.startsWith('jat-') ? sessionName : `jat-${sessionName}`;
-	const timelineFile = `/tmp/jat-timeline-${tmuxSession}.jsonl`;
+	const tmuxSession = sessionName.startsWith('squad-') ? sessionName : `squad-${sessionName}`;
+	const timelineFile = `/tmp/squad-timeline-${tmuxSession}.jsonl`;
 
 	if (!existsSync(timelineFile)) {
 		return json({ success: true, message: 'Timeline already empty' });

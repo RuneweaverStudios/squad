@@ -44,23 +44,23 @@
 
 ## Agent Tools Configuration
 
-**Global instructions:** See `~/.claude/CLAUDE.md` for Agent Mail, JAT Tasks, and bash tools documentation.
+**Global instructions:** See `~/.claude/CLAUDE.md` for Agent Mail, SQUAD Tasks, and bash tools documentation.
 
 **This project uses:**
-- ✅ JAT task planning (`.jat/` directory)
+- ✅ SQUAD task planning (`.squad/` directory)
 - ✅ Agent Mail coordination (project key: `[absolute path to this repo]`)
 - ✅ 28 generic bash tools available globally
 
 **Quick start for AI assistants:**
 ```bash
 # See tasks ready to work
-jt ready
+st ready
 
 # Register with Agent Mail
 am-register --program claude-code --model sonnet-4.5
 
 # Declare files when starting a task
-jt update jat-123 --status in_progress --assignee AgentName --files "src/**"
+st update squad-123 --status in_progress --assignee AgentName --files "src/**"
 ```
 
 ## Troubleshooting

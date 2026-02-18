@@ -40,7 +40,7 @@ import {
 const execAsync = promisify(exec);
 
 // Paths
-const CONFIG_DIR = join(homedir(), '.config', 'jat');
+const CONFIG_DIR = join(homedir(), '.config', 'squad');
 const CONFIG_FILE = join(CONFIG_DIR, 'projects.json');
 
 /**
@@ -62,9 +62,9 @@ function validateProjectKey(key: string): { valid: boolean; error?: string } {
 }
 
 /**
- * Read JAT projects config
+ * Read SQUAD projects config
  */
-async function readJatConfig(): Promise<Record<string, unknown> | null> {
+async function readSquadConfig(): Promise<Record<string, unknown> | null> {
 	try {
 		if (!existsSync(CONFIG_FILE)) {
 			return null;
@@ -72,20 +72,20 @@ async function readJatConfig(): Promise<Record<string, unknown> | null> {
 		const content = await readFile(CONFIG_FILE, 'utf-8');
 		return JSON.parse(content);
 	} catch (error) {
-		console.error('Failed to read JAT config:', error);
+		console.error('Failed to read SQUAD config:', error);
 		return null;
 	}
 }
 
 /**
- * Write JAT config back to file
+ * Write SQUAD config back to file
  */
-async function writeJatConfig(config: Record<string, unknown>): Promise<boolean> {
+async function writeSquadConfig(config: Record<string, unknown>): Promise<boolean> {
 	try {
 		await writeFile(CONFIG_FILE, JSON.stringify(config, null, 2));
 		return true;
 	} catch (error) {
-		console.error('Failed to write JAT config:', error);
+		console.error('Failed to write SQUAD config:', error);
 		return false;
 	}
 }
@@ -98,16 +98,16 @@ async function killProjectAgents(projectPath: string): Promise<string[]> {
 	const killedAgents: string[] = [];
 
 	try {
-		// Get all tmux sessions with jat-* prefix
+		// Get all tmux sessions with squad-* prefix
 		const { stdout } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null', {
 			timeout: 5000
 		});
 
-		const sessions = stdout.trim().split('\n').filter(s => s.startsWith('jat-') && !s.startsWith('jat-pending'));
+		const sessions = stdout.trim().split('\n').filter(s => s.startsWith('squad-') && !s.startsWith('squad-pending'));
 
 		// Check each session to see if it's working on this project
 		for (const sessionName of sessions) {
-			const agentName = sessionName.replace('jat-', '');
+			const agentName = sessionName.replace('squad-', '');
 
 			// Check if agent has a session file in this project
 			const sessionsDir = join(projectPath, '.claude', 'sessions');
@@ -159,8 +159,8 @@ async function killProjectAgents(projectPath: string): Promise<string[]> {
 
 				// Clean up signal files for this session
 				try {
-					const signalFile = `/tmp/jat-signal-tmux-${sessionName}.json`;
-					const timelineFile = `/tmp/jat-timeline-${sessionName}.jsonl`;
+					const signalFile = `/tmp/squad-signal-tmux-${sessionName}.json`;
+					const timelineFile = `/tmp/squad-timeline-${sessionName}.jsonl`;
 					if (existsSync(signalFile)) {
 						await import('fs/promises').then(fs => fs.unlink(signalFile));
 					}
@@ -220,12 +220,12 @@ export async function POST({ request }) {
 		}
 
 		// Read current config
-		const jatConfig = await readJatConfig();
-		if (!jatConfig) {
+		const squadConfig = await readSquadConfig();
+		if (!squadConfig) {
 			return json({ error: 'Failed to read projects configuration' }, { status: 500 });
 		}
 
-		const projects = jatConfig.projects as Record<string, { path?: string; name?: string; [key: string]: unknown }> | undefined;
+		const projects = squadConfig.projects as Record<string, { path?: string; name?: string; [key: string]: unknown }> | undefined;
 		if (!projects) {
 			return json({ error: 'No projects found in configuration' }, { status: 404 });
 		}
@@ -282,7 +282,7 @@ export async function POST({ request }) {
 		projects[normalizedNewKey] = newConfig;
 
 		// Save config
-		const configSaved = await writeJatConfig(jatConfig);
+		const configSaved = await writeSquadConfig(squadConfig);
 		if (!configSaved) {
 			// Try to rollback filesystem rename
 			try {

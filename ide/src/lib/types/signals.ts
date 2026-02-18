@@ -1,7 +1,7 @@
 /**
  * Signal Types
  *
- * Type definitions for the jat-signal system used for agent-to-IDE communication.
+ * Type definitions for the squad-signal system used for agent-to-IDE communication.
  * These types are used by components that display suggested tasks and human actions.
  *
  * @see shared/signals.md for signal system documentation
@@ -12,10 +12,10 @@
 // =============================================================================
 
 /**
- * Suggested task from jat-signal complete command.
+ * Suggested task from squad-signal complete command.
  *
  * Agents can suggest follow-up tasks via the 'complete' signal's suggestedTasks field:
- *   jat-signal complete '{"taskId":"...","suggestedTasks":[{"type":"feature","title":"..."}]}'
+ *   squad-signal complete '{"taskId":"...","suggestedTasks":[{"type":"feature","title":"..."}]}'
  *
  * The IDE receives this data via WebSocket and displays it in the SessionCard.
  */
@@ -32,7 +32,7 @@ export interface SuggestedTask {
 	priority: number;
 	/** Optional reason why this task was suggested */
 	reason?: string;
-	/** Project identifier (e.g., 'jat', 'chimaro') */
+	/** Project identifier (e.g., 'squad', 'chimaro') */
 	project?: string;
 	/** Comma-separated labels */
 	labels?: string;
@@ -68,10 +68,10 @@ export interface SuggestedTaskWithState extends SuggestedTask {
 // =============================================================================
 
 /**
- * Human action from jat-signal complete command.
+ * Human action from squad-signal complete command.
  *
  * Agents can request human actions via the 'complete' signal's humanActions field:
- *   jat-signal complete '{"taskId":"...","humanActions":[{"title":"Review PR","items":["Check tests"]}]}'
+ *   squad-signal complete '{"taskId":"...","humanActions":[{"title":"Review PR","items":["Check tests"]}]}'
  *
  * The IDE displays these as a checklist on the SessionCard.
  */
@@ -89,7 +89,7 @@ export interface HumanAction {
 // =============================================================================
 
 /**
- * Signal state values that can be set via jat-signal.
+ * Signal state values that can be set via squad-signal.
  * These map to SessionCard visual states.
  */
 export type SignalState =
@@ -142,13 +142,13 @@ export interface CrossAgentIntel {
 }
 
 /**
- * Full completion bundle from jat-signal complete command.
+ * Full completion bundle from squad-signal complete command.
  *
  * This is the structured data agents emit when completing a task,
  * enabling the IDE to render an interactive completion UI.
  *
  * Agents emit via:
- *   jat-signal complete '{"taskId":"...","agentName":"...","summary":[...],...}'
+ *   squad-signal complete '{"taskId":"...","agentName":"...","summary":[...],...}'
  */
 export interface CompletionBundle {
 	/** Task ID that was completed */
@@ -228,7 +228,7 @@ export interface SuggestedNextTask {
  * Enhanced idle signal with session summary and recommendations.
  *
  * Agents emit this when they become idle (no active task):
- *   jat-signal idle '{"readyForWork":true,"sessionSummary":{...},"suggestedNextTask":{...}}'
+ *   squad-signal idle '{"readyForWork":true,"sessionSummary":{...},"suggestedNextTask":{...}}'
  *
  * The IDE uses this to show:
  * - Whether the agent can accept new work
@@ -276,7 +276,7 @@ export interface QuestionOption {
  * The IDE can use this to render rich question UIs instead of plain text prompts.
  *
  * Agents emit via:
- *   jat-signal question '{"question":"Which approach?","questionType":"choice","options":[...]}'
+ *   squad-signal question '{"question":"Which approach?","questionType":"choice","options":[...]}'
  *
  * @example Choice question
  * {

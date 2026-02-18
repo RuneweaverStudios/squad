@@ -66,7 +66,7 @@
 	}
 
 	interface TimelineEvent {
-		type: 'jat_event' | 'agent_mail' | 'signal';
+		type: 'squad_event' | 'agent_mail' | 'signal';
 		event?: string;
 		timestamp: string;
 		description?: string;
@@ -84,7 +84,7 @@
 		updated_at?: string;
 		attachments: TaskAttachment[];
 		timeline: TimelineEvent[];
-		timelineCounts: { total: number; jat_events: number; agent_mail: number; signals?: number };
+		timelineCounts: { total: number; squad_events: number; agent_mail: number; signals?: number };
 	}
 
 	// Props
@@ -244,7 +244,7 @@
 		const newOptimistic = new Map(optimisticStates);
 
 		for (const [sessionName, optimisticState] of optimisticStates) {
-			const agentName = sessionName.startsWith('jat-') ? sessionName.slice(4) : sessionName;
+			const agentName = sessionName.startsWith('squad-') ? sessionName.slice(4) : sessionName;
 			const sseState = agentSessionInfo.get(agentName)?.activityState;
 
 			// Clear optimistic state if WS reports same state or a "later" state
@@ -328,7 +328,7 @@
 			// Track which new sessions have task data right now (for text animation timing)
 			const newWithTask = new Set<string>();
 			for (const name of newNames) {
-				const agentName = name.startsWith('jat-') ? name.slice(4) : name;
+				const agentName = name.startsWith('squad-') ? name.slice(4) : name;
 				if (agentTasks.get(agentName)) {
 					newWithTask.add(name);
 				}
@@ -354,7 +354,7 @@
 				// Clean up task cache for exited agents
 				const cleanedCache = new Map(cachedAgentTasks);
 				for (const name of exitNames) {
-					const agentName = name.startsWith('jat-') ? name.slice(4) : name;
+					const agentName = name.startsWith('squad-') ? name.slice(4) : name;
 					cleanedCache.delete(agentName);
 				}
 				cachedAgentTasks = cleanedCache;
@@ -403,7 +403,7 @@
 	}
 
 	function getAgentName(sessionName: string): string {
-		if (sessionName.startsWith('jat-')) {
+		if (sessionName.startsWith('squad-')) {
 			return sessionName.slice(4);
 		}
 		return sessionName;
@@ -584,7 +584,7 @@
 
 			const taskData = taskRes.ok ? await taskRes.json() : null;
 			const attachmentsData = attachmentsRes.ok ? await attachmentsRes.json() : { images: [] };
-			const historyData = historyRes.ok ? await historyRes.json() : { timeline: [], count: { total: 0, jat_events: 0, agent_mail: 0 } };
+			const historyData = historyRes.ok ? await historyRes.json() : { timeline: [], count: { total: 0, squad_events: 0, agent_mail: 0 } };
 			const signalsData = signalsRes.ok ? await signalsRes.json() : { signals: [] };
 
 			const signalEvents = (signalsData.signals || []).map((signal: any) => ({
@@ -617,7 +617,7 @@
 				timeline: mergedTimeline,
 				timelineCounts: {
 					total: mergedTimeline.length,
-					jat_events: historyData.count?.jat_events || 0,
+					squad_events: historyData.count?.squad_events || 0,
 					agent_mail: historyData.count?.agent_mail || 0,
 					signals: signalEvents.length
 				}
@@ -631,7 +631,7 @@
 				labels: [],
 				attachments: [],
 				timeline: [],
-				timelineCounts: { total: 0, jat_events: 0, agent_mail: 0 }
+				timelineCounts: { total: 0, squad_events: 0, agent_mail: 0 }
 			};
 		} finally {
 			taskDetailsLoading = false;
@@ -788,7 +788,7 @@
 			// signal once before sending the actual message text. We don't emit here to avoid
 			// duplicate timeline entries — previously every key event (ctrl-c, escape, enter)
 			// was also generating a signal, causing 5-6 "Processing user input" entries per
-			// single user message. See: jat-ljhxi
+			// single user message. See: squad-ljhxi
 
 			const response = await fetch(`/api/work/${encodeURIComponent(expandedSession)}/input`, {
 				method: 'POST',
@@ -822,7 +822,7 @@
 		}
 	}
 
-	// Send a workflow command (e.g., /jat:complete) to a specific session
+	// Send a workflow command (e.g., /squad:complete) to a specific session
 	async function sendWorkflowCommand(sessionName: string, command: string) {
 		const sessionId = encodeURIComponent(sessionName);
 		try {
@@ -1153,7 +1153,7 @@
 													}
 												}
 												// Now call the actual command
-												const cmd = actionId === 'complete-kill' ? '/jat:complete --kill' : '/jat:complete';
+												const cmd = actionId === 'complete-kill' ? '/squad:complete --kill' : '/squad:complete';
 												await sendWorkflowCommand(session.name, cmd);
 											} else if (actionId === 'interrupt') {
 												await fetch(`/api/work/${encodeURIComponent(session.name)}/input`, {
@@ -1847,7 +1847,7 @@
 						});
 					} catch (e) { /* ignore */ }
 				}
-				await sendWorkflowCommand(d.session.name, '/jat:complete');
+				await sendWorkflowCommand(d.session.name, '/squad:complete');
 			}}>
 				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 					<path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
@@ -1976,7 +1976,7 @@
 		background: oklch(0.16 0.01 250);
 		border: 1px solid oklch(0.25 0.02 250);
 		border-radius: 8px;
-		/* NOTE: overflow-x: clip removed - it was clipping TaskIdBadge dropdowns (see jat-1xa13) */
+		/* NOTE: overflow-x: clip removed - it was clipping TaskIdBadge dropdowns (see squad-1xa13) */
 	}
 
 	.sessions-table {

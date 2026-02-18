@@ -15,7 +15,7 @@ const currentEnvironment: Environment = dev ? 'development' : 'production';
 
 // Browser-safe logger with configuration from logConfig
 const logger = pino({
-  name: 'jat-ide',
+  name: 'squad-ide',
   level: getLogLevel(currentEnvironment),
 
   // Browser configuration

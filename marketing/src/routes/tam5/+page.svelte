@@ -295,7 +295,7 @@
 		</section>
 
 		<section class="install">
-			<code>git clone https://github.com/jomarchy/jat.git</code>
+			<code>git clone https://github.com/jomarchy/squad.git</code>
 		</section>
 	</div>
 </div>

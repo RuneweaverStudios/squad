@@ -27,8 +27,8 @@ export type EventType =
 	| 'file_changed'
 	| 'ingest_item';
 
-/** A JAT event flowing through the bus */
-export interface JatEvent {
+/** A SQUAD event flowing through the bus */
+export interface SquadEvent {
 	/** Unique event ID */
 	id: string;
 	/** Event type */
@@ -48,7 +48,7 @@ export interface JatEvent {
 // =============================================================================
 
 const MAX_EVENTS = 200;
-const events: JatEvent[] = [];
+const events: SquadEvent[] = [];
 
 // =============================================================================
 // PER-WORKFLOW COOLDOWN
@@ -67,9 +67,9 @@ const WORKFLOW_COOLDOWN_MS = 10_000; // 10 seconds
  * Stores in ring buffer and dispatches to matching workflows.
  */
 export function emitEvent(
-	event: Omit<JatEvent, 'id' | 'timestamp'>
-): JatEvent {
-	const fullEvent: JatEvent = {
+	event: Omit<SquadEvent, 'id' | 'timestamp'>
+): SquadEvent {
+	const fullEvent: SquadEvent = {
 		...event,
 		id: nanoid(10),
 		timestamp: new Date().toISOString()
@@ -92,7 +92,7 @@ export function emitEvent(
 /**
  * Get recent events from the ring buffer.
  */
-export function getRecentEvents(opts?: { limit?: number; type?: string }): JatEvent[] {
+export function getRecentEvents(opts?: { limit?: number; type?: string }): SquadEvent[] {
 	let result = [...events];
 
 	if (opts?.type) {
@@ -117,7 +117,7 @@ export function getRecentEvents(opts?: { limit?: number; type?: string }): JatEv
  * Match an event against all enabled workflows' trigger_event nodes
  * and execute matching workflows.
  */
-export async function matchAndDispatch(event: JatEvent): Promise<void> {
+export async function matchAndDispatch(event: SquadEvent): Promise<void> {
 	let workflows: Workflow[];
 	try {
 		workflows = getAllWorkflowsSync();

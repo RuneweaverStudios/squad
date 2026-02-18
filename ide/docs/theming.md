@@ -1,6 +1,6 @@
 # CSS Theming Approach and OKLCH Color System
 
-This document provides comprehensive documentation for the JAT IDE's custom CSS theming strategy, specifically detailing the OKLCH color system implementation, guidelines for component styling, color selection principles, and best practices for maintaining visual consistency across the application.
+This document provides comprehensive documentation for the SQUAD IDE's custom CSS theming strategy, specifically detailing the OKLCH color system implementation, guidelines for component styling, color selection principles, and best practices for maintaining visual consistency across the application.
 
 ## Table of Contents
 
@@ -19,11 +19,11 @@ This document provides comprehensive documentation for the JAT IDE's custom CSS 
 
 ## Overview
 
-The JAT IDE uses a layered theming approach:
+The SQUAD IDE uses a layered theming approach:
 
 1. **Tailwind CSS v4** - Core utility framework with `@import "tailwindcss"` syntax
 2. **DaisyUI** - Component library providing 32+ themes via `@plugin "daisyui"`
-3. **Custom JAT Theme** - Industrial dark theme with OKLCH color definitions
+3. **Custom SQUAD Theme** - Industrial dark theme with OKLCH color definitions
 4. **Status Colors** - Centralized visual configuration in TypeScript for programmatic access
 
 ### Tech Stack
@@ -134,14 +134,14 @@ ide/
 /* src/app.css */
 @import "tailwindcss";
 
-/* Custom JAT theme MUST come before @plugin */
-[data-theme='jat'] {
+/* Custom SQUAD theme MUST come before @plugin */
+[data-theme='squad'] {
   /* Theme definitions here */
 }
 
 @plugin "daisyui" {
   themes:
-    jat --default,  /* Custom theme first, set as default */
+    squad --default,  /* Custom theme first, set as default */
     light,
     dark,
     /* ... other DaisyUI themes */
@@ -158,10 +158,10 @@ ide/
 
 ### Base Color Variables
 
-The JAT theme defines semantic color variables using OKLCH:
+The SQUAD theme defines semantic color variables using OKLCH:
 
 ```css
-[data-theme='jat'] {
+[data-theme='squad'] {
   color-scheme: dark;
 
   /* ─── Base Colors (backgrounds, surfaces) ─── */
@@ -199,7 +199,7 @@ The JAT theme defines semantic color variables using OKLCH:
 For animations that use `color-mix()`, dedicated variables ensure consistency:
 
 ```css
-[data-theme='jat'] {
+[data-theme='squad'] {
   /* ─── Primary Blue (entrance, radar, links) ─── */
   --anim-primary: oklch(0.70 0.18 240);
   --anim-primary-bright: oklch(0.80 0.18 240);
@@ -452,7 +452,7 @@ export interface SessionStateVisual {
 | `compacting` | 280 (violet) | Purple | Context compression |
 | `needs-input` | 45 (orange) | Amber-orange | Waiting for user |
 | `ready-for-review` | 85 (yellow) | Yellow-amber | Code complete |
-| `completing` | 175 (teal) | Teal-green | Running /jat:complete |
+| `completing` | 175 (teal) | Teal-green | Running /squad:complete |
 | `completed` | 145 (green) | Green | Task done |
 | `auto-proceeding` | 160 (lime) | Green-cyan | Spawning next |
 | `idle` | 250 (slate) | Gray-blue | No task |
@@ -624,7 +624,7 @@ When using gradients on table rows, prevent cell-by-cell gradient restart:
    ```javascript
    // Check in browser console
    document.documentElement.getAttribute('data-theme')
-   // Should return 'jat'
+   // Should return 'squad'
    ```
 
 3. **Clear build cache**

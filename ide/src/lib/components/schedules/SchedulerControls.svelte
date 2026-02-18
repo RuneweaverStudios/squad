@@ -1,6 +1,6 @@
 <script lang="ts">
 	/**
-	 * SchedulerControls - Service status bar for jat-scheduler
+	 * SchedulerControls - Service status bar for squad-scheduler
 	 *
 	 * Shows: running/stopped status, uptime, start/stop button,
 	 * scheduled task count, next run info

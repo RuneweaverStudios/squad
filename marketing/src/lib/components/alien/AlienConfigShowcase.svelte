@@ -54,13 +54,13 @@
 			title: 'Multi-Agent Spawning',
 			description: 'Launch agent swarms with one command. Each picks ready work automatically.',
 			code: `# Spawn 4 agents on project
-$ jat myproject 4 --auto
+$ squad myproject 4 --auto
 
 Spawning agents...
-  ├─ BluePeak   → jat-a1 [P0]
-  ├─ GoldBay    → jat-b3 [P1]
-  ├─ RedMarsh   → jat-c2 [P1]
-  └─ FairCove   → jat-d1 [P2]
+  ├─ BluePeak   → squad-a1 [P0]
+  ├─ GoldBay    → squad-b3 [P1]
+  ├─ RedMarsh   → squad-c2 [P1]
+  └─ FairCove   → squad-d1 [P2]
 
 IDE: http://localhost:5174
 Agents: 4 active | 0 idle
@@ -74,11 +74,11 @@ Agents: 4 active | 0 idle
 		tasks: {
 			title: 'Dependency-Aware Task Queue',
 			description: 'Tasks with blockers wait. When dependencies complete, work becomes ready.',
-			code: `$ jt ready --json
+			code: `$ st ready --json
 
 [
   {
-    "id": "jat-7kx2m",
+    "id": "squad-7kx2m",
     "title": "Add OAuth provider",
     "type": "feature",
     "priority": 0,
@@ -86,7 +86,7 @@ Agents: 4 active | 0 idle
     "deps_met": true
   },
   {
-    "id": "jat-3nf8p",
+    "id": "squad-3nf8p",
     "title": "Fix login timeout",
     "type": "bug",
     "priority": 1,
@@ -96,9 +96,9 @@ Agents: 4 active | 0 idle
 ]
 
 # Blocked tasks (deps not met):
-$ jt list --status blocked
-jat-9abc: Dashboard UI [blocked by jat-7kx2m]
-jat-5def: Email notify [blocked by jat-3nf8p]`
+$ st list --status blocked
+squad-9abc: Dashboard UI [blocked by squad-7kx2m]
+squad-5def: Email notify [blocked by squad-3nf8p]`
 		}
 	};
 

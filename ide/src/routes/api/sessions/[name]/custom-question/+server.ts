@@ -1,12 +1,12 @@
 /**
- * Custom Question Signal API - Read/clear jat-signal question data
+ * Custom Question Signal API - Read/clear squad-signal question data
  *
  * This endpoint handles custom question signals emitted by agents via:
- *   jat-signal question '{"question":"...","questionType":"...","options":[...]}'
+ *   squad-signal question '{"question":"...","questionType":"...","options":[...]}'
  *
- * The PostToolUse hook (post-bash-jat-signal.sh) writes these to:
- *   /tmp/jat-question-{sessionId}.json
- *   /tmp/jat-question-tmux-{tmuxSessionName}.json
+ * The PostToolUse hook (post-bash-squad-signal.sh) writes these to:
+ *   /tmp/squad-question-{sessionId}.json
+ *   /tmp/squad-question-tmux-{tmuxSessionName}.json
  *
  * GET /api/sessions/[name]/custom-question
  *   Returns the current custom question if one is active, or { active: false }
@@ -14,7 +14,7 @@
  * DELETE /api/sessions/[name]/custom-question
  *   Clears the question file after user answers
  *
- * Note: The [name] parameter is the tmux session name (e.g., "jat-WisePrairie")
+ * Note: The [name] parameter is the tmux session name (e.g., "squad-WisePrairie")
  *
  * This is separate from /api/work/[sessionId]/question which handles
  * AskUserQuestion tool calls captured by pre-ask-user-question.sh hook.
@@ -48,8 +48,8 @@ export const GET: RequestHandler = async ({ params }) => {
 	}
 
 	// Look for question file by tmux session name
-	// The hook writes to /tmp/jat-question-tmux-{sessionName}.json
-	const questionFile = `/tmp/jat-question-tmux-${sessionName}.json`;
+	// The hook writes to /tmp/squad-question-tmux-{sessionName}.json
+	const questionFile = `/tmp/squad-question-tmux-${sessionName}.json`;
 
 	try {
 		if (!existsSync(questionFile)) {
@@ -110,8 +110,8 @@ export const DELETE: RequestHandler = async ({ params }) => {
 		return json({ error: 'Session name required' }, { status: 400 });
 	}
 
-	// The hook writes to /tmp/jat-question-tmux-{sessionName}.json
-	const questionFile = `/tmp/jat-question-tmux-${sessionName}.json`;
+	// The hook writes to /tmp/squad-question-tmux-{sessionName}.json
+	const questionFile = `/tmp/squad-question-tmux-${sessionName}.json`;
 
 	try {
 		if (existsSync(questionFile)) {
@@ -120,7 +120,7 @@ export const DELETE: RequestHandler = async ({ params }) => {
 
 		// Also try to clean up session ID based file if we can find it
 		// This handles cases where the session ID is in the filename
-		// The hook also writes to /tmp/jat-question-{sessionId}.json
+		// The hook also writes to /tmp/squad-question-{sessionId}.json
 		// but we don't have the session ID here, so we only clean the tmux file
 
 		return json({ success: true, sessionName });

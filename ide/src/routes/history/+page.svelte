@@ -150,7 +150,7 @@
 				const query = searchQuery.toLowerCase();
 				const matchesTitle = task.title.toLowerCase().includes(query);
 				// Exact match for task IDs to avoid parent matching all children
-			// (e.g. searching "jat-abc" would otherwise match "jat-abc.1", "jat-abc.2")
+			// (e.g. searching "squad-abc" would otherwise match "squad-abc.1", "squad-abc.2")
 			const matchesId = task.id.toLowerCase() === query;
 				if (!matchesTitle && !matchesId) return false;
 			}
@@ -309,9 +309,9 @@
 </script>
 
 <svelte:head>
-	<title>Task History | JAT IDE</title>
+	<title>Task History | SQUAD IDE</title>
 	<meta name="description" content="View completed task history with streak calendar and productivity metrics." />
-	<meta property="og:title" content="Task History | JAT IDE" />
+	<meta property="og:title" content="Task History | SQUAD IDE" />
 	<meta property="og:description" content="View completed task history with streak calendar and productivity metrics." />
 	<meta property="og:image" content="/favicons/history.svg" />
 	<link rel="icon" href="/favicons/history.svg" />

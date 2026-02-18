@@ -137,7 +137,7 @@
 						{/if}
 					</h4>
 					<p class="text-xs text-base-content/60 mt-1">
-						Custom templates saved to ~/.config/jat/templates/
+						Custom templates saved to ~/.config/squad/templates/
 					</p>
 				</div>
 				<a

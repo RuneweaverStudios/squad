@@ -1,7 +1,7 @@
 import type { FeedbackReport } from './types';
 import { submitReport } from './api';
 
-const STORAGE_KEY = 'jat-feedback-queue';
+const STORAGE_KEY = 'squad-feedback-queue';
 const MAX_ENTRIES = 50;
 const RETRY_INTERVAL_MS = 30_000;
 

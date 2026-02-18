@@ -4,12 +4,12 @@
 
 ## Getting Help
 
-### `/jat:help` - Command Reference
+### `/squad:help` - Command Reference
 
 **Usage:**
 ```bash
-/jat:help                     # Show all commands
-/jat:help start               # Show detailed help for specific command
+/squad:help                     # Show all commands
+/squad:help start               # Show detailed help for specific command
 ```
 
 **What it shows:**
@@ -26,16 +26,16 @@
 
 ## Core Workflow (3 commands)
 
-### `/jat:start` - Get to Work
+### `/squad:start` - Get to Work
 
 **All parameter variations:**
 ```bash
-/jat:start                    # Auto-create new agent (fast!)
-/jat:start resume             # Choose from logged-out agents
-/jat:start GreatWind          # Resume specific agent by name
-/jat:start quick              # Start highest priority task immediately
-/jat:start task-abc           # Start specific task (with checks)
-/jat:start task-abc quick     # Start specific task (skip checks)
+/squad:start                    # Auto-create new agent (fast!)
+/squad:start resume             # Choose from logged-out agents
+/squad:start GreatWind          # Resume specific agent by name
+/squad:start quick              # Start highest priority task immediately
+/squad:start task-abc           # Start specific task (with checks)
+/squad:start task-abc quick     # Start specific task (skip checks)
 ```
 
 **What it does:**
@@ -47,24 +47,24 @@
 
 ---
 
-### `/jat:complete` - Finish Task Properly
+### `/squad:complete` - Finish Task Properly
 
 **Usage:**
 ```bash
-/jat:complete                 # Full verify + commit + close task
+/squad:complete                 # Full verify + commit + close task
 ```
 
 **What it does:**
 - ✅ Verify task (tests, lint, security, browser)
 - ✅ Commit changes
 - ✅ Write memory entry for future agents
-- ✅ Mark task complete in JAT Tasks
+- ✅ Mark task complete in SQUAD Tasks
 - ✅ Release file locks
 - ✅ **Session ends** (one agent = one task)
 
 **Output includes:**
 ```
-✅ Task Completed: jat-abc "Add user settings"
+✅ Task Completed: squad-abc "Add user settings"
 👤 Agent: GreatWind
 
 💡 What's next:
@@ -79,11 +79,11 @@
 
 ---
 
-### `/jat:pause` - Quick Pivot (Context Switch)
+### `/squad:pause` - Quick Pivot (Context Switch)
 
 **Usage:**
 ```bash
-/jat:pause                    # Quick exit + show menu
+/squad:pause                    # Quick exit + show menu
 ```
 
 **What it does:**
@@ -102,11 +102,11 @@
 
 ## Support Commands (4 commands)
 
-### `/jat:status` - Check Current Work
+### `/squad:status` - Check Current Work
 
 **Usage:**
 ```bash
-/jat:status                   # Shows current task, locks, messages
+/squad:status                   # Shows current task, locks, messages
 ```
 
 **What it shows:**
@@ -116,12 +116,12 @@
 
 ---
 
-### `/jat:verify` - Quality Checks
+### `/squad:verify` - Quality Checks
 
 **Usage:**
 ```bash
-/jat:verify                   # Verify current task
-/jat:verify task-abc          # Verify specific task
+/squad:verify                   # Verify current task
+/squad:verify task-abc          # Verify specific task
 ```
 
 **What it checks:**
@@ -130,69 +130,69 @@
 - Security (common vulnerabilities)
 - Browser (if applicable)
 
-**Note:** Must pass before `/jat:complete`
+**Note:** Must pass before `/squad:complete`
 
 ---
 
-### `/jat:plan` - Convert Planning to Tasks
+### `/squad:plan` - Convert Planning to Tasks
 
 **Usage:**
 ```bash
-/jat:plan                     # Analyze conversation/PRD, create tasks
+/squad:plan                     # Analyze conversation/PRD, create tasks
 ```
 
 **What it does:**
 - Analyzes conversation history OR written PRD
 - Breaks work into atomic, testable tasks
-- Creates JAT tasks with proper dependency chains
+- Creates SQUAD tasks with proper dependency chains
 - Sets priorities (P0 = foundation, P1 = features, P2 = polish)
 - Generates task descriptions with acceptance criteria
 
 ---
 
-### `/jat:doctor` - Diagnose and Repair jat Setup
+### `/squad:doctor` - Diagnose and Repair squad Setup
 
 **Usage:**
 ```bash
-/jat:doctor                   # Check installation health, fix issues
+/squad:doctor                   # Check installation health, fix issues
 ```
 
 **What it checks:**
-- ✅ jat repo exists at `~/code/jat`
-- ✅ All 7 shared doc files present (`~/code/jat/shared/*.md`)
+- ✅ squad repo exists at `~/code/squad`
+- ✅ All 7 shared doc files present (`~/code/squad/shared/*.md`)
 - ✅ CLAUDE.md has correct imports
 - ✅ Statusline installed (`~/.claude/statusline.sh`)
-- ✅ Agent commands installed (`~/.claude/commands/jat/*.md`)
+- ✅ Agent commands installed (`~/.claude/commands/squad/*.md`)
 - ✅ Tools symlinked to `~/.local/bin`
-- ✅ JAT Tasks initialized in project (`.jat/` directory)
+- ✅ SQUAD Tasks initialized in project (`.squad/` directory)
 
 **What it repairs:**
 - 🔧 Missing imports in CLAUDE.md (adds all 7)
 - 🔧 Malformed imports (fixes paths, typos)
 - 🔧 Duplicate imports (removes extras)
-- 🔧 Missing statusline (copies from jat)
-- 🔧 Missing JAT Tasks (runs `jt init`)
+- 🔧 Missing statusline (copies from squad)
+- 🔧 Missing SQUAD Tasks (runs `st init`)
 
 **When to use:**
 - After cloning a new project
-- When jat features aren't working
-- After updating jat
+- When squad features aren't working
+- After updating squad
 - Periodic health check
 
 **Output:**
 ```
-## jat Doctor Report
+## squad Doctor Report
 
 ### Status: HEALTHY
 
 ### Checks:
-✓ jat repo exists
+✓ squad repo exists
 ✓ 7 shared docs present
 ✓ CLAUDE.md has all imports
 ✓ Statusline installed
 ✓ Agent commands installed (9)
 ✓ Tools available
-✓ JAT Tasks initialized
+✓ SQUAD Tasks initialized
 ```
 
 ---
@@ -201,43 +201,43 @@
 
 ### Standard Workflow (One Agent = One Task)
 ```bash
-/jat:start task-abc           # Create agent, start task
+/squad:start task-abc           # Create agent, start task
 # ... work on task ...
-/jat:complete                 # Complete task, session ends
+/squad:complete                 # Complete task, session ends
 # Close terminal, spawn new agent for next task
 ```
 
 ### Quick Start (Skip Checks)
 ```bash
-/jat:start task-abc quick     # Skip conflict checks
+/squad:start task-abc quick     # Skip conflict checks
 # ... work on task ...
-/jat:complete                 # Complete task
+/squad:complete                 # Complete task
 ```
 
 ### Pivot Mid-Task
 ```bash
-/jat:start task-ui-123        # Working on UI
+/squad:start task-ui-123        # Working on UI
 # Got stuck, need to switch...
-/jat:pause                    # Quick save + release locks
+/squad:pause                    # Quick save + release locks
 # Close terminal, spawn new agent for different task
 ```
 
 ### Multi-Agent Swarm
 ```bash
 # Terminal 1: Agent FrontPeak (frontend task)
-/jat:start task-ui-123
+/squad:start task-ui-123
 # ... work ...
-/jat:complete                 # Done, session ends
+/squad:complete                 # Done, session ends
 
 # Terminal 2: Agent BackStream (backend task)
-/jat:start task-api-456
+/squad:start task-api-456
 # ... work ...
-/jat:complete                 # Done, session ends
+/squad:complete                 # Done, session ends
 
 # Terminal 3: Agent TestRiver (testing task)
-/jat:start task-test-789
+/squad:start task-test-789
 # ... work ...
-/jat:complete                 # Done, session ends
+/squad:complete                 # Done, session ends
 ```
 
 ---
@@ -245,8 +245,8 @@
 ## Quick Tips
 
 **Speed:**
-- Use `/jat:start quick` for immediate task start (skip conflict checks)
-- Use `/jat:start task-abc quick` to start specific task immediately
+- Use `/squad:start quick` for immediate task start (skip conflict checks)
+- Use `/squad:start task-abc quick` to start specific task immediately
 
 **Model:**
 - One agent = one session = one task
@@ -254,8 +254,8 @@
 - Clean context = better quality work
 
 **Quality:**
-- Always run `/jat:verify` before `/jat:complete` for critical work
-- `/jat:complete` runs verification automatically
+- Always run `/squad:verify` before `/squad:complete` for critical work
+- `/squad:complete` runs verification automatically
 
 **Coordination:**
 - All commands use Agent Registry for identity and file locks
@@ -267,8 +267,8 @@
 ## See Also
 
 - **Full Documentation:** `README.md`
-- **Shared Docs:** `~/code/jat/shared/*.md` (imported by all projects)
+- **Shared Docs:** `~/code/squad/shared/*.md` (imported by all projects)
 - **Project-Specific Docs:** `CLAUDE.md`
-- **Command Implementations:** `commands/jat/*.md`
-- **IDE:** Run `jat` to see tasks visually
-- **JAT Tasks:** See `README.md` section on JAT Tasks command reference
+- **Command Implementations:** `commands/squad/*.md`
+- **IDE:** Run `squad` to see tasks visually
+- **SQUAD Tasks:** See `README.md` section on SQUAD Tasks command reference

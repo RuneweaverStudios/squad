@@ -16,7 +16,7 @@
 	import FilePathPicker from './FilePathPicker.svelte';
 	import type { GitFileStatus } from './types';
 	import { setFileChangesCount } from '$lib/stores/drawerStore';
-	import { JAT_DEFAULTS } from '$lib/config/constants';
+	import { SQUAD_DEFAULTS } from '$lib/config/constants';
 
 	interface DirectoryEntry {
 		name: string;
@@ -150,8 +150,8 @@
 	let detectedChanges = $state<DetectedChange[]>([]);
 
 	// Directories to ignore in change detection (internal/build artifacts)
-	// Loaded from config API on mount, with fallback to JAT_DEFAULTS
-	let ignoredChangeDirs = $state<Set<string>>(new Set(JAT_DEFAULTS.file_watcher_ignored_dirs));
+	// Loaded from config API on mount, with fallback to SQUAD_DEFAULTS
+	let ignoredChangeDirs = $state<Set<string>>(new Set(SQUAD_DEFAULTS.file_watcher_ignored_dirs));
 
 	/**
 	 * Load ignored directories from config API
@@ -161,7 +161,7 @@
 			const response = await fetch('/api/config/defaults');
 			if (response.ok) {
 				const data = await response.json();
-				const dirs = data.defaults?.file_watcher_ignored_dirs ?? JAT_DEFAULTS.file_watcher_ignored_dirs;
+				const dirs = data.defaults?.file_watcher_ignored_dirs ?? SQUAD_DEFAULTS.file_watcher_ignored_dirs;
 				ignoredChangeDirs = new Set(dirs);
 			}
 		} catch (err) {

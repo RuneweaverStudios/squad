@@ -4,7 +4,7 @@ Review rules control whether a completed task auto-proceeds or waits for a human
 
 ## How it works
 
-When an agent finishes a task and runs `/jat:complete`, the system checks two things: the task type and its priority. Based on your review rules, it either auto-closes the task or flags it for human review.
+When an agent finishes a task and runs `/squad:complete`, the system checks two things: the task type and its priority. Based on your review rules, it either auto-closes the task or flags it for human review.
 
 The logic is simple. Each task type has a `maxAutoPriority` threshold. Priorities at or above that number auto-proceed. Priorities below it require review.
 
@@ -12,7 +12,7 @@ Lower priority numbers mean higher urgency. P0 is critical, P4 is the lowest.
 
 ## The default matrix
 
-Out of the box, JAT ships with these defaults:
+Out of the box, SQUAD ships with these defaults:
 
 | Type | P0 | P1 | P2 | P3 | P4 |
 |------|----|----|----|----|-----|
@@ -45,15 +45,15 @@ Sometimes you want to override the matrix for a specific task. Two override valu
 Set overrides from the CLI:
 
 ```bash
-jt-set-review-override jat-abc always_review
-jt-set-review-override jat-xyz always_auto
+st-set-review-override squad-abc always_review
+st-set-review-override squad-xyz always_auto
 ```
 
 Or configure them in the centralized `review-rules.json` file under the `overrides` array.
 
 ## Storage
 
-Review rules live in `~/.config/jat/review-rules.json`:
+Review rules live in `~/.config/squad/review-rules.json`:
 
 ```json
 {
@@ -77,24 +77,24 @@ The `maxAutoPriority` field means: tasks with priority >= this value auto-procee
 
 ```bash
 # Show all current rules
-jt-review-rules
+st-review-rules
 
 # Set max auto-proceed priority for a type
-jt-review-rules --type bug --max-auto 1
+st-review-rules --type bug --max-auto 1
 
 # Require review for all features
-jt-review-rules --type feature --max-auto -1
+st-review-rules --type feature --max-auto -1
 
 # Check what would happen for a specific task
-jt-check-review jat-abc
+st-check-review squad-abc
 
 # Check all active tasks in batch
-jt-check-review --batch
+st-check-review --batch
 ```
 
 ## How agents use review rules
 
-During `/jat:complete`, the agent emits a completion signal with either `auto_proceed` or `review_required` based on the review rules. The IDE reads this signal and either auto-spawns the next task or shows the completion for human review.
+During `/squad:complete`, the agent emits a completion signal with either `auto_proceed` or `review_required` based on the review rules. The IDE reads this signal and either auto-spawns the next task or shows the completion for human review.
 
 The evaluation chain runs in this order:
 
@@ -105,6 +105,6 @@ The evaluation chain runs in this order:
 
 ## See also
 
-- [Workflow Commands](/docs/workflow-commands/) - How /jat:complete uses review rules
+- [Workflow Commands](/docs/workflow-commands/) - How /squad:complete uses review rules
 - [Automation Rules](/docs/automation/) - Pattern-based session automation
 - [Agent Programs](/docs/agent-programs/) - Agent routing configuration

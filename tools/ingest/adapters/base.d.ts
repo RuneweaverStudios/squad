@@ -1,5 +1,5 @@
 /**
- * TypeScript declaration file for the JAT Ingest BaseAdapter.
+ * TypeScript declaration file for the SQUAD Ingest BaseAdapter.
  *
  * Plugin authors: import these types directly in your TypeScript adapter projects.
  *

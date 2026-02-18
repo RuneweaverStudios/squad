@@ -1,0 +1,18 @@
+#!/bin/bash
+# squad-search - Unified search across tasks, memory, and files
+#
+# Usage:
+#   squad-search "query"                   Meta search (tasks + memory + files)
+#   squad-search tasks "query"             Deep task search (FTS5)
+#   squad-search memory "query"            Memory search (FTS5 + vector)
+#   squad-search files "query"             File search (ripgrep + filename)
+#   squad-search --help
+
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+  DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+exec bash "$SCRIPT_DIR/run.sh" "$@"

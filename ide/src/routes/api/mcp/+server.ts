@@ -25,7 +25,7 @@ function getProjectPath(url: URL): string {
 		// Expand ~ to home directory
 		return project.replace(/^~/, process.env.HOME || '');
 	}
-	// Default to parent of ide (jat project root)
+	// Default to parent of ide (squad project root)
 	return process.cwd().replace('/ide', '');
 }
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Test script for JAT Tasks + Agent Mail Integration Layer
+ * Test script for SQUAD Tasks + Agent Mail Integration Layer
  *
  * Validates that lib/integration.js correctly cross-references
- * JAT tasks with Agent Mail coordination data.
+ * SQUAD tasks with Agent Mail coordination data.
  */
 
 import {
@@ -16,7 +16,7 @@ import {
   getTasksByThread
 } from '../lib/integration.js';
 
-console.log('🧪 Testing JAT Tasks + Agent Mail Integration Layer\n');
+console.log('🧪 Testing SQUAD Tasks + Agent Mail Integration Layer\n');
 console.log('═'.repeat(80));
 
 // Test 1: Get integration stats
@@ -163,10 +163,10 @@ console.log('\n═'.repeat(80));
 console.log('✅ ALL INTEGRATION TESTS PASSED');
 console.log('═'.repeat(80));
 console.log('\nAcceptance Criteria Verification:');
-console.log('✓ Cross-referencing works: JAT task IDs ↔ Agent Mail thread IDs');
+console.log('✓ Cross-referencing works: SQUAD task IDs ↔ Agent Mail thread IDs');
 console.log('✓ Agent assignments visible: getAgentsForTask() shows who worked on what');
 console.log('✓ File reservations linked: getFileReservationsByTask() connects locks to tasks');
 console.log('✓ Active work tracking: getActiveWork() shows current agent activity');
 console.log('✓ Handoff history: getTaskHandoffHistory() provides full audit trail');
 console.log('✓ Integration stats: getIntegrationStats() shows adoption metrics');
-console.log('\n🎉 JAT Tasks + Agent Mail Integration is fully functional!');
+console.log('\n🎉 SQUAD Tasks + Agent Mail Integration is fully functional!');

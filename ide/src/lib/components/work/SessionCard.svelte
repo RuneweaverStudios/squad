@@ -19,7 +19,7 @@
 	 *
 	 * Props:
 	 * - mode: 'agent' | 'server' (default: 'agent')
-	 * - sessionName: tmux session name (e.g., "jat-WisePrairie" or "server-chimaro")
+	 * - sessionName: tmux session name (e.g., "squad-WisePrairie" or "server-chimaro")
 	 * - agentName: Agent name (for agent mode)
 	 * - task: Current task object (for agent mode)
 	 * - projectName, displayName, port, portRunning: Server session props
@@ -218,7 +218,7 @@
 		sseState?: string;
 		/** Timestamp when WS state was last updated */
 		sseStateTimestamp?: number;
-		/** Suggested tasks from jat-signal (via WS session-signal event) */
+		/** Suggested tasks from squad-signal (via WS session-signal event) */
 		signalSuggestedTasks?: Array<{
 			id?: string;
 			type: string;
@@ -232,7 +232,7 @@
 		}>;
 		/** Timestamp when signal suggested tasks were last updated */
 		signalSuggestedTasksTimestamp?: number;
-		/** Completion bundle from jat-signal complete (via WS session-complete event) */
+		/** Completion bundle from squad-signal complete (via WS session-complete event) */
 		completionBundle?: {
 			taskId: string;
 			agentName: string;
@@ -356,10 +356,10 @@
 		// WS real-time state
 		sseState,
 		sseStateTimestamp,
-		// Signal data (from jat-signal via WS)
+		// Signal data (from squad-signal via WS)
 		signalSuggestedTasks,
 		signalSuggestedTasksTimestamp,
-		// Completion bundle (from jat-signal complete via WS)
+		// Completion bundle (from squad-signal complete via WS)
 		completionBundle,
 		completionBundleTimestamp,
 		// Rich signal payload (from WS session-state events)
@@ -388,7 +388,7 @@
 	);
 
 	// Project color for session card border accent (uses project config colors)
-	// For agent mode: derives from task ID prefix (e.g., "jat-abc" → jat project color)
+	// For agent mode: derives from task ID prefix (e.g., "squad-abc" → squad project color)
 	// For server mode: uses projectName prop directly
 	const projectColor = $derived.by(() => {
 		// For agent mode, use task ID to get project color
@@ -547,7 +547,7 @@
 	let logCaptured = $state(false);
 
 	// Auto-close countdown state (for AUTO_PROCEED marker)
-	// When agent outputs [JAT:AUTO_PROCEED] and completes, start 3-second countdown
+	// When agent outputs [SQUAD:AUTO_PROCEED] and completes, start 3-second countdown
 	let autoCloseCountdown = $state<number | null>(null); // Seconds remaining (3, 2, 1, null)
 	let autoCloseTimer: ReturnType<typeof setInterval> | null = null;
 	let autoCloseHeld = $state(false); // User clicked "Hold for Review"
@@ -645,9 +645,9 @@
 	// When set, shows error banner and preserves input text for retry
 	let sendInputError = $state<string | null>(null);
 
-	// API-based signal data (from jat-signal action command)
-	// When agent runs jat-signal action '{"title":"...","items":[...]}', this data is
-	// written to /tmp/jat-signal-{session}.json and fetched here for display
+	// API-based signal data (from squad-signal action command)
+	// When agent runs squad-signal action '{"title":"...","items":[...]}', this data is
+	// written to /tmp/squad-signal-{session}.json and fetched here for display
 	interface SignalAction {
 		title: string;
 		items?: string[];
@@ -656,9 +656,9 @@
 	let signalActionData = $state<SignalAction | null>(null);
 	let signalPollInterval: ReturnType<typeof setInterval> | null = null;
 
-	// Custom question signal data (from jat-signal question command)
-	// When agent runs jat-signal question '{"question":"...","questionType":"...","options":[...]}',
-	// this data is written to /tmp/jat-question-tmux-{sessionName}.json and fetched here for display
+	// Custom question signal data (from squad-signal question command)
+	// When agent runs squad-signal question '{"question":"...","questionType":"...","options":[...]}',
+	// this data is written to /tmp/squad-question-tmux-{sessionName}.json and fetched here for display
 	interface CustomQuestionOption {
 		label: string;
 		value?: string;
@@ -804,7 +804,7 @@
 		dismissedTerminalQuestion = true;
 	}
 
-	// Fetch custom question data from API (jat-signal question)
+	// Fetch custom question data from API (squad-signal question)
 	// Uses throttledFetch to prevent connection exhaustion
 	async function fetchCustomQuestionData() {
 		if (!sessionName) return;
@@ -899,7 +899,7 @@
 		await clearCustomQuestionData();
 	}
 
-	// Fetch signal data from API (for human actions via jat-signal action)
+	// Fetch signal data from API (for human actions via squad-signal action)
 	// Uses throttledFetch to prevent connection exhaustion
 	async function fetchSignalData() {
 		if (!sessionName) return;
@@ -1144,7 +1144,7 @@
 	});
 
 	// NOTE: Previously had an $effect here to detect when text was submitted from an
-	// attached terminal (outside the IDE). This caused a bug (jat-ygylc) where
+	// attached terminal (outside the IDE). This caused a bug (squad-ygylc) where
 	// text would be duplicated/re-streamed multiple times because the detection was
 	// too aggressive - it would falsely trigger when Claude Code echoed back typed
 	// characters or when responses happened to contain the typed text.
@@ -1320,7 +1320,7 @@
 	// Version counter to force $derived reactivity when existingTaskTitles is updated
 	let existingTaskTitlesVersion = $state(0);
 
-	// Fetch existing task titles from JAT (normalized for comparison)
+	// Fetch existing task titles from SQUAD (normalized for comparison)
 	async function fetchExistingTaskTitles(): Promise<void> {
 		try {
 			// Only check open/in_progress titles for dedup (no need to fetch all closed tasks)
@@ -1990,9 +1990,9 @@
 		selectedIndices: number[]; // For multi-select, which are checked
 	}
 
-	// Detected JAT workflow commands (e.g., /jat:complete, /jat:pause)
+	// Detected SQUAD workflow commands (e.g., /squad:complete, /squad:pause)
 	interface WorkflowCommand {
-		command: string; // Full command (e.g., '/jat:complete')
+		command: string; // Full command (e.g., '/squad:complete')
 		label: string; // Display label (e.g., 'Complete')
 		description: string; // Description text
 		variant: "success" | "primary" | "warning" | "info"; // Button style
@@ -2213,8 +2213,8 @@
 		};
 	});
 
-	// Detect JAT workflow state from structured markers in output
-	// Markers: [JAT:READY actions=...], [JAT:WORKING task=...], [JAT:IDLE actions=...]
+	// Detect SQUAD workflow state from structured markers in output
+	// Markers: [SQUAD:READY actions=...], [SQUAD:WORKING task=...], [SQUAD:IDLE actions=...]
 	const detectedWorkflowCommands = $derived.by((): WorkflowCommand[] => {
 		if (!output) return [];
 
@@ -2223,16 +2223,16 @@
 
 		const commands: WorkflowCommand[] = [];
 
-		// Check for structured JAT markers (most reliable detection)
-		const readyMatch = recentOutput.match(/\[JAT:READY actions=([^\]]+)\]/);
-		const workingMatch = recentOutput.match(/\[JAT:WORKING task=([^\]]+)\]/);
-		const idleMatch = recentOutput.match(/\[JAT:IDLE actions=([^\]]+)\]/);
+		// Check for structured SQUAD markers (most reliable detection)
+		const readyMatch = recentOutput.match(/\[SQUAD:READY actions=([^\]]+)\]/);
+		const workingMatch = recentOutput.match(/\[SQUAD:WORKING task=([^\]]+)\]/);
+		const idleMatch = recentOutput.match(/\[SQUAD:IDLE actions=([^\]]+)\]/);
 
 		// If WORKING marker is more recent than READY/IDLE, agent is actively working
 		if (workingMatch) {
-			const workingIndex = recentOutput.lastIndexOf("[JAT:WORKING");
-			const readyIndex = recentOutput.lastIndexOf("[JAT:READY");
-			const idleIndex = recentOutput.lastIndexOf("[JAT:IDLE");
+			const workingIndex = recentOutput.lastIndexOf("[SQUAD:WORKING");
+			const readyIndex = recentOutput.lastIndexOf("[SQUAD:READY");
+			const idleIndex = recentOutput.lastIndexOf("[SQUAD:IDLE");
 
 			// If WORKING is the most recent marker, no workflow buttons
 			if (workingIndex > readyIndex && workingIndex > idleIndex) {
@@ -2242,8 +2242,8 @@
 
 		// Parse READY marker actions
 		if (readyMatch) {
-			const readyIndex = recentOutput.lastIndexOf("[JAT:READY");
-			const workingIndex = recentOutput.lastIndexOf("[JAT:WORKING");
+			const readyIndex = recentOutput.lastIndexOf("[SQUAD:READY");
+			const workingIndex = recentOutput.lastIndexOf("[SQUAD:WORKING");
 
 			// Only use READY if it's more recent than WORKING
 			if (readyIndex > workingIndex) {
@@ -2251,27 +2251,27 @@
 
 				if (actions.includes("complete")) {
 					commands.push({
-						command: "/jat:complete",
+						command: "/squad:complete",
 						label: "Done",
 						description: "Complete this task and see menu",
 						variant: "success",
 					});
 				}
-				// Note: /jat:next removed from UI - one agent = one session = one task model
+				// Note: /squad:next removed from UI - one agent = one session = one task model
 			}
 		}
 
 		// Parse IDLE marker actions
 		if (idleMatch && commands.length === 0) {
-			const idleIndex = recentOutput.lastIndexOf("[JAT:IDLE");
-			const workingIndex = recentOutput.lastIndexOf("[JAT:WORKING");
+			const idleIndex = recentOutput.lastIndexOf("[SQUAD:IDLE");
+			const workingIndex = recentOutput.lastIndexOf("[SQUAD:WORKING");
 
 			if (idleIndex > workingIndex) {
 				const actions = idleMatch[1].split(",").map((a) => a.trim());
 
 				if (actions.includes("start")) {
 					commands.push({
-						command: "/jat:start",
+						command: "/squad:start",
 						label: "Start",
 						description: "Pick up a task",
 						variant: "primary",
@@ -2280,22 +2280,22 @@
 			}
 		}
 
-		// Fallback: detect old-style patterns if no markers found (only for /jat:complete)
+		// Fallback: detect old-style patterns if no markers found (only for /squad:complete)
 		if (commands.length === 0) {
 			const hasNextStepsContext =
 				/next\s*steps?:/i.test(recentOutput) &&
-				/\/jat:complete\b/.test(recentOutput);
+				/\/squad:complete\b/.test(recentOutput);
 
 			const hasResumedWork =
-				/\[JAT:WORKING/.test(recentOutput) ||
+				/\[SQUAD:WORKING/.test(recentOutput) ||
 				/Get to work!/i.test(recentOutput) ||
 				/╔.*STARTING WORK/i.test(recentOutput);
 
 			if (hasNextStepsContext && !hasResumedWork) {
-				// Note: /jat:next removed from UI - one agent = one session = one task model
-				if (/\/jat:complete\b/.test(recentOutput)) {
+				// Note: /squad:next removed from UI - one agent = one session = one task model
+				if (/\/squad:complete\b/.test(recentOutput)) {
 					commands.push({
-						command: "/jat:complete",
+						command: "/squad:complete",
 						label: "Done",
 						description: "Complete this task",
 						variant: "success",
@@ -2311,12 +2311,12 @@
 	 * Session State - Determines what to show in the header
 	 *
 	 * States (see SessionState type in statusColors.ts):
-	 * - 'starting': Task assigned, agent initializing (no [JAT:WORKING] marker yet)
-	 * - 'working': Has active in_progress task with [JAT:WORKING] marker
+	 * - 'starting': Task assigned, agent initializing (no [SQUAD:WORKING] marker yet)
+	 * - 'working': Has active in_progress task with [SQUAD:WORKING] marker
 	 * - 'compacting': Context compaction in progress (via PreCompact hook)
 	 * - 'needs-input': Agent blocked, needs user to provide clarification (orange)
 	 * - 'ready-for-review': Work done, awaiting user review (yellow)
-	 * - 'completing': User triggered /jat:complete, agent running completion steps (teal)
+	 * - 'completing': User triggered /squad:complete, agent running completion steps (teal)
 	 * - 'completed': Task was closed, showing completion summary (green)
 	 * - 'recovering': Automation rule triggered recovery action (cyan)
 	 * - 'idle': No task, new session (gray)
@@ -2373,7 +2373,7 @@
 			// These are either terminal states or user-waiting states where the agent is blocked:
 			// - "completed", "auto-proceeding", "planning" - terminal/long-lived states
 			// - "needs-input" - agent waiting for user to answer a question
-			// - "ready-for-review" - agent waiting for user to review and /jat:complete
+			// - "ready-for-review" - agent waiting for user to review and /squad:complete
 			if (sseState === "completed" || sseState === "auto-proceeding" || sseState === "planning" ||
 				sseState === "needs-input" || sseState === "ready-for-review") {
 				return sseState as SessionState;
@@ -2409,7 +2409,7 @@
 		// Find last position of each marker type
 		// Include Claude Code's native AskUserQuestion UI patterns
 		const needsInputPos = findLastPos([
-			/\[JAT:NEEDS_INPUT\]/,
+			/\[SQUAD:NEEDS_INPUT\]/,
 			/❓\s*NEED CLARIFICATION/,
 			// Claude Code's native question UI patterns
 			/Enter to select.*Tab\/Arrow keys to navigate.*Esc to cancel/,
@@ -2418,10 +2418,10 @@
 			// Plan mode exit prompt (built-in interaction, not AskUserQuestion tool)
 			/ctrl-g to edit in Nvim/,
 		]);
-		const workingPos = findLastPos([/\[JAT:WORKING\s+task=/]);
+		const workingPos = findLastPos([/\[SQUAD:WORKING\s+task=/]);
 		const reviewPos = findLastPos([
-			/\[JAT:NEEDS_REVIEW\]/,
-			/\[JAT:READY\s+actions=/,
+			/\[SQUAD:NEEDS_REVIEW\]/,
+			/\[SQUAD:READY\s+actions=/,
 			/🔍\s*READY FOR REVIEW/,
 			// Natural language patterns indicating agent is presenting work for review
 			/ready to mark.*complete/i,
@@ -2437,27 +2437,27 @@
 			/task (?:is )?(?:done|complete|finished)/i,
 			/work (?:is )?(?:done|complete|finished)/i,
 			/that['']?s (?:it|all|everything|done)/i,
-			/run.*\/jat:complete/i, // Agent suggesting to run complete command
+			/run.*\/squad:complete/i, // Agent suggesting to run complete command
 		]);
 		const completingPos = findLastPos([
-			// Triggered when user runs /jat:complete command
-			/jat:complete is running/i,
+			// Triggered when user runs /squad:complete command
+			/squad:complete is running/i,
 			/✅\s*Marking task complete/i,
 			/Committing changes/i,
 		]);
 		const compactingPos = findLastPos([
 			// Triggered by PreCompact hook - context compaction in progress
-			/\[JAT:COMPACTING\]/,
+			/\[SQUAD:COMPACTING\]/,
 		]);
 
 		// Boolean flags for no-task state checking
 		const hasCompletionMarker =
-			/\[JAT:IDLE\]/.test(recentOutput) ||
+			/\[SQUAD:IDLE\]/.test(recentOutput) ||
 			/✅\s*TASK COMPLETE/.test(recentOutput);
 		const hasReadyForReviewMarker = reviewPos >= 0;
 
 		// Autopilot marker - can proceed automatically (future: trigger auto-spawn)
-		const hasAutoProceedMarker = /\[JAT:AUTO_PROCEED\]/.test(recentOutput);
+		const hasAutoProceedMarker = /\[SQUAD:AUTO_PROCEED\]/.test(recentOutput);
 
 		// Determine state based on most recent marker
 		// Priority when positions are equal: completed > review > needs-input > working
@@ -2477,8 +2477,8 @@
 				return positions[0].state;
 			}
 
-			// No markers found - check JAT task status
-			// If task is in_progress in JAT, agent is working (handles resumed sessions after context compaction)
+			// No markers found - check SQUAD task status
+			// If task is in_progress in SQUAD, agent is working (handles resumed sessions after context compaction)
 			// Otherwise, agent is still starting/initializing
 			if (task.status === "in_progress") {
 				return "working";
@@ -2529,7 +2529,7 @@
 	});
 
 	// Start/stop custom question polling based on sessionState
-	// Custom questions come from jat-signal question command (separate from AskUserQuestion tool)
+	// Custom questions come from squad-signal question command (separate from AskUserQuestion tool)
 	$effect(() => {
 		const needsCustomQuestionPolling = sessionState === "needs-input";
 
@@ -2569,7 +2569,7 @@
 	});
 
 	// Auto-complete effect: When session enters ready-for-review and review rules say 'auto',
-	// automatically trigger /jat:complete without user intervention.
+	// automatically trigger /squad:complete without user intervention.
 	// This enables low-priority work (e.g., P4 chores) to complete without clicks.
 	$effect(() => {
 		// Only trigger in agent mode (not server mode)
@@ -2608,7 +2608,7 @@
 	});
 
 	// Poll for signal data (human actions) in agent mode only
-	// Signal data comes from jat-signal action command via PostToolUse hook
+	// Signal data comes from squad-signal action command via PostToolUse hook
 	// Poll every 3 seconds - signals are written once and persist until cleared
 	// Stop polling when session completes (no more signals expected)
 	$effect(() => {
@@ -2675,7 +2675,7 @@
 
 	// Check if auto-proceed mode is active (for future autopilot feature)
 	const isAutoProceed = $derived(
-		output ? /\[JAT:AUTO_PROCEED\]/.test(output.slice(-3000)) : false,
+		output ? /\[SQUAD:AUTO_PROCEED\]/.test(output.slice(-3000)) : false,
 	);
 
 	// Get auto-kill countdown for this session (null if not scheduled)
@@ -2691,8 +2691,8 @@
 
 	// Detect human action markers in output and from signal API
 	// Sources:
-	// 1. Terminal markers: [JAT:HUMAN_ACTION {"title":"...","description":"..."}]
-	// 2. Signal API: jat-signal action '{"title":"...","items":[...]}'
+	// 1. Terminal markers: [SQUAD:HUMAN_ACTION {"title":"...","description":"..."}]
+	// 2. Signal API: squad-signal action '{"title":"...","items":[...]}'
 	// Uses unified marker parser with balanced-brace JSON extraction
 	interface HumanAction {
 		title: string;
@@ -2705,8 +2705,8 @@
 	const detectedHumanActions = $derived.by((): HumanAction[] => {
 		const actions: HumanAction[] = [];
 
-		// Source: Signal API actions (jat-signal action command)
-		// Human actions are delivered via the jat-signal hook system
+		// Source: Signal API actions (squad-signal action command)
+		// Human actions are delivered via the squad-signal hook system
 		if (signalActionData) {
 			// If signal has items array, each item is a separate action
 			if (signalActionData.items && signalActionData.items.length > 0) {
@@ -2747,7 +2747,7 @@
 	// ==========================================================================
 	// Suggested Tasks Detection
 	// ==========================================================================
-	// Suggested tasks are delivered via the jat-signal hook system (WS).
+	// Suggested tasks are delivered via the squad-signal hook system (WS).
 	// See shared/signals.md for signal system documentation.
 
 	/** Extended SuggestedTask with local UI state for selection and editing */
@@ -2756,7 +2756,7 @@
 		selected: boolean;
 		/** Whether user has edited this task */
 		edited: boolean;
-		/** Whether this task already exists in JAT (matched by title) */
+		/** Whether this task already exists in SQUAD (matched by title) */
 		alreadyCreated?: boolean;
 		/** Task ID if this task was already created (for displaying clickable badge) */
 		taskId?: string;
@@ -2781,7 +2781,7 @@
 
 	/**
 	 * Process SUGGESTED_TASKS from signal data (via WS).
-	 * Signal data comes directly from the jat-signal hook without terminal parsing.
+	 * Signal data comes directly from the squad-signal hook without terminal parsing.
 	 */
 	const detectedSuggestedTasks = $derived.by((): SuggestedTaskWithState[] => {
 		// Reference version counter to ensure this derived re-runs when titles are fetched
@@ -2810,7 +2810,7 @@
 			const edits = suggestedTaskEdits.get(key);
 			const hasEdits = edits && Object.keys(edits).length > 0;
 
-			// Check if task title already exists in JAT (normalized comparison)
+			// Check if task title already exists in SQUAD (normalized comparison)
 			const effectiveTitle = hasEdits && edits.title ? edits.title : task.title;
 			const normalizedTitle = effectiveTitle?.toLowerCase().trim() || "";
 			const existingTaskId = normalizedTitle
@@ -3233,7 +3233,7 @@
 
 	// Task to display - either active task or last completed task
 	// Show lastCompletedTask in most states to maintain task linkage throughout the session lifecycle
-	// During completing/completed states, the task prop may be null (task closed in JAT),
+	// During completing/completed states, the task prop may be null (task closed in SQUAD),
 	// so we fall back to extracting task info from the rich signal payload
 	const displayTask = $derived.by(() => {
 		if (task) return task;
@@ -3427,7 +3427,7 @@
 		}
 	}
 
-	// Capture session log to .jat/logs/ on completion
+	// Capture session log to .squad/logs/ on completion
 	async function captureSessionLog() {
 		if (logCaptured || !sessionName) return;
 
@@ -3587,7 +3587,7 @@
 		}
 	});
 
-	// Send a workflow command (e.g., /jat:complete)
+	// Send a workflow command (e.g., /squad:complete)
 	async function sendWorkflowCommand(command: string) {
 		const startTime = Date.now();
 		console.log(
@@ -3781,7 +3781,7 @@
 
 			case "complete":
 				// Instantly write completing signal for immediate UI feedback
-				// Then send /jat:complete command (agent will update to complete when done)
+				// Then send /squad:complete command (agent will update to complete when done)
 				if (sessionName) {
 					// Get task info from multiple sources (displayTask, richSignalPayload, lastCompletedTask)
 					const taskId = displayTask?.id || richSignalPayload?.taskId as string || lastCompletedTask?.id || '';
@@ -3822,7 +3822,7 @@
 						console.warn('[SessionCard] No taskId available for instant completing signal - skipping');
 					}
 				}
-				await sendWorkflowCommand("/jat:complete");
+				await sendWorkflowCommand("/squad:complete");
 				// Trigger collapse after delay (matches Ctrl+Enter pattern)
 				if (onActionComplete) {
 					setTimeout(() => onActionComplete(), 1400);
@@ -3831,7 +3831,7 @@
 
 			case "complete-kill":
 				// Instantly write completing signal for immediate UI feedback
-				// Then send /jat:complete --kill command (self-destruct session)
+				// Then send /squad:complete --kill command (self-destruct session)
 				if (sessionName) {
 					// Get task info from multiple sources (displayTask, richSignalPayload, lastCompletedTask)
 					const taskId = displayTask?.id || richSignalPayload?.taskId as string || lastCompletedTask?.id || '';
@@ -3861,7 +3861,7 @@
 				}
 				// Track intent so sessionEvents knows to auto-kill when signal arrives
 				setPendingAutoKill(sessionName, true);
-				await sendWorkflowCommand("/jat:complete --kill");
+				await sendWorkflowCommand("/squad:complete --kill");
 				// Trigger collapse after delay (matches Ctrl+Enter pattern)
 				if (onActionComplete) {
 					setTimeout(() => onActionComplete(), 1400);
@@ -3879,8 +3879,8 @@
 				break;
 
 			case "start":
-				// Run /jat:start command
-				await sendWorkflowCommand("/jat:start");
+				// Run /squad:start command
+				await sendWorkflowCommand("/squad:start");
 				break;
 
 			case "kill":
@@ -3989,7 +3989,7 @@
 
 			case "start":
 				// Start on an idle session - instantly write starting signal for immediate UI feedback
-				// Then run /jat:start command
+				// Then run /squad:start command
 				if (sessionName) {
 					try {
 						await fetch(`/api/sessions/${encodeURIComponent(sessionName)}/signal`, {
@@ -4008,12 +4008,12 @@
 						console.warn('[SessionCard] Failed to write starting signal:', e);
 					}
 				}
-				await sendWorkflowCommand("/jat:start");
+				await sendWorkflowCommand("/squad:start");
 				break;
 
 			case "convert-to-tasks":
-				// Send /jat:tasktree command to convert the planning session into tasks
-				await sendWorkflowCommand("/jat:tasktree");
+				// Send /squad:tasktree command to convert the planning session into tasks
+				await sendWorkflowCommand("/squad:tasktree");
 				break;
 
 			default:
@@ -4592,12 +4592,12 @@
 	function handleDragOver(e: DragEvent) {
 		e.preventDefault();
 		e.stopPropagation();
-		// Show drag state for files OR custom JAT image/text data OR plain text paths
+		// Show drag state for files OR custom SQUAD image/text data OR plain text paths
 		const hasFiles = e.dataTransfer?.types.includes("Files");
-		const hasJatImage = e.dataTransfer?.types.includes("application/x-jat-image");
-		const hasJatText = e.dataTransfer?.types.includes("application/x-jat-text");
+		const hasSquadImage = e.dataTransfer?.types.includes("application/x-squad-image");
+		const hasSquadText = e.dataTransfer?.types.includes("application/x-squad-text");
 		const hasText = e.dataTransfer?.types.includes("text/plain");
-		if ((hasFiles || hasJatImage || hasJatText || hasText) && onSendInput) {
+		if ((hasFiles || hasSquadImage || hasSquadText || hasText) && onSendInput) {
 			isDragOver = true;
 			e.dataTransfer!.dropEffect = "copy";
 		}
@@ -4621,10 +4621,10 @@
 		e.preventDefault();
 		e.stopPropagation();
 		const hasFiles = e.dataTransfer?.types.includes("Files");
-		const hasJatImage = e.dataTransfer?.types.includes("application/x-jat-image");
-		const hasJatText = e.dataTransfer?.types.includes("application/x-jat-text");
+		const hasSquadImage = e.dataTransfer?.types.includes("application/x-squad-image");
+		const hasSquadText = e.dataTransfer?.types.includes("application/x-squad-text");
 		const hasText = e.dataTransfer?.types.includes("text/plain");
-		if ((hasFiles || hasJatImage || hasJatText || hasText) && onSendInput) {
+		if ((hasFiles || hasSquadImage || hasSquadText || hasText) && onSendInput) {
 			isDragOver = true;
 		}
 	}
@@ -4634,11 +4634,11 @@
 		e.stopPropagation();
 		isDragOver = false;
 
-		// Check for custom JAT image path data (dragged from TaskDetailPaneA thumbnails)
-		const jatImageData = e.dataTransfer?.getData('application/x-jat-image');
-		if (jatImageData) {
+		// Check for custom SQUAD image path data (dragged from TaskDetailPaneA thumbnails)
+		const squadImageData = e.dataTransfer?.getData('application/x-squad-image');
+		if (squadImageData) {
 			try {
-				const imageInfo = JSON.parse(jatImageData);
+				const imageInfo = JSON.parse(squadImageData);
 				if (imageInfo.path) {
 					// Add as a proper attachment with the image preview
 					const id = `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -4668,11 +4668,11 @@
 			}
 		}
 
-		// Check for custom JAT text data (dragged description or notes from TaskDetailPaneA)
-		const jatTextData = e.dataTransfer?.getData('application/x-jat-text');
-		if (jatTextData) {
+		// Check for custom SQUAD text data (dragged description or notes from TaskDetailPaneA)
+		const squadTextData = e.dataTransfer?.getData('application/x-squad-text');
+		if (squadTextData) {
 			try {
-				const textInfo = JSON.parse(jatTextData);
+				const textInfo = JSON.parse(squadTextData);
 				if (textInfo.content) {
 					// Insert the text content into the input field
 					if (inputText.trim()) {
@@ -6007,8 +6007,8 @@
 								: undefined}
 							onPause={onSendInput
 								? async () => {
-										// Send /jat:pause to pause work on this task
-										await onSendInput("/jat:pause", "text");
+										// Send /squad:pause to pause work on this task
+										await onSendInput("/squad:pause", "text");
 									}
 								: undefined}
 							compact={false}
@@ -6064,15 +6064,15 @@
 							onTaskClick={(taskId) => onTaskClick?.(taskId)}
 							onStartIdle={onSendInput
 								? async () => {
-										// Send /jat:start to start working
-										await onSendInput("/jat:start", "text");
+										// Send /squad:start to start working
+										await onSendInput("/squad:start", "text");
 									}
 								: undefined}
 							onStartSuggested={onSendInput && idleSignal.suggestedNextTask
 								? async () => {
 										// Start working on the suggested task
 										await onSendInput(
-											`/jat:start ${idleSignal.suggestedNextTask!.taskId}`,
+											`/squad:start ${idleSignal.suggestedNextTask!.taskId}`,
 											"text",
 										);
 									}
@@ -6080,7 +6080,7 @@
 							onAssignTask={onSendInput
 								? async (taskId) => {
 										// Start working on a specific task
-										await onSendInput(`/jat:start ${taskId}`, "text");
+										await onSendInput(`/squad:start ${taskId}`, "text");
 									}
 								: undefined}
 							compact={false}
@@ -6295,7 +6295,7 @@
 					</div>
 				{/if}
 
-				<!-- Custom Question UI: Show clickable options from jat-signal question -->
+				<!-- Custom Question UI: Show clickable options from squad-signal question -->
 				<!-- Takes priority over AskUserQuestion UI when both are present -->
 				{#if customQuestionData?.active}
 					<div
@@ -6910,7 +6910,7 @@
 					</div>
 				{/if}
 
-				<!-- Human Actions Required: Display when agent outputs [JAT:HUMAN_ACTION] markers or jat-signal action -->
+				<!-- Human Actions Required: Display when agent outputs [SQUAD:HUMAN_ACTION] markers or squad-signal action -->
 				{#if detectedHumanActions.length > 0}
 					<div
 						class="mb-2 p-2.5 rounded-lg"

@@ -3,7 +3,7 @@
  * Provides individual task details including dependencies and enables
  */
 import { json } from '@sveltejs/kit';
-import { getTaskById, updateTask, deleteTask, addDependency, removeDependency } from '$lib/server/jat-tasks.js';
+import { getTaskById, updateTask, deleteTask, addDependency, removeDependency } from '$lib/server/squad-tasks.js';
 import { readFile, writeFile, unlink } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
@@ -14,7 +14,7 @@ import { emitEvent } from '$lib/utils/eventBus.server.js';
 // Path to task images store
 const getImageStorePath = () => {
 	const projectPath = process.cwd().replace('/ide', '');
-	return join(projectPath, '.jat', 'task-images.json');
+	return join(projectPath, '.squad', 'task-images.json');
 };
 
 /**
@@ -241,7 +241,7 @@ export async function PATCH({ params, request }) {
 		// Validate dependencies (if provided, must be array of task IDs)
 		if (updates.dependencies !== undefined && updates.dependencies !== null) {
 			if (!Array.isArray(updates.dependencies)) {
-				validationErrors.push('dependencies: Must be an array of task IDs (e.g., ["jat-abc", "jat-xyz"])');
+				validationErrors.push('dependencies: Must be an array of task IDs (e.g., ["squad-abc", "squad-xyz"])');
 			}
 		}
 

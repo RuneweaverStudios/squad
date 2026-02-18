@@ -1,17 +1,17 @@
 /**
- * Workflow discovery and scheduling for jat-scheduler.
- * Reads workflow JSON files from ~/.config/jat/workflows/ and finds
+ * Workflow discovery and scheduling for squad-scheduler.
+ * Reads workflow JSON files from ~/.config/squad/workflows/ and finds
  * enabled workflows with trigger_cron nodes that are due to run.
  *
  * Scheduling state (next_run_at per workflow) is tracked in a separate
- * state file: ~/.config/jat/workflows/.scheduler-state.json
+ * state file: ~/.config/squad/workflows/.scheduler-state.json
  */
 
 import { readFileSync, existsSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 
-const WORKFLOWS_DIR = join(homedir(), '.config', 'jat', 'workflows');
+const WORKFLOWS_DIR = join(homedir(), '.config', 'squad', 'workflows');
 const STATE_FILE = join(WORKFLOWS_DIR, '.scheduler-state.json');
 
 /**

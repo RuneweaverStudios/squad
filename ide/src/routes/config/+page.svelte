@@ -389,10 +389,10 @@
 </script>
 
 <svelte:head>
-	<title>Config | JAT IDE</title>
-	<meta name="description" content="JAT IDE configuration editor. Manage defaults, templates, keyboard shortcuts, and automation settings." />
-	<meta property="og:title" content="Config | JAT IDE" />
-	<meta property="og:description" content="JAT IDE configuration editor. Manage defaults, templates, keyboard shortcuts, and automation settings." />
+	<title>Config | SQUAD IDE</title>
+	<meta name="description" content="SQUAD IDE configuration editor. Manage defaults, templates, keyboard shortcuts, and automation settings." />
+	<meta property="og:title" content="Config | SQUAD IDE" />
+	<meta property="og:description" content="SQUAD IDE configuration editor. Manage defaults, templates, keyboard shortcuts, and automation settings." />
 	<meta property="og:image" content="/favicons/config.svg" />
 	<link rel="icon" href="/favicons/config.svg" />
 </svelte:head>

@@ -2,7 +2,7 @@
 	/**
 	 * DefaultsEditor Component
 	 *
-	 * Form for editing JAT global defaults from ~/.config/jat/projects.json
+	 * Form for editing SQUAD global defaults from ~/.config/squad/projects.json
 	 * Settings here affect agent spawning, model selection, and timing.
 	 */
 
@@ -10,7 +10,7 @@
 	import { updateAutoKillConfig } from '$lib/stores/autoKillConfig';
 
 	// Types
-	interface JatDefaults {
+	interface SquadDefaults {
 		terminal: string;
 		editor: string;
 		tools_path: string;
@@ -63,7 +63,7 @@
 	let savingSkipPermissions = $state(false);
 
 	// Track if form has changes
-	let originalValues = $state<JatDefaults | null>(null);
+	let originalValues = $state<SquadDefaults | null>(null);
 	let hasChanges = $derived(
 		originalValues !== null && (
 			terminal !== originalValues.terminal ||
@@ -464,7 +464,7 @@
 			<h2 class="editor-title">Global Defaults</h2>
 			<p class="editor-description">
 				Configure global settings for agent spawning and system behavior.
-				These values are stored in <code>{configPath || '~/.config/jat/projects.json'}</code>
+				These values are stored in <code>{configPath || '~/.config/squad/projects.json'}</code>
 			</p>
 		</div>
 	</div>
@@ -665,7 +665,7 @@
 				<div class="form-group">
 					<label class="form-label" for="tools-path">
 						Tools Path
-						<span class="label-hint">Path to JAT tools directory</span>
+						<span class="label-hint">Path to SQUAD tools directory</span>
 					</label>
 					<input
 						type="text"

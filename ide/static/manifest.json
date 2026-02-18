@@ -1,6 +1,6 @@
 {
-	"name": "JAT - The World's First Agentic IDE",
-	"short_name": "JAT",
+	"name": "SQUAD - The World's First Agentic IDE",
+	"short_name": "SQUAD",
 	"description": "Everything you need to vibe code. In one place.",
 	"start_url": "/",
 	"display": "standalone",

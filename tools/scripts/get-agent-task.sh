@@ -8,7 +8,7 @@
 #   get-agent-task.sh AGENT_NAME
 #
 # Output:
-#   - task_id (e.g., "jat-abc") if agent is working
+#   - task_id (e.g., "squad-abc") if agent is working
 #   - Empty string if agent is not working
 #   - Exit code 0: Task found
 #   - Exit code 1: No task found
@@ -35,9 +35,9 @@ AGENT_NAME="$1"
 
 # STEP 1: Check tasks DB for in_progress tasks assigned to this agent
 # This matches IDE logic: agent.in_progress_tasks > 0
-if command -v jt &>/dev/null; then
+if command -v st &>/dev/null; then
     # Get all in_progress tasks assigned to this agent
-    in_progress_task=$(jt list --status in_progress --json 2>/dev/null | \
+    in_progress_task=$(st list --status in_progress --json 2>/dev/null | \
         jq -r --arg agent "$AGENT_NAME" '.[] | select(.assignee == $agent) | .id' 2>/dev/null | \
         head -1)
 

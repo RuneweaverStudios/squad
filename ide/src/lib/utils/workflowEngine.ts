@@ -358,7 +358,7 @@ async function executeLlmPrompt(
 	return result;
 }
 
-/** Create Task: run jt create */
+/** Create Task: run st create */
 async function executeCreateTask(
 	node: WorkflowNode,
 	input: unknown,
@@ -388,7 +388,7 @@ async function executeCreateTask(
 			? join(homedir(), 'code', ctx.project)
 			: process.cwd().replace('/ide', '');
 
-	const result = await execCommand('jt', args, cwd);
+	const result = await execCommand('st', args, cwd);
 	return result;
 }
 

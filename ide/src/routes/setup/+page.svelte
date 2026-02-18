@@ -299,12 +299,12 @@
 						<p class="text-xs" style="color: oklch(0.55 0.02 250);">
 							Read the docs and learn what Squad can do:<br/>
 							<a
-								href="https://jat.tools/docs"
+								href="https://squad.tools/docs"
 								target="_blank"
 								rel="noopener noreferrer"
 								class="font-mono hover:underline"
 								style="color: oklch(0.70 0.15 240);"
-							>https://jat.tools/docs</a>
+							>https://squad.tools/docs</a>
 						</p>
 					</div>
 					<div class="flex items-start gap-2.5">
@@ -312,12 +312,12 @@
 						<p class="text-xs" style="color: oklch(0.55 0.02 250);">
 							Contribute or report issues on GitHub:<br/>
 							<a
-								href="https://github.com/joewinke/jat"
+								href="https://github.com/joewinke/squad"
 								target="_blank"
 								rel="noopener noreferrer"
 								class="font-mono hover:underline"
 								style="color: oklch(0.70 0.15 240);"
-							>https://github.com/joewinke/jat</a><br/>
+							>https://github.com/joewinke/squad</a><br/>
 							<span style="color: oklch(0.50 0.02 250);">Or just star the repo to share the love!</span>
 						</p>
 					</div>
@@ -479,7 +479,7 @@
 					</button>
 
 					<p class="text-[11px] font-mono text-center mt-2" style="color: oklch(0.45 0.02 250);">
-						Or in terminal: <code class="px-1 py-0.5 rounded" style="background: oklch(0.22 0.01 250);">cd /path/to/your/folder && jt init</code>
+						Or in terminal: <code class="px-1 py-0.5 rounded" style="background: oklch(0.22 0.01 250);">cd /path/to/your/folder && st init</code>
 					</p>
 				{/if}
 			</div>

@@ -153,9 +153,9 @@
 </script>
 
 <svelte:head>
-	<title>Automation | JAT IDE</title>
+	<title>Automation | SQUAD IDE</title>
 	<meta name="description" content="Configure pattern-based automation rules for agent sessions. Set up auto-responses, recovery actions, and notifications." />
-	<meta property="og:title" content="Automation | JAT IDE" />
+	<meta property="og:title" content="Automation | SQUAD IDE" />
 	<meta property="og:description" content="Configure pattern-based automation rules for agent sessions. Set up auto-responses, recovery actions, and notifications." />
 	<meta property="og:image" content="/favicons/automation.svg" />
 	<link rel="icon" href="/favicons/automation.svg" />

@@ -16,22 +16,22 @@
 	const steps = [
 		{
 			title: 'Clone the Repository',
-			command: 'git clone https://github.com/jomarchy/jat.git ~/code/jat',
+			command: 'git clone https://github.com/jomarchy/squad.git ~/code/squad',
 			description: 'Download the alien technology to your local system'
 		},
 		{
 			title: 'Install Dependencies',
-			command: 'cd ~/code/jat && ./install.sh',
+			command: 'cd ~/code/squad && ./install.sh',
 			description: 'Initialize all tools and create symlinks'
 		},
 		{
 			title: 'Start the IDE',
-			command: 'jat',
+			command: 'squad',
 			description: 'Launch your command center'
 		},
 		{
 			title: 'Begin Work',
-			command: '/jat:start',
+			command: '/squad:start',
 			description: 'Register your agent and pick a task'
 		}
 	];
@@ -147,7 +147,7 @@
 				<br />
 				The alien technology is now yours to command.
 			</p>
-			<a href="https://github.com/jomarchy/jat" class="github-link" target="_blank" rel="noopener">
+			<a href="https://github.com/jomarchy/squad" class="github-link" target="_blank" rel="noopener">
 				<span class="link-icon">◇</span>
 				<span>View on GitHub</span>
 				<span class="link-arrow">→</span>

@@ -191,15 +191,15 @@ export const ANIMATIONS = {
 } as const;
 
 // =============================================================================
-// JAT DEFAULTS (stored in ~/.config/jat/projects.json)
+// SQUAD DEFAULTS (stored in ~/.config/squad/projects.json)
 // =============================================================================
 
-export const JAT_DEFAULTS = {
+export const SQUAD_DEFAULTS = {
 	/** Terminal emulator for new sessions. 'auto' detects platform default. */
 	terminal: 'auto',
 	/** Code editor command */
 	editor: 'code',
-	/** Path to JAT tools directory */
+	/** Path to SQUAD tools directory */
 	tools_path: '~/.local/bin',
 	/** CLI flags passed to claude command (non-permission flags only; autonomous mode is controlled by skip_permissions toggle) */
 	claude_flags: '',
@@ -278,7 +278,7 @@ export const SIGNAL_TTL = {
 	/**
 	 * States that use the longer USER_WAITING_MS TTL
 	 * - completed: waiting for user to acknowledge/cleanup
-	 * - review: waiting for user to approve and run /jat:complete
+	 * - review: waiting for user to approve and run /squad:complete
 	 * - needs_input: waiting for user to answer a question
 	 * - working: agents can work for 20+ mins without emitting new signals
 	 */
@@ -363,7 +363,7 @@ export const AUTO_PAUSE_IDLE = {
 export const TASK_LIMITS = {
 	/**
 	 * Maximum length for task description field (in characters).
-	 * Prevents jt import failures caused by Go's bufio.Scanner 64KB line limit.
+	 * Prevents st import failures caused by Go's bufio.Scanner 64KB line limit.
 	 * JSONL lines include all task fields, so description cap is set well below
 	 * the 64KB threshold to leave room for title, labels, metadata, etc.
 	 */

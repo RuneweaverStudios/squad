@@ -12,10 +12,10 @@
 #   bd-set-review-override TASK_ID --show
 #
 # Examples:
-#   bd-set-review-override jat-abc always_review "Security sensitive"
-#   bd-set-review-override jat-xyz always_auto "Low risk cleanup"
-#   bd-set-review-override jat-abc --clear
-#   bd-set-review-override jat-abc --show
+#   bd-set-review-override squad-abc always_review "Security sensitive"
+#   bd-set-review-override squad-xyz always_auto "Low risk cleanup"
+#   bd-set-review-override squad-abc --clear
+#   bd-set-review-override squad-abc --show
 #
 # Storage:
 #   The override is stored in the task's notes field as:
@@ -23,7 +23,7 @@
 #
 # Priority:
 #   Task-level overrides take precedence over:
-#   1. JSON file overrides (.jat/review-rules.json)
+#   1. JSON file overrides (.squad/review-rules.json)
 #   2. Type-specific rules (review_rules.<type>.max_auto)
 #   3. Default action (review_rules.default_action)
 
@@ -62,9 +62,9 @@ if [[ "$TASK_ID" == "--help" ]] || [[ "$TASK_ID" == "-h" ]] || [[ -z "$TASK_ID" 
     echo "  --show         Show current override for the task"
     echo ""
     echo "Examples:"
-    echo "  bd-set-review-override jat-abc always_review \"Security sensitive\""
-    echo "  bd-set-review-override jat-xyz always_auto"
-    echo "  bd-set-review-override jat-abc --clear"
+    echo "  bd-set-review-override squad-abc always_review \"Security sensitive\""
+    echo "  bd-set-review-override squad-xyz always_auto"
+    echo "  bd-set-review-override squad-abc --clear"
     echo ""
     echo "The override is stored in the task's notes field and takes"
     echo "precedence over type rules and JSON file overrides."
@@ -72,13 +72,13 @@ if [[ "$TASK_ID" == "--help" ]] || [[ "$TASK_ID" == "-h" ]] || [[ -z "$TASK_ID" 
 fi
 
 # Verify task exists
-if ! jt show "$TASK_ID" --json >/dev/null 2>&1; then
+if ! st show "$TASK_ID" --json >/dev/null 2>&1; then
     echo -e "${RED}Error: Task not found: $TASK_ID${NC}" >&2
     exit 1
 fi
 
 # Get current task data
-task_json=$(jt show "$TASK_ID" --json)
+task_json=$(st show "$TASK_ID" --json)
 task_title=$(echo "$task_json" | jq -r '.[0].title // "Unknown"')
 current_notes=$(echo "$task_json" | jq -r '.[0].notes // ""')
 
@@ -119,9 +119,9 @@ if [[ "$ACTION" == "--clear" ]] || [[ "$ACTION" == "-c" ]]; then
 
     # Update the task
     if [[ -z "$new_notes" ]]; then
-        jt update "$TASK_ID" --notes "" >/dev/null 2>&1
+        st update "$TASK_ID" --notes "" >/dev/null 2>&1
     else
-        jt update "$TASK_ID" --notes "$new_notes" >/dev/null 2>&1
+        st update "$TASK_ID" --notes "$new_notes" >/dev/null 2>&1
     fi
 
     echo -e "${GREEN}✓ Cleared override for $TASK_ID${NC}"
@@ -163,7 +163,7 @@ else
 fi
 
 # Update the task
-jt update "$TASK_ID" --notes "$new_notes" >/dev/null 2>&1
+st update "$TASK_ID" --notes "$new_notes" >/dev/null 2>&1
 
 echo -e "${GREEN}✓ Set override for $TASK_ID: $ACTION${NC}"
 if [[ -n "$REASON" ]]; then

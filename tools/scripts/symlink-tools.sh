@@ -21,7 +21,7 @@ mkdir -p ~/.local/bin
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-# JAT tool directories (all under tools/)
+# SQUAD tool directories (all under tools/)
 TOOLS_DIR="$PROJECT_ROOT/tools"
 CORE_DIR="$TOOLS_DIR/core"
 BROWSER_DIR="$TOOLS_DIR/browser"
@@ -157,55 +157,55 @@ if [ -d "$SEARCH_DIR" ]; then
 fi
 
 echo ""
-echo -e "${BLUE}Setting up jat CLI...${NC}"
+echo -e "${BLUE}Setting up squad CLI...${NC}"
 echo ""
 
-# Symlink jat CLI (dev environment launcher)
-JAT_CLI_SOURCE="$PROJECT_ROOT/cli/jat"
-JAT_CLI_TARGET="$HOME/.local/bin/jat"
+# Symlink squad CLI (dev environment launcher)
+SQUAD_CLI_SOURCE="$PROJECT_ROOT/cli/squad"
+SQUAD_CLI_TARGET="$HOME/.local/bin/squad"
 
-if [ -f "$JAT_CLI_SOURCE" ]; then
-    if [ -L "$JAT_CLI_TARGET" ]; then
-        CURRENT_TARGET=$(readlink "$JAT_CLI_TARGET")
-        if [ "$CURRENT_TARGET" = "$JAT_CLI_SOURCE" ]; then
-            echo -e "  ${GREEN}✓${NC} jat (already linked)"
+if [ -f "$SQUAD_CLI_SOURCE" ]; then
+    if [ -L "$SQUAD_CLI_TARGET" ]; then
+        CURRENT_TARGET=$(readlink "$SQUAD_CLI_TARGET")
+        if [ "$CURRENT_TARGET" = "$SQUAD_CLI_SOURCE" ]; then
+            echo -e "  ${GREEN}✓${NC} squad (already linked)"
         else
-            echo -e "  ${YELLOW}↻${NC} jat (updating link)"
-            rm "$JAT_CLI_TARGET"
-            ln -s "$JAT_CLI_SOURCE" "$JAT_CLI_TARGET"
+            echo -e "  ${YELLOW}↻${NC} squad (updating link)"
+            rm "$SQUAD_CLI_TARGET"
+            ln -s "$SQUAD_CLI_SOURCE" "$SQUAD_CLI_TARGET"
         fi
     else
-        echo -e "  ${GREEN}+${NC} jat (linked)"
-        ln -s "$JAT_CLI_SOURCE" "$JAT_CLI_TARGET"
+        echo -e "  ${GREEN}+${NC} squad (linked)"
+        ln -s "$SQUAD_CLI_SOURCE" "$SQUAD_CLI_TARGET"
     fi
 else
-    echo -e "  ${YELLOW}⚠${NC} jat CLI not found at $JAT_CLI_SOURCE"
+    echo -e "  ${YELLOW}⚠${NC} squad CLI not found at $SQUAD_CLI_SOURCE"
 fi
 
 echo ""
-echo -e "${BLUE}Setting up jat-complete-bundle...${NC}"
+echo -e "${BLUE}Setting up squad-complete-bundle...${NC}"
 echo ""
 
-# Symlink jat-complete-bundle (completion bundle generator)
-BUNDLE_SOURCE="$PROJECT_ROOT/tools/scripts/jat-complete-bundle"
-BUNDLE_TARGET="$HOME/.local/bin/jat-complete-bundle"
+# Symlink squad-complete-bundle (completion bundle generator)
+BUNDLE_SOURCE="$PROJECT_ROOT/tools/scripts/squad-complete-bundle"
+BUNDLE_TARGET="$HOME/.local/bin/squad-complete-bundle"
 
 if [ -f "$BUNDLE_SOURCE" ]; then
     if [ -L "$BUNDLE_TARGET" ]; then
         CURRENT_TARGET=$(readlink "$BUNDLE_TARGET")
         if [ "$CURRENT_TARGET" = "$BUNDLE_SOURCE" ]; then
-            echo -e "  ${GREEN}✓${NC} jat-complete-bundle (already linked)"
+            echo -e "  ${GREEN}✓${NC} squad-complete-bundle (already linked)"
         else
-            echo -e "  ${YELLOW}↻${NC} jat-complete-bundle (updating link)"
+            echo -e "  ${YELLOW}↻${NC} squad-complete-bundle (updating link)"
             rm "$BUNDLE_TARGET"
             ln -s "$BUNDLE_SOURCE" "$BUNDLE_TARGET"
         fi
     else
-        echo -e "  ${GREEN}+${NC} jat-complete-bundle (linked)"
+        echo -e "  ${GREEN}+${NC} squad-complete-bundle (linked)"
         ln -s "$BUNDLE_SOURCE" "$BUNDLE_TARGET"
     fi
 else
-    echo -e "  ${YELLOW}⚠${NC} jat-complete-bundle not found at $BUNDLE_SOURCE"
+    echo -e "  ${YELLOW}⚠${NC} squad-complete-bundle not found at $BUNDLE_SOURCE"
 fi
 
 echo ""
@@ -235,29 +235,29 @@ else
 fi
 
 echo ""
-echo -e "${BLUE}Setting up jt-epic-child...${NC}"
+echo -e "${BLUE}Setting up st-epic-child...${NC}"
 echo ""
 
-# Symlink jt-epic-child helper
-JT_EPIC_SOURCE="$PROJECT_ROOT/tools/scripts/jt-epic-child"
-JT_EPIC_TARGET="$HOME/.local/bin/jt-epic-child"
+# Symlink st-epic-child helper
+JT_EPIC_SOURCE="$PROJECT_ROOT/tools/scripts/st-epic-child"
+JT_EPIC_TARGET="$HOME/.local/bin/st-epic-child"
 
 if [ -f "$JT_EPIC_SOURCE" ]; then
     if [ -L "$JT_EPIC_TARGET" ]; then
         CURRENT_TARGET=$(readlink "$JT_EPIC_TARGET")
         if [ "$CURRENT_TARGET" = "$JT_EPIC_SOURCE" ]; then
-            echo -e "  ${GREEN}✓${NC} jt-epic-child (already linked)"
+            echo -e "  ${GREEN}✓${NC} st-epic-child (already linked)"
         else
-            echo -e "  ${YELLOW}↻${NC} jt-epic-child (updating link)"
+            echo -e "  ${YELLOW}↻${NC} st-epic-child (updating link)"
             rm "$JT_EPIC_TARGET"
             ln -s "$JT_EPIC_SOURCE" "$JT_EPIC_TARGET"
         fi
     else
-        echo -e "  ${GREEN}+${NC} jt-epic-child (linked)"
+        echo -e "  ${GREEN}+${NC} st-epic-child (linked)"
         ln -s "$JT_EPIC_SOURCE" "$JT_EPIC_TARGET"
     fi
 else
-    echo -e "  ${YELLOW}⚠${NC} jt-epic-child not found at $JT_EPIC_SOURCE"
+    echo -e "  ${YELLOW}⚠${NC} st-epic-child not found at $JT_EPIC_SOURCE"
 fi
 
 echo ""
@@ -287,65 +287,65 @@ else
 fi
 
 echo ""
-echo -e "${BLUE}Setting up jat-demo...${NC}"
+echo -e "${BLUE}Setting up squad-demo...${NC}"
 echo ""
 
-# Symlink jat-demo (demo environment setup)
-JAT_DEMO_SOURCE="$PROJECT_ROOT/tools/scripts/jat-demo"
-JAT_DEMO_TARGET="$HOME/.local/bin/jat-demo"
+# Symlink squad-demo (demo environment setup)
+SQUAD_DEMO_SOURCE="$PROJECT_ROOT/tools/scripts/squad-demo"
+SQUAD_DEMO_TARGET="$HOME/.local/bin/squad-demo"
 
-if [ -f "$JAT_DEMO_SOURCE" ]; then
-    if [ -L "$JAT_DEMO_TARGET" ]; then
-        CURRENT_TARGET=$(readlink "$JAT_DEMO_TARGET")
-        if [ "$CURRENT_TARGET" = "$JAT_DEMO_SOURCE" ]; then
-            echo -e "  ${GREEN}✓${NC} jat-demo (already linked)"
+if [ -f "$SQUAD_DEMO_SOURCE" ]; then
+    if [ -L "$SQUAD_DEMO_TARGET" ]; then
+        CURRENT_TARGET=$(readlink "$SQUAD_DEMO_TARGET")
+        if [ "$CURRENT_TARGET" = "$SQUAD_DEMO_SOURCE" ]; then
+            echo -e "  ${GREEN}✓${NC} squad-demo (already linked)"
         else
-            echo -e "  ${YELLOW}↻${NC} jat-demo (updating link)"
-            rm "$JAT_DEMO_TARGET"
-            ln -s "$JAT_DEMO_SOURCE" "$JAT_DEMO_TARGET"
+            echo -e "  ${YELLOW}↻${NC} squad-demo (updating link)"
+            rm "$SQUAD_DEMO_TARGET"
+            ln -s "$SQUAD_DEMO_SOURCE" "$SQUAD_DEMO_TARGET"
         fi
     else
-        echo -e "  ${GREEN}+${NC} jat-demo (linked)"
-        ln -s "$JAT_DEMO_SOURCE" "$JAT_DEMO_TARGET"
+        echo -e "  ${GREEN}+${NC} squad-demo (linked)"
+        ln -s "$SQUAD_DEMO_SOURCE" "$SQUAD_DEMO_TARGET"
     fi
 else
-    echo -e "  ${YELLOW}⚠${NC} jat-demo not found at $JAT_DEMO_SOURCE"
+    echo -e "  ${YELLOW}⚠${NC} squad-demo not found at $SQUAD_DEMO_SOURCE"
 fi
 
 echo ""
-echo -e "${BLUE}Setting up jat-step...${NC}"
+echo -e "${BLUE}Setting up squad-step...${NC}"
 echo ""
 
-# Symlink jat-step (completion step executor with signal emission)
-JAT_STEP_SOURCE="$PROJECT_ROOT/tools/scripts/jat-step"
-JAT_STEP_TARGET="$HOME/.local/bin/jat-step"
+# Symlink squad-step (completion step executor with signal emission)
+SQUAD_STEP_SOURCE="$PROJECT_ROOT/tools/scripts/squad-step"
+SQUAD_STEP_TARGET="$HOME/.local/bin/squad-step"
 
-if [ -f "$JAT_STEP_SOURCE" ]; then
-    if [ -L "$JAT_STEP_TARGET" ]; then
-        CURRENT_TARGET=$(readlink "$JAT_STEP_TARGET")
-        if [ "$CURRENT_TARGET" = "$JAT_STEP_SOURCE" ]; then
-            echo -e "  ${GREEN}✓${NC} jat-step (already linked)"
+if [ -f "$SQUAD_STEP_SOURCE" ]; then
+    if [ -L "$SQUAD_STEP_TARGET" ]; then
+        CURRENT_TARGET=$(readlink "$SQUAD_STEP_TARGET")
+        if [ "$CURRENT_TARGET" = "$SQUAD_STEP_SOURCE" ]; then
+            echo -e "  ${GREEN}✓${NC} squad-step (already linked)"
         else
-            echo -e "  ${YELLOW}↻${NC} jat-step (updating link)"
-            rm "$JAT_STEP_TARGET"
-            ln -s "$JAT_STEP_SOURCE" "$JAT_STEP_TARGET"
+            echo -e "  ${YELLOW}↻${NC} squad-step (updating link)"
+            rm "$SQUAD_STEP_TARGET"
+            ln -s "$SQUAD_STEP_SOURCE" "$SQUAD_STEP_TARGET"
         fi
     else
-        echo -e "  ${GREEN}+${NC} jat-step (linked)"
-        ln -s "$JAT_STEP_SOURCE" "$JAT_STEP_TARGET"
+        echo -e "  ${GREEN}+${NC} squad-step (linked)"
+        ln -s "$SQUAD_STEP_SOURCE" "$SQUAD_STEP_TARGET"
     fi
 else
-    echo -e "  ${YELLOW}⚠${NC} jat-step not found at $JAT_STEP_SOURCE"
+    echo -e "  ${YELLOW}⚠${NC} squad-step not found at $SQUAD_STEP_SOURCE"
 fi
 
 echo ""
 echo -e "${BLUE}Setting up uninstall (squad-uninstall)...${NC}"
 echo ""
 
-# Symlink uninstall script as squad-uninstall (primary) and jat-uninstall (legacy)
+# Symlink uninstall script as squad-uninstall (primary) and squad-uninstall (legacy)
 UNINSTALL_SOURCE="$PROJECT_ROOT/uninstall.sh"
 SQUAD_UNINSTALL_TARGET="$HOME/.local/bin/squad-uninstall"
-JAT_UNINSTALL_TARGET="$HOME/.local/bin/jat-uninstall"
+SQUAD_UNINSTALL_TARGET="$HOME/.local/bin/squad-uninstall"
 
 link_uninstall() {
     local target="$1"
@@ -366,7 +366,7 @@ link_uninstall() {
 
 if [ -f "$UNINSTALL_SOURCE" ]; then
     link_uninstall "$SQUAD_UNINSTALL_TARGET"
-    link_uninstall "$JAT_UNINSTALL_TARGET"
+    link_uninstall "$SQUAD_UNINSTALL_TARGET"
 else
     echo -e "  ${YELLOW}⚠${NC} uninstall.sh not found at $UNINSTALL_SOURCE"
 fi
@@ -394,14 +394,14 @@ fi
 echo "  Test tools:"
 echo "    am-register --help"
 echo "    browser-eval.js --help"
-echo "    jat --help"
+echo "    squad --help"
 echo ""
 
 echo "  Tool categories:"
 echo "    • Agent Registry (4): am-register, am-agents, am-whoami, am-delete-agent"
 echo "    • Browser (11): browser-start.js, browser-nav.js, browser-eval.js, ..."
-echo "    • Signal (2): jat-signal, jat-signal-validate"
+echo "    • Signal (2): squad-signal, squad-signal-validate"
 echo "    • Media (4+): gemini-image, gemini-edit, gemini-compose, avatar-generate"
-echo "    • Additional (15): db-*, jt-*, monitoring tools"
-echo "    • JAT CLI: jat - Launch IDE"
+echo "    • Additional (15): db-*, st-*, monitoring tools"
+echo "    • SQUAD CLI: squad - Launch IDE"
 echo ""

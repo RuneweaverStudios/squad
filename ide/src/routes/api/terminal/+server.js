@@ -4,7 +4,7 @@
  * POST /api/terminal - Spawn a new terminal session
  * DELETE /api/terminal?name=... - Kill a terminal session
  *
- * Terminal sessions are tmux sessions with names prefixed with "jat-term-"
+ * Terminal sessions are tmux sessions with names prefixed with "squad-term-"
  * They use the same infrastructure as agent sessions (capture-pane, send-keys)
  * but are independent ad-hoc shells for quick commands.
  */
@@ -18,8 +18,8 @@ import { existsSync } from 'fs';
 const execFileAsync = promisify(execFile);
 const execAsync = promisify(exec);
 
-// Terminal session prefix - distinguishes from agent sessions (jat-{AgentName})
-const TERMINAL_PREFIX = 'jat-term-';
+// Terminal session prefix - distinguishes from agent sessions (squad-{AgentName})
+const TERMINAL_PREFIX = 'squad-term-';
 
 /**
  * Generate a short unique ID for terminal sessions
@@ -49,13 +49,13 @@ async function getProjectPath() {
 		return openclawSquad;
 	}
 	// Default to canonical project directory (where upstream IDE runs)
-	const defaultPath = `${homedir()}/code/jat`;
+	const defaultPath = `${homedir()}/code/squad`;
 	if (existsSync(defaultPath)) {
 		return defaultPath;
 	}
 
-	// Fallback: try to get from config (~/.config/jat used by jt CLI)
-	const configPath = `${homedir()}/.config/jat/projects.json`;
+	// Fallback: try to get from config (~/.config/squad used by st CLI)
+	const configPath = `${homedir()}/.config/squad/projects.json`;
 	if (existsSync(configPath)) {
 		try {
 			const { readFileSync } = await import('fs');

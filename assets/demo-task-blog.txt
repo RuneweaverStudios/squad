@@ -10,4 +10,4 @@ Add a comment system to the blog with these requirements:
 - IMPORTANT: Ask user whether to use inline moderation or separate admin panel for comment approval
 - Style with Tailwind CSS
 
-Please create a detailed implementation plan and use /jat:tasktree to convert it into executable tasks.
+Please create a detailed implementation plan and use /squad:tasktree to convert it into executable tasks.

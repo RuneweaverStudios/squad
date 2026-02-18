@@ -1,5 +1,5 @@
 {
-  "taskId": "jat-lloof",
+  "taskId": "squad-lloof",
   "title": "add collapsable project notes section to each proejct",
   "summary": [
     "Added ProjectNotes.svelte component with Monaco editor",

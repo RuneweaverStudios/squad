@@ -56,7 +56,7 @@ export interface BrowserLoggerConfig {
 // CONSTANTS
 // =============================================================================
 
-const LOCAL_STORAGE_KEY = 'jat-browser-logger';
+const LOCAL_STORAGE_KEY = 'squad-browser-logger';
 const LOG_LEVELS: Record<LogLevel, number> = {
 	debug: 0,
 	info: 1,

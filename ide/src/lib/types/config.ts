@@ -4,8 +4,8 @@
  * Type definitions for slash commands, project configuration, and related settings
  * used throughout the IDE.
  *
- * @see commands/jat/ for slash command implementations
- * @see ~/.config/jat/projects.json for project configuration
+ * @see commands/squad/ for slash command implementations
+ * @see ~/.config/squad/projects.json for project configuration
  */
 
 // =============================================================================
@@ -19,7 +19,7 @@
  * ```md
  * ---
  * description: Start working on a task
- * author: jat
+ * author: squad
  * version: 1.0.0
  * tags: workflow, agent
  * ---
@@ -50,10 +50,10 @@ export interface CommandFrontmatter {
  * ```typescript
  * const command: SlashCommand = {
  *   name: 'start',
- *   invocation: '/jat:start',
- *   namespace: 'jat',
- *   path: '~/code/jat/commands/jat/start.md',
- *   content: '# /jat:start - Begin Working\n...',
+ *   invocation: '/squad:start',
+ *   namespace: 'squad',
+ *   path: '~/code/squad/commands/squad/start.md',
+ *   content: '# /squad:start - Begin Working\n...',
  *   frontmatter: {
  *     description: 'Start working on a task',
  *     tags: ['workflow', 'agent']
@@ -64,9 +64,9 @@ export interface CommandFrontmatter {
 export interface SlashCommand {
 	/** Command name without namespace (e.g., "start", "complete") */
 	name: string;
-	/** Full invocation string (e.g., "/jat:start", "/jat:complete") */
+	/** Full invocation string (e.g., "/squad:start", "/squad:complete") */
 	invocation: string;
-	/** Namespace/category (e.g., "jat", "git") */
+	/** Namespace/category (e.g., "squad", "git") */
 	namespace: string;
 	/** Absolute path to the command file */
 	path: string;
@@ -84,17 +84,17 @@ export interface SlashCommand {
  * @example
  * ```typescript
  * const group: CommandGroup = {
- *   namespace: 'jat',
+ *   namespace: 'squad',
  *   commands: [
- *     { name: 'start', invocation: '/jat:start', ... },
- *     { name: 'complete', invocation: '/jat:complete', ... }
+ *     { name: 'start', invocation: '/squad:start', ... },
+ *     { name: 'complete', invocation: '/squad:complete', ... }
  *   ],
  *   isExpanded: true
  * };
  * ```
  */
 export interface CommandGroup {
-	/** Namespace name (e.g., "jat", "git") */
+	/** Namespace name (e.g., "squad", "git") */
 	namespace: string;
 	/** Commands in this group */
 	commands: SlashCommand[];
@@ -119,17 +119,17 @@ export interface ProjectColors {
 }
 
 /**
- * Project configuration from ~/.config/jat/projects.json.
+ * Project configuration from ~/.config/squad/projects.json.
  *
  * Defines how a project appears and behaves in the IDE.
  *
  * @example
  * ```typescript
  * const project: ProjectConfig = {
- *   name: 'JAT',
- *   path: '~/code/jat',
+ *   name: 'SQUAD',
+ *   path: '~/code/squad',
  *   port: 5174,
- *   server_path: '~/code/jat/ide',
+ *   server_path: '~/code/squad/ide',
  *   description: 'Jomarchy Agent Tools IDE',
  *   colors: {
  *     active: 'oklch(0.75 0.15 145)',
@@ -143,8 +143,8 @@ export interface ProjectColors {
  * Project stats computed by the API.
  */
 export interface ProjectStats {
-	/** Whether the project has a .jat/ directory initialized */
-	hasJat: boolean;
+	/** Whether the project has a .squad/ directory initialized */
+	hasSquad: boolean;
 	/** Whether the project has a CLAUDE.md or AGENTS.md file */
 	hasClaudeMd: boolean;
 	/** Number of active agents working on this project */
@@ -158,7 +158,7 @@ export interface ProjectStats {
 }
 
 export interface ProjectConfig {
-	/** Display name for the project (e.g., "JAT", "Chimaro") */
+	/** Display name for the project (e.g., "SQUAD", "Chimaro") */
 	name: string;
 	/** Absolute path to the project directory */
 	path: string;
@@ -185,15 +185,15 @@ export interface ProjectConfig {
 // =============================================================================
 
 /**
- * Root structure of ~/.config/jat/projects.json.
+ * Root structure of ~/.config/squad/projects.json.
  *
  * @example
  * ```json
  * {
  *   "projects": {
- *     "jat": {
- *       "name": "JAT",
- *       "path": "~/code/jat",
+ *     "squad": {
+ *       "name": "SQUAD",
+ *       "path": "~/code/squad",
  *       "port": 5174
  *     },
  *     "chimaro": {

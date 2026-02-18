@@ -1,5 +1,5 @@
 {
-  "name": "jat",
+  "name": "squad",
   "version": "1.0.0",
   "type": "module",
   "description": "Agent Mail and supporting tools for multi-agent coordination",
@@ -9,11 +9,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/joewinke/jat.git"
+    "url": "git+https://github.com/joewinke/squad.git"
   },
-  "homepage": "https://github.com/joewinke/jat#readme",
+  "homepage": "https://github.com/joewinke/squad#readme",
   "bugs": {
-    "url": "https://github.com/joewinke/jat/issues"
+    "url": "https://github.com/joewinke/squad/issues"
   },
   "dependencies": {
     "better-sqlite3": "^11.10.0",
@@ -22,7 +22,7 @@
   },
   "keywords": [
     "agent-mail",
-    "jat-tasks",
+    "squad-tasks",
     "multi-agent",
     "coordination",
     "ai-agents",
