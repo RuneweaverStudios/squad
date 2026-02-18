@@ -292,7 +292,7 @@ Full Monaco editor and git integration included—but the magic is in agent orch
 | **Git integration** | ✅ | ✅ | ✅ | Partial |
 | **Skill marketplace** | ✅ Install & auto-sync | ❌ | ❌ | ❌ |
 | **Supabase integration** | ✅ Migrations | ❌ | ❌ | ❌ |
-| **100% local** | ✅ | ❌ Cloud | ❌ Cloud | ✅ |
+| **Runs locally** | ✅ IDE/tools local; agents can use cloud or local LLMs | ❌ Cloud | ❌ Cloud | ✅ |
 | **Open source** | ✅ MIT | ❌ | ❌ | ✅ |
 
 JAT isn't trying to replace your editor — it's the control tower for your agent swarm, whether you're at the controls or asleep.
@@ -438,7 +438,7 @@ Yes. The ingest daemon connects to Telegram bots, Slack channels, RSS feeds, and
 Yes. Set a cron expression on any task and the scheduler daemon will spawn agents automatically. See [scheduler docs](./shared/scheduler.md).
 
 **Is there a hosted version?**
-No. JAT runs 100% locally. Code never leaves your machine.
+No. The IDE and tools run on your machine. By default, agents use the LLM providers you configure (e.g. Claude, OpenAI); you can also use local models (e.g. WebLLM/WebGPU) for agents or for the orchestrator to save tokens and keep more on-device.
 
 ---
 

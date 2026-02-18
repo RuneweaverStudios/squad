@@ -36,17 +36,25 @@ function generateTerminalId() {
 
 /**
  * Get the project working directory.
- * Default to jat project directory since that's where the IDE runs.
+ * Default to Squad project directory since that's where the IDE runs.
  * @returns {Promise<string>} Path to project directory
  */
 async function getProjectPath() {
-	// Default to jat project directory (where IDE runs from)
-	const jatPath = `${homedir()}/code/jat`;
-	if (existsSync(jatPath)) {
-		return jatPath;
+	// Prefer Squad IDE in OpenClaw workspace when running from this fork
+	const openclawSquad =
+		process.env.OPENCLAW_HOME
+			? `${process.env.OPENCLAW_HOME}/workspace/squad`
+			: `${homedir()}/.openclaw/workspace/squad`;
+	if (existsSync(openclawSquad)) {
+		return openclawSquad;
+	}
+	// Default to canonical project directory (where upstream IDE runs)
+	const defaultPath = `${homedir()}/code/jat`;
+	if (existsSync(defaultPath)) {
+		return defaultPath;
 	}
 
-	// Fallback: try to get from jat config
+	// Fallback: try to get from config (~/.config/jat used by jt CLI)
 	const configPath = `${homedir()}/.config/jat/projects.json`;
 	if (existsSync(configPath)) {
 		try {
@@ -104,10 +112,14 @@ export async function GET() {
 			count: sessions.length
 		});
 	} catch (error) {
-		// No tmux server or no sessions is fine
+		// Graceful degradation: when tmux isn't running or any list error, return empty
+		const err = error instanceof Error ? error : new Error(String(error));
+		const msg = err.message || '';
 		if (
-			error instanceof Error &&
-			(error.message.includes('no server running') || error.message.includes('no sessions'))
+			msg.includes('no server running') ||
+			msg.includes('no sessions') ||
+			msg.includes('tmux') ||
+			msg.includes('spawn')
 		) {
 			return json({
 				success: true,
@@ -121,7 +133,7 @@ export async function GET() {
 			{
 				success: false,
 				error: 'Failed to list terminal sessions',
-				message: error instanceof Error ? error.message : String(error)
+				message: msg
 			},
 			{ status: 500 }
 		);

@@ -320,7 +320,7 @@ Yes. Run `jt init` in any git repo to add task tracking. JAT auto-discovers proj
 
 **Q: Is there a hosted version?**
 
-No. JAT runs 100% locally. Your code never leaves your machine.
+The IDE and tools run locally. Your code stays on your machine; agents use the LLM providers you configure (cloud or local). You can use a local LLM for the orchestrator to reduce token cost and keep routing on-device—see Token efficiency (local orchestrator) in the docs.
 
 **Q: Can I use my existing editor alongside JAT?**
 

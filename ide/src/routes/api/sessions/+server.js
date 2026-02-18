@@ -103,8 +103,9 @@ async function getProjectFromTmuxCwd(sessionName) {
  */
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ url }) {
+	let filter = 'jat';
 	try {
-		const filter = url.searchParams.get('filter') || 'jat';
+		filter = url.searchParams.get('filter') || 'jat';
 		const key = cacheKey('sessions', { filter });
 
 		// singleFlight: cache + deduplication. Sessions endpoint runs tmux
@@ -180,10 +181,27 @@ export async function GET({ url }) {
 
 		return json(responseData);
 	} catch (error) {
+		// Graceful degradation: when tmux isn't running or any other failure, return empty sessions
+		const err = /** @type {Error & { code?: string }} */ (error);
+		const msg = err.message || String(error);
+		if (
+			msg.includes('no server running') ||
+			msg.includes('no sessions') ||
+			msg.includes('tmux') ||
+			err.code === 'ENOENT'
+		) {
+			return json({
+				success: true,
+				sessions: [],
+				count: 0,
+				filter,
+				timestamp: new Date().toISOString()
+			});
+		}
 		console.error('Error in GET /api/sessions:', error);
 		return json({
 			error: 'Internal server error',
-			message: error instanceof Error ? error.message : String(error)
+			message: msg
 		}, { status: 500 });
 	}
 }

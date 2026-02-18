@@ -24,12 +24,12 @@ function checkTool(name: string, versionCmd: string): { installed: boolean; vers
 function getFixHint(name: string, plat: string): string {
 	const isMac = plat === 'darwin';
 	const hints: Record<string, string> = {
-		tmux: isMac ? 'brew install tmux' : 'sudo pacman -S tmux  # or: sudo apt install tmux',
-		sqlite3: isMac ? 'brew install sqlite' : 'sudo pacman -S sqlite  # or: sudo apt install sqlite3',
-		jq: isMac ? 'brew install jq' : 'sudo pacman -S jq  # or: sudo apt install jq',
-		git: isMac ? 'brew install git' : 'sudo pacman -S git  # or: sudo apt install git',
-		jt: 'cd ~/code/jat && ./install.sh',
-		node: isMac ? 'brew install node' : 'sudo pacman -S nodejs npm  # or: nvm install --lts'
+		tmux: isMac ? 'brew install tmux' : 'sudo apt install -y tmux',
+		sqlite3: isMac ? 'brew install sqlite' : 'sudo apt install -y sqlite3',
+		jq: isMac ? 'brew install jq' : 'sudo apt install -y jq',
+		git: isMac ? 'brew install git' : 'sudo apt install -y git',
+		jt: 'curl -sSL https://raw.githubusercontent.com/joewinke/jat/master/tools/scripts/bootstrap.sh | bash',
+		node: isMac ? 'brew install node' : 'sudo apt install -y nodejs npm'
 	};
 	return hints[name] || `Install ${name}`;
 }

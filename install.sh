@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# JAT (Jomarchy Agent Tools) Installer
+# Squad IDE Installer
 # Complete AI-assisted development environment setup
-# https://github.com/joewinke/jat
+# Fork: https://github.com/joewinke/jat
 
 set -e  # Exit on error
 
@@ -172,7 +172,7 @@ if [ -n "$MISSING_DEPS" ]; then
             echo ""
             echo -e "${YELLOW}Installation skipped.${NC}"
             echo ""
-            echo "JAT requires these dependencies to function properly."
+            echo "Squad requires these dependencies to function properly."
             echo "Install them manually with:"
             echo ""
             echo "  $INSTALL_CMD"
@@ -183,7 +183,7 @@ if [ -n "$MISSING_DEPS" ]; then
     else
         echo -e "${RED}ERROR: Could not detect a supported package manager${NC}"
         echo ""
-        echo "JAT supports: pacman, apt, dnf, yum, zypper, brew, apk"
+        echo "Squad supports: pacman, apt, dnf, yum, zypper, brew, apk"
         echo ""
         echo "Install dependencies manually using your package manager:"
         echo ""
@@ -211,20 +211,20 @@ if [ -n "$MISSING_DEPS" ]; then
 fi
 
 # Determine installation directory
-# Priority: JAT_INSTALL_DIR env var > XDG standard > legacy ~/code locations
+# Priority: SQUAD_INSTALL_DIR or JAT_INSTALL_DIR env var > current dir (Squad repo) > XDG location
 
-# Determine installation directory
-# Priority: JAT_INSTALL_DIR env var > current dir (if JAT repo) > XDG location
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-if [ -n "$JAT_INSTALL_DIR" ]; then
-    # User specified custom location via environment variable
+if [ -n "$SQUAD_INSTALL_DIR" ]; then
+    INSTALL_DIR="$SQUAD_INSTALL_DIR"
+    echo -e "${BLUE}Using SQUAD_INSTALL_DIR: $INSTALL_DIR${NC}"
+elif [ -n "$JAT_INSTALL_DIR" ]; then
     INSTALL_DIR="$JAT_INSTALL_DIR"
-    echo -e "${BLUE}Using JAT_INSTALL_DIR: $INSTALL_DIR${NC}"
+    echo -e "${BLUE}Using install dir: $INSTALL_DIR${NC}"
 elif [ -f "$SCRIPT_DIR/install.sh" ] && [ -d "$SCRIPT_DIR/tools" ] && [ -d "$SCRIPT_DIR/ide" ]; then
-    # Running from a JAT repo (developer mode)
+    # Running from Squad repo (developer mode)
     INSTALL_DIR="$SCRIPT_DIR"
-    echo -e "${BLUE}Using current JAT repo: $INSTALL_DIR${NC}"
+    echo -e "${BLUE}Using current Squad repo: $INSTALL_DIR${NC}"
 elif [ -d "${XDG_DATA_HOME:-$HOME/.local/share}/jat" ]; then
     # Existing XDG installation
     INSTALL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/jat"
@@ -240,25 +240,19 @@ fi
 cd "$INSTALL_DIR"
 
 echo ""
-# Gradient logo (blue → sky → lavender → teal) - matches jat CLI
-B=$'\033[1m' R=$'\033[0m'
-b1=$'\033[38;5;33m'  b2=$'\033[38;5;39m'   # J: blue tones
-b3=$'\033[38;5;75m'  b4=$'\033[38;5;111m'   # A: sky/periwinkle
-b5=$'\033[38;5;147m' b6=$'\033[38;5;183m'   # T: lavender/lilac
-b7=$'\033[38;5;80m'                          # T stem: teal
-d=$'\033[2m'                                 # dim for tagline
-echo "${b1}${B}  ╔───────────────${b3}───────────────${b5}─────────────╗${R}"
-echo "${b1}${B}  │${R}                                           ${b5}${B}│${R}"
-echo "${b1}${B}  │${R}${b1}${B}           __${R}       ${b3}${B}___${R}   ${b5}${B}.___________.${R}    ${b5}${B}│${R}"
-echo "${b1}${B}  │${R}${b1}${B}          |  |${R}     ${b3}${B}/   \\ ${R} ${b5}${B}|           |${R}    ${b5}${B}│${R}"
-echo "${b1}${B}  │${R}${b1}${B}          |  |${R}    ${b3}${B}/  ^  \\ ${R}${b5}${B}\`---|  |----\`${R}    ${b5}${B}│${R}"
-echo "${b2}${B}  │${R}${b2}${B}    .--.  |  |${R}   ${b4}${B}/  /_\\  \\ ${R}   ${b6}${B}|  |${R}         ${b6}${B}│${R}"
-echo "${b2}${B}  │${R}${b2}${B}    |  \`--'  |${R}  ${b4}${B}/  _____  \\ ${R}  ${b6}${B}|  |${R}         ${b6}${B}│${R}"
-echo "${b2}${B}  │${R}${b2}${B}     \\______/${R}  ${b4}${B}/__/     \\__\\ ${R} ${b7}${B}|__|${R}         ${b7}${B}│${R}"
-echo "${b2}${B}  │${R}                                           ${b7}${B}│${R}"
-echo "${b2}${B}  │${R}${d}         ◇ Supervise the Swarm ◇${R}           ${b7}${B}│${R}"
-echo "${b3}${B}  │${R}                                           ${b7}${B}│${R}"
-echo "${b3}${B}  ╚───────────────${b5}───────────────${b7}─────────────╝${R}"
+# Squad ASCII banner
+cat << 'SQUAD_BANNER_END'
+                                            d8b 
+                                           88P 
+                                          d88  
+ .d888b,.d88b,.88P?88   d8P d888b8b   d888888  
+ ?8b,   88P  `88P'd88   88 d8P' ?88  d8P' ?88  
+   `?8b ?8b  d88  ?8(  d88 88b  ,88b 88b  ,88b 
+`?888P' `?888888  `?88P'?8b`?88P'`88b`?88P'`88b
+            `?88                               
+              88b                              
+              ?8P                              
+SQUAD_BANNER_END
 echo ""
 echo "The world's first agentic IDE. Agents ship, you supervise."
 echo ""
@@ -269,7 +263,7 @@ echo "  • Smart question UI: agent questions become buttons"
 echo "  • Auto-proceed rules for hands-off completion"
 echo "  • 50+ CLI tools (agent mail, browser, media, db)"
 echo "  • Works with Claude Code, Codex, Gemini, Aider"
-echo "  • 100% local, open source (MIT)"
+echo "  • Runs locally; use cloud or local models. Open source (MIT)"
 echo ""
 echo -e "${YELLOW}Press ENTER to continue or Ctrl+C to cancel${NC}"
 
@@ -290,16 +284,16 @@ bash "$INSTALL_DIR/tools/scripts/install-agent-mail.sh"
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}Step 2/9: Setting Up JAT Task CLI${NC}"
+echo -e "${BOLD}Step 2/9: Setting Up Task CLI${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
 # jt CLI is symlinked via symlink-tools.sh (Step 3)
 # Just verify the binary exists
 if [ -f "$INSTALL_DIR/cli/jat" ]; then
-    echo -e "  ${GREEN}✓${NC} JAT CLI found (will be symlinked in next step)"
+    echo -e "  ${GREEN}✓${NC} CLI found (will be symlinked in next step)"
 else
-    echo -e "  ${YELLOW}⚠${NC} JAT CLI not found at $INSTALL_DIR/cli/jat"
+    echo -e "  ${YELLOW}⚠${NC} CLI not found at $INSTALL_DIR/cli/jat"
 fi
 
 echo ""
@@ -322,7 +316,7 @@ if command -v npm &> /dev/null; then
     NODE_MAJOR=$(node -v 2>/dev/null | sed 's/v\([0-9]*\).*/\1/')
     if [ -n "$NODE_MAJOR" ] && [ "$NODE_MAJOR" -gt 22 ] 2>/dev/null; then
         echo -e "${YELLOW}  ⚠ Node.js v$(node -v | sed 's/v//') detected - this may cause build failures${NC}"
-        echo -e "${YELLOW}  JAT requires Node.js 20 or 22 (LTS). Current/odd versions (23, 25)${NC}"
+        echo -e "${YELLOW}  Squad requires Node.js 20 or 22 (LTS). Current/odd versions (23, 25)${NC}"
         echo -e "${YELLOW}  break native modules like better-sqlite3.${NC}"
         echo ""
         echo -e "  Fix with nvm: ${BOLD}nvm install 22 && nvm use 22${NC}"
@@ -333,8 +327,8 @@ if command -v npm &> /dev/null; then
     if [ -f "$INSTALL_DIR/package.json" ]; then
         echo "  → Installing jat core dependencies..."
         (cd "$INSTALL_DIR" && npm install --silent 2>/dev/null) && \
-            echo -e "  ${GREEN}✓${NC} jat core dependencies installed" || \
-            echo -e "  ${YELLOW}⚠${NC} jat npm install failed (run manually: cd ~/code/jat && npm install)"
+            echo -e "  ${GREEN}✓${NC} core dependencies installed" || \
+            echo -e "  ${YELLOW}⚠${NC} npm install failed (run manually: cd $INSTALL_DIR && npm install)"
     fi
 
     # Install browser-tools dependencies (puppeteer-core, cheerio)
@@ -455,14 +449,14 @@ INSTALL_PI_SKILLS="no"
 if command -v pi &> /dev/null; then
     echo ""
     echo "Pi coding agent detected ($(pi --version 2>/dev/null))."
-    echo "JAT skills enable Pi to participate in multi-agent workflows."
+    echo "Squad skills enable Pi to participate in multi-agent workflows."
     echo ""
     if command -v gum &> /dev/null && [ -t 0 ]; then
-        if gum confirm "Install JAT skills for Pi?"; then
+        if gum confirm "Install Squad skills for Pi?"; then
             INSTALL_PI_SKILLS="yes"
         fi
     else
-        if prompt_yes_no "Install JAT skills for Pi? [Y/n] " "y"; then
+        if prompt_yes_no "Install Squad skills for Pi? [Y/n] " "y"; then
             INSTALL_PI_SKILLS="yes"
         fi
     fi
@@ -488,14 +482,14 @@ echo ""
 echo ""
 echo -e "${GREEN}╔───────────────────────────────────────────╗${NC}"
 echo -e "${GREEN}│                                           │${NC}"
-echo -e "${GREEN}│      ${BOLD}✓ JAT Successfully Installed!${NC}${GREEN}        │${NC}"
+echo -e "${GREEN}│      ${BOLD}✓ Squad Successfully Installed!${NC}${GREEN}        │${NC}"
 echo -e "${GREEN}│                                           │${NC}"
 echo -e "${GREEN}╚───────────────────────────────────────────╝${NC}"
 echo ""
 echo "What was installed:"
 echo ""
 echo "  ✓ Agent Registry (4 bash/SQLite tools: am-register, am-agents, am-whoami, am-delete-agent)"
-echo "  ✓ JAT Task CLI (jt command + 4 review tools)"
+echo "  ✓ Task CLI (jt command + 4 review tools)"
 echo "  ✓ Browser Tools (12 CDP automation tools: browser-*.js)"
 echo "  ✓ Database Tools (4 tools: db-query, db-schema, etc.)"
 echo "  ✓ Signal Tools (2 tools: jat-signal, jat-signal-validate)"
@@ -527,7 +521,7 @@ fi
 # Ensure ~/.local/bin is in PATH
 if ! grep -q '\.local/bin' "$SHELL_CONFIG" 2>/dev/null; then
     echo "" >> "$SHELL_CONFIG"
-    echo '# JAT tools' >> "$SHELL_CONFIG"
+    echo '# Squad tools' >> "$SHELL_CONFIG"
     echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$SHELL_CONFIG"
     echo -e "  ${GREEN}✓${NC} Added ~/.local/bin to PATH in $SHELL_CONFIG"
 fi
@@ -535,9 +529,9 @@ fi
 echo ""
 echo "The IDE will guide you through adding your first project."
 echo ""
-echo "Documentation: https://github.com/joewinke/jat"
+echo "Documentation: https://github.com/joewinke/jat (upstream)"
 echo ""
-if prompt_yes_no "${BOLD}Launch JAT now? [Y/n]${NC} " "y"; then
+if prompt_yes_no "${BOLD}Launch Squad IDE now? [Y/n]${NC} " "y"; then
     echo ""
     exec "$HOME/.local/bin/jat"
 fi

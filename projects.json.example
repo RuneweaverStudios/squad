@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "openclaw-workspace": {
+      "name": "OpenClaw Workspace",
+      "path": "/Users/austindixson/.openclaw/workspace",
+      "port": 3000
+    }
+  },
+  "defaults": {
+    "max_sessions": 12,
+    "model": "opus",
+    "scheduler_autostart": false,
+    "timezone": "America/New_York"
+  }
+}

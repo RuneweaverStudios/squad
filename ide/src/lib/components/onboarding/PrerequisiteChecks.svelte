@@ -113,20 +113,29 @@
 				</span>
 			</div>
 		{:else}
+			{@const missingList = checks.filter(c => c.required && !c.installed)}
 			<div
 				class="px-3 py-2 rounded-lg"
 				style="background: oklch(0.22 0.06 25 / 0.1); border: 1px solid oklch(0.40 0.12 25 / 0.3);"
 			>
-				<p class="text-xs font-mono mb-1" style="color: oklch(0.70 0.15 25);">
-					Missing required tools. Install them first:
+				<p class="text-xs font-mono mb-1.5" style="color: oklch(0.70 0.15 25);">
+					Missing required tools. Run each one-liner (or copy all):
 				</p>
-				{#each checks.filter(c => c.required && !c.installed) as missing}
-					<code
-						class="block text-[11px] px-2 py-1 rounded mt-1 font-mono"
-						style="background: oklch(0.18 0.01 250); color: oklch(0.70 0.02 250);"
-					>
-						{missing.fixHint}
-					</code>
+				<pre
+					class="text-[11px] px-2 py-2 rounded font-mono overflow-x-auto whitespace-pre-wrap break-all"
+					style="background: oklch(0.18 0.01 250); color: oklch(0.85 0.02 250); border: 1px solid oklch(0.28 0.02 250);"
+				><code>{missingList.map(m => m.fixHint).join('\n')}</code></pre>
+				{#each missingList as missing}
+					<p class="text-[10px] font-mono mt-1.5 flex items-center gap-1.5" style="color: oklch(0.55 0.02 250);">
+						<span>{missing.name}:</span>
+						<code
+							class="text-[11px] px-1.5 py-0.5 rounded font-mono flex-1 min-w-0 truncate"
+							style="background: oklch(0.18 0.01 250); color: oklch(0.75 0.12 200);"
+							title={missing.fixHint}
+						>
+							{missing.fixHint}
+						</code>
+					</p>
 				{/each}
 			</div>
 		{/if}

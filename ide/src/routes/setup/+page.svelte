@@ -48,13 +48,13 @@
 		}
 	});
 
-	async function loadPrerequisites() {
-		// Use cache if valid
-		const cached = getPrerequisiteResults();
-		if (cached && isCacheValid()) {
+	async function loadPrerequisites(forceRefresh = false) {
+		// When rerunning the wizard, always detect requirements before showing install state
+		const useCache = !forceRefresh && getPrerequisiteResults() && isCacheValid();
+		if (useCache) {
+			const cached = getPrerequisiteResults()!;
 			checks = cached;
 			loading = false;
-			// Check if all required tools passed from cached results
 			prereqsPassed = cached.every((c: PrerequisiteResult) => !c.required || c.installed);
 			if (prereqsPassed && currentStep === 1) currentStep = 2;
 			return;
@@ -135,7 +135,8 @@
 	}
 
 	onMount(() => {
-		loadPrerequisites();
+		// Always detect requirements when opening (or rerunning) the install wizard
+		loadPrerequisites(true);
 		checkProjects();
 		// Infer user name from git config
 		fetch('/api/config/user').then(r => r.json()).then(data => {
@@ -148,8 +149,8 @@
 </script>
 
 <svelte:head>
-	<title>Setup - JAT IDE</title>
-	<meta property="og:title" content="Set Up JAT - The World's First Agentic IDE" />
+	<title>Setup - Squad IDE</title>
+	<meta property="og:title" content="Set Up Squad - The World's First Agentic IDE" />
 	<meta property="og:description" content="Get your multi-agent development environment running. Create tasks, spawn AI agents, ship code." />
 </svelte:head>
 
@@ -170,14 +171,14 @@
 						text-shadow: 0 0 15px oklch(0.70 0.18 240 / 0.5);
 					"
 				>
-					JAT
+					Squad
 				</div>
 			</div>
 			<h1 class="text-2xl font-bold font-mono" style="color: oklch(0.85 0.02 250);">
-				{userName ? `Welcome, ${userName.split(' ')[0]}` : 'Welcome to JAT IDE'}
+				{userName ? `Welcome, ${userName.split(' ')[0]}` : 'Welcome to Squad IDE'}
 			</h1>
 			<p class="text-sm" style="color: oklch(0.55 0.02 250);">
-				Your multi-agent development command center
+				Your multi-agent development command center (Squad IDE)
 			</p>
 		</div>
 
@@ -290,13 +291,13 @@
 				"
 			>
 				<p class="text-sm font-mono" style="color: oklch(0.65 0.04 250);">
-					Thanks for setting up JAT! You're a developer &mdash; consider helping make it better:
+					Thanks for setting up Squad! You're a developer &mdash; consider helping make it better:
 				</p>
 				<div class="space-y-2.5 pl-1">
 					<div class="flex items-start gap-2.5">
 						<span class="text-xs font-mono font-bold mt-0.5" style="color: oklch(0.50 0.02 250);">1)</span>
 						<p class="text-xs" style="color: oklch(0.55 0.02 250);">
-							Read the docs and learn what JAT can do:<br/>
+							Read the docs and learn what Squad can do:<br/>
 							<a
 								href="https://jat.tools/docs"
 								target="_blank"
@@ -323,7 +324,7 @@
 					<div class="flex items-start gap-2.5">
 						<span class="text-xs font-mono font-bold mt-0.5" style="color: oklch(0.50 0.02 250);">3)</span>
 						<p class="text-xs" style="color: oklch(0.55 0.02 250);">
-							If JAT has saved you time, consider sponsoring development:<br/>
+							If Squad has saved you time, consider sponsoring development:<br/>
 							<a
 								href="https://github.com/sponsors/joewinke"
 								target="_blank"
@@ -365,7 +366,7 @@
 				<p class="text-[11px] ml-7 mb-2" style="color: oklch(0.50 0.02 250);">
 					Required tools for running agent sessions
 				</p>
-				<PrerequisiteChecks {checks} {loading} onRecheck={loadPrerequisites} />
+				<PrerequisiteChecks {checks} {loading} onRecheck={() => loadPrerequisites(true)} />
 			</div>
 
 			<!-- Step 2: Agent Harness -->
@@ -437,7 +438,7 @@
 						</h2>
 					</div>
 					<p class="text-[11px] ml-7 mt-1" style="color: oklch(0.50 0.02 250);">
-						A git repo where agents will create tasks and work
+						Pick a folder on your computer where agents will create tasks and work
 					</p>
 				</div>
 
@@ -454,9 +455,11 @@
 						</span>
 					</div>
 				{:else}
-					<p class="text-sm" style="color: oklch(0.60 0.02 250);">
-						JAT tracks tasks using a lightweight, git-friendly task system.
-						Add a project from <code class="px-1 py-0.5 rounded text-xs" style="background: oklch(0.22 0.01 250);">~/code/</code> to get started.
+					<p class="text-sm mb-2" style="color: oklch(0.60 0.02 250);">
+						A <strong>project</strong> is a folder on your computer (usually a git repo). Click the button below to open a panel where you <strong>enter or browse to that folder path</strong>. Squad will then set up task tracking there.
+					</p>
+					<p class="text-[11px] mb-3" style="color: oklch(0.50 0.02 250);">
+						Example paths: <code class="px-1 py-0.5 rounded text-xs" style="background: oklch(0.22 0.01 250);">~/code/my-app</code>, <code class="px-1 py-0.5 rounded text-xs" style="background: oklch(0.22 0.01 250);">~/.openclaw/workspace</code>
 					</p>
 
 					<button
@@ -472,11 +475,11 @@
 						<svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
 						</svg>
-						Add Project
+						Add project (choose folder path)
 					</button>
 
-					<p class="text-[11px] font-mono text-center" style="color: oklch(0.45 0.02 250);">
-						Or from terminal: <code class="px-1 py-0.5 rounded" style="background: oklch(0.22 0.01 250);">cd ~/code/project && jt init</code>
+					<p class="text-[11px] font-mono text-center mt-2" style="color: oklch(0.45 0.02 250);">
+						Or in terminal: <code class="px-1 py-0.5 rounded" style="background: oklch(0.22 0.01 250);">cd /path/to/your/folder && jt init</code>
 					</p>
 				{/if}
 			</div>
@@ -610,7 +613,7 @@
 				border: 1px solid oklch(0.25 0.02 250);
 			"
 		>
-			<p class="text-[10px] font-mono text-center mb-2.5" style="color: oklch(0.45 0.02 250);">How JAT works</p>
+			<p class="text-[10px] font-mono text-center mb-2.5" style="color: oklch(0.45 0.02 250);">How Squad works</p>
 			<div class="grid grid-cols-4 gap-3 text-center">
 				<div class="space-y-1">
 					<div

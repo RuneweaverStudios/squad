@@ -537,18 +537,22 @@ export async function GET({ url }) {
 			source
 		});
 	} catch (error) {
-		console.error('[Sparkline API] Error:', error);
-		const err = /** @type {Error} */ (error);
-		console.error('[Sparkline API] Error stack:', err.stack);
-
-		return json(
-			{
-				error: 'Failed to fetch sparkline data',
-				message: err.message || 'Unknown error',
-				stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
-			},
-			{ status: 500 }
-		);
+		console.error('[Sparkline API] Error (returning empty data):', error);
+		// Return 200 with empty data so layout and usage bar don't break when DB/config missing
+		const multiProject = url.searchParams.get('multiProject') === 'true';
+		return json({
+			data: [],
+			totalTokens: 0,
+			totalCost: 0,
+			bucketCount: 0,
+			bucketSize: '30min',
+			startTime: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+			endTime: new Date().toISOString(),
+			...(multiProject ? { projectKeys: [], projectColors: {} } : {}),
+			cached: false,
+			cacheAge: 0,
+			source: 'none'
+		});
 	}
 }
 

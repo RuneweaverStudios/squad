@@ -47,7 +47,8 @@ export async function GET() {
 	try {
 		const jatDir = findJatDir();
 		if (!jatDir) {
-			return json({ error: true, message: 'No .jat directory found' }, { status: 404 });
+			// Return defaults so UI works when running without a project .jat (e.g. dev from ide/)
+			return json(DEFAULT_RULES);
 		}
 
 		const rulesPath = resolve(jatDir, 'review-rules.json');

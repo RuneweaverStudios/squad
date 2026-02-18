@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# JAT Voice-to-Text (Whisper.cpp) Installer
+# Squad Voice-to-Text (Whisper.cpp) Installer
 # Installs local speech-to-text for IDE voice input
 # 100% private - no data leaves your machine
 
@@ -66,8 +66,12 @@ if ! command -v git &> /dev/null; then
     MISSING_DEPS="$MISSING_DEPS git"
 fi
 
-# Check for ffmpeg development libraries
-if ! pkg-config --exists libavformat 2>/dev/null; then
+# Check for ffmpeg development libraries (needed to build with ffmpeg support)
+# On macOS/Homebrew, ffmpeg includes dev libs; on Linux we need pkg-config
+if command -v brew &> /dev/null; then
+    # Homebrew: ffmpeg in PATH is sufficient (package includes libavformat etc.)
+    :
+elif ! pkg-config --exists libavformat 2>/dev/null; then
     MISSING_DEPS="$MISSING_DEPS ffmpeg-dev-libs"
 fi
 
@@ -116,6 +120,14 @@ fi
 # Build whisper.cpp with ffmpeg support
 echo ""
 echo -e "${BLUE}Building whisper.cpp (this may take a few minutes)...${NC}"
+
+# On macOS with Homebrew, help cmake find ffmpeg's pkg-config
+if command -v brew &> /dev/null && [[ "$(uname)" == "Darwin" ]]; then
+    BREW_PREFIX=$(brew --prefix 2>/dev/null || echo "/opt/homebrew")
+    if [ -d "$BREW_PREFIX/opt/ffmpeg/lib/pkgconfig" ]; then
+        export PKG_CONFIG_PATH="${BREW_PREFIX}/opt/ffmpeg/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+    fi
+fi
 
 mkdir -p build
 cd build
@@ -182,8 +194,8 @@ fi
 echo ""
 echo -e "${BLUE}Creating configuration...${NC}"
 
-# Update IDE transcribe API to use jat whisper path
-# The API checks ~/.local/share/jat/whisper first, then falls back to chezwizper
+# Update IDE transcribe API to use whisper path
+# The API checks ~/.local/share/jat/whisper first (jt CLI standard), then falls back to chezwizper
 echo -e "${GREEN}  ✓ Whisper configured at: $WHISPER_DIR${NC}"
 
 echo ""

@@ -127,7 +127,7 @@
 		// Update validation based on directory state
 		if (dir.hasJat) {
 			validationStatus = 'already-initialized';
-			validationMessage = 'JAT already initialized in this project';
+			validationMessage = 'Squad already initialized in this project';
 		} else if (!dir.isGitRepo) {
 			validationStatus = 'needs-git';
 			validationMessage = 'Not a git repository. Initialize git to continue.';
@@ -268,7 +268,7 @@
 
 				if (isUnderHome && (data.message?.includes('not found') || data.error?.includes('not found') || response.status === 404)) {
 					validationStatus = 'will-create';
-					validationMessage = 'Will create directory, initialize git, and set up JAT Tasks';
+					validationMessage = 'Will create directory, initialize git, and set up Squad Tasks';
 					selectedDirectory = null;
 					return;
 				}
@@ -302,10 +302,10 @@
 				selectedDirectory = dirInfo;
 				if (dirInfo.hasJat) {
 					validationStatus = 'already-initialized';
-					validationMessage = 'JAT already initialized in this project';
+					validationMessage = 'Squad already initialized in this project';
 				} else if (!dirInfo.isGitRepo) {
-					validationStatus = 'invalid';
-					validationMessage = 'Not a git repository. Run "git init" first.';
+					validationStatus = 'needs-git';
+					validationMessage = 'Not a git repository yet. Click "Initialize Git Repository" below, or run git init yourself.';
 				} else {
 					validationStatus = 'valid';
 					validationMessage = 'Ready to initialize';
@@ -347,7 +347,7 @@
 		}
 
 		if (validationStatus === 'already-initialized') {
-			submitError = 'This project is already initialized with JAT';
+			submitError = 'This project is already initialized with Squad';
 			return;
 		}
 
@@ -489,7 +489,7 @@
 							Add Project
 						</h2>
 						<p class="text-sm mt-1" style="color: oklch(0.55 0.02 250);">
-							Initialize a git repository with JAT Tasks
+							Enter the <strong>full path</strong> to a folder on your computer (existing git repo or new folder—we can run <code class="text-xs">git init</code> if needed).
 						</p>
 					</div>
 				</div>
@@ -510,15 +510,18 @@
 					<div class="form-control">
 						<label class="label" for="project-path">
 							<span class="label-text text-xs font-semibold font-mono uppercase tracking-wider" style="color: oklch(0.55 0.02 250);">
-								Project Path
+								Folder path
 								<span class="text-error">*</span>
 							</span>
 						</label>
+						<p class="text-[11px] mb-1.5" style="color: oklch(0.50 0.02 250);">
+							Full path to the project folder, e.g. <code class="px-1 py-0.5 rounded text-[10px]" style="background: oklch(0.22 0.01 250);">~/code/my-app</code> or <code class="px-1 py-0.5 rounded text-[10px]" style="background: oklch(0.22 0.01 250);">/Users/you/workspace</code>. Use <strong>Browse</strong> to start from your home or <code class="text-[10px]">~/code</code>.
+						</p>
 						<div class="flex items-center gap-2">
 							<input
 								id="project-path"
 								type="text"
-								placeholder="/path/to/my-project"
+								placeholder="e.g. ~/code/my-app or /Users/you/workspace"
 								class="input flex-1 font-mono"
 								style="background: oklch(0.18 0.01 250); border: 1px solid oklch(0.35 0.02 250); color: oklch(0.80 0.02 250);"
 								bind:this={pathInputRef}
@@ -597,11 +600,11 @@
 										</li>
 										<li class="flex items-center gap-1.5">
 											<span style="color: oklch(0.70 0.18 145);">3.</span>
-											Set up JAT task management
+											Set up Squad task management
 										</li>
 										<li class="flex items-center gap-1.5">
 											<span style="color: oklch(0.70 0.18 145);">4.</span>
-											Add to JAT configuration
+											Add to Squad configuration
 										</li>
 									</ul>
 								</div>
@@ -722,7 +725,7 @@
 														class="badge badge-xs"
 														style="background: oklch(0.35 0.15 145); color: oklch(0.90 0.02 250);"
 													>
-														JAT
+														Squad
 													</span>
 												{/if}
 												{#if dir.isGitRepo}
@@ -773,7 +776,7 @@
 								<svg class="w-4 h-4 flex-shrink-0" style="color: oklch(0.70 0.18 145);" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
 								</svg>
-								<span>JAT task management set up for you</span>
+								<span>Squad task management set up for you</span>
 							</li>
 						</ul>
 					</div>

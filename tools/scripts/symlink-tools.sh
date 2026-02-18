@@ -339,29 +339,36 @@ else
 fi
 
 echo ""
-echo -e "${BLUE}Setting up jat-uninstall...${NC}"
+echo -e "${BLUE}Setting up uninstall (squad-uninstall)...${NC}"
 echo ""
 
-# Symlink uninstall script
+# Symlink uninstall script as squad-uninstall (primary) and jat-uninstall (legacy)
 UNINSTALL_SOURCE="$PROJECT_ROOT/uninstall.sh"
-UNINSTALL_TARGET="$HOME/.local/bin/jat-uninstall"
+SQUAD_UNINSTALL_TARGET="$HOME/.local/bin/squad-uninstall"
+JAT_UNINSTALL_TARGET="$HOME/.local/bin/jat-uninstall"
 
-if [ -f "$UNINSTALL_SOURCE" ]; then
-    if [ -L "$UNINSTALL_TARGET" ]; then
-        CURRENT_TARGET=$(readlink "$UNINSTALL_TARGET")
-        if [ "$CURRENT_TARGET" = "$UNINSTALL_SOURCE" ]; then
-            echo -e "  ${GREEN}✓${NC} jat-uninstall (already linked)"
+link_uninstall() {
+    local target="$1"
+    if [ -L "$target" ]; then
+        local current=$(readlink "$target")
+        if [ "$current" = "$UNINSTALL_SOURCE" ]; then
+            echo -e "  ${GREEN}✓${NC} $(basename "$target") (already linked)"
         else
-            echo -e "  ${YELLOW}↻${NC} jat-uninstall (updating link)"
-            rm "$UNINSTALL_TARGET"
-            ln -s "$UNINSTALL_SOURCE" "$UNINSTALL_TARGET"
+            echo -e "  ${YELLOW}↻${NC} $(basename "$target") (updating link)"
+            rm "$target"
+            ln -s "$UNINSTALL_SOURCE" "$target"
         fi
     else
-        echo -e "  ${GREEN}+${NC} jat-uninstall (linked)"
-        ln -s "$UNINSTALL_SOURCE" "$UNINSTALL_TARGET"
+        echo -e "  ${GREEN}+${NC} $(basename "$target") (linked)"
+        ln -s "$UNINSTALL_SOURCE" "$target"
     fi
+}
+
+if [ -f "$UNINSTALL_SOURCE" ]; then
+    link_uninstall "$SQUAD_UNINSTALL_TARGET"
+    link_uninstall "$JAT_UNINSTALL_TARGET"
 else
-    echo -e "  ${YELLOW}⚠${NC} jat-uninstall not found at $UNINSTALL_SOURCE"
+    echo -e "  ${YELLOW}⚠${NC} uninstall.sh not found at $UNINSTALL_SOURCE"
 fi
 
 echo ""
