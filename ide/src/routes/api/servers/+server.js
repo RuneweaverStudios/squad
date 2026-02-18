@@ -33,6 +33,7 @@ import { apiCache, cacheKey, CACHE_TTL, singleFlight } from '$lib/server/cache.j
 const execAsync = promisify(exec);
 
 /** @type {object|null} */
+/** @type {{ projects?: Record<string, { path?: string, server_path?: string, port?: number }> } | null} */
 let _projectsConfig = null;
 /** @type {number} */
 let _projectsConfigMtime = 0;
@@ -40,7 +41,7 @@ let _projectsConfigMtime = 0;
 /**
  * Load projects.json config with simple mtime-based caching.
  * Avoids spawning a jq subprocess per server session.
- * @returns {object|null}
+ * @returns {{ projects?: Record<string, { path?: string, server_path?: string, port?: number }> } | null}
  */
 function loadProjectsConfig() {
 	const configPath = `${process.env.HOME}/.config/jat/projects.json`;
@@ -373,8 +374,8 @@ async function computeServersData(lines) {
 		});
 
 		// Step 4: Batch port check — single ss call for all ports
-		const uniquePorts = [...new Set(sessionPorts.filter(Boolean))];
-		const listeningPorts = await getListeningPorts(uniquePorts);
+		const uniquePorts = [...new Set(sessionPorts.filter((/** @type {number | null} */ p) => p != null))];
+		const listeningPorts = await getListeningPorts(/** @type {number[]} */ (uniquePorts));
 
 		// Step 5: Build ServerSession objects (no more subprocess calls)
 		const serverSessions = rawSessions.map((session, i) => {

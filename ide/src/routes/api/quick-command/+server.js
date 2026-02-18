@@ -52,14 +52,19 @@ function substituteVariables(prompt, variables) {
 // Resolve file references (e.g. @readme.md, @src/lib/utils.ts) in prompt.
 // Matches @path where path looks like a file (contains a dot or slash).
 // Files are injected as XML blocks with path attribute.
-/** @param {string} prompt */
-/** @param {string} projectPath */
+/**
+ * @param {string} prompt
+ * @param {string} projectPath
+ * @returns {Promise<{ resolved: string, files: Array<{ path: string, size: number }>, errors: string[] }>}
+ */
 async function resolveFileReferences(prompt, projectPath) {
 	// Match @path patterns where path looks like a file path
 	// Requires at least one dot or slash to distinguish from plain words/emails
 	// Won't match emails because emails have @ followed by domain (no dot before the @-word ends)
 	const FILE_REF_PATTERN = /@([\w\-\.\/]+\.[\w\-\.\/]+)/g;
+	/** @type {Array<{ path: string, size: number }>} */
 	const files = [];
+	/** @type {string[]} */
 	const errors = [];
 
 	// Collect all matches first
@@ -98,7 +103,7 @@ async function resolveFileReferences(prompt, projectPath) {
 			resolved = resolved.slice(0, m.index) + replacement + resolved.slice(m.index + m.full.length);
 			files.push({ path: m.path, size: content.length });
 		} catch (err) {
-			errors.push(`${m.path}: ${err.message}`);
+			errors.push(`${m.path}: ${err instanceof Error ? err.message : String(err)}`);
 		}
 	}
 
@@ -129,8 +134,8 @@ const CONTEXT_PROVIDERS = [
 				t.assignee ? `Assignee: ${t.assignee}` : null,
 				t.labels?.length ? `Labels: ${t.labels.join(', ')}` : null,
 				t.description ? `\nDescription:\n${t.description}` : null,
-				t.dependencies?.length ? `\nDependencies:\n${t.dependencies.map(d => `  - ${d.id}: ${d.title} [${d.status}]`).join('\n')}` : null,
-				t.dependents?.length ? `\nBlocks:\n${t.dependents.map(d => `  - ${d.id}: ${d.title} [${d.status}]`).join('\n')}` : null
+				t.dependencies?.length ? `\nDependencies:\n${t.dependencies.map((/** @type {{ id: string, title: string, status: string }} */ d) => `  - ${d.id}: ${d.title} [${d.status}]`).join('\n')}` : null,
+				t.dependents?.length ? `\nBlocks:\n${t.dependents.map((/** @type {{ id: string, title: string, status: string }} */ d) => `  - ${d.id}: ${d.title} [${d.status}]`).join('\n')}` : null
 			].filter(Boolean);
 			return { content: lines.join('\n'), ref: taskId };
 		}
@@ -188,7 +193,7 @@ const CONTEXT_PROVIDERS = [
 			const stdout = await execCommand('jat-memory', ['search', query, '--limit', '5', '--json'], cwd, 15000);
 			const results = JSON.parse(stdout);
 			if (!results || results.length === 0) return { content: '(no matching memories)', ref: query };
-			const formatted = results.map(r =>
+			const formatted = results.map((/** @type {{ section?: string, path?: string, score?: number, snippet?: string }} */ r) =>
 				`[${r.section}] ${r.path} (score: ${r.score?.toFixed(2) || '?'})\n${r.snippet}`
 			).join('\n---\n');
 			return { content: formatted, ref: query };
@@ -264,7 +269,7 @@ async function resolveContextProviders(prompt, projectPath) {
 				resolved = resolved.slice(0, match.index) + replacement + resolved.slice(match.index + match.full.length);
 				providers.push({ type: provider.type, ref: result.ref, size: result.content.length });
 			} catch (err) {
-				errors.push(`@${provider.type}:${match.groups[1] || ''}: ${err.message}`);
+				errors.push(`@${provider.type}:${match.groups[1] || ''}: ${err instanceof Error ? err.message : String(err)}`);
 			}
 		}
 	}
@@ -283,7 +288,7 @@ function resolveModel(model) {
 		sonnet: 'sonnet',
 		opus: 'opus'
 	};
-	return modelMap[model] || model;
+	return modelMap[/** @type {keyof typeof modelMap} */ (model)] || model;
 }
 
 /**
@@ -453,8 +458,9 @@ export async function POST({ request }) {
 		});
 	} catch (error) {
 		const durationMs = Date.now() - startTime;
+		const err = /** @type {{ killed?: boolean, message?: string, stderr?: string }} */ (error);
 
-		if (error.killed) {
+		if (err.killed) {
 			console.error(`[quick-command] Timeout after ${durationMs}ms`);
 			return json(
 				{
@@ -466,11 +472,11 @@ export async function POST({ request }) {
 			);
 		}
 
-		console.error('[quick-command] Execution failed:', error.message);
+		console.error('[quick-command] Execution failed:', err.message);
 		return json(
 			{
 				error: 'Execution failed',
-				message: error.stderr || error.message || 'Unknown error',
+				message: err.stderr || err.message || 'Unknown error',
 				durationMs
 			},
 			{ status: 500 }

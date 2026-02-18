@@ -17,7 +17,7 @@ function generateId() {
 export async function GET({ params }) {
 	try {
 		const pipelines = await readPipelines();
-		const pipeline = pipelines.find((p) => p.id === params.id);
+		const pipeline = pipelines.find((/** @type {{ id: string }} */ p) => p.id === params.id);
 
 		if (!pipeline) {
 			return json(
@@ -34,7 +34,7 @@ export async function GET({ params }) {
 	} catch (error) {
 		console.error(`[quick-command/pipelines/${params.id}] Failed to read:`, error);
 		return json(
-			{ error: 'Failed to read pipeline', message: error.message },
+			{ error: 'Failed to read pipeline', message: error instanceof Error ? error.message : String(error) },
 			{ status: 500 }
 		);
 	}
@@ -45,7 +45,7 @@ export async function PUT({ params, request }) {
 	try {
 		const body = await request.json();
 		const pipelines = await readPipelines();
-		const index = pipelines.findIndex((p) => p.id === params.id);
+		const index = pipelines.findIndex((/** @type {{ id: string }} */ p) => p.id === params.id);
 
 		if (index === -1) {
 			return json(
@@ -58,7 +58,7 @@ export async function PUT({ params, request }) {
 		if (
 			body.name &&
 			pipelines.some(
-				(p, i) => i !== index && p.name.toLowerCase() === body.name.trim().toLowerCase()
+				(/** @type {{ name: string }} */ p, i) => i !== index && p.name.toLowerCase() === body.name.trim().toLowerCase()
 			)
 		) {
 			return json(
@@ -87,13 +87,13 @@ export async function PUT({ params, request }) {
 			}
 		}
 
-		const existing = pipelines[index];
+		const existing = /** @type {import('../lib.js').Pipeline} */ (pipelines[index]);
 		pipelines[index] = {
 			...existing,
 			...(body.name && { name: body.name.trim() }),
 			...(body.description !== undefined && { description: (body.description || '').trim() }),
 			...(body.steps && {
-				steps: body.steps.map((s, i) => ({
+				steps: body.steps.map((/** @type {{ id?: string, templateId?: string, prompt?: string, model?: string, label?: string }} */ s, /** @type {number} */ i) => ({
 					id: s.id || generateId(),
 					order: i,
 					templateId: s.templateId || null,
@@ -108,16 +108,17 @@ export async function PUT({ params, request }) {
 
 		await writePipelines(pipelines);
 
+		const updated = pipelines[index];
 		return json({
 			success: true,
-			pipeline: pipelines[index],
-			message: `Pipeline '${pipelines[index].name}' updated`,
+			pipeline: /** @type {import('../lib.js').Pipeline} */ (updated),
+			message: `Pipeline '${existing.name}' updated`,
 			timestamp: new Date().toISOString()
 		});
 	} catch (error) {
 		console.error(`[quick-command/pipelines/${params.id}] Failed to update:`, error);
 		return json(
-			{ error: 'Failed to update pipeline', message: error.message },
+			{ error: 'Failed to update pipeline', message: error instanceof Error ? error.message : String(error) },
 			{ status: 500 }
 		);
 	}
@@ -147,7 +148,7 @@ export async function DELETE({ params }) {
 	} catch (error) {
 		console.error(`[quick-command/pipelines/${params.id}] Failed to delete:`, error);
 		return json(
-			{ error: 'Failed to delete pipeline', message: error.message },
+			{ error: 'Failed to delete pipeline', message: error instanceof Error ? error.message : String(error) },
 			{ status: 500 }
 		);
 	}

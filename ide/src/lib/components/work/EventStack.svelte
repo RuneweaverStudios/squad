@@ -658,7 +658,7 @@
 
 	// State styling - solid backgrounds to avoid see-through stacking
 	// Maps signal states to visual styles (matches SessionCard SessionState)
-	const stateStyles: Record<string, { icon: string; bg: string; text: string; border: string }> = {
+	const stateStyles: Record<string, { icon: string; bg: string; text: string; border: string; accent?: string }> = {
 		user_input: {
 			icon: '💬',
 			bg: 'oklch(0.22 0.08 260)',
@@ -728,7 +728,7 @@
 	};
 
 	// Type-based styling (for events without state)
-	const typeStyles: Record<string, { icon: string; bg: string; text: string; border: string }> = {
+	const typeStyles: Record<string, { icon: string; bg: string; text: string; border: string; accent?: string }> = {
 		tasks: {
 			icon: '📋',
 			bg: 'oklch(0.22 0.08 280)',
@@ -743,7 +743,7 @@
 		}
 	};
 
-	const defaultStyle = {
+	const defaultStyle: { icon: string; bg: string; text: string; border: string; accent?: string } = {
 		icon: '📍',
 		bg: 'oklch(0.20 0.01 250)',
 		text: 'oklch(0.70 0.02 250)',

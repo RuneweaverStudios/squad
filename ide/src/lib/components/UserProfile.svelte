@@ -67,11 +67,15 @@
 		type SessionMaximizeHeight
 	} from '$lib/stores/preferences.svelte';
 
-	// User identity (inferred from git config)
+	/** Keycloak user when auth is enabled (from layout server load) */
+	let { user = null, keycloakEnabled = false } = $props();
+
+	// User identity (inferred from git config when not using Keycloak)
 	let userName = $state('');
 	let userInitials = $state('');
 
 	onMount(async () => {
+		if (keycloakEnabled && user) return; // Use Keycloak user, skip git config
 		try {
 			const res = await fetch('/api/config/user');
 			const data = await res.json();
@@ -379,7 +383,11 @@
 		class="flex items-center justify-center w-7 h-7 rounded transition-all hover:scale-105 bg-base-300 border border-base-content/20"
 		aria-label="User profile menu"
 	>
-		{#if userInitials}
+		{#if keycloakEnabled && user}
+			<span class="text-[10px] font-bold text-primary leading-none">
+				{(user.name || user.preferred_username || user.email || '?').slice(0, 2).toUpperCase()}
+			</span>
+		{:else if userInitials}
 			<span class="text-[10px] font-bold text-primary leading-none">{userInitials}</span>
 		{:else}
 			<svg
@@ -400,8 +408,26 @@
 		tabindex="0"
 		class="dropdown-content mt-3 z-[60] p-2 shadow-lg rounded w-72 max-h-[80vh] overflow-y-auto bg-base-300 border border-base-content/20"
 	>
-		<!-- User Greeting -->
-		{#if userName}
+		<!-- User Greeting (Keycloak or git config) -->
+		{#if keycloakEnabled && user}
+			<li class="px-2 py-1.5">
+				<span class="text-xs font-medium text-base-content/70">
+					{user.name || user.preferred_username || user.email || 'Signed in'}
+				</span>
+			</li>
+			<li>
+				<a
+					href="/auth/logout"
+					class="flex items-center gap-2 w-full px-2 py-1.5 rounded transition-colors hover:bg-base-200 text-base-content/70"
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v3.75M15.75 9l-3-3m0 0l-3 3m3-3h8.25M8.25 15H5.25a2.25 2.25 0 01-2.25-2.25V5.25A2.25 2.25 0 015.25 3h2.25a2.25 2.25 0 012.25 2.25V15" />
+					</svg>
+					<span class="text-xs">Log out</span>
+				</a>
+			</li>
+			<div class="divider my-1 h-px bg-base-content/20"></div>
+		{:else if userName}
 			<li class="px-2 py-1.5">
 				<span class="text-xs font-medium text-base-content/70">{userName}</span>
 			</li>

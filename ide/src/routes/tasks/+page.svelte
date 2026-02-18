@@ -642,7 +642,7 @@
 
 			// Clean up stale collapsed epic IDs to prevent memory leak
 			// (removes IDs for tasks that no longer exist)
-			const existingIds = new Set(tasks.map((t: Task) => t.id));
+			const existingIds = new Set<string>(tasks.map((t: Task) => t.id));
 			cleanupCollapsedEpics(existingIds);
 		} catch (err) {
 			tasksError = err instanceof Error ? err.message : "Unknown error";

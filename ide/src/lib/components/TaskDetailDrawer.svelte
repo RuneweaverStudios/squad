@@ -208,15 +208,6 @@
 		agentStatus !== null && agentStatus !== 'offline' && agentStatus !== 'disconnected'
 	);
 
-	// Derived: Is this a paused/recoverable session? (in_progress but agent offline)
-	// This happens when an agent was working but their tmux session is gone (paused or crashed)
-	const isPausedSession = $derived(
-		task?.status === 'in_progress' &&
-		task?.assignee &&
-		!isAgentOnline &&
-		recoverableSession !== null
-	);
-
 	// Derived: Session name for attach
 	const sessionName = $derived(
 		taskAgent ? `jat-${taskAgent.name}` : null
@@ -326,6 +317,14 @@
 	}
 	let recoverableSession = $state<RecoverableSession | null>(null);
 	let recoverableLoading = $state(false);
+
+	// Derived: Is this a paused/recoverable session? (in_progress but agent offline)
+	const isPausedSession = $derived(
+		task?.status === 'in_progress' &&
+		task?.assignee &&
+		!isAgentOnline &&
+		recoverableSession !== null
+	);
 
 	// Available projects for suggested task creation
 	let availableProjects = $state<string[]>([]);
@@ -462,7 +461,7 @@
 			}
 			return Array.from(seen.entries()).map(([shortName, name]) => ({ shortName, name }));
 		}
-		const preset = AGENT_PRESETS.find(p => p.id === task.agent_program);
+		const preset = AGENT_PRESETS.find(p => p.id === task!.agent_program);
 		return (preset?.config.models || []).map(m => ({ shortName: m.shortName, name: m.name }));
 	});
 
@@ -1693,7 +1692,7 @@
 			if (results.success.length > 0) {
 				showToast('success', `✓ Created ${results.success.length} task${results.success.length > 1 ? 's' : ''}`);
 				// Broadcast task event to refresh task lists
-				broadcastTaskEvent({ type: 'tasks-created', taskIds: results.success.map((r: any) => r.taskId) });
+				broadcastTaskEvent('task-change', results.success[0]?.taskId || '');
 			}
 			if (results.failed.length > 0) {
 				showToast('error', `✗ Failed to create ${results.failed.length} task${results.failed.length > 1 ? 's' : ''}`);
@@ -2331,7 +2330,7 @@
 														<li>
 															<button
 																class="text-xs"
-																onclick={() => { handleResumeSession(session.session_id, session.agent_name); document.activeElement?.blur(); }}
+																onclick={() => { handleResumeSession(session.session_id, session.agent_name); (document.activeElement as HTMLElement)?.blur(); }}
 																disabled={resumingSessionId === session.session_id}
 															>
 																{#if resumingSessionId === session.session_id}
@@ -2580,17 +2579,17 @@
 													class="px-2.5 py-1 rounded-lg text-sm text-left flex items-center gap-1.5 transition-colors cmd-dropdown-trigger min-h-6"
 													onclick={() => { harnessDropdownOpen = !harnessDropdownOpen; modelDropdownOpen = false; }}
 												>
-													{#if task.agent_program}
-														{@const preset = AGENT_PRESETS.find(p => p.id === task.agent_program)}
-														<ProviderLogo agentId={task.agent_program} size={14} />
-														<span class="truncate" style="color: oklch(0.85 0.02 250);">{preset?.name || task.agent_program}</span>
-													{:else}
-														<span class="truncate" style="color: oklch(0.65 0.02 250); font-style: italic;">default</span>
-													{/if}
-													<svg class="w-2.5 h-2.5 flex-shrink-0 transition-transform {harnessDropdownOpen ? 'rotate-180' : ''}" style="color: oklch(0.50 0.02 250);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-														<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-													</svg>
-												</button>
+												{#if task?.agent_program}
+													{@const preset = AGENT_PRESETS.find(p => p.id === task!.agent_program)}
+													<ProviderLogo agentId={task!.agent_program} size={14} />
+													<span class="truncate" style="color: oklch(0.85 0.02 250);">{preset?.name || task!.agent_program}</span>
+												{:else}
+													<span class="truncate" style="color: oklch(0.65 0.02 250); font-style: italic;">default</span>
+												{/if}
+												<svg class="w-2.5 h-2.5 flex-shrink-0 transition-transform {harnessDropdownOpen ? 'rotate-180' : ''}" style="color: oklch(0.50 0.02 250);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+												</svg>
+											</button>
 
 												{#if harnessDropdownOpen}
 													<div
@@ -3131,36 +3130,34 @@
 										onCreateAndStartTasks={createAndStartSuggestedTasks}
 										{availableProjects}
 										{defaultProject}
-										onApplyRename={async (tid, newTitle) => {
-											try {
-												const response = await fetch(`/api/tasks/${encodeURIComponent(tid)}`, {
-													method: 'PATCH',
-													headers: { 'Content-Type': 'application/json' },
-													body: JSON.stringify({ title: newTitle })
-												});
-												if (response.ok) {
-													// Refetch task to update drawer
-													await fetchTask();
-												}
-											} catch (e) {
-												console.error('[TaskDetailDrawer] Failed to apply rename:', e);
+									onApplyRename={async (tid, newTitle) => {
+										try {
+											const response = await fetch(`/api/tasks/${encodeURIComponent(tid)}`, {
+												method: 'PATCH',
+												headers: { 'Content-Type': 'application/json' },
+												body: JSON.stringify({ title: newTitle })
+											});
+											if (response.ok && taskId) {
+												await fetchTask(taskId);
 											}
-										}}
-										onApplyLabels={async (tid, labels) => {
-											try {
-												const response = await fetch(`/api/tasks/${encodeURIComponent(tid)}`, {
-													method: 'PATCH',
-													headers: { 'Content-Type': 'application/json' },
-													body: JSON.stringify({ labels })
-												});
-												if (response.ok) {
-													// Refetch task to update drawer
-													await fetchTask();
-												}
-											} catch (e) {
-												console.error('[TaskDetailDrawer] Failed to apply labels:', e);
+										} catch (e) {
+											console.error('[TaskDetailDrawer] Failed to apply rename:', e);
+										}
+									}}
+									onApplyLabels={async (tid, labels) => {
+										try {
+											const response = await fetch(`/api/tasks/${encodeURIComponent(tid)}`, {
+												method: 'PATCH',
+												headers: { 'Content-Type': 'application/json' },
+												body: JSON.stringify({ labels })
+											});
+											if (response.ok && taskId) {
+												await fetchTask(taskId);
 											}
-										}}
+										} catch (e) {
+											console.error('[TaskDetailDrawer] Failed to apply labels:', e);
+										}
+									}}
 									/>
 								{:else}
 									<!-- Collapsed view - show just the latest signal -->

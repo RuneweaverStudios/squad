@@ -179,6 +179,8 @@ function getCachedTasks() {
  * @property {string} [closedAt] - When task was closed
  * @property {string} [updated_at] - Last update timestamp
  * @property {TaskDep[]} [depends_on] - Task dependencies
+ * @property {string[]} [labels] - Task labels
+ * @property {string} [created_at] - Creation timestamp
  */
 
 /**

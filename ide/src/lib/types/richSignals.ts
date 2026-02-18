@@ -199,6 +199,8 @@ export interface QuestionOption {
 	id: string;
 	/** Display label */
 	label: string;
+	/** Optional value (alias for id, used by some signal formats) */
+	value?: string;
 	/** Description of what this option means */
 	description: string;
 	/** Whether this is the recommended option */

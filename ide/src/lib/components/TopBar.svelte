@@ -62,7 +62,7 @@
 	});
 
 	// Check which page we're on for showing appropriate sort dropdown
-	const isAgentsPage = $derived($page.url.pathname === "/agents");
+	const isAgentsPage = $derived(($page.url.pathname as string) === "/agents");
 	const isServersPage = $derived($page.url.pathname === "/servers");
 
 	// Sort dropdown state (shared between agent and server pages)
@@ -260,6 +260,10 @@
 		onProjectChange?: (project: string) => void;
 		/** Task counts per project (for ProjectSelector) */
 		taskCounts?: Map<string, number> | null;
+		/** Keycloak user when auth is enabled */
+		user?: { sub: string; email?: string; name?: string; preferred_username?: string } | null;
+		/** Whether Keycloak login is enabled */
+		keycloakEnabled?: boolean;
 	}
 
 	let {
@@ -281,6 +285,8 @@
 		onGlobalSearchOpen,
 		onProjectChange,
 		taskCounts = null,
+		user = null,
+		keycloakEnabled = false,
 	}: Props = $props();
 
 
@@ -704,7 +710,7 @@
 		<ServersBadge />
 
 		<!-- User Profile -->
-		<UserProfile />
+		<UserProfile {user} {keycloakEnabled} />
 	</div>
 </nav>
 

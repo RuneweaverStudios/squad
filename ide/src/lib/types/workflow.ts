@@ -73,6 +73,7 @@ export interface TriggerEventConfig {
 	eventType:
 		| 'task_created'
 		| 'task_closed'
+		| 'task_completed'
 		| 'task_status_changed'
 		| 'signal_received'
 		| 'file_changed'

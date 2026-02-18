@@ -67,7 +67,7 @@ export function getAgentActivities(agentName) {
 }
 
 /**
- * @typedef {import('../../../../lib/jat-tasks.js').Task} Task
+ * @typedef {import('../../../../lib/tasks.js').Task} Task
  */
 
 /**

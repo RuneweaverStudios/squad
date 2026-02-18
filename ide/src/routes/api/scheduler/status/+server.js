@@ -31,10 +31,11 @@ function getScheduledWorkflows() {
 	if (!existsSync(WORKFLOWS_DIR)) return [];
 
 	// Read scheduler state
+	/** @type {Record<string, unknown>} */
 	let state = {};
 	try {
 		if (existsSync(WORKFLOW_STATE_FILE)) {
-			state = JSON.parse(readFileSync(WORKFLOW_STATE_FILE, 'utf-8'));
+			state = /** @type {Record<string, unknown>} */ (JSON.parse(readFileSync(WORKFLOW_STATE_FILE, 'utf-8')));
 		}
 	} catch { /* ignore */ }
 
@@ -46,13 +47,13 @@ function getScheduledWorkflows() {
 			try {
 				const data = JSON.parse(readFileSync(join(WORKFLOWS_DIR, entry.name), 'utf-8'));
 				if (!data.enabled) continue;
-				const cronNode = (data.nodes || []).find(n => n.type === 'trigger_cron');
+				const cronNode = (data.nodes || []).find((/** @type {{ type?: string, config?: { cronExpr?: string } }} */ n) => n.type === 'trigger_cron');
 				if (!cronNode || !cronNode.config?.cronExpr) continue;
 				workflows.push({
 					id: data.id,
 					name: data.name || data.id,
 					cronExpr: cronNode.config.cronExpr,
-					nextRunAt: state[data.id] || null,
+					nextRunAt: /** @type {string | null} */ (state[data.id] != null && typeof state[data.id] === 'string' ? state[data.id] : null),
 				});
 			} catch { /* skip malformed */ }
 		}

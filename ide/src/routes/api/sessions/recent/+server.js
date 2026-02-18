@@ -121,11 +121,11 @@ export async function GET() {
 			}
 
 			// Sort by mtime descending (most recent first), limit 20
-			recentSessions.sort((a, b) => b.mtime - a.mtime);
+			recentSessions.sort((a, b) => (/** @type {{ mtime: number }} */ (b)).mtime - (/** @type {{ mtime: number }} */ (a)).mtime);
 			const limited = recentSessions.slice(0, 20);
 
 			// Remove mtime (internal sorting field)
-			const sessions = limited.map(({ mtime, ...rest }) => rest);
+			const sessions = limited.map((s) => { const { mtime, ...rest } = /** @type {{ mtime: number, [key: string]: unknown }} */ (s); return rest; });
 
 			return {
 				sessions,

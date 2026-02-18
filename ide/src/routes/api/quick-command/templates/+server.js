@@ -16,7 +16,7 @@ const TEMPLATES_FILE = join(CONFIG_DIR, 'quick-commands.json');
 
 /**
  * Read templates from config file.
- * @returns {Promise<Array>}
+ * @returns {Promise<Array<unknown>>}
  */
 async function readTemplates() {
 	try {
@@ -31,7 +31,7 @@ async function readTemplates() {
 
 /**
  * Write templates to config file.
- * @param {Array} templates
+ * @param {Array<unknown>} templates
  */
 async function writeTemplates(templates) {
 	if (!existsSync(CONFIG_DIR)) {
@@ -60,7 +60,7 @@ export async function GET() {
 	} catch (error) {
 		console.error('[quick-command/templates] Failed to read templates:', error);
 		return json(
-			{ error: 'Failed to read templates', message: error.message },
+			{ error: 'Failed to read templates', message: error instanceof Error ? error.message : String(error) },
 			{ status: 500 }
 		);
 	}
@@ -89,7 +89,7 @@ export async function POST({ request }) {
 		const templates = await readTemplates();
 
 		// Check for duplicate names
-		if (templates.some((t) => t.name.toLowerCase() === name.trim().toLowerCase())) {
+		if (templates.some((t) => (/** @type {{ name: string }} */ (t)).name.toLowerCase() === name.trim().toLowerCase())) {
 			return json(
 				{ error: 'Duplicate name', message: `Template '${name}' already exists` },
 				{ status: 409 }
@@ -119,7 +119,7 @@ export async function POST({ request }) {
 	} catch (error) {
 		console.error('[quick-command/templates] Failed to create template:', error);
 		return json(
-			{ error: 'Failed to create template', message: error.message },
+			{ error: 'Failed to create template', message: error instanceof Error ? error.message : String(error) },
 			{ status: 500 }
 		);
 	}

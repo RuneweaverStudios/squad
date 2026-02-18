@@ -60,8 +60,7 @@ function findParentEpics(taskId: string, projectPath?: string): string[] {
 		// Filter to only return epics at depth > 0 (direct parent epics)
 		const parentEpics: string[] = [];
 		if (Array.isArray(result)) {
-			for (const item of result) {
-				// depth=1 means direct parent (epic depends on this task)
+			for (const item of result as Array<{ id: string; depth: number; issue_type?: string }>) {
 				if (item.depth === 1 && item.issue_type === 'epic') {
 					parentEpics.push(item.id);
 				}

@@ -8,6 +8,7 @@
 	 */
 
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import ProviderLogo from '$lib/components/agents/ProviderLogo.svelte';
 	import { AGENT_PRESETS, type AgentProgramPreset } from '$lib/types/agentProgram';
 
@@ -191,11 +192,14 @@
 					{/if}
 				</p>
 				<p class="text-xs" style="color: oklch(0.48 0.02 250);">
-					Agent harnesses are CLI-based AI coding tools that JAT can orchestrate. Each harness runs in its own terminal session, picks up tasks from your backlog, and works autonomously.
+					Agent harnesses are CLI-based AI coding tools that Squad can orchestrate. Each harness runs in its own terminal session, picks up tasks from your backlog, and works autonomously.
 					{#if anyInstalled}
 						Tools marked <span class="font-semibold" style="color: oklch(0.75 0.18 145);">Ready</span> are installed and authenticated.
-						<span class="font-semibold" style="color: oklch(0.80 0.15 60);">Needs Auth</span> means the CLI is installed but requires authentication (e.g. <code class="px-1 py-0.5 rounded text-[11px]" style="background: oklch(0.22 0.01 250);">claude auth</code> or an API key in Settings).
+						<span class="font-semibold" style="color: oklch(0.80 0.15 60);">Needs Auth</span> means the CLI is installed but requires authentication — use <strong>Sign in with GitHub</strong> below or run the CLI auth command.
 					{/if}
+				</p>
+				<p class="text-xs" style="color: oklch(0.45 0.02 250);">
+					You can edit harnesses anytime in <button type="button" class="underline font-mono hover:opacity-90" onclick={() => goto('/config?tab=agents')}>Config → Agents</button>.
 				</p>
 			</div>
 
@@ -207,6 +211,7 @@
 					{@const needsAuth = isInstalled && !agent.status?.authConfigured}
 					{@const models = agent.preset.config.models || []}
 
+					<div class="preset-card-wrapper relative">
 					<button
 						class="preset-card"
 						class:selected={agent.selected}
@@ -258,6 +263,19 @@
 							</div>
 						{/if}
 					</button>
+					<!-- One-click login when needs auth -->
+					{#if needsAuth && agent.preset.authUrl}
+						<button
+							type="button"
+							class="one-click-login-btn"
+							onclick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(agent.preset.authUrl!, '_blank', 'noopener'); }}
+							title="Open login in new tab"
+						>
+							<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+							Sign in with GitHub
+						</button>
+					{/if}
+					</div>
 				{/each}
 			</div>
 
@@ -304,6 +322,33 @@
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
 		gap: 0.75rem;
+	}
+
+	.preset-card-wrapper {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+
+	.one-click-login-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.35rem;
+		width: 100%;
+		padding: 0.35rem 0.5rem;
+		font-size: 0.6875rem;
+		font-weight: 600;
+		color: oklch(0.85 0.02 250);
+		background: oklch(0.22 0.02 250);
+		border: 1px solid oklch(0.35 0.06 250);
+		border-radius: 6px;
+		cursor: pointer;
+		transition: background 0.15s, border-color 0.15s;
+	}
+	.one-click-login-btn:hover {
+		background: oklch(0.28 0.03 250);
+		border-color: oklch(0.45 0.08 250);
 	}
 
 	.preset-card {

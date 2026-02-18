@@ -92,12 +92,13 @@ function addProjectToConfig(projectKey, absolutePath) {
 	}
 
 	// Read existing config or create new one
-	let config = { projects: {}, defaults: {} };
+	/** @type {{ projects: Record<string, { name: string, path: string }>, defaults?: unknown }} */
+	let config = { projects: /** @type {Record<string, { name: string, path: string }>} */ ({}), defaults: {} };
 	if (existsSync(CONFIG_FILE)) {
 		try {
 			const content = readFileSync(CONFIG_FILE, 'utf-8');
-			config = JSON.parse(content);
-			if (!config.projects) config.projects = {};
+			config = /** @type {{ projects: Record<string, { name: string, path: string }>, defaults?: unknown }} */ (JSON.parse(content));
+			if (!config.projects) config.projects = /** @type {Record<string, { name: string, path: string }>} */ ({});
 		} catch (err) {
 			console.error('Failed to read config, creating new:', err);
 		}

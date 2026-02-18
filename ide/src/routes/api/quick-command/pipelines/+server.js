@@ -24,7 +24,7 @@ export async function GET() {
 	} catch (error) {
 		console.error('[quick-command/pipelines] Failed to read pipelines:', error);
 		return json(
-			{ error: 'Failed to read pipelines', message: error.message },
+			{ error: 'Failed to read pipelines', message: error instanceof Error ? error.message : String(error) },
 			{ status: 500 }
 		);
 	}
@@ -63,7 +63,7 @@ export async function POST({ request }) {
 
 		const pipelines = await readPipelines();
 
-		if (pipelines.some((p) => p.name.toLowerCase() === name.trim().toLowerCase())) {
+		if (pipelines.some((/** @type {{ name: string }} */ p) => p.name.toLowerCase() === name.trim().toLowerCase())) {
 			return json(
 				{ error: 'Duplicate name', message: `Pipeline '${name}' already exists` },
 				{ status: 409 }
@@ -98,7 +98,7 @@ export async function POST({ request }) {
 	} catch (error) {
 		console.error('[quick-command/pipelines] Failed to create pipeline:', error);
 		return json(
-			{ error: 'Failed to create pipeline', message: error.message },
+			{ error: 'Failed to create pipeline', message: error instanceof Error ? error.message : String(error) },
 			{ status: 500 }
 		);
 	}

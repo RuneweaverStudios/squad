@@ -17,10 +17,13 @@ import { readdirSync, unlinkSync, statSync, existsSync, readFileSync } from 'fs'
 import { join } from 'path';
 import { homedir } from 'os';
 import { randomUUID } from 'crypto';
+import { redirect } from '@sveltejs/kit';
 import logger from '$lib/utils/logger';
 import { shouldLog, getSamplingRate } from '$lib/config/logConfig';
 import { dev } from '$app/environment';
 import { SIGNAL_TTL } from '$lib/config/constants';
+import { isKeycloakEnabled, getSessionCookieName } from '$lib/auth/keycloak';
+import { getSessionFromCookie } from '$lib/auth/session';
 
 // Track aggregation interval
 let aggregationInterval: ReturnType<typeof setInterval> | null = null;
@@ -290,6 +293,26 @@ export const handle = async ({ event, resolve }) => {
 		method: event.request.method,
 		query: event.url.search
 	});
+
+	// Keycloak auth: when enabled, require valid session for non-public paths
+	if (isKeycloakEnabled()) {
+		const pathname = event.url.pathname;
+		const isPublic =
+			pathname.startsWith('/auth/') ||
+			pathname === '/login' ||
+			pathname.startsWith('/_app/') ||
+			pathname.startsWith('/favicon');
+
+		if (!isPublic) {
+			const cookieValue = event.cookies.get(getSessionCookieName());
+			const session = await getSessionFromCookie(cookieValue);
+			if (session) {
+				event.locals.user = session.user;
+			} else {
+				throw redirect(302, '/login');
+			}
+		}
+	}
 
 	// Check if we should log this request based on sampling
 	// In dev mode, still apply sampling for high-frequency endpoints to reduce log spam

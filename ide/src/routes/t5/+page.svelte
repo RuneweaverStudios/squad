@@ -320,7 +320,7 @@
 					{#if selectedTask().description}
 						<p class="detail-description">{selectedTask().description}</p>
 					{/if}
-					{#if selectedTask().labels && selectedTask().labels.length > 0}
+					{#if selectedTask().labels && selectedTask().labels!.length > 0}
 						<div class="detail-labels">
 							{#each selectedTask().labels as label}
 								<span class="label">{label}</span>

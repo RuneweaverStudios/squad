@@ -18,7 +18,7 @@ const TEMPLATES_FILE = join(CONFIG_DIR, 'quick-commands.json');
 
 /**
  * Read templates from config file.
- * @returns {Promise<Array>}
+ * @returns {Promise<Array<unknown>>}
  */
 async function readTemplates() {
 	try {
@@ -35,7 +35,7 @@ async function readTemplates() {
  * Find the scheduled task for a template.
  * Matches both quick-command and spawn-agent modes.
  * @param {string} templateId
- * @returns {object|null}
+ * @returns {object | null}
  */
 function findScheduledTask(templateId) {
 	const quickCommand = `/quick-command:${templateId}`;
@@ -52,12 +52,13 @@ function findScheduledTask(templateId) {
 
 /**
  * Determine run mode from a scheduled task.
- * @param {object} task
+ * @param {{ command?: string, id?: string, title?: string, schedule_cron?: string, next_run_at?: string, model?: string, status?: string, project?: string }} task
  * @param {string} templateId
  * @returns {'quick-command' | 'spawn-agent'}
  */
 function getRunMode(task, templateId) {
-	if (task.command === `/quick-command:${templateId}`) return 'quick-command';
+	const t = /** @type {{ command?: string | null }} */ (task);
+	if (t.command === `/quick-command:${templateId}`) return 'quick-command';
 	return 'spawn-agent';
 }
 
@@ -69,22 +70,23 @@ export async function GET({ params }) {
 			return json({ scheduled: false });
 		}
 
+		const t = /** @type {{ id: string, title: string, schedule_cron?: string, next_run_at?: string, model?: string, status?: string, project?: string }} */ (task);
 		return json({
 			scheduled: true,
 			task: {
-				id: task.id,
-				title: task.title,
-				schedule_cron: task.schedule_cron,
-				next_run_at: task.next_run_at,
-				model: task.model,
-				status: task.status,
-				project: task.project,
+				id: t.id,
+				title: t.title,
+				schedule_cron: t.schedule_cron,
+				next_run_at: t.next_run_at,
+				model: t.model,
+				status: t.status,
+				project: t.project,
 				runMode: getRunMode(task, params.id)
 			}
 		});
 	} catch (error) {
 		console.error(`[schedule] Failed to get schedule for template ${params.id}:`, error);
-		return json({ error: 'Failed to get schedule', message: error.message }, { status: 500 });
+		return json({ error: 'Failed to get schedule', message: error instanceof Error ? error.message : String(error) }, { status: 500 });
 	}
 }
 
@@ -111,7 +113,7 @@ export async function POST({ params, request }) {
 
 		// Find the template
 		const templates = await readTemplates();
-		const template = templates.find((t) => t.id === params.id);
+		const template = /** @type {{ id: string, name: string, prompt: string, defaultModel?: string } | undefined} */ (templates.find((t) => (/** @type {{ id: string }} */ (t)).id === params.id));
 		if (!template) {
 			return json(
 				{ error: 'Template not found', message: `No template with ID '${params.id}'` },
@@ -125,7 +127,7 @@ export async function POST({ params, request }) {
 			return json(
 				{
 					error: 'Already scheduled',
-					message: `Template '${template.name}' is already scheduled (task ${existing.id})`
+					message: `Template '${template.name}' is already scheduled (task ${/** @type {{ id: string }} */ (existing).id})`
 				},
 				{ status: 409 }
 			);
@@ -147,6 +149,7 @@ export async function POST({ params, request }) {
 			const { createRequire } = await import('module');
 			const { join } = await import('path');
 			const require = createRequire(join(process.cwd(), '..', 'tools', 'scheduler', 'lib', 'cron.js'));
+			// @ts-expect-error - cron-parser may be in sibling tools/scheduler
 			const cronParser = require('cron-parser');
 			const interval = cronParser.parseExpression(cronExpr, { currentDate: new Date(), tz: 'UTC' });
 			nextRunAt = interval.next().toISOString();
@@ -201,7 +204,7 @@ export async function POST({ params, request }) {
 	} catch (error) {
 		console.error(`[schedule] Failed to schedule template ${params.id}:`, error);
 		return json(
-			{ error: 'Failed to schedule template', message: error.message },
+			{ error: 'Failed to schedule template', message: error instanceof Error ? error.message : String(error) },
 			{ status: 500 }
 		);
 	}
@@ -219,16 +222,17 @@ export async function DELETE({ params }) {
 		}
 
 		// Close the scheduled task
-		closeTask(task.id, 'Schedule removed');
+		const taskObj = /** @type {{ id: string }} */ (task);
+		closeTask(taskObj.id, 'Schedule removed');
 
 		return json({
 			success: true,
-			message: `Schedule removed for template (task ${task.id} closed)`
+			message: `Schedule removed for template (task ${taskObj.id} closed)`
 		});
 	} catch (error) {
 		console.error(`[schedule] Failed to remove schedule for template ${params.id}:`, error);
 		return json(
-			{ error: 'Failed to remove schedule', message: error.message },
+			{ error: 'Failed to remove schedule', message: error instanceof Error ? error.message : String(error) },
 			{ status: 500 }
 		);
 	}

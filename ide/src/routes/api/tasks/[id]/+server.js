@@ -161,9 +161,9 @@ export async function PUT({ params, request }) {
 						oldStatus: existingTask.status,
 						newStatus: updates.status,
 						title: updatedTask.title,
-						project: updatedTask.project_name || undefined
+						project: updatedTask.project || undefined
 					},
-					project: updatedTask.project_name || undefined
+					project: updatedTask.project || undefined
 				});
 			} catch (e) {
 				console.error('[tasks] Failed to emit task_status_changed event:', e);

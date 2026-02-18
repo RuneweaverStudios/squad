@@ -65,10 +65,10 @@ export async function POST({ params, request }) {
 					taskId,
 					title: existingTask.title,
 					reason,
-					project: existingTask.project_name || undefined,
+					project: existingTask.project || undefined,
 					assignee: existingTask.assignee || undefined
 				},
-				project: existingTask.project_name || undefined
+				project: existingTask.project || undefined
 			});
 		} catch (e) {
 			console.error('[tasks/close] Failed to emit task_closed event:', e);

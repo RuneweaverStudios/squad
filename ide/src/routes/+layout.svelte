@@ -46,7 +46,7 @@
 		areBrowserNotificationsSupported
 	} from '$lib/utils/pushNotifications';
 
-	let { children } = $props();
+	let { data, children } = $props();
 
 	// Shared project state for entire app (always a specific project, never "All Projects")
 	let selectedProject = $state('');
@@ -139,6 +139,8 @@
 
 	// Detect if on setup page (hide chrome for focused onboarding)
 	const isSetupPage = $derived($page.url.pathname === '/setup');
+	// Login page: minimal layout (no sidebar/topbar)
+	const isLoginPage = $derived($page.url.pathname === '/login');
 
 	// Derived project data
 	// Use config projects directly (no "All Projects" option)
@@ -1023,15 +1025,15 @@
 
 <svelte:window onkeydown={handleGlobalKeydown} />
 
-{#if isSetupPage}
-	<!-- Setup page: focused layout without sidebar/topbar -->
+{#if isSetupPage || isLoginPage}
+	<!-- Setup or login: minimal layout without sidebar/topbar -->
 	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 	<div class="h-screen overflow-y-auto" onclick={handleFirstInteraction}>
 		{@render children()}
-
-		<!-- Drawers still available during setup (project creation, task creation) -->
-		<TaskCreationDrawer />
-		<CreateProjectDrawer onProjectCreated={loadConfigProjects} />
+		{#if !isLoginPage}
+			<TaskCreationDrawer />
+			<CreateProjectDrawer onProjectCreated={loadConfigProjects} />
+		{/if}
 	</div>
 {:else}
 	<!-- Drawer Structure -->
@@ -1062,6 +1064,8 @@
 				onGlobalSearchOpen={() => { globalSearchOpen = true; }}
 				onProjectChange={handleProjectChange}
 				{taskCounts}
+				user={data?.user ?? null}
+				keycloakEnabled={data?.keycloakEnabled ?? false}
 			/>
 
 			<!-- Page content -->

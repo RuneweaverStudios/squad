@@ -3418,7 +3418,6 @@
 																		variant="avatar"
 																		onClick={() => handleResumeSession(session)}
 																		class="opacity-60 hover:opacity-100 transition-opacity ring-1 ring-base-100"
-																		title={`Resume ${session.agentName}'s session`}
 																	/>
 																{/each}
 																{#if resumableSessions.length > 3}
@@ -3630,7 +3629,7 @@
 						{@const isParentRunningEpic = groupingMode === 'parent' && epicQueueIsActive && epicQueueId === groupKey}
 						{@const parentEpicQueueAgents = isParentRunningEpic ? epicQueueRunningAgents : []}
 						{@const parentAllTasksList = allTasks.length > 0 ? allTasks : tasks}
-						{@const parentAllChildren = epicChildrenAllMap.get(groupKey) || []}
+						{@const parentAllChildren = epicChildrenAllMap.get(groupKey ?? '') || []}
 						{@const parentClosedCount = parentAllChildren.filter(t => t.status === 'closed').length}
 						{@const parentTotalCount = parentAllChildren.length}
 						{@const parentIsFullyComplete = parentClosedCount === parentTotalCount && parentTotalCount > 0}
@@ -3880,15 +3879,14 @@
 													<!-- Resumable session avatars (agents with history) -->
 													<div class="flex items-center -space-x-1">
 														{#each resumableSessionsStd.slice(0, 3) as session}
-															<WorkingAgentBadge
-																name={session.agentName}
-																size={18}
-																isWorking={false}
-																variant="avatar"
-																onClick={() => handleResumeSession(session)}
-																class="opacity-60 hover:opacity-100 transition-opacity ring-1 ring-base-100"
-																title={`Resume ${session.agentName}'s session`}
-															/>
+														<WorkingAgentBadge
+															name={session.agentName}
+															size={18}
+															isWorking={false}
+															variant="avatar"
+															onClick={() => handleResumeSession(session)}
+															class="opacity-60 hover:opacity-100 transition-opacity ring-1 ring-base-100"
+														/>
 														{/each}
 														{#if resumableSessionsStd.length > 3}
 															<span class="text-xs text-base-content/50 pl-1">+{resumableSessionsStd.length - 3}</span>

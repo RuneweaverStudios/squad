@@ -22,14 +22,14 @@
 		const storeEvents = getActivityEvents();
 		// DEBUG: Log what we're converting
 		console.log('[automation page] Converting', storeEvents.length, 'store events to log entries');
-		const entries = storeEvents.map(event => ({
+		const entries: ActivityLogEntry[] = storeEvents.map(event => ({
 			id: event.id,
 			timestamp: new Date(event.timestamp),
 			sessionName: event.sessionName,
 			ruleName: event.ruleName,
 			matchedPattern: event.matchedPattern,
 			actionTaken: event.actionsExecuted?.map(a => a.type).join(', ') || 'none',
-			result: event.success ? 'success' : 'failure',
+			result: (event.success ? 'success' : 'failure') as 'success' | 'failure',
 			details: event.error
 		}));
 		console.log('[automation page] Created', entries.length, 'log entries');
@@ -198,7 +198,7 @@
 				<!-- Bottom Row -->
 				<!-- Pattern Tester (left) -->
 				<div class="min-h-[250px] overflow-hidden">
-					<PatternTester rules={testerRules} />
+					<PatternTester rules={testerRules as any} />
 				</div>
 
 				<!-- Activity Log (right) -->

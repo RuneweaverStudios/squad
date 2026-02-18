@@ -16,7 +16,7 @@ const TEMPLATES_FILE = join(CONFIG_DIR, 'quick-commands.json');
 
 /**
  * Read templates from config file.
- * @returns {Promise<Array>}
+ * @returns {Promise<Array<unknown>>}
  */
 async function readTemplates() {
 	try {
@@ -31,7 +31,7 @@ async function readTemplates() {
 
 /**
  * Write templates to config file.
- * @param {Array} templates
+ * @param {Array<unknown>} templates
  */
 async function writeTemplates(templates) {
 	if (!existsSync(CONFIG_DIR)) {
@@ -44,7 +44,7 @@ async function writeTemplates(templates) {
 export async function GET({ params }) {
 	try {
 		const templates = await readTemplates();
-		const template = templates.find((t) => t.id === params.id);
+		const template = templates.find((t) => (/** @type {{ id: string }} */ (t)).id === params.id);
 
 		if (!template) {
 			return json(
@@ -61,7 +61,7 @@ export async function GET({ params }) {
 	} catch (error) {
 		console.error(`[quick-command/templates/${params.id}] Failed to read:`, error);
 		return json(
-			{ error: 'Failed to read template', message: error.message },
+			{ error: 'Failed to read template', message: error instanceof Error ? error.message : String(error) },
 			{ status: 500 }
 		);
 	}
@@ -72,7 +72,7 @@ export async function PUT({ params, request }) {
 	try {
 		const body = await request.json();
 		const templates = await readTemplates();
-		const index = templates.findIndex((t) => t.id === params.id);
+		const index = templates.findIndex((t) => (/** @type {{ id: string }} */ (t)).id === params.id);
 
 		if (index === -1) {
 			return json(
@@ -85,7 +85,7 @@ export async function PUT({ params, request }) {
 		if (
 			body.name &&
 			templates.some(
-				(t, i) => i !== index && t.name.toLowerCase() === body.name.trim().toLowerCase()
+				(t, i) => i !== index && (/** @type {{ name: string }} */ (t)).name.toLowerCase() === body.name.trim().toLowerCase()
 			)
 		) {
 			return json(
@@ -95,7 +95,7 @@ export async function PUT({ params, request }) {
 		}
 
 		// Merge updates
-		const existing = templates[index];
+		const existing = /** @type {{ id: string, name: string, prompt?: string, defaultProject?: string | null, defaultModel?: string, outputAction?: string, variables?: unknown[], createdAt?: string, updatedAt?: string }} */ (templates[index]);
 		templates[index] = {
 			...existing,
 			...(body.name && { name: body.name.trim() }),
@@ -111,16 +111,17 @@ export async function PUT({ params, request }) {
 
 		await writeTemplates(templates);
 
+		const updated = /** @type {{ id: string, name: string }} */ (templates[index]);
 		return json({
 			success: true,
-			template: templates[index],
-			message: `Template '${templates[index].name}' updated`,
+			template: updated,
+			message: `Template '${updated.name}' updated`,
 			timestamp: new Date().toISOString()
 		});
 	} catch (error) {
 		console.error(`[quick-command/templates/${params.id}] Failed to update:`, error);
 		return json(
-			{ error: 'Failed to update template', message: error.message },
+			{ error: 'Failed to update template', message: error instanceof Error ? error.message : String(error) },
 			{ status: 500 }
 		);
 	}
@@ -130,7 +131,7 @@ export async function PUT({ params, request }) {
 export async function DELETE({ params }) {
 	try {
 		const templates = await readTemplates();
-		const index = templates.findIndex((t) => t.id === params.id);
+		const index = templates.findIndex((t) => (/** @type {{ id: string }} */ (t)).id === params.id);
 
 		if (index === -1) {
 			return json(
@@ -139,7 +140,7 @@ export async function DELETE({ params }) {
 			);
 		}
 
-		const removed = templates.splice(index, 1)[0];
+		const removed = /** @type {{ name: string }} */ (templates.splice(index, 1)[0]);
 		await writeTemplates(templates);
 
 		return json({
@@ -150,7 +151,7 @@ export async function DELETE({ params }) {
 	} catch (error) {
 		console.error(`[quick-command/templates/${params.id}] Failed to delete:`, error);
 		return json(
-			{ error: 'Failed to delete template', message: error.message },
+			{ error: 'Failed to delete template', message: error instanceof Error ? error.message : String(error) },
 			{ status: 500 }
 		);
 	}

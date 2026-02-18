@@ -31,6 +31,9 @@ let generationQueue = Promise.resolve();
 /**
  * Enqueue an avatar generation request. Requests are processed one at a time
  * to avoid hitting Claude API rate limits when multiple agents spawn simultaneously.
+ * @param {string} name
+ * @param {string} apiKey
+ * @returns {Promise<void>}
  */
 function enqueueGeneration(name, apiKey) {
 	return new Promise((resolve, reject) => {
@@ -40,7 +43,7 @@ function enqueueGeneration(name, apiKey) {
 					timeout: 30000,
 					env: { ...process.env, ANTHROPIC_API_KEY: apiKey }
 				});
-				resolve();
+				resolve(undefined);
 			} catch (err) {
 				reject(err);
 			}

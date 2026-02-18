@@ -394,7 +394,7 @@ async function computeAgentsData({ projectFilter, agentFilter, includeUsage, inc
 		let activities = [];
 		if (includeActivities) {
 			try {
-				activities = getTaskActivities(agent.name, tasks);
+				activities = getTaskActivities(agent.name, /** @type {any} */ (tasks));
 			} catch (err) {
 				console.error(`Failed to fetch activities for agent ${agent.name}:`, err);
 				// Continue with empty activities array

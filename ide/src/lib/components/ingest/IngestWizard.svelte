@@ -121,7 +121,7 @@
 	let secretMasked = $state('');
 	let tokenInput = $state('');
 	let showTokenInput = $state(false);
-	let testResult = $state<{ success: boolean; info?: any; error?: string } | null>(null);
+	let testResult = $state<{ success: boolean; info?: any; error?: string; sampleItems?: Array<{ title: string }> } | null>(null);
 	let testingConnection = $state(false);
 
 	// Derive projects list
@@ -261,7 +261,7 @@
 			// This avoids reading the reactive proxies (e.g. pluginSecretStatus[key] = ...)
 			// which would register them as dependencies and cause infinite re-triggering.
 			const newPluginFields: Record<string, any> = {};
-			const newPluginSecretStatus: Record<string, string> = {};
+			const newPluginSecretStatus: Record<string, 'checking' | 'found' | 'missing' | 'saving' | 'error'> = {};
 
 			// Reset filter conditions (initialize from defaultFilter if available)
 			filterConditions = pluginMetadata?.defaultFilter ? [...pluginMetadata.defaultFilter] : [];

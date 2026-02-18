@@ -383,8 +383,8 @@
 
 	// Default project derived from current task ID or last completed task (for suggested tasks pre-selection)
 	const defaultProject = $derived(
-		task?.id ? getProjectFromTaskId(task.id) :
-		lastCompletedTask?.id ? getProjectFromTaskId(lastCompletedTask.id) : ''
+		(task?.id ? getProjectFromTaskId(task.id) :
+		lastCompletedTask?.id ? getProjectFromTaskId(lastCompletedTask.id) : null) ?? ''
 	);
 
 	// Project color for session card border accent (uses project config colors)
@@ -1620,9 +1620,6 @@
 	let inputRef: HTMLTextAreaElement | null = null;
 	let sendToLLMRef: { open: () => void } | null = null;
 
-	// Derived check for whether input has content (for Send button visibility)
-	// Using $derived ensures reactivity when inputText changes
-	const hasInputContent = $derived(inputText.trim().length > 0 || attachedFiles.length > 0);
 	let escapeFlash = $state(false); // Brief flash when Escape clears
 	let pasteFlash = $state(false); // Brief flash when content is pasted
 	let tabFlash = $state(false); // Brief flash when Tab autocomplete is sent
@@ -1951,14 +1948,18 @@
 	// Attached files (pending upload) - supports images, PDFs, text, code, etc.
 	interface AttachedFile {
 		id: string;
-		blob: Blob;
-		preview: string; // Object URL for thumbnail (images only)
+		blob: Blob | null;
+		preview: string;
 		name: string;
-		category: FileCategory; // File type category
-		icon: string; // SVG path for non-image files
-		iconColor: string; // oklch color for icon
+		category: FileCategory;
+		icon: string;
+		iconColor: string;
+		path?: string;
 	}
 	let attachedFiles = $state<AttachedFile[]>([]);
+
+	// Derived check for whether input has content (for Send button visibility)
+	const hasInputContent = $derived(inputText.trim().length > 0 || attachedFiles.length > 0);
 
 	// Drag-and-drop state for file attachments
 	let isDragOver = $state(false);
@@ -2589,7 +2590,7 @@
 		if (!autoCompleteTriggered && !autoCompleteDisabled) {
 			autoCompleteTriggered = true;
 			console.log(
-				`[SessionCard] Auto-completing ${sessionName} (review rules: auto for ${reviewStatus.reason})`,
+				`[SessionCard] Auto-completing ${sessionName} (review rules: auto for ${reviewStatus?.reason})`,
 			);
 
 			// Brief delay so user sees the state transition in the UI
@@ -3957,8 +3958,8 @@
 							body: JSON.stringify({
 								type: 'working',
 								data: {
-									taskId: displayTask?.id || sseSignal?.taskId,
-									taskTitle: displayTask?.title || sseSignal?.taskTitle,
+									taskId: displayTask?.id || task?.id,
+									taskTitle: displayTask?.title || task?.title,
 									agentName: agentName,
 									approach: 'Resuming from paused state',
 									expectedFiles: [],

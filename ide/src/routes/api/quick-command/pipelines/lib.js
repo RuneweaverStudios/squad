@@ -12,8 +12,12 @@ const CONFIG_DIR = join(homedir(), '.config', 'jat');
 const PIPELINES_FILE = join(CONFIG_DIR, 'quick-command-pipelines.json');
 
 /**
+ * @typedef {{ id: string, name: string, description?: string, steps: Array<{ id: string, order: number, templateId?: string | null, prompt?: string | null, model?: string | null, label?: string | null }>, defaultProject?: string | null, createdAt?: string, updatedAt?: string }} Pipeline
+ */
+
+/**
  * Read pipelines from config file.
- * @returns {Promise<Array>}
+ * @returns {Promise<Pipeline[]>}
  */
 export async function readPipelines() {
 	try {
@@ -28,7 +32,7 @@ export async function readPipelines() {
 
 /**
  * Write pipelines to config file.
- * @param {Array} pipelines
+ * @param {Pipeline[]} pipelines
  */
 export async function writePipelines(pipelines) {
 	if (!existsSync(CONFIG_DIR)) {

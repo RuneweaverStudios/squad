@@ -420,6 +420,9 @@ export interface AgentProgramPreset {
 
 	/** URL to installation instructions */
 	installUrl?: string;
+
+	/** One-click login: open this URL in a new tab to authenticate (e.g. GitHub OAuth) */
+	authUrl?: string;
 }
 
 /**
@@ -434,6 +437,7 @@ export const AGENT_PRESETS: AgentProgramPreset[] = [
 		description: 'Anthropic Claude via Claude Code CLI',
 		installCommand: 'npm install -g @anthropic-ai/claude-code',
 		installUrl: 'https://docs.anthropic.com/en/docs/claude-code',
+		authUrl: 'https://claude.ai/login',
 		config: {
 			id: 'claude-code',
 			name: 'Claude Code',
@@ -455,6 +459,7 @@ export const AGENT_PRESETS: AgentProgramPreset[] = [
 		description: 'OpenAI Codex via official CLI',
 		installCommand: 'npm install -g @openai/codex',
 		installUrl: 'https://github.com/openai/codex',
+		authUrl: 'https://platform.openai.com/login',
 		config: {
 			id: 'codex-cli',
 			name: 'Codex CLI',
@@ -478,6 +483,7 @@ export const AGENT_PRESETS: AgentProgramPreset[] = [
 		description: 'Google Gemini terminal coding agent',
 		installCommand: 'npx https://geminicli.com/run',
 		installUrl: 'https://geminicli.com/',
+		authUrl: 'https://aistudio.google.com/',
 		config: {
 			id: 'gemini-cli',
 			name: 'Gemini CLI',
@@ -522,6 +528,7 @@ export const AGENT_PRESETS: AgentProgramPreset[] = [
 		description: 'OpenCode - Terminal-based AI coding assistant',
 		installCommand: 'curl -fsSL https://opencode.ai/install | bash',
 		installUrl: 'https://opencode.ai/',
+		authUrl: 'https://opencode.ai/',
 		config: {
 			id: 'opencode',
 			name: 'OpenCode',
@@ -546,6 +553,7 @@ export const AGENT_PRESETS: AgentProgramPreset[] = [
 		description: 'Pi - Minimal terminal coding agent from pi.dev',
 		installCommand: 'npm install -g @mariozechner/pi-coding-agent',
 		installUrl: 'https://pi.dev/',
+		authUrl: 'https://pi.dev/',
 		config: {
 			id: 'pi',
 			name: 'Pi',

@@ -65,7 +65,7 @@ export async function GET() {
  */
 export async function POST({ request }) {
 	try {
-		const body = await request.json();
+		const body = /** @type {{ title?: string, description?: string, type?: string, priority?: string, page_url?: string, user_agent?: string, screenshots?: string[], console_logs?: Array<{ type?: string, level?: string, message?: unknown }>, selected_elements?: Array<{ tagName?: string, tag?: string, id?: string, className?: string }> }} */ (await request.json());
 
 		// Validate required fields
 		if (!body.title || typeof body.title !== 'string' || body.title.trim() === '') {
@@ -74,8 +74,8 @@ export async function POST({ request }) {
 
 		const title = body.title.trim();
 		const description = body.description ? body.description.trim() : '';
-		const type = TYPE_MAP[body.type] || 'bug';
-		const priority = PRIORITY_MAP[body.priority] ?? 2;
+		const type = TYPE_MAP[/** @type {keyof typeof TYPE_MAP} */ (body.type)] || 'bug';
+		const priority = PRIORITY_MAP[/** @type {keyof typeof PRIORITY_MAP} */ (body.priority)] ?? 2;
 
 		// Build rich description with metadata
 		const descParts = [];
@@ -121,7 +121,7 @@ export async function POST({ request }) {
 					writeFileSync(filepath, Buffer.from(base64, 'base64'));
 					screenshotPaths.push(`.jat/screenshots/${filename}`);
 				} catch (err) {
-					console.warn(`[feedback-report] Screenshot save failed (${i}):`, err.message);
+					console.warn(`[feedback-report] Screenshot save failed (${i}):`, err instanceof Error ? err.message : String(err));
 				}
 			}
 
@@ -136,7 +136,7 @@ export async function POST({ request }) {
 		if (body.console_logs && Array.isArray(body.console_logs) && body.console_logs.length > 0) {
 			const logSummary = body.console_logs
 				.slice(0, 10)
-				.map((log) => {
+				.map((/** @type {{ type?: string, level?: string, message?: unknown }} */ log) => {
 					const level = log.type || log.level || 'log';
 					const msg =
 						typeof log.message === 'string' ? log.message : JSON.stringify(log.message);
@@ -154,7 +154,7 @@ export async function POST({ request }) {
 		) {
 			const elemSummary = body.selected_elements
 				.slice(0, 5)
-				.map((el) => {
+				.map((/** @type {{ tagName?: string, tag?: string, id?: string, className?: string }} */ el) => {
 					const tag = el.tagName || el.tag || 'element';
 					const id = el.id ? `#${el.id}` : '';
 					const classes = el.className ? `.${el.className.split(' ').join('.')}` : '';
@@ -217,7 +217,7 @@ export async function POST({ request }) {
 		return json(
 			{
 				ok: false,
-				error: err.message || 'Failed to submit report'
+				error: (err instanceof Error ? err.message : String(err)) || 'Failed to submit report'
 			},
 			{ status: 500, headers: CORS_HEADERS }
 		);
