@@ -1,34 +1,32 @@
 ```
-╔───────────────────────────────────────────╗
-│                                           │
-│           __       ___   .___________.    │
-│          |  |     /   \  |           |    │
-│          |  |    /  ^  \ `---|  |----`    │
-│    .--.  |  |   /  /_\  \    |  |         │
-│    |  `--'  |  /  _____  \   |  |         │
-│     \______/  /__/     \__\  |__|         │
-│                                           │
-│         ◇ Supervise the Swarm ◇           │
-│                                           │
-╚───────────────────────────────────────────╝
+╔───────────────────────────────────────────────────╗
+│                                                   │
+│    ███████╗ ██████╗ ██╗   ██╗ █████╗ ██████╗     │
+│    ██╔════╝██╔═══██╗██║   ██║██╔══██╗██╔══██╗    │
+│    ███████╗██║   ██║██║   ██║███████║██║  ██║    │
+│    ╚════██║██║▄▄ ██║██║   ██║██╔══██║██║  ██║    │
+│    ███████║╚██████╔╝╚██████╔╝██║  ██║██████╔╝    │
+│    ╚══════╝ ╚══▀▀═╝  ╚═════╝ ╚═╝  ╚═╝╚═════╝     │
+│                                                   │
+│           ◇ Supervise the Swarm ◇                 │
+│                                                   │
+╚───────────────────────────────────────────────────╝
 ```
 
-# JAT — Autonomous Agents, Supervised or Not
+# Squad — Autonomous Agents, Supervised or Not
 
 **Agents ship, suggest, repeat. You supervise — or they run on their own.**
 
-JAT is the complete, self-contained environment for agentic development. Task management, agent orchestration, code editor, git integration, terminal access—all unified in a single IDE. Connect RSS, Slack, Telegram, Gmail — events create tasks and spawn agents automatically. No plugins to install, no services to configure, no pieces to assemble. Supervise the swarm hands-on, or let it run autonomously while you sleep.
+Squad is the complete, self-contained environment for agentic development. Task management, agent orchestration, code editor, git integration, terminal access—all unified in a single IDE. Connect RSS, Slack, Telegram, Gmail — events create tasks and spawn agents automatically. No plugins to install, no services to configure, no pieces to assemble. Supervise the swarm hands-on, or let it run autonomously while you sleep.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![Agents](https://img.shields.io/badge/Agents-20+-green)
 ![Tools](https://img.shields.io/badge/Tools-50+-blue)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?logo=discord&logoColor=white)](https://discord.gg/AFJf93p7Bx)
 
-<!-- [**Docs**](https://jat.tools) | [**Star this repo**](https://github.com/joewinke/jat/stargazers) -->
-
 <!-- TODO: Add screenshot -->
-![JAT IDE](./assets/ide-screenshot.png)
-*The JAT IDE: agent sessions, task management, and code editor unified*
+![Squad IDE](./assets/ide-screenshot.png)
+*The Squad IDE: agent sessions, task management, and code editor unified*
 
 ---
 
@@ -41,7 +39,7 @@ Agentic IDE:           Agents write code, you supervise and approve
 Autonomous Platform:   Events trigger agents, work ships while you sleep
 ```
 
-JAT supports all four. Manage 20+ agents hands-on, or connect external sources and let agents spawn themselves.
+Squad supports all four. Manage 20+ agents hands-on, or connect external sources and let agents spawn themselves.
 
 ---
 
@@ -49,7 +47,7 @@ JAT supports all four. Manage 20+ agents hands-on, or connect external sources a
 
 ```bash
 # Install (one command)
-curl -sSL https://raw.githubusercontent.com/joewinke/jat/master/tools/scripts/bootstrap.sh | bash
+curl -sSL https://raw.githubusercontent.com/RuneweaverStudios/squad/master/tools/scripts/bootstrap.sh | bash
 
 # Restart shell
 source ~/.bashrc
@@ -62,8 +60,8 @@ Open http://localhost:3333 → Add a project → Create a task → Spawn an agen
 
 **Alternative (developers):**
 ```bash
-git clone https://github.com/joewinke/jat.git ~/code/jat
-cd ~/code/jat && ./install.sh
+git clone https://github.com/RuneweaverStudios/squad.git ~/code/squad
+cd ~/code/squad && ./install.sh
 ```
 
 ---
@@ -149,7 +147,7 @@ Live terminal output for all running agents:
 
 ### Task Management (`/tasks`)
 
-JAT Tasks-powered issue tracking:
+Built-in issue tracking:
 
 - Create tasks with priorities (P0-P4)
 - Epic workflows with subtask spawning
@@ -201,7 +199,7 @@ Full commit history and repository management:
 
 ## Integrations & Autonomous Triggers
 
-JAT connects to external sources. When events arrive, tasks are created and agents spawn — no human in the loop required.
+Squad connects to external sources. When events arrive, tasks are created and agents spawn — no human in the loop required.
 
 ### Built-in Integrations
 
@@ -217,7 +215,7 @@ JAT connects to external sources. When events arrive, tasks are created and agen
 
 | Mode | When Agent Spawns | Use Case |
 |------|-------------------|----------|
-| **Immediate** | Instantly on event | Telegram: message JAT, agent starts now |
+| **Immediate** | Instantly on event | Telegram: message Squad, agent starts now |
 | **Delay** | After N min/hours | Batch morning emails, start after lunch |
 | **Schedule** | At a specific time | "Process feed items at 9 AM" |
 | **Cron** | Recurring schedule | "Every weekday at 9 AM, review PRs" |
@@ -226,7 +224,7 @@ JAT connects to external sources. When events arrive, tasks are created and agen
 
 ```
 1. You message your Telegram bot: "Add dark mode to the settings page"
-2. JAT ingest daemon receives the message
+2. Squad ingest daemon receives the message
 3. Task created: "Add dark mode to the settings page" (P1, immediate trigger)
 4. Agent spawns automatically, picks up the task
 5. Agent writes code, commits, opens PR
@@ -256,7 +254,7 @@ Build your own adapter with the plugin system. See [PLUGINS.md](./tools/ingest/P
 
 ---
 
-## What Makes JAT Different
+## What Makes Squad Different
 
 | Feature | Description |
 |---------|-------------|
@@ -271,15 +269,16 @@ Build your own adapter with the plugin system. See [PLUGINS.md](./tools/ingest/P
 | **Error recovery** | Automatic retry patterns for failures |
 | **PRD → Tasks** | `/jat:tasktree` converts requirements to structured tasks |
 | **Skill marketplace** | Install community skills, auto-synced to all agents |
+| **Enterprise auth** | Optional Keycloak OIDC for team/shared deployments |
 
 Full Monaco editor and git integration included—but the magic is in agent orchestration.
 
 ---
 
-## JAT vs Other AI Coding Tools
+## Squad vs Other AI Coding Tools
 
-| Feature | JAT | Cursor | Windsurf | Cline/Aider |
-|---------|-----|--------|----------|-------------|
+| Feature | Squad | Cursor | Windsurf | Cline/Aider |
+|---------|-------|--------|----------|-------------|
 | **Multi-agent (20+)** | ✅ | ❌ | ❌ | ❌ |
 | **Visual IDE** | ✅ | ❌ | ❌ | ❌ |
 | **Task management** | ✅ Built-in | ❌ | ❌ | ❌ |
@@ -291,18 +290,18 @@ Full Monaco editor and git integration included—but the magic is in agent orch
 | **Code editor** | ✅ Monaco | ✅ VS Code | ✅ VS Code | ❌ |
 | **Git integration** | ✅ | ✅ | ✅ | Partial |
 | **Skill marketplace** | ✅ Install & auto-sync | ❌ | ❌ | ❌ |
-| **Supabase integration** | ✅ Migrations | ❌ | ❌ | ❌ |
+| **Enterprise auth (Keycloak)** | ✅ OIDC | ❌ | ❌ | ❌ |
 | **Runs locally** | ✅ IDE/tools local; agents can use cloud or local LLMs | ❌ Cloud | ❌ Cloud | ✅ |
 | **Open source** | ✅ MIT | ❌ | ❌ | ✅ |
 
-JAT isn't trying to replace your editor — it's the control tower for your agent swarm, whether you're at the controls or asleep.
+Squad isn't trying to replace your editor — it's the control tower for your agent swarm, whether you're at the controls or asleep.
 
 ---
 
 ## Architecture
 
 ```
-~/code/jat/
+~/code/squad/
 ├── ide/          # SvelteKit app (the IDE)
 │   └── src/
 │       ├── routes/     # /tasks, /files, /source, /integrations, /servers, /config
@@ -336,7 +335,7 @@ JAT isn't trying to replace your editor — it's the control tower for your agen
 
 ## Authentication
 
-**No API keys required.** JAT uses your existing AI assistant subscriptions.
+**No API keys required.** Squad uses your existing AI assistant subscriptions.
 
 Most coding agents authenticate via their own subscriptions — no separate API keys needed:
 
@@ -347,11 +346,13 @@ Most coding agents authenticate via their own subscriptions — no separate API 
 | Gemini CLI | Google Account (free tier included) | First run triggers OAuth |
 | Aider | API keys only | Set provider key in env |
 
-JAT's built-in AI features (task suggestions, avatars) use an **auto-fallback** system:
+Squad's built-in AI features (task suggestions, avatars) use an **auto-fallback** system:
 1. **Anthropic API key** — if configured (optional)
 2. **Claude CLI** — falls back to your Claude subscription via `claude -p`
 
 If you have Claude Code installed and authenticated, AI features work out of the box with zero configuration.
+
+**Enterprise auth:** For team and shared deployments, Squad supports optional [Keycloak OIDC authentication](./ide/README-KEYCLOAK.md) — OAuth 2.0, social logins, MFA, and single sign-out.
 
 ---
 
@@ -414,6 +415,7 @@ IDE settings at `/config`:
 | [QUICKSTART.md](./QUICKSTART.md) | 5-minute tutorial |
 | [CLAUDE.md](./CLAUDE.md) | Full technical reference |
 | [ide/CLAUDE.md](./ide/CLAUDE.md) | IDE dev guide |
+| [ide/README-KEYCLOAK.md](./ide/README-KEYCLOAK.md) | Enterprise auth setup |
 | [shared/scheduler.md](./shared/scheduler.md) | Scheduler daemon reference |
 | [tools/ingest/PLUGINS.md](./tools/ingest/PLUGINS.md) | Custom integration plugin guide |
 | [shared/](./shared/) | Agent documentation |
@@ -426,16 +428,19 @@ IDE settings at `/config`:
 Any terminal-based AI: Claude Code, Aider, Cline, Codex, etc.
 
 **How many agents can I run?**
-Tested with 20+. Limited by your machine and API limits, not JAT.
+Tested with 20+. Limited by your machine and API limits, not Squad.
 
 **Can I use existing projects?**
 Yes. Run `jt init` in any git repo to initialize task tracking, then add the project via `/config` → Projects tab, or use the "Add Project" button on the Tasks page.
 
-**Can JAT act on Slack/Telegram messages?**
+**Can Squad act on Slack/Telegram messages?**
 Yes. The ingest daemon connects to Telegram bots, Slack channels, RSS feeds, and Gmail. Incoming events create tasks and spawn agents automatically — immediately, on a delay, at a scheduled time, or on a cron. See [Integrations](#integrations--autonomous-triggers).
 
 **Can I schedule recurring tasks?**
 Yes. Set a cron expression on any task and the scheduler daemon will spawn agents automatically. See [scheduler docs](./shared/scheduler.md).
+
+**Does Squad support multi-user / team deployments?**
+Yes. Enable [Keycloak authentication](./ide/README-KEYCLOAK.md) for enterprise-grade OIDC with OAuth 2.0, social logins, MFA, and session management.
 
 **Is there a hosted version?**
 No. The IDE and tools run on your machine. By default, agents use the LLM providers you configure (e.g. Claude, OpenAI); you can also use local models (e.g. WebLLM/WebGPU) for agents or for the orchestrator to save tokens and keep more on-device.
@@ -444,9 +449,9 @@ No. The IDE and tools run on your machine. By default, agents use the LLM provid
 
 ## Community
 
-- **Discord** — [Join the JAT community](https://discord.gg/AFJf93p7Bx) for help, discussion, and sharing what you've built
-- **Issues** — [Report bugs or request features](https://github.com/joewinke/jat/issues)
-- **Discussions** — [GitHub Discussions](https://github.com/joewinke/jat/discussions) for questions and ideas
+- **Discord** — [Join the Squad community](https://discord.gg/AFJf93p7Bx) for help, discussion, and sharing what you've built
+- **Issues** — [Report bugs or request features](https://github.com/RuneweaverStudios/squad/issues)
+- **Discussions** — [GitHub Discussions](https://github.com/RuneweaverStudios/squad/discussions) for questions and ideas
 
 ---
 
@@ -456,8 +461,8 @@ We welcome contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guideline
 
 **Quick start for contributors:**
 ```bash
-git clone https://github.com/joewinke/jat.git ~/code/jat
-cd ~/code/jat/ide
+git clone https://github.com/RuneweaverStudios/squad.git ~/code/squad
+cd ~/code/squad/ide
 npm install && npm run dev
 ```
 
@@ -484,6 +489,7 @@ Open a PR against `master`. All contributions are licensed under MIT.
 - **Vite** — Build tool ([Evan You](https://github.com/yyx990803))
 - **SQLite** — Embedded database ([D. Richard Hipp](https://www.sqlite.org/crew.html))
 - **TypeScript** — Type safety ([Anders Hejlsberg](https://github.com/ahejlsberg))
+- **Keycloak** — Enterprise auth ([Red Hat](https://www.keycloak.org/))
 - **Claude** — Wrote a lot of the code ([Anthropic](https://anthropic.com))
 
 ---
@@ -496,9 +502,9 @@ MIT - This is my gift to all the great's who haved gifted so much to all of us. 
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=joewinke/jat&type=timeline&legend=top-left)](https://www.star-history.com/#joewinke/jat&type=timeline&legend=top-left)
+[![Star History Chart](https://api.star-history.com/svg?repos=RuneweaverStudios/squad&type=timeline&legend=top-left)](https://www.star-history.com/#RuneweaverStudios/squad&type=timeline&legend=top-left)
 
 ---
-**JAT: Supervise the swarm — or let it run autonomously.**
+**Squad: Supervise the swarm — or let it run autonomously.**
 
-[Install](#quick-start) | [Docs](./QUICKSTART.md) | [Discord](https://discord.gg/AFJf93p7Bx) | [Issues](https://github.com/joewinke/jat/issues)
+[Install](#quick-start) | [Docs](./QUICKSTART.md) | [Discord](https://discord.gg/AFJf93p7Bx) | [Issues](https://github.com/RuneweaverStudios/squad/issues)
